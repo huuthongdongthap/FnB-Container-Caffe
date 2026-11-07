@@ -9,7 +9,8 @@ function genId(prefix: string): string {
 }
 
 export async function processReferralOnFirstOrder(db: D1Database, customerId: string, tenantId?: string): Promise<Record<string, unknown>> {
-  const effectiveTenant = tenantId && tenantId !== '*' ? tenantId.trim() || 'default' : null;
+  const rawTenant = tenantId ? tenantId.trim() : '';
+  let effectiveTenant = rawTenant && rawTenant !== '*' && rawTenant.toLowerCase() !== 'hq' ? rawTenant : null;
   let pending: (Referral & { tenant_id?: string | null }) | null = null;
   if (effectiveTenant) {
     try {
@@ -28,6 +29,12 @@ export async function processReferralOnFirstOrder(db: D1Database, customerId: st
     }
   } else {
     pending = await db.prepare('SELECT * FROM referrals WHERE referred_customer_id = ? AND status = ?').bind(customerId, 'pending').first<Referral & { tenant_id?: string | null }>();
+    if (pending && 'tenant_id' in pending && pending.tenant_id !== undefined) {
+      const pTenant = String(pending.tenant_id ?? '').trim();
+      if (pTenant && pTenant !== '*' && pTenant.toLowerCase() !== 'hq') {
+        effectiveTenant = pTenant;
+      }
+    }
   }
   if (!pending) {
     return { success: false, reason: 'no_pending_referral' };
@@ -103,16 +110,44 @@ export async function processReferralOnFirstOrder(db: D1Database, customerId: st
     ).bind(ptLogId, referrer.id, POINTS, 'referral', newPoints, `Gi?i thi?u b?n: +${POINTS} di?m (legacy)`, now).run();
   }
 
-  await db.prepare('UPDATE referral_codes SET total_points_earned = total_points_earned + ? WHERE code = ?').bind(POINTS, pending.referral_code).run();
+  if (effectiveTenant) {
+    try {
+      await db.prepare(
+        "UPDATE referral_codes SET total_points_earned = total_points_earned + ? WHERE code = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
+      ).bind(POINTS, pending.referral_code, effectiveTenant).run();
+    } catch {
+      await db.prepare('UPDATE referral_codes SET total_points_earned = total_points_earned + ? WHERE code = ?').bind(POINTS, pending.referral_code).run();
+    }
+  } else {
+    await db.prepare('UPDATE referral_codes SET total_points_earned = total_points_earned + ? WHERE code = ?').bind(POINTS, pending.referral_code).run();
+  }
 
   if (effectiveTenant || (claimRes as { meta?: unknown } | undefined)?.meta !== undefined) {
     try {
-      await db
-        .prepare(
-          'UPDATE loyalty_accounts SET current_points = COALESCE(current_points, 0) + ?, lifetime_points = COALESCE(lifetime_points, 0) + ?, updated_at = ? WHERE customer_id = ?'
-        )
-        .bind(POINTS, POINTS, now, referrer.id)
-        .run();
+      if (effectiveTenant) {
+        try {
+          await db
+            .prepare(
+              "UPDATE loyalty_accounts SET current_points = COALESCE(current_points, 0) + ?, lifetime_points = COALESCE(lifetime_points, 0) + ?, updated_at = ? WHERE customer_id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
+            )
+            .bind(POINTS, POINTS, now, referrer.id, effectiveTenant)
+            .run();
+        } catch {
+          await db
+            .prepare(
+              'UPDATE loyalty_accounts SET current_points = COALESCE(current_points, 0) + ?, lifetime_points = COALESCE(lifetime_points, 0) + ?, updated_at = ? WHERE customer_id = ?'
+            )
+            .bind(POINTS, POINTS, now, referrer.id)
+            .run();
+        }
+      } else {
+        await db
+          .prepare(
+            'UPDATE loyalty_accounts SET current_points = COALESCE(current_points, 0) + ?, lifetime_points = COALESCE(lifetime_points, 0) + ?, updated_at = ? WHERE customer_id = ?'
+          )
+          .bind(POINTS, POINTS, now, referrer.id)
+          .run();
+      }
     } catch {
       // loyalty_accounts table is optional in minimal schemas
     }

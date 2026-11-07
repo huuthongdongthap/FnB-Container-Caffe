@@ -134,6 +134,17 @@ export function requestMetricsMiddleware(): MiddlewareHandler<{ Bindings: Env }>
       const method = c.req.method;
       const path = c.req.path;
       const status = c.res?.status ?? 500;
+      const ctxGetter = (c as unknown as { get?: (k: string) => unknown }).get;
+      const rawCtxTenant = typeof ctxGetter === 'function' ? String(ctxGetter.call(c, 'tenantId') || '').trim() : '';
+      const rawHdrTenant = String(c.req.header('X-Tenant-ID') || c.req.header('x-tenant-id') || '').trim();
+      const rawPilotTenant = typeof (c.env as Record<string, unknown> | undefined)?.PILOT_TENANT_ID === 'string'
+        ? String((c.env as Record<string, unknown>).PILOT_TENANT_ID).trim()
+        : '';
+      const resolvedTenant =
+        (rawCtxTenant && rawCtxTenant !== '*' ? rawCtxTenant : '') ||
+        (rawHdrTenant && rawHdrTenant !== '*' ? rawHdrTenant : '') ||
+        (rawPilotTenant && rawPilotTenant !== '*' ? rawPilotTenant : '') ||
+        'default';
 
       // Guard: only record if executionCtx is available
       let ctx: { waitUntil: (promise: Promise<unknown>) => void } | undefined;
@@ -149,14 +160,15 @@ export function requestMetricsMiddleware(): MiddlewareHandler<{ Bindings: Env }>
       ctx.waitUntil(
         (async() => {
           try {
-            recordMetric(c.env.AURA_DB, 'request_duration_ms', duration);
+            recordMetric(c.env.AURA_DB, 'request_duration_ms', duration, { tenant_id: resolvedTenant });
             recordMetric(c.env.AURA_DB, 'request_count', 1, {
               method,
               path,
-              status_code: String(status)
+              status_code: String(status),
+              tenant_id: resolvedTenant,
             });
             if (status >= 500) {
-              recordMetric(c.env.AURA_DB, 'request_5xx', 1);
+              recordMetric(c.env.AURA_DB, 'request_5xx', 1, { tenant_id: resolvedTenant });
             }
           } catch (err: unknown) {
             const errMsg = err instanceof Error ? err.message : String(err);

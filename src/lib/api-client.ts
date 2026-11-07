@@ -1,5 +1,5 @@
 import { invalidateClientSession, sessionErrorRequiresLogin } from './client-session';
-import { logger } from '@/lib/logger';
+import { logger } from './logger';
 
 export const API_BASE = import.meta.env.VITE_API_BASE || (import.meta.env.DEV ? '' : 'https://aura-space-worker.sadec-marketing-hub.workers.dev');
 

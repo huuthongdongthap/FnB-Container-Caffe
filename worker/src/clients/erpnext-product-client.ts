@@ -177,7 +177,9 @@ export class ErpnextProductClient {
         continue;
       }
 
-      const productKey = effectiveTenant !== 'default' ? `${effectiveTenant}::${localId}` : localId;
+      const productKey = effectiveTenant !== 'default'
+        ? `${effectiveTenant}::${localId}`
+        : (localId.includes('::') ? `default::${localId}` : localId);
 
       try {
         try {
@@ -190,8 +192,12 @@ export class ErpnextProductClient {
               last_synced_at    = excluded.last_synced_at,
               erpnext_modified  = excluded.erpnext_modified,
               tenant_id         = excluded.tenant_id
+            WHERE COALESCE(NULLIF(TRIM(erpnext_product_sync.tenant_id), ''), 'default') = excluded.tenant_id
           `).bind(productKey, product.name, now, product.modified || now, effectiveTenant).run();
         } catch {
+          if (effectiveTenant !== 'default') {
+            throw new Error('Tenant-scoped product sync failed');
+          }
           try {
             await db.prepare(`
               INSERT INTO erpnext_product_sync
@@ -280,7 +286,11 @@ export async function createErpnextProductClientWithKv(
   env: ProductEnv & { AUTH_KV?: import('@cloudflare/workers-types').KVNamespace },
   tenantId?: string,
 ): Promise<ErpnextProductClient | null> {
-  const client = await createErpnextClientWithKv(env, tenantId);
+  const isNonDefaultTenant = Boolean(tenantId && tenantId.trim() && tenantId.trim() !== 'default' && tenantId.trim() !== '*');
+  const envForKv = isNonDefaultTenant
+    ? { ...env, ERPNEXT_URL: undefined, ERPNEXT_API_KEY: undefined, ERPNEXT_API_SECRET: undefined }
+    : env;
+  const client = await createErpnextClientWithKv(envForKv, tenantId);
   if (!client) {
     return null;
   }

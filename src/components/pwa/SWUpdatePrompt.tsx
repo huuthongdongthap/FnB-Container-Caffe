@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { RefreshCw, X } from 'lucide-react';
 import { useSWRegistration } from '@/hooks/use-sw-registration';
@@ -12,14 +12,37 @@ export default function SWUpdatePrompt() {
   const { isUpdateAvailable, skipWaiting } = useSWRegistration();
   const { t } = useTranslation();
   const [dismissed, setDismissed] = useState(false);
+  const reloadRequested = useRef(false);
+  const releaseReloadListener = useRef<(() => void) | null>(null);
+
+  useEffect(() => () => {
+    releaseReloadListener.current?.();
+    reloadRequested.current = false;
+  }, []);
 
   if (!isUpdateAvailable || dismissed) return null;
 
   const handleReload = () => {
-    skipWaiting();
-    // controllerchange fires → new SW controls → reload
-    const handler = () => window.location.reload();
-    navigator.serviceWorker?.addEventListener('controllerchange', handler, { once: true });
+    const serviceWorker = navigator.serviceWorker;
+    if (reloadRequested.current || !serviceWorker) return;
+    reloadRequested.current = true;
+    const handler = () => {
+      releaseReloadListener.current?.();
+      window.location.reload();
+    };
+    releaseReloadListener.current = () => {
+      serviceWorker.removeEventListener('controllerchange', handler);
+      releaseReloadListener.current = null;
+    };
+    // Observe takeover before posting: the worker can respond immediately.
+    serviceWorker.addEventListener('controllerchange', handler, { once: true });
+    try {
+      skipWaiting();
+    } catch (error) {
+      releaseReloadListener.current?.();
+      reloadRequested.current = false;
+      throw error;
+    }
   };
 
   return (

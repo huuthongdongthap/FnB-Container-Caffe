@@ -27,7 +27,8 @@ export async function enrollCampaigns(
   const errors: string[] = [];
 
   try {
-    const normalizedTenant = !tenantId || !tenantId.trim() ? 'default' : tenantId.trim();
+    const rawTenant = !tenantId || !tenantId.trim() ? 'default' : tenantId.trim();
+    const normalizedTenant = rawTenant.toLowerCase() === 'hq' ? '*' : rawTenant;
     const isWildcard = normalizedTenant === '*';
     const tenantSql = isWildcard ? '' : " AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?";
     const tenantParams = isWildcard ? [] : [normalizedTenant];
@@ -73,9 +74,15 @@ export async function enrollCampaigns(
 
     for (const customer of masterCustomers || []) {
       try {
+        const rawCustomerTenant = typeof (customer as unknown as Record<string, unknown>).tenant_id === 'string' &&
+          ((customer as unknown as Record<string, unknown>).tenant_id as string).trim() &&
+          ((customer as unknown as Record<string, unknown>).tenant_id as string).trim() !== '*'
+          ? ((customer as unknown as Record<string, unknown>).tenant_id as string).trim()
+          : 'default';
+        const rowTenant = isWildcard ? rawCustomerTenant : normalizedTenant;
         let alreadyEnrolled = false;
         try {
-          alreadyEnrolled = await isAlreadyEnrolled(db, customer.id, 'vip-master', 30, normalizedTenant);
+          alreadyEnrolled = await isAlreadyEnrolled(db, customer.id, 'vip-master', 30, rowTenant);
         } catch {
           alreadyEnrolled = false;
         }
@@ -84,7 +91,7 @@ export async function enrollCampaigns(
         }
         await client.addToCampaign(customer.email || customer.phone, 'vip-master');
         try {
-          await trackEnrollment(db, customer.id, 'vip-master', 'vip-master', 0, 'enrolled', normalizedTenant);
+          await trackEnrollment(db, customer.id, 'vip-master', 'vip-master', 0, 'enrolled', rowTenant);
         } catch {
           // Best-effort enrollment tracking
         }
@@ -118,9 +125,15 @@ export async function enrollCampaigns(
 
     for (const customer of newCustomers || []) {
       try {
+        const rawCustomerTenant = typeof (customer as unknown as Record<string, unknown>).tenant_id === 'string' &&
+          ((customer as unknown as Record<string, unknown>).tenant_id as string).trim() &&
+          ((customer as unknown as Record<string, unknown>).tenant_id as string).trim() !== '*'
+          ? ((customer as unknown as Record<string, unknown>).tenant_id as string).trim()
+          : 'default';
+        const rowTenant = isWildcard ? rawCustomerTenant : normalizedTenant;
         let alreadyEnrolled = false;
         try {
-          alreadyEnrolled = await isAlreadyEnrolled(db, customer.id, 'welcome-series', 30, normalizedTenant);
+          alreadyEnrolled = await isAlreadyEnrolled(db, customer.id, 'welcome-series', 30, rowTenant);
         } catch {
           alreadyEnrolled = false;
         }
@@ -129,7 +142,7 @@ export async function enrollCampaigns(
         }
         await client.addToCampaign(customer.email || customer.phone, 'welcome-series');
         try {
-          await trackEnrollment(db, customer.id, 'welcome-series', 'welcome-series', 0, 'enrolled', normalizedTenant);
+          await trackEnrollment(db, customer.id, 'welcome-series', 'welcome-series', 0, 'enrolled', rowTenant);
         } catch {
           // Best-effort enrollment tracking
         }

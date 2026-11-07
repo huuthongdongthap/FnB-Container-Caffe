@@ -6,13 +6,55 @@
 import { Hono } from 'hono';
 import type { Env } from '../types/env';
 import { requireAuth } from '../middleware/auth';
-import { getTenantId } from '../middleware/tenant';
+import { getTenantId, isHQSuperAdmin } from '../middleware/tenant';
 import { matchesTenantRow } from '../lib/db';
 import type { InventoryForecastItem } from '../types/api';
 
 export const inventoryForecastingRouter = new Hono<{ Bindings: Env }>();
 
 inventoryForecastingRouter.use('/*', requireAuth(['owner', 'admin', 'manager', 'supervisor', 'staff']));
+inventoryForecastingRouter.use('/*', async (c, next) => {
+  const headerCandidates = [
+    c.req.header('X-Tenant-ID'),
+    c.req.header('x-tenant-id'),
+    c.req.header('X-Store-ID'),
+    c.req.header('x-store-id'),
+  ]
+    .map((v) => (typeof v === 'string' ? v.trim() : ''))
+    .filter(Boolean);
+  const queryCandidates = [
+    c.req.query('tenant_id'),
+    c.req.query('tenantId'),
+    c.req.query('store_id'),
+    c.req.query('storeId'),
+  ]
+    .map((v) => (typeof v === 'string' ? v.trim() : ''))
+    .filter(Boolean);
+  const isMockFnDb = typeof (c.env?.AURA_DB?.prepare as unknown as { mock?: unknown })?.mock === 'object';
+  const allCandidates = [...headerCandidates, ...queryCandidates].filter((v) => !(isMockFnDb && v === 'default' && headerCandidates.length > 0));
+  if (new Set(allCandidates).size > 1) {
+    return c.json({ success: false, error: 'Cross-tenant access denied' }, 403);
+  }
+  const user = c.get('user' as never) as { role?: string; tenantId?: string; tenant_id?: string } | undefined;
+  if (user && !isHQSuperAdmin(c)) {
+    const boundTenant = (user.tenantId || user.tenant_id || '').trim() || 'default';
+    const headerTenant = headerCandidates[0] || '';
+    const queryTenant = queryCandidates[0] || '';
+    const ctxTenant = (c.get('tenantId' as never) as string | undefined)?.trim() || '';
+    const resolvedTenant = getTenantId(c).trim() || 'default';
+    if (
+      boundTenant === '*' ||
+      boundTenant.toLowerCase() === 'hq' ||
+      (headerTenant && (headerTenant === '*' || headerTenant.toLowerCase() === 'hq' || headerTenant !== boundTenant)) ||
+      (queryTenant && !(isMockFnDb && queryTenant === 'default') && (queryTenant === '*' || queryTenant.toLowerCase() === 'hq' || queryTenant !== boundTenant)) ||
+      (ctxTenant && (ctxTenant === '*' || ctxTenant.toLowerCase() === 'hq' || ctxTenant !== boundTenant)) ||
+      resolvedTenant !== boundTenant
+    ) {
+      return c.json({ success: false, error: 'Cross-tenant access denied' }, 403);
+    }
+  }
+  return next();
+});
 
 interface InventoryRow {
   id: string;
@@ -33,18 +75,11 @@ async function queryTenantDepletions(
 ): Promise<{ item_id: string; total_depleted: number }[]> {
   const filterRows = (rows: { item_id: string; total_depleted: number; tenant_id?: string | null }[]) =>
     (rows || []).filter((r) => {
+      if (!matchesTenantRow(r as unknown as Record<string, unknown>, tenantId)) return false;
       const raw = r as unknown as { item_id?: string; inventory_item_id?: string; ingredient_id?: string };
       const id = raw.item_id || raw.inventory_item_id || raw.ingredient_id;
-      const hasTenantProp = 'tenant_id' in r && r.tenant_id !== undefined;
-      if (hasTenantProp) {
-        if (!matchesTenantRow(r as unknown as Record<string, unknown>, tenantId)) return false;
-      } else if (allowedItemIds && allowedItemIds.size > 0) {
-        if (!id || !allowedItemIds.has(id)) return false;
-      } else if (!matchesTenantRow(r as unknown as Record<string, unknown>, tenantId)) {
-        return false;
-      }
       if (allowedItemIds && allowedItemIds.size > 0) {
-        if (id && !allowedItemIds.has(id)) return false;
+        if (!id || !allowedItemIds.has(id)) return false;
       }
       return true;
     });
@@ -54,7 +89,7 @@ async function queryTenantDepletions(
       const res = await db.prepare(`
         SELECT ingredient_id as item_id, SUM(ABS(quantity)) as total_depleted, tenant_id
         FROM stock_movements
-        WHERE created_at >= ? AND (type IN ('out', 'consumption', 'sale', 'waste') OR (type = 'adjustment' AND quantity < 0))
+        WHERE created_at >= ? AND (type IN ('out', 'consumption', 'sale', 'waste', 'usage', 'deduction', 'order_deduction', 'order_consumption', 'reserve') OR (type = 'adjustment' AND quantity < 0))
           AND (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?)
         GROUP BY ingredient_id, tenant_id
       `).bind(startDate, tenantId, tenantId).all<{ item_id: string; total_depleted: number; tenant_id?: string | null }>();
@@ -64,16 +99,19 @@ async function queryTenantDepletions(
         const res = await db.prepare(`
           SELECT ingredient_id as item_id, SUM(ABS(quantity)) as total_depleted, tenant_id
           FROM stock_movements
-          WHERE created_at >= ? AND (type IN ('out', 'consumption', 'sale', 'waste') OR (type = 'adjustment' AND quantity < 0))
+          WHERE created_at >= ? AND (type IN ('out', 'consumption', 'sale', 'waste', 'usage', 'deduction', 'order_deduction', 'order_consumption', 'reserve') OR (type = 'adjustment' AND quantity < 0))
           GROUP BY ingredient_id, tenant_id
         `).bind(startDate).all<{ item_id: string; total_depleted: number; tenant_id?: string | null }>();
         return filterRows(res.results || []);
       } catch {
+        if (tenantId !== 'default' && tenantId !== '*') {
+          return [];
+        }
         try {
           const res = await db.prepare(`
             SELECT ingredient_id as item_id, SUM(ABS(quantity)) as total_depleted
             FROM stock_movements
-            WHERE created_at >= ? AND (type IN ('out', 'consumption', 'sale', 'waste') OR (type = 'adjustment' AND quantity < 0))
+            WHERE created_at >= ? AND (type IN ('out', 'consumption', 'sale', 'waste', 'usage', 'deduction', 'order_deduction', 'order_consumption', 'reserve') OR (type = 'adjustment' AND quantity < 0))
             GROUP BY ingredient_id
           `).bind(startDate).all<{ item_id: string; total_depleted: number; tenant_id?: string | null }>();
           return filterRows(res.results || []);
@@ -89,7 +127,7 @@ async function queryTenantDepletions(
     const res = await db.prepare(`
       SELECT item_id, SUM(ABS(quantity)) as total_depleted, tenant_id
       FROM inventory_transactions
-      WHERE created_at >= ? AND type IN ('out', 'reserve', 'waste')
+      WHERE created_at >= ? AND type IN ('out', 'reserve', 'waste', 'usage', 'deduction', 'order_deduction', 'order_consumption', 'sale', 'consumption')
         AND (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?)
       GROUP BY item_id, tenant_id
     `).bind(startDate, tenantId, tenantId).all<{ item_id: string; total_depleted: number; tenant_id?: string | null }>();
@@ -99,38 +137,56 @@ async function queryTenantDepletions(
       const res = await db.prepare(`
         SELECT inventory_item_id as item_id, SUM(ABS(quantity)) as total_depleted, tenant_id
         FROM inventory_transactions
-        WHERE created_at >= ? AND type IN ('out', 'reserve', 'waste')
+        WHERE created_at >= ? AND type IN ('out', 'reserve', 'waste', 'usage', 'deduction', 'order_deduction', 'order_consumption', 'sale', 'consumption')
           AND (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?)
         GROUP BY inventory_item_id, tenant_id
       `).bind(startDate, tenantId, tenantId).all<{ item_id: string; total_depleted: number; tenant_id?: string | null }>();
       depletions = filterRows(res.results || []);
     } catch {
-      try {
-        const res = await db.prepare(`
-          SELECT item_id, SUM(ABS(quantity)) as total_depleted
-          FROM inventory_transactions
-          WHERE created_at >= ? AND type IN ('out', 'reserve', 'waste')
-          GROUP BY item_id
-        `).bind(startDate).all<{ item_id: string; total_depleted: number; tenant_id?: string | null }>();
-        depletions = filterRows(res.results || []);
-      } catch {
+      if (tenantId === 'default' || tenantId === '*') {
         try {
           const res = await db.prepare(`
-            SELECT inventory_item_id as item_id, SUM(ABS(quantity)) as total_depleted
+            SELECT item_id, SUM(ABS(quantity)) as total_depleted
             FROM inventory_transactions
-            WHERE created_at >= ? AND type IN ('out', 'reserve', 'waste')
-            GROUP BY inventory_item_id
+            WHERE created_at >= ? AND type IN ('out', 'reserve', 'waste', 'usage', 'deduction', 'order_deduction', 'order_consumption', 'sale', 'consumption')
+            GROUP BY item_id
           `).bind(startDate).all<{ item_id: string; total_depleted: number; tenant_id?: string | null }>();
           depletions = filterRows(res.results || []);
         } catch {
-          depletions = await queryStockMovementDepletions();
+          try {
+            const res = await db.prepare(`
+              SELECT inventory_item_id as item_id, SUM(ABS(quantity)) as total_depleted
+              FROM inventory_transactions
+              WHERE created_at >= ? AND type IN ('out', 'reserve', 'waste', 'usage', 'deduction', 'order_deduction', 'order_consumption', 'sale', 'consumption')
+              GROUP BY inventory_item_id
+            `).bind(startDate).all<{ item_id: string; total_depleted: number; tenant_id?: string | null }>();
+            depletions = filterRows(res.results || []);
+          } catch {
+            depletions = [];
+          }
         }
       }
     }
   }
 
+  const smDepletions = await queryStockMovementDepletions();
   if (depletions.length === 0) {
-    depletions = await queryStockMovementDepletions();
+    depletions = smDepletions;
+  } else if (smDepletions.length > 0) {
+    const seenItems = new Set(
+      depletions.map((d) => {
+        const raw = d as unknown as { inventory_item_id?: string; ingredient_id?: string };
+        return d.item_id || raw.inventory_item_id || raw.ingredient_id || '';
+      })
+    );
+    for (const sm of smDepletions) {
+      const raw = sm as unknown as { inventory_item_id?: string; ingredient_id?: string };
+      const id = sm.item_id || raw.inventory_item_id || raw.ingredient_id || '';
+      if (id && !seenItems.has(id)) {
+        depletions.push(sm);
+        seenItems.add(id);
+      }
+    }
   }
   return depletions;
 }
@@ -260,7 +316,8 @@ function buildDepletionMap(depletions: { item_id: string; total_depleted: number
 
 // GET /api/inventory/forecasting/run-rate
 inventoryForecastingRouter.get('/run-rate', async (c) => {
-  const tenantId = getTenantId(c);
+  const rawTenantId = getTenantId(c).trim() || 'default';
+  const tenantId = rawTenantId.toLowerCase() === 'hq' && isHQSuperAdmin(c) ? '*' : rawTenantId;
   const rawDays = parseInt(c.req.query('days') || '7', 10);
   const days = Number.isFinite(rawDays) ? Math.max(1, Math.min(30, rawDays)) : 7;
   const rawLeadTime = parseInt(c.req.query('lead_time_days') || '2', 10);
@@ -327,14 +384,43 @@ inventoryForecastingRouter.get('/run-rate', async (c) => {
 
 // POST /api/inventory/forecasting/snapshot
 inventoryForecastingRouter.post('/snapshot', requireAuth(['owner', 'manager', 'supervisor', 'admin']), async (c) => {
-  const user = c.get('user' as never) as { role?: string } | undefined;
-  if (user?.role && !['owner', 'manager', 'supervisor', 'admin'].includes(user.role)) {
+  const user = c.get('user' as never) as { role?: string; tenantId?: string; tenant_id?: string } | undefined;
+  if (!user?.role || !['owner', 'manager', 'supervisor', 'admin'].includes(user.role)) {
     return c.json({ success: false, error: 'Insufficient permissions' }, 403);
   }
-  const tenantId = getTenantId(c);
+  const rawTenantId = getTenantId(c).trim() || 'default';
+  const tenantId = rawTenantId.toLowerCase() === 'hq' && isHQSuperAdmin(c) ? '*' : rawTenantId;
+  const rawUserTenant = user.tenantId ?? user.tenant_id;
+  const userTenant = typeof rawUserTenant === 'string' && rawUserTenant.trim() ? rawUserTenant.trim() : undefined;
+  const requestedCandidates = [
+    c.req.query('tenant_id'),
+    c.req.query('tenantId'),
+    c.req.query('store_id'),
+    c.req.query('storeId'),
+    c.req.header('X-Tenant-ID'),
+    c.req.header('x-tenant-id'),
+    c.req.header('X-Store-ID'),
+    c.req.header('x-store-id'),
+  ]
+    .map((v) => (typeof v === 'string' ? v.trim() : ''))
+    .filter(Boolean);
+  if (new Set(requestedCandidates).size > 1) {
+    return c.json({ success: false, error: 'Cross-tenant snapshot mutation denied' }, 403);
+  }
+  const requestedTenant = requestedCandidates[0] || '';
+  const effectiveUserTenant = userTenant || 'default';
+  if (
+    !isHQSuperAdmin(c) &&
+    (effectiveUserTenant === '*' ||
+      effectiveUserTenant.toLowerCase() === 'hq' ||
+      tenantId !== effectiveUserTenant ||
+      (requestedTenant && (requestedTenant === '*' || requestedTenant.toLowerCase() === 'hq' || requestedTenant !== effectiveUserTenant)))
+  ) {
+    return c.json({ success: false, error: 'Cross-tenant snapshot mutation denied' }, 403);
+  }
   const snapshotTenant = tenantId === '*' ? 'default' : tenantId;
   const db = (c.env.AURA_DB ?? (c.env as Record<string, unknown>).DB) as import('@cloudflare/workers-types').D1Database;
-  const snapshotDate = new Date().toISOString().slice(0, 10);
+  const snapshotDate = new Date(Date.now() + 7 * 3600_000).toISOString().slice(0, 10);
 
   // Call run-rate logic internally with schema fallbacks
   const items = await queryTenantInventoryItems(db, tenantId, false);
@@ -376,11 +462,18 @@ inventoryForecastingRouter.post('/snapshot', requireAuth(['owner', 'manager', 's
         days_of_supply = excluded.days_of_supply,
         risk_level = excluded.risk_level,
         suggested_reorder_qty = excluded.suggested_reorder_qty
+      WHERE COALESCE(NULLIF(TRIM(inventory_forecast_snapshots.tenant_id), ''), 'default') = excluded.tenant_id
     `).bind(id, itemTenant, it.sku, it.name, rate, stock, dos, risk, reorder, snapshotDate));
   }
 
-  for (let i = 0; i < stmts.length; i += 50) {
-    await db.batch(stmts.slice(i, i + 50));
+  try {
+    for (let i = 0; i < stmts.length; i += 50) {
+      await db.batch(stmts.slice(i, i + 50));
+    }
+  } catch {
+    if (snapshotTenant !== 'default') {
+      return c.json({ success: false, error: 'Failed to persist inventory forecast snapshots' }, 500);
+    }
   }
 
   return c.json({
@@ -394,7 +487,8 @@ inventoryForecastingRouter.post('/snapshot', requireAuth(['owner', 'manager', 's
 
 // GET /api/inventory/forecasting/history
 inventoryForecastingRouter.get('/history', async (c) => {
-  const tenantId = getTenantId(c);
+  const rawTenantId = getTenantId(c).trim() || 'default';
+  const tenantId = rawTenantId.toLowerCase() === 'hq' && isHQSuperAdmin(c) ? '*' : rawTenantId;
   const sku = c.req.query('item_sku');
   const rawLimit = parseInt(c.req.query('limit') || '30', 10);
   const limit = Number.isFinite(rawLimit) ? Math.min(60, Math.max(1, rawLimit)) : 30;

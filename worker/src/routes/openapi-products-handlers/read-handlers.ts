@@ -1,12 +1,40 @@
 import type { OpenAPIHono } from '@hono/zod-openapi';
 import { ProductRoutes } from '@aura/domain-catalog';
 import type { Env } from '../../types/env';
-import { formatProduct, matchesCatalogTenant, resolveCatalogTenantId, type ProductRow } from './helpers';
+import {
+  FORBIDDEN_TENANT_SENTINEL,
+  formatProduct,
+  matchesCatalogTenant,
+  resolveCatalogTenantId,
+  type ProductRow,
+} from './helpers';
 import { getDatabase } from '../../lib/db';
+import { getTenantId, isHQSuperAdmin } from '../../middleware/tenant';
+
+function verifyProductReadTenant(c: any): { ok: true; tenantId: string } | { ok: false; status: 403; error: string } {
+  const resolved = resolveCatalogTenantId(c);
+  if (resolved === FORBIDDEN_TENANT_SENTINEL) {
+    return { ok: false, status: 403, error: 'Cross-tenant product read denied' };
+  }
+  const user = c.get('user') as { id?: string; role?: string; tenant_id?: string; tenantId?: string } | undefined;
+  if (user && !isHQSuperAdmin(c)) {
+    const userTenant = (user.tenant_id || user.tenantId || '').trim() || 'default';
+    const ctxTenant = getTenantId(c).trim() || 'default';
+    if (ctxTenant === '*' || ctxTenant.toLowerCase() === 'hq' || ctxTenant !== userTenant) {
+      return { ok: false, status: 403, error: 'Cross-tenant product read denied' };
+    }
+    return { ok: true, tenantId: userTenant };
+  }
+  return { ok: true, tenantId: resolved };
+}
 
 export function registerProductReadHandlers(router: OpenAPIHono<{ Bindings: Env }>): void {
   // GET /api/products - List products with pagination, filtering, and search
   router.openapi(ProductRoutes.list as any, async (c: any) => {
+    const tenantCheck = verifyProductReadTenant(c);
+    if (!tenantCheck.ok) {
+      return c.json({ success: false, error: tenantCheck.error }, tenantCheck.status);
+    }
     const db = getDatabase(c);
     const query = c.req.valid('query' as never) as {
       page?: number;
@@ -51,7 +79,7 @@ export function registerProductReadHandlers(router: OpenAPIHono<{ Bindings: Env 
       params.push(`%${tags}%`);
     }
 
-    const tenantId = resolveCatalogTenantId(c);
+    const tenantId = tenantCheck.tenantId;
     const safePage = Number.isFinite(Number(page)) && Number(page) >= 1 ? Math.floor(Number(page)) : 1;
     const safeLimit = Number.isFinite(Number(limit)) && Number(limit) >= 1 ? Math.min(Math.floor(Number(limit)), 100) : 20;
 
@@ -67,13 +95,26 @@ export function registerProductReadHandlers(router: OpenAPIHono<{ Bindings: Env 
     const safeSort = allowedSorts[sort] || 'p.sort_order';
     const safeDirection = (order?.toLowerCase() === 'desc') ? 'DESC' : 'ASC';
     const orderClause = `${safeSort} ${safeDirection}`;
-    const rows = (await db.prepare(
-      `SELECT p.*, c.name as category_name
-       FROM products p
-       LEFT JOIN categories c ON p.category_id = c.id
-       ${whereClause}
-       ORDER BY ${orderClause}`
-    ).bind(...params).all()) as { results: ProductRow[] };
+    let rows: { results: ProductRow[] };
+    try {
+      rows = (await db.prepare(
+        `SELECT p.*, c.name as category_name
+         FROM products p
+         LEFT JOIN categories c ON p.category_id = c.id
+           AND COALESCE(NULLIF(TRIM(c.tenant_id), ''), 'default') = COALESCE(NULLIF(TRIM(p.tenant_id), ''), 'default')
+         ${whereClause}
+         ORDER BY ${orderClause}`
+      ).bind(...params).all()) as { results: ProductRow[] };
+    } catch (err) {
+      if (tenantId !== 'default') throw err;
+      rows = (await db.prepare(
+        `SELECT p.*, c.name as category_name
+         FROM products p
+         LEFT JOIN categories c ON p.category_id = c.id
+         ${whereClause}
+         ORDER BY ${orderClause}`
+      ).bind(...params).all()) as { results: ProductRow[] };
+    }
 
     const rawRows = rows.results || [];
     const filteredRows = rawRows.filter((row) => matchesCatalogTenant(row, tenantId));
@@ -89,17 +130,33 @@ export function registerProductReadHandlers(router: OpenAPIHono<{ Bindings: Env 
 
   // GET /api/products/:id - Get product by ID
   router.openapi(ProductRoutes.get as any, async (c: any) => {
+    const tenantCheck = verifyProductReadTenant(c);
+    if (!tenantCheck.ok) {
+      return c.json({ success: false, error: tenantCheck.error }, tenantCheck.status);
+    }
     const db = getDatabase(c);
-    const tenantId = resolveCatalogTenantId(c);
+    const tenantId = tenantCheck.tenantId;
     const { id } = c.req.valid('param' as never) as { id: string };
     const locale = c.req.query('locale') || 'vi';
 
-    const row = (await db.prepare(
-      `SELECT p.*, c.name as category_name
-       FROM products p
-       LEFT JOIN categories c ON p.category_id = c.id
-       WHERE p.id = ?`
-    ).bind(id).first()) as ProductRow | null;
+    let row: ProductRow | null = null;
+    try {
+      row = (await db.prepare(
+        `SELECT p.*, c.name as category_name
+         FROM products p
+         LEFT JOIN categories c ON p.category_id = c.id
+           AND COALESCE(NULLIF(TRIM(c.tenant_id), ''), 'default') = COALESCE(NULLIF(TRIM(p.tenant_id), ''), 'default')
+         WHERE p.id = ?`
+      ).bind(id).first()) as ProductRow | null;
+    } catch (err) {
+      if (tenantId !== 'default') throw err;
+      row = (await db.prepare(
+        `SELECT p.*, c.name as category_name
+         FROM products p
+         LEFT JOIN categories c ON p.category_id = c.id
+         WHERE p.id = ?`
+      ).bind(id).first()) as ProductRow | null;
+    }
 
     if (!row || !matchesCatalogTenant(row, tenantId)) {
       return c.json({ success: false, error: 'Product not found' }, 404);
@@ -113,25 +170,45 @@ export function registerProductReadHandlers(router: OpenAPIHono<{ Bindings: Env 
 
   // GET /api/products/slug/:slug - Get product by slug
   router.openapi(ProductRoutes.getBySlug as any, async (c: any) => {
+    const tenantCheck = verifyProductReadTenant(c);
+    if (!tenantCheck.ok) {
+      return c.json({ success: false, error: tenantCheck.error }, tenantCheck.status);
+    }
     const db = getDatabase(c);
-    const tenantId = resolveCatalogTenantId(c);
+    const tenantId = tenantCheck.tenantId;
     const { slug } = c.req.valid('param' as never) as { slug: string };
     const locale = c.req.query('locale') || 'vi';
 
-    let row = (await db.prepare(
-      `SELECT p.*, c.name as category_name
-       FROM products p
-       LEFT JOIN categories c ON p.category_id = c.id
-       WHERE p.slug = ?`
-    ).bind(slug).first()) as ProductRow | null;
+    const scopedSlugSql = `
+      SELECT p.*, c.name as category_name
+      FROM products p
+      LEFT JOIN categories c ON p.category_id = c.id
+        AND COALESCE(NULLIF(TRIM(c.tenant_id), ''), 'default') = COALESCE(NULLIF(TRIM(p.tenant_id), ''), 'default')
+      WHERE p.slug = ?
+    `;
+    const unscopedSlugSql = `
+      SELECT p.*, c.name as category_name
+      FROM products p
+      LEFT JOIN categories c ON p.category_id = c.id
+      WHERE p.slug = ?
+    `;
+
+    let row: ProductRow | null = null;
+    try {
+      row = (await db.prepare(scopedSlugSql).bind(slug).first()) as ProductRow | null;
+    } catch (err) {
+      if (tenantId !== 'default') throw err;
+      row = (await db.prepare(unscopedSlugSql).bind(slug).first()) as ProductRow | null;
+    }
 
     if (row && !matchesCatalogTenant(row, tenantId)) {
-      const allRows = (await db.prepare(
-        `SELECT p.*, c.name as category_name
-         FROM products p
-         LEFT JOIN categories c ON p.category_id = c.id
-         WHERE p.slug = ?`
-      ).bind(slug).all().catch(() => ({ results: [] }))) as { results?: ProductRow[] };
+      let allRows: { results?: ProductRow[] } = { results: [] };
+      try {
+        allRows = (await db.prepare(scopedSlugSql).bind(slug).all()) as { results?: ProductRow[] };
+      } catch (err) {
+        if (tenantId !== 'default') throw err;
+        allRows = (await db.prepare(unscopedSlugSql).bind(slug).all().catch(() => ({ results: [] }))) as { results?: ProductRow[] };
+      }
       row = (allRows.results || []).find((r) => matchesCatalogTenant(r, tenantId)) || null;
     }
 

@@ -1,7 +1,7 @@
 import type { Hono } from 'hono';
 import type { Env } from '../../types/env';
 import { requireAuth } from '../../middleware/auth';
-import { getTenantId } from '../../middleware/tenant';
+import { getTenantId, isHQSuperAdmin, resolvePublicTenantId } from '../../middleware/tenant';
 import { publishOrderEvent } from '@aura/domain-order';
 import {
   placeOrder,
@@ -9,6 +9,52 @@ import {
   getFulfillment,
   listPickupPoints,
 } from '@aura/domain-crm';
+
+function hasCrmOrderTenantMismatch(c: any): boolean {
+  const user = c.get?.('user') as { role?: string; tenantId?: string; tenant_id?: string } | undefined;
+  const queryTenant = String(
+    c.req?.query?.('tenant_id') ||
+    c.req?.query?.('tenantId') ||
+    c.req?.query?.('store_id') ||
+    c.req?.query?.('storeId') ||
+    ''
+  ).trim();
+  const headerTenant = String(
+    c.req?.header?.('X-Tenant-ID') ||
+    c.req?.header?.('x-tenant-id') ||
+    c.req?.header?.('X-Store-ID') ||
+    c.req?.header?.('x-store-id') ||
+    ''
+  ).trim();
+  if (queryTenant && headerTenant && queryTenant !== headerTenant) return true;
+  const reqTenant = queryTenant || headerTenant;
+  if (!user) {
+    return reqTenant === '*' || reqTenant.toLowerCase() === 'hq';
+  }
+  if (isHQSuperAdmin(user)) return false;
+  const userTenant = String(user.tenantId ?? user.tenant_id ?? '').trim();
+  const boundTenant = userTenant || 'default';
+  if (
+    userTenant === '*' ||
+    userTenant.toLowerCase() === 'hq' ||
+    reqTenant === '*' ||
+    reqTenant.toLowerCase() === 'hq'
+  ) {
+    return true;
+  }
+  return Boolean(reqTenant && reqTenant !== boundTenant);
+}
+
+function resolveCrmOrderTenantId(c: any, user?: { role?: string; tenantId?: string; tenant_id?: string }): string {
+  if (!user) {
+    return resolvePublicTenantId(c);
+  }
+  const raw = user.role === 'customer'
+    ? (user.tenantId ?? user.tenant_id ?? getTenantId(c))
+    : getTenantId(c);
+  const trimmed = String(raw || '').trim() || 'default';
+  return trimmed.toLowerCase() === 'hq' && isHQSuperAdmin(user) ? '*' : trimmed;
+}
 
 export function registerOrderHandlers(router: Hono<{ Bindings: Env }>): void {
 
@@ -22,10 +68,13 @@ export function registerOrderHandlers(router: Hono<{ Bindings: Env }>): void {
    */
   router.post('/orders', requireAuth(['customer', 'staff', 'supervisor', 'manager', 'admin', 'owner']), async (c) => {
     const db = c.env.AURA_DB;
-    const user = c.get('user');
+    const user = c.get('user') as { id: string; userId?: string; customerId?: string; customer_id?: string; sub?: string; role: string; tenantId?: string; tenant_id?: string } | undefined;
 
     if (!user) {
       return c.json({ success: false, error: 'Unauthorized' }, 401);
+    }
+    if (hasCrmOrderTenantMismatch(c)) {
+      return c.json({ success: false, error: 'Forbidden' }, 403);
     }
 
     const body = await c.req.json<{
@@ -49,32 +98,41 @@ export function registerOrderHandlers(router: Hono<{ Bindings: Env }>): void {
 
     // Customer role: use own id. Staff/owner: must pass customerId in body.
     const isSelfCustomer = user.role === 'customer';
-    const rawCustomerId = isSelfCustomer ? user.id : (typeof body.customerId === 'string' ? body.customerId.trim() : '');
+    const selfIds = [user.id, user.userId, user.customerId, user.customer_id, user.sub]
+      .filter((v): v is string => typeof v === 'string' && v.trim() !== '');
+    if (isSelfCustomer && typeof body.customerId === 'string' && body.customerId.trim() && !selfIds.includes(body.customerId.trim())) {
+      return c.json({ success: false, error: 'Forbidden' }, 403);
+    }
+    const rawCustomerId = isSelfCustomer
+      ? (user.customerId || user.customer_id || user.id)
+      : (typeof body.customerId === 'string' ? body.customerId.trim() : '');
     if (!rawCustomerId) {
       return c.json({ success: false, error: 'customerId is required for staff-placed CRM orders' }, 400);
     }
     const customerId = rawCustomerId;
-    const rawTenant = user.role === 'customer' ? (user.tenantId || getTenantId(c as any)) : getTenantId(c as any);
-    const tenantId = (rawTenant || '').trim() || 'default';
+    const tenantId = resolveCrmOrderTenantId(c, user);
+    let effectiveOrderTenant = tenantId;
     if (!isSelfCustomer && customerId) {
-      if (tenantId !== '*') {
-        try {
-          const custRow = await db.prepare('SELECT tenant_id FROM customers WHERE id = ? LIMIT 1').bind(customerId).first<{ tenant_id?: string | null }>();
-          if (custRow) {
-            const custTenant = (custRow.tenant_id && String(custRow.tenant_id).trim()) || 'default';
-            if (custTenant !== tenantId) {
-              return c.json({ success: false, error: 'Forbidden' }, 403);
-            }
-          } else if (tenantId !== 'default') {
+      try {
+        const custRow = await db.prepare('SELECT tenant_id FROM customers WHERE id = ? LIMIT 1').bind(customerId).first<{ tenant_id?: string | null }>();
+        if (custRow) {
+          const custTenant = (custRow.tenant_id && String(custRow.tenant_id).trim()) || 'default';
+          if (tenantId !== '*' && custTenant !== tenantId) {
             return c.json({ success: false, error: 'Forbidden' }, 403);
           }
-        } catch (err) {
-          if (!/no such column:\s*tenant_id/i.test(String(err)) || tenantId !== 'default') {
-            return c.json({ success: false, error: 'Forbidden' }, 403);
+          if (tenantId === '*') {
+            effectiveOrderTenant = custTenant;
           }
+        } else if (tenantId !== 'default' && tenantId !== '*') {
+          return c.json({ success: false, error: 'Forbidden' }, 403);
+        }
+      } catch (err) {
+        if (tenantId !== '*' && (!/no such column:\s*tenant_id/i.test(String(err)) || tenantId !== 'default')) {
+          return c.json({ success: false, error: 'Forbidden' }, 403);
         }
       }
     }
+    const finalOrderTenant = effectiveOrderTenant === '*' ? 'default' : effectiveOrderTenant;
     const customerPhone = body.customerPhone.trim();
 
     const result = await placeOrder(db, {
@@ -84,7 +142,7 @@ export function registerOrderHandlers(router: Hono<{ Bindings: Env }>): void {
       channel: body.channel as 'pickup' | 'delivery',
       items: body.items,
       notes: body.notes,
-      tenantId,
+      tenantId: finalOrderTenant,
     });
 
     if (!result.ok) {
@@ -101,7 +159,7 @@ export function registerOrderHandlers(router: Hono<{ Bindings: Env }>): void {
     }
 
     if (c.env?.AUTH_KV) {
-      await publishOrderEvent(c.env.AUTH_KV, result.orderId, result.status).catch(() => {});
+      await publishOrderEvent(c.env.AUTH_KV, result.orderId, result.status, { tenantId: finalOrderTenant }).catch(() => {});
     }
 
     return c.json({
@@ -122,8 +180,13 @@ export function registerOrderHandlers(router: Hono<{ Bindings: Env }>): void {
    * No auth — customer needs to see pickup point before ordering.
    */
   router.get('/fulfillment/locations', async (c) => {
+    if (hasCrmOrderTenantMismatch(c)) {
+      return c.json({ success: false, error: 'Forbidden' }, 403);
+    }
     const kv = c.env.AUTH_KV as import('@cloudflare/workers-types').KVNamespace | undefined;
-    const points = await listPickupPoints(kv);
+    const user = c.get('user' as any) as { role?: string; tenantId?: string; tenant_id?: string } | undefined;
+    const tenantId = resolveCrmOrderTenantId(c, user);
+    const points = await listPickupPoints(kv, tenantId);
     return c.json({ success: true, data: points });
   });
 
@@ -134,10 +197,13 @@ export function registerOrderHandlers(router: Hono<{ Bindings: Env }>): void {
    */
   router.get('/orders/:id/fulfillment', requireAuth(['customer', 'staff', 'waiter', 'cashier', 'supervisor', 'manager', 'admin', 'owner']), async (c) => {
     const db = c.env.AURA_DB;
-    const user = c.get('user');
+    const user = c.get('user') as { id: string; userId?: string; customerId?: string; customer_id?: string; role: string; tenantId?: string; tenant_id?: string } | undefined;
 
     if (!user) {
       return c.json({ success: false, error: 'Unauthorized' }, 401);
+    }
+    if (hasCrmOrderTenantMismatch(c)) {
+      return c.json({ success: false, error: 'Forbidden' }, 403);
     }
 
     const orderId = c.req.param('id');
@@ -145,8 +211,7 @@ export function registerOrderHandlers(router: Hono<{ Bindings: Env }>): void {
       return c.json({ success: false, error: 'order id is required' }, 400);
     }
 
-    const rawOrderTenant = user.role === 'customer' ? (user.tenantId || getTenantId(c as any)) : getTenantId(c as any);
-    const tenantId = (rawOrderTenant || '').trim() || 'default';
+    const tenantId = resolveCrmOrderTenantId(c, user);
     if (user.role !== 'customer') {
       if (tenantId !== '*') {
         try {
@@ -173,7 +238,7 @@ export function registerOrderHandlers(router: Hono<{ Bindings: Env }>): void {
     }
 
     // Customer role is scoped to own orders; staff/owner can read any in their tenant.
-    const customerScope = user.role === 'customer' ? user.id : undefined;
+    const customerScope = user.role === 'customer' ? (user.customerId || user.customer_id || user.id) : undefined;
     const kv = c.env.AUTH_KV as import('@cloudflare/workers-types').KVNamespace | undefined;
 
     const result = await getFulfillment(db, orderId, customerScope, kv, tenantId);

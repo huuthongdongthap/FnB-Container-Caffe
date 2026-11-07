@@ -69,26 +69,29 @@ export async function updateConsent(
     return { ok: false, error: 'Staff consent changes require actor_id !== customer_id', code: 'forbidden' };
   }
 
-  const effectiveTenant = (tenantId ?? update.tenantId)?.trim() || 'default';
+  const rawTenant = (tenantId ?? update.tenantId)?.trim() || 'default';
+  const effectiveTenant = rawTenant === '*' || rawTenant.toLowerCase() === 'hq' ? '*' : rawTenant;
   const isWildcard = effectiveTenant === '*';
-  if (!isWildcard) {
-    try {
-      const custRow = await db
-        .prepare('SELECT id, tenant_id FROM customers WHERE id = ? LIMIT 1')
-        .bind(update.customerId)
-        .first<{ id: string; tenant_id?: string | null }>();
-      if (custRow && 'tenant_id' in custRow && custRow.tenant_id !== undefined) {
-        const custTenant = (custRow.tenant_id && String(custRow.tenant_id).trim()) || 'default';
-        if (custTenant !== effectiveTenant) {
-          return { ok: false, error: 'Forbidden: customer belongs to another tenant', code: 'forbidden' };
-        }
-      } else if (!custRow && effectiveTenant !== 'default') {
-        return { ok: false, error: 'Forbidden: customer not found in tenant', code: 'forbidden' };
+  let resolvedCustomerTenant: string | undefined;
+  try {
+    const custRow = await db
+      .prepare('SELECT id, tenant_id FROM customers WHERE id = ? LIMIT 1')
+      .bind(update.customerId)
+      .first<{ id: string; tenant_id?: string | null }>();
+    if (custRow && 'tenant_id' in custRow && custRow.tenant_id !== undefined) {
+      const custTenant = (custRow.tenant_id && String(custRow.tenant_id).trim()) || 'default';
+      if (custTenant !== '*' && custTenant.toLowerCase() !== 'hq') {
+        resolvedCustomerTenant = custTenant;
       }
-    } catch (err) {
-      if (!/no such column:\s*tenant_id/i.test(String(err)) && effectiveTenant !== 'default') {
-        return { ok: false, error: 'Forbidden: tenant verification failed', code: 'forbidden' };
+      if (!isWildcard && custTenant !== effectiveTenant) {
+        return { ok: false, error: 'Forbidden: customer belongs to another tenant', code: 'forbidden' };
       }
+    } else if (!isWildcard && !custRow && effectiveTenant !== 'default') {
+      return { ok: false, error: 'Forbidden: customer not found in tenant', code: 'forbidden' };
+    }
+  } catch (err) {
+    if (!isWildcard && !/no such column:\s*tenant_id/i.test(String(err)) && effectiveTenant !== 'default') {
+      return { ok: false, error: 'Forbidden: tenant verification failed', code: 'forbidden' };
     }
   }
 
@@ -98,39 +101,31 @@ export async function updateConsent(
     const granted = update.granted ? 1 : 0;
     const grantedAt = now;
     const revokedAt = update.granted ? null : now;
+    const targetTenant = isWildcard ? (resolvedCustomerTenant || 'default') : effectiveTenant;
 
     try {
-      if (!isWildcard) {
-        try {
-          await db
-            .prepare(
-              "UPDATE consents SET revoked_at = ? WHERE customer_id = ? AND purpose = ? AND revoked_at IS NULL AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?",
-            )
-            .bind(now, update.customerId, update.purpose, effectiveTenant)
-            .run();
-        } catch (revokeErr) {
-          if (/no such column:\s*tenant_id/i.test(String(revokeErr)) && effectiveTenant === 'default') {
-            await db
-              .prepare(
-                'UPDATE consents SET revoked_at = ? WHERE customer_id = ? AND purpose = ? AND revoked_at IS NULL',
-              )
-              .bind(now, update.customerId, update.purpose)
-              .run();
-          }
-        }
-      } else {
+      try {
         await db
           .prepare(
-            'UPDATE consents SET revoked_at = ? WHERE customer_id = ? AND purpose = ? AND revoked_at IS NULL',
+            "UPDATE consents SET revoked_at = ? WHERE customer_id = ? AND purpose = ? AND revoked_at IS NULL AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?",
           )
-          .bind(now, update.customerId, update.purpose)
+          .bind(now, update.customerId, update.purpose, targetTenant)
           .run();
+      } catch (revokeErr) {
+        if (targetTenant === 'default' && /no such column:\s*tenant_id/i.test(String(revokeErr))) {
+          await db
+            .prepare(
+              'UPDATE consents SET revoked_at = ? WHERE customer_id = ? AND purpose = ? AND revoked_at IS NULL',
+            )
+            .bind(now, update.customerId, update.purpose)
+            .run();
+        }
       }
     } catch {
       // Optional prior-row revocation when table/column is available
     }
 
-    const insertTenant = isWildcard ? 'default' : effectiveTenant;
+    const insertTenant = targetTenant;
     try {
       await db
         .prepare(
@@ -171,7 +166,10 @@ export async function updateConsent(
             now,
           )
           .run();
-      } catch {
+      } catch (scopedErr) {
+        if (targetTenant !== 'default') {
+          throw scopedErr;
+        }
         try {
           await db
             .prepare(

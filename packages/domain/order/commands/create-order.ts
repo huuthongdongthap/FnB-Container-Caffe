@@ -79,7 +79,9 @@ export async function createOrder(
         db.prepare(
           "SELECT * FROM promotions WHERE UPPER(code) = ? AND (COALESCE(NULLIF(tenant_id, ''), 'default') = ? OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?2)"
         ).bind(rawPromoCode, tenantId).first<PromoRow>().catch(() =>
-          db.prepare('SELECT * FROM promotions WHERE UPPER(code) = ?').bind(rawPromoCode).first<PromoRow>().catch(() => null)
+          (tenantId === 'default' || tenantId === '*')
+            ? db.prepare('SELECT * FROM promotions WHERE UPPER(code) = ?').bind(rawPromoCode).first<PromoRow>().catch(() => null)
+            : null
         )
       );
       if (promo && 'tenant_id' in promo && promo.tenant_id !== undefined && tenantId !== '*') {
@@ -98,35 +100,46 @@ export async function createOrder(
       const startsAt = promo.starts_at ?? promo.valid_from;
       const expiresAt = promo.expires_at ?? promo.valid_to;
       const minOrder = Number(promo.min_order ?? promo.min_order_value ?? 0);
-      const usageLimit = promo.usage_limit ?? promo.max_uses;
-      const usageCount = Number(promo.usage_count ?? promo.current_uses ?? 0);
+      const rawUsageLimit = Number(promo.usage_limit ?? 0);
+      const rawMaxUses = Number(promo.max_uses ?? 0);
+      const usageLimit = rawUsageLimit > 0 ? rawUsageLimit : rawMaxUses > 0 ? rawMaxUses : (promo.usage_limit ?? promo.max_uses);
+      const usageCount = Math.max(Number(promo.usage_count ?? 0), Number(promo.current_uses ?? 0));
       if (startsAt && new Date(startsAt) > new Date()) return errorResponse('Chương trình khuyến mãi chưa bắt đầu', 400);
-      if (!isWelcome && expiresAt && new Date(expiresAt) < new Date()) return errorResponse('Mã khuyến mãi đã hết hạn', 400);
-      if (!isWelcome && usageLimit != null && Number(usageLimit) > 0 && usageCount >= Number(usageLimit)) {
+      // WELCOME with a real promotions row still honours the configured window
+      // and usage limit; the synthetic fallback carries no expiry of its own.
+      if (expiresAt && new Date(expiresAt) < new Date()) return errorResponse('Mã khuyến mãi đã hết hạn', 400);
+      if (usageLimit != null && Number(usageLimit) > 0 && usageCount >= Number(usageLimit)) {
         return errorResponse('Mã khuyến mãi đã hết lượt sử dụng', 400);
       }
       if (minOrder > 0 && snapshot.subtotal < minOrder) return errorResponse(`Đơn hàng tối thiểu ${minOrder}đ`, 400);
       if (isWelcome) {
         const rawPhone = String(data.customer_phone || '').trim();
-        const normalizedPhone = rawPhone.replace(/\D/g, '');
+        const digits = rawPhone.replace(/\D/g, '');
+        // Canonicalize the Vietnam national prefix so 0901… and +84901… are the
+        // same customer and cannot both claim the first-order WELCODE discount.
+        const normalizedPhone = (digits.startsWith('84') && digits.length >= 10 ? '0' + digits.slice(2) : digits);
         if (!data.customer_name?.trim() || !normalizedPhone || /^0+$/.test(normalizedPhone)) {
           return errorResponse('Mã WELCOME yêu cầu khách hàng mới để lại thông tin đăng ký', 400);
         }
         const prior = await db.prepare(
           "SELECT COUNT(*) AS cnt FROM orders WHERE (customer_id = ? OR customer_phone = ?) AND (COALESCE(NULLIF(tenant_id, ''), 'default') = ? OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?3) AND status NOT IN ('cancelled', 'failed')"
         ).bind(resolvedCustomerId, normalizedPhone, tenantId).first<{ cnt?: number }>().catch(() =>
-          db.prepare(
-            "SELECT COUNT(*) AS cnt FROM orders WHERE (customer_id = ? OR customer_phone = ?) AND status NOT IN ('cancelled', 'failed')"
-          ).bind(resolvedCustomerId, normalizedPhone).first<{ cnt?: number }>().catch(() => null)
+          (tenantId === 'default' || tenantId === '*')
+            ? db.prepare(
+                "SELECT COUNT(*) AS cnt FROM orders WHERE (customer_id = ? OR customer_phone = ?) AND status NOT IN ('cancelled', 'failed')"
+              ).bind(resolvedCustomerId, normalizedPhone).first<{ cnt?: number }>().catch(() => null)
+            : null
         );
         let priorCount = Number(prior?.cnt ?? 0);
         if (priorCount === 0) {
           const priorFormatted = await db.prepare(
             "SELECT COUNT(*) AS cnt FROM orders WHERE (customer_phone = ? OR REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(customer_phone, ' ', ''), '-', ''), '+', ''), '.', ''), '(', ''), ')', '') = ?) AND (COALESCE(NULLIF(tenant_id, ''), 'default') = ? OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?3) AND status NOT IN ('cancelled', 'failed')"
           ).bind(rawPhone, normalizedPhone, tenantId).first<{ cnt?: number }>().catch(() =>
-            db.prepare(
-              "SELECT COUNT(*) AS cnt FROM orders WHERE (customer_phone = ? OR REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(customer_phone, ' ', ''), '-', ''), '+', ''), '.', ''), '(', ''), ')', '') = ?) AND status NOT IN ('cancelled', 'failed')"
-            ).bind(rawPhone, normalizedPhone).first<{ cnt?: number }>().catch(() => null)
+            (tenantId === 'default' || tenantId === '*')
+              ? db.prepare(
+                  "SELECT COUNT(*) AS cnt FROM orders WHERE (customer_phone = ? OR REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(customer_phone, ' ', ''), '-', ''), '+', ''), '.', ''), '(', ''), ')', '') = ?) AND status NOT IN ('cancelled', 'failed')"
+                ).bind(rawPhone, normalizedPhone).first<{ cnt?: number }>().catch(() => null)
+              : null
           );
           priorCount = Number(priorFormatted?.cnt ?? 0);
         }
@@ -136,24 +149,36 @@ export async function createOrder(
       }
       let reservedInPlace = false;
       if (!isWelcome || promo.id !== 'promo_welcome') {
-        const reserveRes = await db.prepare(
-          "UPDATE promotions SET usage_count = usage_count + 1 WHERE UPPER(code) = ? AND (COALESCE(NULLIF(tenant_id, ''), 'default') = ? OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?2) AND is_active = 1 AND (usage_limit IS NULL OR usage_limit = 0 OR usage_count < usage_limit)"
-        ).bind(promo.code, tenantId).run().catch(() =>
-          (tenantId === 'default' || tenantId === '*')
-            ? db.prepare(
-                'UPDATE promotions SET usage_count = usage_count + 1 WHERE UPPER(code) = ? AND is_active = 1 AND (usage_limit IS NULL OR usage_limit = 0 OR usage_count < usage_limit)'
-              ).bind(promo.code).run().catch(() => null)
-            : null
-        ) as { meta?: { changes?: number }; changes?: number } | null;
+        const reserveSql =
+          rawUsageLimit <= 0 && rawMaxUses > 0
+            ? "UPDATE promotions SET usage_count = COALESCE(usage_count, 0) + 1, current_uses = COALESCE(current_uses, 0) + 1 WHERE UPPER(code) = ? AND (COALESCE(NULLIF(tenant_id, ''), 'default') = ? OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?2) AND is_active = 1 AND (usage_limit IS NULL OR usage_limit <= 0 OR COALESCE(usage_count, 0) < usage_limit) AND (max_uses IS NULL OR max_uses <= 0 OR COALESCE(current_uses, 0) < max_uses) AND (max_uses IS NULL OR max_uses <= 0 OR COALESCE(usage_count, 0) < max_uses)"
+            : "UPDATE promotions SET usage_count = usage_count + 1 WHERE UPPER(code) = ? AND (COALESCE(NULLIF(tenant_id, ''), 'default') = ? OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?2) AND is_active = 1 AND (usage_limit IS NULL OR usage_limit = 0 OR usage_count < usage_limit)";
+        const reserveRes = await db.prepare(reserveSql)
+          .bind(promo.code, tenantId)
+          .run()
+          .catch(() =>
+            db.prepare(
+              "UPDATE promotions SET usage_count = usage_count + 1 WHERE UPPER(code) = ? AND (COALESCE(NULLIF(tenant_id, ''), 'default') = ? OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?2) AND is_active = 1 AND (usage_limit IS NULL OR usage_limit = 0 OR usage_count < usage_limit)"
+            ).bind(promo.code, tenantId).run()
+          )
+          .catch(() =>
+            (tenantId === 'default' || tenantId === '*')
+              ? db.prepare(
+                  'UPDATE promotions SET usage_count = usage_count + 1 WHERE UPPER(code) = ? AND is_active = 1 AND (usage_limit IS NULL OR usage_limit = 0 OR usage_count < usage_limit)'
+                ).bind(promo.code).run().catch(() => null)
+              : null
+          ) as { meta?: { changes?: number }; changes?: number } | null;
         const changes = reserveRes?.meta?.changes ?? reserveRes?.changes;
         if (changes !== undefined && Number(changes) < 1) {
           return errorResponse('Mã khuyến mãi đã hết lượt sử dụng', 400);
         }
-        if (promo.id) {
+        if (promo.id && !(rawUsageLimit <= 0 && rawMaxUses > 0)) {
           await db.prepare(
             "UPDATE promotions SET current_uses = COALESCE(current_uses, 0) + 1 WHERE id = ? AND (COALESCE(NULLIF(tenant_id, ''), 'default') = ? OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?2)"
           ).bind(promo.id, tenantId).run().catch(() =>
-            db.prepare('UPDATE promotions SET current_uses = COALESCE(current_uses, 0) + 1 WHERE id = ?').bind(promo.id).run().catch(() => {})
+            (tenantId === 'default' || tenantId === '*')
+              ? db.prepare('UPDATE promotions SET current_uses = COALESCE(current_uses, 0) + 1 WHERE id = ?').bind(promo.id).run().catch(() => {})
+              : null
           );
         }
         reservedInPlace = true;
@@ -185,37 +210,74 @@ export async function createOrder(
       message: 'Order created successfully',
     };
     const statements: D1PreparedStatement[] = [];
+    const legacyStatements: D1PreparedStatement[] = [];
     if (idem) {
-      statements.push(db.prepare(`INSERT INTO order_creation_requests
-        (scope_key, fingerprint, order_id, response_body, created_at) VALUES (?, ?, ?, ?, ?)`)
-        .bind(idem.key, idem.fingerprint, orderId, JSON.stringify(responseBody), now));
+      const idemSql = `INSERT INTO order_creation_requests
+        (scope_key, fingerprint, order_id, response_body, created_at) VALUES (?, ?, ?, ?, ?)`;
+      const idemArgs = [idem.key, idem.fingerprint, orderId, JSON.stringify(responseBody), now] as const;
+      statements.push(db.prepare(idemSql).bind(...idemArgs));
+      legacyStatements.push(db.prepare(idemSql).bind(...idemArgs));
     }
-    statements.push(db.prepare(`INSERT INTO orders (
+    const orderInsertSql = `INSERT INTO orders (
       id, items, total, status, customer_name, customer_phone,
       customer_email, customer_address, payment_method, payment_status,
       shipping_fee, discount, notes, delivery_time, table_id,
       order_type, tip_amount, service_fee, customer_id, tenant_id, created_at, updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
-      .bind(orderId, snapshot.itemsJson, snapshot.total, 'pending', data.customer_name, data.customer_phone,
-        data.customer_email || null, data.customer_address || null, validatedMethod, 'unpaid',
-        snapshot.shipping_fee, snapshot.discount, data.notes || null, data.delivery_time || 'now', resolvedTableId,
-        orderType, snapshot.tip_amount, snapshot.service_fee, resolvedCustomerId, tenantId, now, now));
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+    const orderInsertArgs = [
+      orderId, snapshot.itemsJson, snapshot.total, 'pending', data.customer_name, data.customer_phone,
+      data.customer_email || null, data.customer_address || null, validatedMethod, 'unpaid',
+      snapshot.shipping_fee, snapshot.discount, data.notes || null, data.delivery_time || 'now', resolvedTableId,
+      orderType, snapshot.tip_amount, snapshot.service_fee, resolvedCustomerId, tenantId, now, now,
+    ] as const;
+    statements.push(db.prepare(orderInsertSql).bind(...orderInsertArgs));
+    legacyStatements.push(db.prepare(orderInsertSql).bind(...orderInsertArgs));
     for (const item of snapshot.items) {
-      statements.push(db.prepare(`INSERT INTO order_items
+      const itemId = generateId('ITEM_');
+      const modifiersJson = JSON.stringify(item.modifiers || []);
+      const legacyItemStmt = db.prepare(`INSERT INTO order_items
         (id, order_id, product_id, quantity, subtotal, modifiers, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)`)
-        .bind(generateId('ITEM_'), orderId, item.menuItemId, item.quantity, item.subtotalCents,
-          JSON.stringify(item.modifiers || []), now));
+        .bind(itemId, orderId, item.menuItemId, item.quantity, item.subtotalCents,
+          modifiersJson, now);
+      if (tenantId === 'default') {
+        statements.push(legacyItemStmt);
+      } else {
+        statements.push(db.prepare(`INSERT INTO order_items
+          (id, order_id, product_id, quantity, subtotal, modifiers, created_at, tenant_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`)
+          .bind(itemId, orderId, item.menuItemId, item.quantity, item.subtotalCents,
+            modifiersJson, now, tenantId));
+      }
+      legacyStatements.push(legacyItemStmt);
     }
     if (validatedMethod === 'cod') {
-      statements.push(db.prepare(`INSERT INTO payments (id, order_id, method, amount, status, created_at, updated_at)
+      const payId = generateId('PAY_');
+      statements.push(db.prepare(`INSERT INTO payments (id, order_id, method, amount, status, tenant_id, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)`)
+        .bind(payId, orderId, 'cod', snapshot.total, 'pending', tenantId, now, now));
+      legacyStatements.push(db.prepare(`INSERT INTO payments (id, order_id, method, amount, status, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?, ?, ?)`)
-        .bind(generateId('PAY_'), orderId, 'cod', snapshot.total, 'pending', now, now));
+        .bind(payId, orderId, 'cod', snapshot.total, 'pending', now, now));
     }
     if (resolvedTableId) {
-      const tblClause = tenantId === 'default' ? "AND (tenant_id = ? OR tenant_id IS NULL OR tenant_id = '')" : 'AND tenant_id = ?';
-      statements.push(db.prepare(`UPDATE cafe_tables SET status = 'Occupied' WHERE id = ? ${tblClause} AND status = 'Available'`).bind(resolvedTableId, tenantId));
+      const tblClause = tenantId === 'default'
+        ? "AND (tenant_id = ? OR tenant_id IS NULL OR tenant_id = '' OR TRIM(tenant_id) = '')"
+        : 'AND (tenant_id = ? OR TRIM(tenant_id) = ?2)';
+      const tableOccupySql = `UPDATE cafe_tables SET status = 'Occupied' WHERE id = ? ${tblClause} AND status = 'Available'`;
+      statements.push(db.prepare(tableOccupySql).bind(resolvedTableId, tenantId));
+      legacyStatements.push(db.prepare(tableOccupySql).bind(resolvedTableId, tenantId));
     }
-    try { await db.batch(statements); }
+    try {
+      try {
+        await db.batch(statements);
+      } catch (batchErr) {
+        const msg = String((batchErr as Error)?.message ?? '');
+        if ((msg.includes('tenant_id') || msg.includes('no column named')) && (tenantId === 'default' || tenantId === '*' || msg.includes('order_items'))) {
+          await db.batch(legacyStatements);
+        } else {
+          throw batchErr;
+        }
+      }
+    }
     catch (error) {
       if (appliedPromo?.reservedInPlace) {
         const promoTenant = tenantId === '*' ? 'default' : (tenantId || 'default');

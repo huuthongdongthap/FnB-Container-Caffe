@@ -38,9 +38,26 @@ export interface PostOrderParams {
 export async function runPostOrderSideEffects(params: PostOrderParams): Promise<void> {
   const { db, env, ctx, orderId, data, snapshot, validatedMethod, resolvedTableId } = params;
 
-  const effectiveTenant = params.tenantId && params.tenantId.trim() && params.tenantId !== '*'
-    ? params.tenantId.trim()
-    : 'default';
+  const rawParamTenant = params.tenantId && params.tenantId.trim() ? params.tenantId.trim() : '';
+  const isWildcard = rawParamTenant === '*' || rawParamTenant.toLowerCase() === 'hq';
+  let effectiveTenant = rawParamTenant && !isWildcard ? rawParamTenant : 'default';
+  if ((!rawParamTenant || isWildcard) && orderId) {
+    try {
+      const ordRow = await db
+        .prepare('SELECT tenant_id FROM orders WHERE id = ?')
+        .bind(orderId)
+        .first<{ tenant_id?: string | null }>()
+        .catch(() => null);
+      if (ordRow && 'tenant_id' in ordRow && ordRow.tenant_id !== undefined) {
+        const ordTenant = typeof ordRow.tenant_id === 'string' && ordRow.tenant_id.trim() ? ordRow.tenant_id.trim() : '';
+        if (ordTenant && ordTenant !== '*' && ordTenant.toLowerCase() !== 'hq') {
+          effectiveTenant = ordTenant;
+        }
+      }
+    } catch {
+      // Optional orders lookup in minimal test mocks
+    }
+  }
 
   let customerIdForCapture: string | null = data.customer_id || null;
   const { normalizedPhone: validPhone, email: validEmail } = sanitizeCustomerIdentity(
@@ -56,11 +73,13 @@ export async function runPostOrderSideEffects(params: PostOrderParams): Promise<
         ON CONFLICT DO NOTHING
       `).bind(newCustId, validEmail, data.customer_name, validPhone, effectiveTenant).run();
     } catch {
-      await db.prepare(`
-        INSERT INTO customers (id, email, name, phone, loyalty_points, lifetime_points, loyalty_tier)
-        VALUES (?, ?, ?, ?, 0, 0, 'bronze')
-        ON CONFLICT DO NOTHING
-      `).bind(newCustId, validEmail, data.customer_name, validPhone).run().catch(() => {});
+      if (effectiveTenant === 'default') {
+        await db.prepare(`
+          INSERT INTO customers (id, email, name, phone, loyalty_points, lifetime_points, loyalty_tier)
+          VALUES (?, ?, ?, ?, 0, 0, 'bronze')
+          ON CONFLICT DO NOTHING
+        `).bind(newCustId, validEmail, data.customer_name, validPhone).run().catch(() => {});
+      }
     }
     let linkedCust: { id: string } | null = null;
     try {
@@ -68,7 +87,9 @@ export async function runPostOrderSideEffects(params: PostOrderParams): Promise<
         "SELECT id FROM customers WHERE email = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
       ).bind(validEmail, effectiveTenant).first<{ id: string }>();
     } catch {
-      linkedCust = await db.prepare('SELECT id FROM customers WHERE email = ?').bind(validEmail).first<{ id: string }>().catch(() => null);
+      if (effectiveTenant === 'default') {
+        linkedCust = await db.prepare('SELECT id FROM customers WHERE email = ?').bind(validEmail).first<{ id: string }>().catch(() => null);
+      }
     }
     if (linkedCust) customerIdForCapture = linkedCust.id;
   } else if (validPhone) {
@@ -80,7 +101,9 @@ export async function runPostOrderSideEffects(params: PostOrderParams): Promise<
           "SELECT id FROM customers WHERE phone = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
         ).bind(digits, effectiveTenant).first<{ id: string }>();
       } catch {
-        existing = await db.prepare('SELECT id FROM customers WHERE phone = ?').bind(digits).first<{ id: string }>().catch(() => null);
+        if (effectiveTenant === 'default') {
+          existing = await db.prepare('SELECT id FROM customers WHERE phone = ?').bind(digits).first<{ id: string }>().catch(() => null);
+        }
       }
       if (!existing) {
         const custId = generateId('CUST_');
@@ -96,15 +119,21 @@ export async function runPostOrderSideEffects(params: PostOrderParams): Promise<
             ON CONFLICT DO NOTHING
           `).bind(custId, syntheticEmail, data.customer_name, digits, now, now, effectiveTenant).run();
         } catch {
-          await db.prepare(`
-            INSERT INTO customers (id, email, name, phone, loyalty_points, lifetime_points, loyalty_tier, source, created_at, updated_at)
-            VALUES (?, ?, ?, ?, 0, 0, 'bronze', 'checkout', ?, ?)
-            ON CONFLICT DO NOTHING
-          `).bind(custId, syntheticEmail, data.customer_name, digits, now, now).run().catch(() => {});
+          if (effectiveTenant === 'default') {
+            await db.prepare(`
+              INSERT INTO customers (id, email, name, phone, loyalty_points, lifetime_points, loyalty_tier, source, created_at, updated_at)
+              VALUES (?, ?, ?, ?, 0, 0, 'bronze', 'checkout', ?, ?)
+              ON CONFLICT DO NOTHING
+            `).bind(custId, syntheticEmail, data.customer_name, digits, now, now).run().catch(() => {});
+          }
         }
         const insertedForTenant = await db.prepare(
           "SELECT id FROM customers WHERE phone = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
-        ).bind(digits, effectiveTenant).first<{ id: string }>().catch(() => null);
+        ).bind(digits, effectiveTenant).first<{ id: string }>().catch(() =>
+          effectiveTenant === 'default'
+            ? db.prepare('SELECT id FROM customers WHERE phone = ?').bind(digits).first<{ id: string }>().catch(() => null)
+            : null
+        );
         if (insertedForTenant) {
           try {
             await db.prepare(`
@@ -113,11 +142,13 @@ export async function runPostOrderSideEffects(params: PostOrderParams): Promise<
               ON CONFLICT DO NOTHING
             `).bind(wid, insertedForTenant.id, now, now, effectiveTenant).run();
           } catch {
-            await db.prepare(`
-              INSERT INTO cashback_wallets (id, customer_id, balance, total_earned, total_spent, created_at, updated_at)
-              VALUES (?, ?, 0, 0, 0, ?, ?)
-              ON CONFLICT DO NOTHING
-            `).bind(wid, insertedForTenant.id, now, now).run().catch(() => {});
+            if (effectiveTenant === 'default') {
+              await db.prepare(`
+                INSERT INTO cashback_wallets (id, customer_id, balance, total_earned, total_spent, created_at, updated_at)
+                VALUES (?, ?, 0, 0, 0, ?, ?)
+                ON CONFLICT DO NOTHING
+              `).bind(wid, insertedForTenant.id, now, now).run().catch(() => {});
+            }
           }
           customerIdForCapture = insertedForTenant.id;
         }

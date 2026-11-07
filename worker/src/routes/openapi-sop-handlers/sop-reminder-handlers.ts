@@ -15,10 +15,25 @@ import {
   acknowledgeReminder,
   countOpenReminders,
   listReminders,
+  SopAccessError,
   sopScope,
 } from '@aura/domain-sop';
 import type { Env } from '../../types/env';
 import type { SopAdminRoutes } from '../../schemas/sop-routes';
+
+function handleSopReminderError(c: any, err: unknown) {
+  if (err instanceof SopAccessError) {
+    return c.json({ success: false, error: err.message }, { status: err.status });
+  }
+  if (typeof err === 'object' && err !== null && 'status' in err) {
+    const status = Number((err as { status: unknown }).status);
+    if (status >= 400 && status <= 599) {
+      const msg = err instanceof Error ? err.message : 'Yêu cầu SOP không hợp lệ';
+      return c.json({ success: false, error: msg }, { status });
+    }
+  }
+  return c.json({ success: false, error: 'Không thể xử lý yêu cầu SOP' }, { status: 500 });
+}
 
 export function registerSopReminderHandlers(app: OpenAPIHono<{ Bindings: Env }>, routes: typeof SopAdminRoutes) {
   /**
@@ -26,23 +41,27 @@ export function registerSopReminderHandlers(app: OpenAPIHono<{ Bindings: Env }>,
    * separately, so the badge can never disagree with the rows beneath it.
    */
   app.openapi(routes.reminders as any, async (c: any) => {
-    const scope = sopScope(c.env, c.get('user'));
-    const query = c.req.valid('query');
-    // The query schema passes the string through unchanged, so `'false'` must be
-    // read as false rather than tested for truthiness, which any non-empty string
-    // satisfies.
-    const unreadOnly = query.unread === undefined ? undefined : query.unread === 'true';
-    const [reminders, counts] = await Promise.all([
-      listReminders(scope, {
-        kind: query.kind,
-        dayKey: query.dayKey,
-        templateId: query.templateId,
-        unreadOnly,
-        limit: query.limit,
-      }),
-      countOpenReminders(scope),
-    ]);
-    return c.json({ success: true, data: { reminders, counts } });
+    try {
+      const scope = sopScope(c.env, c.get('user'), c);
+      const query = c.req.valid('query');
+      // The query schema passes the string through unchanged, so `'false'` must be
+      // read as false rather than tested for truthiness, which any non-empty string
+      // satisfies.
+      const unreadOnly = query.unread === undefined ? undefined : query.unread === 'true';
+      const [reminders, counts] = await Promise.all([
+        listReminders(scope, {
+          kind: query.kind,
+          dayKey: query.dayKey,
+          templateId: query.templateId,
+          unreadOnly,
+          limit: query.limit,
+        }),
+        countOpenReminders(scope),
+      ]);
+      return c.json({ success: true, data: { reminders, counts } });
+    } catch (err) {
+      return handleSopReminderError(c, err);
+    }
   });
 
   /**
@@ -51,8 +70,12 @@ export function registerSopReminderHandlers(app: OpenAPIHono<{ Bindings: Env }>,
    * way and a double-tap should not read as a failure.
    */
   app.openapi(routes.acknowledgeReminder as any, async (c: any) => {
-    const scope = sopScope(c.env, c.get('user'));
-    const acknowledged = await acknowledgeReminder(scope, c.req.valid('param').id);
-    return c.json({ success: true, data: { acknowledged } });
+    try {
+      const scope = sopScope(c.env, c.get('user'), c);
+      const acknowledged = await acknowledgeReminder(scope, c.req.valid('param').id);
+      return c.json({ success: true, data: { acknowledged } });
+    } catch (err) {
+      return handleSopReminderError(c, err);
+    }
   });
 }

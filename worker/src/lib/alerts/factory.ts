@@ -25,8 +25,14 @@ import { dispatchDigestViaCallback } from './digest';
  *   const ad = createAlertDispatcher(c.env.AURA_DB);
  *   const fired = await ad.dispatchAlerts(async (msg) => { ... });
  */
-export function createAlertDispatcher(db: D1Database | null) {
+export function createAlertDispatcher(db: D1Database | null, tenantId?: string) {
   const metrics = createMetricsCollector(db);
+  const scopedTenant = typeof tenantId === 'string' && tenantId.trim() && tenantId.trim() !== '*'
+    ? tenantId.trim()
+    : null;
+  const tenantClause = scopedTenant
+    ? ' AND COALESCE(NULLIF(TRIM(json_extract(tags, \'$.tenant_id\')), \'\'), \'default\') = ?'
+    : '';
 
   async function dispatchAlertsInner(
     // eslint-disable-next-line no-unused-vars
@@ -48,36 +54,36 @@ export function createAlertDispatcher(db: D1Database | null) {
         switch (alert.key) {
         case 'order_stuck':
           query =
-              'SELECT COUNT(*) as value FROM _metrics WHERE name = \'order_stuck\' AND created_at >= datetime(\'now\', \'-15 minutes\')';
+              'SELECT COUNT(*) as value FROM _metrics WHERE name = \'order_stuck\' AND created_at >= datetime(\'now\', \'-15 minutes\')' + tenantClause;
           thresholdValue = 1;
           break;
         case 'payment_failure':
           query =
-              'SELECT COUNT(*) as value FROM _metrics WHERE name = \'payment_failed\' AND created_at >= datetime(\'now\', \'-30 minutes\')';
+              'SELECT COUNT(*) as value FROM _metrics WHERE name = \'payment_failed\' AND created_at >= datetime(\'now\', \'-30 minutes\')' + tenantClause;
           thresholdValue = 1;
           break;
         case 'worker_5xx_rate': {
           query = `SELECT CASE WHEN total = 0 THEN 0 ELSE CAST(err AS REAL) * 100.0 / total END as value FROM (
               SELECT
-                COALESCE((SELECT COUNT(*) FROM _metrics WHERE name = 'request' AND CAST(json_extract(tags, '$.status') AS INTEGER) >= 500 AND created_at >= datetime('now', '-5 minutes')), 0) as err,
-                COALESCE((SELECT COUNT(*) FROM _metrics WHERE name = 'request' AND created_at >= datetime('now', '-5 minutes')), 0) as total
+                COALESCE((SELECT COUNT(*) FROM _metrics WHERE name = 'request' AND CAST(json_extract(tags, '$.status') AS INTEGER) >= 500 AND created_at >= datetime('now', '-5 minutes')${tenantClause}), 0) as err,
+                COALESCE((SELECT COUNT(*) FROM _metrics WHERE name = 'request' AND created_at >= datetime('now', '-5 minutes')${tenantClause}), 0) as total
             )`;
           thresholdValue = 5;
           break;
         }
         case 'd1_latency_high':
           query =
-              'SELECT COALESCE(MAX(CAST(json_extract(tags, \'$.duration\') AS REAL)), 0) as value FROM _metrics WHERE name = \'request\' AND created_at >= datetime(\'now\', \'-5 minutes\')';
+              'SELECT COALESCE(MAX(CAST(json_extract(tags, \'$.duration\') AS REAL)), 0) as value FROM _metrics WHERE name = \'request\' AND created_at >= datetime(\'now\', \'-5 minutes\')' + tenantClause;
           thresholdValue = 500;
           break;
         case 'failed_login_spike':
           query =
-              'SELECT COUNT(*) as value FROM _metrics WHERE name = \'login_failed\' AND created_at >= datetime(\'now\', \'-1 minutes\')';
+              'SELECT COUNT(*) as value FROM _metrics WHERE name = \'login_failed\' AND created_at >= datetime(\'now\', \'-1 minutes\')' + tenantClause;
           thresholdValue = 10;
           break;
         case 'order_volume_anomaly':
           query =
-              'SELECT COUNT(*) as value FROM _metrics WHERE name = \'order_created\' AND created_at >= datetime(\'now\', \'-5 minutes\')';
+              'SELECT COUNT(*) as value FROM _metrics WHERE name = \'order_created\' AND created_at >= datetime(\'now\', \'-5 minutes\')' + tenantClause;
           thresholdValue =
               3; // placeholder — real anomaly detection compares to hourly avg
           break;
@@ -85,14 +91,19 @@ export function createAlertDispatcher(db: D1Database | null) {
           continue;
         }
 
-        const row = await db
-          .prepare(query)
-          .first<{ value: number }>();
+        const stmt = db.prepare(query);
+        const boundStmt = scopedTenant
+          ? (alert.key === 'worker_5xx_rate' ? stmt.bind(scopedTenant, scopedTenant) : stmt.bind(scopedTenant))
+          : stmt;
+        const row = await boundStmt.first<{ value: number }>();
         const value = row?.value ?? 0;
 
         if (value >= thresholdValue) {
+          const alertKey = scopedTenant && scopedTenant !== 'default'
+            ? `${alert.key}:${scopedTenant}`
+            : alert.key;
           const alertId = await metrics.recordAlert(
-            alert.key,
+            alertKey,
             `${alert.description}\nValue: ${value} (threshold: ${thresholdValue})`,
             {
               severity: alert.severity,
@@ -122,7 +133,7 @@ export function createAlertDispatcher(db: D1Database | null) {
     sendTelegram: (msg: string) => Promise<void>,
     locale: 'vi' | 'en' = 'vi'
   ): Promise<void> {
-    return dispatchDigestViaCallback(db, sendTelegram, locale);
+    return dispatchDigestViaCallback(db, sendTelegram, locale, tenantId);
   }
 
   return { dispatchAlerts: dispatchAlertsInner, dispatchDigest: dispatchDigestInner };

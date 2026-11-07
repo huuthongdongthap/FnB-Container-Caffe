@@ -59,10 +59,16 @@ const MS_PER_DAY = 86_400_000;
  */
 export async function resolveBandPolicy(
   kv?: { get: (key: string) => Promise<string | null> },
+  tenantId?: string,
 ): Promise<BandPolicy> {
   if (!kv) return DEFAULT_BAND_POLICY;
   try {
-    const raw = await kv.get('crm:band_policy');
+    const clean = typeof tenantId === 'string' && tenantId.trim() ? tenantId.trim() : 'default';
+    const scopedKey =
+      clean === 'default' || clean === '*' || clean.toLowerCase() === 'hq'
+        ? 'crm:band_policy'
+        : `crm:band_policy:${clean}`;
+    const raw = (await kv.get(scopedKey)) ?? (scopedKey !== 'crm:band_policy' ? await kv.get('crm:band_policy') : null);
     if (!raw) return DEFAULT_BAND_POLICY;
     const override = JSON.parse(raw) as Partial<BandPolicy>;
     return { ...DEFAULT_BAND_POLICY, ...override };

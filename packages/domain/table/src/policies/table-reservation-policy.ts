@@ -13,7 +13,9 @@ import type {
   ReleaseTableInput,
   ReservationLifecycleStatus,
 } from '../model/table-reservation-types';
-import { validateOrderTable, matchesOperatingUnit } from './table-availability-policy';
+import { validateOrderTable, matchesOperatingUnit, isTableUnavailableForService } from './table-availability-policy';
+
+const ACTIVE_RESERVATION_STATUSES = new Set(['confirmed', 'pending', 'approved', 'seated']);
 
 export async function createCanonicalReservation(
   db: D1Database,
@@ -31,6 +33,9 @@ export async function createCanonicalReservation(
     return { ok: false, error: tableCheck.error || 'table_not_found' };
   }
   const table = tableCheck.table;
+  if (isTableUnavailableForService(table.status)) {
+    return { ok: false, error: 'table_unavailable' };
+  }
 
   if (input.guestCount !== undefined && typeof table.capacity === 'number' && table.capacity > 0 && input.guestCount > table.capacity) {
     return { ok: false, error: 'capacity_exceeded' };
@@ -43,7 +48,10 @@ export async function createCanonicalReservation(
   const effectiveUnit =
     (table.operating_unit_id && String(table.operating_unit_id).trim()) ||
     (table.tenant_id && String(table.tenant_id).trim()) ||
-    (input.operatingUnitId && input.operatingUnitId.trim() && input.operatingUnitId.trim() !== '*'
+    (input.operatingUnitId &&
+    input.operatingUnitId.trim() &&
+    input.operatingUnitId.trim() !== '*' &&
+    input.operatingUnitId.trim().toLowerCase() !== 'hq'
       ? input.operatingUnitId.trim()
       : undefined);
   const targetUnit = effectiveUnit || 'default';
@@ -181,6 +189,7 @@ export async function updateReservationStatus(
     operatingUnitId &&
     operatingUnitId.trim() &&
     operatingUnitId.trim() !== '*' &&
+    operatingUnitId.trim().toLowerCase() !== 'hq' &&
     !('operating_unit_id' in rsv || 'tenant_id' in rsv) &&
     rsv.table_id
   ) {
@@ -190,10 +199,12 @@ export async function updateReservationStatus(
     }
   }
 
+  const rawOperatingUnit = operatingUnitId && operatingUnitId.trim() ? operatingUnitId.trim() : '';
+  const normOperatingUnit = rawOperatingUnit.toLowerCase() === 'hq' ? '*' : rawOperatingUnit;
   const effectiveUnit =
     (rsv.operating_unit_id && String(rsv.operating_unit_id).trim()) ||
     (rsv.tenant_id && String(rsv.tenant_id).trim()) ||
-    (operatingUnitId && operatingUnitId.trim() ? operatingUnitId.trim() : undefined);
+    (normOperatingUnit || undefined);
   const now = new Date().toISOString();
   if (effectiveUnit && effectiveUnit !== '*') {
     try {
@@ -202,12 +213,16 @@ export async function updateReservationStatus(
          SET status = ?, notes = COALESCE(?, notes), updated_at = ?
          WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?`
       ).bind(targetStatus, notes || null, now, reservationId, effectiveUnit).run();
-    } catch {
-      await db.prepare(
-        `UPDATE reservations
-         SET status = ?, notes = COALESCE(?, notes), updated_at = ?
-         WHERE id = ?`
-      ).bind(targetStatus, notes || null, now, reservationId).run();
+    } catch (err) {
+      if (effectiveUnit === 'default') {
+        await db.prepare(
+          `UPDATE reservations
+           SET status = ?, notes = COALESCE(?, notes), updated_at = ?
+           WHERE id = ?`
+        ).bind(targetStatus, notes || null, now, reservationId).run();
+      } else {
+        throw err;
+      }
     }
   } else {
     await db.prepare(
@@ -217,13 +232,98 @@ export async function updateReservationStatus(
     ).bind(targetStatus, notes || null, now, reservationId).run();
   }
 
-  if (targetStatus === 'cancelled') {
-    if (effectiveUnit && effectiveUnit !== '*') {
+  if ((targetStatus === 'cancelled' || targetStatus === 'no_show') && rsv.table_id) {
+    let canResetTable = true;
+    const tableRow = await db
+      .prepare('SELECT * FROM cafe_tables WHERE id = ? LIMIT 1')
+      .bind(rsv.table_id)
+      .first<CanonicalTable>()
+      .catch(() => null);
+    if (tableRow) {
+      const tblStatus = String(tableRow.status ?? '').trim().toLowerCase();
+      if (tblStatus === 'occupied' || tblStatus === 'overdue' || isTableUnavailableForService(tableRow.status) || (tblStatus && tblStatus !== 'reserved')) {
+        canResetTable = false;
+      }
+    }
+    const rsvDate = String(rsv.date ?? (rsv as unknown as Record<string, unknown>).reservation_date ?? '').trim();
+    if (canResetTable && rsvDate) {
+      let sameDayRows: Record<string, unknown>[] = [];
       try {
-        await db.prepare(
-          "UPDATE cafe_tables SET status = 'Available', updated_at = ? WHERE id = ? AND status = 'Reserved' AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
-        ).bind(now, rsv.table_id, effectiveUnit).run();
+        const stmt = db.prepare(
+          `SELECT * FROM reservations
+           WHERE (table_id = ? OR table_id = ?)
+             AND date = ?
+             AND status IN ('confirmed', 'pending', 'approved', 'seated')`
+        ).bind(rsv.table_id, String(tableRow?.table_number ?? rsv.table_id), rsvDate);
+        if (typeof stmt.all === 'function') {
+          const res = await stmt.all<Record<string, unknown>>();
+          sameDayRows = res?.results || [];
+        } else if (typeof stmt.first === 'function') {
+          const single = await stmt.first<Record<string, unknown>>();
+          if (single) sameDayRows = [single];
+        }
       } catch {
+        try {
+          const stmt = db.prepare(
+            `SELECT * FROM reservations
+             WHERE (table_id = ? OR table_id = ?)
+               AND reservation_date = ?
+               AND status IN ('confirmed', 'pending', 'approved', 'seated')`
+          ).bind(rsv.table_id, String(tableRow?.table_number ?? rsv.table_id), rsvDate);
+          if (typeof stmt.all === 'function') {
+            const res = await stmt.all<Record<string, unknown>>();
+            sameDayRows = res?.results || [];
+          }
+        } catch {
+          sameDayRows = [];
+        }
+      }
+      const targetUnit = effectiveUnit && effectiveUnit !== '*' ? effectiveUnit : 'default';
+      const hasOtherActive = sameDayRows.some((row) => {
+        if (String(row.id ?? '') === String(reservationId)) return false;
+        const rowStatus = String(row.status ?? '').trim().toLowerCase();
+        if (!ACTIVE_RESERVATION_STATUSES.has(rowStatus)) return false;
+        const rowTableId = String(row.table_id ?? '');
+        if (rowTableId && rowTableId !== String(rsv.table_id) && (!tableRow || rowTableId !== String(tableRow.table_number ?? ''))) {
+          return false;
+        }
+        const rowDate = String(row.date ?? row.reservation_date ?? '').trim();
+        if (rsvDate && rowDate && rowDate !== rsvDate) return false;
+        return matchesOperatingUnit(row, targetUnit);
+      });
+      if (hasOtherActive) {
+        canResetTable = false;
+      }
+    }
+
+    if (canResetTable) {
+      if (effectiveUnit && effectiveUnit !== '*') {
+        try {
+          await db.prepare(
+            "UPDATE cafe_tables SET status = 'Available', updated_at = ? WHERE id = ? AND status = 'Reserved' AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
+          ).bind(now, rsv.table_id, effectiveUnit).run();
+        } catch {
+          try {
+            await db.prepare(
+              "UPDATE cafe_tables SET status = 'Available' WHERE id = ? AND status = 'Reserved' AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
+            ).bind(rsv.table_id, effectiveUnit).run();
+          } catch (err) {
+            if (effectiveUnit === 'default') {
+              try {
+                await db.prepare(
+                  "UPDATE cafe_tables SET status = 'Available', updated_at = ? WHERE id = ? AND status = 'Reserved'"
+                ).bind(now, rsv.table_id).run();
+              } catch {
+                await db.prepare(
+                  "UPDATE cafe_tables SET status = 'Available' WHERE id = ? AND status = 'Reserved'"
+                ).bind(rsv.table_id).run();
+              }
+            } else {
+              throw err;
+            }
+          }
+        }
+      } else {
         try {
           await db.prepare(
             "UPDATE cafe_tables SET status = 'Available', updated_at = ? WHERE id = ? AND status = 'Reserved'"
@@ -233,16 +333,6 @@ export async function updateReservationStatus(
             "UPDATE cafe_tables SET status = 'Available' WHERE id = ? AND status = 'Reserved'"
           ).bind(rsv.table_id).run();
         }
-      }
-    } else {
-      try {
-        await db.prepare(
-          "UPDATE cafe_tables SET status = 'Available', updated_at = ? WHERE id = ? AND status = 'Reserved'"
-        ).bind(now, rsv.table_id).run();
-      } catch {
-        await db.prepare(
-          "UPDATE cafe_tables SET status = 'Available' WHERE id = ? AND status = 'Reserved'"
-        ).bind(rsv.table_id).run();
       }
     }
   }
@@ -259,10 +349,21 @@ export async function seatTable(
     return { ok: false, error: tableCheck.error || 'table_not_found' };
   }
   const table = tableCheck.table;
-  const effectiveUnit =
+  if (isTableUnavailableForService(table.status)) {
+    return { ok: false, error: 'table_unavailable' };
+  }
+  if (String(table.status ?? '').trim().toLowerCase() === 'occupied') {
+    return { ok: false, error: 'table_already_occupied' };
+  }
+  const tableExplicitUnit =
     (table.operating_unit_id && String(table.operating_unit_id).trim()) ||
     (table.tenant_id && String(table.tenant_id).trim()) ||
-    (input.operatingUnitId && input.operatingUnitId.trim() ? input.operatingUnitId.trim() : 'default');
+    '';
+  const rawInputUnit = input.operatingUnitId && input.operatingUnitId.trim() ? input.operatingUnitId.trim() : '';
+  const normInputUnit = rawInputUnit.toLowerCase() === 'hq' ? '*' : rawInputUnit;
+  const effectiveUnit =
+    tableExplicitUnit ||
+    (normInputUnit || 'default');
   const now = new Date().toISOString();
 
   let rsv: CanonicalReservation | undefined;
@@ -274,7 +375,12 @@ export async function seatTable(
     if (!foundRsv) {
       return { ok: false, error: 'reservation_not_found' };
     }
-    if (!matchesOperatingUnit(foundRsv as unknown as Record<string, unknown>, input.operatingUnitId)) {
+    if (
+      !matchesOperatingUnit(foundRsv as unknown as Record<string, unknown>, input.operatingUnitId) ||
+      (tableExplicitUnit &&
+        tableExplicitUnit !== '*' &&
+        !matchesOperatingUnit(foundRsv as unknown as Record<string, unknown>, tableExplicitUnit))
+    ) {
       return { ok: false, error: 'cross_operating_unit_mismatch' };
     }
     if (foundRsv.status === 'cancelled' || foundRsv.status === 'completed' || foundRsv.status === 'no_show') {
@@ -289,10 +395,14 @@ export async function seatTable(
         await db.prepare(
           "UPDATE reservations SET status = 'seated', updated_at = ? WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
         ).bind(now, input.reservationId, effectiveUnit).run();
-      } catch {
-        await db.prepare(
-          "UPDATE reservations SET status = 'seated', updated_at = ? WHERE id = ?"
-        ).bind(now, input.reservationId).run();
+      } catch (err) {
+        if (effectiveUnit === 'default') {
+          await db.prepare(
+            "UPDATE reservations SET status = 'seated', updated_at = ? WHERE id = ?"
+          ).bind(now, input.reservationId).run();
+        } else {
+          throw err;
+        }
       }
     } else {
       await db.prepare(
@@ -309,12 +419,22 @@ export async function seatTable(
     } catch {
       try {
         await db.prepare(
-          "UPDATE cafe_tables SET status = 'Occupied', updated_at = ? WHERE id = ?"
-        ).bind(now, table.id).run();
-      } catch {
-        await db.prepare(
-          "UPDATE cafe_tables SET status = 'Occupied' WHERE id = ?"
-        ).bind(table.id).run();
+          "UPDATE cafe_tables SET status = 'Occupied' WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
+        ).bind(table.id, effectiveUnit).run();
+      } catch (err) {
+        if (effectiveUnit === 'default') {
+          try {
+            await db.prepare(
+              "UPDATE cafe_tables SET status = 'Occupied', updated_at = ? WHERE id = ?"
+            ).bind(now, table.id).run();
+          } catch {
+            await db.prepare(
+              "UPDATE cafe_tables SET status = 'Occupied' WHERE id = ?"
+            ).bind(table.id).run();
+          }
+        } else {
+          throw err;
+        }
       }
     }
   } else {
@@ -350,10 +470,12 @@ export async function releaseTable(
     return { ok: false, error: tableCheck.error || 'table_not_found' };
   }
   const table = tableCheck.table;
+  const rawReleaseUnit = input.operatingUnitId && input.operatingUnitId.trim() ? input.operatingUnitId.trim() : '';
+  const normReleaseUnit = rawReleaseUnit.toLowerCase() === 'hq' ? '*' : rawReleaseUnit;
   const effectiveUnit =
     (table.operating_unit_id && String(table.operating_unit_id).trim()) ||
     (table.tenant_id && String(table.tenant_id).trim()) ||
-    (input.operatingUnitId && input.operatingUnitId.trim() ? input.operatingUnitId.trim() : 'default');
+    (normReleaseUnit || 'default');
   const now = new Date().toISOString();
   const alreadyReleased = String(table.status).toLowerCase() === 'available';
 
@@ -369,12 +491,22 @@ export async function releaseTable(
     } catch {
       try {
         await db.prepare(
-          "UPDATE cafe_tables SET status = 'Available', updated_at = ? WHERE id = ?"
-        ).bind(now, table.id).run();
-      } catch {
-        await db.prepare(
-          "UPDATE cafe_tables SET status = 'Available' WHERE id = ?"
-        ).bind(table.id).run();
+          "UPDATE cafe_tables SET status = 'Available' WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
+        ).bind(table.id, effectiveUnit).run();
+      } catch (err) {
+        if (effectiveUnit === 'default') {
+          try {
+            await db.prepare(
+              "UPDATE cafe_tables SET status = 'Available', updated_at = ? WHERE id = ?"
+            ).bind(now, table.id).run();
+          } catch {
+            await db.prepare(
+              "UPDATE cafe_tables SET status = 'Available' WHERE id = ?"
+            ).bind(table.id).run();
+          }
+        } else {
+          throw err;
+        }
       }
     }
   } else {
@@ -394,10 +526,14 @@ export async function releaseTable(
       await db.prepare(
         "UPDATE reservations SET status = 'completed', updated_at = ? WHERE (table_id = ? OR table_id = ?) AND status = 'seated' AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
       ).bind(now, table.id, String(table.table_number ?? table.id), effectiveUnit).run();
-    } catch {
-      await db.prepare(
-        "UPDATE reservations SET status = 'completed', updated_at = ? WHERE (table_id = ? OR table_id = ?) AND status = 'seated'"
-      ).bind(now, table.id, String(table.table_number ?? table.id)).run();
+    } catch (err) {
+      if (effectiveUnit === 'default') {
+        await db.prepare(
+          "UPDATE reservations SET status = 'completed', updated_at = ? WHERE (table_id = ? OR table_id = ?) AND status = 'seated'"
+        ).bind(now, table.id, String(table.table_number ?? table.id)).run();
+      } else {
+        throw err;
+      }
     }
   } else {
     await db.prepare(

@@ -142,7 +142,7 @@ export const LoyaltyRewardListResponseSchema = z.object({
 export const RedeemRewardSchema = z.object({
   rewardId: z.string().min(1),
   orderId: z.string().min(1).optional(),
-  idempotencyKey: z.string().min(1),
+  idempotencyKey: z.string().min(1).optional(),
 }).openapi('RedeemReward');
 
 export const RedeemResponseSchema = z.object({

@@ -6,11 +6,11 @@ import { reconcilePayOSPayment } from './payos-reconcile';
 
 export interface PayOSAttempt {
   id: string; order_id: string; amount: number; transaction_id: string;
-  payment_url: string | null; status: string; created_at: string; updated_at: string;
+  payment_url: string | null; status: string; tenant_id?: string | null; created_at: string; updated_at: string;
 }
 interface AttemptInput {
   db: D1Database; kv?: KVNamespace | null; orderId: string; amount: number; clientId: string; apiKey: string;
-  checksumKey: string; description: string; returnUrl: string; cancelUrl: string; buyerName?: string;
+  checksumKey: string; description: string; returnUrl: string; cancelUrl: string; buyerName?: string; tenantId?: string;
 }
 type AttemptResult = { ok: true; payment: PayOSAttempt; cached: boolean }
   | { ok: false; status: 202 | 409 | 502; code?: string; orderId?: string; error: string; payment?: PayOSAttempt };
@@ -19,24 +19,53 @@ const LEASE_MS = 30_000;
 /** A deterministic primary key plus a conditional INSERT serializes ALL local callers. */
 async function reserveAttempt(input: AttemptInput): Promise<{ payment: PayOSAttempt; owned: boolean } | null> {
   const { db, orderId, amount } = input;
+  const rawInputTenant = input.tenantId && input.tenantId.trim() ? input.tenantId.trim() : '';
+  let orderTenant =
+    rawInputTenant && rawInputTenant !== '*' && rawInputTenant.toLowerCase() !== 'hq'
+      ? rawInputTenant
+      : '';
+  if (!orderTenant) {
+    const ordRow = await db.prepare('SELECT tenant_id FROM orders WHERE id = ?').bind(orderId).first<{ tenant_id?: string | null }>().catch(() => null);
+    const rawOrdTenant = ordRow?.tenant_id && String(ordRow.tenant_id).trim() ? String(ordRow.tenant_id).trim() : '';
+    orderTenant = rawOrdTenant && rawOrdTenant !== '*' && rawOrdTenant.toLowerCase() !== 'hq' ? rawOrdTenant : 'default';
+  }
   for (let attempt = 0; attempt < 3; attempt++) {
     const existing = await db.prepare(
-      "SELECT * FROM payments WHERE order_id = ? AND method = 'payos' ORDER BY created_at ASC LIMIT 2"
-    ).bind(orderId).all<PayOSAttempt>();
+      "SELECT * FROM payments WHERE order_id = ? AND method = 'payos' AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ? ORDER BY created_at ASC LIMIT 2"
+    ).bind(orderId, orderTenant).all<PayOSAttempt>().catch(() =>
+      orderTenant === 'default'
+        ? db.prepare(
+            "SELECT * FROM payments WHERE order_id = ? AND method = 'payos' ORDER BY created_at ASC LIMIT 2"
+          ).bind(orderId).all<PayOSAttempt>()
+        : Promise.resolve({ results: [] as PayOSAttempt[] } as any)
+    );
     // Historical duplicate invoices need reconciliation; never guess which is payable.
     if (existing.results.length > 1) return null;
     if (existing.results[0]) return { payment: existing.results[0], owned: false };
     const now = new Date().toISOString();
     const orderCode = String(generateOrderCode());
     const id = `payos:${orderId}`;
-    const result = await db.prepare(`
-      INSERT OR IGNORE INTO payments (id, order_id, method, amount, status, transaction_id, payment_url, created_at, updated_at)
-      SELECT ?, ?, 'payos', ?, 'pending', ?, NULL, ?, ?
-      WHERE NOT EXISTS (SELECT 1 FROM payments WHERE order_id = ? AND method = 'payos')
-    `).bind(id, orderId, amount, orderCode, now, now, orderId).run();
+    let result: any;
+    try {
+      result = await db.prepare(`
+        INSERT OR IGNORE INTO payments (id, order_id, method, amount, status, transaction_id, payment_url, tenant_id, created_at, updated_at)
+        SELECT ?, ?, 'payos', ?, 'pending', ?, NULL, ?, ?, ?
+        WHERE NOT EXISTS (SELECT 1 FROM payments WHERE order_id = ? AND method = 'payos' AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?)
+      `).bind(id, orderId, amount, orderCode, orderTenant, now, now, orderId, orderTenant).run();
+    } catch (err) {
+      if (orderTenant === 'default') {
+        result = await db.prepare(`
+          INSERT OR IGNORE INTO payments (id, order_id, method, amount, status, transaction_id, payment_url, created_at, updated_at)
+          SELECT ?, ?, 'payos', ?, 'pending', ?, NULL, ?, ?
+          WHERE NOT EXISTS (SELECT 1 FROM payments WHERE order_id = ? AND method = 'payos')
+        `).bind(id, orderId, amount, orderCode, now, now, orderId).run();
+      } else {
+        throw err;
+      }
+    }
     if ((result.meta?.changes ?? 0) > 0) {
       return { payment: { id, order_id: orderId, amount, transaction_id: orderCode,
-        status: 'pending', payment_url: null, created_at: now, updated_at: now }, owned: true };
+        status: 'pending', payment_url: null, tenant_id: orderTenant, created_at: now, updated_at: now }, owned: true };
     }
     // A transaction-code collision is retried BEFORE any provider request.
   }
@@ -97,6 +126,7 @@ export async function getOrCreatePayOSAttempt(input: AttemptInput): Promise<Atte
         checksumKey: input.checksumKey,
         source: 'create_link',
         preVerified: verified,
+        tenantId: (payment.tenant_id && String(payment.tenant_id).trim()) || undefined,
       });
       if (reconciled.ok && (reconciled.outcome === 'settled' || reconciled.outcome === 'already_settled')) {
         return {

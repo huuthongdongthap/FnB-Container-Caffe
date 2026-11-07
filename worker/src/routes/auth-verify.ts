@@ -67,37 +67,73 @@ const db = env.AURA_DB as unknown as { prepare(_sql: string): { bind(..._a: unkn
     const defaultTenant = typeof env.PILOT_TENANT_ID === 'string' && env.PILOT_TENANT_ID.trim() && env.PILOT_TENANT_ID.trim() !== '*'
       ? env.PILOT_TENANT_ID.trim()
       : 'default';
+    const isLegacyGeneratedTenant = (val: unknown) => /^tenant_[a-z0-9]{7,}_[a-z0-9]+$/i.test(String(val || ''));
     const tenantId = (!user.role || user.role === 'customer')
-      ? (user.tenant_id && !String(user.tenant_id).startsWith('tenant_') ? String(user.tenant_id) : defaultTenant)
+      ? (user.tenant_id && !isLegacyGeneratedTenant(user.tenant_id) ? String(user.tenant_id).trim() : defaultTenant)
       : (user.tenant_id || defaultTenant);
 
     if ((!user.role || user.role === 'customer') && db?.prepare) {
       try {
-        const existingCustomer = await db.prepare(
-          'SELECT id FROM customers WHERE id = ? OR lower(email) = lower(?) OR (? != \'\' AND phone = ?) LIMIT 1'
-        ).bind(user.id, email, user.phone || '', user.phone || '').first<{ id: string }>().catch(() => null);
-        if (existingCustomer?.id) {
+        let existingCustomer: { id: string; email?: string | null; tenant_id?: string | null } | null = null;
+        try {
+          existingCustomer = await db.prepare(
+            `SELECT id, email, tenant_id FROM customers
+             WHERE (id = ? OR lower(email) = lower(?))
+               AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?
+             LIMIT 1`
+          ).bind(user.id, email, tenantId).first<{ id: string; email?: string | null; tenant_id?: string | null }>();
+        } catch {
+          if (tenantId === 'default') {
+            existingCustomer = await db.prepare(
+              'SELECT id, email FROM customers WHERE id = ? OR lower(email) = lower(?) LIMIT 1'
+            ).bind(user.id, email).first<{ id: string; email?: string | null }>().catch(() => null);
+          }
+        }
+        const existingTenant = String(existingCustomer?.tenant_id || '').trim() || tenantId;
+        const existingEmail = String(existingCustomer?.email || '').trim().toLowerCase();
+        const canBindCustomer = Boolean(
+          existingCustomer?.id &&
+          existingTenant === tenantId &&
+          (!existingEmail || existingEmail === email)
+        );
+        if (canBindCustomer && existingCustomer) {
           user.id = existingCustomer.id;
-          await db.prepare(
-            'UPDATE customers SET email = COALESCE(NULLIF(email, \'\'), ?), verified_at = COALESCE(verified_at, ?), updated_at = ? WHERE id = ?'
-          ).bind(email, now, now, user.id).run().catch(() => {});
+          try {
+            await db.prepare(
+              `UPDATE customers
+               SET email = COALESCE(NULLIF(email, ''), ?),
+                   verified_at = COALESCE(verified_at, ?),
+                   updated_at = ?
+               WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?`
+            ).bind(email, now, now, user.id, tenantId).run();
+          } catch {
+            if (tenantId === 'default') {
+              await db.prepare(
+                'UPDATE customers SET email = COALESCE(NULLIF(email, \'\'), ?), verified_at = COALESCE(verified_at, ?), updated_at = ? WHERE id = ?'
+              ).bind(email, now, now, user.id).run().catch(() => {});
+            }
+          }
         } else {
           try {
             await db.prepare(
               'INSERT INTO customers (id, email, name, phone, loyalty_points, lifetime_points, loyalty_tier, tenant_id, verified_at, created_at, updated_at) VALUES (?, ?, ?, ?, 0, 0, ?, ?, ?, ?, ?)'
             ).bind(user.id, email, user.name || 'Thành viên', user.phone || '', 'bronze', tenantId, now, now, now).run();
           } catch {
-            await db.prepare(
-              'INSERT INTO customers (id, email, name, phone, loyalty_points, loyalty_tier, created_at) VALUES (?, ?, ?, ?, 0, ?, ?)'
-            ).bind(user.id, email, user.name || 'Thành viên', user.phone || '', 'bronze', now).run().catch(() => {});
+            if (tenantId === 'default') {
+              await db.prepare(
+                'INSERT INTO customers (id, email, name, phone, loyalty_points, loyalty_tier, created_at) VALUES (?, ?, ?, ?, 0, ?, ?)'
+              ).bind(user.id, email, user.name || 'Thành viên', user.phone || '', 'bronze', now).run().catch(() => {});
+            }
           }
           const walletId = `wal_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
           await db.prepare(
             'INSERT INTO cashback_wallets (id, customer_id, balance, total_earned, total_spent, tenant_id, created_at, updated_at) VALUES (?, ?, 0, 0, 0, ?, ?, ?)'
           ).bind(walletId, user.id, tenantId, now, now).run().catch(async () => {
-            await db.prepare(
-              'INSERT INTO cashback_wallets (id, customer_id, balance, total_earned, total_spent, created_at, updated_at) VALUES (?, ?, 0, 0, 0, ?, ?)'
-            ).bind(walletId, user.id, now, now).run().catch(() => {});
+            if (tenantId === 'default') {
+              await db.prepare(
+                'INSERT INTO cashback_wallets (id, customer_id, balance, total_earned, total_spent, created_at, updated_at) VALUES (?, ?, 0, 0, 0, ?, ?)'
+              ).bind(walletId, user.id, now, now).run().catch(() => {});
+            }
           });
         }
       } catch {

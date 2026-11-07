@@ -2,12 +2,8 @@
  * get-customer-account — self-service read model for customer-facing
  * account surfaces (M4 Online). Aggregates profile, loyalty, recent
  * orders, active consents, and tier progress into one view.
- *
- * Pure D1 reads — no writes, no side effects. Failures swallowed and
- * returned as a partial-but-typed account so a read failure never
- * breaks the customer journey.
  */
-import type { D1Database } from '@cloudflare/workers-types';
+import type { D1Database, KVNamespace } from '@cloudflare/workers-types';
 import { createLogger } from 'worker/src/middleware/logger';
 import { loadPolicy, type LoyaltyPolicy } from './loyalty-policy';
 
@@ -42,6 +38,7 @@ const EMPTY: CustomerAccount = {
 export interface AccountOptions {
   orderLimit?: number;
   tenantId?: string;
+  kv?: KVNamespace;
 }
 
 export async function getCustomerAccount(
@@ -58,23 +55,35 @@ export async function getCustomerAccount(
       : null;
 
   try {
+    const effectiveTenant =
+      !requestedTenant
+        ? 'default'
+        : requestedTenant.toLowerCase() === 'hq' || requestedTenant === '*'
+          ? '*'
+          : requestedTenant;
     const customer = await db
-      .prepare('SELECT id, name, phone, email, loyalty_tier, loyalty_points, lifetime_points, tenant_id FROM customers WHERE id = ?')
-      .bind(customerId)
+      .prepare(
+        "SELECT id, name, phone, email, loyalty_tier, loyalty_points, lifetime_points, tenant_id FROM customers WHERE id = ? AND (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?)",
+      )
+      .bind(customerId, effectiveTenant, effectiveTenant === '*' ? 'default' : effectiveTenant)
       .first<{ id: string; name: string | null; phone: string | null; email: string | null; loyalty_tier: string | null; loyalty_points: number | null; lifetime_points: number | null; tenant_id?: string | null }>()
       .catch(() =>
-        db
-          .prepare('SELECT id, name, phone, email, loyalty_tier, loyalty_points, lifetime_points FROM customers WHERE id = ?')
-          .bind(customerId)
-          .first<{ id: string; name: string | null; phone: string | null; email: string | null; loyalty_tier: string | null; loyalty_points: number | null; lifetime_points: number | null; tenant_id?: string | null }>(),
+        effectiveTenant === 'default'
+          ? db
+              .prepare('SELECT id, name, phone, email, loyalty_tier, loyalty_points, lifetime_points FROM customers WHERE id = ?')
+              .bind(customerId)
+              .first<{ id: string; name: string | null; phone: string | null; email: string | null; loyalty_tier: string | null; loyalty_points: number | null; lifetime_points: number | null; tenant_id?: string | null }>()
+          : null,
       );
 
     if (!customer) {
       return { ...EMPTY, customerId };
     }
 
-    const customerTenant = (customer.tenant_id && String(customer.tenant_id).trim()) || 'default';
-    if (requestedTenant && requestedTenant !== '*' && 'tenant_id' in customer && customer.tenant_id !== undefined && customerTenant !== requestedTenant) {
+    const rawCustomerTenant = customer.tenant_id && String(customer.tenant_id).trim();
+    const customerTenant = rawCustomerTenant || 'default';
+    const effectiveTenantFilter = customerTenant;
+    if (effectiveTenant !== '*' && 'tenant_id' in customer && customer.tenant_id !== undefined && effectiveTenantFilter !== effectiveTenant) {
       return { ...EMPTY, customerId };
     }
     const nonEmptyPhone = customer.phone && customer.phone.trim() ? customer.phone.trim() : null;
@@ -83,74 +92,77 @@ export async function getCustomerAccount(
       db
         .prepare(
           `SELECT * FROM orders
-           WHERE (customer_id = ? OR (customer_phone IS NOT NULL AND customer_phone != '' AND customer_phone = ?))
-             AND COALESCE(NULLIF(tenant_id, ''), 'default') = ?
-              OR (customer_id = ?1 OR (customer_phone IS NOT NULL AND customer_phone != '' AND customer_phone = ?2))
+           WHERE ((customer_id = ?1 OR (customer_phone IS NOT NULL AND customer_phone != '' AND customer_phone = ?2))
+             AND COALESCE(NULLIF(tenant_id, ''), 'default') = ?3
              AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?3
+             OR ((customer_id = ?1 OR (customer_phone IS NOT NULL AND customer_phone != '' AND customer_phone = ?2))
+               AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?3))
            ORDER BY created_at DESC LIMIT ?4`,
         )
-        .bind(customerId, nonEmptyPhone, customerTenant, orderLimit)
+        .bind(customerId, nonEmptyPhone, effectiveTenantFilter, orderLimit)
         .all<Record<string, unknown>>()
         .catch(() =>
-          db
-            .prepare(
-              `SELECT * FROM orders
-               WHERE customer_id = ? OR (customer_phone IS NOT NULL AND customer_phone != '' AND customer_phone = ?)
-               ORDER BY created_at DESC LIMIT ?`,
-            )
-            .bind(customerId, nonEmptyPhone, orderLimit)
-            .all<Record<string, unknown>>()
-            .catch(() =>
-              db
+          customerTenant === 'default'
+            ? db
                 .prepare(
-                  `SELECT id, COALESCE(total, total_amount, 0) AS total, status, created_at, tenant_id FROM orders
-                   WHERE customer_phone IS NOT NULL AND customer_phone != '' AND customer_phone = ?
-                     AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?
+                  `SELECT * FROM orders
+                   WHERE customer_id = ? OR (customer_phone IS NOT NULL AND customer_phone != '' AND customer_phone = ?)
                    ORDER BY created_at DESC LIMIT ?`,
                 )
-                .bind(nonEmptyPhone, customerTenant, orderLimit)
+                .bind(customerId, nonEmptyPhone, orderLimit)
                 .all<Record<string, unknown>>()
                 .catch(() =>
-                  customerTenant === 'default'
-                    ? db
+                  db
+                    .prepare(
+                      `SELECT id, COALESCE(total, total_amount, 0) AS total, status, created_at FROM orders
+                       WHERE customer_phone IS NOT NULL AND customer_phone != '' AND customer_phone = ? ORDER BY created_at DESC LIMIT ?`,
+                    )
+                    .bind(nonEmptyPhone, orderLimit)
+                    .all<Record<string, unknown>>()
+                    .catch(() =>
+                      db
                         .prepare(
-                          `SELECT id, COALESCE(total, total_amount, 0) AS total, status, created_at FROM orders
+                          `SELECT id, total, status, created_at FROM orders
                            WHERE customer_phone IS NOT NULL AND customer_phone != '' AND customer_phone = ? ORDER BY created_at DESC LIMIT ?`,
                         )
                         .bind(nonEmptyPhone, orderLimit)
-                        .all<Record<string, unknown>>()
-                        .catch(() =>
-                          db
-                            .prepare(
-                              `SELECT id, total, status, created_at FROM orders
-                               WHERE customer_phone IS NOT NULL AND customer_phone != '' AND customer_phone = ? ORDER BY created_at DESC LIMIT ?`,
-                            )
-                            .bind(nonEmptyPhone, orderLimit)
-                            .all<Record<string, unknown>>(),
-                        )
-                    : Promise.resolve({ results: [] as Record<string, unknown>[] }),
-                ),
-            ),
+                        .all<Record<string, unknown>>(),
+                    ),
+                )
+            : Promise.resolve({ results: [] as Record<string, unknown>[] }),
         ),
 
       db
         .prepare(
           `SELECT purpose, granted, COALESCE(revoked_at, granted_at) AS updated_at FROM consents
-           WHERE customer_id = ? AND revoked_at IS NULL ORDER BY granted_at DESC`,
+           WHERE customer_id = ? AND revoked_at IS NULL
+             AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?
+           ORDER BY granted_at DESC`,
         )
-        .bind(customerId)
+        .bind(customerId, customerTenant)
         .all<{ purpose: string; granted: number; updated_at: string }>()
         .catch(() =>
-          db
-            .prepare(
-              `SELECT purpose, granted, updated_at FROM consents
-               WHERE customer_id = ? AND revoked_at IS NULL ORDER BY updated_at DESC`,
-            )
-            .bind(customerId)
-            .all<{ purpose: string; granted: number; updated_at: string }>(),
+          customerTenant === 'default'
+            ? db
+                .prepare(
+                  `SELECT purpose, granted, COALESCE(revoked_at, granted_at) AS updated_at FROM consents
+                   WHERE customer_id = ? AND revoked_at IS NULL ORDER BY granted_at DESC`,
+                )
+                .bind(customerId)
+                .all<{ purpose: string; granted: number; updated_at: string }>()
+                .catch(() =>
+                  db
+                    .prepare(
+                      `SELECT purpose, granted, updated_at FROM consents
+                       WHERE customer_id = ? AND revoked_at IS NULL ORDER BY updated_at DESC`,
+                    )
+                    .bind(customerId)
+                    .all<{ purpose: string; granted: number; updated_at: string }>(),
+                )
+            : Promise.resolve({ results: [] as { purpose: string; granted: number; updated_at: string }[] }),
         ),
 
-      loadPolicy(db, undefined, new Date(), customerTenant).catch(() => null),
+      loadPolicy(db, normalizedOpts.kv, new Date(), customerTenant).catch(() => null),
     ]);
 
     const lifetimePoints = customer.lifetime_points ?? 0;

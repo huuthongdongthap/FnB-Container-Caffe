@@ -335,4 +335,64 @@ describe('useOrderStore', () => {
     expect(intervalsStarted()).toBe(0);
     expect(useOrderStore.getState().pollingId).toBeNull();
   });
+
+  it('aborts an in-flight initial fetchOrder even before polling starts when unsubscribed', async () => {
+    let resolveInitial: (value: unknown) => void = () => {};
+    let capturedSignal: AbortSignal | undefined;
+    mockApiFetch.mockImplementationOnce((_path: string, opts?: { signal?: AbortSignal }) => {
+      capturedSignal = opts?.signal;
+      return new Promise((resolve) => { resolveInitial = resolve; });
+    });
+
+    useOrderStore.getState().subscribeToOrder('ord-initial');
+    const inFlight = useOrderStore.getState().fetchOrder('ord-initial');
+
+    expect(capturedSignal).toBeDefined();
+    expect(capturedSignal?.aborted).toBe(false);
+
+    useOrderStore.getState().unsubscribeFromOrder();
+    expect(capturedSignal?.aborted).toBe(true);
+
+    resolveInitial({ data: MOCK_ORDER });
+    await inFlight;
+
+    expect(useOrderStore.getState().currentOrder).toBeNull();
+  });
+
+  it('switching order A -> order B aborts in-flight order A read and ignores late order A SSE/HTTP updates', async () => {
+    let resolveOrderA: (value: unknown) => void = () => {};
+    let resolveOrderB: (value: unknown) => void = () => {};
+    let signalA: AbortSignal | undefined;
+
+    mockApiFetch
+      .mockImplementationOnce((_path: string, opts?: { signal?: AbortSignal }) => {
+        signalA = opts?.signal;
+        return new Promise((resolve) => { resolveOrderA = resolve; });
+      })
+      .mockImplementationOnce(() => new Promise((resolve) => { resolveOrderB = resolve; }));
+
+    useOrderStore.getState().subscribeToOrder('ord-A');
+    const fetchA = useOrderStore.getState().fetchOrder('ord-A');
+    const streamA = FakeEventSource.instances[0]!;
+
+    useOrderStore.getState().subscribeToOrder('ord-B');
+    const fetchB = useOrderStore.getState().fetchOrder('ord-B');
+
+    expect(signalA?.aborted).toBe(true);
+    expect(streamA.closed).toBe(true);
+
+    // Late SSE event from order A must be ignored
+    streamA.emit('update_order', JSON.stringify({ id: 'ord-A', status: 'ready' }));
+    expect(useOrderStore.getState().currentOrder).toBeNull();
+
+    // Late HTTP response from order A must be discarded
+    resolveOrderA({ data: { ...MOCK_ORDER, id: 'ord-A', status: 'preparing' } });
+    await fetchA;
+    expect(useOrderStore.getState().currentOrder).toBeNull();
+
+    // Order B resolves and is applied
+    resolveOrderB({ data: { ...MOCK_ORDER, id: 'ord-B', status: 'confirmed' } });
+    await fetchB;
+    expect(useOrderStore.getState().currentOrder?.id).toBe('ord-B');
+  });
 });

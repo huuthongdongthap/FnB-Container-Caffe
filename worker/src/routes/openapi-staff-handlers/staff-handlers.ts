@@ -1,14 +1,14 @@
 import type { OpenAPIHono } from '@hono/zod-openapi';
 import type { Env } from '../../types/env';
 import { StaffRoutes } from '../../schemas/staff';
-import { getDatabase } from '../../lib/db';
+import { getDatabase, matchesTenantRow } from '../../lib/db';
 import { hashPassword } from '../../lib/jwt';
-import { getTenantId } from '../../middleware/tenant';
+import { getTenantId, isHQSuperAdmin } from '../../middleware/tenant';
 import { loadStaffAccount, SessionUnavailableError } from '../../lib/staff-session';
 import { staffManagementDenial, staffMutationGuard } from '../../lib/staff-account-mutation';
 import { createStaffIdentity, staffEmailInUse } from '../../lib/staff-login-identity';
 
-import { shiftScope } from '../../../../packages/domain/shift/commands/shift-access';
+import { extractRequestedShiftTenant, shiftScope } from '../../../../packages/domain/shift/commands/shift-access';
 import { listShifts } from '../../../../packages/domain/shift/commands/shift-repository';
 import { shiftDto, attendanceDto } from '../../../../packages/domain/shift/model/shift-types';
 
@@ -24,49 +24,132 @@ async function writeStaffAuditLog(
   now: string,
   tenantId: string = 'default'
 ): Promise<void> {
-  const effectiveTenant = !tenantId || tenantId === '*' ? 'default' : tenantId.trim() || 'default';
+  const rawTenant = tenantId ? tenantId.trim() : '';
+  const effectiveTenant = !rawTenant || rawTenant === '*' || rawTenant.toLowerCase() === 'hq' ? 'default' : rawTenant;
+  const auditId = `audit_${crypto.randomUUID()}`;
+  let enrichedMeta = metadata;
+  try {
+    const parsed = JSON.parse(metadata);
+    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed) && parsed.tenant_id === undefined) {
+      enrichedMeta = JSON.stringify({ ...parsed, tenant_id: effectiveTenant });
+    }
+  } catch { /* non-JSON metadata */ }
   try {
     await db.prepare(
       `INSERT INTO audit_logs (id, user_id, action, entity_type, entity_id, metadata, tenant_id, created_at)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
-    ).bind(`audit_${crypto.randomUUID()}`, userId, action, entityType, entityId, metadata, effectiveTenant, now).run();
+    ).bind(auditId, userId, action, entityType, entityId, enrichedMeta, effectiveTenant, now).run();
   } catch {
     try {
       await db.prepare(
-        `INSERT INTO audit_logs (id, user_id, action, entity_type, entity_id, metadata, created_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?)`
-      ).bind(`audit_${crypto.randomUUID()}`, userId, action, entityType, entityId, metadata, now).run();
+        `INSERT INTO audit_logs (actor_id, actor_name, user_id, action, resource_type, resource_id, entity_type, entity_id, details, metadata, tenant_id, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      ).bind(userId, userId, userId, action, entityType, entityId, entityType, entityId, enrichedMeta, enrichedMeta, effectiveTenant, now).run();
     } catch {
-      try {
-        await db.prepare(
-          `INSERT INTO audit_logs (actor_id, actor_name, user_id, action, resource_type, resource_id, entity_type, entity_id, details, metadata, tenant_id, created_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-        ).bind(userId, userId, userId, action, entityType, entityId, entityType, entityId, metadata, metadata, effectiveTenant, now).run();
-      } catch {
+      if (effectiveTenant === 'default') {
         try {
           await db.prepare(
-            `INSERT INTO audit_logs (actor_id, actor_name, user_id, action, resource_type, resource_id, entity_type, entity_id, details, metadata, created_at)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-          ).bind(userId, userId, userId, action, entityType, entityId, entityType, entityId, metadata, metadata, now).run();
+            `INSERT INTO audit_logs (id, user_id, action, entity_type, entity_id, metadata, created_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?)`
+          ).bind(auditId, userId, action, entityType, entityId, enrichedMeta, now).run();
         } catch {
           try {
             await db.prepare(
-              `INSERT INTO audit_logs (actor_id, actor_name, action, resource_type, resource_id, details, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)`
-            ).bind(userId, userId, action, entityType, entityId, metadata, now).run().catch(() => {});
+              `INSERT INTO audit_logs (actor_id, actor_name, user_id, action, resource_type, resource_id, entity_type, entity_id, details, metadata, created_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+            ).bind(userId, userId, userId, action, entityType, entityId, entityType, entityId, enrichedMeta, enrichedMeta, now).run();
           } catch {
-            // Ignore audit log error
+            try {
+              await db.prepare(
+                `INSERT INTO audit_logs (actor_id, actor_name, action, resource_type, resource_id, details, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)`
+              ).bind(userId, userId, action, entityType, entityId, enrichedMeta, now).run().catch(() => {});
+            } catch {
+              // Ignore audit log error
+            }
           }
         }
       }
     }
   }
+  await db
+    .prepare('UPDATE audit_logs SET tenant_id = ? WHERE id = ?')
+    .bind(effectiveTenant, auditId)
+    .run()
+    .catch(() => {});
+}
+
+function resolveOpenApiStaffTenant(c: any): {
+  ok: true;
+  tenantId: string;
+  callerTenant: string;
+  isHq: boolean;
+} | { ok: false } {
+  const user = c.get?.('user') as
+    | { id?: string; role?: string; tenantId?: string; tenant_id?: string }
+    | undefined;
+  const rawCallerTenant =
+    (typeof user?.tenantId === 'string' && user.tenantId.trim()) ||
+    (typeof user?.tenant_id === 'string' && user.tenant_id.trim()) ||
+    '';
+  const hasCallerTenant = rawCallerTenant.length > 0;
+  const callerTenant = hasCallerTenant ? rawCallerTenant : 'default';
+  const isHq = isHQSuperAdmin(user);
+
+  const requestedHeaderOrQuery = extractRequestedShiftTenant(c);
+  if (requestedHeaderOrQuery === '__CONFLICT__') {
+    return { ok: false };
+  }
+  const rawCtxTenant = String((c.get?.('tenantId') as string | undefined) || '').trim();
+  const ctxTenant = getTenantId(c).trim() || 'default';
+
+  if (!isHq) {
+    if (callerTenant === '*' || callerTenant.toLowerCase() === 'hq') {
+      return { ok: false };
+    }
+    if (
+      requestedHeaderOrQuery &&
+      (requestedHeaderOrQuery === '*' ||
+        requestedHeaderOrQuery.toLowerCase() === 'hq' ||
+        requestedHeaderOrQuery !== callerTenant)
+    ) {
+      return { ok: false };
+    }
+    if (hasCallerTenant && rawCtxTenant && rawCtxTenant !== callerTenant) {
+      return { ok: false };
+    }
+    if (!hasCallerTenant && (rawCtxTenant === '*' || rawCtxTenant.toLowerCase() === 'hq')) {
+      return { ok: false };
+    }
+    return {
+      ok: true,
+      tenantId: hasCallerTenant ? callerTenant : ctxTenant,
+      callerTenant,
+      isHq,
+    };
+  }
+
+  const normalizedCtx = rawCtxTenant === '*' || rawCtxTenant.toLowerCase() === 'hq' ? '' : rawCtxTenant;
+  const cleanReq =
+    requestedHeaderOrQuery && requestedHeaderOrQuery !== '*' && requestedHeaderOrQuery.toLowerCase() !== 'hq'
+      ? requestedHeaderOrQuery
+      : '';
+  const effective =
+    requestedHeaderOrQuery === '*' || requestedHeaderOrQuery.toLowerCase() === 'hq'
+      ? '*'
+      : cleanReq || normalizedCtx || '*';
+  const resolved = effective === '*' || effective.toLowerCase() === 'hq' ? '*' : effective;
+  return { ok: true, tenantId: resolved, callerTenant, isHq };
 }
 
 export function registerStaffHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
   // GET /api/staff - List staff
   app.openapi(StaffRoutes.list as any, async (c: any) => {
     const db = getDatabase(c);
-    const tenantId = getTenantId(c).trim() || 'default';
+    const tenantCheck = resolveOpenApiStaffTenant(c);
+    if (!tenantCheck.ok) {
+      return c.json({ success: false, error: 'Cross-tenant access denied' }, 403);
+    }
+    const { tenantId } = tenantCheck;
     const query = c.req.valid('query');
     const { page = 1, limit = 20, sort = 'name', order = 'asc', role, isActive, search } = query;
 
@@ -153,8 +236,14 @@ export function registerStaffHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
       rawRows = rows.results || [];
     }
 
+    const caller = c.get('user');
+    const canViewUnmaskedPii = Boolean(
+      caller?.role && ['owner', 'admin', 'manager'].includes(String(caller.role).toLowerCase())
+    );
     const staff = rawRows.map((s: any) => ({
       ...s,
+      email: canViewUnmaskedPii || s.id === caller?.id ? (s.email ?? null) : null,
+      phone: canViewUnmaskedPii || s.id === caller?.id ? (s.phone ?? null) : null,
       role: s.role,
       locale: s.locale ?? 'vi',
       isActive: s.is_active === 1,
@@ -172,7 +261,11 @@ export function registerStaffHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
   // GET /api/staff/:id - Get staff by ID
   app.openapi(StaffRoutes.get as any, async (c: any) => {
     const db = getDatabase(c);
-    const tenantId = getTenantId(c).trim() || 'default';
+    const tenantCheck = resolveOpenApiStaffTenant(c);
+    if (!tenantCheck.ok) {
+      return c.json({ success: false, error: 'Cross-tenant access denied' }, 403);
+    }
+    const { tenantId } = tenantCheck;
     const { id } = c.req.valid('param');
     const account = await loadStaffAccount(db, id);
     if (!account.ok || (tenantId !== '*' && ((account.account.tenant_id || '').trim() || 'default') !== tenantId)) return c.json({ success: false, error: 'Staff not found' }, 404);
@@ -195,16 +288,23 @@ export function registerStaffHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
       return c.json({ success: false, error: 'Staff not found' }, 404);
     }
 
-    const scope = await shiftScope(c.env, c.get('user'));
+    const targetStaffTenant = (account.account.tenant_id || '').trim() || 'default';
+    const scope = await shiftScope(c.env, c.get('user'), tenantId === '*' ? targetStaffTenant : tenantId);
     const shifts = await listShifts(scope, { staffId: id, limit: 10 });
     const attendance = await listShifts(scope, { staffId: id, attendanceOnly: true, limit: 10 });
     const shiftResults = shifts.rows.map(shiftDto);
     const attendanceResults = attendance.rows.map(attendanceDto);
 
+    const caller = c.get('user');
+    const canViewUnmaskedPii = Boolean(
+      caller?.role && ['owner', 'admin', 'manager'].includes(String(caller.role).toLowerCase())
+    );
     return c.json({
       success: true,
       data: {
         ...staff,
+        email: canViewUnmaskedPii || staff.id === caller?.id ? (staff.email ?? null) : null,
+        phone: canViewUnmaskedPii || staff.id === caller?.id ? (staff.phone ?? null) : null,
         role: staff.role,
         locale: staff.locale ?? 'vi',
         isActive: staff.is_active === 1,
@@ -237,34 +337,142 @@ export function registerStaffHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
       return c.json({ success: false, error: 'Manager không được tạo tài khoản quản lý' }, 403);
     }
 
-    // Check if email exists
-    let existing: unknown = null;
+    const tenantCheck = resolveOpenApiStaffTenant(c);
+    if (!tenantCheck.ok) {
+      return c.json({ success: false, error: 'Cross-tenant access denied' }, 403);
+    }
+    let rawPayload: Record<string, any> = {};
     try {
-      existing = await db.prepare('SELECT id FROM users WHERE email = ?').bind(body.email).first();
+      rawPayload = (await c.req?.json?.()) || {};
     } catch {
-      if (body.phone) {
-        existing = await db.prepare('SELECT id FROM users WHERE phone = ?').bind(body.phone).first().catch(() => null);
+      rawPayload = {};
+    }
+    const bodyTenantCandidates = [
+      typeof body.locationId === 'string' ? body.locationId.trim() : '',
+      typeof (body as any).tenant_id === 'string' ? (body as any).tenant_id.trim() : '',
+      typeof (body as any).tenantId === 'string' ? (body as any).tenantId.trim() : '',
+      typeof rawPayload?.locationId === 'string' ? rawPayload.locationId.trim() : '',
+      typeof rawPayload?.tenant_id === 'string' ? rawPayload.tenant_id.trim() : '',
+      typeof rawPayload?.tenantId === 'string' ? rawPayload.tenantId.trim() : '',
+      typeof rawPayload?.store_id === 'string' ? rawPayload.store_id.trim() : '',
+      typeof rawPayload?.storeId === 'string' ? rawPayload.storeId.trim() : '',
+    ].filter(Boolean);
+    if (new Set(bodyTenantCandidates).size > 1) {
+      return c.json({ success: false, error: 'Cross-tenant access denied' }, 403);
+    }
+    const rawBodyTenant = bodyTenantCandidates[0] || '';
+    if (rawBodyTenant) {
+      if (!tenantCheck.isHq) {
+        if (
+          rawBodyTenant === '*' ||
+          rawBodyTenant.toLowerCase() === 'hq' ||
+          rawBodyTenant !== tenantCheck.callerTenant
+        ) {
+          return c.json({ success: false, error: 'Cross-tenant access denied' }, 403);
+        }
+      } else if (
+        tenantCheck.tenantId !== '*' &&
+        rawBodyTenant !== '*' &&
+        rawBodyTenant.toLowerCase() !== 'hq' &&
+        rawBodyTenant !== tenantCheck.tenantId
+      ) {
+        return c.json({ success: false, error: 'Cross-tenant access denied' }, 403);
       }
     }
-    if (existing) {
+    const cleanBodyTenant =
+      rawBodyTenant && rawBodyTenant !== '*' && rawBodyTenant.toLowerCase() !== 'hq'
+        ? rawBodyTenant
+        : '';
+    const rawTenantId = tenantCheck.tenantId;
+    const staffTenant = tenantCheck.isHq
+      ? (rawTenantId === '*' ? (cleanBodyTenant || 'default') : rawTenantId)
+      : tenantCheck.callerTenant;
+
+    // Check if email exists within the target tenant
+    let existing: Record<string, unknown> | null = null;
+    try {
+      existing = await db
+        .prepare(
+          "SELECT id, tenant_id FROM users WHERE email = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
+        )
+        .bind(body.email, staffTenant)
+        .first<Record<string, unknown>>();
+    } catch {
+      if (staffTenant === 'default') {
+        try {
+          const unscopedEmail = await db
+            .prepare('SELECT id, tenant_id FROM users WHERE email = ?')
+            .bind(body.email)
+            .first<Record<string, unknown>>();
+          if (unscopedEmail && matchesTenantRow(unscopedEmail, staffTenant)) {
+            existing = unscopedEmail;
+          }
+        } catch {
+          try {
+            const legacyEmail = await db
+              .prepare('SELECT id FROM users WHERE email = ?')
+              .bind(body.email)
+              .first<Record<string, unknown>>();
+            if (legacyEmail && matchesTenantRow(legacyEmail, staffTenant)) {
+              existing = legacyEmail;
+            }
+          } catch {
+            if (body.phone) {
+              const fallbackPhone = await db
+                .prepare('SELECT id FROM users WHERE phone = ?')
+                .bind(body.phone)
+                .first<Record<string, unknown>>()
+                .catch(() => null);
+              if (fallbackPhone && matchesTenantRow(fallbackPhone, staffTenant)) {
+                existing = fallbackPhone;
+              }
+            }
+          }
+        }
+      }
+    }
+    if (existing && matchesTenantRow(existing, staffTenant)) {
       return c.json({ success: false, error: 'Email already exists' }, 409);
     }
     if (body.phone && String(body.phone).trim() !== '') {
-      let existingPhone: unknown = null;
+      const normalizedPhone = String(body.phone).trim();
+      let existingPhone: Record<string, unknown> | null = null;
       try {
-        existingPhone = await db.prepare('SELECT id, tenant_id FROM users WHERE phone = ?').bind(String(body.phone).trim()).first();
+        existingPhone = await db
+          .prepare(
+            "SELECT id, tenant_id FROM users WHERE phone = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
+          )
+          .bind(normalizedPhone, staffTenant)
+          .first<Record<string, unknown>>();
       } catch {
-        existingPhone = await db.prepare('SELECT id FROM users WHERE phone = ?').bind(String(body.phone).trim()).first().catch(() => null);
+        if (staffTenant === 'default') {
+          try {
+            const unscopedPhone = await db
+              .prepare('SELECT id, tenant_id FROM users WHERE phone = ?')
+              .bind(normalizedPhone)
+              .first<Record<string, unknown>>();
+            if (unscopedPhone && matchesTenantRow(unscopedPhone, staffTenant)) {
+              existingPhone = unscopedPhone;
+            }
+          } catch {
+            const legacyPhone = await db
+              .prepare('SELECT id FROM users WHERE phone = ?')
+              .bind(normalizedPhone)
+              .first<Record<string, unknown>>()
+              .catch(() => null);
+            if (legacyPhone && matchesTenantRow(legacyPhone, staffTenant)) {
+              existingPhone = legacyPhone;
+            }
+          }
+        }
       }
-      if (existingPhone) {
+      if (existingPhone && matchesTenantRow(existingPhone, staffTenant)) {
         return c.json({ success: false, error: 'Phone number already exists' }, 409);
       }
     }
 
     const passwordHash = await hashPassword(body.password);
     const id = crypto.randomUUID();
-    const rawTenantId = getTenantId(c).trim() || 'default';
-    const staffTenant = rawTenantId === '*' ? (String(user?.tenantId || user?.tenant_id || '').trim() || 'default') : rawTenantId;
 
     if (!await createStaffIdentity(c.env, { id, name: body.name, email: body.email,
       phone: body.phone || '', role: body.role, tenant_id: staffTenant,
@@ -298,14 +506,18 @@ export function registerStaffHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
     return c.json({
       success: true,
       data: {
-        ...created!,
+        id,
+        name: body.name,
         email: created?.email ?? body.email,
-        role: created!.role,
+        phone: created?.phone ?? body.phone ?? null,
+        role: created?.role ?? body.role,
+        tenant_id: staffTenant,
         locale: created?.locale ?? body.locale ?? 'vi',
-        isActive: created!.is_active === 1,
+        isActive: created ? (created.is_active === 1 || created.isActive === true) : true,
         hireDate: created?.hire_date ?? body.hireDate ?? now.slice(0, 10),
-        createdAt: created!.created_at,
-        updatedAt: created!.updated_at,
+        createdAt: created?.created_at ?? now,
+        updatedAt: created?.updated_at ?? now,
+        ...created,
       },
     }, 201);
   });
@@ -318,14 +530,41 @@ export function registerStaffHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
     const user = c.get('user');
     const now = new Date().toISOString();
 
-    const existing = (await db.prepare('SELECT * FROM users WHERE id = ? AND role != \'customer\'').bind(id).first()) as any;
-    if (!existing) {
-      return c.json({ success: false, error: 'Staff not found' }, 404);
+    const tenantCheck = resolveOpenApiStaffTenant(c);
+    if (!tenantCheck.ok) {
+      return c.json({ success: false, error: 'Cross-tenant access denied' }, 403);
     }
+    const { tenantId } = tenantCheck;
     const authority = await loadStaffAccount(db, id);
     if (!authority.ok) return c.json({ success: false, error: 'Staff not found' }, 404);
     const denied = staffManagementDenial(user, authority.account, body.role);
     if (denied) return c.json({ success: false, error: denied }, 403);
+    let existing: any = null;
+    if (tenantId !== '*') {
+      try {
+        existing = await db
+          .prepare(
+            "SELECT * FROM users WHERE id = ? AND role != 'customer' AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
+          )
+          .bind(id, tenantId)
+          .first();
+      } catch {
+        existing = null;
+      }
+    }
+    if (!existing && (tenantId === '*' || tenantId === 'default')) {
+      existing = await db.prepare("SELECT * FROM users WHERE id = ? AND role != 'customer'").bind(id).first().catch(() => null);
+    }
+    if (!existing) {
+      return c.json({ success: false, error: 'Staff not found' }, 404);
+    }
+    const targetAccountTenant =
+      (authority.account.tenant_id ? String(authority.account.tenant_id).trim() : '') ||
+      (existing.tenant_id ? String(existing.tenant_id).trim() : '') ||
+      'default';
+    if (!matchesTenantRow(existing as Record<string, unknown>, tenantId) || (tenantId !== '*' && targetAccountTenant !== tenantId)) {
+      return c.json({ success: false, error: 'Staff not found' }, 404);
+    }
 
     if ((existing.role === 'owner' || body.role === 'owner') && user?.role !== 'owner') {
       return c.json({ success: false, error: 'Only owners can modify or assign owner accounts' }, 403);
@@ -345,28 +584,77 @@ export function registerStaffHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
     if (body.email !== undefined) {
       if (await staffEmailInUse(c.env, body.email, id)) return c.json({ success: false, error: 'Email already exists' }, 409);
       const identity = await db.prepare('SELECT staff_id FROM staff_login_identities WHERE email = ? AND staff_id != ?')
-        .bind(body.email, id).first();
+        .bind(body.email, id).first().catch(() => null);
       if (identity) return c.json({ success: false, error: 'Email already exists' }, 409);
-      let emailExists: unknown = null;
+      let emailExists: Record<string, unknown> | null = null;
       try {
-        emailExists = await db.prepare('SELECT id FROM users WHERE email = ? AND id != ?').bind(body.email, id).first();
+        emailExists = await db
+          .prepare(
+            "SELECT id, tenant_id FROM users WHERE email = ? AND id != ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
+          )
+          .bind(body.email, id, targetAccountTenant)
+          .first<Record<string, unknown>>();
       } catch {
-        emailExists = null;
+        if (targetAccountTenant === 'default') {
+          try {
+            const unscopedEmail = await db
+              .prepare('SELECT id, tenant_id FROM users WHERE email = ? AND id != ?')
+              .bind(body.email, id)
+              .first<Record<string, unknown>>();
+            if (unscopedEmail && matchesTenantRow(unscopedEmail, targetAccountTenant)) {
+              emailExists = unscopedEmail;
+            }
+          } catch {
+            const legacyEmail = await db
+              .prepare('SELECT id FROM users WHERE email = ? AND id != ?')
+              .bind(body.email, id)
+              .first<Record<string, unknown>>()
+              .catch(() => null);
+            if (legacyEmail && matchesTenantRow(legacyEmail, targetAccountTenant)) {
+              emailExists = legacyEmail;
+            }
+          }
+        }
       }
-      if (emailExists) {
+      if (emailExists && matchesTenantRow(emailExists, targetAccountTenant)) {
         return c.json({ success: false, error: 'Email already exists' }, 409);
       }
       updates.push('email = ?'); params.push(body.email);
     }
     if (body.phone !== undefined) {
       if (String(body.phone).trim() !== '') {
-        let phoneExists: unknown = null;
+        const normalizedPhone = String(body.phone).trim();
+        let phoneExists: Record<string, unknown> | null = null;
         try {
-          phoneExists = await db.prepare('SELECT id FROM users WHERE phone = ? AND id != ?').bind(String(body.phone).trim(), id).first();
+          phoneExists = await db
+            .prepare(
+              "SELECT id, tenant_id FROM users WHERE phone = ? AND id != ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
+            )
+            .bind(normalizedPhone, id, targetAccountTenant)
+            .first<Record<string, unknown>>();
         } catch {
-          phoneExists = null;
+          if (targetAccountTenant === 'default') {
+            try {
+              const unscopedPhone = await db
+                .prepare('SELECT id, tenant_id FROM users WHERE phone = ? AND id != ?')
+                .bind(normalizedPhone, id)
+                .first<Record<string, unknown>>();
+              if (unscopedPhone && matchesTenantRow(unscopedPhone, targetAccountTenant)) {
+                phoneExists = unscopedPhone;
+              }
+            } catch {
+              const legacyPhone = await db
+                .prepare('SELECT id FROM users WHERE phone = ? AND id != ?')
+                .bind(normalizedPhone, id)
+                .first<Record<string, unknown>>()
+                .catch(() => null);
+              if (legacyPhone && matchesTenantRow(legacyPhone, targetAccountTenant)) {
+                phoneExists = legacyPhone;
+              }
+            }
+          }
         }
-        if (phoneExists) {
+        if (phoneExists && matchesTenantRow(phoneExists, targetAccountTenant)) {
           return c.json({ success: false, error: 'Phone number already exists' }, 409);
         }
       }
@@ -443,13 +731,15 @@ export function registerStaffHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
       staffParams.push(now);
       staffParams.push(id);
       if (staffUpdates.length > 1) {
-        const targetStaffTenant = (authority.account.tenant_id ? String(authority.account.tenant_id).trim() : '') || 'default';
+        const targetStaffTenant = targetAccountTenant;
         try {
           await db.prepare(
             `UPDATE staff_users SET ${staffUpdates.join(', ')} WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?`
           ).bind(...staffParams, targetStaffTenant).run();
         } catch {
-          await db.prepare(`UPDATE staff_users SET ${staffUpdates.join(', ')} WHERE id = ?`).bind(...staffParams).run();
+          if (targetStaffTenant === 'default') {
+            await db.prepare(`UPDATE staff_users SET ${staffUpdates.join(', ')} WHERE id = ?`).bind(...staffParams).run();
+          }
         }
       }
     } catch {
@@ -459,10 +749,23 @@ export function registerStaffHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
     // Dual-store sync: update AUTH_KV cached user record if bound
     if (c.env.AUTH_KV) {
       try {
-        const oldEmail = existing.email;
+        let oldEmail = existing.email ? String(existing.email).trim() : '';
+        if (!oldEmail) {
+          try {
+            const identityRow = await db
+              .prepare('SELECT email FROM staff_login_identities WHERE staff_id = ? LIMIT 1')
+              .bind(id)
+              .first<{ email?: string | null }>();
+            if (identityRow?.email && String(identityRow.email).trim()) {
+              oldEmail = String(identityRow.email).trim();
+            }
+          } catch {
+            // staff_login_identities optional
+          }
+        }
         const newEmail = body.email || oldEmail;
-        const kvKey = `user:${oldEmail}`;
-        const raw = await c.env.AUTH_KV.get(kvKey);
+        const kvKey = oldEmail ? `user:${oldEmail}` : '';
+        const raw = kvKey ? await c.env.AUTH_KV.get(kvKey) : null;
         let kvUser: any = raw ? JSON.parse(raw) : null;
         if (!kvUser) {
           const rawById = await c.env.AUTH_KV.get(`user:${id}`);
@@ -484,10 +787,12 @@ export function registerStaffHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
             auth_version: nextAuthVersion,
             updated_at: now,
           };
-          if (newEmail !== oldEmail) {
+          if (kvKey && newEmail !== oldEmail) {
             await c.env.AUTH_KV.delete(kvKey);
           }
-          await c.env.AUTH_KV.put(`user:${newEmail}`, JSON.stringify(updatedKv));
+          if (newEmail) {
+            await c.env.AUTH_KV.put(`user:${newEmail}`, JSON.stringify(updatedKv));
+          }
           await c.env.AUTH_KV.put(`user:${id}`, JSON.stringify(updatedKv)).catch(() => {});
         }
       } catch {
@@ -497,7 +802,11 @@ export function registerStaffHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
 
     // Audit log (redact password if present)
     const { password: _redactedUpdatePw, ...auditUpdateBody } = body;
-    const updateAuditTenant = (authority.account.tenant_id ? String(authority.account.tenant_id).trim() : '') || getTenantId(c).trim() || 'default';
+    const updateAuditTenant =
+      (authority.account.tenant_id ? String(authority.account.tenant_id).trim() : '') ||
+      (existing.tenant_id ? String(existing.tenant_id).trim() : '') ||
+      getTenantId(c).trim() ||
+      'default';
     await writeStaffAuditLog(db, user.id, 'staff_update', 'user', id, JSON.stringify(auditUpdateBody), now, updateAuditTenant);
 
     let updated: any = null;
@@ -534,7 +843,27 @@ export function registerStaffHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
     const user = c.get('user');
     const now = new Date().toISOString();
 
-    const existing = (await db.prepare('SELECT * FROM users WHERE id = ? AND role != \'customer\'').bind(id).first()) as any;
+    const tenantCheck = resolveOpenApiStaffTenant(c);
+    if (!tenantCheck.ok) {
+      return c.json({ success: false, error: 'Cross-tenant access denied' }, 403);
+    }
+    const { tenantId } = tenantCheck;
+    let existing: any = null;
+    if (tenantId !== '*') {
+      try {
+        existing = await db
+          .prepare(
+            "SELECT * FROM users WHERE id = ? AND role != 'customer' AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
+          )
+          .bind(id, tenantId)
+          .first();
+      } catch {
+        existing = null;
+      }
+    }
+    if (!existing && (tenantId === '*' || tenantId === 'default')) {
+      existing = await db.prepare("SELECT * FROM users WHERE id = ? AND role != 'customer'").bind(id).first();
+    }
     if (!existing) {
       return c.json({ success: false, error: 'Staff not found' }, 404);
     }
@@ -542,6 +871,13 @@ export function registerStaffHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
     if (!authority.ok) return c.json({ success: false, error: 'Staff not found' }, 404);
     const denied = staffManagementDenial(user, authority.account, undefined);
     if (denied) return c.json({ success: false, error: denied }, 403);
+    const targetAccountTenant =
+      (authority.account.tenant_id ? String(authority.account.tenant_id).trim() : '') ||
+      (existing.tenant_id ? String(existing.tenant_id).trim() : '') ||
+      'default';
+    if (!matchesTenantRow(existing as Record<string, unknown>, tenantId) || (tenantId !== '*' && targetAccountTenant !== tenantId)) {
+      return c.json({ success: false, error: 'Staff not found' }, 404);
+    }
 
     if (existing.role === 'owner' && user?.role !== 'owner') {
       return c.json({ success: false, error: 'Only owners can delete owner accounts' }, 403);
@@ -557,13 +893,15 @@ export function registerStaffHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
     if (!result.meta.changes) return c.json({ success: false, error: 'Không thể vô hiệu hóa owner cuối cùng hoặc trạng thái đã đổi' }, 409);
 
     try {
-      const targetStaffTenant = (authority.account.tenant_id ? String(authority.account.tenant_id).trim() : '') || 'default';
+      const targetStaffTenant = targetAccountTenant;
       try {
         await db.prepare(
           "UPDATE staff_users SET is_active = 0, updated_at = ? WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
         ).bind(now, id, targetStaffTenant).run();
       } catch {
-        await db.prepare('UPDATE staff_users SET is_active = 0, updated_at = ? WHERE id = ?').bind(now, id).run();
+        if (targetStaffTenant === 'default') {
+          await db.prepare('UPDATE staff_users SET is_active = 0, updated_at = ? WHERE id = ?').bind(now, id).run();
+        }
       }
     } catch {
       // staff_users table optional
@@ -571,7 +909,21 @@ export function registerStaffHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
 
     if (c.env.AUTH_KV) {
       try {
-        const emailKey = existing.email ? `user:${existing.email}` : null;
+        let resolvedDeleteEmail = existing.email ? String(existing.email).trim() : '';
+        if (!resolvedDeleteEmail) {
+          try {
+            const identityRow = await db
+              .prepare('SELECT email FROM staff_login_identities WHERE staff_id = ? LIMIT 1')
+              .bind(id)
+              .first<{ email?: string | null }>();
+            if (identityRow?.email && String(identityRow.email).trim()) {
+              resolvedDeleteEmail = String(identityRow.email).trim();
+            }
+          } catch {
+            // staff_login_identities optional
+          }
+        }
+        const emailKey = resolvedDeleteEmail ? `user:${resolvedDeleteEmail}` : null;
         const rawByEmail = emailKey ? await c.env.AUTH_KV.get(emailKey) : null;
         const rawById = await c.env.AUTH_KV.get(`user:${id}`);
         const baseKv = rawByEmail ? JSON.parse(rawByEmail) : (rawById ? JSON.parse(rawById) : existing);
@@ -594,7 +946,11 @@ export function registerStaffHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
     }
 
     // Audit log
-    const deleteAuditTenant = (authority.account.tenant_id ? String(authority.account.tenant_id).trim() : '') || getTenantId(c).trim() || 'default';
+    const deleteAuditTenant =
+      (authority.account.tenant_id ? String(authority.account.tenant_id).trim() : '') ||
+      (existing.tenant_id ? String(existing.tenant_id).trim() : '') ||
+      getTenantId(c).trim() ||
+      'default';
     await writeStaffAuditLog(db, user.id, 'staff_delete', 'user', id, JSON.stringify({ name: existing.name }), now, deleteAuditTenant);
 
     return c.json({ success: true, data: { success: true } });

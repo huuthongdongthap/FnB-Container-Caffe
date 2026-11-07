@@ -2,11 +2,11 @@ import { OpenAPIHono } from '@hono/zod-openapi';
 import { requireAuth, optionalAuth } from '../../middleware/auth';
 import type { Env } from '../../types/env';
 import { registerProductReadHandlers } from './read-handlers';
-import { registerProductMutationHandlers } from './mutation-handlers';
+import { registerProductMutationHandlers, PRODUCT_WRITE_ROLES } from './mutation-handlers';
 
 export const openApiProductsRouter = new OpenAPIHono<{ Bindings: Env }>();
 
-const staffAuth = requireAuth(['owner', 'manager', 'supervisor', 'admin']);
+const staffAuth = requireAuth(PRODUCT_WRITE_ROLES);
 
 // Apply auth middleware to mutations only (keeping public GET routes unauthenticated)
 openApiProductsRouter.use('/api/products', async (c, next) => {

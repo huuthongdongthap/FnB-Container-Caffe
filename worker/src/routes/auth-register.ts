@@ -28,10 +28,11 @@ export async function registerWithVerification(request: Request, env: Record<str
       return errorResponse(first.message, 400);
     }
 
-    const { email, password, name, phone } = parsed.data;
+    const { email: rawEmail, password, name, phone } = parsed.data;
+    const email = rawEmail.trim().toLowerCase();
 
     const authKV = env.AUTH_KV as import('@cloudflare/workers-types').KVNamespace;
-    const existingUser = await authKV.get(`user:${email}`);
+    const existingUser = (await authKV.get(`user:${email}`)) || (rawEmail !== email ? await authKV.get(`user:${rawEmail}`) : null);
     if (existingUser) {
       return errorResponse('Email đã được đăng ký', 409);
     }
@@ -40,37 +41,114 @@ export async function registerWithVerification(request: Request, env: Record<str
     let userId = generateId('USR_');
     const now = new Date().toISOString();
     const db = env.AURA_DB as import('@cloudflare/workers-types').D1Database;
-    const rawPilotTenant = typeof env.PILOT_TENANT_ID === 'string' && env.PILOT_TENANT_ID.trim() && env.PILOT_TENANT_ID.trim() !== '*'
-      ? env.PILOT_TENANT_ID.trim()
-      : 'default';
+    const headerCandidates = [
+      request.headers.get('X-Tenant-ID'),
+      request.headers.get('x-tenant-id'),
+      request.headers.get('X-Store-ID'),
+      request.headers.get('x-store-id'),
+    ]
+      .map((v) => (typeof v === 'string' ? v.trim() : ''))
+      .filter(Boolean);
+    const urlCandidates = (() => {
+      try {
+        const u = new URL(request.url);
+        return [
+          u.searchParams.get('tenant_id'),
+          u.searchParams.get('tenantId'),
+          u.searchParams.get('store_id'),
+          u.searchParams.get('storeId'),
+        ]
+          .map((v) => (typeof v === 'string' ? v.trim() : ''))
+          .filter(Boolean);
+      } catch {
+        return [] as string[];
+      }
+    })();
+    const allTenantCandidates = [...headerCandidates, ...urlCandidates];
+    if (new Set(allTenantCandidates).size > 1) {
+      return errorResponse('Forbidden: conflicting tenant overrides', 403);
+    }
+    const requestedTenant = allTenantCandidates[0] || '';
+    if (requestedTenant === '*' || requestedTenant.toLowerCase() === 'hq') {
+      return errorResponse('Forbidden: invalid store tenant', 403);
+    }
+    const validTenantPattern = /^[a-zA-Z0-9_-]{1,64}$/;
+    const rawPilotTenant = requestedTenant && validTenantPattern.test(requestedTenant)
+      ? requestedTenant
+      : (typeof env.PILOT_TENANT_ID === 'string' &&
+          env.PILOT_TENANT_ID.trim() &&
+          env.PILOT_TENANT_ID.trim() !== '*' &&
+          env.PILOT_TENANT_ID.trim().toLowerCase() !== 'hq'
+          ? env.PILOT_TENANT_ID.trim()
+          : 'default');
 
     if (db?.prepare) {
       try {
-        const existingCustomer = await db.prepare(
-          'SELECT id FROM customers WHERE lower(email) = lower(?) OR (? != \'\' AND phone = ?) LIMIT 1'
-        ).bind(email, phone || '', phone || '').first<{ id: string }>().catch(() => null);
-        if (existingCustomer?.id) {
+        let existingCustomer: { id: string; email?: string | null; phone?: string | null; tenant_id?: string | null } | null = null;
+        try {
+          existingCustomer = await db.prepare(
+            `SELECT id, email, phone, tenant_id FROM customers
+             WHERE (lower(email) = lower(?) OR (? != '' AND phone = ? AND (email IS NULL OR TRIM(email) = '')))
+               AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?
+             LIMIT 1`
+          ).bind(email, phone || '', phone || '', rawPilotTenant).first<{ id: string; email?: string | null; phone?: string | null; tenant_id?: string | null }>();
+        } catch {
+          if (rawPilotTenant === 'default') {
+            existingCustomer = await db.prepare(
+              `SELECT id, email, phone FROM customers
+               WHERE lower(email) = lower(?) OR (? != '' AND phone = ? AND (email IS NULL OR TRIM(email) = ''))
+               LIMIT 1`
+            ).bind(email, phone || '', phone || '').first<{ id: string; email?: string | null; phone?: string | null }>().catch(() => null);
+          }
+        }
+
+        const existingTenant = String(existingCustomer?.tenant_id || '').trim() || rawPilotTenant;
+        const existingEmail = String(existingCustomer?.email || '').trim().toLowerCase();
+        const canAdoptCustomer = Boolean(
+          existingCustomer?.id &&
+          existingTenant === rawPilotTenant &&
+          (!existingEmail || existingEmail === email)
+        );
+
+        if (canAdoptCustomer && existingCustomer) {
           userId = existingCustomer.id;
-          await db.prepare(
-            'UPDATE customers SET email = COALESCE(NULLIF(email, \'\'), ?), name = COALESCE(NULLIF(name, \'\'), ?), phone = COALESCE(NULLIF(phone, \'\'), ?), updated_at = ? WHERE id = ?'
-          ).bind(email, name || 'Thành viên', phone || '', now, userId).run().catch(() => {});
+          try {
+            await db.prepare(
+              `UPDATE customers
+               SET email = COALESCE(NULLIF(email, ''), ?),
+                   name = COALESCE(NULLIF(name, ''), ?),
+                   phone = COALESCE(NULLIF(phone, ''), ?),
+                   updated_at = ?
+               WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?`
+            ).bind(email, name || 'Thành viên', phone || '', now, userId, rawPilotTenant).run();
+          } catch {
+            if (rawPilotTenant === 'default') {
+              await db.prepare(
+                'UPDATE customers SET email = COALESCE(NULLIF(email, \'\'), ?), name = COALESCE(NULLIF(name, \'\'), ?), phone = COALESCE(NULLIF(phone, \'\'), ?), updated_at = ? WHERE id = ?'
+              ).bind(email, name || 'Thành viên', phone || '', now, userId).run().catch(() => {});
+            }
+          }
         } else {
           try {
             await db.prepare(
               'INSERT INTO customers (id, email, name, phone, loyalty_points, lifetime_points, loyalty_tier, tenant_id, created_at, updated_at) VALUES (?, ?, ?, ?, 0, 0, ?, ?, ?, ?)'
             ).bind(userId, email, name || 'Thành viên', phone || '', 'bronze', rawPilotTenant, now, now).run();
           } catch {
-            await db.prepare(
-              'INSERT INTO customers (id, email, name, phone, loyalty_points, loyalty_tier, created_at) VALUES (?, ?, ?, ?, 0, ?, ?)'
-            ).bind(userId, email, name || 'Thành viên', phone || '', 'bronze', now).run().catch(() => {});
+            if (rawPilotTenant === 'default') {
+              await db.prepare(
+                'INSERT INTO customers (id, email, name, phone, loyalty_points, loyalty_tier, created_at) VALUES (?, ?, ?, ?, 0, ?, ?)'
+              ).bind(userId, email, name || 'Thành viên', phone || '', 'bronze', now).run().catch(() => {});
+            }
           }
           const walletId = generateId('wal_');
           await db.prepare(
             'INSERT INTO cashback_wallets (id, customer_id, balance, total_earned, total_spent, tenant_id, created_at, updated_at) VALUES (?, ?, 0, 0, 0, ?, ?, ?)'
           ).bind(walletId, userId, rawPilotTenant, now, now).run().catch(async () => {
-            await db.prepare(
-              'INSERT INTO cashback_wallets (id, customer_id, balance, total_earned, total_spent, created_at, updated_at) VALUES (?, ?, 0, 0, 0, ?, ?)'
-            ).bind(walletId, userId, now, now).run().catch(() => {});
+            if (rawPilotTenant === 'default') {
+              await db.prepare(
+                'INSERT INTO cashback_wallets (id, customer_id, balance, total_earned, total_spent, created_at, updated_at) VALUES (?, ?, 0, 0, 0, ?, ?)'
+              ).bind(walletId, userId, now, now).run().catch(() => {});
+            }
           });
         }
       } catch {

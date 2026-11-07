@@ -84,19 +84,59 @@ describe('useAdminOrdersStore', () => {
     expect(useAdminOrdersStore.getState().error).toContain('Không thể tải danh sách đơn hàng');
   });
 
-  it('fetchOrders(): passes filter params', async () => {
+  it('fetchOrders(): passes filter and pagination params', async () => {
     mockSuccess({ orders: [], totalCount: 0 });
 
-    await useAdminOrdersStore.getState().fetchOrders(1, { status: 'pending', payment: 'cash', search: 'test' });
+    await useAdminOrdersStore.getState().fetchOrders(2, { status: 'pending', payment: 'cash', search: 'test' }, 12);
 
     expect(mockApiFetch).toHaveBeenCalled();
     const url = mockApiFetch.mock.calls[0]![0] as string;
+    expect(url).toContain('page=2');
+    expect(url).toContain('limit=12');
+    expect(url).toContain('offset=12');
     expect(url).toContain('status=pending');
     expect(url).toContain('payment_status=cash');
     expect(url).toContain('search=test');
   });
 
-  it('updateOrderStatus(): calls apiFetch with PATCH', async () => {
+  it('fetchOrders(): discards stale out-of-order response when a newer request is already in flight', async () => {
+    let resolvePage1: (value: unknown) => void = () => {};
+    let resolvePage2: (value: unknown) => void = () => {};
+    mockApiFetch
+      .mockImplementationOnce(
+        () => new Promise((resolve) => { resolvePage1 = resolve; }),
+      )
+      .mockImplementationOnce(
+        () => new Promise((resolve) => { resolvePage2 = resolve; }),
+      );
+
+    const p1 = useAdminOrdersStore.getState().fetchOrders(1, { status: 'pending' }, 12);
+    const p2 = useAdminOrdersStore.getState().fetchOrders(2, { status: 'preparing' }, 12);
+
+    resolvePage2({
+      orders: [{ id: 'ORD-PAGE-2', customer: 'Page Two', items: 1, total: 50000, status: 'preparing', payment: 'cash', createdAt: '2026-10-14T11:00:00Z' }],
+      totalCount: 24,
+    });
+    await p2;
+
+    resolvePage1({
+      orders: [{ id: 'ORD-PAGE-1-STALE', customer: 'Stale One', items: 1, total: 40000, status: 'pending', payment: 'cash', createdAt: '2026-10-14T10:00:00Z' }],
+      totalCount: 99,
+    });
+    await p1;
+
+    const state = useAdminOrdersStore.getState();
+    expect(state.page).toBe(2);
+    expect(state.totalCount).toBe(24);
+    expect(state.orders.map((o) => o.id)).toEqual(['ORD-PAGE-2']);
+  });
+
+  it('updateOrderStatus(): calls apiFetch with PATCH and refreshes current page/filters', async () => {
+    useAdminOrdersStore.setState({
+      page: 3,
+      pageSize: 12,
+      activeFilters: { status: 'preparing', search: 'VIP' },
+    });
     mockSuccess({});
     mockSuccess({ orders: [], totalCount: 0 });
 
@@ -106,5 +146,10 @@ describe('useAdminOrdersStore', () => {
       method: 'PATCH',
       body: JSON.stringify({ status: 'completed' }),
     });
+    const refreshUrl = mockApiFetch.mock.calls[1]![0] as string;
+    expect(refreshUrl).toContain('page=3');
+    expect(refreshUrl).toContain('offset=24');
+    expect(refreshUrl).toContain('status=preparing');
+    expect(refreshUrl).toContain('search=VIP');
   });
 });

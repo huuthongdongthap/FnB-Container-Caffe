@@ -22,9 +22,29 @@ export async function autoPostNewPromotions(env: Record<string, unknown>, tenant
   const tenantId = (tenantOverride || resolvePilotStore(env as unknown as Parameters<typeof resolvePilotStore>[0])).trim() || 'default';
   const accounts = accountsStr.split(',').map(Number).filter(n => n > 0);
 
-  const { results } = await db.prepare(
-    'SELECT * FROM promotions WHERE is_active = 1'
-  ).all<PromotionRow>();
+  let results: PromotionRow[] | undefined;
+  let scopedOk = false;
+  if (tenantId !== '*') {
+    try {
+      const stmt = db.prepare(
+        "SELECT * FROM promotions WHERE is_active = 1 AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ? LIMIT 50"
+      );
+      const bound = typeof (stmt as unknown as { bind?: (...args: unknown[]) => typeof stmt }).bind === 'function'
+        ? stmt.bind(tenantId)
+        : stmt;
+      const res = await bound.all<PromotionRow>();
+      results = res.results;
+      scopedOk = true;
+    } catch {
+      scopedOk = false;
+    }
+  }
+  if (!scopedOk) {
+    const res = await db.prepare(
+      'SELECT * FROM promotions WHERE is_active = 1'
+    ).all<PromotionRow>();
+    results = res.results;
+  }
   const promotions = (results || []).filter((p) => matchesTenantRow(p as unknown as Record<string, unknown>, tenantId));
   if (promotions.length === 0) {
     return { posted: 0 };

@@ -67,18 +67,30 @@ function RevenueChart() {
 
 /* ─── Staff Clock-In Panel ───────────────────────────────────────────── */
 
-function StaffPanel() {
-  const staff = [
-    { name: 'Sarah J.', active: true, since: 'Active since 06:00 AM' },
-    { name: 'Marcus T.', active: true, since: 'Active since 07:30 AM' },
-    { name: 'Elena W.', active: false, since: 'Starts 10:00 AM' },
-  ];
+export interface StaffShiftMember {
+  name: string;
+  active: boolean;
+  since: string;
+}
+
+export interface ActivePromotionItem {
+  title: string;
+  desc: string;
+  progress: number;
+}
+
+function StaffPanel({ staff = [] }: { staff?: StaffShiftMember[] }) {
+  const formattedDate = new Date().toLocaleDateString('en-US', {
+    weekday: 'long',
+    month: 'short',
+    day: 'numeric',
+  });
 
   return (
     <div className={cn(GLASS_CLASSES, 'flex flex-col rounded-xl p-6')}>
       <div className="mb-4 text-center">
         <p className="mb-1 text-[12px] uppercase tracking-widest text-[var(--aura-text-secondary, #a0a8b0)] opacity-60">
-          Monday, Oct 24
+          {formattedDate}
         </p>
         <h2 className="text-5xl font-mono font-extrabold bg-gradient-to-r from-[var(--aura-chrome-light, #C9D6DF)] via-[var(--aura-chrome-light, #C9D6DF)] to-[var(--aura-chrome-light, #C9D6DF)] bg-clip-text text-transparent tabular-nums">
           {new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false })}
@@ -89,17 +101,23 @@ function StaffPanel() {
         <p className="border-b border-white/10 pb-2 text-[11px] font-bold uppercase tracking-wider text-[var(--aura-text-primary, #e8e8e8)] opacity-60">
           CURRENT SHIFT
         </p>
-        {staff.map((s) => (
-          <div key={s.name} className="flex items-center justify-between rounded-lg p-2 transition-colors hover:bg-white/5">
-            <div className="flex items-center gap-3">
-              <div className={cn('h-2 w-2 rounded-full', s.active ? 'bg-[var(--aura-chrome-light, #C9D6DF)] animate-pulse' : 'bg-white/20')} />
-              <span className={cn('text-[13px] font-medium text-[var(--aura-text-primary, #e8e8e8)]', !s.active && 'opacity-50')}>
-                {s.name}
-              </span>
+        {staff.length === 0 ? (
+          <p className="py-4 text-center text-[12px] text-[var(--aura-text-secondary, #a0a8b0)] opacity-60">
+            No active shift data
+          </p>
+        ) : (
+          staff.map((s) => (
+            <div key={s.name} className="flex items-center justify-between rounded-lg p-2 transition-colors hover:bg-white/5">
+              <div className="flex items-center gap-3">
+                <div className={cn('h-2 w-2 rounded-full', s.active ? 'bg-[var(--aura-chrome-light, #C9D6DF)] animate-pulse' : 'bg-white/20')} />
+                <span className={cn('text-[13px] font-medium text-[var(--aura-text-primary, #e8e8e8)]', !s.active && 'opacity-50')}>
+                  {s.name}
+                </span>
+              </div>
+              <span className="text-[12px] text-[var(--aura-text-secondary, #a0a8b0)] opacity-50">{s.since}</span>
             </div>
-            <span className="text-[12px] text-[var(--aura-text-secondary, #a0a8b0)] opacity-50">{s.since}</span>
-          </div>
-        ))}
+          ))
+        )}
       </div>
 
       <button type="button" className="w-full rounded-xl bg-gradient-to-r from-[var(--aura-chrome-light, #C9D6DF)] to-[var(--aura-chrome-light, #C9D6DF)] py-4 font-sans text-[12px] font-bold uppercase tracking-[0.1em] text-[var(--aura-noir-void, #050D1A)] shadow-lg shadow-[rgba(201,214,223,0.3)] transition-all hover:brightness-110 active:scale-[0.97]">
@@ -111,48 +129,34 @@ function StaffPanel() {
 
 /* ─── Active Promotions Panel ────────────────────────────────────────── */
 
-function PromotionsPanel() {
-  const promos = [
-    {
-      title: 'Buy 1 Get 1 Mocha',
-      desc: 'Ends in 4h • Afternoon Rush',
-      progress: 65,
-      color: 'var(--aura-chrome-light, #C9D6DF)',
-      hoverBorder: 'hover:border-[var(--aura-chrome-light, #C9D6DF)]',
-    },
-    {
-      title: 'Morning Happy Hour',
-      desc: '6 AM – 9 AM • 20% Off Pastries',
-      progress: 100,
-      color: 'var(--aura-chrome-light, #C9D6DF)',
-      hoverBorder: 'hover:border-[var(--aura-chrome-light, #C9D6DF)]',
-    },
-  ];
-
+function PromotionsPanel({ promos = [] }: { promos?: ActivePromotionItem[] }) {
   return (
     <div className={cn(GLASS_CLASSES, 'flex flex-col rounded-xl p-6')}>
       <h2 className="font-display mb-5 text-xl font-semibold bg-gradient-to-r from-[var(--aura-chrome-light, #C9D6DF)] via-[var(--aura-chrome-light, #C9D6DF)] to-[var(--aura-chrome-light, #C9D6DF)] bg-clip-text text-transparent">
         Active Promotions
       </h2>
       <div className="flex flex-1 flex-col gap-3">
-        {promos.map((p) => (
-          <div
-            key={p.title}
-            className={cn(
-              'cursor-pointer rounded-xl border border-white/10 bg-white/5 p-4 transition-all group',
-              p.hoverBorder,
-            )}
-          >
-            <div className="mb-2 flex items-start justify-between">
-              <h4 className="font-bold text-[var(--aura-text-primary, #e8e8e8)]">{p.title}</h4>
-              <span className="text-[var(--aura-chrome-light, #C9D6DF)] opacity-0 transition-opacity group-hover:opacity-100">&rsaquo;</span>
+        {promos.length === 0 ? (
+          <p className="py-4 text-center text-[12px] text-[var(--aura-text-secondary, #a0a8b0)] opacity-60">
+            No active promotions
+          </p>
+        ) : (
+          promos.map((p) => (
+            <div
+              key={p.title}
+              className="cursor-pointer rounded-xl border border-white/10 bg-white/5 p-4 transition-all group hover:border-[var(--aura-chrome-light, #C9D6DF)]"
+            >
+              <div className="mb-2 flex items-start justify-between">
+                <h4 className="font-bold text-[var(--aura-text-primary, #e8e8e8)]">{p.title}</h4>
+                <span className="text-[var(--aura-chrome-light, #C9D6DF)] opacity-0 transition-opacity group-hover:opacity-100">&rsaquo;</span>
+              </div>
+              <p className="mb-3 text-[12px] text-[var(--aura-text-secondary, #a0a8b0)]">{p.desc}</p>
+              <div className="h-1.5 w-full rounded-full bg-white/5">
+                <div className="h-full rounded-full transition-all" style={{ width: `${p.progress}%`, backgroundColor: 'var(--aura-chrome-light, #C9D6DF)' }} />
+              </div>
             </div>
-            <p className="mb-3 text-[12px] text-[var(--aura-text-secondary, #a0a8b0)]">{p.desc}</p>
-            <div className="h-1.5 w-full rounded-full bg-white/5">
-              <div className="h-full rounded-full transition-all" style={{ width: `${p.progress}%`, backgroundColor: p.color }} />
-            </div>
-          </div>
-        ))}
+          ))
+        )}
         <button type="button" className="w-full rounded-lg border border-dashed border-white/20 py-3 text-[13px] text-[var(--aura-text-secondary, #a0a8b0)] transition-colors hover:bg-white/5 hover:text-[var(--aura-text-primary, #e8e8e8)]">
           + Create New Promotion
         </button>
@@ -163,12 +167,18 @@ function PromotionsPanel() {
 
 /* ─── Dashboard Section Export ───────────────────────────────────────── */
 
-export function StitchOrderMgmtDashboard() {
+export function StitchOrderMgmtDashboard({
+  staff,
+  promos,
+}: {
+  staff?: StaffShiftMember[];
+  promos?: ActivePromotionItem[];
+} = {}) {
   return (
     <section className="mb-6 grid grid-cols-1 gap-6 lg:grid-cols-3">
       <RevenueChart />
-      <StaffPanel />
-      <PromotionsPanel />
+      <StaffPanel staff={staff} />
+      <PromotionsPanel promos={promos} />
     </section>
   );
 }

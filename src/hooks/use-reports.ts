@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { apiFetch, API_BASE } from '@/lib/api-client';
+import { useClientSessionScope } from '@/lib/client-session';
 
 // ── Types ──
 export interface DailyReport {
@@ -35,8 +36,9 @@ export interface CustomerMetricsData {
 
 // ── Daily Report ──
 export function useDailyReport(from: string, to: string) {
+  const session = useClientSessionScope();
   return useQuery<DailyReport[]>({
-    queryKey: ['reports', 'daily', from, to],
+    queryKey: ['reports', 'daily', session.tenantId, session.userScope, from, to],
     queryFn: async () => {
       const res = await apiFetch<{ success?: boolean; data?: DailyReport[] } | DailyReport[]>(
         `/api/reports/daily?from=${from}&to=${to}`,
@@ -50,8 +52,9 @@ export function useDailyReport(from: string, to: string) {
 
 // ── Top Products ──
 export function useTopProducts(from: string, to: string, limit = 10) {
+  const session = useClientSessionScope();
   return useQuery<TopProduct[]>({
-    queryKey: ['reports', 'top-products', from, to, limit],
+    queryKey: ['reports', 'top-products', session.tenantId, session.userScope, from, to, limit],
     queryFn: async () => {
       const res = await apiFetch<{ success?: boolean; data?: TopProduct[] } | TopProduct[]>(
         `/api/reports/top-products?from=${from}&to=${to}&limit=${limit}`,
@@ -65,8 +68,9 @@ export function useTopProducts(from: string, to: string, limit = 10) {
 
 // ── Peak Hours ──
 export function usePeakHours(from: string, to: string) {
+  const session = useClientSessionScope();
   return useQuery<PeakHour[]>({
-    queryKey: ['reports', 'peak-hours', from, to],
+    queryKey: ['reports', 'peak-hours', session.tenantId, session.userScope, from, to],
     queryFn: async () => {
       const res = await apiFetch<{ success?: boolean; data?: PeakHour[] } | PeakHour[]>(
         `/api/reports/peak-hours?from=${from}&to=${to}`,
@@ -80,8 +84,9 @@ export function usePeakHours(from: string, to: string) {
 
 // ── Customer Metrics ──
 export function useCustomerMetrics() {
+  const session = useClientSessionScope();
   return useQuery<CustomerMetricsData>({
-    queryKey: ['reports', 'customer-metrics'],
+    queryKey: ['reports', 'customer-metrics', session.tenantId, session.userScope],
     queryFn: async () => {
       const res = await apiFetch<{ success?: boolean; data?: CustomerMetricsData } | CustomerMetricsData>(
         '/api/reports/customer-metrics',

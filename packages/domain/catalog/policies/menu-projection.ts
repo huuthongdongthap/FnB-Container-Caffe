@@ -53,24 +53,47 @@ export function mapProductToMenuProjection(
   };
 }
 
+function resolveProjectionTenant(tenantId?: string | null, fallbackTenant?: string | null): string {
+  const candidate = tenantId && tenantId.trim() ? tenantId : fallbackTenant;
+  return candidate && candidate.trim() && candidate.trim() !== '*' ? candidate.trim() : 'default';
+}
+
 /**
  * Synchronize a single product from canonical `products` table to `menu_items` projection.
  */
-export async function syncProductToMenuProjection(db: D1Database, productId: string): Promise<void> {
-  const query = `
+export async function syncProductToMenuProjection(
+  db: D1Database,
+  productId: string,
+  tenantId?: string
+): Promise<void> {
+  const scopedQuery = `
+    SELECT p.*, c.slug as category_slug
+    FROM products p
+    LEFT JOIN categories c ON p.category_id = c.id
+      AND COALESCE(NULLIF(TRIM(c.tenant_id), ''), 'default') = COALESCE(NULLIF(TRIM(p.tenant_id), ''), 'default')
+    WHERE p.id = ?
+  `;
+  const unscopedQuery = `
     SELECT p.*, c.slug as category_slug
     FROM products p
     LEFT JOIN categories c ON p.category_id = c.id
     WHERE p.id = ?
   `;
-  const row = (await db.prepare(query).bind(productId).first()) as (Product & { category_slug?: string }) | null;
+  let row: (Product & { category_slug?: string }) | null = null;
+  try {
+    row = (await db.prepare(scopedQuery).bind(productId).first()) as (Product & { category_slug?: string }) | null;
+  } catch {
+    if (!tenantId || !tenantId.trim() || tenantId.trim() === 'default') {
+      row = (await db.prepare(unscopedQuery).bind(productId).first()) as (Product & { category_slug?: string }) | null;
+    }
+  }
   if (!row) return;
 
   const projection = mapProductToMenuProjection(row, row.category_slug);
   const rawTenant = (row as unknown as { tenant_id?: string | null }).tenant_id;
-  const effectiveTenant = rawTenant && String(rawTenant).trim() ? String(rawTenant).trim() : 'default';
+  const effectiveTenant = resolveProjectionTenant(tenantId, rawTenant);
 
-  const upsertWithTenantSql = `
+  const upsertWithTenantGuardSql = `
     INSERT INTO menu_items (id, category, name, price, description, image_url, tags, badge, available, tenant_id, updated_at)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
     ON CONFLICT(id) DO UPDATE SET
@@ -84,6 +107,7 @@ export async function syncProductToMenuProjection(db: D1Database, productId: str
       available = excluded.available,
       tenant_id = excluded.tenant_id,
       updated_at = CURRENT_TIMESTAMP
+    WHERE COALESCE(NULLIF(TRIM(menu_items.tenant_id), ''), 'default') = COALESCE(NULLIF(TRIM(excluded.tenant_id), ''), 'default')
   `;
 
   const upsertSql = `
@@ -102,7 +126,7 @@ export async function syncProductToMenuProjection(db: D1Database, productId: str
   `;
 
   try {
-    await db.prepare(upsertWithTenantSql).bind(
+    await db.prepare(upsertWithTenantGuardSql).bind(
       projection.id,
       projection.category,
       projection.name,
@@ -115,9 +139,28 @@ export async function syncProductToMenuProjection(db: D1Database, productId: str
       effectiveTenant
     ).run();
   } catch {
+    if (effectiveTenant === 'default') {
+      try {
+        await db.prepare(upsertSql).bind(
+          projection.id,
+          projection.category,
+          projection.name,
+          projection.price,
+          projection.description,
+          projection.image_url,
+          projection.tags,
+          projection.badge,
+          projection.available
+        ).run();
+        return;
+      } catch {
+        // Fall through to tenant-scoped UPDATE fallback
+      }
+    }
     try {
-      await db.prepare(upsertSql).bind(
-        projection.id,
+      await db.prepare(
+        "UPDATE menu_items SET category = ?, name = ?, price = ?, description = ?, image_url = ?, tags = ?, badge = ?, available = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
+      ).bind(
         projection.category,
         projection.name,
         projection.price,
@@ -125,7 +168,9 @@ export async function syncProductToMenuProjection(db: D1Database, productId: str
         projection.image_url,
         projection.tags,
         projection.badge,
-        projection.available
+        projection.available,
+        projection.id,
+        effectiveTenant
       ).run();
     } catch {
       // Graceful fallback when menu_items projection table or columns are unmigrated
@@ -133,34 +178,85 @@ export async function syncProductToMenuProjection(db: D1Database, productId: str
   }
 }
 
+export const projectProductToMenu = syncProductToMenuProjection;
+
 /**
  * Synchronize availability changes (active/inactive or soft-delete) to menu_items.
  */
 export async function syncProductAvailabilityProjection(
   db: D1Database,
   productId: string,
-  isAvailable: boolean | number
+  isAvailable: boolean | number,
+  tenantId?: string
 ): Promise<void> {
   const availableFlag = isAvailable ? 1 : 0;
+  let resolvedTenant = tenantId;
+  if (!resolvedTenant) {
+    const prodRow = await db.prepare('SELECT tenant_id FROM products WHERE id = ?').bind(productId).first<{ tenant_id?: string | null }>().catch(() => null);
+    resolvedTenant = prodRow?.tenant_id ?? 'default';
+  }
+  const effectiveTenant = resolveProjectionTenant(resolvedTenant);
   try {
     await db.prepare(
-      'UPDATE menu_items SET available = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?'
-    ).bind(availableFlag, productId).run();
+      "UPDATE menu_items SET available = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
+    ).bind(availableFlag, productId, effectiveTenant).run();
   } catch {
-    // Graceful fallback when menu_items projection table is unmigrated
+    try {
+      await db.prepare(
+        "UPDATE menu_items SET is_available = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
+      ).bind(availableFlag, productId, effectiveTenant).run();
+    } catch {
+      if (effectiveTenant === 'default') {
+        try {
+          await db.prepare(
+            'UPDATE menu_items SET available = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?'
+          ).bind(availableFlag, productId).run();
+        } catch {
+          // Graceful fallback when menu_items projection table is unmigrated
+        }
+      }
+    }
   }
 }
 
 /**
  * Delete corresponding projection item from menu_items when hard-deleted.
  */
-export async function deleteProductProjection(db: D1Database, productId: string): Promise<void> {
+export async function deleteProductProjection(
+  db: D1Database,
+  productId: string,
+  tenantId?: string
+): Promise<void> {
+  const effectiveTenant = resolveProjectionTenant(tenantId);
   try {
-    await db.prepare('DELETE FROM menu_items WHERE id = ?').bind(productId).run();
+    await db.prepare(
+      "DELETE FROM menu_modifiers WHERE item_id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
+    ).bind(productId, effectiveTenant).run();
   } catch {
-    // Graceful fallback when menu_items projection table is unmigrated
+    if (effectiveTenant === 'default') {
+      try {
+        await db.prepare('DELETE FROM menu_modifiers WHERE item_id = ?').bind(productId).run();
+      } catch {
+        // Ignore when menu_modifiers has no item_id column or is unmigrated
+      }
+    }
+  }
+  try {
+    await db.prepare(
+      "DELETE FROM menu_items WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
+    ).bind(productId, effectiveTenant).run();
+  } catch {
+    if (effectiveTenant === 'default') {
+      try {
+        await db.prepare('DELETE FROM menu_items WHERE id = ?').bind(productId).run();
+      } catch {
+        // Graceful fallback when menu_items projection table is unmigrated
+      }
+    }
   }
 }
+
+export const removeMenuProjection = deleteProductProjection;
 
 /**
  * Update projection category slugs when a category slug is updated.
@@ -168,16 +264,38 @@ export async function deleteProductProjection(db: D1Database, productId: string)
 export async function syncCategorySlugToMenuProjection(
   db: D1Database,
   categoryId: string,
-  newSlug: string
+  newSlug: string,
+  tenantId?: string
 ): Promise<void> {
+  let resolvedTenant = tenantId;
+  if (!resolvedTenant) {
+    const catRow = await db.prepare('SELECT tenant_id FROM categories WHERE id = ?').bind(categoryId).first<{ tenant_id?: string | null }>().catch(() => null);
+    resolvedTenant = catRow?.tenant_id ?? 'default';
+  }
+  const effectiveTenant = resolveProjectionTenant(resolvedTenant);
   try {
     await db.prepare(`
       UPDATE menu_items
       SET category = ?, updated_at = CURRENT_TIMESTAMP
-      WHERE id IN (SELECT id FROM products WHERE category_id = ?)
-    `).bind(newSlug, categoryId).run();
+      WHERE id IN (
+        SELECT id FROM products
+        WHERE category_id = ?
+          AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?
+      )
+      AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?
+    `).bind(newSlug, categoryId, effectiveTenant, effectiveTenant).run();
   } catch {
-    // Graceful fallback when menu_items projection table is unmigrated
+    if (effectiveTenant === 'default') {
+      try {
+        await db.prepare(`
+          UPDATE menu_items
+          SET category = ?, updated_at = CURRENT_TIMESTAMP
+          WHERE id IN (SELECT id FROM products WHERE category_id = ?)
+        `).bind(newSlug, categoryId).run();
+      } catch {
+        // Graceful fallback when menu_items projection table is unmigrated
+      }
+    }
   }
 }
 
@@ -185,11 +303,23 @@ export async function syncCategorySlugToMenuProjection(
  * Reconciles all canonical products into menu_items projection to heal any drift.
  */
 export async function reconcileAllMenuProjections(db: D1Database): Promise<{ count: number }> {
-  const { results } = await db.prepare(`
-    SELECT p.*, c.slug as category_slug
-    FROM products p
-    LEFT JOIN categories c ON p.category_id = c.id
-  `).all<Product & { category_slug?: string }>();
+  let results: Array<Product & { category_slug?: string }> | undefined;
+  try {
+    const res = await db.prepare(`
+      SELECT p.*, c.slug as category_slug
+      FROM products p
+      LEFT JOIN categories c ON p.category_id = c.id
+        AND COALESCE(NULLIF(TRIM(c.tenant_id), ''), 'default') = COALESCE(NULLIF(TRIM(p.tenant_id), ''), 'default')
+    `).all<Product & { category_slug?: string }>();
+    results = res.results;
+  } catch {
+    const res = await db.prepare(`
+      SELECT p.*, c.slug as category_slug
+      FROM products p
+      LEFT JOIN categories c ON p.category_id = c.id
+    `).all<Product & { category_slug?: string }>();
+    results = res.results;
+  }
 
   const products = results || [];
   for (const product of products) {
@@ -211,6 +341,7 @@ export async function reconcileAllMenuProjections(db: D1Database): Promise<{ cou
           available = excluded.available,
           tenant_id = excluded.tenant_id,
           updated_at = CURRENT_TIMESTAMP
+        WHERE COALESCE(NULLIF(TRIM(menu_items.tenant_id), ''), 'default') = COALESCE(NULLIF(TRIM(excluded.tenant_id), ''), 'default')
       `).bind(
         proj.id,
         proj.category,
@@ -224,33 +355,35 @@ export async function reconcileAllMenuProjections(db: D1Database): Promise<{ cou
         effectiveTenant
       ).run();
     } catch {
-      try {
-        await db.prepare(`
-          INSERT INTO menu_items (id, category, name, price, description, image_url, tags, badge, available, updated_at)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
-          ON CONFLICT(id) DO UPDATE SET
-            category = excluded.category,
-            name = excluded.name,
-            price = excluded.price,
-            description = excluded.description,
-            image_url = excluded.image_url,
-            tags = excluded.tags,
-            badge = excluded.badge,
-            available = excluded.available,
-            updated_at = CURRENT_TIMESTAMP
-        `).bind(
-          proj.id,
-          proj.category,
-          proj.name,
-          proj.price,
-          proj.description,
-          proj.image_url,
-          proj.tags,
-          proj.badge,
-          proj.available
-        ).run();
-      } catch {
-        // Graceful fallback when menu_items projection table is unmigrated
+      if (effectiveTenant === 'default') {
+        try {
+          await db.prepare(`
+            INSERT INTO menu_items (id, category, name, price, description, image_url, tags, badge, available, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+            ON CONFLICT(id) DO UPDATE SET
+              category = excluded.category,
+              name = excluded.name,
+              price = excluded.price,
+              description = excluded.description,
+              image_url = excluded.image_url,
+              tags = excluded.tags,
+              badge = excluded.badge,
+              available = excluded.available,
+              updated_at = CURRENT_TIMESTAMP
+          `).bind(
+            proj.id,
+            proj.category,
+            proj.name,
+            proj.price,
+            proj.description,
+            proj.image_url,
+            proj.tags,
+            proj.badge,
+            proj.available
+          ).run();
+        } catch {
+          // Graceful fallback when menu_items projection table is unmigrated
+        }
       }
     }
   }
@@ -277,7 +410,7 @@ export function mapModifierChoiceToProjection(
     id: choice.id,
     group_id: choice.group_id,
     option_name: choice.name,
-    price_delta: Math.round(Number(choice.price_delta) || 0),
+    price_delta: Math.max(0, Math.round(Number(choice.price_delta) || 0)),
     available: isAvailable ? 1 : 0,
   };
 }
@@ -287,24 +420,125 @@ export function mapModifierChoiceToProjection(
  */
 export async function syncModifierChoiceToMenuProjection(
   db: D1Database,
-  choice: { id: string; group_id: string; name: string; price_delta: number; is_available?: number | boolean }
+  choice: {
+    id: string;
+    group_id: string;
+    name: string;
+    price_delta: number;
+    is_available?: number | boolean;
+    tenant_id?: string | null;
+  },
+  tenantId?: string
 ): Promise<void> {
   const proj = mapModifierChoiceToProjection(choice);
+  let resolvedTenant = tenantId ?? choice.tenant_id ?? null;
+  if (!resolvedTenant) {
+    const grp = await db.prepare('SELECT tenant_id FROM modifier_groups WHERE id = ?').bind(choice.group_id).first<{ tenant_id?: string | null }>().catch(() => null);
+    resolvedTenant = grp?.tenant_id ?? 'default';
+  }
+  const effectiveTenant = resolveProjectionTenant(resolvedTenant);
   try {
     await db.prepare(`
-      INSERT INTO menu_modifiers (id, group_id, option_name, price_delta, available, updated_at)
-      VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+      INSERT INTO menu_modifiers (id, group_id, option_name, price_delta, available, tenant_id, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
       ON CONFLICT(id) DO UPDATE SET
         group_id = excluded.group_id,
         option_name = excluded.option_name,
         price_delta = excluded.price_delta,
         available = excluded.available,
+        tenant_id = excluded.tenant_id,
         updated_at = CURRENT_TIMESTAMP
-    `).bind(proj.id, proj.group_id, proj.option_name, proj.price_delta, proj.available).run();
+      WHERE COALESCE(NULLIF(TRIM(menu_modifiers.tenant_id), ''), 'default') = ?
+    `).bind(proj.id, proj.group_id, proj.option_name, proj.price_delta, proj.available, effectiveTenant, effectiveTenant).run();
   } catch (err) {
-    // The table is expected to exist after the menu_modifiers migration; swallow
-    // only to keep a pre-migration environment alive, but leave a trace so a
-    // stale projection is diagnosable instead of silently serving old prices.
-    console.error('[menu-projection] modifier sync failed', choice.id, err);
+    if (effectiveTenant === 'default') {
+      try {
+        await db.prepare(`
+          INSERT INTO menu_modifiers (id, group_id, option_name, price_delta, available, updated_at)
+          VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+          ON CONFLICT(id) DO UPDATE SET
+            group_id = excluded.group_id,
+            option_name = excluded.option_name,
+            price_delta = excluded.price_delta,
+            available = excluded.available,
+            updated_at = CURRENT_TIMESTAMP
+        `).bind(proj.id, proj.group_id, proj.option_name, proj.price_delta, proj.available).run();
+        return;
+      } catch {
+        // Fall through to tenant-scoped UPDATE fallback
+      }
+    }
+    try {
+      await db.prepare(
+        "UPDATE menu_modifiers SET group_id = ?, option_name = ?, price_delta = ?, available = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
+      ).bind(proj.group_id, proj.option_name, proj.price_delta, proj.available, proj.id, effectiveTenant).run();
+    } catch {
+      console.error('[menu-projection] modifier sync failed', choice.id, err);
+    }
+  }
+}
+
+export const upsertMenuItemModifier = syncModifierChoiceToMenuProjection;
+
+/**
+ * Synchronize modifier group active status to menu_modifiers projection availability.
+ */
+export async function syncModifierGroupAvailabilityToMenuProjection(
+  db: D1Database,
+  groupId: string,
+  isActive: number | boolean,
+  tenantId?: string
+): Promise<void> {
+  const activeFlag = isActive === true || isActive === 1 ? 1 : 0;
+  let resolvedTenant = tenantId;
+  if (!resolvedTenant) {
+    const grp = await db.prepare('SELECT tenant_id FROM modifier_groups WHERE id = ?').bind(groupId).first<{ tenant_id?: string | null }>().catch(() => null);
+    resolvedTenant = grp?.tenant_id ?? 'default';
+  }
+  const effectiveTenant = resolveProjectionTenant(resolvedTenant);
+  try {
+    if (activeFlag === 0) {
+      await db.prepare(
+        "UPDATE menu_modifiers SET available = 0, updated_at = CURRENT_TIMESTAMP WHERE group_id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
+      ).bind(groupId, effectiveTenant).run();
+      return;
+    }
+    await db.prepare(
+      `UPDATE menu_modifiers
+       SET available = COALESCE((SELECT mc.is_available FROM modifier_choices mc WHERE mc.id = menu_modifiers.id), 1),
+           updated_at = CURRENT_TIMESTAMP
+       WHERE group_id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?`
+    ).bind(groupId, effectiveTenant).run();
+    return;
+  } catch {
+    if (effectiveTenant !== 'default') {
+      return;
+    }
+  }
+  try {
+    if (activeFlag === 0) {
+      await db.prepare(
+        'UPDATE menu_modifiers SET available = 0, updated_at = CURRENT_TIMESTAMP WHERE group_id = ?'
+      ).bind(groupId).run();
+    } else {
+      try {
+        await db.prepare(
+          `UPDATE menu_modifiers
+           SET available = COALESCE((SELECT mc.is_available FROM modifier_choices mc WHERE mc.id = menu_modifiers.id), 1),
+               updated_at = CURRENT_TIMESTAMP
+           WHERE group_id = ?`
+        ).bind(groupId).run();
+      } catch {
+        await db.prepare(
+          'UPDATE menu_modifiers SET available = 1, updated_at = CURRENT_TIMESTAMP WHERE group_id = ?'
+        ).bind(groupId).run();
+      }
+    }
+  } catch {
+    try {
+      await db.prepare('UPDATE menu_modifiers SET available = ? WHERE group_id = ?').bind(activeFlag, groupId).run();
+    } catch {
+      // Best-effort sync for environments or minimal mocks without menu_modifiers
+    }
   }
 }

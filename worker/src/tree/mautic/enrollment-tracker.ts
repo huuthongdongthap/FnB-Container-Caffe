@@ -15,14 +15,23 @@ export async function trackEnrollment(
   tenantId?: string
 ): Promise<string> {
   const id = `ce_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
+  const nowIso = new Date().toISOString();
+  const effectiveTenant = tenantId && tenantId.trim() && tenantId.trim() !== '*' ? tenantId.trim() : 'default';
   try {
-    await db.prepare(
-      `INSERT INTO campaign_enrollments (id, customer_id, campaign_type, campaign_id, created_at, mautic_contact_id, status)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`
-    ).bind(id, customerId, campaignType, campaignId, new Date().toISOString(), String(mauticContactId), status).run();
-    if (tenantId && tenantId !== '*') {
-      await db.prepare('UPDATE campaign_enrollments SET tenant_id = ? WHERE id = ?')
-        .bind(tenantId, id).run().catch(() => null);
+    try {
+      await db.prepare(
+        `INSERT INTO campaign_enrollments (id, customer_id, campaign_type, campaign_id, created_at, mautic_contact_id, status, tenant_id)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+      ).bind(id, customerId, campaignType, campaignId, nowIso, String(mauticContactId), status, effectiveTenant).run();
+    } catch {
+      await db.prepare(
+        `INSERT INTO campaign_enrollments (id, customer_id, campaign_type, campaign_id, created_at, mautic_contact_id, status)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`
+      ).bind(id, customerId, campaignType, campaignId, nowIso, String(mauticContactId), status).run();
+      if (tenantId && tenantId !== '*') {
+        await db.prepare('UPDATE campaign_enrollments SET tenant_id = ? WHERE id = ?')
+          .bind(tenantId, id).run().catch(() => null);
+      }
     }
   } catch {
     // Non-blocking if campaign_enrollments table is not provisioned
@@ -47,7 +56,9 @@ export async function isAlreadyEnrolled(
         ).bind(customerId, campaignType, since, effectiveTenant).first();
         return !!scopedRow;
       } catch {
-        // Fallback if tenant_id column is absent
+        if (effectiveTenant !== 'default') {
+          return true;
+        }
       }
     }
     const row = await db.prepare(

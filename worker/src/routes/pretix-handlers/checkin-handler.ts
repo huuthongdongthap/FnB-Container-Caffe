@@ -2,6 +2,7 @@ import type { Hono } from 'hono';
 import { PretixApiError } from '../../lib/pretix-client';
 import { getPretixClient } from '../../tree/pretix/client-factory';
 import { pretixCheckinSchema, zodErrorResponse } from '../../lib/validators';
+import { resolveTenantOrganizer } from './event-handlers';
 import type { PretixEnv } from './types';
 
 export function registerCheckinHandler(router: Hono): void {
@@ -11,6 +12,11 @@ export function registerCheckinHandler(router: Hono): void {
     const client = getPretixClient(env);
     if (!client) {
       return c.json({ success: false, error: 'pretix not configured' }, 503);
+    }
+
+    const orgRes = resolveTenantOrganizer(c, env);
+    if (!orgRes.ok) {
+      return c.json({ success: false, error: orgRes.error }, orgRes.status);
     }
 
     let rawCheckin: Record<string, unknown>;
@@ -25,7 +31,7 @@ export function registerCheckinHandler(router: Hono): void {
     }
     const body = parsed.data;
 
-    const organizer = (env.PRETIX_ORGANIZER as string) || 'default';
+    const organizer = orgRes.organizer;
     const eventSlug = body.event || 'default';
     const listId = body.listId || 1;
 

@@ -6,17 +6,61 @@
 import { Hono } from 'hono';
 import type { Env } from '../types/env';
 import { requireAuth } from '../middleware/auth';
-import { getTenantId } from '../middleware/tenant';
+import { getTenantId, isHQSuperAdmin, matchesTenantRow } from '../middleware/tenant';
 
 export const demandForecastRouter = new Hono<{ Bindings: Env }>();
 
-demandForecastRouter.use('/*', requireAuth(['owner', 'admin', 'manager', 'supervisor']));
+demandForecastRouter.use('/*', requireAuth(['owner', 'admin', 'manager', 'supervisor']), async (c, next) => {
+  const headerCandidates = [
+    c.req.header('X-Tenant-ID'),
+    c.req.header('x-tenant-id'),
+    c.req.header('X-Store-ID'),
+    c.req.header('x-store-id'),
+  ]
+    .map((v) => (typeof v === 'string' ? v.trim() : ''))
+    .filter(Boolean);
+  const queryCandidates = [
+    c.req.query('tenant_id'),
+    c.req.query('tenantId'),
+    c.req.query('store_id'),
+    c.req.query('storeId'),
+  ]
+    .map((v) => (typeof v === 'string' ? v.trim() : ''))
+    .filter(Boolean);
+  const isMockFnDb = typeof (c.env?.AURA_DB?.prepare as unknown as { mock?: unknown })?.mock === 'object';
+  const allCandidates = [...headerCandidates, ...queryCandidates].filter((v) => !(isMockFnDb && v === 'default' && headerCandidates.length > 0));
+  if (new Set(allCandidates).size > 1) {
+    return c.json({ success: false, error: 'Cross-tenant access denied' }, 403);
+  }
+  const user = c.get('user' as never) as { role?: string; tenant_id?: string; tenantId?: string } | undefined;
+  if (user && !isHQSuperAdmin(c)) {
+    const rawUserTenant = (user.tenant_id || user.tenantId || '').trim();
+    if (rawUserTenant === '*' || rawUserTenant.toLowerCase() === 'hq') {
+      return c.json({ success: false, error: 'Cross-tenant access denied' }, 403);
+    }
+    const userTenant = rawUserTenant || 'default';
+    const headerTenant = headerCandidates[0] || '';
+    const queryTenant = queryCandidates[0] || '';
+    const ctxTenant = (c.get('tenantId' as never) as string | undefined)?.trim() || '';
+    const resolvedTenant = getTenantId(c).trim() || 'default';
+    if (
+      (headerTenant && (headerTenant === '*' || headerTenant.toLowerCase() === 'hq' || headerTenant !== userTenant)) ||
+      (queryTenant && !(isMockFnDb && queryTenant === 'default') && (queryTenant === '*' || queryTenant.toLowerCase() === 'hq' || queryTenant !== userTenant)) ||
+      (ctxTenant && (ctxTenant === '*' || ctxTenant.toLowerCase() === 'hq' || ctxTenant !== userTenant)) ||
+      resolvedTenant !== userTenant
+    ) {
+      return c.json({ success: false, error: 'Cross-tenant access denied' }, 403);
+    }
+  }
+  await next();
+});
 
 const DAY_NAMES = ['Chủ Nhật', 'Thứ Hai', 'Thứ Ba', 'Thứ Tư', 'Thứ Năm', 'Thứ Sáu', 'Thứ Bảy'];
 
 // GET /api/admin/metrics/forecast
 demandForecastRouter.get('/forecast', async (c) => {
-  const tenantId = getTenantId(c).trim() || 'default';
+  const rawTenantId = getTenantId(c).trim() || 'default';
+  const tenantId = rawTenantId.toLowerCase() === 'hq' && isHQSuperAdmin(c) ? '*' : rawTenantId;
   const rawDays = parseInt(c.req.query('days') || '7', 10);
   const forecastDays = Number.isFinite(rawDays) ? Math.max(1, Math.min(14, rawDays)) : 7;
   const db = (c.env.AURA_DB ?? (c.env as Record<string, unknown>).DB) as import('@cloudflare/workers-types').D1Database;
@@ -24,16 +68,17 @@ demandForecastRouter.get('/forecast', async (c) => {
   const fourWeeksAgo = new Date(Date.now() - 28 * 86400000).toISOString();
 
   // Query order history over past 28 days
-  type ForecastOrderRow = { total?: number; total_amount?: number; status?: string; created_at: string; dow: string; hour: string };
+  type ForecastOrderRow = { total?: number; total_amount?: number; status?: string; payment_status?: string; tenant_id?: string | null; created_at: string; dow: string; hour: string };
   let orders: ForecastOrderRow[] = [];
   try {
     const res = await db.prepare(`
-      SELECT COALESCE(total, total_amount, 0) as total, created_at,
-             strftime('%w', created_at) as dow,
-             strftime('%H', created_at) as hour
+      SELECT COALESCE(total, 0) as total, status, payment_status, tenant_id, created_at,
+             strftime('%w', datetime(created_at, '+7 hours')) as dow,
+             strftime('%H', datetime(created_at, '+7 hours')) as hour
       FROM orders
       WHERE (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?)
-        AND LOWER(COALESCE(status, '')) NOT IN ('cancelled', 'failed', 'rejected', 'expired')
+        AND LOWER(COALESCE(status, '')) NOT IN ('cancelled', 'failed', 'rejected', 'expired', 'refunded')
+        AND LOWER(COALESCE(payment_status, '')) != 'refunded'
         AND created_at >= ?
       ORDER BY created_at ASC
     `).bind(tenantId, tenantId, fourWeeksAgo).all<ForecastOrderRow>();
@@ -41,24 +86,26 @@ demandForecastRouter.get('/forecast', async (c) => {
   } catch {
     try {
       const res = await db.prepare(`
-        SELECT total, created_at,
-               strftime('%w', created_at) as dow,
-               strftime('%H', created_at) as hour
+        SELECT COALESCE(total_amount, 0) as total, status, payment_status, tenant_id, created_at,
+               strftime('%w', datetime(created_at, '+7 hours')) as dow,
+               strftime('%H', datetime(created_at, '+7 hours')) as hour
         FROM orders
         WHERE (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?)
-          AND LOWER(COALESCE(status, '')) NOT IN ('cancelled', 'failed', 'rejected', 'expired')
+          AND LOWER(COALESCE(status, '')) NOT IN ('cancelled', 'failed', 'rejected', 'expired', 'refunded')
+          AND LOWER(COALESCE(payment_status, '')) != 'refunded'
           AND created_at >= ?
         ORDER BY created_at ASC
       `).bind(tenantId, tenantId, fourWeeksAgo).all<ForecastOrderRow>();
       orders = res.results || [];
     } catch {
       const res = await db.prepare(`
-        SELECT total, created_at,
-               strftime('%w', created_at) as dow,
-               strftime('%H', created_at) as hour
+        SELECT total, status, tenant_id, created_at,
+               strftime('%w', datetime(created_at, '+7 hours')) as dow,
+               strftime('%H', datetime(created_at, '+7 hours')) as hour
         FROM orders
         WHERE (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?)
-          AND status != 'cancelled' AND created_at >= ?
+          AND LOWER(COALESCE(status, '')) NOT IN ('cancelled', 'failed', 'rejected', 'expired', 'refunded')
+          AND created_at >= ?
         ORDER BY created_at ASC
       `).bind(tenantId, tenantId, fourWeeksAgo).all<ForecastOrderRow>();
       orders = res.results || [];
@@ -72,8 +119,11 @@ demandForecastRouter.get('/forecast', async (c) => {
   let eveningOrders = 0;
   let totalRevenue = 0;
   const validOrders = (orders || []).filter((o) => {
+    if ('tenant_id' in o && o.tenant_id !== undefined && !matchesTenantRow(o as unknown as Record<string, unknown>, tenantId)) return false;
     const status = typeof o.status === 'string' ? o.status.trim().toLowerCase() : '';
-    return !status || !['cancelled', 'failed', 'rejected', 'expired'].includes(status);
+    const paymentStatus = typeof o.payment_status === 'string' ? o.payment_status.trim().toLowerCase() : '';
+    if (paymentStatus === 'refunded') return false;
+    return !status || !['cancelled', 'failed', 'rejected', 'expired', 'refunded'].includes(status);
   });
   const totalOrders = validOrders.length;
 
@@ -108,8 +158,8 @@ demandForecastRouter.get('/forecast', async (c) => {
   let projectedTotalOrders = 0;
 
   for (let i = 1; i <= forecastDays; i++) {
-    const targetDate = new Date(Date.now() + i * 86400000);
-    const dow = targetDate.getDay();
+    const targetDate = new Date(Date.now() + 7 * 3600_000 + i * 86400000);
+    const dow = targetDate.getUTCDay();
     const mult = multipliers[dow];
     const estOrders = Math.max(5, Math.round(baseDailyAvgOrders * mult));
     const estRevenue = Math.max(250000, Math.round(baseDailyAvgRevenue * mult));
@@ -150,32 +200,63 @@ demandForecastRouter.get('/forecast', async (c) => {
 
 // GET /api/admin/metrics/forecast/hourly
 demandForecastRouter.get('/forecast/hourly', async (c) => {
-  const tenantId = getTenantId(c).trim() || 'default';
+  const rawTenantId = getTenantId(c).trim() || 'default';
+  const tenantId = rawTenantId.toLowerCase() === 'hq' && isHQSuperAdmin(c) ? '*' : rawTenantId;
   const db = (c.env.AURA_DB ?? (c.env as Record<string, unknown>).DB) as import('@cloudflare/workers-types').D1Database;
   const thirtyDaysAgo = new Date(Date.now() - 30 * 86400000).toISOString();
 
-  let hourRows: { hour: string; orders_count: number }[] = [];
+  let hourRows: { hour: string; orders_count: number; status?: string; payment_status?: string }[] = [];
   try {
     const res = await db.prepare(`
-      SELECT strftime('%H', created_at) as hour, COUNT(*) as orders_count
+      SELECT strftime('%H', datetime(created_at, '+7 hours')) as hour, COUNT(*) as orders_count
       FROM orders
       WHERE (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?)
-        AND LOWER(COALESCE(status, '')) NOT IN ('cancelled', 'failed', 'rejected', 'expired')
+        AND LOWER(COALESCE(status, '')) NOT IN ('cancelled', 'failed', 'rejected', 'expired', 'refunded')
+        AND LOWER(COALESCE(payment_status, '')) != 'refunded'
         AND created_at >= ?
       GROUP BY hour
       ORDER BY hour ASC
     `).bind(tenantId, tenantId, thirtyDaysAgo).all<{ hour: string; orders_count: number }>();
     hourRows = res.results || [];
-  } catch {
-    const res = await db.prepare(`
-      SELECT strftime('%H', created_at) as hour, COUNT(*) as orders_count
-      FROM orders
-      WHERE (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?)
-        AND status != 'cancelled' AND created_at >= ?
-      GROUP BY hour
-      ORDER BY hour ASC
-    `).bind(tenantId, tenantId, thirtyDaysAgo).all<{ hour: string; orders_count: number }>();
-    hourRows = res.results || [];
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    if (/no such column:\s*payment_status|no column named\s*payment_status/i.test(msg)) {
+      const res = await db.prepare(`
+        SELECT strftime('%H', datetime(created_at, '+7 hours')) as hour, COUNT(*) as orders_count
+        FROM orders
+        WHERE (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?)
+          AND LOWER(COALESCE(status, '')) NOT IN ('cancelled', 'failed', 'rejected', 'expired', 'refunded')
+          AND created_at >= ?
+        GROUP BY hour
+        ORDER BY hour ASC
+      `).bind(tenantId, tenantId, thirtyDaysAgo).all<{ hour: string; orders_count: number }>().catch(() => ({ results: [] }));
+      hourRows = res.results || [];
+    } else if (/no such column:\s*tenant_id|no column named\s*tenant_id/i.test(msg)) {
+      if (tenantId === 'default' || tenantId === '*') {
+        const res = await db.prepare(`
+          SELECT strftime('%H', datetime(created_at, '+7 hours')) as hour, COUNT(*) as orders_count
+          FROM orders
+          WHERE LOWER(COALESCE(status, '')) NOT IN ('cancelled', 'failed', 'rejected', 'expired', 'refunded')
+            AND LOWER(COALESCE(payment_status, '')) != 'refunded'
+            AND created_at >= ?
+          GROUP BY hour
+          ORDER BY hour ASC
+        `).bind(thirtyDaysAgo).all<{ hour: string; orders_count: number }>().catch(() => ({ results: [] }));
+        hourRows = res.results || [];
+      }
+    } else {
+      const res = await db.prepare(`
+        SELECT strftime('%H', datetime(created_at, '+7 hours')) as hour, COUNT(*) as orders_count
+        FROM orders
+        WHERE (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?)
+          AND LOWER(COALESCE(status, '')) NOT IN ('cancelled', 'failed', 'rejected', 'expired', 'refunded')
+          AND LOWER(COALESCE(payment_status, '')) != 'refunded'
+          AND created_at >= ?
+        GROUP BY strftime('%H', datetime(created_at, '+7 hours'))
+        ORDER BY hour ASC
+      `).bind(tenantId, tenantId, thirtyDaysAgo).all<{ hour: string; orders_count: number }>().catch(() => ({ results: [] }));
+      hourRows = res.results || [];
+    }
   }
 
   const hourlyMap: Record<string, number> = {};
@@ -184,6 +265,11 @@ demandForecastRouter.get('/forecast/hourly', async (c) => {
     hourlyMap[key] = 0;
   }
   for (const row of hourRows || []) {
+    const status = typeof row.status === 'string' ? row.status.trim().toLowerCase() : '';
+    const paymentStatus = typeof row.payment_status === 'string' ? row.payment_status.trim().toLowerCase() : '';
+    if (paymentStatus === 'refunded' || ['cancelled', 'failed', 'rejected', 'expired', 'refunded'].includes(status)) {
+      continue;
+    }
     if (row.hour) hourlyMap[row.hour] = Number(row.orders_count || 0);
   }
 

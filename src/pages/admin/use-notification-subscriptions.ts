@@ -6,6 +6,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { apiFetch } from '@/lib/api-client';
+import { isSameSessionSnapshot, readSessionSnapshot, subscribeSessionChange } from '@/lib/client-session';
 import type { StaffSubscription } from './notification-settings-types';
 
 export function useNotificationSubscriptions() {
@@ -21,6 +22,7 @@ export function useNotificationSubscriptions() {
   >({});
 
   const fetchSubscriptions = useCallback(async () => {
+    const snap = readSessionSnapshot();
     setLoading(true);
     setFetchError(null);
     try {
@@ -28,27 +30,39 @@ export function useNotificationSubscriptions() {
         success: boolean;
         subscriptions?: StaffSubscription[];
       }>('/api/push/list-subscriptions', { method: 'GET' });
+      if (!isSameSessionSnapshot(snap, readSessionSnapshot())) return;
       if (resp.success && resp.subscriptions) {
         setSubscriptions(resp.subscriptions);
       } else {
         setSubscriptions([]);
       }
     } catch (err) {
+      if (!isSameSessionSnapshot(snap, readSessionSnapshot())) return;
       setFetchError(err instanceof Error ? err.message : 'Fetch failed');
       setSubscriptions([]);
     } finally {
-      setLoading(false);
+      if (isSameSessionSnapshot(snap, readSessionSnapshot())) {
+        setLoading(false);
+      }
     }
   }, []);
 
   useEffect(() => {
     void fetchSubscriptions();
+    return subscribeSessionChange(() => {
+      setSubscriptions([]);
+      setFetchError(null);
+      setTestSending(null);
+      setTestResults({});
+      void fetchSubscriptions();
+    });
   }, [fetchSubscriptions]);
 
   const addSubscription = async (
     name: string,
     role: StaffSubscription['role'],
   ): Promise<boolean> => {
+    const snap = readSessionSnapshot();
     try {
       const trimmedName = name.trim();
       const resp = await apiFetch<{ success: boolean; message?: string }>(
@@ -58,6 +72,7 @@ export function useNotificationSubscriptions() {
           body: JSON.stringify({ name: trimmedName, role }),
         },
       );
+      if (!isSameSessionSnapshot(snap, readSessionSnapshot())) return false;
       if (resp.success) {
         setSubscriptions((prev) => [
           ...prev.filter((s) => s.name !== trimmedName),
@@ -72,11 +87,13 @@ export function useNotificationSubscriptions() {
   };
 
   const removeSubscription = async (name: string) => {
+    const snap = readSessionSnapshot();
     try {
       await apiFetch('/api/push/subscribe', {
         method: 'DELETE',
         body: JSON.stringify({ name }),
       });
+      if (!isSameSessionSnapshot(snap, readSessionSnapshot())) return;
       setSubscriptions((prev) => prev.filter((s) => s.name !== name));
     } catch {
       // noop
@@ -84,6 +101,7 @@ export function useNotificationSubscriptions() {
   };
 
   const testSend = async (name: string, role: StaffSubscription['role']) => {
+    const snap = readSessionSnapshot();
     setTestSending(name);
     setTestResults((prev) => ({
       ...prev,
@@ -105,6 +123,7 @@ export function useNotificationSubscriptions() {
           body: JSON.stringify({ targetRole: role, name }),
         },
       );
+      if (!isSameSessionSnapshot(snap, readSessionSnapshot())) return;
       const sentCount = resp.data?.sent ?? resp.sent;
       if (resp.success && (sentCount === undefined || sentCount > 0)) {
         setTestResults((prev) => ({
@@ -129,6 +148,7 @@ export function useNotificationSubscriptions() {
         }));
       }
     } catch (err) {
+      if (!isSameSessionSnapshot(snap, readSessionSnapshot())) return;
       setTestResults((prev) => ({
         ...prev,
         [name]: {
@@ -142,7 +162,9 @@ export function useNotificationSubscriptions() {
         },
       }));
     } finally {
-      setTestSending(null);
+      if (isSameSessionSnapshot(snap, readSessionSnapshot())) {
+        setTestSending(null);
+      }
     }
   };
 

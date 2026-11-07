@@ -48,7 +48,10 @@ export async function loadPolicy(
   tenantId?: string,
 ): Promise<LoyaltyPolicy> {
   const effectiveTenant =
-    typeof tenantId === 'string' && tenantId.trim() && tenantId.trim() !== '*'
+    typeof tenantId === 'string' &&
+    tenantId.trim() &&
+    tenantId.trim() !== '*' &&
+    tenantId.trim().toLowerCase() !== 'hq'
       ? tenantId.trim()
       : undefined;
   let tiers: LoyaltyTierPolicy[] = [];
@@ -58,20 +61,81 @@ export async function loadPolicy(
   let campaignEndDate: string | null = null;
 
   try {
-    const { results } = await db
-      .prepare(
-        `SELECT tier_name, min_points, cashback_rate, point_multiplier, expiry_days
-         FROM loyalty_tiers ORDER BY min_points ASC`,
-      )
-      .all<{
-        tier_name: string;
-        min_points: number;
-        cashback_rate: number;
-        point_multiplier: number;
-        expiry_days: number | null;
-      }>();
+    type TierRow = {
+      tier_name: string;
+      min_points: number;
+      cashback_rate: number;
+      point_multiplier: number;
+      expiry_days: number | null;
+      tenant_id?: string | null;
+    };
+    let rows: TierRow[] = [];
+    if (effectiveTenant) {
+      let scopedSucceeded = false;
+      try {
+        const scoped = await db
+          .prepare(
+            `SELECT tier_name, min_points, cashback_rate, point_multiplier, expiry_days, tenant_id
+             FROM loyalty_tiers
+             WHERE COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?
+             ORDER BY min_points ASC`,
+          )
+          .bind(effectiveTenant)
+          .all<TierRow>();
+        scopedSucceeded = true;
+        rows = scoped.results || [];
+        if (rows.length === 0 && effectiveTenant !== 'default') {
+          const defScoped = await db
+            .prepare(
+              `SELECT tier_name, min_points, cashback_rate, point_multiplier, expiry_days, tenant_id
+               FROM loyalty_tiers
+               WHERE COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = 'default'
+               ORDER BY min_points ASC`,
+            )
+            .all<TierRow>()
+            .catch(() => ({ results: [] as TierRow[] }));
+          rows = defScoped.results || [];
+        }
+      } catch {
+        scopedSucceeded = false;
+      }
+      if (!scopedSucceeded || rows.length === 0) {
+        const unscoped = await db
+          .prepare(
+            `SELECT tier_name, min_points, cashback_rate, point_multiplier, expiry_days
+             FROM loyalty_tiers ORDER BY min_points ASC`,
+          )
+          .all<TierRow>();
+        const rawUnscoped = unscoped.results || [];
+        if (!scopedSucceeded) {
+          rows = rawUnscoped.filter((r) => {
+            if ('tenant_id' in r && r.tenant_id !== undefined) {
+              const rt = String(r.tenant_id ?? '').trim() || 'default';
+              return rt === effectiveTenant;
+            }
+            return true;
+          });
+        } else if (rawUnscoped.length > 0) {
+          const anyWithTenant = await db
+            .prepare('SELECT tenant_id FROM loyalty_tiers LIMIT 1')
+            .first<{ tenant_id?: string | null }>()
+            .catch(() => null);
+          if (!anyWithTenant || !('tenant_id' in anyWithTenant)) {
+            rows = rawUnscoped;
+          }
+        }
+      }
+    } else {
+      const { results } = await db
+        .prepare(
+          `SELECT tier_name, min_points, cashback_rate, point_multiplier, expiry_days
+           FROM loyalty_tiers ORDER BY min_points ASC`,
+        )
+        .all<TierRow>();
+      rows = results || [];
+    }
 
-    tiers = (results || []).map((r) => ({
+    tiers = rows.map((r) => ({
       tierName: r.tier_name,
       minPoints: r.min_points,
       cashbackRate: r.cashback_rate,

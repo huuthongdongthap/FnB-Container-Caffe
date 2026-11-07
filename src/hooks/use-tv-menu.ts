@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { apiFetch } from '@/lib/api-client';
+import { useClientSessionScope } from '@/lib/client-session';
 import { useEffect, useState } from 'react';
 
 export interface MenuItem {
@@ -34,6 +35,7 @@ function checkHappyHour(): boolean {
 }
 
 export function useTVMenu(): TVMenuResult {
+  const session = useClientSessionScope();
   const [isHappyHour, setIsHappyHour] = useState(checkHappyHour);
 
   useEffect(() => {
@@ -48,7 +50,7 @@ export function useTVMenu(): TVMenuResult {
     isLoading,
     isError,
   } = useQuery<{ items: MenuItem[]; success: boolean }>({
-    queryKey: ['tv-menu'],
+    queryKey: ['tv-menu', session.tenantId],
     queryFn: () =>
       apiFetch<{ items: MenuItem[]; success: boolean }>('/api/menu?available=true&limit=50'),
     refetchInterval: REFRESH_INTERVAL,

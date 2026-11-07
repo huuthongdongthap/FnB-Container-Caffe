@@ -3,6 +3,7 @@
 import { useState, useCallback, useEffect } from 'react';
 import { useMobileAuth as _useMobileAuth } from '@/hooks/use-mobile-auth';
 import { apiFetch } from '@/lib/api-client';
+import { isSameSessionSnapshot, readSessionSnapshot, subscribeSessionChange } from '@/lib/client-session';
 
 /* ── Types ────────────────────────────────────────────────────────── */
 
@@ -72,26 +73,45 @@ export default function TableManager() {
   const [confirmTarget, setConfirmTarget] = useState<{ id: string; newStatus: string } | null>(null);
 
   const loadTables = useCallback(async () => {
+    const snap = readSessionSnapshot();
     try {
       setError(null);
       const body = await apiFetch<{ success: boolean; tables: TableRow[] }>('/mobile/tables');
+      if (!isSameSessionSnapshot(snap, readSessionSnapshot())) return;
       if (body.success && body.tables) setTables(body.tables);
     } catch (err) {
+      if (!isSameSessionSnapshot(snap, readSessionSnapshot())) return;
       setError(err instanceof Error ? err.message : 'Không thể tải danh sách bàn');
-    } finally { setLoading(false); }
+    } finally {
+      if (isSameSessionSnapshot(snap, readSessionSnapshot())) {
+        setLoading(false);
+      }
+    }
   }, []);
 
-  useEffect(() => { loadTables(); }, [loadTables]);
+  useEffect(() => {
+    void loadTables();
+    return subscribeSessionChange(() => {
+      setTables([]);
+      setConfirmTarget(null);
+      setError(null);
+      setLoading(true);
+      void loadTables();
+    });
+  }, [loadTables]);
 
   const patchStatus = useCallback(async (tableId: string, newStatus: string) => {
+    const snap = readSessionSnapshot();
     try {
       setError(null);
       await apiFetch(`/mobile/tables/${tableId}`, {
         method: 'PATCH',
         body: JSON.stringify({ status: newStatus }),
       });
+      if (!isSameSessionSnapshot(snap, readSessionSnapshot())) return;
       setTables((prev) => prev.map((t) => (t.id === tableId ? { ...t, status: newStatus as TableRow['status'] } : t)));
     } catch (err) {
+      if (!isSameSessionSnapshot(snap, readSessionSnapshot())) return;
       setError(err instanceof Error ? err.message : 'Cập nhật trạng thái bàn thất bại');
     }
   }, []);

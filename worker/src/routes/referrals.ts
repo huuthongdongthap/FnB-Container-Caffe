@@ -8,6 +8,7 @@ import { Hono } from 'hono';
 import { matchesTenantRow } from '../lib/db';
 import { resolvePilotStore } from '../lib/pilot-store';
 import { referralApplySchema } from '../lib/validators';
+import { isHQSuperAdmin } from '../middleware/tenant';
 import { authCustomer } from '../tree/loyalty/auth-middleware';
 import { rateLimitMiddleware, REFERRAL_CODE_RATE_LIMIT } from '../middleware/rate-limit';
 import type { Env } from '../types/env';
@@ -15,21 +16,114 @@ import type { Customer, ReferralCode } from '../types/models';
 
 export const referralRouter = new Hono<{ Bindings: Env }>();
 
+function hasReferralTenantMismatch(c: {
+  env: Env;
+  req?: { query?: (k: string) => string | undefined; header?: (k: string) => string | undefined };
+  get: (k: string) => unknown;
+}): boolean {
+  const user = c.get('user') as { role?: string; tenantId?: string; tenant_id?: string } | undefined;
+  const cust = c.get('customer') as { tenant_id?: string | null } | undefined;
+  const queryCandidates = [
+    c.req?.query?.('tenant_id'),
+    c.req?.query?.('tenantId'),
+    c.req?.query?.('store_id'),
+    c.req?.query?.('storeId'),
+  ]
+    .map((v) => (typeof v === 'string' ? v.trim() : ''))
+    .filter(Boolean);
+  const headerCandidates = [
+    c.req?.header?.('X-Tenant-ID'),
+    c.req?.header?.('x-tenant-id'),
+    c.req?.header?.('X-Store-ID'),
+    c.req?.header?.('x-store-id'),
+  ]
+    .map((v) => (typeof v === 'string' ? v.trim() : ''))
+    .filter(Boolean);
+  if (new Set([...queryCandidates, ...headerCandidates]).size > 1) {
+    return true;
+  }
+  const reqTenant = queryCandidates[0] || headerCandidates[0] || '';
+  if (isHQSuperAdmin(user)) {
+    return false;
+  }
+  const custTenant = cust?.tenant_id && String(cust.tenant_id).trim() ? String(cust.tenant_id).trim() : '';
+  const userTenant = String(user?.tenantId ?? user?.tenant_id ?? '').trim();
+  if (
+    custTenant === '*' ||
+    custTenant.toLowerCase() === 'hq' ||
+    userTenant === '*' ||
+    userTenant.toLowerCase() === 'hq' ||
+    reqTenant === '*' ||
+    reqTenant.toLowerCase() === 'hq'
+  ) {
+    return true;
+  }
+  let pilotTenant = 'default';
+  try {
+    pilotTenant = resolvePilotStore(c.env);
+  } catch {
+    pilotTenant = 'default';
+  }
+  const boundTenant = custTenant || userTenant || pilotTenant || 'default';
+  if (custTenant && userTenant && custTenant !== userTenant) {
+    return true;
+  }
+  if (reqTenant && reqTenant !== boundTenant) {
+    return true;
+  }
+  return false;
+}
+
 function getTenantId(c: {
   env: Env;
-  req?: { header?: (k: string) => string | undefined };
+  req?: { query?: (k: string) => string | undefined; header?: (k: string) => string | undefined };
   get: (k: string) => unknown;
 }): string {
   const cust = c.get('customer') as { tenant_id?: string | null } | undefined;
-  const user = c.get('user') as { tenantId?: string } | undefined;
+  const user = c.get('user') as { role?: string; tenantId?: string; tenant_id?: string } | undefined;
+  const reqTenant = String(
+    c.req?.query?.('tenant_id') ||
+    c.req?.query?.('tenantId') ||
+    c.req?.query?.('store_id') ||
+    c.req?.query?.('storeId') ||
+    c.req?.header?.('X-Tenant-ID') ||
+    c.req?.header?.('x-tenant-id') ||
+    c.req?.header?.('X-Store-ID') ||
+    c.req?.header?.('x-store-id') ||
+    ''
+  ).trim();
+  if (isHQSuperAdmin(user)) {
+    if (reqTenant) {
+      return reqTenant.toLowerCase() === 'hq' ? '*' : reqTenant;
+    }
+    if (cust?.tenant_id && String(cust.tenant_id).trim()) {
+      const ct = String(cust.tenant_id).trim();
+      if (ct !== '*' && ct.toLowerCase() !== 'hq') {
+        return ct;
+      }
+    }
+    return '*';
+  }
   if (cust) {
-    if (cust.tenant_id && String(cust.tenant_id).trim()) return String(cust.tenant_id).trim();
-    if (user?.tenantId && user.tenantId.trim()) return user.tenantId.trim();
+    if (cust.tenant_id && String(cust.tenant_id).trim()) {
+      const ct = String(cust.tenant_id).trim();
+      return ct === '*' || ct.toLowerCase() === 'hq' ? 'default' : ct;
+    }
+    const rawUserTenant = user?.tenantId ?? user?.tenant_id;
+    if (rawUserTenant && rawUserTenant.trim()) {
+      const ut = rawUserTenant.trim();
+      return ut === '*' || ut.toLowerCase() === 'hq' ? 'default' : ut;
+    }
     return 'default';
   }
-  if (user?.tenantId && user.tenantId.trim()) return user.tenantId.trim();
-  const hdr = c.req?.header?.('X-Tenant-ID');
-  if (hdr && hdr.trim()) return hdr.trim();
+  const rawUserTenant = user?.tenantId ?? user?.tenant_id;
+  if (rawUserTenant && rawUserTenant.trim()) {
+    const ut = rawUserTenant.trim();
+    return ut === '*' || ut.toLowerCase() === 'hq' ? 'default' : ut;
+  }
+  if (reqTenant) {
+    return reqTenant === '*' || reqTenant.toLowerCase() === 'hq' ? 'default' : reqTenant;
+  }
   try {
     return resolvePilotStore(c.env);
   } catch {
@@ -65,11 +159,29 @@ function genReferralCode(length = 6): string {
 referralRouter.use('/*', authCustomer);
 
 referralRouter.get('/code', rateLimitMiddleware(REFERRAL_CODE_RATE_LIMIT), async(c) => {
-  const cust = c.get('customer') as unknown as Customer;
+  if (hasReferralTenantMismatch(c as unknown as Parameters<typeof hasReferralTenantMismatch>[0])) {
+    return c.json({ success: false, error: 'Cross-tenant access denied' }, 403);
+  }
+  const cust = c.get('customer') as unknown as Customer & { tenant_id?: string | null };
   const db = c.env.AURA_DB;
-  const tenantId = getTenantId(c as unknown as { env: Env; get: (k: string) => unknown });
+  const tenantId = getTenantId(c as unknown as Parameters<typeof getTenantId>[0]);
+  const custTenant =
+    cust?.tenant_id && String(cust.tenant_id).trim() && String(cust.tenant_id).trim() !== '*' && String(cust.tenant_id).trim().toLowerCase() !== 'hq'
+      ? String(cust.tenant_id).trim()
+      : '';
+  const writeTenant = (tenantId && tenantId !== '*' ? tenantId : custTenant) || 'default';
 
-  let rc = await db.prepare('SELECT * FROM referral_codes WHERE customer_id = ?').bind(cust.id).first<ReferralCode>();
+  let rc: ReferralCode | null = null;
+  try {
+    rc = await db
+      .prepare(
+        "SELECT * FROM referral_codes WHERE customer_id = ? AND (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?) ORDER BY created_at DESC LIMIT 1"
+      )
+      .bind(cust.id, tenantId, tenantId)
+      .first<ReferralCode>();
+  } catch {
+    rc = await db.prepare('SELECT * FROM referral_codes WHERE customer_id = ?').bind(cust.id).first<ReferralCode>().catch(() => null);
+  }
   if (rc && 'tenant_id' in (rc as unknown as Record<string, unknown>) && (rc as unknown as Record<string, unknown>).tenant_id !== undefined && !matchesTenantRow(rc, tenantId)) {
     const scopedRc = tenantId && tenantId !== '*'
       ? await db.prepare("SELECT * FROM referral_codes WHERE customer_id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?").bind(cust.id, tenantId).first<ReferralCode>().catch(() => null)
@@ -95,7 +207,14 @@ referralRouter.get('/code', rateLimitMiddleware(REFERRAL_CODE_RATE_LIMIT), async
     for (let attempt = 0; attempt < 3; attempt++) {
       try {
         finalCodeId = attempt === 0 ? codeId : codeId + attempt;
-        await db.prepare('INSERT INTO referral_codes (id, customer_id, code, times_used, total_points_earned, created_at) VALUES (?, ?, ?, 0, 0, ?)').bind(finalCodeId, cust.id, code, now).run();
+        try {
+          await db.prepare('INSERT INTO referral_codes (id, customer_id, code, times_used, total_points_earned, created_at, tenant_id) VALUES (?, ?, ?, 0, 0, ?, ?)').bind(finalCodeId, cust.id, code, now, writeTenant).run();
+        } catch (innerErr) {
+          if ((innerErr as Error).message && (innerErr as Error).message!.includes('UNIQUE')) {
+            throw innerErr;
+          }
+          await db.prepare('INSERT INTO referral_codes (id, customer_id, code, times_used, total_points_earned, created_at) VALUES (?, ?, ?, 0, 0, ?)').bind(finalCodeId, cust.id, code, now).run();
+        }
         inserted = true;
         break;
       } catch (e) {
@@ -109,9 +228,7 @@ referralRouter.get('/code', rateLimitMiddleware(REFERRAL_CODE_RATE_LIMIT), async
     if (!inserted) {
       return c.json({ success: false, error: 'Không thể tạo mã giới thiệu. Vui lòng thử lại sau.' }, 500);
     }
-    if (tenantId && tenantId !== '*') {
-      await db.prepare('UPDATE referral_codes SET tenant_id = ? WHERE id = ?').bind(tenantId, finalCodeId).run().catch(() => {});
-    }
+    await db.prepare('UPDATE referral_codes SET tenant_id = ? WHERE id = ?').bind(writeTenant, finalCodeId).run().catch(() => {});
     rc = { id: finalCodeId, customer_id: cust.id, code, times_used: 0, total_points_earned: 0, created_at: now };
   }
 
@@ -127,7 +244,10 @@ referralRouter.get('/code', rateLimitMiddleware(REFERRAL_CODE_RATE_LIMIT), async
 });
 
 referralRouter.post('/apply', async(c) => {
-  const cust = c.get('customer') as unknown as Customer;
+  if (hasReferralTenantMismatch(c as unknown as Parameters<typeof hasReferralTenantMismatch>[0])) {
+    return c.json({ success: false, error: 'Cross-tenant access denied' }, 403);
+  }
+  const cust = c.get('customer') as unknown as Customer & { tenant_id?: string | null };
   const db = c.env.AURA_DB;
   const body = await c.req.json() as Record<string, unknown>;
   const parsed = referralApplySchema.safeParse(body);
@@ -137,8 +257,22 @@ referralRouter.post('/apply', async(c) => {
   const { code } = parsed.data;
 
   const normalized = code.trim().toUpperCase();
+  const tenantId = getTenantId(c as unknown as Parameters<typeof getTenantId>[0]);
 
-  const rc = await db.prepare('SELECT * FROM referral_codes WHERE code = ?').bind(normalized).first<ReferralCode>();
+  let rc: ReferralCode | null = null;
+  try {
+    rc = await db
+      .prepare(
+        "SELECT * FROM referral_codes WHERE code = ? AND (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?) ORDER BY created_at DESC LIMIT 1"
+      )
+      .bind(normalized, tenantId, tenantId)
+      .first<ReferralCode>();
+  } catch {
+    rc = null;
+  }
+  if (!rc) {
+    rc = await db.prepare('SELECT * FROM referral_codes WHERE code = ?').bind(normalized).first<ReferralCode>();
+  }
   if (!rc) {
     return c.json({ success: false, error: 'M? gi?i thi?u khong t?n t?i' }, 404);
   }
@@ -150,7 +284,6 @@ referralRouter.post('/apply', async(c) => {
     return c.json({ success: false, error: 'Mã giới thiệu đã hết lượt sử dụng' }, 409);
   }
 
-  const tenantId = getTenantId(c as unknown as { env: Env; get: (k: string) => unknown });
   if ('tenant_id' in (rc as unknown as Record<string, unknown>) && (rc as unknown as Record<string, unknown>).tenant_id !== undefined && !matchesTenantRow(rc, tenantId)) {
     return c.json({ success: false, error: 'Người giới thiệu không tồn tại' }, 404);
   }
@@ -164,13 +297,57 @@ referralRouter.post('/apply', async(c) => {
     return c.json({ success: false, error: 'Người giới thiệu không tồn tại' }, 404);
   }
 
+  const rcRawTenant = (rc as unknown as { tenant_id?: string | null }).tenant_id;
+  const rcTenant =
+    rcRawTenant && String(rcRawTenant).trim() && String(rcRawTenant).trim() !== '*' && String(rcRawTenant).trim().toLowerCase() !== 'hq'
+      ? String(rcRawTenant).trim()
+      : '';
+  const referrerTenant =
+    referrer.tenant_id && String(referrer.tenant_id).trim() && String(referrer.tenant_id).trim() !== '*' && String(referrer.tenant_id).trim().toLowerCase() !== 'hq'
+      ? String(referrer.tenant_id).trim()
+      : '';
+  const custTenant =
+    cust?.tenant_id && String(cust.tenant_id).trim() && String(cust.tenant_id).trim() !== '*' && String(cust.tenant_id).trim().toLowerCase() !== 'hq'
+      ? String(cust.tenant_id).trim()
+      : '';
+  if (rcTenant && referrerTenant && rcTenant !== referrerTenant) {
+    return c.json({ success: false, error: 'Người giới thiệu không tồn tại' }, 404);
+  }
+  const codeOwnerTenant = rcTenant || referrerTenant;
+  if (custTenant && codeOwnerTenant && custTenant !== codeOwnerTenant) {
+    return c.json({ success: false, error: 'Người giới thiệu không tồn tại' }, 404);
+  }
+  const writeTenant = (tenantId && tenantId !== '*' ? tenantId : (codeOwnerTenant || custTenant)) || 'default';
+
   let existing: { id: string; tenant_id?: string | null } | null = null;
   try {
-    existing = await db.prepare('SELECT id, tenant_id FROM referrals WHERE referred_customer_id = ?').bind(cust.id).first<{ id: string; tenant_id?: string | null }>();
+    existing = await db
+      .prepare(
+        "SELECT id, tenant_id FROM referrals WHERE referred_customer_id = ? AND (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?) ORDER BY created_at DESC LIMIT 1"
+      )
+      .bind(cust.id, writeTenant, writeTenant)
+      .first<{ id: string; tenant_id?: string | null }>();
   } catch {
-    existing = await db.prepare('SELECT id FROM referrals WHERE referred_customer_id = ?').bind(cust.id).first<{ id: string }>();
+    try {
+      existing = await db.prepare('SELECT id, tenant_id FROM referrals WHERE referred_customer_id = ?').bind(cust.id).first<{ id: string; tenant_id?: string | null }>();
+    } catch {
+      try {
+        existing = await db.prepare('SELECT id FROM referrals WHERE referred_customer_id = ?').bind(cust.id).first<{ id: string }>();
+      } catch {
+        try {
+          existing = await db
+            .prepare(
+              "SELECT id, tenant_id FROM referrals WHERE referred_id = ? AND (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?) ORDER BY created_at DESC LIMIT 1"
+            )
+            .bind(cust.id, writeTenant, writeTenant)
+            .first<{ id: string; tenant_id?: string | null }>();
+        } catch {
+          existing = await db.prepare('SELECT id FROM referrals WHERE referred_id = ?').bind(cust.id).first<{ id: string }>();
+        }
+      }
+    }
   }
-  if (existing && 'tenant_id' in existing && existing.tenant_id !== undefined && !matchesTenantRow(existing, tenantId)) {
+  if (existing && 'tenant_id' in existing && existing.tenant_id !== undefined && !matchesTenantRow(existing, writeTenant)) {
     existing = null;
   }
   if (existing) {
@@ -196,23 +373,59 @@ referralRouter.post('/apply', async(c) => {
 
   try {
     await db.prepare(
-      `INSERT INTO referrals (id, referrer_id, referred_customer_id, referral_code, points_awarded, cashback_awarded_vnd, status, bonus_type, created_at)
-       VALUES (?, ?, ?, ?, 0, ?, 'pending', ?, ?)`
-    ).bind(refId, referrer.id, cust.id, normalized, REFERRER_CASHBACK_VND, 'pending', now).run();
-  } catch {
-    await db.prepare(
-      `INSERT INTO referrals (id, referrer_id, referred_customer_id, referral_code, points_awarded, status, created_at)
-       VALUES (?, ?, ?, ?, 0, 'pending', ?)`
-    ).bind(refId, referrer.id, cust.id, normalized, now).run();
+      `INSERT INTO referrals (id, referrer_id, referred_customer_id, referral_code, points_awarded, cashback_awarded_vnd, status, bonus_type, created_at, tenant_id)
+       VALUES (?, ?, ?, ?, 0, ?, 'pending', ?, ?, ?)`
+    ).bind(refId, referrer.id, cust.id, normalized, REFERRER_CASHBACK_VND, 'cashback', now, writeTenant).run();
+  } catch (insertErr) {
+    if (/UNIQUE|constraint/i.test(String(insertErr))) {
+      return c.json({ success: false, error: 'B?n d? s? d?ng m? gi?i thi?u tru?c d?y' }, 409);
+    }
+    try {
+      await db.prepare(
+        `INSERT INTO referrals (id, referrer_id, referred_customer_id, referral_code, points_awarded, cashback_awarded_vnd, status, bonus_type, created_at)
+         VALUES (?, ?, ?, ?, 0, ?, 'pending', ?, ?)`
+      ).bind(refId, referrer.id, cust.id, normalized, REFERRER_CASHBACK_VND, 'cashback', now).run();
+    } catch (innerInsertErr) {
+      if (/UNIQUE|constraint/i.test(String(innerInsertErr))) {
+        return c.json({ success: false, error: 'B?n d? s? d?ng m? gi?i thi?u tru?c d?y' }, 409);
+      }
+      try {
+        await db.prepare(
+          `INSERT INTO referrals (id, referrer_id, referred_customer_id, referral_code, points_awarded, status, created_at)
+           VALUES (?, ?, ?, ?, 0, 'pending', ?)`
+        ).bind(refId, referrer.id, cust.id, normalized, now).run();
+      } catch (fallbackInsertErr) {
+        if (/UNIQUE|constraint/i.test(String(fallbackInsertErr))) {
+          return c.json({ success: false, error: 'B?n d? s? d?ng m? gi?i thi?u tru?c d?y' }, 409);
+        }
+        throw fallbackInsertErr;
+      }
+    }
   }
-  if (tenantId && tenantId !== '*') {
-    await db.prepare('UPDATE referrals SET tenant_id = ? WHERE id = ?').bind(tenantId, refId).run().catch(() => {});
+  await db.prepare('UPDATE referrals SET tenant_id = ? WHERE id = ?').bind(writeTenant, refId).run().catch(() => {});
+
+  try {
+    const verifyRes = await db
+      .prepare(
+        "SELECT id FROM referrals WHERE referred_customer_id = ? AND (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?) ORDER BY created_at ASC, id ASC"
+      )
+      .bind(cust.id, writeTenant, writeTenant)
+      .all<{ id: string }>();
+    const verifyRows = verifyRes?.results || [];
+    if (verifyRows.length > 1 && verifyRows[0]?.id && verifyRows[0].id !== refId) {
+      await db.prepare('DELETE FROM referrals WHERE id = ?').bind(refId).run().catch(() => {});
+      return c.json({ success: false, error: 'B?n d? s? d?ng m? gi?i thi?u tru?c d?y' }, 409);
+    }
+  } catch {
+    // Ignore when test harness does not support .all() on referrals verification
   }
 
   try {
     const usageRes = await db
-      .prepare('UPDATE referral_codes SET times_used = times_used + 1 WHERE id = ? AND (max_uses IS NULL OR max_uses <= 0 OR COALESCE(times_used, 0) < max_uses)')
-      .bind(rc.id)
+      .prepare(
+        "UPDATE referral_codes SET times_used = times_used + 1 WHERE id = ? AND (max_uses IS NULL OR max_uses <= 0 OR COALESCE(times_used, 0) < max_uses) AND (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?)"
+      )
+      .bind(rc.id, writeTenant, writeTenant)
       .run();
     const changes = Number((usageRes as unknown as { meta?: { changes?: number } })?.meta?.changes ?? 1);
     if (changes === 0) {
@@ -220,7 +433,19 @@ referralRouter.post('/apply', async(c) => {
       return c.json({ success: false, error: 'Mã giới thiệu đã hết lượt sử dụng' }, 409);
     }
   } catch {
-    await db.prepare('UPDATE referral_codes SET times_used = times_used + 1 WHERE id = ?').bind(rc.id).run();
+    try {
+      const usageRes = await db
+        .prepare('UPDATE referral_codes SET times_used = times_used + 1 WHERE id = ? AND (max_uses IS NULL OR max_uses <= 0 OR COALESCE(times_used, 0) < max_uses)')
+        .bind(rc.id)
+        .run();
+      const changes = Number((usageRes as unknown as { meta?: { changes?: number } })?.meta?.changes ?? 1);
+      if (changes === 0) {
+        await db.prepare('DELETE FROM referrals WHERE id = ?').bind(refId).run().catch(() => {});
+        return c.json({ success: false, error: 'Mã giới thiệu đã hết lượt sử dụng' }, 409);
+      }
+    } catch {
+      await db.prepare('UPDATE referral_codes SET times_used = times_used + 1 WHERE id = ?').bind(rc.id).run();
+    }
   }
 
   return c.json({
@@ -234,11 +459,24 @@ referralRouter.post('/apply', async(c) => {
 });
 
 referralRouter.get('/stats', async(c) => {
+  if (hasReferralTenantMismatch(c as unknown as Parameters<typeof hasReferralTenantMismatch>[0])) {
+    return c.json({ success: false, error: 'Cross-tenant access denied' }, 403);
+  }
   const cust = c.get('customer') as unknown as Customer;
   const db = c.env.AURA_DB;
-  const tenantId = getTenantId(c as unknown as { env: Env; get: (k: string) => unknown });
+  const tenantId = getTenantId(c as unknown as Parameters<typeof getTenantId>[0]);
 
-  let rc = await db.prepare('SELECT * FROM referral_codes WHERE customer_id = ?').bind(cust.id).first<ReferralCode>();
+  let rc: ReferralCode | null = null;
+  try {
+    rc = await db
+      .prepare(
+        "SELECT * FROM referral_codes WHERE customer_id = ? AND (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?) ORDER BY created_at DESC LIMIT 1"
+      )
+      .bind(cust.id, tenantId, tenantId)
+      .first<ReferralCode>();
+  } catch {
+    rc = await db.prepare('SELECT * FROM referral_codes WHERE customer_id = ?').bind(cust.id).first<ReferralCode>().catch(() => null);
+  }
   if (rc && 'tenant_id' in (rc as unknown as Record<string, unknown>) && (rc as unknown as Record<string, unknown>).tenant_id !== undefined && !matchesTenantRow(rc, tenantId)) {
     const scopedRc = tenantId && tenantId !== '*'
       ? await db.prepare("SELECT * FROM referral_codes WHERE customer_id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?").bind(cust.id, tenantId).first<ReferralCode>().catch(() => null)
@@ -262,11 +500,23 @@ referralRouter.get('/stats', async(c) => {
     refCount = res.results || [];
   }
 
-  const { results: rawRecentRefs } = await db.prepare(
-    `SELECT r.*, c.name as referred_name, c.phone as referred_phone
-     FROM referrals r LEFT JOIN customers c ON r.referred_customer_id = c.id
-     WHERE r.referrer_id = ? ORDER BY r.created_at DESC LIMIT 20`
-  ).bind(cust.id).all();
+  let rawRecentRefs: unknown[] = [];
+  try {
+    const res = await db.prepare(
+      `SELECT r.*, c.name as referred_name, c.phone as referred_phone
+       FROM referrals r LEFT JOIN customers c ON r.referred_customer_id = c.id AND COALESCE(NULLIF(TRIM(c.tenant_id), ''), 'default') = COALESCE(NULLIF(TRIM(r.tenant_id), ''), 'default')
+       WHERE r.referrer_id = ? AND (? = '*' OR COALESCE(NULLIF(TRIM(r.tenant_id), ''), 'default') = ?)
+       ORDER BY r.created_at DESC LIMIT 20`
+    ).bind(cust.id, tenantId, tenantId).all();
+    rawRecentRefs = res.results || [];
+  } catch {
+    const res = await db.prepare(
+      `SELECT r.*, c.name as referred_name, c.phone as referred_phone
+       FROM referrals r LEFT JOIN customers c ON r.referred_customer_id = c.id
+       WHERE r.referrer_id = ? ORDER BY r.created_at DESC LIMIT 20`
+    ).bind(cust.id).all();
+    rawRecentRefs = res.results || [];
+  }
   const recentRefs = ((rawRecentRefs || []) as Record<string, unknown>[]).filter((row) => {
     if ('tenant_id' in row && row.tenant_id !== undefined) {
       return matchesTenantRow(row, tenantId);

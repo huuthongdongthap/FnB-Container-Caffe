@@ -3,6 +3,7 @@
  * Check-in rewards with staff approval flow.
  */
 import { describe, test, expect, vi, beforeEach } from 'vitest';
+import { Hono } from 'hono';
 
 function createMockD1(seedData: Record<string, any[]> = {}) {
   const tables: Record<string, any[]> = {
@@ -81,17 +82,25 @@ function createMockD1(seedData: Record<string, any[]> = {}) {
 }
 
 function createEnv(overrides: Record<string, unknown> = {}) {
-  return { AURA_DB: createMockD1(), JWT_SECRET: 'test-secret', ...overrides };
+  return { AURA_DB: createMockD1(), JWT_SECRET: 'test-jwt-secret-at-least-16-chars', ...overrides };
 }
 
 let router: any;
+let rawRouter: any;
 let env: ReturnType<typeof createEnv>;
 
 beforeEach(async () => {
   vi.clearAllMocks();
   env = createEnv();
   const mod = await import('../worker/src/routes/checkin.ts');
-  router = mod.checkinRouter;
+  rawRouter = mod.checkinRouter;
+  const app = new Hono();
+  app.use('*', async (c, next) => {
+    c.set('user' as never, { id: 'staff-owner-1', role: 'owner', tenantId: 'default' } as never);
+    await next();
+  });
+  app.route('/', rawRouter);
+  router = app;
 });
 
 describe('POST /', () => {
@@ -125,7 +134,7 @@ describe('POST /', () => {
   });
 
   test('returns 400 on duplicate check-in same day', async () => {
-    const todayISO = new Date().toISOString().slice(0, 10);
+    const todayISO = new Date(Date.now() + 7 * 3600_000).toISOString().slice(0, 10);
     env.AURA_DB = createMockD1({
       customers: [{ id: 'cust1', name: 'A' }],
       checkins: [{ id: 'ci_existing', customer_id: 'cust1', checkin_date: todayISO, status: 'pending' }],
@@ -183,5 +192,10 @@ describe('GET /', () => {
     const body = await res.json();
     expect(body.success).toBe(true);
     expect(body.data).toEqual([]);
+  });
+
+  test('returns 401 when GET / is requested without staff authentication', async () => {
+    const res = await rawRouter.request('/', { method: 'GET' }, env);
+    expect(res.status).toBe(401);
   });
 });

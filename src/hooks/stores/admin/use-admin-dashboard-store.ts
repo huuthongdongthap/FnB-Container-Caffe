@@ -38,22 +38,27 @@ function normalizeDashboardStats(body: Record<string, unknown> | null | undefine
   };
 }
 
+let latestFetchDashboardSeq = 0;
+
 export const useAdminDashboardStore = create<AdminDashboardState>((set) => ({
   stats: null,
   loading: false,
   error: null,
 
   fetchDashboard: async (period?: string) => {
+    const seq = ++latestFetchDashboardSeq;
     set({ loading: true, error: null });
     try {
       const endpoint = period ? `/api/stats?period=${encodeURIComponent(period)}` : '/api/stats';
       const body = await apiFetch<any>(endpoint);
+      if (seq !== latestFetchDashboardSeq) return;
       set({
         stats: normalizeDashboardStats(body),
         loading: false,
         error: null,
       });
     } catch (err) {
+      if (seq !== latestFetchDashboardSeq) return;
       const message = err instanceof Error ? err.message : 'Lỗi kết nối';
       set({ loading: false, error: message });
     }

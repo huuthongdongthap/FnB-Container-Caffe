@@ -38,25 +38,43 @@ export async function handleGuestCheckin(c: Context<{ Bindings: Env }>) {
 
   // Claim table atomically via CAS before inserting the guest check-in order.
   const normalizedTenant = (tenantId || '').trim() || 'default';
-  const tblTenantClause = normalizedTenant === 'default'
+  const initTblTenantClause = normalizedTenant === 'default'
+    ? "AND (tenant_id = ?2 OR tenant_id IS NULL OR tenant_id = '' OR TRIM(tenant_id) = '')"
+    : 'AND (tenant_id = ?2 OR TRIM(tenant_id) = ?2)';
+  const table = await db
+    .prepare(`SELECT id, table_number, status, tenant_id FROM cafe_tables WHERE id = ?1 ${initTblTenantClause}`)
+    .bind(tableRow.id, normalizedTenant)
+    .first<{ id?: string; table_number?: string | number; status?: string | null; tenant_id?: string | null }>()
+    .catch(() => null);
+  if (table && table.status !== undefined && table.status !== null && String(table.status).trim() !== '') {
+    if (String(table.status || '').trim().toLowerCase() !== 'available') {
+      return c.json({ success: false, error: 'Bàn đang được sử dụng, vui lòng chọn bàn khác' }, 409);
+    }
+  }
+  const rawTableTenant = table?.tenant_id ? String(table.tenant_id).trim() : '';
+  const effectiveTableTenant =
+    rawTableTenant && rawTableTenant !== '*' && rawTableTenant.toLowerCase() !== 'hq'
+      ? rawTableTenant
+      : normalizedTenant;
+  const tblTenantClause = effectiveTableTenant === 'default'
     ? "AND (tenant_id = ?2 OR tenant_id IS NULL OR tenant_id = '' OR TRIM(tenant_id) = '')"
     : 'AND (tenant_id = ?2 OR TRIM(tenant_id) = ?2)';
   let tableClaimStmt = db.prepare(
-    `UPDATE cafe_tables SET status = 'Occupied', current_order_id = ?3, updated_at = CURRENT_TIMESTAMP WHERE id = ?1 ${tblTenantClause} AND status = 'Available'`
-  ).bind(tableRow.id, normalizedTenant, orderId);
+    `UPDATE cafe_tables SET status = 'Occupied', current_order_id = ?3, updated_at = CURRENT_TIMESTAMP WHERE id = ?1 ${tblTenantClause} AND LOWER(TRIM(COALESCE(status, ''))) = 'available'`
+  ).bind(tableRow.id, effectiveTableTenant, orderId);
   let tableUpdateResult: { success?: boolean; changes?: number; meta?: { changes?: number } };
   try {
     tableUpdateResult = (await tableClaimStmt.run()) as { success?: boolean; changes?: number; meta?: { changes?: number } };
   } catch {
     try {
       tableClaimStmt = db.prepare(
-        `UPDATE cafe_tables SET status = 'Occupied', updated_at = CURRENT_TIMESTAMP WHERE id = ?1 ${tblTenantClause} AND status = 'Available'`
-      ).bind(tableRow.id, normalizedTenant);
+        `UPDATE cafe_tables SET status = 'Occupied', updated_at = CURRENT_TIMESTAMP WHERE id = ?1 ${tblTenantClause} AND LOWER(TRIM(COALESCE(status, ''))) = 'available'`
+      ).bind(tableRow.id, effectiveTableTenant);
       tableUpdateResult = (await tableClaimStmt.run()) as { success?: boolean; changes?: number; meta?: { changes?: number } };
     } catch {
       tableClaimStmt = db.prepare(
-        `UPDATE cafe_tables SET status = 'Occupied' WHERE id = ?1 ${tblTenantClause} AND status = 'Available'`
-      ).bind(tableRow.id, normalizedTenant);
+        `UPDATE cafe_tables SET status = 'Occupied' WHERE id = ?1 ${tblTenantClause} AND LOWER(TRIM(COALESCE(status, ''))) = 'available'`
+      ).bind(tableRow.id, effectiveTableTenant);
       tableUpdateResult = (await tableClaimStmt.run()) as { success?: boolean; changes?: number; meta?: { changes?: number } };
     }
   }
@@ -72,7 +90,7 @@ export async function handleGuestCheckin(c: Context<{ Bindings: Env }>) {
   ).bind(
     orderId, data.customer_name, data.customer_phone, tableRow.id,
     JSON.stringify([]), 0,
-    'Khách QR - cho don mon', normalizedTenant, now, now
+    'Khách QR - cho don mon', effectiveTableTenant, now, now
   );
   try {
     if ('idx' in (orderInsertStmt as unknown as Record<string, unknown>) && typeof db.batch === 'function') {
@@ -91,12 +109,12 @@ export async function handleGuestCheckin(c: Context<{ Bindings: Env }>) {
         .prepare(
           `UPDATE cafe_tables SET status = 'Available', current_order_id = NULL WHERE id = ?1 ${tblTenantClause} AND (current_order_id = ?3 OR current_order_id IS NULL)`
         )
-        .bind(tableRow.id, normalizedTenant, orderId)
+        .bind(tableRow.id, effectiveTableTenant, orderId)
         .run();
     } catch {
       await db
         .prepare(`UPDATE cafe_tables SET status = 'Available' WHERE id = ?1 ${tblTenantClause}`)
-        .bind(tableRow.id, normalizedTenant)
+        .bind(tableRow.id, effectiveTableTenant)
         .run()
         .catch(() => {});
     }
@@ -104,10 +122,32 @@ export async function handleGuestCheckin(c: Context<{ Bindings: Env }>) {
   }
 
   if (c.env?.AUTH_KV) {
+    const tableKeySuffix = String(tableRow.table_number ?? data.table_id);
+    const checkinPayload = JSON.stringify({
+      id: orderId,
+      table_id: tableRow.id,
+      table_number: tableKeySuffix,
+      customer_name: data.customer_name,
+      customer_phone: data.customer_phone,
+      tenant_id: effectiveTableTenant,
+      created_at: now,
+    });
+    const isNonDefault = Boolean(effectiveTableTenant && effectiveTableTenant !== 'default');
     await Promise.all([
-      c.env.AUTH_KV.put('latest_order_ts', String(Date.now())).catch(() => {}),
-      c.env.AUTH_KV.put('orders:latest_updated_at', now).catch(() => {}),
-      publishOrderEvent(c.env.AUTH_KV, orderId, 'pending'),
+      c.env.AUTH_KV.put(isNonDefault ? `latest_order_ts:${effectiveTableTenant}` : 'latest_order_ts', String(Date.now())).catch(() => {}),
+      c.env.AUTH_KV.put(isNonDefault ? `orders:latest_updated_at:${effectiveTableTenant}` : 'orders:latest_updated_at', now).catch(() => {}),
+      c.env.AUTH_KV.put(isNonDefault ? `checkin:${effectiveTableTenant}:${orderId}` : `checkin:${orderId}`, checkinPayload).catch(() => {}),
+      c.env.AUTH_KV.put(isNonDefault ? `table_active:${effectiveTableTenant}:${tableKeySuffix}` : `table_active:${tableKeySuffix}`, orderId).catch(() => {}),
+      ...(isNonDefault
+        ? [
+            c.env.AUTH_KV.put('latest_order_ts', String(Date.now())).catch(() => {}),
+            c.env.AUTH_KV.put('orders:latest_updated_at', now).catch(() => {}),
+          ]
+        : [
+            c.env.AUTH_KV.put(`checkin:default:${orderId}`, checkinPayload).catch(() => {}),
+            c.env.AUTH_KV.put(`table_active:default:${tableKeySuffix}`, orderId).catch(() => {}),
+          ]),
+      publishOrderEvent(c.env.AUTH_KV, orderId, 'pending', { tenantId: effectiveTableTenant }),
     ]);
   }
 
@@ -117,14 +157,14 @@ export async function handleGuestCheckin(c: Context<{ Bindings: Env }>) {
     const pushPromise = notifyStaff(c.env as Env, {
       title: 'Khách check-in 🪑',
       body: `Ban ${data.table_id} - ${data.customer_name} / ${data.customer_phone}`,
-      data: { url: '/kds', orderId, tenantId: normalizedTenant }
-    }, STAFF_PUSH_ROLE, undefined, normalizedTenant).catch(() => {});
+      data: { url: '/kds', orderId, tenantId: effectiveTableTenant }
+    }, STAFF_PUSH_ROLE, undefined, effectiveTableTenant).catch(() => {});
     c.executionCtx?.waitUntil(pushPromise);
   } catch { /* push best-effort */ }
 
   try {
     const mc = createMetricsCollector(db);
-    c.executionCtx?.waitUntil(mc.recordMetric('guest_checkin', 0, { table: data.table_id }));
+    c.executionCtx?.waitUntil(mc.recordMetric('guest_checkin', 0, { table: data.table_id, tenant_id: effectiveTableTenant }));
   } catch { /* metrics best-effort */ }
 
   return c.json({

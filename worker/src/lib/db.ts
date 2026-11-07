@@ -14,7 +14,8 @@ export { resolveTenantId as getTenantId };
  */
 export function matchesTenantRow(row: unknown, tenantId: string): boolean {
   if (!row || typeof row !== 'object') return false;
-  const normalizedTenant = (tenantId && String(tenantId).trim()) || 'default';
+  const rawTenant = (tenantId && String(tenantId).trim()) || 'default';
+  const normalizedTenant = rawTenant.toLowerCase() === 'hq' ? '*' : rawTenant;
   if (normalizedTenant === '*') return true;
   const r = row as Record<string, unknown>;
   if ('tenant_id' in r && r.tenant_id !== undefined) {

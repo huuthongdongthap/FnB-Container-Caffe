@@ -43,14 +43,30 @@ export interface SopRunShift {
  * store's attendance even if the caller names an id that exists there.
  */
 export async function findOpenShift(scope: SopScope): Promise<OpenShift | null> {
-  const row = await sopDatabase(scope)
-    .prepare(
-      `SELECT id, clock_in, shift FROM staff_shifts
-       WHERE tenant_id = ? AND staff_id = ? AND ${OPEN_SHIFT_SQL}
-       ORDER BY clock_in DESC LIMIT 1`
-    )
-    .bind(scope.tenantId, scope.actorId)
-    .first<{ id: number; clock_in: string; shift: string }>();
+  let row: { id: number; clock_in: string; shift: string } | null = null;
+  try {
+    row = await sopDatabase(scope)
+      .prepare(
+        `SELECT id, clock_in, shift FROM staff_shifts
+         WHERE COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ? AND staff_id = ? AND ${OPEN_SHIFT_SQL}
+         ORDER BY clock_in DESC LIMIT 1`
+      )
+      .bind(scope.tenantId, scope.actorId)
+      .first<{ id: number; clock_in: string; shift: string }>();
+  } catch {
+    row = null;
+  }
+
+  if (!row) {
+    row = await sopDatabase(scope)
+      .prepare(
+        `SELECT id, clock_in, shift FROM staff_shifts
+         WHERE tenant_id = ? AND staff_id = ? AND ${OPEN_SHIFT_SQL}
+         ORDER BY clock_in DESC LIMIT 1`
+      )
+      .bind(scope.tenantId, scope.actorId)
+      .first<{ id: number; clock_in: string; shift: string }>();
+  }
 
   if (!row || !row.clock_in) return null;
   return { id: String(row.id), clockIn: row.clock_in, shift: row.shift };
@@ -65,7 +81,10 @@ export async function findOpenShift(scope: SopScope): Promise<OpenShift | null> 
  */
 export async function linkOpenShift(scope: SopScope, runId: string, shiftId: string): Promise<SopRunShift | null> {
   const updated = await sopDatabase(scope)
-    .prepare('UPDATE sop_runs SET shift_id = ? WHERE id = ? AND tenant_id = ? AND shift_id IS NULL')
+    .prepare(
+      `UPDATE sop_runs SET shift_id = ?
+       WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ? AND shift_id IS NULL`
+    )
     .bind(shiftId, runId, scope.tenantId)
     .run();
   return updated.meta.changes ? { runId, shiftId } : null;

@@ -48,6 +48,22 @@ export function registerPostsHandler(router: Hono<{ Bindings: MixpostEnv }>): vo
   // POST /posts — create and publish a post
   router.post('/posts', async (c) => {
     const env = c.env as unknown as MixpostEnv;
+    const isProd =
+      (env as unknown as Record<string, unknown>)?.ENVIRONMENT === 'production' ||
+      (env as unknown as Record<string, unknown>)?.NODE_ENV === 'production';
+    const hasAuthHeader = Boolean(c.req.header('Authorization') || c.req.header('authorization'));
+    const user = c.get?.('user' as never) as { role?: string; tenantId?: string; tenant_id?: string } | undefined;
+    if (!user && (isProd || hasAuthHeader)) {
+      return c.json({ success: false, error: 'Authentication required' }, 401);
+    }
+    if (user?.role && !['owner', 'admin', 'manager', 'supervisor'].includes(String(user.role).toLowerCase())) {
+      return c.json({ success: false, error: 'Insufficient permissions' }, 403);
+    }
+    const rawTenant = getTenantId(c as unknown as Parameters<typeof getTenantId>[0]).trim() || 'default';
+    const rawTenantId = rawTenant.toLowerCase() === 'hq' ? '*' : rawTenant;
+    if (user && rawTenantId === '*') {
+      return c.json({ success: false, error: 'Concrete tenant context required to publish post' }, 400);
+    }
     const client = getMixpostClient(env);
     if (!client) {
       return c.json({ success: false, error: 'Mixpost not configured' }, 503);
@@ -112,20 +128,22 @@ export function registerPostsHandler(router: Hono<{ Bindings: MixpostEnv }>): vo
             tenantId
           ).run();
         } catch {
-          try {
-            await env.AURA_DB.prepare(
-              'INSERT INTO mixpost_posts (content, status, platforms, media_urls, scheduled_at, published_at, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)'
-            ).bind(
-              data.content,
-              scheduledAt ? 'scheduled' : 'published',
-              JSON.stringify(data.accounts),
-              JSON.stringify(mediaUrls),
-              scheduledAt || null,
-              scheduledAt ? null : now,
-              now
-            ).run();
-          } catch {
-            // optional persistence table in test mocks
+          if (tenantId === 'default') {
+            try {
+              await env.AURA_DB.prepare(
+                'INSERT INTO mixpost_posts (content, status, platforms, media_urls, scheduled_at, published_at, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)'
+              ).bind(
+                data.content,
+                scheduledAt ? 'scheduled' : 'published',
+                JSON.stringify(data.accounts),
+                JSON.stringify(mediaUrls),
+                scheduledAt || null,
+                scheduledAt ? null : now,
+                now
+              ).run();
+            } catch {
+              // optional persistence table in test mocks
+            }
           }
         }
       }
@@ -141,18 +159,21 @@ export function registerPostsHandler(router: Hono<{ Bindings: MixpostEnv }>): vo
   // GET /posts — list recent posts
   router.get('/posts', async (c) => {
     const env = c.env as unknown as MixpostEnv;
-    const tenantId = getTenantId(c as unknown as Parameters<typeof getTenantId>[0]).trim() || 'default';
+    const rawTenant = getTenantId(c as unknown as Parameters<typeof getTenantId>[0]).trim() || 'default';
+    const tenantId = rawTenant.toLowerCase() === 'hq' ? '*' : rawTenant;
     const client = getMixpostClient(env);
     const rawLimit = parseInt(c.req.query('limit') || '20', 10);
     const limit = Number.isFinite(rawLimit) && rawLimit > 0 ? Math.min(rawLimit, 100) : 20;
     if (env.AURA_DB) {
       try {
         let filtered: PostRecord[] = [];
+        let scopedOk = false;
         if (tenantId !== '*') {
           try {
             const { results: scopedResults } = await env.AURA_DB.prepare(
               "SELECT * FROM mixpost_posts WHERE COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ? ORDER BY created_at DESC LIMIT ?"
             ).bind(tenantId, limit).all<PostRecord>();
+            scopedOk = true;
             filtered = (scopedResults || [])
               .filter((r) => matchesTenantRow(r as unknown as Record<string, unknown>, tenantId))
               .slice(0, limit);
@@ -160,7 +181,7 @@ export function registerPostsHandler(router: Hono<{ Bindings: MixpostEnv }>): vo
             filtered = [];
           }
         }
-        if (filtered.length === 0) {
+        if (filtered.length === 0 && (tenantId === '*' || (!scopedOk && tenantId === 'default'))) {
           const { results } = await env.AURA_DB.prepare(
             'SELECT * FROM mixpost_posts ORDER BY created_at DESC LIMIT ?'
           ).bind(Math.max(limit, 200)).all<PostRecord>();
@@ -197,6 +218,17 @@ export function registerPostsHandler(router: Hono<{ Bindings: MixpostEnv }>): vo
   // GET /accounts — list connected accounts
   router.get('/accounts', async (c) => {
     const env = c.env as unknown as MixpostEnv;
+    const isProd =
+      (env as unknown as Record<string, unknown>)?.ENVIRONMENT === 'production' ||
+      (env as unknown as Record<string, unknown>)?.NODE_ENV === 'production';
+    const hasAuthHeader = Boolean(c.req.header('Authorization') || c.req.header('authorization'));
+    const user = c.get?.('user' as never) as { role?: string } | undefined;
+    if (!user && (isProd || hasAuthHeader)) {
+      return c.json({ success: false, error: 'Authentication required' }, 401);
+    }
+    if (user?.role && !['owner', 'admin', 'manager', 'supervisor', 'staff'].includes(String(user.role).toLowerCase())) {
+      return c.json({ success: false, error: 'Insufficient permissions' }, 403);
+    }
     const client = getMixpostClient(env);
     if (!client) {
       return c.json({ success: false, error: 'Mixpost not configured' }, 503);

@@ -11,16 +11,45 @@ export async function staffEmailInUse(env: Env, email: string, staffId?: string)
 }
 
 /** D1 locates new Staff accounts even while optional KV metadata is unavailable. */
-export async function findLoginUser(env: Env, email: string): Promise<Record<string, any> | null> {
+export async function findLoginUser(
+  env: Env,
+  email: string,
+  tenantId?: string
+): Promise<Record<string, any> | null> {
+  const rawTenant = typeof tenantId === 'string' ? tenantId.trim() : '';
+  const requestedTenant =
+    rawTenant && rawTenant !== '*' && rawTenant.toLowerCase() !== 'hq'
+      ? rawTenant
+      : undefined;
+
   let legacy: Record<string, any> | null = null;
   let kvFailed = false;
   try { legacy = JSON.parse(await env.AUTH_KV.get(`user:${email}`) || 'null'); }
   catch { kvFailed = true; }
   try {
-    const identity = await env.AURA_DB.prepare('SELECT staff_id FROM staff_login_identities WHERE email = ?')
-      .bind(email).first<{ staff_id: string }>();
-    if (identity?.staff_id) return { ...legacy, id: identity.staff_id, email, role: 'staff',
-      password: legacy?.id === identity.staff_id ? legacy.password : '' };
+    let identity: { staff_id: string; tenant_id?: string | null } | null = null;
+    if (requestedTenant) {
+      identity = await env.AURA_DB.prepare(
+        "SELECT sli.staff_id, u.tenant_id FROM staff_login_identities sli JOIN users u ON u.id = sli.staff_id WHERE sli.email = ? AND COALESCE(NULLIF(TRIM(u.tenant_id), ''), 'default') = ? LIMIT 1"
+      )
+        .bind(email, requestedTenant)
+        .first<{ staff_id: string; tenant_id?: string | null }>()
+        .catch(() => null);
+    }
+    if (!identity && !requestedTenant) {
+      identity = await env.AURA_DB.prepare('SELECT staff_id FROM staff_login_identities WHERE email = ?')
+        .bind(email).first<{ staff_id: string }>();
+    }
+    if (identity?.staff_id) {
+      return {
+        ...legacy,
+        id: identity.staff_id,
+        email,
+        role: 'staff',
+        ...(requestedTenant ? { tenant_id: identity.tenant_id ?? requestedTenant } : {}),
+        password: legacy?.id === identity.staff_id ? legacy.password : '',
+      };
+    }
     if (legacy?.role && legacy.role !== 'customer') {
       const canonical = await env.AURA_DB.prepare('SELECT email FROM staff_login_identities WHERE staff_id = ?')
         .bind(legacy.id).first<{ email: string }>();
@@ -32,7 +61,46 @@ export async function findLoginUser(env: Env, email: string): Promise<Record<str
     if (!legacy || (legacy.role && legacy.role !== 'customer')) throw new SessionUnavailableError();
   }
   if (kvFailed) throw new SessionUnavailableError();
+  if (legacy && requestedTenant) {
+    const legacyTenant = String(legacy.tenant_id || legacy.tenantId || '').trim() || 'default';
+    if (legacyTenant !== requestedTenant) {
+      return null;
+    }
+  }
   return legacy;
+}
+
+export async function loadStaffAccountForLogin(
+  envOrDb: Env | Env['AURA_DB'],
+  email: string,
+  tenantId?: string
+): Promise<Record<string, any> | null> {
+  if (envOrDb && 'AURA_DB' in (envOrDb as unknown as Record<string, unknown>)) {
+    return findLoginUser(envOrDb as Env, email, tenantId);
+  }
+  const db = envOrDb as Env['AURA_DB'];
+  if (!db?.prepare) return null;
+  const rawTenant = typeof tenantId === 'string' ? tenantId.trim() : '';
+  const requestedTenant =
+    rawTenant && rawTenant !== '*' && rawTenant.toLowerCase() !== 'hq'
+      ? rawTenant
+      : undefined;
+  if (requestedTenant) {
+    return db
+      .prepare(
+        "SELECT u.* FROM staff_login_identities sli JOIN users u ON u.id = sli.staff_id WHERE sli.email = ? AND COALESCE(NULLIF(TRIM(u.tenant_id), ''), 'default') = ? LIMIT 1"
+      )
+      .bind(email, requestedTenant)
+      .first<Record<string, any>>()
+      .catch(() => null);
+  }
+  return db
+    .prepare(
+      'SELECT u.* FROM staff_login_identities sli JOIN users u ON u.id = sli.staff_id WHERE sli.email = ? LIMIT 1'
+    )
+    .bind(email)
+    .first<Record<string, any>>()
+    .catch(() => null);
 }
 
 export async function createStaffIdentity(env: Env, user: {

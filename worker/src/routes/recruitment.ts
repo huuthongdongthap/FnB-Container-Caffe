@@ -12,10 +12,29 @@ import type { Env } from '../types/env';
 const statusSchema = z.object({ status: z.enum(['pending', 'contacted', 'interview', 'hired', 'rejected']) });
 export const submitApplication = (c: Context<{ Bindings: Env }>) => createRecruitmentApplication(c);
 
+function hasDisallowedStoreOverride(c: Context<{ Bindings: Env }>, tenantId: string): boolean {
+  const candidates = [
+    c.req.query('tenant_id'),
+    c.req.query('tenantId'),
+    c.req.query('store_id'),
+    c.req.query('storeId'),
+    c.req.header('X-Tenant-ID'),
+    c.req.header('x-tenant-id'),
+    c.req.header('X-Store-ID'),
+    c.req.header('x-store-id'),
+  ]
+    .map((v) => (typeof v === 'string' ? v.trim() : ''))
+    .filter(Boolean);
+  if (new Set(candidates).size > 1) return true;
+  const requested = candidates[0] || '';
+  return Boolean(requested && (requested === '*' || requested.toLowerCase() === 'hq' || requested !== tenantId));
+}
+
 export async function listApplications(c: Context<{ Bindings: Env }>) {
   try {
     const tenant = privacyStore(c, ['owner', 'manager']);
     if (tenant instanceof Response) return tenant;
+    if (hasDisallowedStoreOverride(c, tenant)) return errorResponse('Không đủ quyền truy cập cửa hàng', 403);
     const tenantClause = tenant === 'default'
       ? "(tenant_id = ? OR tenant_id IS NULL OR tenant_id = '' OR TRIM(tenant_id) = '')"
       : '(tenant_id = ? OR TRIM(tenant_id) = ?1)';
@@ -41,6 +60,7 @@ export async function updateApplicationStatus(c: Context<{ Bindings: Env }>) {
   try {
     const tenant = privacyStore(c, ['owner', 'manager']);
     if (tenant instanceof Response) return tenant;
+    if (hasDisallowedStoreOverride(c, tenant)) return errorResponse('Không đủ quyền truy cập cửa hàng', 403);
     const parsed = statusSchema.safeParse(await c.req.json());
     if (!parsed.success) return errorResponse('Trạng thái không hợp lệ', 400);
     const tenantClause = tenant === 'default'
@@ -57,6 +77,7 @@ export async function deleteApplication(c: Context<{ Bindings: Env }>) {
   try {
     const tenant = privacyStore(c, ['owner', 'manager']);
     if (tenant instanceof Response) return tenant;
+    if (hasDisallowedStoreOverride(c, tenant)) return errorResponse('Không đủ quyền truy cập cửa hàng', 403);
     const tenantClause = tenant === 'default'
       ? "(tenant_id = ? OR tenant_id IS NULL OR tenant_id = '' OR TRIM(tenant_id) = '')"
       : '(tenant_id = ? OR TRIM(tenant_id) = ?2)';
@@ -72,6 +93,11 @@ recruitmentRouter.post('/', rateLimitMiddleware(RECRUITMENT_RATE_LIMIT), submitA
 recruitmentRouter.use('/applications/*', requireAuth(['owner', 'manager']));
 recruitmentRouter.use('/applications', requireAuth(['owner', 'manager']));
 recruitmentRouter.get('/applications', listApplications);
-recruitmentRouter.post('/applications', (c) => createRecruitmentApplication(c, true));
+recruitmentRouter.post('/applications', (c) => {
+  const tenant = privacyStore(c, ['owner', 'manager']);
+  if (tenant instanceof Response) return tenant;
+  if (hasDisallowedStoreOverride(c, tenant)) return errorResponse('Không đủ quyền truy cập cửa hàng', 403);
+  return createRecruitmentApplication(c, true);
+});
 recruitmentRouter.patch('/applications/:id', updateApplicationStatus);
 recruitmentRouter.delete('/applications/:id', deleteApplication);

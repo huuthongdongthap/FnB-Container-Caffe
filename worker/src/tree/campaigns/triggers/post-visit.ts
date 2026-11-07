@@ -3,6 +3,7 @@
  * Detects orders completed 24-48h ago that haven't had a follow-up sent
  */
 import { createLogger } from '../../../utils/logger';
+import { matchesTenantRow } from '../../../middleware/tenant';
 import type { CampaignCustomer } from '../types';
 
 const log = createLogger({ route: 'trigger-post-visit' });
@@ -15,8 +16,9 @@ export async function detectPostVisitCandidates(
     const now = Date.now();
     const since = new Date(now - 48 * 60 * 60 * 1000).toISOString();
     const until = new Date(now - 24 * 60 * 60 * 1000).toISOString();
+    const scoped = Boolean(tenantId && tenantId !== '*');
 
-    if (tenantId && tenantId !== '*') {
+    if (scoped && tenantId) {
       try {
         const { results } = await db.prepare(`
           SELECT c.id, c.name, c.phone, c.email, c.tenant_id,
@@ -36,10 +38,64 @@ export async function detectPostVisitCandidates(
                 AND COALESCE(NULLIF(TRIM(cl.tenant_id), ''), 'default') = ?
             )
         `).bind(since, until, tenantId, tenantId, since, tenantId).all<CampaignCustomer>();
-        log.info('post_visit_candidates', { count: results.length, tenantId });
-        return results;
+        const filtered = (results || []).filter(
+          (r) => matchesTenantRow(r as unknown as Record<string, unknown>, tenantId)
+        );
+        log.info('post_visit_candidates', { count: filtered.length, tenantId });
+        return filtered;
       } catch {
-        // Fall through to default queries if tenant_id column is absent
+        try {
+          const { results } = await db.prepare(`
+            SELECT c.id, c.name, c.phone, c.email, c.tenant_id,
+              o.id as order_id, o.created_at as last_order_date
+            FROM orders o
+            JOIN customers c ON o.customer_id = c.id
+            WHERE o.status = 'completed'
+              AND o.created_at BETWEEN ? AND ?
+              AND COALESCE(NULLIF(TRIM(o.tenant_id), ''), 'default') = ?
+              AND COALESCE(NULLIF(TRIM(c.tenant_id), ''), 'default') = ?
+              AND (c.phone IS NOT NULL OR c.email IS NOT NULL)
+              AND NOT EXISTS (
+                SELECT 1 FROM campaign_logs cl
+                WHERE cl.customer_id = c.id
+                  AND cl.trigger = 'post_visit'
+                  AND cl.sent_at > ?
+              )
+          `).bind(since, until, tenantId, tenantId, since).all<CampaignCustomer>();
+          const filtered = (results || []).filter(
+            (r) => matchesTenantRow(r as unknown as Record<string, unknown>, tenantId)
+          );
+          log.info('post_visit_candidates', { count: filtered.length, tenantId });
+          return filtered;
+        } catch {
+          try {
+            const { results } = await db.prepare(`
+              SELECT c.id, c.name, c.phone, c.email, c.tenant_id,
+                o.id as order_id, o.created_at as last_order_date
+              FROM orders o
+              JOIN customers c ON o.customer_id = c.id
+              WHERE o.status = 'completed'
+                AND o.created_at BETWEEN ? AND ?
+                AND COALESCE(NULLIF(TRIM(c.tenant_id), ''), 'default') = ?
+                AND (c.phone IS NOT NULL OR c.email IS NOT NULL)
+                AND NOT EXISTS (
+                  SELECT 1 FROM campaign_logs cl
+                  WHERE cl.customer_id = c.id
+                    AND cl.trigger = 'post_visit'
+                    AND cl.sent_at > ?
+                )
+            `).bind(since, until, tenantId, since).all<CampaignCustomer>();
+            const filtered = (results || []).filter(
+              (r) => matchesTenantRow(r as unknown as Record<string, unknown>, tenantId)
+            );
+            log.info('post_visit_candidates', { count: filtered.length, tenantId });
+            return filtered;
+          } catch {
+            if (tenantId !== 'default') {
+              return [];
+            }
+          }
+        }
       }
     }
 
@@ -59,8 +115,11 @@ export async function detectPostVisitCandidates(
         )
     `).bind(since, until, since).all<CampaignCustomer>();
 
-    log.info('post_visit_candidates', { count: results.length });
-    return results;
+    const filtered = (results || []).filter(
+      (r) => !scoped || !tenantId || matchesTenantRow(r as unknown as Record<string, unknown>, tenantId)
+    );
+    log.info('post_visit_candidates', { count: filtered.length });
+    return filtered;
   } catch (err) {
     try {
       const now = Date.now();

@@ -38,7 +38,10 @@ export async function resolveReferralPolicy(
   if (!kv) return DEFAULT_REFERRAL_POLICY;
   try {
     const normTenant =
-      typeof tenantId === 'string' && tenantId.trim() && tenantId.trim() !== '*'
+      typeof tenantId === 'string' &&
+      tenantId.trim() &&
+      tenantId.trim() !== '*' &&
+      tenantId.trim().toLowerCase() !== 'hq'
         ? tenantId.trim()
         : undefined;
     let raw: string | null = null;

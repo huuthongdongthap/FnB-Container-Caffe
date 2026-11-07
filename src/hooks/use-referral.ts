@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiFetch } from '@/lib/api-client';
+import { useClientSessionScope } from '@/lib/client-session';
 
 export interface ReferralData {
   referral_code: string | null;
@@ -29,8 +30,9 @@ export const REFERRAL_CASHBACK_VND = 10000;
 export const REFERRAL_MIN_ORDER = 20000;
 
 export function useReferralStats() {
+  const session = useClientSessionScope();
   return useQuery<ReferralData>({
-    queryKey: ['referral-stats'],
+    queryKey: ['referral-stats', session.tenantId, session.userScope],
     queryFn: async () => {
       const res = await apiFetch<ApiResponse<ReferralData>>('/api/loyalty/referral/stats');
       return res.data;
@@ -40,6 +42,7 @@ export function useReferralStats() {
 
 export function useApplyReferralCode() {
   const queryClient = useQueryClient();
+  const session = useClientSessionScope();
 
   return useMutation({
     mutationFn: async (code: string) => {
@@ -53,7 +56,7 @@ export function useApplyReferralCode() {
       return res.data;
     },
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['referral-stats'] });
+      void queryClient.invalidateQueries({ queryKey: ['referral-stats', session.tenantId, session.userScope] });
     },
   });
 }

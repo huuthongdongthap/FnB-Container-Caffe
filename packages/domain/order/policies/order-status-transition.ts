@@ -36,17 +36,53 @@ export async function transitionOrderStatus(
     fields?: { notes?: unknown; delivery_time?: unknown };
   } = {},
 ): Promise<OrderStatusResult> {
-  const tenantId = (options.tenantId ?? '').trim() || 'default';
+  const rawTenantId = (options.tenantId ?? '').trim() || 'default';
+  const tenantId = rawTenantId.toLowerCase() === 'hq' ? '*' : rawTenantId;
   const tenantClause = tenantId === '*'
     ? ''
     : tenantId === 'default'
       ? " AND (tenant_id = ? OR tenant_id IS NULL OR tenant_id = '')"
       : ' AND tenant_id = ?';
   const tenantBinds = tenantId === '*' ? [] : [tenantId];
-  const order = options.currentOrder ?? await db
-    .prepare(`SELECT id, status FROM orders WHERE id = ?${tenantClause}`)
-    .bind(orderId, ...tenantBinds).first<{ id: string; status: string }>();
+  let order: { id: string; status: string; tenant_id?: string | null } | null = options.currentOrder ?? null;
+  if (!order) {
+    if (tenantId === '*') {
+      order = await db
+        .prepare('SELECT id, status, tenant_id FROM orders WHERE id = ?')
+        .bind(orderId)
+        .first<{ id: string; status: string; tenant_id?: string | null }>()
+        .catch(() => null);
+      if (!order) {
+        order = await db
+          .prepare('SELECT id, status FROM orders WHERE id = ?')
+          .bind(orderId)
+          .first<{ id: string; status: string }>()
+          .catch(() => null);
+      }
+    } else {
+      order = await db
+        .prepare(`SELECT id, status FROM orders WHERE id = ?${tenantClause}`)
+        .bind(orderId, ...tenantBinds)
+        .first<{ id: string; status: string }>();
+    }
+  }
   if (!order) return { success: false, error: 'Order not found', statusCode: 404 };
+  const resolvedOrderTenant =
+    tenantId === '*' && 'tenant_id' in order && order.tenant_id !== undefined
+      ? (typeof order.tenant_id === 'string' &&
+        order.tenant_id.trim() &&
+        order.tenant_id.trim() !== '*' &&
+        order.tenant_id.trim().toLowerCase() !== 'hq'
+          ? order.tenant_id.trim()
+          : 'default')
+      : null;
+  const effectiveWriteTenant = resolvedOrderTenant ?? tenantId;
+  const writeTenantClause = effectiveWriteTenant === '*'
+    ? ''
+    : effectiveWriteTenant === 'default'
+      ? " AND (tenant_id = ? OR tenant_id IS NULL OR tenant_id = '')"
+      : ' AND tenant_id = ?';
+  const writeTenantBinds = effectiveWriteTenant === '*' ? [] : [effectiveWriteTenant];
 
   const isNoOp = order.status === targetStatus;
   if (!isNoOp && isTerminal(order.status)) {
@@ -62,8 +98,8 @@ export async function transitionOrderStatus(
   if (targetStatus === 'preparing') {
     try {
       const paymentRow = await db
-        .prepare(`SELECT order_type, payment_status FROM orders WHERE id = ?${tenantClause}`)
-        .bind(orderId, ...tenantBinds)
+        .prepare(`SELECT order_type, payment_status FROM orders WHERE id = ?${writeTenantClause}`)
+        .bind(orderId, ...writeTenantBinds)
         .first<{ order_type?: string | null; payment_status?: string | null }>();
       if (paymentRow?.order_type === 'delivery' && paymentRow?.payment_status !== 'paid') {
         return {
@@ -83,8 +119,8 @@ export async function transitionOrderStatus(
   }
   const additions = fields.map(([key]) => `, ${key} = ?`).join('');
   const result = await db.prepare(
-    `UPDATE orders SET status = ?, updated_at = ?${additions} WHERE id = ? AND status = ?${tenantClause}`,
-  ).bind(targetStatus, new Date().toISOString(), ...fields.map(([, value]) => value), orderId, order.status, ...tenantBinds).run();
+    `UPDATE orders SET status = ?, updated_at = ?${additions} WHERE id = ? AND status = ?${writeTenantClause}`,
+  ).bind(targetStatus, new Date().toISOString(), ...fields.map(([, value]) => value), orderId, order.status, ...writeTenantBinds).run();
   // D1 changes includes timestamp/audit trigger writes; this PK-scoped CAS still matches at most one order.
   if (changedRows(result) < 1) {
     return { success: false, error: 'Order changed concurrently; refresh and retry', statusCode: 409 };

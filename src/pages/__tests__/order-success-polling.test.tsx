@@ -6,6 +6,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen } from '@/test-utils';
 import { OrderSuccessPage } from '@/pages/order-success';
+import TrackOrderPage from '@/pages/stitch/track-order';
 import { useOrderStore } from '@/hooks/stores/use-order-store';
 
 // Mock react-router-dom's useSearchParams
@@ -133,5 +134,27 @@ describe('OrderSuccessPage — polling behavior', () => {
 
     // Unmount should not throw (timer cleanup)
     expect(() => unmount()).not.toThrow();
+  });
+
+  it('TrackOrderPage renders real empty state without ?id= and never falls back to demo #AC-8842 / Midnight Espresso', () => {
+    mockSearchParams.delete('id');
+    render(<TrackOrderPage />);
+
+    expect(screen.queryByText(/AC-8842/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Midnight Espresso/i)).not.toBeInTheDocument();
+  });
+
+  it('TrackOrderPage does not display stale order A when ?id=ORD_2 does not match currentOrder.id', () => {
+    seedOrderInStore(); // seeds ORD_1 with item 'Cà phê'
+    mockSearchParams.set('id', 'ORD_2');
+    vi.spyOn(useOrderStore.getState(), 'fetchOrder').mockImplementation(async () => {
+      useOrderStore.setState({ loading: true, error: null });
+    });
+
+    render(<TrackOrderPage />);
+
+    expect(screen.queryByText(/ORD_1/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/AC-8842/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Midnight Espresso/i)).not.toBeInTheDocument();
   });
 });

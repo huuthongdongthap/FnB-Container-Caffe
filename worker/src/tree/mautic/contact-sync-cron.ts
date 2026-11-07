@@ -25,70 +25,125 @@ export async function syncMauticContacts(env: Record<string, unknown>, tenantOve
     return { synced: 0, skipped: true };
   }
 
-  const tenantId = tenantOverride || resolvePilotStore(env as unknown as Parameters<typeof resolvePilotStore>[0]);
+  const tenantId = (tenantOverride || resolvePilotStore(env as unknown as Parameters<typeof resolvePilotStore>[0]) || 'default').trim() || 'default';
   const isScopedTenant = Boolean(tenantId && tenantId !== 'default' && tenantId !== '*');
-  const syncKvKey = isScopedTenant ? `mautic_last_sync_ts:${tenantId}` : 'mautic_last_sync_ts';
+  const effectiveTenant = isScopedTenant ? tenantId : 'default';
+  const syncKvKey = tenantId === '*'
+    ? 'mautic_last_sync_ts:*'
+    : isScopedTenant
+      ? `mautic_last_sync_ts:${effectiveTenant}`
+      : 'mautic_last_sync_ts';
   const kv = env.AUTH_KV as KVNamespace | undefined;
   const lastSyncTs: string | null = kv ? await kv.get(syncKvKey) : null;
   const since = lastSyncTs || new Date(Date.now() - 3600000).toISOString();
 
   let results: Record<string, unknown>[] | undefined;
-  if (isScopedTenant) {
-    try {
-      const res = await db.prepare(
-        `SELECT c.phone, c.name, c.email, c.loyalty_tier, c.date_of_birth as birthday,
-          (SELECT MAX(o.created_at) FROM orders o WHERE o.customer_id = c.id AND COALESCE(NULLIF(TRIM(o.tenant_id), ''), 'default') = ?2) as last_order_date,
-          (SELECT COUNT(*) FROM orders o2 WHERE o2.customer_id = c.id AND COALESCE(NULLIF(TRIM(o2.tenant_id), ''), 'default') = ?2) as total_orders,
-          c.updated_at
-         FROM customers c
-         WHERE c.updated_at > ?1
-           AND COALESCE(NULLIF(TRIM(c.tenant_id), ''), 'default') = ?2
-         ORDER BY c.updated_at ASC
-         LIMIT 500`
-      ).bind(since, tenantId).all();
-      results = (res.results || []) as Array<Record<string, unknown>>;
-    } catch (err) {
-      const msg = String((err as Error)?.message || '');
-      if (msg.includes('column')) {
-        return { synced: 0, errors: 0 } as { synced: number; errors?: number; skipped?: boolean };
-      } else {
-        throw err;
-      }
-    }
-  } else if (tenantId === 'default') {
+  if (tenantId !== '*') {
     try {
       const res = await db.prepare(
         `SELECT c.phone, c.name, c.email, c.loyalty_tier, c.date_of_birth as birthday, c.tenant_id,
-          (SELECT MAX(o.created_at) FROM orders o WHERE o.customer_id = c.id AND COALESCE(NULLIF(TRIM(o.tenant_id), ''), 'default') = ?2) as last_order_date,
-          (SELECT COUNT(*) FROM orders o2 WHERE o2.customer_id = c.id AND COALESCE(NULLIF(TRIM(o2.tenant_id), ''), 'default') = ?2) as total_orders,
+          (SELECT MAX(o.created_at) FROM orders o WHERE o.customer_id = c.id AND COALESCE(o.status, '') NOT IN ('cancelled', 'rejected', 'failed', 'expired') AND COALESCE(NULLIF(TRIM(o.tenant_id), ''), 'default') = ?2) as last_order_date,
+          (SELECT COUNT(*) FROM orders o2 WHERE o2.customer_id = c.id AND COALESCE(o2.status, '') NOT IN ('cancelled', 'rejected', 'failed', 'expired') AND COALESCE(NULLIF(TRIM(o2.tenant_id), ''), 'default') = ?2) as total_orders,
           c.updated_at
          FROM customers c
          WHERE c.updated_at > ?1
            AND COALESCE(NULLIF(TRIM(c.tenant_id), ''), 'default') = ?2
          ORDER BY c.updated_at ASC
          LIMIT 500`
-      ).bind(since, tenantId).all();
+      ).bind(since, effectiveTenant).all();
       results = ((res.results || []) as Array<Record<string, unknown>>).filter(
-        (row) => !('tenant_id' in row) || matchesTenantRow(row, tenantId)
+        (row) => !('tenant_id' in row) || matchesTenantRow(row, effectiveTenant)
       );
     } catch {
       try {
         const res = await db.prepare(
-          `SELECT c.phone, c.name, c.email, c.loyalty_tier, c.date_of_birth as birthday,
-            (SELECT MAX(o.created_at) FROM orders o WHERE o.customer_id = c.id) as last_order_date,
-            (SELECT COUNT(*) FROM orders o2 WHERE o2.customer_id = c.id) as total_orders,
+          `SELECT c.phone, c.name, c.email, c.loyalty_tier, NULL as birthday, c.tenant_id,
+            (SELECT MAX(o.created_at) FROM orders o WHERE o.customer_id = c.id AND COALESCE(o.status, '') NOT IN ('cancelled', 'rejected', 'failed', 'expired') AND COALESCE(NULLIF(TRIM(o.tenant_id), ''), 'default') = ?2) as last_order_date,
+            (SELECT COUNT(*) FROM orders o2 WHERE o2.customer_id = c.id AND COALESCE(o2.status, '') NOT IN ('cancelled', 'rejected', 'failed', 'expired') AND COALESCE(NULLIF(TRIM(o2.tenant_id), ''), 'default') = ?2) as total_orders,
             c.updated_at
            FROM customers c
-           WHERE c.updated_at > ?
+           WHERE c.updated_at > ?1
+             AND COALESCE(NULLIF(TRIM(c.tenant_id), ''), 'default') = ?2
            ORDER BY c.updated_at ASC
            LIMIT 500`
-        ).bind(since).all();
+        ).bind(since, effectiveTenant).all();
         results = ((res.results || []) as Array<Record<string, unknown>>).filter(
-          (row) => !('tenant_id' in row) || matchesTenantRow(row, tenantId)
+          (row) => !('tenant_id' in row) || matchesTenantRow(row, effectiveTenant)
         );
-      } catch (err) {
-        const msg = String((err as Error)?.message || '');
-        if (msg.includes('column')) {
+      } catch {
+        try {
+          const res = await db.prepare(
+            `SELECT c.phone, c.name, c.email, c.tier as loyalty_tier, NULL as birthday, c.tenant_id,
+              (SELECT MAX(o.created_at) FROM orders o WHERE o.customer_id = c.id AND COALESCE(o.status, '') NOT IN ('cancelled', 'rejected', 'failed', 'expired') AND COALESCE(NULLIF(TRIM(o.tenant_id), ''), 'default') = ?2) as last_order_date,
+              (SELECT COUNT(*) FROM orders o2 WHERE o2.customer_id = c.id AND COALESCE(o2.status, '') NOT IN ('cancelled', 'rejected', 'failed', 'expired') AND COALESCE(NULLIF(TRIM(o2.tenant_id), ''), 'default') = ?2) as total_orders,
+              c.created_at as updated_at
+             FROM customers c
+             WHERE c.created_at > ?1
+               AND COALESCE(NULLIF(TRIM(c.tenant_id), ''), 'default') = ?2
+             ORDER BY c.created_at ASC
+             LIMIT 500`
+          ).bind(since, effectiveTenant).all();
+          results = ((res.results || []) as Array<Record<string, unknown>>).filter(
+            (row) => !('tenant_id' in row) || matchesTenantRow(row, effectiveTenant)
+          );
+        } catch (err) {
+          const msg = String((err as Error)?.message || '');
+          if (msg.includes('column')) {
+            if (isScopedTenant) {
+              return { synced: 0, errors: 0 } as { synced: number; errors?: number; skipped?: boolean };
+            }
+            const res = await db.prepare(
+              `SELECT c.phone, c.name, c.email, c.tier as loyalty_tier, NULL as birthday,
+                (SELECT MAX(o.created_at) FROM orders o WHERE o.customer_id = c.id) as last_order_date,
+                (SELECT COUNT(*) FROM orders o2 WHERE o2.customer_id = c.id) as total_orders,
+                c.created_at as updated_at
+               FROM customers c
+               WHERE c.created_at > ?
+               ORDER BY c.created_at ASC
+               LIMIT 500`
+            ).bind(since).all();
+            results = ((res.results || []) as Array<Record<string, unknown>>).filter(
+              (row) => !('tenant_id' in row) || matchesTenantRow(row, effectiveTenant)
+            );
+          } else {
+            throw err;
+          }
+        }
+      }
+    }
+  } else {
+    try {
+      const res = await db.prepare(
+        `SELECT c.phone, c.name, c.email, c.loyalty_tier, c.date_of_birth as birthday, c.tenant_id,
+          (SELECT MAX(o.created_at) FROM orders o WHERE o.customer_id = c.id AND COALESCE(o.status, '') NOT IN ('cancelled', 'rejected', 'failed', 'expired') AND COALESCE(NULLIF(TRIM(o.tenant_id), ''), 'default') = COALESCE(NULLIF(TRIM(c.tenant_id), ''), 'default')) as last_order_date,
+          (SELECT COUNT(*) FROM orders o2 WHERE o2.customer_id = c.id AND COALESCE(o2.status, '') NOT IN ('cancelled', 'rejected', 'failed', 'expired') AND COALESCE(NULLIF(TRIM(o2.tenant_id), ''), 'default') = COALESCE(NULLIF(TRIM(c.tenant_id), ''), 'default')) as total_orders,
+          c.updated_at
+         FROM customers c
+         WHERE c.updated_at > ?
+         ORDER BY c.updated_at ASC
+         LIMIT 500`
+      ).bind(since).all();
+      results = ((res.results || []) as Array<Record<string, unknown>>).filter(
+        (row) => !('tenant_id' in row) || matchesTenantRow(row, tenantId)
+      );
+    } catch (err) {
+      const msg = String((err as Error)?.message || '');
+      if (msg.includes('column')) {
+        try {
+          const res = await db.prepare(
+            `SELECT c.phone, c.name, c.email, c.tier as loyalty_tier, NULL as birthday, c.tenant_id,
+              (SELECT MAX(o.created_at) FROM orders o WHERE o.customer_id = c.id AND COALESCE(o.status, '') NOT IN ('cancelled', 'rejected', 'failed', 'expired') AND COALESCE(NULLIF(TRIM(o.tenant_id), ''), 'default') = COALESCE(NULLIF(TRIM(c.tenant_id), ''), 'default')) as last_order_date,
+              (SELECT COUNT(*) FROM orders o2 WHERE o2.customer_id = c.id AND COALESCE(o2.status, '') NOT IN ('cancelled', 'rejected', 'failed', 'expired') AND COALESCE(NULLIF(TRIM(o2.tenant_id), ''), 'default') = COALESCE(NULLIF(TRIM(c.tenant_id), ''), 'default')) as total_orders,
+              c.created_at as updated_at
+             FROM customers c
+             WHERE c.created_at > ?
+             ORDER BY c.created_at ASC
+             LIMIT 500`
+          ).bind(since).all();
+          results = ((res.results || []) as Array<Record<string, unknown>>).filter(
+            (row) => !('tenant_id' in row) || matchesTenantRow(row, tenantId)
+          );
+        } catch {
           const res = await db.prepare(
             `SELECT c.phone, c.name, c.email, c.tier as loyalty_tier, NULL as birthday,
               (SELECT MAX(o.created_at) FROM orders o WHERE o.customer_id = c.id) as last_order_date,
@@ -102,42 +157,7 @@ export async function syncMauticContacts(env: Record<string, unknown>, tenantOve
           results = ((res.results || []) as Array<Record<string, unknown>>).filter(
             (row) => !('tenant_id' in row) || matchesTenantRow(row, tenantId)
           );
-        } else {
-          throw err;
         }
-      }
-    }
-  } else {
-    try {
-      const res = await db.prepare(
-        `SELECT c.phone, c.name, c.email, c.loyalty_tier, c.date_of_birth as birthday,
-          (SELECT MAX(o.created_at) FROM orders o WHERE o.customer_id = c.id) as last_order_date,
-          (SELECT COUNT(*) FROM orders o2 WHERE o2.customer_id = c.id) as total_orders,
-          c.updated_at
-         FROM customers c
-         WHERE c.updated_at > ?
-         ORDER BY c.updated_at ASC
-         LIMIT 500`
-      ).bind(since).all();
-      results = ((res.results || []) as Array<Record<string, unknown>>).filter(
-        (row) => !('tenant_id' in row) || matchesTenantRow(row, tenantId)
-      );
-    } catch (err) {
-      const msg = String((err as Error)?.message || '');
-      if (msg.includes('column')) {
-        const res = await db.prepare(
-          `SELECT c.phone, c.name, c.email, c.tier as loyalty_tier, NULL as birthday,
-            (SELECT MAX(o.created_at) FROM orders o WHERE o.customer_id = c.id) as last_order_date,
-            (SELECT COUNT(*) FROM orders o2 WHERE o2.customer_id = c.id) as total_orders,
-            c.created_at as updated_at
-           FROM customers c
-           WHERE c.created_at > ?
-           ORDER BY c.created_at ASC
-           LIMIT 500`
-        ).bind(since).all();
-        results = ((res.results || []) as Array<Record<string, unknown>>).filter(
-          (row) => !('tenant_id' in row) || matchesTenantRow(row, tenantId)
-        );
       } else {
         throw err;
       }

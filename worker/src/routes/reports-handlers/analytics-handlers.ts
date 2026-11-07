@@ -1,7 +1,118 @@
 import type { Hono } from 'hono';
 import type { Env } from '../../types/env';
+import { authenticateRequest } from '../../middleware/auth';
 import { getTenantId } from '../../middleware/tenant';
 import type { DailyReport, SummaryReport } from './types';
+
+const REPORT_ANALYTICS_ROLES = ['owner', 'manager', 'supervisor', 'admin'];
+const VALID_REVENUE_ORDER_SQL =
+  "COALESCE(status, '') NOT IN ('cancelled', 'refunded', 'failed', 'expired') AND COALESCE(payment_status, '') NOT IN ('refunded', 'failed') AND LOWER(COALESCE(status, '')) NOT IN ('cancelled', 'canceled', 'refunded', 'failed', 'rejected', 'expired') AND LOWER(COALESCE(payment_status, '')) NOT IN ('refunded', 'failed')";
+
+export function isStrictHQReportAdmin(role: string, userTenant: string): boolean {
+  const normTenant = (userTenant || '').trim().toLowerCase();
+  return (role === 'owner' || role === 'admin') && (normTenant === '*' || normTenant === 'hq');
+}
+
+export async function verifyReportAnalyticsAccess(
+  c: any,
+  options?: { allowUnauthenticatedDefaultInTest?: boolean }
+): Promise<Response | null> {
+  let user = (typeof c.get === 'function' ? c.get('user') : undefined) as
+    | { id?: string; role?: string; tenantId?: string; tenant_id?: string }
+    | undefined;
+  const hasAuthHeader = Boolean(c.req?.header?.('Authorization') || c.req?.header?.('authorization'));
+  if (!user && c.req?.raw && c.env?.JWT_SECRET && hasAuthHeader) {
+    const session = await authenticateRequest(c.req.raw, c.env, { optional: true }).catch(() => null);
+    if (session && 'payload' in session) {
+      user = {
+        id: session.payload.id,
+        role: session.payload.role,
+        tenantId: session.payload.tenantId,
+      };
+      c.set?.('user', user);
+    }
+  }
+  const reqCandidates = [
+    c.req?.query?.('tenant_id'),
+    c.req?.query?.('tenantId'),
+    c.req?.query?.('store_id'),
+    c.req?.query?.('storeId'),
+    c.req?.header?.('X-Tenant-ID'),
+    c.req?.header?.('x-tenant-id'),
+    c.req?.header?.('X-Store-ID'),
+    c.req?.header?.('x-store-id'),
+  ]
+    .map((v) => (typeof v === 'string' ? v.trim() : ''))
+    .filter(Boolean);
+  const hasConflictingReqTenant = new Set(reqCandidates).size > 1;
+  const reqTenant = hasConflictingReqTenant ? '__CONFLICT__' : (reqCandidates[0] || '');
+  const ctxTenant = (typeof c.get === 'function' ? (c.get('tenantId') as string | undefined) : undefined)?.trim() || '';
+  const role = user?.role ? String(user.role).toLowerCase() : '';
+  if (!user || !role) {
+    if (
+      options?.allowUnauthenticatedDefaultInTest &&
+      !hasAuthHeader &&
+      c.env?.ENVIRONMENT !== 'production' &&
+      !reqTenant &&
+      (!ctxTenant || ctxTenant === 'default')
+    ) {
+      return null;
+    }
+    return c.json({ success: false, error: 'Authentication required' }, 401);
+  }
+  if (!REPORT_ANALYTICS_ROLES.includes(role)) {
+    return c.json({ success: false, error: 'Insufficient permissions' }, 403);
+  }
+  if (hasConflictingReqTenant) {
+    return c.json({ success: false, error: 'Cross-tenant report access denied' }, 403);
+  }
+  const userTenant = String(user.tenantId ?? user.tenant_id ?? '').trim();
+  const hqAdmin = isStrictHQReportAdmin(role, userTenant);
+  const boundTenant = userTenant || 'default';
+  const resolvedTenant = getTenantId(c).trim() || 'default';
+
+  if (!hqAdmin) {
+    if (
+      boundTenant === '*' ||
+      boundTenant.toLowerCase() === 'hq' ||
+      reqTenant === '*' ||
+      reqTenant.toLowerCase() === 'hq' ||
+      (reqTenant && reqTenant !== boundTenant) ||
+      (ctxTenant && (ctxTenant === '*' || ctxTenant.toLowerCase() === 'hq' || ctxTenant !== boundTenant)) ||
+      resolvedTenant !== boundTenant
+    ) {
+      return c.json({ success: false, error: 'Cross-tenant report access denied' }, 403);
+    }
+  } else {
+    const hqTarget = reqTenant
+      ? (reqTenant.toLowerCase() === 'hq' ? '*' : reqTenant)
+      : (resolvedTenant.toLowerCase() === 'hq' ? '*' : resolvedTenant);
+    c.set?.('tenantId', hqTarget);
+  }
+  return null;
+}
+
+export function validateDateRangeWindow(from: string, to: string): string | null {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(from) || !/^\d{4}-\d{2}-\d{2}$/.test(to)) {
+    return 'Invalid date format. Expected YYYY-MM-DD';
+  }
+  const startMs = Date.parse(`${from}T00:00:00.000Z`);
+  const endMs = Date.parse(`${to}T00:00:00.000Z`);
+  if (
+    !Number.isFinite(startMs) ||
+    !Number.isFinite(endMs) ||
+    new Date(startMs).toISOString().slice(0, 10) !== from ||
+    new Date(endMs).toISOString().slice(0, 10) !== to ||
+    startMs > endMs
+  ) {
+    return 'Invalid date range';
+  }
+  const daySpan = Math.floor((endMs - startMs) / 86400000) + 1;
+  if (daySpan > 366) {
+    return 'Date range cannot exceed 366 days';
+  }
+  return null;
+}
 
 export function buildTenantClause(tenantId: string, alias?: string): { where: string; and: string; binds: string[] } {
   if (!tenantId || tenantId === '*') {
@@ -43,25 +154,24 @@ export function buildCustomerJoinTenantClause(tenantId: string): { join: string;
 export function registerAnalyticsHandlers(app: Hono<{ Bindings: Env }>) {
   // GET /api/reports/daily — daily metrics for date range
   app.get('/daily', async (c) => {
-    const db = c.env.AURA_DB;
-    const tenantId = getTenantId(c);
-    const tf = buildTenantClause(tenantId);
-    const cjf = buildCustomerJoinTenantClause(tenantId);
     const from = c.req.query('from') || new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10);
     const to = c.req.query('to') || new Date().toISOString().slice(0, 10);
 
     if (!/^\d{4}-\d{2}-\d{2}$/.test(from) || !/^\d{4}-\d{2}-\d{2}$/.test(to)) {
       return c.json({ success: false, error: 'Invalid date format (YYYY-MM-DD required)' }, 400);
     }
-    const startMs = Date.parse(`${from}T00:00:00.000Z`);
-    const endMs = Date.parse(`${to}T00:00:00.000Z`);
-    if (!Number.isFinite(startMs) || !Number.isFinite(endMs) || startMs > endMs) {
-      return c.json({ success: false, error: 'Invalid date range' }, 400);
+    const rangeErr = validateDateRangeWindow(from, to);
+    if (rangeErr) {
+      return c.json({ success: false, error: rangeErr }, 400);
     }
-    const daySpan = Math.floor((endMs - startMs) / 86400000) + 1;
-    if (daySpan > 366) {
-      return c.json({ success: false, error: 'Date range cannot exceed 366 days' }, 400);
-    }
+
+    const authErr = await verifyReportAnalyticsAccess(c);
+    if (authErr) return authErr;
+
+    const db = c.env.AURA_DB;
+    const tenantId = getTenantId(c);
+    const tf = buildTenantClause(tenantId);
+    const cjf = buildCustomerJoinTenantClause(tenantId);
 
     // Signups by day
     const { results: signups } = await db.prepare(
@@ -73,7 +183,7 @@ export function registerAnalyticsHandlers(app: Hono<{ Bindings: Env }>) {
     // Orders by day
     const { results: orders } = await db.prepare(
       `SELECT DATE(created_at) as date, COUNT(*) as count, COALESCE(SUM(total), 0) as revenue
-       FROM orders WHERE DATE(created_at) BETWEEN ? AND ? AND status != 'cancelled'${tf.and}
+       FROM orders WHERE DATE(created_at) BETWEEN ? AND ? AND ${VALID_REVENUE_ORDER_SQL}${tf.and}
        GROUP BY DATE(created_at) ORDER BY date`
     ).bind(from, to, ...tf.binds).all<{ date: string; count: number; revenue: number }>();
 
@@ -196,6 +306,9 @@ export function registerAnalyticsHandlers(app: Hono<{ Bindings: Env }>) {
 
   // GET /api/reports/summary — overall summary KPIs
   app.get('/summary', async (c) => {
+    const authErr = await verifyReportAnalyticsAccess(c);
+    if (authErr) return authErr;
+
     const db = c.env.AURA_DB;
     const tenantId = getTenantId(c);
     const tf = buildTenantClause(tenantId);
@@ -217,10 +330,10 @@ export function registerAnalyticsHandlers(app: Hono<{ Bindings: Env }>) {
     ] = await Promise.all([
       runFirst<{ count: number }>(`SELECT COUNT(*) as count FROM customers${tf.where}`),
       runFirst<{ total: number }>(
-        `SELECT COALESCE(SUM(total), 0) as total FROM orders WHERE status != 'cancelled'${tf.and}`
+        `SELECT COALESCE(SUM(total), 0) as total FROM orders WHERE ${VALID_REVENUE_ORDER_SQL}${tf.and}`
       ),
       runFirst<{ count: number }>(
-        `SELECT COUNT(*) as count FROM orders WHERE status != 'cancelled'${tf.and}`
+        `SELECT COUNT(*) as count FROM orders WHERE ${VALID_REVENUE_ORDER_SQL}${tf.and}`
       ),
       (async () => {
         try {
@@ -268,13 +381,21 @@ export function registerAnalyticsHandlers(app: Hono<{ Bindings: Env }>) {
 
   // GET /api/reports/orders — order metrics
   app.get('/orders', async (c) => {
-    const db = c.env.AURA_DB;
-    const tf = buildTenantClause(getTenantId(c));
     const from = c.req.query('from') || new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10);
     const to = c.req.query('to') || new Date().toISOString().slice(0, 10);
     if (!/^\d{4}-\d{2}-\d{2}$/.test(from) || !/^\d{4}-\d{2}-\d{2}$/.test(to)) {
       return c.json({ success: false, error: 'Invalid date format. Expected YYYY-MM-DD' }, 400);
     }
+    const rangeErr = validateDateRangeWindow(from, to);
+    if (rangeErr) {
+      return c.json({ success: false, error: rangeErr }, 400);
+    }
+
+    const authErr = await verifyReportAnalyticsAccess(c);
+    if (authErr) return authErr;
+
+    const db = c.env.AURA_DB;
+    const tf = buildTenantClause(getTenantId(c));
 
     const { results } = await db.prepare(
       `SELECT status, COUNT(*) as count, COALESCE(SUM(total), 0) as revenue
@@ -287,17 +408,26 @@ export function registerAnalyticsHandlers(app: Hono<{ Bindings: Env }>) {
 
   // GET /api/reports/top-products — top selling products by quantity in date range
   app.get('/top-products', async (c) => {
-    const db = c.env.AURA_DB;
-    const tf = buildTenantClause(getTenantId(c));
     const from = c.req.query('from') || new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10);
     const to = c.req.query('to') || new Date().toISOString().slice(0, 10);
     if (!/^\d{4}-\d{2}-\d{2}$/.test(from) || !/^\d{4}-\d{2}-\d{2}$/.test(to)) {
       return c.json({ success: false, error: 'Invalid date format. Expected YYYY-MM-DD' }, 400);
     }
+    const rangeErr = validateDateRangeWindow(from, to);
+    if (rangeErr) {
+      return c.json({ success: false, error: rangeErr }, 400);
+    }
+
+    const authErr = await verifyReportAnalyticsAccess(c);
+    if (authErr) return authErr;
+
+    const db = c.env.AURA_DB;
+    const tf = buildTenantClause(getTenantId(c));
 
     const { results } = await db.prepare(
       `SELECT items FROM orders
-       WHERE DATE(created_at) BETWEEN ? AND ? AND status != 'cancelled'${tf.and}`
+       WHERE DATE(created_at) BETWEEN ? AND ? AND ${VALID_REVENUE_ORDER_SQL}${tf.and}
+       ORDER BY created_at DESC`
     ).bind(from, to, ...tf.binds).all<{ items: string }>();
 
     // Aggregate by product name (parse JSON in JS for safety)
@@ -310,8 +440,9 @@ export function registerAnalyticsHandlers(app: Hono<{ Bindings: Env }>) {
         }
         for (const item of items) {
           const name = item.name || item.product_name || 'Unknown';
-          const qty = item.qty || item.quantity || 1;
-          const price = item.price || item.unit_price || 0;
+          const qty = Number(item.qty ?? item.quantity ?? 1);
+          const price = Number(item.price ?? item.unit_price ?? 0);
+          if (!Number.isFinite(qty) || qty <= 0 || !Number.isFinite(price) || price < 0) continue;
           const existing = productMap.get(name) || { qty: 0, revenue: 0 };
           existing.qty += qty;
           existing.revenue += price * qty;
@@ -334,22 +465,44 @@ export function registerAnalyticsHandlers(app: Hono<{ Bindings: Env }>) {
 
   // GET /api/reports/peak-hours — hourly order distribution, zero-filled
   app.get('/peak-hours', async (c) => {
-    const db = c.env.AURA_DB;
-    const tf = buildTenantClause(getTenantId(c));
     const from = c.req.query('from') || new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10);
     const to = c.req.query('to') || new Date().toISOString().slice(0, 10);
     if (!/^\d{4}-\d{2}-\d{2}$/.test(from) || !/^\d{4}-\d{2}-\d{2}$/.test(to)) {
       return c.json({ success: false, error: 'Invalid date format. Expected YYYY-MM-DD' }, 400);
     }
+    const rangeErr = validateDateRangeWindow(from, to);
+    if (rangeErr) {
+      return c.json({ success: false, error: rangeErr }, 400);
+    }
 
-    const { results } = await db.prepare(
-      `SELECT CAST(strftime('%H', created_at) AS INTEGER) as hour,
-              COUNT(*) as order_count,
-              COALESCE(SUM(total), 0) as revenue
-       FROM orders
-       WHERE DATE(created_at) BETWEEN ? AND ? AND status != 'cancelled'${tf.and}
-       GROUP BY hour ORDER BY hour`
-    ).bind(from, to, ...tf.binds).all<{ hour: number; order_count: number; revenue: number }>();
+    const authErr = await verifyReportAnalyticsAccess(c);
+    if (authErr) return authErr;
+
+    const db = c.env.AURA_DB;
+    const tf = buildTenantClause(getTenantId(c));
+
+    let results: { hour: number; order_count: number; revenue: number }[] | undefined;
+    try {
+      const res = await db.prepare(
+        `SELECT CAST(strftime('%H', datetime(created_at, '+7 hours')) AS INTEGER) as hour,
+                COUNT(*) as order_count,
+                COALESCE(SUM(total), 0) as revenue
+         FROM orders
+         WHERE DATE(created_at) BETWEEN ? AND ? AND ${VALID_REVENUE_ORDER_SQL}${tf.and}
+         GROUP BY hour ORDER BY hour`
+      ).bind(from, to, ...tf.binds).all<{ hour: number; order_count: number; revenue: number }>();
+      results = res.results;
+    } catch {
+      const res = await db.prepare(
+        `SELECT CAST(strftime('%H', created_at) AS INTEGER) as hour,
+                COUNT(*) as order_count,
+                COALESCE(SUM(total), 0) as revenue
+         FROM orders
+         WHERE DATE(created_at) BETWEEN ? AND ? AND ${VALID_REVENUE_ORDER_SQL}${tf.and}
+         GROUP BY hour ORDER BY hour`
+      ).bind(from, to, ...tf.binds).all<{ hour: number; order_count: number; revenue: number }>();
+      results = res.results;
+    }
 
     // Build zero-filled 24-hour array
     const peakHours: { hour: number; order_count: number; revenue: number }[] = [];
@@ -368,6 +521,9 @@ export function registerAnalyticsHandlers(app: Hono<{ Bindings: Env }>) {
 
   // GET /api/reports/customer-metrics — aggregate customer KPIs
   app.get('/customer-metrics', async (c) => {
+    const authErr = await verifyReportAnalyticsAccess(c);
+    if (authErr) return authErr;
+
     const db = c.env.AURA_DB;
     const tf = buildTenantClause(getTenantId(c));
     const runFirst = <T>(sql: string, extraBinds: unknown[] = []) => {
@@ -389,16 +545,16 @@ export function registerAnalyticsHandlers(app: Hono<{ Bindings: Env }>) {
       runFirst<{ count: number }>(`SELECT COUNT(*) as count FROM customers${tf.where}`),
       runFirst<{ count: number }>(`SELECT COUNT(*) as count FROM customers WHERE created_at >= ?${tf.and}`, [thirtyDaysAgo]),
       runFirst<{ count: number }>(
-        `SELECT COUNT(*) as count FROM (SELECT customer_id FROM orders WHERE customer_id IS NOT NULL AND customer_id != '' AND customer_id != 'guest'${tf.and} GROUP BY customer_id HAVING COUNT(*) > 1)`
+        `SELECT COUNT(*) as count FROM (SELECT customer_id FROM orders WHERE customer_id IS NOT NULL AND TRIM(COALESCE(customer_id, '')) NOT IN ('', 'guest', 'walk-in', 'pos') AND ${VALID_REVENUE_ORDER_SQL}${tf.and} GROUP BY customer_id, COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') HAVING COUNT(*) > 1)`
       ),
       runFirst<{ total: number }>(
-        `SELECT COALESCE(SUM(total), 0) as total FROM orders WHERE status != 'cancelled'${tf.and}`
+        `SELECT COALESCE(SUM(total), 0) as total FROM orders WHERE ${VALID_REVENUE_ORDER_SQL}${tf.and}`
       ),
       runFirst<{ count: number }>(
-        `SELECT COUNT(*) as count FROM orders WHERE status != 'cancelled'${tf.and}`
+        `SELECT COUNT(*) as count FROM orders WHERE ${VALID_REVENUE_ORDER_SQL}${tf.and}`
       ),
       runFirst<{ count: number }>(
-        `SELECT COUNT(DISTINCT customer_id) as count FROM orders WHERE status != 'cancelled'${tf.and}`
+        `SELECT COUNT(DISTINCT CASE WHEN TRIM(COALESCE(customer_id, '')) NOT IN ('', 'guest', 'walk-in', 'pos') THEN customer_id END) as count FROM orders WHERE ${VALID_REVENUE_ORDER_SQL}${tf.and}`
       )
     ]);
 

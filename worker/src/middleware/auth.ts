@@ -9,7 +9,8 @@ export { authenticateRequest };
 export interface AuthUser {
   id: string; email: string; name: string;
   role: 'customer' | 'staff' | 'waiter' | 'manager' | 'supervisor' | 'owner' | 'admin' | 'cashier' | 'kitchen' | 'barista' | 'chef' | 'shipper';
-  tenantId?: string; tier?: string;
+  tenantId?: string; tier?: string; authVersion?: number;
+  emailVerified?: boolean; email_verified?: boolean | number;
 }
 declare module 'hono' {
   // eslint-disable-next-line no-unused-vars
@@ -20,11 +21,18 @@ declare module 'hono' {
     userTier?: string;
   }
 }
-function toUser(payload: { id: string; email: string; name: string; role: string; tenantId?: string; tier?: string }): AuthUser {
+export function toUser(payload: { id: string; email: string; name: string; role: string; tenantId?: string; tier?: string; authVersion?: number; emailVerified?: boolean; email_verified?: boolean | number }): AuthUser {
+  const rawVerified = payload.emailVerified ?? payload.email_verified;
+  const isVerified = rawVerified === undefined ? undefined : Boolean(rawVerified && rawVerified !== 0);
   return { id: payload.id, email: payload.email || '', name: payload.name || '',
-    role: (payload.role || 'customer') as AuthUser['role'], tenantId: payload.tenantId, tier: payload.tier };
+    role: (payload.role || 'customer') as AuthUser['role'], tenantId: payload.tenantId, tier: payload.tier,
+    ...(payload.authVersion !== undefined ? { authVersion: payload.authVersion } : {}),
+    ...(isVerified !== undefined ? { emailVerified: isVerified, email_verified: rawVerified } : {}) };
 }
-export function requireAuth(allowedRoles: string[] = ['owner', 'staff']): import('hono').MiddlewareHandler<{ Bindings: Env }> {
+const DEFAULT_AUTHENTICATED_ROLES = [
+  'customer', 'staff', 'waiter', 'manager', 'supervisor', 'owner', 'admin', 'cashier', 'kitchen', 'barista', 'chef', 'shipper',
+];
+export function requireAuth(allowedRoles: string[] = DEFAULT_AUTHENTICATED_ROLES): import('hono').MiddlewareHandler<{ Bindings: Env }> {
   return async (c, next) => {
     const env = c.env as Env;
     const isProd = env?.ENVIRONMENT === 'production' || (env as Record<string, unknown>)?.NODE_ENV === 'production';
@@ -57,6 +65,7 @@ export function requireAuth(allowedRoles: string[] = ['owner', 'staff']): import
       const user = toUser(session.payload);
       if (!allowedRoles.includes(user.role)) return c.json({ success: false, error: 'Không đủ quyền truy cập' }, 403);
       c.set('user', user);
+      if (user.tier) c.set('userTier', user.tier);
     } catch (error) {
       if (error instanceof StaffSessionError) return c.json({ success: false, error: error.message, code: error.code }, error.status);
       return c.json({ success: false, error: 'Authentication unavailable' }, 503);
@@ -70,7 +79,11 @@ export function optionalAuth(): import('hono').MiddlewareHandler<{ Bindings: Env
     try {
       const session = await authenticateRequest(c.req.raw, c.env, { optional: true });
       if (session && 'blocked' in session) return c.json({ success: false, error: session.blocked }, 403);
-      if (session && 'payload' in session) c.set('user', toUser(session.payload));
+      if (session && 'payload' in session) {
+        const user = toUser(session.payload);
+        c.set('user', user);
+        if (user.tier) c.set('userTier', user.tier);
+      }
     } catch (error) {
       if (error instanceof StaffSessionError) return c.json({ success: false, error: error.message, code: error.code }, error.status);
       return c.json({ success: false, error: 'Authentication unavailable' }, 503);

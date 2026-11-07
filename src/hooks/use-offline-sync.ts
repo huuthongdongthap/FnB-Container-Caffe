@@ -7,11 +7,21 @@ Conflict resolution: last-write-wins (server timestamp wins).
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { offlineDb, type OfflineOrderRecord } from '@/lib/offline-db';
 import { API_BASE } from '@/lib/api-client';
+import { isSameSessionSnapshot, readClientSession, readSessionSnapshot, subscribeSessionChange } from '@/lib/client-session';
 import { logger } from '@/lib/logger';
 
 const SYNC_INTERVAL_MS = 10_000; // poll every 10s when online
 
 type QueuedItem = OfflineOrderRecord;
+
+function resolveActiveOfflineContext(): { tenantId: string | null; userId: string | null } {
+  const session = readClientSession();
+  const user = session.user as { id?: string; tenantId?: string; tenant_id?: string } | null;
+  const rawTenant = String(user?.tenantId || user?.tenant_id || '').trim();
+  const tenantId = rawTenant || null;
+  const userId = user?.id ? String(user.id).trim() : null;
+  return { tenantId, userId };
+}
 
 interface SyncState {
   isOnline: boolean;
@@ -38,7 +48,7 @@ export function useOfflineSync() {
 
   /* ── Count pending ──────────────────────────────────────────── */
   const refreshPendingCount = useCallback(async () => {
-    const pending = await offlineDb.getPendingOrders();
+    const pending = await offlineDb.getPendingOrders(resolveActiveOfflineContext());
     if (mountedRef.current) {
       setState(s => ({ ...s, pendingCount: pending.length }));
     }
@@ -49,8 +59,24 @@ export function useOfflineSync() {
   const syncItem = useCallback(async (item: QueuedItem): Promise<boolean> => {
     try {
       const token = typeof localStorage !== 'undefined' ? localStorage.getItem('aura_auth_token') : null;
+      const activeCtx = resolveActiveOfflineContext();
+      const itemTenant = typeof item.tenantId === 'string' && item.tenantId.trim() ? item.tenantId.trim() : null;
+      if (itemTenant && activeCtx.tenantId && itemTenant !== activeCtx.tenantId) {
+        return false;
+      }
+      if (itemTenant && itemTenant !== 'default' && !activeCtx.tenantId) {
+        return false;
+      }
+      if (item.userId && activeCtx.userId && item.userId !== activeCtx.userId) {
+        return false;
+      }
+      if (item.userId && !activeCtx.userId) {
+        return false;
+      }
+      const effectiveTenant = itemTenant || activeCtx.tenantId;
       const headers: Record<string, string> = { 'Content-Type': 'application/json' };
       if (token) headers.Authorization = `Bearer ${token}`;
+      if (effectiveTenant) headers['X-Tenant-ID'] = effectiveTenant;
       const res = await fetch(`${API_BASE}/api/orders/sync`, {
         method: 'POST',
         credentials: 'include',
@@ -59,6 +85,7 @@ export function useOfflineSync() {
           localId: item.localId,
           orderData: item.orderData,
           createdAt: item.createdAt,
+          ...(effectiveTenant ? { tenantId: effectiveTenant } : {}),
         }),
       });
 
@@ -69,6 +96,19 @@ export function useOfflineSync() {
       // 409 = conflict → server has newer version; keep local queue for manual resolve
       if (res.status === 409) {
         logger.warn('OfflineSync conflict — keeping in queue', { localId: item.localId });
+        return false;
+      }
+      // Terminal validation errors (400/404/422) — drop from queue; auth/transient errors (401/403/408/429) remain queued
+      if (
+        res.status >= 400 &&
+        res.status < 500 &&
+        res.status !== 401 &&
+        res.status !== 403 &&
+        res.status !== 408 &&
+        res.status !== 429
+      ) {
+        await offlineDb.removeOrder(item.localId);
+        return true;
       }
       return false;
     } catch {
@@ -84,16 +124,18 @@ export function useOfflineSync() {
     syncingRef.current = true;
     setState(s => ({ ...s, syncing: true, error: null }));
 
+    const snap = readSessionSnapshot();
     try {
-      const pending = await offlineDb.getPendingOrders();
+      const pending = await offlineDb.getPendingOrders(resolveActiveOfflineContext());
       let failed = 0;
 
       for (const item of pending) {
+        if (!isSameSessionSnapshot(snap, readSessionSnapshot())) break;
         const ok = await syncItem(item as QueuedItem);
         if (!ok) failed++;
       }
 
-      if (mountedRef.current) {
+      if (mountedRef.current && isSameSessionSnapshot(snap, readSessionSnapshot())) {
         setState(s => ({
           ...s,
           syncing: false,
@@ -109,7 +151,11 @@ export function useOfflineSync() {
 
   /* ── Queue a new mutation ───────────────────────────────────── */
   const queueMutation = useCallback(async (orderData: object): Promise<string> => {
-    const localId = await offlineDb.saveOrder(orderData);
+    const ctx = resolveActiveOfflineContext();
+    const localId =
+      ctx.tenantId || ctx.userId
+        ? await offlineDb.saveOrder(orderData, ctx)
+        : await offlineDb.saveOrder(orderData);
     await refreshPendingCount();
     // If online, try immediate sync
     const currentlyOnline = typeof navigator !== 'undefined' ? navigator.onLine : true;
@@ -133,6 +179,12 @@ export function useOfflineSync() {
 
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);
+    const unsubscribeSession = subscribeSessionChange(() => {
+      if (mountedRef.current) {
+        setState(s => ({ ...s, syncing: false, error: null }));
+        void refreshPendingCount();
+      }
+    });
 
     // Initial count
     void refreshPendingCount();
@@ -146,6 +198,7 @@ export function useOfflineSync() {
 
     return () => {
       mountedRef.current = false;
+      unsubscribeSession();
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
       if (syncTimerRef.current) clearInterval(syncTimerRef.current);

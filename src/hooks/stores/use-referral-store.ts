@@ -1,6 +1,10 @@
 import { create } from 'zustand';
 import { apiFetch } from '@/lib/api-client';
-import { readClientSession, subscribeClientSession } from '@/lib/client-session';
+import {
+  readSessionSnapshot,
+  isSameSessionSnapshot,
+  subscribeSessionChange,
+} from '@/lib/client-session';
 
 /* ═══════════════════════════════════════════════════════════════════
    Referral store — Zustand with manual localStorage persistence.
@@ -71,11 +75,11 @@ export const useReferralStore = create<ReferralState>((set, get) => ({
   error: null,
 
   fetchReferralData: async () => {
-    const sessionToken = readClientSession().token;
+    const sessionSnap = readSessionSnapshot();
     set({ loading: true, error: null });
     try {
       const body = await apiFetch<{ data: Record<string, unknown> }>('/api/loyalty/referral/stats');
-      if (readClientSession().token !== sessionToken) return;
+      if (!isSameSessionSnapshot(sessionSnap, readSessionSnapshot())) return;
 
       const data = body.data || body;
 
@@ -91,6 +95,7 @@ export const useReferralStore = create<ReferralState>((set, get) => ({
             '/api/loyalty/referral/code',
             { method: 'POST' },
           );
+          if (!isSameSessionSnapshot(sessionSnap, readSessionSnapshot())) return;
           referralCode =
             codeRes?.data?.referral_code ??
             codeRes?.data?.code ??
@@ -101,6 +106,7 @@ export const useReferralStore = create<ReferralState>((set, get) => ({
           // Non-fatal: code provisioning fallback optional
         }
       }
+      if (!isSameSessionSnapshot(sessionSnap, readSessionSnapshot())) return;
       const totalReferrals: number = (raw.total_referrals as number) ?? 0;
       const cashbackEarned: number = (raw.total_cashback_earned_vnd as number) ?? 0;
       const codeUsage: number = (raw.code_usage as number) ?? 0;
@@ -123,17 +129,20 @@ export const useReferralStore = create<ReferralState>((set, get) => ({
         error: null,
       });
     } catch (err) {
+      if (!isSameSessionSnapshot(sessionSnap, readSessionSnapshot())) return;
       set({ loading: false, error: err instanceof Error ? err.message : 'Network error' });
     }
   },
 
   applyReferralCode: async (code: string) => {
+    const sessionSnap = readSessionSnapshot();
     set({ loading: true, error: null });
     try {
       const body = await apiFetch<{ success?: boolean; error?: string; message?: string }>('/api/loyalty/referral/apply', {
         method: 'POST',
         body: JSON.stringify({ code }),
       });
+      if (!isSameSessionSnapshot(sessionSnap, readSessionSnapshot())) return;
 
       if (body.success === false || body.error) {
         set({ loading: false, error: body.error || body.message || 'Invalid referral code' });
@@ -144,6 +153,7 @@ export const useReferralStore = create<ReferralState>((set, get) => ({
       set({ loading: false, error: null });
       await get().fetchReferralData();
     } catch (err) {
+      if (!isSameSessionSnapshot(sessionSnap, readSessionSnapshot())) return;
       set({ loading: false, error: err instanceof Error ? err.message : 'Network error' });
     }
   },
@@ -154,23 +164,28 @@ export const useReferralStore = create<ReferralState>((set, get) => ({
     return `${window.location.origin}/referral?ref=${referralCode}`;
   },
 
-  reset: () => set({
-    referralCode: null,
-    referralCount: 0,
-    cashbackEarned: 0,
-    codeUsage: 0,
-    recentReferrals: [],
-    loading: false,
-    error: null,
-  }),
+  reset: () => {
+    try {
+      localStorage.removeItem(REFERRAL_KEY);
+    } catch { /* ignore */ }
+    set({
+      referralCode: null,
+      referralCount: 0,
+      cashbackEarned: 0,
+      codeUsage: 0,
+      recentReferrals: [],
+      loading: false,
+      error: null,
+    });
+  },
 
   clearError: () => set({ error: null }),
 }));
 
+// Reset referral state whenever the active session token, user, or tenant changes
+// so referral codes and cashback totals never bleed across accounts.
 if (typeof window !== 'undefined') {
-  subscribeClientSession((session) => {
-    if (!session.token) {
-      useReferralStore.getState().reset();
-    }
+  subscribeSessionChange(() => {
+    useReferralStore.getState().reset();
   });
 }

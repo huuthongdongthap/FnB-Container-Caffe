@@ -67,6 +67,7 @@ tier?: string;
 sessionId?: string;
 authVersion?: number;
 emailVerified?: boolean;
+phoneVerified?: boolean;
 sub?: string;
 jti?: string;
 iat?: number;

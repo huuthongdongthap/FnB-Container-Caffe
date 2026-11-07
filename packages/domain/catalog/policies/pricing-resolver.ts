@@ -71,7 +71,7 @@ export async function resolveServerProductPrice(
   let dbItem: DbCatalogRow | null = null;
   if (db && productId) {
     const attachTenantId = async (table: 'products' | 'menu_items', id: string, row: DbCatalogRow): Promise<DbCatalogRow> => {
-      if (input.tenantId && input.tenantId !== '*' && row.tenant_id === undefined) {
+      if (row.tenant_id === undefined) {
         const tenantRow = await db
           .prepare(`SELECT tenant_id FROM ${table} WHERE id = ?`)
           .bind(id)
@@ -84,55 +84,80 @@ export async function resolveServerProductPrice(
       return row;
     };
 
+    const matchesRequestedTenant = (candidate: DbCatalogRow | null): boolean => {
+      if (!candidate) return false;
+      const reqRaw = input.tenantId ? input.tenantId.trim() : '';
+      const isWildcard = !reqRaw || reqRaw === '*' || reqRaw.toLowerCase() === 'hq';
+      if (!isWildcard && 'tenant_id' in candidate && candidate.tenant_id !== undefined) {
+        const reqTenant = reqRaw || 'default';
+        const itemTenant = (candidate.tenant_id && String(candidate.tenant_id).trim()) || 'default';
+        return itemTenant === reqTenant;
+      }
+      return true;
+    };
+
     const findById = async (id: string): Promise<DbCatalogRow | null> => {
+      let probedProducts = false;
       try {
         const row = await db
           .prepare('SELECT id, name, price, is_available as available, category_id FROM products WHERE id = ?')
           .bind(id)
           .first<DbCatalogRow>();
-        if (row) return attachTenantId('products', id, row);
+        probedProducts = true;
+        if (row) {
+          const withTenant = await attachTenantId('products', id, row);
+          if (matchesRequestedTenant(withTenant)) return withTenant;
+        }
       } catch {
         // fallback to legacy column list
       }
-      try {
-        const row = await db
-          .prepare('SELECT id, name, price, is_available as available FROM products WHERE id = ?')
-          .bind(id)
-          .first<DbCatalogRow>();
-        if (row) return attachTenantId('products', id, row);
-      } catch {
-        // fallback to menu_items
+      if (!probedProducts) {
+        try {
+          const row = await db
+            .prepare('SELECT id, name, price, is_available as available FROM products WHERE id = ?')
+            .bind(id)
+            .first<DbCatalogRow>();
+          if (row) {
+            const withTenant = await attachTenantId('products', id, row);
+            if (matchesRequestedTenant(withTenant)) return withTenant;
+          }
+        } catch {
+          // fallback to menu_items
+        }
       }
+      let probedMenuItems = false;
       try {
         const row = await db
           .prepare('SELECT id, name, price, available, category FROM menu_items WHERE id = ?')
           .bind(id)
           .first<DbCatalogRow>();
-        if (row) return attachTenantId('menu_items', id, row);
+        probedMenuItems = true;
+        if (row) {
+          const withTenant = await attachTenantId('menu_items', id, row);
+          if (matchesRequestedTenant(withTenant)) return withTenant;
+        }
       } catch {
         // fallback to legacy column list
       }
-      try {
-        const row = await db
-          .prepare('SELECT id, name, price, available FROM menu_items WHERE id = ?')
-          .bind(id)
-          .first<DbCatalogRow>();
-        if (row) return attachTenantId('menu_items', id, row);
-      } catch {
-        // ignore
+      if (!probedMenuItems) {
+        try {
+          const row = await db
+            .prepare('SELECT id, name, price, available FROM menu_items WHERE id = ?')
+            .bind(id)
+            .first<DbCatalogRow>();
+          if (row) {
+            const withTenant = await attachTenantId('menu_items', id, row);
+            if (matchesRequestedTenant(withTenant)) return withTenant;
+          }
+        } catch {
+          // ignore
+        }
       }
       return null;
     };
 
     try {
       dbItem = await findById(productId);
-      if (dbItem && input.tenantId && input.tenantId !== '*' && 'tenant_id' in dbItem && dbItem.tenant_id !== undefined) {
-        const reqTenant = input.tenantId.trim() || 'default';
-        const itemTenant = (dbItem.tenant_id && String(dbItem.tenant_id).trim()) || 'default';
-        if (itemTenant !== reqTenant) {
-          dbItem = null;
-        }
-      }
     } catch {
       dbItem = null;
     }
@@ -168,17 +193,25 @@ export async function resolveServerProductPrice(
     };
   }
 
-  const basePriceCents = dbItem
-    ? Math.max(0, Math.floor(Number(dbItem.price) || 0))
-    : Math.max(0, Math.floor(Number(fallbackPrice) || 0));
+  const rawBasePrice = dbItem ? Number(dbItem.price) : Number(fallbackPrice);
+  const basePriceCents = Number.isFinite(rawBasePrice) ? Math.max(0, Math.floor(rawBasePrice)) : 0;
   const itemName = dbItem?.name || fallbackName || 'Item';
 
   // Validate modifier choices strictly against DB modifier_choices table and product mappings
   const candidateProductIds = [productId, dbItem?.id].filter(Boolean) as string[];
-  const effectiveModTenant = input.tenantId && input.tenantId.trim() && input.tenantId.trim() !== '*'
-    ? input.tenantId.trim()
-    : (dbItem?.tenant_id && String(dbItem.tenant_id).trim() ? String(dbItem.tenant_id).trim() : input.tenantId);
-  const modResult = await validateProductModifiers(db, productId, modifiers, candidateProductIds, effectiveModTenant);
+  const normInputTenant =
+    input.tenantId && input.tenantId.trim() && input.tenantId.trim() !== '*' && input.tenantId.trim().toLowerCase() !== 'hq'
+      ? input.tenantId.trim()
+      : undefined;
+  const effectiveTenantId =
+    normInputTenant
+      ? normInputTenant
+      : dbItem && typeof dbItem.tenant_id === 'string' && dbItem.tenant_id.trim() !== '' && dbItem.tenant_id.trim() !== '*' && dbItem.tenant_id.trim().toLowerCase() !== 'hq'
+        ? dbItem.tenant_id.trim()
+        : dbItem && 'tenant_id' in dbItem && dbItem.tenant_id === null
+          ? 'default'
+          : undefined;
+  const modResult = await validateProductModifiers(db, productId, modifiers, candidateProductIds, effectiveTenantId);
   if (!modResult.valid) {
     return {
       id: dbItem?.id || productId,
@@ -194,6 +227,11 @@ export async function resolveServerProductPrice(
   }
 
   // Load active happy hour windows scoped to tenant
+  const effectiveTenant =
+    effectiveTenantId ||
+    (input.tenantId && input.tenantId.trim()
+      ? (input.tenantId.trim() === '*' || input.tenantId.trim().toLowerCase() === 'hq' ? '*' : input.tenantId.trim())
+      : 'default');
   let happyHourWindows: HappyHourWindow[] = [];
   if (db) {
     try {
@@ -202,7 +240,6 @@ export async function resolveServerProductPrice(
         .bind()
         .all<HappyHourWindow>();
       const rawWindows = (Array.isArray(hhRes) ? hhRes : hhRes?.results || []) as HappyHourWindow[];
-      const effectiveTenant = input.tenantId && input.tenantId.trim() ? input.tenantId.trim() : 'default';
       happyHourWindows = effectiveTenant === '*'
         ? rawWindows
         : rawWindows.filter((w) => {
@@ -213,28 +250,57 @@ export async function resolveServerProductPrice(
             }
             return effectiveTenant === 'default';
           });
+      if (
+        dbItem &&
+        !dbItem.category &&
+        happyHourWindows.some((w) => ['category_id', 'category', 'categories'].includes((w.apply_to || '').toLowerCase()))
+      ) {
+        const catRow = await db
+          .prepare('SELECT category FROM products WHERE id = ?')
+          .bind(dbItem.id || productId)
+          .first<{ category?: string | null }>()
+          .catch(() => null);
+        if (catRow && typeof catRow.category === 'string' && catRow.category.trim()) {
+          dbItem.category = catRow.category.trim();
+        }
+      }
     } catch {
       happyHourWindows = [];
     }
   }
 
   const categoryId = dbItem?.category_id ?? dbItem?.category ?? null;
-  const unitPriceCents = resolveItemPrice({
+  const categorySlug = dbItem?.category ?? null;
+  const rawDelta =
+    channelDeltas?.[normChannel] ??
+    (normChannel === 'online' ? channelDeltas?.delivery : (normChannel === 'delivery' ? channelDeltas?.online : 0)) ??
+    0;
+  const parsedDelta = Number(rawDelta);
+  const delta = Number.isFinite(parsedDelta) ? Math.round(parsedDelta) : 0;
+  const safeChannelDeltas: ChannelDeltaConfig | undefined = channelDeltas
+    ? {
+        dine_in: Number.isFinite(Number(channelDeltas.dine_in)) ? Math.round(Number(channelDeltas.dine_in)) : 0,
+        takeaway: Number.isFinite(Number(channelDeltas.takeaway)) ? Math.round(Number(channelDeltas.takeaway)) : 0,
+        delivery: Number.isFinite(Number(channelDeltas.delivery)) ? Math.round(Number(channelDeltas.delivery)) : 0,
+        online: Number.isFinite(Number(channelDeltas.online)) ? Math.round(Number(channelDeltas.online)) : 0,
+      }
+    : undefined;
+
+  const rawUnitPriceCents = resolveItemPrice({
     basePriceCents,
     channel: normChannel,
     modifierChoices: modResult.validatedModifiers,
     happyHourWindows,
     now,
-    channelDeltas,
+    channelDeltas: safeChannelDeltas,
     productId: dbItem?.id || productId,
     categoryId,
+    categorySlug,
+    tenantId: effectiveTenant,
   });
-
-  const rawDelta =
-    channelDeltas?.[normChannel] ??
-    (normChannel === 'online' ? channelDeltas?.delivery : (normChannel === 'delivery' ? channelDeltas?.online : 0)) ??
-    0;
-  const delta = Math.round(Number(rawDelta) || 0);
+  const unitPriceCents = Number.isFinite(rawUnitPriceCents)
+    ? Math.max(0, Math.round(rawUnitPriceCents))
+    : 0;
 
   return {
     id: dbItem?.id || productId,

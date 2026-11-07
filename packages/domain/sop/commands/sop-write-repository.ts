@@ -20,6 +20,7 @@ import {
   type SopTemplate,
 } from '../index';
 import { assertId, businessDate, SopAccessError, type SopScope } from './sop-access';
+import { findRun } from './sop-read-repository';
 import { findTemplate } from './sop-template-reads';
 import { sopDatabase } from './sop-violation-columns';
 import { runItemId, nowIso, mapPolicyError } from './sop-write-support';
@@ -52,7 +53,57 @@ export async function startRunForStaff(
     throw new SopAccessError('Template is not executable', 409);
   }
 
+  if (!scope.canManage) {
+    const rawTargetRole = (template as { targetRole?: string | null }).targetRole;
+    const targetRole = typeof rawTargetRole === 'string' ? rawTargetRole.trim() : '';
+    if (targetRole && targetRole !== 'any' && targetRole !== '*') {
+      const allowedTargetRoles = targetRole
+        .split(',')
+        .map((role) => role.trim())
+        .filter(Boolean);
+      if (allowedTargetRoles.length > 0 && !allowedTargetRoles.includes(scope.actorRole)) {
+        throw new SopAccessError('Role is not permitted to execute this template', 403);
+      }
+    }
+
+    const applicable = typeof template.applicableRoles === 'string' ? template.applicableRoles.trim() : '';
+    if (applicable && applicable !== 'any' && applicable !== '*') {
+      const allowedRoles = applicable
+        .split(',')
+        .map((role) => role.trim())
+        .filter(Boolean);
+      if (allowedRoles.length > 0 && !allowedRoles.includes(scope.actorRole)) {
+        throw new SopAccessError('Role is not permitted to execute this template', 403);
+      }
+    }
+  }
+
   const scheduledDate = shiftDate(scope);
+
+  // Prevent duplicate in-progress runs for the same staff member, template, and business day.
+  try {
+    const existingRow = await sopDatabase(scope)
+      .prepare(
+        `SELECT id FROM sop_runs
+         WHERE COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?
+           AND template_id = ?
+           AND staff_id = ?
+           AND scheduled_date = ?
+           AND status = 'in_progress'
+         ORDER BY started_at DESC
+         LIMIT 1`
+      )
+      .bind(scope.tenantId, template.id, scope.actorId, scheduledDate)
+      .first<{ id: string }>();
+    if (existingRow?.id) {
+      const existingRun = await findRun(scope, existingRow.id);
+      if (existingRun) {
+        return { run: existingRun, template };
+      }
+    }
+  } catch {
+    // Proceed with fresh run creation if lookup is unsupported by a lightweight test stub.
+  }
 
   const built = startRun({
     runId: `run_${crypto.randomUUID()}`,

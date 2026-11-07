@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { useMobileAuth } from '@/hooks/use-mobile-auth';
 import { apiFetch } from '@/lib/api-client';
 import type { TableInfo, MobileOrder, OrderItem } from './waiter-orders-types';
@@ -18,14 +18,16 @@ export { TABLE_STATUS_LABELS, tableCardStyle, tabStyle, orderStatusColor } from 
 /* ── Component ────────────────────────────────────────────────────── */
 
 export default function WaiterOrders() {
-  const { token: _token } = useMobileAuth();
+  const { token, user } = useMobileAuth();
   const [tab, setTab] = useState<'orders' | 'tables'>('orders');
-  const [orders, setOrders] = useState<MobileOrder[]>([]);
+  const [rawOrders, setRawOrders] = useState<MobileOrder[]>([]);
   const [tables, setTables] = useState<TableInfo[]>([]);
   const [showNewOrder, setShowNewOrder] = useState(false);
   const [selectedTableId, setSelectedTableId] = useState('');
   const [newOrderItems, setNewOrderItems] = useState<OrderItem[]>([{ name: '', quantity: 1, price: 0, note: '' }]);
   const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const submittingRef = useRef(false);
 
   const fetchTables = useCallback(async () => {
     try {
@@ -37,22 +39,36 @@ export default function WaiterOrders() {
         })));
       }
     } catch { /* silent */ }
-  }, []);
+  }, [token, user?.id, user?.tenantId]);
 
   const fetchOrders = useCallback(async () => {
     try {
       const body = (await apiFetch<{ success: boolean; orders: MobileOrder[] }>('/mobile/orders'));
       if (body.success) {
-        const tableMap = new Map(tables.map((t) => [t.id, (t as TableInfo & { number?: number }).number ?? t.table_number]));
-        setOrders(body.orders.map((o) => ({ ...o, table_number: tableMap.get(o.table_id) ?? o.table_number ?? 0 })));
+        setRawOrders(body.orders);
       }
     } catch { /* silent */ }
-  }, [tables]);
+  }, [token, user?.id, user?.tenantId]);
 
-  useEffect(() => { fetchTables(); }, [fetchTables]);
-  useEffect(() => { fetchOrders(); }, [fetchOrders]);
+  const orders = useMemo(() => {
+    const tableMap = new Map(
+      tables.map((t) => [t.id, (t as TableInfo & { number?: number }).number ?? t.table_number])
+    );
+    return rawOrders.map((o) => ({
+      ...o,
+      table_number: tableMap.get(o.table_id) ?? o.table_number ?? 0,
+    }));
+  }, [rawOrders, tables]);
+
+  useEffect(() => {
+    setRawOrders([]);
+    setTables([]);
+    void fetchTables();
+    void fetchOrders();
+  }, [fetchTables, fetchOrders]);
 
   const submitOrder = useCallback(async () => {
+    if (submittingRef.current) return;
     const newOrderTable = selectedTableId.trim();
     if (!newOrderTable) return;
     const validItems = newOrderItems.filter((i) => i.name.trim());
@@ -63,10 +79,17 @@ export default function WaiterOrders() {
       String(parseInt(newOrderTable, 10)) === newOrderTable
         ? parseInt(newOrderTable, 10)
         : newOrderTable;
+    submittingRef.current = true;
     setSubmitting(true);
+    setSubmitError(null);
+    const idempotencyKey = `waiter-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
     try {
-      const body = await apiFetch<{ success: boolean }>('/mobile/orders', {
+      const body = await apiFetch<{ success: boolean; error?: string }>('/mobile/orders', {
         method: 'POST',
+        headers: {
+          'Idempotency-Key': idempotencyKey,
+          ...(user?.tenantId ? { 'X-Tenant-ID': user.tenantId } : {}),
+        },
         body: JSON.stringify({
           table_id: resolvedTableId,
           table_number: selectedTable?.number ?? selectedTable?.table_number,
@@ -79,10 +102,17 @@ export default function WaiterOrders() {
         setShowNewOrder(false);
         setSelectedTableId('');
         setNewOrderItems([{ name: '', quantity: 1, price: 0, note: '' }]);
-        fetchOrders();
-        fetchTables();
+        void fetchOrders();
+        void fetchTables();
+      } else {
+        setSubmitError(body.error || 'Failed to submit order');
       }
-    } catch { /* silent */ } finally { setSubmitting(false); }
+    } catch (err) {
+      setSubmitError(err instanceof Error ? err.message : 'Failed to submit order');
+    } finally {
+      submittingRef.current = false;
+      setSubmitting(false);
+    }
   }, [selectedTableId, newOrderItems, tables, fetchOrders, fetchTables]);
 
   const updateItem = useCallback((idx: number, patch: Partial<OrderItem>) => {
@@ -159,7 +189,13 @@ export default function WaiterOrders() {
         </div>
       )}
 
-      <button style={fab} onClick={() => { setSelectedTableId(''); setNewOrderItems([{ name: '', quantity: 1, price: 0, note: '' }]); setShowNewOrder(true); }} aria-label="New order">+</button>
+      <button style={fab} onClick={() => { setSelectedTableId(''); setNewOrderItems([{ name: '', quantity: 1, price: 0, note: '' }]); setSubmitError(null); setShowNewOrder(true); }} aria-label="New order">+</button>
+
+      {submitError && (
+        <div role="alert" style={{ padding: '8px 12px', margin: '8px 16px', borderRadius: 8, background: 'rgba(220,53,69,0.15)', color: '#ff6b6b', fontSize: 12 }}>
+          {submitError}
+        </div>
+      )}
 
       {showNewOrder && (
         <NewOrderModal

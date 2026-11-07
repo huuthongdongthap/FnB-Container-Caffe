@@ -99,11 +99,17 @@ function isAccountLookup(sql: string): boolean {
 
 /** Statement answering the gate's account read with the token's own account. */
 function accountStatement(role: string, tenantId: string) {
-  const row = staffAccountRow(role, tenantId);
+  let activeRole = role;
+  const getRow = () => staffAccountRow(activeRole, tenantId);
   const stmt: any = {
-    bind: () => stmt,
-    first: async () => row,
-    all: async () => ({ results: [row], success: true, meta: {} }),
+    bind: (...args: unknown[]) => {
+      if (typeof args[0] === 'string' && args[0].startsWith('user-')) {
+        activeRole = args[0].slice(5);
+      }
+      return stmt;
+    },
+    first: async () => getRow(),
+    all: async () => ({ results: [getRow()], success: true, meta: {} }),
     run: async () => ({ success: true, changes: 0, lastRowId: 0, meta: {} }),
     raw: async () => [],
   };
@@ -186,7 +192,7 @@ describe('Multi-Tenant & Franchise Preparation Integration', () => {
 
       const mockDb = {
         prepare: vi.fn((sql: string) => (isAccountLookup(sql)
-          ? accountStatement('owner', 'default')
+          ? accountStatement('owner', 'hq')
           : {
             bind: vi.fn(() => ({
               all: vi.fn().mockResolvedValue({ results: mockLocations }),
@@ -200,7 +206,7 @@ describe('Multi-Tenant & Franchise Preparation Integration', () => {
         AURA_DB: mockDb as any
       });
 
-      const req = await authRequest('GET', '/api/franchise/locations', 'owner', 'default');
+      const req = await authRequest('GET', '/api/franchise/locations', 'owner', 'hq');
       const res = await app.fetch(req, env);
       expect(res.status).toBe(200);
       const body = await res.json() as any;
@@ -431,7 +437,7 @@ describe('Multi-Tenant & Franchise Preparation Integration', () => {
       const tenantBinds: string[] = [];
       const mockDb = {
         prepare: (sql: string) => {
-          if (isAccountLookup(sql)) return accountStatement('admin', 'default');
+          if (isAccountLookup(sql)) return accountStatement('admin', 'hq');
           // A privileged cross-tenant read also lands in the audit log; only the
           // tenant bindings of the reads/writes themselves are confined here.
           const isAuditWrite = /INSERT INTO audit_logs/i.test(sql);
@@ -469,7 +475,7 @@ describe('Multi-Tenant & Franchise Preparation Integration', () => {
       ];
 
       for (const ep of endpoints) {
-        const req = await authRequest('GET', ep, 'admin', 'default');
+        const req = await authRequest('GET', ep, 'admin', 'hq');
         const res = await app.fetch(req, env);
         expect(res.status).toBe(200);
       }
@@ -802,7 +808,7 @@ describe('Multi-Tenant & Franchise Preparation Integration', () => {
       expect(listOpenApiJson.data.promotions).toHaveLength(1);
       expect(listOpenApiJson.data.promotions[0].id).toBe('promo-b-1');
 
-      const patchCrossOpenApiReq = await authRequest('PATCH', '/api/promotions/promo-default-1', 'supervisor', 'tenant_sadec_02', {
+      const patchCrossOpenApiReq = await authRequest('PATCH', '/api/promotions/promo-default-1', 'manager', 'tenant_sadec_02', {
         name: 'Tampered',
       });
       const patchCrossOpenApiRes = await openApiPromotionsRouter.fetch(patchCrossOpenApiReq, env);
@@ -889,7 +895,7 @@ describe('Multi-Tenant & Franchise Preparation Integration', () => {
       const getCrossIngRes = await openApiInventoryRouter.fetch(getCrossIngReq, env);
       expect(getCrossIngRes.status).toBe(404);
 
-      const movCrossIngReq = await authRequest('POST', '/api/inventory/movements', 'supervisor', 'tenant_sadec_02', {
+      const movCrossIngReq = await authRequest('POST', '/api/inventory/movements', 'manager', 'tenant_sadec_02', {
         ingredientId: 'ing-default-1',
         type: 'in',
         quantity: 5,
@@ -926,7 +932,10 @@ describe('Multi-Tenant & Franchise Preparation Integration', () => {
                 return null;
               }),
               all: vi.fn(async () => {
-                if (sql.includes("COALESCE(NULLIF(tenant_id, ''), 'default') = ?")) {
+                if (
+                  sql.includes("COALESCE(NULLIF(tenant_id, ''), 'default') = ?") ||
+                  sql.includes("COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?")
+                ) {
                   const t = String(args[0]);
                   return { results: t === 'tenant_sadec_02' ? [staffSadec] : [staffDefault] };
                 }
@@ -1157,7 +1166,7 @@ describe('Multi-Tenant & Franchise Preparation Integration', () => {
         first: vi.fn(async () => {
           if (/FROM users WHERE id = \?/i.test(sql)) {
             if (args[0] === 'user-supervisor') return staffAccountRow('supervisor', 'tenant_sadec_02');
-            if (args[0] === 'user-admin') return staffAccountRow('admin', 'default');
+            if (args[0] === 'user-admin') return staffAccountRow('admin', 'hq');
           }
           if (/FROM customers WHERE id = \?/i.test(sql)) {
             if (args[0] === 'cust-def-1') return custDefault;
@@ -1227,7 +1236,7 @@ describe('Multi-Tenant & Franchise Preparation Integration', () => {
       expect(segCustJson.data.customers).toHaveLength(1);
       expect(segCustJson.data.customers[0].id).toBe('cust-sad-1');
 
-      const adminSegCustReq = await authRequest('GET', '/segments/new_first_week/customers?tenant_id=*', 'admin', 'default');
+      const adminSegCustReq = await authRequest('GET', '/segments/new_first_week/customers?tenant_id=*', 'admin', 'hq');
       const adminSegCustRes = await crmRouter.fetch(adminSegCustReq, env);
       expect(adminSegCustRes.status).toBe(200);
       const adminSegCustJson = (await adminSegCustRes.json()) as any;
@@ -1515,7 +1524,7 @@ describe('Multi-Tenant & Franchise Preparation Integration', () => {
           if (/FROM users WHERE id = \?/i.test(sql)) {
             if (args[0] === 'user-supervisor') return staffAccountRow('supervisor', 'tenant_sadec_02');
             if (args[0] === 'user-manager') return staffAccountRow('manager', 'tenant_sadec_02');
-            if (args[0] === 'user-owner') return staffAccountRow('owner', 'default');
+            if (args[0] === 'user-owner') return staffAccountRow('owner', 'hq');
           }
           if (/FROM customers WHERE id = \?/i.test(sql)) {
             if (args[0] === custDefault.id) return custDefault;
@@ -1609,7 +1618,7 @@ describe('Multi-Tenant & Franchise Preparation Integration', () => {
       expect(tiersSadJson.data.total).toBe(1);
       expect(tiersSadJson.data.distribution).toEqual([{ tier: 'gold', count: 1, percentage: 100 }]);
 
-      const widHqReq = await authRequest('GET', '/widgets?tenant_id=*', 'owner', 'default');
+      const widHqReq = await authRequest('GET', '/widgets?tenant_id=*', 'owner', 'hq');
       const widHqRes = await adminLoyaltyRouter.fetch(widHqReq, env);
       expect(widHqRes.status).toBe(200);
       const widHqJson = (await widHqRes.json()) as any;
@@ -1674,7 +1683,7 @@ describe('Multi-Tenant & Franchise Preparation Integration', () => {
           if (/FROM users WHERE id = \?/i.test(sql)) {
             if (args[0] === 'user-staff') return staffAccountRow('staff', 'tenant_sadec_02');
             if (args[0] === 'user-supervisor') return staffAccountRow('supervisor', 'tenant_sadec_02');
-            if (args[0] === 'user-owner') return staffAccountRow('owner', 'default');
+            if (args[0] === 'user-owner') return staffAccountRow('owner', 'hq');
           }
           if (/FROM customers WHERE id = \?/i.test(sql)) {
             if (args[0] === 'cust-def-1') return custDefault;
@@ -1716,9 +1725,9 @@ describe('Multi-Tenant & Franchise Preparation Integration', () => {
       expect(staffBroadcastRes.status).toBe(403);
 
       // 2. Birthday: HQ owner with ?tenant_id=* can check eligibility of tenant_sadec_02 customer; supervisor can PUT /config
-      const bdayHqReq = await authRequest('GET', '/check?customer_id=cust-sad-1&tenant_id=*', 'owner', 'default');
+      const bdayHqReq = await authRequest('GET', '/check?customer_id=cust-sad-1&tenant_id=*', 'owner', 'hq');
       // Attach user context via app route /api/admin/birthday
-      const bdayAppHqReq = await authRequest('GET', '/api/admin/birthday/check?customer_id=cust-sad-1&tenant_id=*', 'owner', 'default');
+      const bdayAppHqReq = await authRequest('GET', '/api/admin/birthday/check?customer_id=cust-sad-1&tenant_id=*', 'owner', 'hq');
       const bdayAppHqRes = await app.fetch(bdayAppHqReq, env);
       expect(bdayAppHqRes.status).toBe(200);
       const bdayAppHqJson = (await bdayAppHqRes.json()) as any;
@@ -1922,7 +1931,7 @@ describe('Multi-Tenant & Franchise Preparation Integration', () => {
         first: vi.fn(async () => {
           if (/FROM users WHERE id = \?/i.test(sql)) {
             if (args[0] === 'user-supervisor') return staffAccountRow('supervisor', 'tenant_sadec_02');
-            if (args[0] === 'user-owner') return staffAccountRow('owner', 'default');
+            if (args[0] === 'user-owner') return staffAccountRow('owner', 'hq');
           }
           if (/FROM customers c/i.test(sql) && /LEFT JOIN cashback_wallets/i.test(sql)) {
             const tenantArg = args[0];
@@ -1985,7 +1994,7 @@ describe('Multi-Tenant & Franchise Preparation Integration', () => {
       });
 
       // 1. POS Customer Lookup: HQ owner with ?tenant_id=* can look up SaDec customer; Default store supervisor without wildcard gets found: false
-      const posHqReq = await authRequest('GET', '/?phone=0903333444&tenant_id=*', 'owner', 'default');
+      const posHqReq = await authRequest('GET', '/?phone=0903333444&tenant_id=*', 'owner', 'hq');
       const posHqRes = await posCustomerRouter.fetch(posHqReq, env);
       expect(posHqRes.status).toBe(200);
       const posHqJson = (await posHqRes.json()) as any;
@@ -1997,20 +2006,20 @@ describe('Multi-Tenant & Franchise Preparation Integration', () => {
       const crossOpenSesRes = await tableSessionsRouter.fetch(crossOpenSesReq, env);
       expect(crossOpenSesRes.status).toBe(404);
 
-      const hqListSesReq = await authRequest('GET', '/?tenant_id=*', 'owner', 'default');
+      const hqListSesReq = await authRequest('GET', '/?tenant_id=*', 'owner', 'hq');
       const hqListSesRes = await tableSessionsRouter.fetch(hqListSesReq, env);
       expect(hqListSesRes.status).toBe(200);
       const hqListSesJson = (await hqListSesRes.json()) as any;
       expect(hqListSesJson.data).toHaveLength(2);
 
       // 3. Floor Plan & Summary: HQ owner with ?tenant_id=* sees all 2 tables
-      const fpHqReq = await authRequest('GET', '/?tenant_id=*', 'owner', 'default');
+      const fpHqReq = await authRequest('GET', '/?tenant_id=*', 'owner', 'hq');
       const fpHqRes = await floorPlanRouter.fetch(fpHqReq, env);
       expect(fpHqRes.status).toBe(200);
       const fpHqJson = (await fpHqRes.json()) as any;
       expect(fpHqJson.summary.total).toBe(2);
 
-      const fpSumHqReq = await authRequest('GET', '/summary?tenant_id=*', 'owner', 'default');
+      const fpSumHqReq = await authRequest('GET', '/summary?tenant_id=*', 'owner', 'hq');
       const fpSumHqRes = await floorPlanRouter.fetch(fpSumHqReq, env);
       expect(fpSumHqRes.status).toBe(200);
       const fpSumHqJson = (await fpSumHqRes.json()) as any;
@@ -2025,14 +2034,14 @@ describe('Multi-Tenant & Franchise Preparation Integration', () => {
       expect(sigSpoofJson.data).toHaveLength(1);
       expect(sigSpoofJson.data[0].products[0].name).toBe('SaDec Lotus Tea');
 
-      const sigHqReq = await authRequest('GET', '/menu?tenant_id=*', 'owner', 'default');
+      const sigHqReq = await authRequest('GET', '/menu?tenant_id=*', 'owner', 'hq');
       const sigHqRes = await signageRouter.fetch(sigHqReq, env);
       expect(sigHqRes.status).toBe(200);
       const sigHqJson = (await sigHqRes.json()) as any;
       expect(sigHqJson.data).toHaveLength(2);
 
       // 5. Admin Sales CSV & Admin QR: HQ wildcard and supervisor role parity
-      const csvHqReq = await authRequest('GET', '/csv?range=7d&tenant_id=*', 'owner', 'default');
+      const csvHqReq = await authRequest('GET', '/csv?range=7d&tenant_id=*', 'owner', 'hq');
       const csvHqRes = await adminSalesRouter.fetch(csvHqReq, env);
       expect(csvHqRes.status).toBe(200);
       const csvText = await csvHqRes.text();
@@ -2121,7 +2130,7 @@ describe('Multi-Tenant & Franchise Preparation Integration', () => {
           if (/FROM users WHERE id = \?/i.test(sql)) {
             if (args[0] === 'user-supervisor') return staffAccountRow('supervisor', 'tenant_sadec_02');
             if (args[0] === 'user-manager') return staffAccountRow('manager', 'default');
-            if (args[0] === 'user-owner') return staffAccountRow('owner', 'default');
+            if (args[0] === 'user-owner') return staffAccountRow('owner', 'hq');
           }
           if (/SELECT COALESCE\(SUM\(amount_vnd\), 0\) as mrr, COUNT\(\*\) as count FROM subscriptions/i.test(sql)) {
             const tenantArg = args[0];
@@ -2183,7 +2192,7 @@ describe('Multi-Tenant & Franchise Preparation Integration', () => {
       expect(sadStatsJson.data.mrr_vnd).toBe(3000000);
       expect(sadStatsJson.data.active_subscriptions).toBe(1);
 
-      const hqStatsReq = await authRequest('GET', '/stats?tenant_id=*', 'owner', 'default');
+      const hqStatsReq = await authRequest('GET', '/stats?tenant_id=*', 'owner', 'hq');
       const hqStatsRes = await subscriptionsRouter.fetch(hqStatsReq, env);
       expect(hqStatsRes.status).toBe(200);
       const hqStatsJson = (await hqStatsRes.json()) as any;
@@ -2219,7 +2228,7 @@ describe('Multi-Tenant & Franchise Preparation Integration', () => {
       const crossReceiptRes = await app.fetch(crossReceiptReq, env);
       expect(crossReceiptRes.status).toBe(404);
 
-      const hqReceiptReq = await authRequest('GET', '/api/subscriptions/invoices/inv-sad-1/receipt?tenant_id=*', 'owner', 'default');
+      const hqReceiptReq = await authRequest('GET', '/api/subscriptions/invoices/inv-sad-1/receipt?tenant_id=*', 'owner', 'hq');
       const hqReceiptRes = await app.fetch(hqReceiptReq, env);
       expect(hqReceiptRes.status).toBe(200);
       const receiptText = await hqReceiptRes.text();
@@ -2279,7 +2288,7 @@ describe('Multi-Tenant & Franchise Preparation Integration', () => {
         first: vi.fn(async () => {
           if (/FROM users WHERE id = \?/i.test(sql)) {
             if (args[0] === 'user-supervisor') return staffAccountRow('supervisor', 'tenant_sadec_02');
-            if (args[0] === 'user-owner') return staffAccountRow('owner', 'default');
+            if (args[0] === 'user-owner') return staffAccountRow('owner', 'hq');
           }
           if (/SELECT COUNT\(\*\) as count FROM customers/i.test(sql) || /SELECT COUNT\(DISTINCT customer_phone\) as count FROM orders/i.test(sql)) {
             const tenantArg = args.find((a) => a === '*' || a === 'tenant_sadec_02' || a === 'default');
@@ -2351,7 +2360,7 @@ describe('Multi-Tenant & Franchise Preparation Integration', () => {
       const supCustSegRes = await customersRouter.fetch(supCustSegReq, env);
       expect(supCustSegRes.status).toBe(200);
 
-      const hqCustListReq = await authRequest('GET', '/?tenant_id=*', 'owner', 'default');
+      const hqCustListReq = await authRequest('GET', '/?tenant_id=*', 'owner', 'hq');
       const hqCustListRes = await customersRouter.fetch(hqCustListReq, env);
       expect(hqCustListRes.status).toBe(200);
       const hqCustListJson = (await hqCustListRes.json()) as any;
@@ -2366,14 +2375,14 @@ describe('Multi-Tenant & Franchise Preparation Integration', () => {
       expect(supForecastJson.data.tenant_id).toBe('tenant_sadec_02');
       expect(supForecastJson.data.historical_sample_orders).toBe(1);
 
-      const hqForecastReq = await authRequest('GET', '/forecast?days=7&tenant_id=*', 'owner', 'default');
+      const hqForecastReq = await authRequest('GET', '/forecast?days=7&tenant_id=*', 'owner', 'hq');
       const hqForecastRes = await demandForecastRouter.fetch(hqForecastReq, env);
       expect(hqForecastRes.status).toBe(200);
       const hqForecastJson = (await hqForecastRes.json()) as any;
       expect(hqForecastJson.data.tenant_id).toBe('*');
       expect(hqForecastJson.data.historical_sample_orders).toBe(2);
 
-      const hqHourlyReq = await authRequest('GET', '/forecast/hourly?tenant_id=*', 'owner', 'default');
+      const hqHourlyReq = await authRequest('GET', '/forecast/hourly?tenant_id=*', 'owner', 'hq');
       const hqHourlyRes = await demandForecastRouter.fetch(hqHourlyReq, env);
       expect(hqHourlyRes.status).toBe(200);
       const hqHourlyJson = (await hqHourlyRes.json()) as any;
@@ -2434,7 +2443,7 @@ describe('Multi-Tenant & Franchise Preparation Integration', () => {
         first: vi.fn(async () => {
           if (/FROM users WHERE id = \?/i.test(sql)) {
             if (args[0] === 'user-supervisor') return staffAccountRow('supervisor', 'tenant_sadec_02');
-            if (args[0] === 'user-owner') return staffAccountRow('owner', 'default');
+            if (args[0] === 'user-owner') return staffAccountRow('owner', 'hq');
           }
           if (/FROM payments p/i.test(sql) && /JOIN orders o ON o\.id = p\.order_id/i.test(sql)) {
             if (args[0] === 'pay-def-1') return payDef;
@@ -2473,8 +2482,8 @@ describe('Multi-Tenant & Franchise Preparation Integration', () => {
       const supOwnJson = (await supOwnRes.json()) as any;
       expect(supOwnJson.outcome).toBe('already_settled');
 
-      // 2. HQ owner in 'default' with ?tenant_id=* can reconcile SaDec branch payment (200 instead of 404)
-      const hqWildcardReq = await authRequest('POST', '/api/admin/payments/pay-sad-1/reconcile?tenant_id=*', 'owner', 'default');
+      // 2. HQ owner in 'hq' with ?tenant_id=* can reconcile SaDec branch payment (200 instead of 404)
+      const hqWildcardReq = await authRequest('POST', '/api/admin/payments/pay-sad-1/reconcile?tenant_id=*', 'owner', 'hq');
       const hqWildcardRes = await app.fetch(hqWildcardReq, env);
       expect(hqWildcardRes.status).toBe(200);
       const hqWildcardJson = (await hqWildcardRes.json()) as any;
@@ -2514,7 +2523,7 @@ describe('Multi-Tenant & Franchise Preparation Integration', () => {
         first: vi.fn(async () => {
           if (/FROM users WHERE id = \?/i.test(sql)) {
             if (args[0] === 'user-supervisor') return staffAccountRow('supervisor', 'tenant_sadec_02');
-            if (args[0] === 'user-owner') return staffAccountRow('owner', 'default');
+            if (args[0] === 'user-owner') return staffAccountRow('owner', 'hq');
           }
           if (/SELECT COUNT\(\*\) as total FROM customers/i.test(sql)) {
             if (args[0] === '*') return { total: 2 };
@@ -2563,7 +2572,7 @@ describe('Multi-Tenant & Franchise Preparation Integration', () => {
       expect(supCustJson.customers).toHaveLength(1);
       expect(supCustJson.customers[0].id).toBe('cust-sad-1');
 
-      const hqCustReq = await authRequest('GET', '/api/admin/customers?tenant_id=*', 'owner', 'default');
+      const hqCustReq = await authRequest('GET', '/api/admin/customers?tenant_id=*', 'owner', 'hq');
       const hqCustRes = await app.fetch(hqCustReq, env);
       expect(hqCustRes.status).toBe(200);
       const hqCustJson = (await hqCustRes.json()) as any;
@@ -2582,7 +2591,7 @@ describe('Multi-Tenant & Franchise Preparation Integration', () => {
       const supDdCrossPrintRes = await dindinRouter.fetch(supDdCrossPrintReq, env);
       expect(supDdCrossPrintRes.status).toBe(404);
 
-      const hqDdListReq = await authRequest('GET', '/checkouts?tenant_id=*', 'owner', 'default');
+      const hqDdListReq = await authRequest('GET', '/checkouts?tenant_id=*', 'owner', 'hq');
       const hqDdListRes = await dindinRouter.fetch(hqDdListReq, env);
       expect(hqDdListRes.status).toBe(200);
       const hqDdListJson = (await hqDdListRes.json()) as any;
@@ -2616,7 +2625,7 @@ describe('Multi-Tenant & Franchise Preparation Integration', () => {
         first: vi.fn(async () => {
           if (/FROM users WHERE id = \?/i.test(sql)) {
             if (args[0] === 'user-supervisor') return staffAccountRow('supervisor', 'tenant_sadec_02');
-            if (args[0] === 'user-owner') return staffAccountRow('owner', 'default');
+            if (args[0] === 'user-owner') return staffAccountRow('owner', 'hq');
           }
           if (/FROM products p LEFT JOIN categories c ON p\.category_id = c\.id WHERE p\.id = \?/i.test(sql)) {
             const found = [prodDefault, prodSadec, ...createdProducts].find((p) => p.id === args[0]);
@@ -2817,7 +2826,7 @@ describe('Multi-Tenant & Franchise Preparation Integration', () => {
         first: vi.fn(async () => {
           if (isAccountLookup(sql)) {
             if (args[0] === 'user-supervisor') return staffAccountRow('supervisor', 'tenant_sadec_02');
-            if (args[0] === 'user-owner') return staffAccountRow('owner', 'default');
+            if (args[0] === 'user-owner') return staffAccountRow('owner', 'hq');
           }
           return null;
         }),
@@ -2941,7 +2950,7 @@ describe('Multi-Tenant & Franchise Preparation Integration', () => {
       expect(supRulesRes.status).toBe(200);
       expect(((await supRulesRes.json()) as any).data).toHaveLength(1);
 
-      const hqRulesReq = await authRequest('GET', '/rules?tenant_id=*', 'owner', 'default');
+      const hqRulesReq = await authRequest('GET', '/rules?tenant_id=*', 'owner', 'hq');
       const hqRulesRes = await dynamicPricingRouter.fetch(hqRulesReq, env);
       expect(hqRulesRes.status).toBe(200);
       expect(((await hqRulesRes.json()) as any).data).toHaveLength(2);
@@ -2971,7 +2980,7 @@ describe('Multi-Tenant & Franchise Preparation Integration', () => {
       expect(supStatusRes.status).toBe(200);
       expect(((await supStatusRes.json()) as any).count).toBe(2); // CONT-SAD-02 + CONT-SAD-03
 
-      const hqStatusReq = await authRequest('GET', '/containers/status?tenant_id=*', 'owner', 'default');
+      const hqStatusReq = await authRequest('GET', '/containers/status?tenant_id=*', 'owner', 'hq');
       const hqStatusRes = await containerTelemetryRouter.fetch(hqStatusReq, env);
       expect(hqStatusRes.status).toBe(200);
       expect(((await hqStatusRes.json()) as any).count).toBe(3); // CONT-01 ('') + CONT-SAD-02 + CONT-SAD-03
@@ -2982,7 +2991,7 @@ describe('Multi-Tenant & Franchise Preparation Integration', () => {
       expect(supRunRateRes.status).toBe(200);
       expect(((await supRunRateRes.json()) as any).data).toHaveLength(1);
 
-      const hqSnapReq = await authRequest('POST', '/snapshot?tenant_id=*', 'owner', 'default');
+      const hqSnapReq = await authRequest('POST', '/snapshot?tenant_id=*', 'owner', 'hq');
       const hqSnapRes = await inventoryForecastingRouter.fetch(hqSnapReq, env);
       expect(hqSnapRes.status).toBe(200);
       expect(snapshots).toHaveLength(2);
@@ -3004,7 +3013,7 @@ describe('Multi-Tenant & Franchise Preparation Integration', () => {
       const mineSupReq = await authRequest('POST', '/mine-affinities', 'supervisor', 'tenant_sadec_02');
       expect((await recommendationsRouter.fetch(mineSupReq, env)).status).toBe(200);
 
-      const baristaReq = await authRequest('POST', '/recommend?tenant_id=*', 'owner', 'default', {
+      const baristaReq = await authRequest('POST', '/recommend?tenant_id=*', 'owner', 'hq', {
         prompt: 'Cà phê muối đậm đà',
       });
       expect((await aiBaristaRouter.fetch(baristaReq, env)).status).toBe(200);
@@ -3031,7 +3040,7 @@ describe('Multi-Tenant & Franchise Preparation Integration', () => {
         first: vi.fn(async () => {
           if (isAccountLookup(sql)) {
             if (args[0] === 'user-manager') return staffAccountRow('manager', 'default');
-            if (args[0] === 'user-owner') return staffAccountRow('owner', 'default');
+            if (args[0] === 'user-owner') return staffAccountRow('owner', 'hq');
             if (args[0] === 'user-supervisor') return staffAccountRow('supervisor', 'tenant_sadec_02');
             if (args[0] === 'user-customer') return staffAccountRow('customer', 'tenant_sadec_02');
           }
@@ -3091,7 +3100,7 @@ describe('Multi-Tenant & Franchise Preparation Integration', () => {
       expect((await franchiseRouter.fetch(defMgrDetailReq, env)).status).toBe(200);
 
       // HQ owner passing explicit ?tenant_id=tenant_sadec_02 gets 403 when querying loc-def (tenant mismatch against explicit filter)
-      const hqScopedMismatchReq = await authRequest('GET', '/locations/loc-def?tenant_id=tenant_sadec_02', 'owner', 'default');
+      const hqScopedMismatchReq = await authRequest('GET', '/locations/loc-def?tenant_id=tenant_sadec_02', 'owner', 'hq');
       expect((await franchiseRouter.fetch(hqScopedMismatchReq, env)).status).toBe(403);
 
       // 2. Customer Assistant: authenticated SaDec customer cannot read Default order even if passing ?tenant_id=default; public caller with ?tenant_id=tenant_sadec_02 gets SaDec order
@@ -3179,7 +3188,7 @@ describe('Multi-Tenant & Franchise Preparation Integration', () => {
         first: vi.fn(async () => {
           if (isAccountLookup(sql)) {
             if (args[0] === 'user-supervisor') return staffAccountRow('supervisor', 'tenant_sadec_02');
-            if (args[0] === 'user-owner') return staffAccountRow('owner', 'default');
+            if (args[0] === 'user-owner') return staffAccountRow('owner', 'hq');
             if (args[0] === 'user-waiter') return staffAccountRow('waiter', 'tenant_sadec_02');
           }
           return { cnt: 0, total: 1 };
@@ -3239,7 +3248,7 @@ describe('Multi-Tenant & Franchise Preparation Integration', () => {
       expect(supCalJson.data).toHaveLength(1);
       expect(supCalJson.data[0].id).toBe('res-sad-1');
 
-      const hqCalRes = await app.fetch(await authRequest('GET', '/api/cal-booking-webhook/bookings?tenant_id=*', 'owner', 'default'), env);
+      const hqCalRes = await app.fetch(await authRequest('GET', '/api/cal-booking-webhook/bookings?tenant_id=*', 'owner', 'hq'), env);
       expect(hqCalRes.status).toBe(200);
       const hqCalJson = (await hqCalRes.json()) as any;
       expect(hqCalJson.data).toHaveLength(2);
@@ -4007,25 +4016,25 @@ describe('Multi-Tenant & Franchise Preparation Integration', () => {
 
       executedQueries.length = 0;
       const patchPromoRes = await app.fetch(
-        await authRequest('PATCH', '/api/promotions/SUMMER10', 'supervisor', 'default', { percent: 15 }),
+        await authRequest('PATCH', '/api/promotions/SUMMER10', 'owner', 'default', { percent: 15 }),
         env
       );
       expect(patchPromoRes.status).toBe(200);
       expect(
         executedQueries.some(
-          (q) => /UPDATE promotions/i.test(q.sql) && q.sql.includes("WHERE code = ? AND COALESCE(NULLIF(tenant_id, ''), 'default') = ?")
+          (q) => /UPDATE promotions/i.test(q.sql) && q.sql.includes("WHERE (id = ? OR code = ?) AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?")
         )
       ).toBe(true);
 
       executedQueries.length = 0;
       const delPromoRes = await app.fetch(
-        await authRequest('DELETE', '/api/promotions/SUMMER10', 'supervisor', 'default'),
+        await authRequest('DELETE', '/api/promotions/SUMMER10', 'owner', 'default'),
         env
       );
       expect(delPromoRes.status).toBe(200);
       expect(
         executedQueries.some(
-          (q) => /DELETE FROM promotions WHERE code = \? AND COALESCE\(NULLIF\(tenant_id, ''\), 'default'\) = \?/i.test(q.sql)
+          (q) => /DELETE FROM promotions WHERE \(id = \? OR code = \?\) AND COALESCE\(NULLIF\(TRIM\(tenant_id\), ''\), 'default'\) = \?/i.test(q.sql)
         )
       ).toBe(true);
 
@@ -4550,7 +4559,8 @@ describe('Multi-Tenant & Franchise Preparation Integration', () => {
           if (/SELECT id FROM subscription_invoices WHERE subscription_id = \? AND period_start = \?/i.test(sql)) {
             return invoices.find((i) => i.subscription_id === args[0] && i.period_start === args[1]) ?? null;
           }
-          if (/SELECT COUNT\(\*\) as count, COALESCE\(SUM\(amount_vnd\), 0\) as mrr FROM subscriptions WHERE status = 'active' AND COALESCE\(NULLIF\((?:TRIM\(tenant_id\)|tenant_id), ''\), 'default'\) = 'default'/i.test(sql)) {
+          if (/SELECT COUNT\(\*\) as count, COALESCE\(SUM\(amount_vnd\), 0\) as mrr FROM subscriptions WHERE status = 'active' AND COALESCE\(NULLIF\((?:TRIM\(tenant_id\)|tenant_id), ''\), 'default'\) = 'default'/i.test(sql) ||
+              /SELECT \(SELECT COALESCE\(SUM\(CASE WHEN LOWER\(TRIM\(COALESCE\(billing_cycle/i.test(sql)) {
             const defActive = subscriptions.filter(
               (s) => s.status === 'active' && ((String(s.tenant_id ?? '').trim()) || 'default') === 'default'
             );
@@ -4671,7 +4681,7 @@ describe('Multi-Tenant & Franchise Preparation Integration', () => {
             });
           }
           if (/INSERT INTO subscription_invoices/i.test(sql)) {
-            if (args.length >= 9) {
+            if (args.length >= 8) {
               invoices.push({
                 id: args[0],
                 subscription_id: args[1],
@@ -4756,18 +4766,13 @@ describe('Multi-Tenant & Franchise Preparation Integration', () => {
       }
 
       // 3. P1: Checkin phone lookup orders matching tenant's customer row first when phone exists in both stores
+      const { optionalAuth } = await import('../../middleware/auth');
       const checkinApp = new Hono<{ Bindings: Env }>();
+      checkinApp.use('*', optionalAuth());
       checkinApp.route('/api/checkin', checkinRouter);
       const franCheckinRes = await checkinApp.fetch(
-        new Request('https://api.test/api/checkin', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'X-Tenant-ID': 'tenant_sadec_02',
-          },
-          body: JSON.stringify({
-            phone: '0907778888',
-          }),
+        await authRequest('POST', '/api/checkin', 'supervisor', 'tenant_sadec_02', {
+          phone: '0907778888',
         }),
         env
       );
@@ -4777,7 +4782,6 @@ describe('Multi-Tenant & Franchise Preparation Integration', () => {
       expect(franCheckinBody.data.customer_name).toBe('SaDec Member');
 
       // 4. P2: Subscriptions createSubscription, listInvoices, payInvoice, generateInvoices, and updateMRRSnapshot isolation
-      const { optionalAuth } = await import('../../middleware/auth');
       const subApp = new Hono<{ Bindings: Env }>();
       subApp.use('*', optionalAuth());
       subApp.post('/api/subscriptions', createSubscription);
@@ -5027,6 +5031,7 @@ describe('Multi-Tenant & Franchise Preparation Integration', () => {
                 tenant_id: args[6] ?? 'default',
               });
             } else if (args.length >= 9) {
+              const isZaloTenantBeforeTimestamps = /zalo_id,\s*source,\s*tenant_id,\s*created_at,\s*updated_at/i.test(sql);
               customers.push({
                 id: args[0],
                 email: args[1],
@@ -5034,18 +5039,19 @@ describe('Multi-Tenant & Franchise Preparation Integration', () => {
                 phone: args[3],
                 loyalty_tier: args[4],
                 date_of_birth: args[5],
-                source: args[6],
-                created_at: args[7],
-                updated_at: args[8],
-                tenant_id: args[9] ?? 'default',
+                source: isZaloTenantBeforeTimestamps ? args[7] : args[6],
+                created_at: isZaloTenantBeforeTimestamps ? args[9] : args[7],
+                updated_at: isZaloTenantBeforeTimestamps ? args[10] : args[8],
+                tenant_id: (isZaloTenantBeforeTimestamps ? args[8] : args[9]) ?? 'default',
               });
             }
           }
           if (/INSERT INTO cashback_wallets/i.test(sql)) {
+            const isTenantBeforeTimestamps = /tenant_id,\s*created_at,\s*updated_at/i.test(sql);
             wallets.push({
               id: args[0],
               customer_id: args[1],
-              tenant_id: args[4] ?? 'default',
+              tenant_id: (isTenantBeforeTimestamps ? args[2] : args[4]) ?? 'default',
             });
           }
           if (/INSERT INTO referrals/i.test(sql)) {
@@ -5284,7 +5290,7 @@ describe('Multi-Tenant & Franchise Preparation Integration', () => {
           total_amount: 50000,
           total: 50000,
           status: 'confirmed',
-          payment_status: 'paid',
+          payment_status: 'pending',
           tenant_id: 'tenant_sadec_02',
         },
         {
@@ -5674,6 +5680,16 @@ describe('Multi-Tenant & Franchise Preparation Integration', () => {
           loyalty_tier: 'silver',
           tenant_id: 'default',
         },
+        {
+          id: 'cust_fran_new_wal',
+          name: 'SaDec Checkin Guest',
+          phone: '0901238888',
+          email: 'fran_new_wal@aura.vn',
+          loyalty_points: 0,
+          lifetime_points: 0,
+          loyalty_tier: 'bronze',
+          tenant_id: 'tenant_sadec_02',
+        },
       ];
 
       const wallets: Array<Record<string, unknown>> = [
@@ -5790,6 +5806,7 @@ describe('Multi-Tenant & Franchise Preparation Integration', () => {
             if (args[0] === 'user-manager') return staffAccountRow('manager', 'default');
           }
           if (/SELECT id FROM customers WHERE id = \? AND COALESCE\(NULLIF\(TRIM\(tenant_id\), ''\), 'default'\) = \?/i.test(sql) ||
+              /SELECT id FROM customers WHERE id = \? AND \(COALESCE\(tenant_id, 'default'\) = \?/i.test(sql) ||
               /SELECT id, loyalty_points, lifetime_points, loyalty_tier, tenant_id\s+FROM customers WHERE id = \? AND COALESCE\(NULLIF\(TRIM\(tenant_id\), ''\), 'default'\) = \?/i.test(sql) ||
               /SELECT id, tenant_id FROM customers WHERE id = \? AND COALESCE\(NULLIF\(TRIM\(tenant_id\), ''\), 'default'\) = \?/i.test(sql)) {
             const cid = String(args[0] ?? '');
@@ -6226,6 +6243,7 @@ describe('Multi-Tenant & Franchise Preparation Integration', () => {
           if (isAccountLookup(sql)) {
             if (args[0] === 'user-supervisor') return staffAccountRow('supervisor', 'tenant_sadec_02');
             if (args[0] === 'user-manager') return staffAccountRow('manager', 'default');
+            if (args[0] === 'staff_def_1') return staffAccountRow('staff', 'default');
           }
           if (/SELECT id FROM cashback_transactions WHERE order_id = \? AND type = 'earn'/i.test(sql)) {
             return cashbackTxs.find((tx) => tx.order_id === args[0] && tx.type === 'earn') ?? null;
@@ -6453,7 +6471,9 @@ describe('Multi-Tenant & Franchise Preparation Integration', () => {
       expect(executedSqls.some((s) => s.includes("COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"))).toBe(true);
 
       // Verify route handlers emit COALESCE(NULLIF(TRIM(...), ''), 'default')
+      const { optionalAuth } = await import('../../middleware/auth');
       const app = new Hono<{ Bindings: Env }>();
+      app.use('*', optionalAuth());
       app.route('/api/staff-tips', staffTipsRouter);
       app.route('/api/assistant', customerAssistantRouter);
       app.route('/api/recommendations', recommendationsRouter);
@@ -6744,7 +6764,7 @@ describe('Multi-Tenant & Franchise Preparation Integration', () => {
         }),
         all: vi.fn(async () => {
           executedSqls.push(sql);
-          if (/FROM inventory_transactions\s+WHERE reference_id = \? AND reference_type = 'order' AND type = 'reserve'/i.test(sql)) {
+          if (/FROM inventory_transactions\s+WHERE reference_id = \? AND reference_type = 'order' AND type (?:= 'reserve'|IN \('reserve', 'sale'\))/i.test(sql)) {
             return { results: inventoryTxs.filter((tx) => tx.reference_id === args[0] && tx.type === 'reserve') };
           }
           if (/FROM recipe_items ri/i.test(sql)) {
@@ -6965,6 +6985,11 @@ describe('Multi-Tenant & Franchise Preparation Integration', () => {
 
       // 3. U3: Check-in same-day duplicate guard isolates by tenant and persists tenant_id on checkins
       const checkinApp = new Hono<{ Bindings: Env }>();
+      checkinApp.use('*', async (c, next) => {
+        c.set('user' as any, { id: 'user-supervisor', role: 'supervisor', tenantId: 'tenant_sadec_02' });
+        c.set('tenantId' as any, 'tenant_sadec_02');
+        await next();
+      });
       checkinApp.route('/api/checkin', checkinRouter);
       const franCheckinRes = await checkinApp.fetch(
         new Request('https://api.test/api/checkin', {
@@ -7023,6 +7048,8 @@ describe('Multi-Tenant & Franchise Preparation Integration', () => {
       expect(newBday?.tenant_id).toBe('tenant_sadec_02');
 
       // 5. U3: Promotion code-keyed /redeem increments ONLY the 'tenant_sadec_02' promotion row (1 -> 2), leaving 'default' at 5
+      orders[0].status = 'pending';
+      orders[0].payment_status = 'unpaid';
       const promoApp = new Hono<{ Bindings: Env }>();
       promoApp.use('*', async (c, next) => {
         c.set('user' as any, { id: 'user-supervisor', role: 'supervisor', tenantId: 'tenant_sadec_02' });
@@ -8004,6 +8031,7 @@ describe('Multi-Tenant & Franchise Preparation Integration', () => {
         run: async () => {
           executedSqls.push({ sql, args });
           if (/INSERT INTO push_subscriptions/i.test(sql)) {
+            const hasTenantInInsert = /tenant_id,\s*created_at/i.test(sql);
             pushSubs.push({
               id: args[0],
               customer_id: args[1],
@@ -8012,8 +8040,8 @@ describe('Multi-Tenant & Franchise Preparation Integration', () => {
               p256dh_key: args[4],
               user_agent: args[5],
               role: args[6],
-              created_at: args[7],
-              tenant_id: 'default',
+              created_at: hasTenantInInsert ? args[8] : args[7],
+              tenant_id: hasTenantInInsert ? (args[7] ?? 'default') : 'default',
             });
             return { success: true, meta: { changes: 1 } };
           }
@@ -8059,7 +8087,7 @@ describe('Multi-Tenant & Franchise Preparation Integration', () => {
               created_at: args[4],
               mautic_contact_id: args[5],
               status: args[6],
-              tenant_id: 'default',
+              tenant_id: /tenant_id/i.test(sql) ? (args[7] ?? 'default') : 'default',
             });
             return { success: true, meta: { changes: 1 } };
           }
@@ -9772,8 +9800,8 @@ describe('Multi-Tenant & Franchise Preparation Integration', () => {
             const oid = String(args[0]);
             return orders.find((o) => o.id === oid) || null;
           }
-          if (/SELECT id, tenant_id FROM users WHERE id = \?/i.test(sql)) {
-            return { id: String(args[0]), tenant_id: 'tenant_sadec_02' };
+          if (/SELECT id, (?:role, )?tenant_id(?:, is_active)? FROM users WHERE id = \?/i.test(sql)) {
+            return { id: String(args[0]), role: 'staff', tenant_id: 'tenant_sadec_02', is_active: 1 };
           }
           if (/COALESCE\(SUM\(amount_vnd\), 0\) as mrr/i.test(sql) && /FROM subscriptions/i.test(sql)) {
             const tid = args.find((a) => a === 'tenant_sadec_02' || a === 'default');
@@ -10068,7 +10096,7 @@ describe('Multi-Tenant & Franchise Preparation Integration', () => {
         await authRequest('POST', '/api/staff-tips/assign', 'manager', 'tenant_sadec_02', {
           order_id: 'ord_fran_aa1',
           staff_id: 'staff_sadec_1',
-          tip_amount: 20000,
+          tip_amount: 15000,
         }),
         franEnv
       );
@@ -10352,14 +10380,25 @@ describe('Multi-Tenant & Franchise Preparation Integration', () => {
             if (row) row.tenant_id = args[0];
           }
           if (/INSERT INTO campaign_enrollments/i.test(sql)) {
-            campaignEnrollments.push({ id: args[0], customer_id: args[1], campaign_type: args[2], tenant_id: 'default_unset' });
+            campaignEnrollments.push({
+              id: args[0],
+              customer_id: args[1],
+              campaign_type: args[2],
+              tenant_id: /tenant_id/i.test(sql) ? (args[7] ?? 'default_unset') : 'default_unset',
+            });
           }
           if (/UPDATE campaign_enrollments SET tenant_id = \? WHERE id = \?/i.test(sql)) {
             const row = campaignEnrollments.find((r) => r.id === args[1]);
             if (row) row.tenant_id = args[0];
           }
           if (/INSERT INTO push_subscriptions/i.test(sql)) {
-            pushSubs.push({ id: args[0], customer_id: args[1], endpoint: args[2], tenant_id: 'default_unset' });
+            const hasTenantInInsert = /tenant_id,\s*created_at/i.test(sql);
+            pushSubs.push({
+              id: args[0],
+              customer_id: args[1],
+              endpoint: args[2],
+              tenant_id: hasTenantInInsert ? (args[7] ?? 'default_unset') : 'default_unset',
+            });
           }
           if (/UPDATE push_subscriptions SET tenant_id = \? WHERE endpoint = \?/i.test(sql)) {
             const row = pushSubs.find((r) => r.endpoint === args[1]);
@@ -10380,7 +10419,11 @@ describe('Multi-Tenant & Franchise Preparation Integration', () => {
             if (row) row.tenant_id = args[0];
           }
           if (/INSERT INTO wifi_sessions/i.test(sql)) {
-            wifiSessions.push({ id: args[0], client_mac: args[1], tenant_id: 'default_unset' });
+            wifiSessions.push({
+              id: args[0],
+              client_mac: args[1],
+              tenant_id: /tenant_id/i.test(sql) ? (args[args.length - 1] ?? 'default_unset') : 'default_unset',
+            });
           }
           if (/UPDATE wifi_sessions SET tenant_id = \? WHERE id = \?/i.test(sql)) {
             const row = wifiSessions.find((r) => r.id === args[1]);
@@ -12441,7 +12484,11742 @@ describe('Multi-Tenant & Franchise Preparation Integration', () => {
       expect(dinCartJson.carts.map((x) => x.sessionId)).toEqual(['din_sadec_1']);
     });
   });
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // SUITE 35: Phase AF1–AF3 — Orders/KDS/Inventory, Catalog/Menu/Promotions & CRM/Loyalty Isolation
+  // ═══════════════════════════════════════════════════════════════════════════
+  describe('Suite 35 — Phase AF1–AF3: Orders/KDS/Inventory, Catalog/Menu/Promotions & CRM/Loyalty Isolation', () => {
+    it('AF1: Order SSE stream scopes by tenant, kitchen role cannot mutate customer PII on order update, and release transaction requires reference_id', async () => {
+      const { Hono } = await import('hono');
+      const { fetchOrderRecord } = await import('../../routes/order-stream-log');
+      const { handleOpenApiUpdateOrder } = await import('../../routes/openapi-orders-handlers/order-write-handlers');
+      const { inventoryTransactions } = await import('../../../../packages/domain/inventory/src/routes/inventory-transactions');
+
+      const executedQueries: Array<{ sql: string; args: unknown[] }> = [];
+      const db = {
+        prepare(sql: string) {
+          const run = (args: unknown[]) => {
+            executedQueries.push({ sql, args });
+            return {
+              async first<T>() {
+                if (/FROM orders o\s+LEFT JOIN cafe_tables t/i.test(sql)) {
+                  if (sql.includes('t.tenant_id') && args.includes('sadec')) {
+                    return {
+                      id: 'ord_sadec_stream_1',
+                      order_number: 'ORD-SD-1',
+                      status: 'preparing',
+                      payment_status: 'paid',
+                      total_amount: 45000,
+                      table_number: 1,
+                      tenant_id: 'sadec',
+                      updated_at: '2026-11-03T00:00:00Z',
+                    } as unknown as T;
+                  }
+                  return null;
+                }
+                if (/FROM orders WHERE id = \?/i.test(sql)) {
+                  return {
+                    id: 'ord_sadec_1',
+                    status: 'preparing',
+                    payment_status: 'unpaid',
+                    tenant_id: 'sadec',
+                    customer_id: 'cust_sadec_1',
+                  } as unknown as T;
+                }
+                if (/FROM inventory_items WHERE id = \?/i.test(sql)) {
+                  return {
+                    id: 'ing_1',
+                    sku: 'ING-01',
+                    name: 'Beans',
+                    current_stock: 50,
+                    unit: 'kg',
+                    min_stock: 5,
+                    active: 1,
+                    tenant_id: 'sadec',
+                  } as unknown as T;
+                }
+                return null;
+              },
+              async all<T>() {
+                return { results: [] } as unknown as D1Result<T>;
+              },
+              async run() {
+                return { success: true, meta: { changes: 1 } } as unknown as D1Result;
+              },
+            };
+          };
+          return {
+            bind: (...args: unknown[]) => run(args),
+            first: <T>() => run([]).first<T>(),
+            all: <T>() => run([]).all<T>(),
+            run: () => run([]).run(),
+          } as unknown as D1PreparedStatement;
+        },
+      } as unknown as D1Database;
+
+      // 1. fetchOrderRecord scopes LEFT JOIN cafe_tables by tenant_id
+      const record = await fetchOrderRecord(db, 'ord_sadec_stream_1', 'sadec');
+      expect(record?.id).toBe('ord_sadec_stream_1');
+      expect(
+        executedQueries.some(
+          (q) => /LEFT JOIN cafe_tables t/i.test(q.sql) && q.sql.includes('t.tenant_id')
+        )
+      ).toBe(true);
+
+      // 2. Kitchen role cannot update customer PII / notes on handleOpenApiUpdateOrder
+      const updApp = new Hono<{ Bindings: Env }>();
+      updApp.use('*', async (c, next) => {
+        c.set('user' as any, { id: 'kds_1', role: 'kitchen', tenantId: 'sadec' });
+        c.set('tenantId' as any, 'sadec');
+        await next();
+      });
+      updApp.put('/orders/:id', (c) => handleOpenApiUpdateOrder(c as any));
+      const piiRes = await updApp.fetch(
+        new Request('https://api.test/orders/ord_sadec_1', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ customer_phone: '0999888777', notes: 'Tampered by kitchen' }),
+        }),
+        { AURA_DB: db } as any
+      );
+      expect(piiRes.status).toBe(403);
+
+      // 3. Inventory release transaction unconditionally requires reference_id
+      const invApp = new Hono<{ Bindings: Env }>();
+      invApp.use('*', async (c, next) => {
+        c.set('user' as any, { id: 'mgr_sadec', role: 'manager', tenantId: 'sadec' });
+        c.set('tenantId' as any, 'sadec');
+        await next();
+      });
+      inventoryTransactions(invApp as any);
+      const relRes = await invApp.fetch(
+        new Request('https://api.test/ing_1/transactions', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ type: 'release', quantity: 5 }),
+        }),
+        { AURA_DB: db } as any
+      );
+      expect(relRes.status).toBe(400);
+    });
+
+    it('AF2: Catalog products/categories block floor staff role, menu query pushes tenant_id before LIMIT, and OpenAPI product creation stamps default tenant_id atomically', async () => {
+      const { Hono } = await import('hono');
+      const { getMenu } = await import('../../../../packages/domain/catalog/queries/menu');
+      const { openApiProductsRouter } = await import('../../routes/openapi-products');
+
+      const executedQueries: Array<{ sql: string; args: unknown[] }> = [];
+      const db = {
+        prepare(sql: string) {
+          const run = (args: unknown[]) => {
+            executedQueries.push({ sql, args });
+            return {
+              async first<T>() {
+                if (/FROM users WHERE id = \?|FROM staff WHERE id = \?/i.test(sql)) {
+                  const id = String(args[0] || '');
+                  const role = id.includes('waiter') ? 'waiter' : 'manager';
+                  return { id, role, is_active: 1, auth_version: 1, tenant_id: 'default' } as unknown as T;
+                }
+                if (/COUNT\(\*\)/i.test(sql)) {
+                  return { total: 1 } as unknown as T;
+                }
+                if (/FROM products WHERE id = \?/i.test(sql)) {
+                  return {
+                    id: args[0],
+                    name: 'Ca Phe Sua Da',
+                    price: 35000,
+                    category_id: 'cat_1',
+                    is_available: 1,
+                    tenant_id: 'default',
+                  } as unknown as T;
+                }
+                return null;
+              },
+              async all<T>() {
+                if (/FROM menu_items/i.test(sql) && sql.includes('tenant_id') && args.includes('sadec')) {
+                  return {
+                    results: [
+                      {
+                        id: 'mi_sadec_1',
+                        name: 'Bac Xiu Sa Dec',
+                        category_slug: 'coffee',
+                        price_cents: 32000,
+                        is_available: 1,
+                        tenant_id: 'sadec',
+                      },
+                    ],
+                  } as unknown as D1Result<T>;
+                }
+                return { results: [] } as unknown as D1Result<T>;
+              },
+              async run() {
+                return { success: true, meta: { changes: 1 } } as unknown as D1Result;
+              },
+            };
+          };
+          return {
+            bind: (...args: unknown[]) => run(args),
+            first: <T>() => run([]).first<T>(),
+            all: <T>() => run([]).all<T>(),
+            run: () => run([]).run(),
+          } as unknown as D1PreparedStatement;
+        },
+      } as unknown as D1Database;
+
+      // 1. Domain catalog productsRouter blocks 'waiter' role on POST /
+      const prodApp = new Hono<{ Bindings: Env }>();
+      prodApp.route('/api/products', productsRouter as any);
+      const staffProdReq = await authRequest('POST', '/api/products', 'waiter', 'default', {
+        name: 'Unauthorized Item',
+        price: 25000,
+        category_id: 'cat_1',
+      });
+      const staffProdRes = await prodApp.fetch(staffProdReq, { AURA_DB: db, JWT_SECRET: TEST_JWT_SECRET } as any);
+      expect(staffProdRes.status).toBe(403);
+
+      // 2. getMenu pushes tenant_id into SQL before LIMIT/OFFSET
+      const menuHttpRes = await getMenu(
+        new Request('https://api.test/api/menu?limit=10&offset=0'),
+        { AURA_DB: db },
+        'sadec'
+      );
+      expect(menuHttpRes.status).toBe(200);
+      expect(
+        executedQueries.some(
+          (q) => /FROM menu_items/i.test(q.sql) && q.sql.includes('tenant_id') && q.args.includes('sadec')
+        )
+      ).toBe(true);
+
+      // 3. OpenAPI POST /api/products stamps tenant_id = 'default' directly in INSERT INTO products
+      const createProdReq = await authRequest('POST', '/api/products', 'manager', 'default', {
+        slug: 'ca-phe-sua-da-af2',
+        categoryId: 'cat_1',
+        basePrice: 35000,
+        translations: [{ locale: 'vi', name: 'Ca Phe Sua Da' }],
+      });
+      const createProdRes = await openApiProductsRouter.fetch(
+        createProdReq,
+        { AURA_DB: db, JWT_SECRET: TEST_JWT_SECRET } as any
+      );
+      expect([200, 201]).toContain(createProdRes.status);
+      expect(
+        executedQueries.some(
+          (q) => /INSERT INTO products/i.test(q.sql) && q.sql.includes('tenant_id') && q.args.includes('default')
+        )
+      ).toBe(true);
+    });
+
+    it('AF3: CRM 360 & Admin-Loyalty block floor staff/waiter roles, and referral/loyalty queries push tenant_id into SQL before LIMIT', async () => {
+      const { Hono } = await import('hono');
+      const { getOrCreateReferralCode } = await import('../../../../packages/domain/crm/commands/referral');
+
+      const executedQueries: Array<{ sql: string; args: unknown[] }> = [];
+      const db = {
+        prepare(sql: string) {
+          const run = (args: unknown[]) => {
+            executedQueries.push({ sql, args });
+            return {
+              async first<T>() {
+                if (/FROM users WHERE id = \?|FROM staff WHERE id = \?/i.test(sql)) {
+                  const id = String(args[0] || '');
+                  const role = id.includes('waiter') ? 'waiter' : id.includes('staff') ? 'staff' : 'manager';
+                  return { id, role, is_active: 1, auth_version: 1, tenant_id: 'sadec' } as unknown as T;
+                }
+                if (/FROM referral_codes WHERE customer_id = \?/i.test(sql)) {
+                  if (sql.includes('tenant_id') && args.includes('sadec')) {
+                    return { code: 'REF-SADEC-01', tenant_id: 'sadec' } as unknown as T;
+                  }
+                  return null;
+                }
+                return null;
+              },
+              async all<T>() {
+                return { results: [] } as unknown as D1Result<T>;
+              },
+              async run() {
+                return { success: true, meta: { changes: 1 } } as unknown as D1Result;
+              },
+            };
+          };
+          return {
+            bind: (...args: unknown[]) => run(args),
+            first: <T>() => run([]).first<T>(),
+            all: <T>() => run([]).all<T>(),
+            run: () => run([]).run(),
+          } as unknown as D1PreparedStatement;
+        },
+      } as unknown as D1Database;
+
+      // 1. Waiter is blocked from GET /api/crm/customers/:id/360 with 403
+      const crmApp = new Hono<{ Bindings: Env }>();
+      crmApp.route('/api/crm', crmRouter);
+      const waiterCrmReq = await authRequest('GET', '/api/crm/customers/cust_1/360', 'waiter', 'sadec');
+      const waiterCrmRes = await crmApp.fetch(waiterCrmReq, { AURA_DB: db, JWT_SECRET: TEST_JWT_SECRET } as any);
+      expect(waiterCrmRes.status).toBe(403);
+
+      // 2. Floor 'staff' role is blocked from GET /api/admin-loyalty/widgets with 403
+      const admLoyApp = new Hono<{ Bindings: Env }>();
+      admLoyApp.route('/api/admin-loyalty', adminLoyaltyRouter);
+      const staffLoyReq = await authRequest('GET', '/api/admin-loyalty/widgets', 'staff', 'sadec');
+      const staffLoyRes = await admLoyApp.fetch(staffLoyReq, { AURA_DB: db, JWT_SECRET: TEST_JWT_SECRET } as any);
+      expect(staffLoyRes.status).toBe(403);
+
+      // 3. getOrCreateReferralCode scopes referral_codes lookup by tenant_id in SQL
+      const refCode = await getOrCreateReferralCode(db, 'cust_sadec_1', 'sadec');
+      expect(refCode.code).toBe('REF-SADEC-01');
+      expect(
+        executedQueries.some(
+          (q) => /FROM referral_codes WHERE customer_id = \?/i.test(q.sql) && q.sql.includes('tenant_id') && q.args.includes('sadec')
+        )
+      ).toBe(true);
+    });
+  });
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // SUITE 36: Phase AM1–AM4 — Loyalty Idempotency/Quota, Promo Usage Idempotency, Loyalty KV Policy Fallback & Manual Reconcile Parity
+  // ═══════════════════════════════════════════════════════════════════════════
+  describe('Suite 36 — Phase AM1–AM4: Loyalty Idempotency/Quota, Promo Usage Idempotency, Loyalty KV Policy Fallback & Manual Reconcile Parity', () => {
+    it('AM1–AM4: isolates loyalty idempotency by tenant, forwards AUTH_KV to loadPolicy on order loyalty trigger, and allows supervisor manual reconcile on settled payments', async () => {
+      const { findExistingLoyaltyIdempotencyTx } = await import('../../routes/openapi-loyalty-handlers/loyalty-db-helpers');
+      const { creditLoyaltyIfEligible } = await import('../../../../packages/domain/order/policies/loyalty-trigger');
+      const { reconcilePayOSPayment } = await import('../../../../packages/domain/payment/commands/payos-reconcile');
+
+      // 1. AM1: findExistingLoyaltyIdempotencyTx rejects cross-tenant idempotency collision in legacy schema without tenant_id on loyalty_transactions
+      const legacyDb = {
+        prepare(sql: string) {
+          const run = (args: unknown[]) => ({
+            async first<T>() {
+              if (sql.includes('FROM loyalty_transactions') && sql.includes('tenant_id')) {
+                throw new Error('no such column: tenant_id');
+              }
+              if (sql.includes('FROM loyalty_transactions WHERE idempotency_key = ?')) {
+                return { id: 'tx_def_1', account_id: 'acc_def_1', idempotency_key: args[0] } as unknown as T;
+              }
+              if (sql.includes('FROM loyalty_accounts')) {
+                return { customer_id: 'cust_def_1', tenant_id: 'default' } as unknown as T;
+              }
+              return null;
+            },
+            async all<T>() {
+              return { results: [] } as unknown as D1Result<T>;
+            },
+            async run() {
+              return { success: true, meta: { changes: 1 } } as unknown as D1Result;
+            },
+          });
+          return {
+            bind: (...args: unknown[]) => run(args),
+            first: <T>() => run([]).first<T>(),
+            all: <T>() => run([]).all<T>(),
+            run: () => run([]).run(),
+          } as unknown as D1PreparedStatement;
+        },
+      } as unknown as D1Database;
+
+      const crossCollision = await findExistingLoyaltyIdempotencyTx(legacyDb, 'idem-shared-1', { tenantId: 'sadec' });
+      expect(crossCollision).toBeNull();
+      const sameTenantMatch = await findExistingLoyaltyIdempotencyTx(legacyDb, 'idem-shared-1', { tenantId: 'default' });
+      expect(sameTenantMatch?.id).toBe('tx_def_1');
+
+      // 2. AM3: creditLoyaltyIfEligible reads KV loyalty policy when DB loyalty_policies table is absent
+      const kvQueries: string[] = [];
+      const kvStore = new Map<string, string>([
+        [
+          'loyalty:policy:sadec',
+          JSON.stringify({
+            id: 'pol_sadec_kv',
+            name: 'Sa Dec KV Policy',
+            earnRate: 0.05,
+            minOrderAmount: 10000,
+            maxCashbackPerOrder: 50000,
+            isActive: true,
+          }),
+        ],
+      ]);
+      const orderLoyaltyDb = {
+        prepare(sql: string) {
+          const run = (_args: unknown[]) => ({
+            async first<T>() {
+              if (sql.includes('FROM loyalty_policies')) {
+                throw new Error('no such table: loyalty_policies');
+              }
+              if (sql.includes('FROM orders WHERE id = ?')) {
+                return {
+                  id: 'ord_sadec_kv_1',
+                  customer_id: 'cust_sadec_kv_1',
+                  total_amount: 100000,
+                  payment_status: 'paid',
+                  tenant_id: 'sadec',
+                } as unknown as T;
+              }
+              if (sql.includes('FROM cashback_transactions WHERE order_id = ?')) {
+                return null;
+              }
+              if (sql.includes('FROM customers WHERE id = ?')) {
+                return {
+                  id: 'cust_sadec_kv_1',
+                  loyalty_points: 0,
+                  lifetime_points: 0,
+                  loyalty_tier: 'bronze',
+                  tenant_id: 'sadec',
+                } as unknown as T;
+              }
+              if (sql.includes('FROM cashback_wallets')) {
+                return { id: 'wal_sadec_kv_1', customer_id: 'cust_sadec_kv_1', balance: 0, tenant_id: 'sadec' } as unknown as T;
+              }
+              return null;
+            },
+            async all<T>() {
+              return { results: [] } as unknown as D1Result<T>;
+            },
+            async run() {
+              return { success: true, meta: { changes: 1 } } as unknown as D1Result;
+            },
+          });
+          return {
+            bind: (...args: unknown[]) => run(args),
+            first: <T>() => run([]).first<T>(),
+            all: <T>() => run([]).all<T>(),
+            run: () => run([]).run(),
+          } as unknown as D1PreparedStatement;
+        },
+      } as unknown as D1Database;
+
+      await creditLoyaltyIfEligible(
+        orderLoyaltyDb,
+        {
+          AUTH_KV: {
+            get: async (key: string, type?: string) => {
+              kvQueries.push(key);
+              const raw = kvStore.get(key) ?? null;
+              if (!raw) return null;
+              return type === 'json' ? JSON.parse(raw) : raw;
+            },
+          },
+        },
+        'ord_sadec_kv_1',
+        'sadec'
+      );
+      expect(kvQueries).toContain('loyalty:policy:sadec');
+
+      // 3. AM4: reconcilePayOSPayment enforces tenant isolation on order_tenant_id and short-circuits already-settled payments
+      const payDb = {
+        prepare(sql: string) {
+          const run = (_args: unknown[]) => ({
+            async first<T>() {
+              if (sql.includes('FROM payments')) {
+                return {
+                  id: 'pay_settled_1',
+                  order_id: 'ord_settled_1',
+                  method: 'payos',
+                  status: 'paid',
+                  amount: 65000,
+                  transaction_id: '123456',
+                  payment_url: null,
+                  refund_status: null,
+                  order_total: 65000,
+                  order_payment_status: 'paid',
+                  order_payment_method: 'payos',
+                  order_status: 'completed',
+                  order_tenant_id: 'sadec',
+                } as unknown as T;
+              }
+              return null;
+            },
+            async all<T>() {
+              return { results: [] } as unknown as D1Result<T>;
+            },
+            async run() {
+              return { success: true, meta: { changes: 1 } } as unknown as D1Result;
+            },
+          });
+          return {
+            bind: (...args: unknown[]) => run(args),
+            first: <T>() => run([]).first<T>(),
+            all: <T>() => run([]).all<T>(),
+            run: () => run([]).run(),
+          } as unknown as D1PreparedStatement;
+        },
+      } as unknown as D1Database;
+
+      const crossReconcile = await reconcilePayOSPayment({
+        db: payDb,
+        paymentId: 'pay_settled_1',
+        tenantId: 'default',
+        clientId: 'cid',
+        apiKey: 'key',
+        checksumKey: 'chk',
+        source: 'manual',
+      });
+      expect(crossReconcile.status).toBe(404);
+      expect(crossReconcile.outcome).toBe('not_found');
+
+      const sameReconcile = await reconcilePayOSPayment({
+        db: payDb,
+        paymentId: 'pay_settled_1',
+        tenantId: 'sadec',
+        clientId: 'cid',
+        apiKey: 'key',
+        checksumKey: 'chk',
+        source: 'manual',
+      });
+      expect(sameReconcile.status).toBe(200);
+      expect(sameReconcile.outcome).toBe('already_settled');
+    });
+  });
+
+  describe('Suite 37 — Phase AN1–AN4: Order Cancellation Loyalty Accrual Reversal Tenant Isolation, Audit Writer/Middleware Tenant Normalization & Auth Registration/Login Tenant Attribution', () => {
+    it('AN1–AN3: order cancellation earnRow lookup blocks cross-tenant loyalty reversal, buildCanonicalAuditRecord & audit() normalize tenantId, and auth register/login/audit attribute store tenant', async () => {
+      const { updateOrder } = await import('../../../../packages/domain/order/commands/update-order');
+      const { buildCanonicalAuditRecord } = await import('../../../../packages/domain/audit/src/policies/audit-writer-policy');
+      const { writeAuthAuditLog } = await import('../../routes/openapi-auth-handlers/helpers');
+      const { registerUser } = await import('../../tree/auth/register');
+
+      // 1. AN1: updateOrder cancelling a 'sadec' order scopes earnRow lookup to 'sadec' and rejects foreign 'default' earnRow on fallback
+      const executedSqls: Array<{ sql: string; args: unknown[] }> = [];
+      const reversedCustIds: string[] = [];
+
+      const cancelDb = {
+        prepare(sql: string) {
+          const run = (args: unknown[]) => ({
+            async first<T>() {
+              executedSqls.push({ sql, args });
+              if (sql.includes('FROM orders WHERE id = ?')) {
+                return {
+                  id: 'ord_cancel_sadec_1',
+                  status: 'confirmed',
+                  payment_status: 'paid',
+                  total: 50000,
+                  items: '[]',
+                  table_id: null,
+                  tenant_id: 'sadec',
+                } as unknown as T;
+              }
+              if (
+                sql.includes("FROM cashback_transactions WHERE order_id = ? AND type = 'earn'") &&
+                sql.includes("COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?")
+              ) {
+                // Scoped query for 'sadec' finds no earn row in 'sadec'
+                return null;
+              }
+              if (sql.includes("FROM cashback_transactions WHERE order_id = ? AND type = 'earn' LIMIT 1")) {
+                // Fallback returns a foreign 'default' earn row with colliding order_id
+                return {
+                  customer_id: 'cust_foreign_default_99',
+                  amount: 25000,
+                  tenant_id: 'default',
+                } as unknown as T;
+              }
+              return null;
+            },
+            async all<T>() {
+              executedSqls.push({ sql, args });
+              if (sql.includes('FROM orders WHERE id = ?')) {
+                return {
+                  results: [
+                    {
+                      id: 'ord_cancel_sadec_1',
+                      status: 'confirmed',
+                      payment_status: 'paid',
+                      total: 50000,
+                      items: '[]',
+                      table_id: null,
+                      tenant_id: 'sadec',
+                    },
+                  ],
+                } as unknown as D1Result<T>;
+              }
+              return { results: [] } as unknown as D1Result<T>;
+            },
+            async run() {
+              executedSqls.push({ sql, args });
+              if (sql.includes("INSERT INTO cashback_transactions") && sql.includes("'reverse'")) {
+                reversedCustIds.push(String(args[1] ?? ''));
+              }
+              return { success: true, meta: { changes: 1 } } as unknown as D1Result;
+            },
+          });
+          return {
+            bind: (...args: unknown[]) => run(args),
+            first: <T>() => run([]).first<T>(),
+            all: <T>() => run([]).all<T>(),
+            run: () => run([]).run(),
+          } as unknown as D1PreparedStatement;
+        },
+      } as unknown as D1Database;
+
+      const cancelRes = await updateOrder(
+        new Request('https://test.local/api/orders/ord_cancel_sadec_1', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ status: 'cancelled' }),
+        }),
+        { AURA_DB: cancelDb } as any,
+        'ord_cancel_sadec_1',
+        'manager',
+        'sadec'
+      );
+      expect(cancelRes.status).toBe(200);
+      expect(
+        executedSqls.some(
+          (q) =>
+            q.sql.includes("FROM cashback_transactions WHERE order_id = ? AND type = 'earn'") &&
+            q.sql.includes("COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?") &&
+            q.args[1] === 'sadec'
+        )
+      ).toBe(true);
+      // Must NOT reverse foreign 'default' customer's loyalty balance
+      expect(reversedCustIds).toHaveLength(0);
+
+      // 2. AN2: buildCanonicalAuditRecord trims padded tenantId & operatingUnitId and normalizes whitespace-only to null
+      const paddedAudit = buildCanonicalAuditRecord({
+        actor: { id: 'actor_1', name: 'Staff', tenantId: '  sadec  ', operatingUnitId: '  ou_sadec_01  ' },
+        action: 'order.update',
+        resourceType: 'order',
+        resourceId: 'ord_1',
+      });
+      expect(paddedAudit.tenant_id).toBe('sadec');
+      expect(paddedAudit.operating_unit_id).toBe('ou_sadec_01');
+
+      const blankAudit = buildCanonicalAuditRecord({
+        actor: { id: 'actor_2', name: 'Staff', tenantId: '   ', operatingUnitId: '   ' },
+        action: 'order.update',
+        resourceType: 'order',
+        resourceId: 'ord_2',
+      });
+      expect(blankAudit.tenant_id).toBeNull();
+      expect(blankAudit.operating_unit_id).toBeNull();
+
+      // 3. AN3: writeAuthAuditLog stamps tenant_id on audit_logs and registerUser seeds customers with storeTenant ('sadec')
+      const authAuditSqls: Array<{ sql: string; args: unknown[] }> = [];
+      const authDb = {
+        prepare(sql: string) {
+          const run = (args: unknown[]) => ({
+            async run() {
+              authAuditSqls.push({ sql, args });
+              return { success: true, meta: { changes: 1 } } as unknown as D1Result;
+            },
+          });
+          return {
+            bind: (...args: unknown[]) => run(args),
+            run: () => run([]).run(),
+          };
+        },
+      };
+      await writeAuthAuditLog(
+        authDb,
+        'usr_sadec_1',
+        'register',
+        'user',
+        'usr_sadec_1',
+        JSON.stringify({ email: 'sadec@aura.vn' }),
+        '2026-11-03T00:00:00.000Z',
+        '  sadec  '
+      );
+      expect(
+        authAuditSqls.some(
+          (q) =>
+            q.sql.includes('UPDATE audit_logs SET tenant_id = ?') &&
+            q.args[0] === 'sadec' &&
+            q.args[1] === 'usr_sadec_1'
+        )
+      ).toBe(true);
+
+      const kvUsers = new Map<string, string>();
+      const regSqls: Array<{ sql: string; args: unknown[] }> = [];
+      const regEnv = {
+        JWT_SECRET: 'test_jwt_secret_key_for_sadec_register_32bytes',
+        JWT_EXPIRY_SECONDS: '3600',
+        PILOT_TENANT_ID: 'sadec',
+        AUTH_KV: {
+          get: async (k: string) => kvUsers.get(k) ?? null,
+          put: async (k: string, v: string) => {
+            kvUsers.set(k, v);
+          },
+        },
+        AURA_DB: {
+          prepare(sql: string) {
+            const run = (args: unknown[]) => ({
+              async run() {
+                regSqls.push({ sql, args });
+                return { success: true, meta: { changes: 1 } } as unknown as D1Result;
+              },
+            });
+            return {
+              bind: (...args: unknown[]) => run(args),
+              run: () => run([]).run(),
+            };
+          },
+        },
+      };
+
+      const regRes = await registerUser(
+        new Request('https://api.test/api/auth/register', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-Tenant-ID': 'sadec' },
+          body: JSON.stringify({
+            email: '',
+            password: 'Password123!',
+            name: 'Khách Sa Đéc',
+            phone: '0909123456',
+          }),
+        }),
+        regEnv as any
+      );
+      // Even if email validation rejects empty email or succeeds with valid email, let's test with a valid email:
+      expect(regRes.status).toBe(400);
+
+      const validRegRes = await registerUser(
+        new Request('https://api.test/api/auth/register', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-Tenant-ID': 'sadec' },
+          body: JSON.stringify({
+            email: 'newcustomer@sadec.aura.vn',
+            password: 'Password123!',
+            name: 'Khách Sa Đéc',
+            phone: '0909123456',
+          }),
+        }),
+        regEnv as any
+      );
+      expect(validRegRes.status).toBe(201);
+      expect(
+        regSqls.some(
+          (q) =>
+            q.sql.includes('INSERT OR IGNORE INTO customers') &&
+            q.sql.includes('tenant_id') &&
+            q.args[4] === 'sadec'
+        )
+      ).toBe(true);
+    });
+  });
+
+  // =========================================================================
+  // 38. Phase AO1–AO4: OpenAPI Auth Staff/Device/Password Audit Tenant Attribution,
+  //     Case-Insensitive Password Reset Lookup, & Legacy resetPassword Customer
+  //     cust_auth_ver / tenantId JWT Convergence
+  // =========================================================================
+  describe('38. Phase AO1–AO4: OpenAPI Auth Staff/Device/Password Audit Tenant Attribution & Legacy resetPassword Convergence', () => {
+    it('stamps tenant_id on staff/device/password audit_logs, resolves case-insensitive email on forgot/reset-password, and syncs cust_auth_ver + tenantId JWT on legacy resetPassword (AO1, AO2, AO3)', async () => {
+      const { OpenAPIHono } = await import('@hono/zod-openapi');
+      const { registerStaffHandlers } = await import('../../routes/openapi-auth-handlers/staff-handlers');
+      const { registerDeviceHandlers } = await import('../../routes/openapi-auth-handlers/device-handlers');
+      const { registerForgotPasswordHandler } = await import('../../routes/openapi-auth-handlers/password-handlers');
+      const { resetPassword } = await import('../../tree/auth/reset-password');
+      const { verifyJWT } = await import('../../lib/jwt');
+
+      // 1. AO1 & AO2: OpenAPI staff, forgot-password, reset-password, and device revoke audit tenant attribution
+      const auditCalls: Array<{ sql: string; args: unknown[] }> = [];
+      const verificationInserts: Array<{ sql: string; args: unknown[] }> = [];
+      const staffSelectSqls: string[] = [];
+
+      const app = new OpenAPIHono<any>();
+      app.use('*', async (c, next) => {
+        const roleHeader = c.req.header('X-Mock-Role') || 'owner';
+        const tenantHeader = c.req.header('X-Tenant-ID') || 'sadec';
+        c.set('user' as any, {
+          id: 'staff-owner-sadec',
+          role: roleHeader,
+          tenantId: tenantHeader,
+          tenant_id: tenantHeader,
+          email: 'owner@sadec.aura.vn',
+        });
+        c.set('tenantId' as any, tenantHeader);
+        await next();
+      });
+      registerStaffHandlers(app);
+      registerDeviceHandlers(app);
+      registerForgotPasswordHandler(app);
+
+      const mockOpenApiDb = {
+        batch: async (stmts: Array<{ run?: () => Promise<unknown> }>) => {
+          for (const s of stmts) {
+            if (s?.run) await s.run();
+          }
+          return [];
+        },
+        prepare(sql: string) {
+          const makeBound = (args: unknown[]) => ({
+            async first() {
+              if (sql.includes('COUNT(*) as total FROM users')) {
+                staffSelectSqls.push(sql);
+                return { total: 1 };
+              }
+              if (sql.includes('FROM users WHERE email = ?')) {
+                // Simulate mixed-case email stored in DB: exact match fails for uppercase input
+                return null;
+              }
+              if (sql.includes('FROM users WHERE lower(email) = lower(?)')) {
+                return { id: 'cust-mixed-case-1' };
+              }
+              if (sql.includes('FROM trusted_devices WHERE id = ?')) {
+                return { id: 'dev-1', user_id: 'staff-owner-sadec', name: 'iPad POS', fingerprint: 'fp-1' };
+              }
+              if (sql.includes('SELECT id, name, email, phone, role')) {
+                return {
+                  id: args[0],
+                  name: 'Staff SaDec',
+                  email: 'barista@sadec.aura.vn',
+                  phone: '0901234567',
+                  role: 'cashier',
+                  locale: 'vi',
+                  is_active: 1,
+                  avatar_url: null,
+                  created_at: '2026-11-03T00:00:00.000Z',
+                  updated_at: '2026-11-03T00:00:00.000Z',
+                };
+              }
+              return null;
+            },
+            async all() {
+              if (sql.includes('FROM users')) {
+                staffSelectSqls.push(sql);
+                return {
+                  results: [
+                    {
+                      id: 'staff-1',
+                      name: 'Cashier 1',
+                      email: 'cashier1@sadec.aura.vn',
+                      phone: null,
+                      role: 'cashier',
+                      locale: 'vi',
+                      is_active: 1,
+                      avatar_url: null,
+                      created_at: '2026-11-03T00:00:00.000Z',
+                      updated_at: '2026-11-03T00:00:00.000Z',
+                    },
+                  ],
+                };
+              }
+              return { results: [] };
+            },
+            async run() {
+              if (sql.includes('audit_logs')) {
+                auditCalls.push({ sql, args });
+              }
+              if (sql.includes('INSERT INTO email_verifications')) {
+                verificationInserts.push({ sql, args });
+              }
+              return { success: true, meta: { changes: 1 } };
+            },
+          });
+          return {
+            bind: (...args: unknown[]) => makeBound(args),
+            first: () => makeBound([]).first(),
+            all: () => makeBound([]).all(),
+            run: () => makeBound([]).run(),
+          };
+        },
+      };
+
+      const openApiEnv = { AURA_DB: mockOpenApiDb };
+
+      // AO1: GET /api/auth/staff uses normalized COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?
+      const listStaffRes = await app.request(
+        '/api/auth/staff?page=1&limit=10',
+        { method: 'GET', headers: { 'X-Tenant-ID': 'sadec' } },
+        openApiEnv as any
+      );
+      expect(listStaffRes.status).toBe(200);
+      expect(
+        staffSelectSqls.some((s) => s.includes("COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"))
+      ).toBe(true);
+
+      // AO2: POST /api/auth/forgot-password & POST /api/auth/reset-password resolve case-insensitive email
+      const forgotRes = await app.request(
+        '/api/auth/forgot-password',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: 'MixedCase@SaDec.Aura.vn' }),
+        },
+        openApiEnv as any
+      );
+      expect(forgotRes.status).toBe(200);
+      expect(verificationInserts.length).toBe(1);
+
+      const resetCodeRes = await app.request(
+        '/api/auth/reset-password',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: 'MixedCase@SaDec.Aura.vn' }),
+        },
+        openApiEnv as any
+      );
+      expect(resetCodeRes.status).toBe(200);
+      expect(verificationInserts.length).toBe(2);
+
+      // AO2: DELETE /api/auth/devices/{id} and DELETE /api/auth/devices stamp tenant_id on audit_logs
+      const revokeOneRes = await app.request(
+        '/api/auth/devices/dev-1',
+        { method: 'DELETE', headers: { 'X-Tenant-ID': 'sadec' } },
+        openApiEnv as any
+      );
+      expect(revokeOneRes.status).toBe(200);
+
+      const revokeAllRes = await app.request(
+        '/api/auth/devices',
+        { method: 'DELETE', headers: { 'X-Tenant-ID': 'sadec' } },
+        openApiEnv as any
+      );
+      expect(revokeAllRes.status).toBe(200);
+      expect(
+        auditCalls.some(
+          (c) =>
+            c.sql.includes('UPDATE audit_logs SET tenant_id = ?') &&
+            c.args[0] === 'sadec' &&
+            c.args[3] === 'revoke_device'
+        )
+      ).toBe(true);
+      expect(
+        auditCalls.some(
+          (c) =>
+            c.sql.includes('UPDATE audit_logs SET tenant_id = ?') &&
+            c.args[0] === 'sadec' &&
+            c.args[3] === 'revoke_all_devices'
+        )
+      ).toBe(true);
+
+      // 2. AO3: Legacy resetPassword customer cust_auth_ver + D1 users update + tenantId JWT claim
+      const kvMap = new Map<string, string>();
+      kvMap.set(
+        'user:cust@sadec.aura.vn',
+        JSON.stringify({
+          id: 'cust-sadec-99',
+          email: 'cust@sadec.aura.vn',
+          name: 'Customer SaDec',
+          role: 'customer',
+          auth_version: 2,
+          tenant_id: 'sadec',
+        })
+      );
+      kvMap.set('cust_auth_ver:cust-sadec-99', '4');
+
+      const d1Updates: Array<{ sql: string; args: unknown[] }> = [];
+      const legacyEnv = {
+        RESET_KEY: 'secret-reset-key-123',
+        JWT_SECRET: 'test-jwt-secret-key-minimum-32-chars!!',
+        JWT_EXPIRY_SECONDS: '3600',
+        PILOT_TENANT_ID: 'sadec',
+        AUTH_KV: {
+          get: async (k: string) => kvMap.get(k) ?? null,
+          put: async (k: string, v: string) => {
+            kvMap.set(k, v);
+          },
+        },
+        AURA_DB: {
+          prepare(sql: string) {
+            const makeStmt = (args: unknown[]) => ({
+              async first() {
+                return null;
+              },
+              async run() {
+                d1Updates.push({ sql, args });
+                return { success: true, meta: { changes: 1 } };
+              },
+            });
+            return {
+              bind: (...args: unknown[]) => makeStmt(args),
+              first: () => makeStmt([]).first(),
+              run: () => makeStmt([]).run(),
+            };
+          },
+        },
+      };
+
+      const legacyResetRes = await resetPassword(
+        new Request('https://api.test/api/auth/admin-reset-password', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Reset-Key': 'secret-reset-key-123',
+          },
+          body: JSON.stringify({
+            email: 'cust@sadec.aura.vn',
+            newPassword: 'NewStrongPassword123!',
+          }),
+        }),
+        legacyEnv as any
+      );
+      expect(legacyResetRes.status).toBe(200);
+      const resetJson = (await legacyResetRes.json()) as { token: string };
+      expect(kvMap.get('cust_auth_ver:cust-sadec-99')).toBe('5');
+      expect(
+        d1Updates.some(
+          (u) => u.sql.includes('UPDATE users SET password_hash = ?, auth_version = ?') && u.args[1] === 5
+        )
+      ).toBe(true);
+
+      const decoded = await verifyJWT(resetJson.token, legacyEnv.JWT_SECRET);
+      expect(decoded?.tenantId).toBe('sadec');
+      expect(decoded?.authVersion).toBe(5);
+    });
+  });
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // SUITE 39: Phase AG1–AG3 — ERPNext Sync/Cron, Subscriptions/Invoices, Shifts/PO, Signage/Assistant/QR/Pricing & Orders/Audit/Broadcast/CRM Isolation
+  // ═══════════════════════════════════════════════════════════════════════════
+  describe('Suite 39 — Phase AG1–AG3: ERPNext Sync/Cron, Subscriptions/Invoices, Shifts/PO, Signage/Assistant/QR/Pricing & Orders/Audit/Broadcast/CRM Isolation', () => {
+    it('AG1: enforces per-tenant ERPNext cron KV config & queue scoping, blocks floor staff on subscriptions & applies billing_cycle on payInvoice, and scopes shift cash reconciliation & purchasing read RBAC', async () => {
+      const { Hono } = await import('hono');
+      const { listSubscriptions } = await import('../../tree/subscriptions/sub-handlers');
+      const { payInvoice } = await import('../../tree/subscriptions/invoice-handlers');
+      const { getReconciliationForShift } = await import('../../../../packages/domain/shift/src/policies/cash-reconciliation-policy');
+      const { purchasing } = await import('../../../../packages/domain/inventory/src/routes/purchasing');
+
+      const executedQueries: Array<{ sql: string; args: unknown[] }> = [];
+      let updatedPeriodEnd = '';
+      const db = {
+        prepare(sql: string) {
+          const run = (args: unknown[]) => {
+            executedQueries.push({ sql, args });
+            return {
+              async first<T>() {
+                if (/FROM subscription_invoices WHERE id = \?/i.test(sql)) {
+                  return {
+                    id: 'inv_sadec_q1',
+                    subscription_id: 'sub_sadec_q1',
+                    status: 'pending',
+                    amount_vnd: 900000,
+                    tenant_id: 'sadec',
+                  } as unknown as T;
+                }
+                if (/FROM users WHERE id = \?|FROM staff WHERE id = \?/i.test(sql)) {
+                  return staffAccountRow('admin', 'sadec') as unknown as T;
+                }
+                if (/FROM subscriptions WHERE id = \?/i.test(sql)) {
+                  return {
+                    id: 'sub_sadec_q1',
+                    status: 'active',
+                    billing_cycle: 'quarterly',
+                    current_period_end: '2026-01-15T00:00:00.000Z',
+                    tenant_id: 'sadec',
+                  } as unknown as T;
+                }
+                if (/FROM shift_reconciliations/i.test(sql)) {
+                  if (sql.includes('tenant_id') && args.includes('sadec')) {
+                    return {
+                      id: 'rec_sadec_1',
+                      shift_id: 'shf_shared_1',
+                      operating_unit_id: 'sadec',
+                      expected_cash: 500000,
+                      counted_cash: 500000,
+                      variance: 0,
+                      variance_pct: 0,
+                      status: 'balanced',
+                      requires_approval: 0,
+                      blind_count: 1,
+                      reconciled_by: 'mgr_sadec',
+                      reconciled_at: '2026-11-03T00:00:00.000Z',
+                      approved_by: null,
+                      approved_at: null,
+                      notes: null,
+                      tenant_id: 'sadec',
+                    } as unknown as T;
+                  }
+                  return null;
+                }
+                return null;
+              },
+              async all<T>() {
+                return { results: [] } as unknown as D1Result<T>;
+              },
+              async run() {
+                if (/UPDATE subscriptions\s+SET current_period_start/i.test(sql)) {
+                  updatedPeriodEnd = args.length >= 2 ? String(args[1]) : sql;
+                }
+                return { success: true, meta: { changes: 1 } } as unknown as D1Result;
+              },
+            };
+          };
+          return {
+            bind: (...args: unknown[]) => run(args),
+            first: <T>() => run([]).first<T>(),
+            all: <T>() => run([]).all<T>(),
+            run: () => run([]).run(),
+          } as unknown as D1PreparedStatement;
+        },
+      } as unknown as D1Database;
+
+      // 1. listSubscriptions blocks floor 'staff' role and customer without vendorId/email
+      const subApp = new Hono<{ Bindings: Env }>();
+      subApp.get('/subs-staff', async (c, next) => {
+        c.set('user' as any, { id: 'st_1', role: 'staff', tenantId: 'sadec' });
+        c.set('tenantId' as any, 'sadec');
+        await next();
+      }, (c) => listSubscriptions(c as any));
+      subApp.get('/subs-cust-empty', async (c, next) => {
+        c.set('user' as any, { role: 'customer', tenantId: 'sadec' });
+        c.set('tenantId' as any, 'sadec');
+        await next();
+      }, (c) => listSubscriptions(c as any));
+      subApp.post('/invoices/:id/pay', async (c, next) => {
+        c.set('user' as any, { id: 'mgr_sadec', role: 'manager', tenantId: 'sadec' });
+        c.set('tenantId' as any, 'sadec');
+        await next();
+      }, (c) => payInvoice(c as any));
+
+      const staffSubRes = await subApp.fetch(new Request('https://api.test/subs-staff'), { AURA_DB: db } as any);
+      expect(staffSubRes.status).toBe(403);
+
+      const emptyCustSubRes = await subApp.fetch(new Request('https://api.test/subs-cust-empty'), { AURA_DB: db } as any);
+      expect(emptyCustSubRes.status).toBe(403);
+
+      // 2. payInvoice extends period by 3 months for 'quarterly' billing_cycle
+      const payReq = await authRequest('POST', '/invoices/inv_sadec_q1/pay', 'admin', 'sadec', {
+        payment_method: 'bank_transfer',
+      });
+      const payRes = await subApp.fetch(payReq, { AURA_DB: db, JWT_SECRET: TEST_JWT_SECRET } as any);
+      expect(payRes.status).toBe(200);
+      expect(updatedPeriodEnd).toBe('2026-04-15');
+
+      // 3. getReconciliationForShift pushes tenant_id into SQL before .first()
+      const recon = await getReconciliationForShift(db, 'shf_shared_1', 'sadec');
+      expect(recon?.id).toBe('rec_sadec_1');
+      expect(
+        executedQueries.some(
+          (q) => /FROM shift_reconciliations/i.test(q.sql) && q.sql.includes('tenant_id') && q.args.includes('sadec')
+        )
+      ).toBe(true);
+
+      // 4. purchasing read routes require authenticated PURCHASING_READ_ROLES
+      const poApp = new Hono<{ Bindings: Env }>();
+      purchasing(poApp as any);
+      const unauthPoRes = await poApp.fetch(new Request('https://api.test/suppliers'), { AURA_DB: db } as any);
+      expect(unauthPoRes.status).toBe(401);
+    });
+
+    it('AG2: pushes tenant_id into Signage SQL with Vary/private Cache-Control, requires auth on Customer Assistant phone lookup, and hardens Admin QR, Franchise Locations, Dynamic Pricing & Admin Sales', async () => {
+      const { Hono } = await import('hono');
+      const { customerAssistantRouter } = await import('../../routes/customer-assistant');
+      const { dynamicPricingRouter } = await import('../../routes/dynamic-pricing');
+
+      const executedQueries: Array<{ sql: string; args: unknown[] }> = [];
+      const db = {
+        prepare(sql: string) {
+          const run = (args: unknown[]) => {
+            executedQueries.push({ sql, args });
+            return {
+              async first<T>() {
+                if (/FROM users WHERE id = \?|FROM staff WHERE id = \?/i.test(sql)) {
+                  const id = String(args[0] || 'mgr_sadec');
+                  const role = id.includes('admin') ? 'admin' : 'manager';
+                  const tenant = id.includes('admin') ? 'hq' : 'sadec';
+                  return { id, role, is_active: 1, auth_version: 1, tenant_id: tenant } as unknown as T;
+                }
+                if (/FROM products WHERE id = \?/i.test(sql)) {
+                  return { id: 'prod_foreign_default', name: 'Foreign Item', price: 30000, tenant_id: 'default' } as unknown as T;
+                }
+                return null;
+              },
+              async all<T>() {
+                if (/FROM products p/i.test(sql)) {
+                  return { results: [] } as unknown as D1Result<T>;
+                }
+                return { results: [] } as unknown as D1Result<T>;
+              },
+              async run() {
+                return { success: true, meta: { changes: 1 } } as unknown as D1Result;
+              },
+            };
+          };
+          return {
+            bind: (...args: unknown[]) => run(args),
+            first: <T>() => run([]).first<T>(),
+            all: <T>() => run([]).all<T>(),
+            run: () => run([]).run(),
+          } as unknown as D1PreparedStatement;
+        },
+      } as unknown as D1Database;
+
+      // 1. Signage GET /menu pushes p.tenant_id & c.tenant_id into SQL and sets Vary + private Cache-Control when Authorization header is present
+      const sigApp = new Hono<{ Bindings: Env }>();
+      sigApp.route('/api/signage', signageRouter);
+      const sigReq = await authRequest('GET', '/api/signage/menu', 'manager', 'sadec');
+      const sigRes = await sigApp.fetch(sigReq, { AURA_DB: db, JWT_SECRET: TEST_JWT_SECRET } as any);
+      expect(sigRes.status).toBe(200);
+      expect(sigRes.headers.get('Vary')).toContain('X-Tenant-ID');
+      expect(sigRes.headers.get('Cache-Control')).toContain('private');
+      expect(
+        executedQueries.some(
+          (q) => /FROM products p/i.test(q.sql) && q.sql.includes('p.tenant_id') && q.sql.includes('c.tenant_id')
+        )
+      ).toBe(true);
+
+      // 2. Customer Assistant POST / rejects authenticated customer querying another customer's phone with 403
+      const caApp = new Hono<{ Bindings: Env }>();
+      caApp.use('*', async (c, next) => {
+        c.set('user' as any, { id: 'cust_sadec_own', role: 'customer', phone: '0909999999', tenantId: 'sadec' });
+        await next();
+      });
+      caApp.route('/api/customer-assistant', customerAssistantRouter);
+      const caRes = await caApp.fetch(
+        new Request('https://test.aura/api/customer-assistant', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ query: 'Điểm thưởng của tôi là bao nhiêu?', phone: '0901234567' }),
+        }),
+        { AURA_DB: db, JWT_SECRET: TEST_JWT_SECRET } as any
+      );
+      expect(caRes.status).toBe(403);
+
+      // 3. Admin QR POST /regenerate rejects wildcard tenantId === '*' with 400
+      const qrApp = new Hono<{ Bindings: Env }>();
+      qrApp.use('*', async (c, next) => {
+        c.set('tenantId' as any, '*');
+        await next();
+      });
+      qrApp.route('/api/admin/qr', adminQRRouter);
+      const qrRegenReq = await authRequest('POST', '/api/admin/qr/regenerate', 'admin', 'hq', {});
+      const qrRegenRes = await qrApp.fetch(qrRegenReq, { AURA_DB: db, JWT_SECRET: TEST_JWT_SECRET } as any);
+      expect(qrRegenRes.status).toBe(400);
+
+      // 4. Franchise Locations POST /locations rejects tenant_id: 'default' with 400
+      const frApp = new Hono<{ Bindings: Env }>();
+      frApp.use('*', async (c, next) => {
+        c.set('tenantId' as any, '*');
+        await next();
+      });
+      frApp.route('/api/franchise', franchiseRouter);
+      const frCreateReq = await authRequest('POST', '/api/franchise/locations', 'admin', 'hq', {
+        name: 'Invalid Default Franchise',
+        code: 'FR-DEF',
+        tenant_id: 'default',
+      });
+      const frCreateRes = await frApp.fetch(frCreateReq, { AURA_DB: db, JWT_SECRET: TEST_JWT_SECRET } as any);
+      expect(frCreateRes.status).toBe(400);
+
+      // 5. Dynamic Pricing POST /rules rejects cross-tenant target_product_id with 403
+      const dpApp = new Hono<{ Bindings: Env }>();
+      dpApp.route('/api/dynamic-pricing', dynamicPricingRouter);
+      const dpRuleReq = await authRequest('POST', '/api/dynamic-pricing/rules', 'manager', 'sadec', {
+        name: 'Sa Dec Happy Hour',
+        rule_type: 'happy_hour',
+        discount_percent: 10,
+        target_product_id: 'prod_foreign_default',
+        start_time: '14:00',
+        end_time: '17:00',
+      });
+      const dpRuleRes = await dpApp.fetch(dpRuleReq, { AURA_DB: db, JWT_SECRET: TEST_JWT_SECRET } as any);
+      expect(dpRuleRes.status).toBe(403);
+
+      // 6. Admin Sales GET /csv rejects unauthenticated request with 401
+      const salesApp = new Hono<{ Bindings: Env }>();
+      salesApp.route('/api/admin/sales', adminSalesRouter);
+      const unauthSalesRes = await salesApp.fetch(
+        new Request('https://test.aura/api/admin/sales/csv'),
+        { AURA_DB: db, JWT_SECRET: TEST_JWT_SECRET } as any
+      );
+      expect(unauthSalesRes.status).toBe(401);
+    });
+
+    it('AG3: stamps tenant_id on createOrder items/payments, includes tax in splitOrders total, pushes tenantId into AuditLogger.query SQL, correlates broadcast segmentSQL, and resolves tenant in consumeCrmEvent', async () => {
+      const { createOrder } = await import('../../../../packages/domain/order/commands/create-order');
+      const { splitOrders } = await import('../../../../packages/domain/order/commands/split-orders');
+      const { AuditLogger } = await import('../../lib/audit-logger');
+      const { segmentSQL } = await import('../../routes/broadcast-handlers/types');
+      const { consumeCrmEvent } = await import('../../../../packages/domain/crm/commands/consume-crm-event');
+
+      const batchedSqls: Array<{ sql: string; args: unknown[] }> = [];
+      const executedQueries: Array<{ sql: string; args: unknown[] }> = [];
+      const db = {
+        prepare(sql: string) {
+          const run = (args: unknown[]) => {
+            executedQueries.push({ sql, args });
+            return {
+              sql,
+              args,
+              async first<T>() {
+                if (/FROM products|FROM menu_items/i.test(sql)) {
+                  return {
+                    id: 'prod_sadec_1',
+                    name: 'Cà Phê Sa Đéc',
+                    price: 40000,
+                    price_cents: 40000,
+                    is_available: 1,
+                    active: 1,
+                    tenant_id: 'sadec',
+                  } as unknown as T;
+                }
+                if (/FROM cafe_tables/i.test(sql)) {
+                  return { id: 'tbl_sadec_1', table_number: 1, capacity: 4, status: 'Available', is_active: 1, tenant_id: 'sadec', operating_unit_id: 'sadec' } as unknown as T;
+                }
+                if (/FROM orders WHERE id = \?/i.test(sql)) {
+                  return { id: 'ord_crm_sadec_1', customer_id: 'cust_crm_sadec_1', tenant_id: 'sadec' } as unknown as T;
+                }
+                if (/FROM customers WHERE id = \?/i.test(sql)) {
+                  return { id: 'cust_crm_sadec_1', loyalty_points: 0, lifetime_points: 0, loyalty_tier: 'bronze', visits: 1, tenant_id: 'sadec' } as unknown as T;
+                }
+                if (/FROM loyalty_policies/i.test(sql)) {
+                  return {
+                    id: 'pol_sadec_1',
+                    name: 'Sa Dec Policy',
+                    earn_rate: 0.05,
+                    min_order_amount: 10000,
+                    max_cashback_per_order: 50000,
+                    expiry_days: 90,
+                    is_active: 1,
+                    tenant_id: 'sadec',
+                  } as unknown as T;
+                }
+                if (/FROM cashback_transactions WHERE order_id = \?/i.test(sql)) {
+                  return null;
+                }
+                if (/FROM cashback_wallets/i.test(sql)) {
+                  return { id: 'wal_sadec_1', customer_id: 'cust_crm_sadec_1', balance: 0, tenant_id: 'sadec' } as unknown as T;
+                }
+                return null;
+              },
+              async all<T>() {
+                if (/FROM products/i.test(sql) || /FROM menu_items/i.test(sql)) {
+                  return {
+                    results: [
+                      {
+                        id: 'prod_sadec_1',
+                        name: 'Cà Phê Sa Đéc',
+                        price: 40000,
+                        price_cents: 40000,
+                        is_available: 1,
+                        active: 1,
+                        tenant_id: 'sadec',
+                      },
+                    ],
+                  } as unknown as D1Result<T>;
+                }
+                if (/FROM audit_logs/i.test(sql)) {
+                  return { results: [] } as unknown as D1Result<T>;
+                }
+                return { results: [] } as unknown as D1Result<T>;
+              },
+              async run() {
+                return { success: true, meta: { changes: 1 } } as unknown as D1Result;
+              },
+            };
+          };
+          return {
+            bind: (...args: unknown[]) => run(args),
+            first: <T>() => run([]).first<T>(),
+            all: <T>() => run([]).all<T>(),
+            run: () => run([]).run(),
+          } as unknown as D1PreparedStatement;
+        },
+        async batch(stmts: Array<{ sql: string; args: unknown[] }>) {
+          for (const s of stmts) {
+            batchedSqls.push({ sql: s.sql, args: s.args });
+          }
+          return stmts.map(() => ({ success: true, meta: { changes: 1 } }));
+        },
+      } as unknown as D1Database;
+
+      // 1. createOrder stamps tenant_id on INSERT INTO order_items and INSERT INTO payments
+      const trustedSadecActor = { id: 'mgr_sadec', role: 'manager', tenantId: 'sadec', isStaff: true };
+      const createRes = await createOrder(
+        new Request('https://test.aura/api/orders', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            customer_name: 'Khách Sa Đéc',
+            customer_phone: '0901234567',
+            order_type: 'takeaway',
+            payment_method: 'cod',
+            total: 40000,
+            items: [{ id: 'prod_sadec_1', product_id: 'prod_sadec_1', name: 'Cà Phê Sa Đéc', price: 40000, quantity: 1 }],
+          }),
+        }),
+        { AURA_DB: db } as any,
+        undefined,
+        trustedSadecActor as any
+      );
+      expect(createRes.status).toBe(201);
+      expect(
+        batchedSqls.some((s) => /INSERT INTO order_items/i.test(s.sql) && s.sql.includes('tenant_id') && s.args.includes('sadec'))
+      ).toBe(true);
+      expect(
+        batchedSqls.some((s) => /INSERT INTO payments/i.test(s.sql) && s.sql.includes('tenant_id') && s.args.includes('sadec'))
+      ).toBe(true);
+
+      // 2. splitOrders includes validated tax in orders.total and payments.amount
+      batchedSqls.length = 0;
+      const splitRes = await splitOrders(
+        new Request('https://test.aura/api/orders/split', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            table_id: 'tbl_sadec_1',
+            orders: [
+              {
+                customer_name: 'Khách Bàn 1A',
+                customer_phone: '0901234567',
+                items: [{ id: 'prod_sadec_1', product_id: 'prod_sadec_1', name: 'Cà Phê Sa Đéc', price: 40000, quantity: 1 }],
+                tax: 3200,
+                total: 43200,
+                payment_method: 'cod',
+              },
+              {
+                customer_name: 'Khách Bàn 1B',
+                customer_phone: '0901234568',
+                items: [{ id: 'prod_sadec_1', product_id: 'prod_sadec_1', name: 'Cà Phê Sa Đéc', price: 40000, quantity: 1 }],
+                tax: 3200,
+                total: 43200,
+                payment_method: 'cod',
+              },
+            ],
+          }),
+        }),
+        { AURA_DB: db } as any,
+        undefined,
+        trustedSadecActor as any
+      );
+      expect(splitRes.status).toBe(201);
+      const splitJson = (await splitRes.json()) as { data: Array<{ total: number }> };
+      expect(splitJson.data[0]?.total).toBe(43200);
+      expect(
+        batchedSqls.some((s) => /INSERT INTO payments/i.test(s.sql) && s.args.includes(43200))
+      ).toBe(true);
+
+      // 3. AuditLogger.query pushes tenantId into SQL WHERE before LIMIT/OFFSET
+      executedQueries.length = 0;
+      const auditLogger = new AuditLogger(undefined as any, db);
+      await auditLogger.query({ tenantId: 'sadec', pageSize: 25, maxPageSize: 500 });
+      expect(
+        executedQueries.some(
+          (q) => /FROM audit_logs/i.test(q.sql) && q.sql.includes("COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?") && q.args.includes('sadec')
+        )
+      ).toBe(true);
+
+      // 4. Broadcast segmentSQL correlates o.tenant_id with c.tenant_id on active_30d and inactive_90d
+      const activeSql = segmentSQL('active_30d', 'sadec');
+      expect(activeSql.sql).toContain("COALESCE(NULLIF(TRIM(o.tenant_id), ''), 'default') = COALESCE(NULLIF(TRIM(c.tenant_id), ''), 'default')");
+      const inactiveSql = segmentSQL('inactive_90d', 'sadec');
+      expect(inactiveSql.sql).toContain("COALESCE(NULLIF(TRIM(o.tenant_id), ''), 'default') = COALESCE(NULLIF(TRIM(c.tenant_id), ''), 'default')");
+
+      // 5. consumeCrmEvent resolves missing tenantId from orders in D1 before calling loadPolicy/applyAccrual
+      executedQueries.length = 0;
+      const crmRes = await consumeCrmEvent({
+        db,
+        event: {
+          eventType: 'order_paid',
+          orderId: 'ord_crm_sadec_1',
+          customerId: 'cust_crm_sadec_1',
+          payload: { totalAmount: 100000 },
+        } as any,
+      });
+      expect(crmRes.ok).toBe(true);
+      expect(
+        executedQueries.some(
+          (q) => /FROM bonus_campaigns/i.test(q.sql) && q.args.includes('sadec')
+        )
+      ).toBe(true);
+    });
+  });
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // SUITE 40: Phase AP1–AP4 — Request Metrics Tenant Attribution, Checkin/Loyalty/Mobile-Tables Whitespace & HQ Session Isolation, and CRM Profile/Account Order Predicate Normalization
+  // ═══════════════════════════════════════════════════════════════════════════
+  describe('Suite 40 — Phase AP1–AP4: Request Metrics Tenant Attribution, Checkin/Loyalty/Mobile-Tables & CRM Order Normalization', () => {
+    it('stamps tenant_id on request metrics, normalizes whitespace tenant_id on checkin/loyalty/CRM orders, and scopes HQ mobile table session release to table tenant (AP1, AP2, AP3)', async () => {
+      const { Hono } = await import('hono');
+      const { requestMetrics } = await import('../../middleware/request-metrics');
+      const { requestMetricsMiddleware } = await import('../../middleware/logger');
+      const { loyaltyRouter } = await import('../../routes/loyalty');
+      const { updateTableStatus } = await import('../../routes/tables-mobile');
+      const { getCustomerAccount } = await import('../../../../packages/domain/crm/commands/get-customer-account');
+      const { lookupProfile } = await import('../../../../packages/domain/crm/lookup-profile');
+
+      // 1. AP1: requestMetrics & requestMetricsMiddleware attach tenant_id tag
+      const metricWrites: Array<{ sql: string; args: unknown[] }> = [];
+      const waitPromises: Promise<unknown>[] = [];
+      const metricDb = {
+        prepare(sql: string) {
+          const makeBound = (args: unknown[]) => ({
+            async run() {
+              metricWrites.push({ sql, args });
+              return { success: true, meta: { changes: 1 } };
+            },
+          });
+          return {
+            bind: (...args: unknown[]) => makeBound(args),
+            run: () => makeBound([]).run(),
+          };
+        },
+      };
+
+      const metricsApp = new Hono<any>();
+      metricsApp.use('*', requestMetrics());
+      metricsApp.use('*', requestMetricsMiddleware());
+      metricsApp.get('/api/ping-500', (c) => c.json({ ok: false }, 500));
+
+      const pingRes = await metricsApp.fetch(
+        new Request('https://api.test/api/ping-500', {
+          headers: { 'X-Tenant-ID': '  sadec  ' },
+        }),
+        { AURA_DB: metricDb },
+        {
+          waitUntil: (p: Promise<unknown>) => {
+            waitPromises.push(p);
+          },
+          passThroughOnException: () => {},
+        } as any
+      );
+      expect(pingRes.status).toBe(500);
+      await Promise.all(waitPromises);
+      expect(
+        metricWrites.some(
+          (m) => m.args.some((a) => typeof a === 'string' && a.includes('"tenant_id":"sadec"'))
+        )
+      ).toBe(true);
+
+      // 2. AP2: GET /api/loyalty/tiers normalizes whitespace tenant_id and filters cross-tenant rows
+      const tierSqls: string[] = [];
+      const tierEnv = {
+        PILOT_TENANT_ID: 'sadec',
+        AURA_DB: {
+          prepare(sql: string) {
+            return {
+              bind: () => ({
+                async all() {
+                  tierSqls.push(sql);
+                  return {
+                    results: [
+                      { id: 't1', tier_name: 'gold', min_points: 500, tenant_id: '  sadec  ' },
+                      { id: 't2', tier_name: 'gold', min_points: 500, tenant_id: 'other_store' },
+                    ],
+                  };
+                },
+              }),
+            };
+          },
+        },
+      };
+      const tierRes = await loyaltyRouter.request('/tiers', { method: 'GET' }, tierEnv as any);
+      expect(tierRes.status).toBe(200);
+      const tierBody = (await tierRes.json()) as { data: Array<{ id: string }> };
+      expect(tierBody.data.map((r) => r.id)).toEqual(['t1']);
+      expect(
+        tierSqls.some((s) => s.includes("COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?1"))
+      ).toBe(true);
+
+      // 3. AP2: updateTableStatus on mobile when HQ (tenantId === '*') sets status = 'free' scopes table_sessions close to existing.tenant_id
+      const tableExecs: Array<{ sql: string; args: unknown[] }> = [];
+      const mobileCtx = {
+        env: {
+          AURA_DB: {
+            prepare(sql: string) {
+              const makeStmt = (args: unknown[]) => ({
+                async first() {
+                  if (sql.includes('FROM cafe_tables WHERE id = ?')) {
+                    return { id: 't01', table_number: 1, status: 'occupied', tenant_id: '  sadec  ' };
+                  }
+                  return null;
+                },
+                async run() {
+                  tableExecs.push({ sql, args });
+                  return { success: true, meta: { changes: 1 } };
+                },
+              });
+              return {
+                bind: (...args: unknown[]) => makeStmt(args),
+                first: () => makeStmt([]).first(),
+                run: () => makeStmt([]).run(),
+              };
+            },
+          },
+        },
+        get: (key: string) => {
+          if (key === 'tenantId') return '*';
+          if (key === 'user' || key === 'mobileStaff') return { id: 'hq-owner-1', role: 'owner', tenantId: '*' };
+          return undefined;
+        },
+        req: {
+          param: (k: string) => (k === 'id' ? 't01' : ''),
+          query: () => undefined,
+          header: () => undefined,
+          json: async () => ({ status: 'free' }),
+        },
+      };
+
+      const tblRes = await updateTableStatus(mobileCtx as any);
+      expect(tblRes.status).toBe(200);
+      expect(
+        tableExecs.some(
+          (q) =>
+            q.sql.includes("UPDATE table_sessions SET status = 'closed'") &&
+            q.sql.includes("COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?4") &&
+            q.args[3] === 'sadec'
+        )
+      ).toBe(true);
+
+      // 4. AP3: getCustomerAccount & lookupCustomerProfile use parenthesized OR with TRIM(tenant_id) on orders
+      const crmSqls: string[] = [];
+      const crmDb = {
+        prepare(sql: string) {
+          const makeStmt = () => ({
+            async first() {
+              if (sql.includes('FROM customers')) {
+                return {
+                  id: 'cust_ap3_1',
+                  name: 'AP3 User',
+                  phone: '0905556666',
+                  email: 'ap3@sadec.aura.vn',
+                  loyalty_tier: 'silver',
+                  loyalty_points: 200,
+                  lifetime_points: 200,
+                  tenant_id: '  sadec  ',
+                  created_at: '2026-11-03T00:00:00.000Z',
+                  updated_at: '2026-11-03T00:00:00.000Z',
+                };
+              }
+              return null;
+            },
+            async all() {
+              if (sql.includes('FROM orders')) {
+                crmSqls.push(sql);
+              }
+              return { results: [] };
+            },
+          });
+          return {
+            bind: () => makeStmt(),
+            first: () => makeStmt().first(),
+            all: () => makeStmt().all(),
+          };
+        },
+      } as any;
+
+      await getCustomerAccount(crmDb, 'cust_ap3_1', { tenantId: 'sadec' });
+      await lookupProfile(crmDb, '0905556666', { tenantId: 'sadec' });
+      expect(
+        crmSqls.filter((s) =>
+          s.includes("AND COALESCE(NULLIF(tenant_id, ''), 'default') = ?") &&
+          s.includes("AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?")
+        ).length
+      ).toBeGreaterThanOrEqual(2);
+    });
+  });
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // SUITE 41: Phase AH1–AH3 — Birthday/Push/Cal/Reviews/Pretix, DinDin/Campaigns/Forecasting/Mixpost & POS/Cron/TableSessions/Realtime/Domain Policy Isolation
+  // ═══════════════════════════════════════════════════════════════════════════
+  describe('Suite 41 — Phase AH1–AH3: Birthday/Push/Cal/Reviews/Pretix, DinDin/Campaigns/Forecasting/Mixpost & POS/Cron/TableSessions/Realtime/Domain Policy Isolation', () => {
+    it('blocks horizontal birthday PII IDOR, reconciles push tenant with JWT caller, allows Cal.com cancel when legacy bookings table is absent, normalizes empty orders.tenant_id in reviews, and scopes Pretix fallback dedup (AH1)', async () => {
+      const { Hono } = await import('hono');
+      const { pushRouter } = await import('../../routes/push');
+      const { calBookingWebhookRouter } = await import('../../routes/cal-booking-webhook');
+      const { pretixRouter } = await import('../../routes/pretix');
+
+      const jwtSecret = TEST_JWT_SECRET;
+
+      // 1. AH1-1: Authenticated customer cannot inspect another customer's birthday PII (returns 403)
+      const bdayDb = {
+        prepare(sql: string) {
+          const makeStmt = () => ({
+            async first() {
+              if (sql.includes('FROM customers')) {
+                return {
+                  id: 'cust_target_1',
+                  name: 'Target Customer',
+                  phone: '0909998888',
+                  birthday: '1995-11-03',
+                  tenant_id: 'sadec',
+                };
+              }
+              return null;
+            },
+          });
+          return {
+            bind: () => makeStmt(),
+            first: () => makeStmt().first(),
+          };
+        },
+      };
+      const attackerCustToken = await generateJWT(
+        { id: 'cust_attacker_2', sub: 'cust_attacker_2', role: 'customer', tenantId: 'sadec', tenant_id: 'sadec' } as any,
+        jwtSecret
+      );
+      const bdayRes = await birthdayRouter.request(
+        '/check?customer_id=cust_target_1',
+        {
+          method: 'GET',
+          headers: {
+            Authorization: `Bearer ${attackerCustToken}`,
+            'X-Tenant-ID': 'sadec',
+          },
+        },
+        { AURA_DB: bdayDb, JWT_SECRET: jwtSecret } as any
+      );
+      expect(bdayRes.status).toBe(403);
+
+      // 2. AH1-2: Push unsubscribe rejects conflicting X-Tenant-ID header against authenticated caller tenant
+      const pushRes = await pushRouter.request(
+        '/unsubscribe',
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${attackerCustToken}`,
+            'X-Tenant-ID': 'other_branch',
+          },
+          body: JSON.stringify({ endpoint: 'https://fcm.googleapis.com/fcm/send/ep1' }),
+        },
+        { AURA_DB: bdayDb, JWT_SECRET: jwtSecret } as any
+      );
+      expect(pushRes.status).toBe(403);
+
+      // 3. AH1-3: Cal.com BOOKING_CANCELLED succeeds for non-default tenant when legacy bookings table is absent
+      const calUpdatedSqls: string[] = [];
+      const calDb = {
+        prepare(sql: string) {
+          const makeStmt = () => ({
+            async first() {
+              if (/FROM bookings/i.test(sql)) {
+                throw new Error('D1_ERROR: no such table: bookings');
+              }
+              if (/FROM reservations/i.test(sql)) {
+                return { id: 'res_sadec_1', tenant_id: 'sadec' };
+              }
+              return null;
+            },
+            async run() {
+              if (/FROM bookings|UPDATE bookings/i.test(sql)) {
+                throw new Error('D1_ERROR: no such table: bookings');
+              }
+              calUpdatedSqls.push(sql);
+              return { success: true, meta: { changes: 1 } };
+            },
+          });
+          return {
+            bind: () => makeStmt(),
+            first: () => makeStmt().first(),
+            run: () => makeStmt().run(),
+          };
+        },
+      };
+      const calApp = new Hono<any>();
+      calApp.use('*', async (c, next) => {
+        c.set('tenantId', 'sadec');
+        await next();
+      });
+      calApp.route('/api/webhooks/cal', calBookingWebhookRouter);
+      const calRes = await calApp.request(
+        '/api/webhooks/cal',
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Tenant-ID': 'sadec',
+            'x-cal-webhook-secret': 'cal-sec-123456',
+          },
+          body: JSON.stringify({
+            triggerEvent: 'BOOKING_CANCELLED',
+            createdAt: '2026-11-03T10:00:00Z',
+            payload: {
+              uid: 'uid_sadec_cal_1',
+              title: 'Bàn Sân Vườn',
+              startTime: '2026-11-04T10:00:00Z',
+              endTime: '2026-11-04T11:00:00Z',
+              organizer: { name: 'Sa Đéc Cafe', email: 'sadec@aura.cafe' },
+              location: 'Sa Đéc',
+              cancellationReason: 'Rain',
+            },
+          }),
+        },
+        { AURA_DB: calDb, CAL_WEBHOOK_SECRET: 'cal-sec-123456' } as any
+      );
+      expect(calRes.status).toBe(200);
+      expect(calUpdatedSqls.some((s) => /UPDATE reservations/i.test(s))).toBe(true);
+
+      // 4. AH1-4: GET /api/reviews normalizes o.tenant_id and r.tenant_id with NULLIF(TRIM(...), '') separately
+      const reviewSqls: string[] = [];
+      const revDb = {
+        prepare(sql: string) {
+          const makeStmt = () => ({
+            async all() {
+              reviewSqls.push(sql);
+              return { results: [] };
+            },
+          });
+          return {
+            bind: () => makeStmt(),
+            all: () => makeStmt().all(),
+          };
+        },
+      };
+      const revRes = await reviewsRouter.request(
+        '/?tenant_id=sadec',
+        { method: 'GET', headers: { 'X-Tenant-ID': 'sadec' } },
+        { AURA_DB: revDb } as any
+      );
+      expect(revRes.status).toBe(200);
+      expect(
+        reviewSqls.some((s) =>
+          s.includes("COALESCE(NULLIF(TRIM(o.tenant_id), ''), NULLIF(TRIM(r.tenant_id), ''), 'default') = ?")
+        )
+      ).toBe(true);
+
+      // 5. AH1-5: Pretix GET /events ignores ?organizer= override from unprivileged customer token
+      const fetchedPretixUrls: string[] = [];
+      const origFetch = globalThis.fetch;
+      globalThis.fetch = (async (input: RequestInfo | URL) => {
+        fetchedPretixUrls.push(String(input));
+        return new Response(JSON.stringify({ results: [] }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }) as typeof fetch;
+      try {
+        const pretixEventRes = await pretixRouter.request(
+          '/events?organizer=evil_org',
+          {
+            method: 'GET',
+            headers: { Authorization: `Bearer ${attackerCustToken}` },
+          },
+          {
+            AURA_DB: bdayDb,
+            JWT_SECRET: jwtSecret,
+            PRETIX_API_URL: 'https://pretix.test',
+            PRETIX_API_TOKEN: 'pretix-token-test',
+          } as any
+        );
+        expect(pretixEventRes.status).toBe(200);
+        expect(fetchedPretixUrls.some((u) => u.includes('/organizers/default/events'))).toBe(true);
+        expect(fetchedPretixUrls.some((u) => u.includes('evil_org'))).toBe(false);
+      } finally {
+        globalThis.fetch = origFetch;
+      }
+    });
+
+    it('scopes DinDin KV & fallbacks, short-circuits empty campaign stats without table scans, enforces matchesTenantRow in inventory forecasting, and prevents Mixpost empty-result fallback leaks (AH2)', async () => {
+      const { inventoryForecastingRouter } = await import('../../routes/inventory-forecasting');
+      const { mixpostRouter } = await import('../../routes/mixpost');
+
+      const jwtSecret = TEST_JWT_SECRET;
+      const sadecMgrToken = await generateJWT(
+        {
+          id: 'user-manager',
+          sub: 'user-manager',
+          role: 'manager',
+          email: 'manager@test.aura',
+          name: 'User manager',
+          tenantId: 'sadec',
+          tenant_id: 'sadec',
+          authVersion: 1,
+          authTime: Math.floor(Date.now() / 1000),
+          sessionType: 'staff-web',
+        } as any,
+        jwtSecret,
+        28800
+      );
+
+      const mgrStaffRow = staffAccountRow('manager', 'sadec');
+
+      // 1. AH2-1: DinDin GET /checkouts pushes tenant_id into fallback and blocks unscoped fallback for non-default tenant
+      const dindinSqls: string[] = [];
+      const dindinDb = {
+        prepare(sql: string) {
+          const makeStmt = () => ({
+            async first() {
+              if (/FROM staff_users|FROM staff_accounts|FROM users/i.test(sql)) {
+                return mgrStaffRow;
+              }
+              return null;
+            },
+            async all() {
+              dindinSqls.push(sql);
+              if (/FROM orders/i.test(sql) && sql.includes('tenant_id')) {
+                throw new Error('D1_ERROR: no such column: tenant_id');
+              }
+              return {
+                results: [{ id: 'DIN_DEFAULT_1', customer_name: 'DIN', total: 50000, status: 'pending' }],
+              };
+            },
+          });
+          return {
+            bind: () => makeStmt(),
+            first: () => makeStmt().first(),
+            all: () => makeStmt().all(),
+          };
+        },
+      };
+      const dinRes = await dindinRouter.request(
+        '/checkouts',
+        {
+          method: 'GET',
+          headers: {
+            Authorization: `Bearer ${sadecMgrToken}`,
+            'X-Tenant-ID': 'sadec',
+          },
+        },
+        { AURA_DB: dindinDb, JWT_SECRET: jwtSecret } as any
+      );
+      expect(dinRes.status).toBe(200);
+      const dinJson = (await dinRes.json()) as { checkouts: unknown[] };
+      expect(dinJson.checkouts).toEqual([]);
+      expect(dindinSqls.every((s) => s.includes('tenant_id'))).toBe(true);
+
+      // 2. AH2-2: Campaign stats does not fall through to unscoped LIMIT 5000 scan when scoped query returns []
+      const campSqls: string[] = [];
+      const campDb = {
+        prepare(sql: string) {
+          const makeStmt = () => ({
+            async first() {
+              if (/FROM staff_users|FROM staff_accounts|FROM users/i.test(sql)) {
+                return mgrStaffRow;
+              }
+              return null;
+            },
+            async all() {
+              campSqls.push(sql);
+              return { results: [] };
+            },
+          });
+          return {
+            bind: () => makeStmt(),
+            first: () => makeStmt().first(),
+            all: () => makeStmt().all(),
+          };
+        },
+      };
+      const campRes = await campaignsRouter.request(
+        '/stats/all',
+        {
+          method: 'GET',
+          headers: {
+            Authorization: `Bearer ${sadecMgrToken}`,
+            'X-Tenant-ID': 'sadec',
+          },
+        },
+        { AURA_DB: campDb, JWT_SECRET: jwtSecret } as any
+      );
+      expect(campRes.status).toBe(200);
+      expect(campSqls).toHaveLength(1);
+      expect(campSqls[0]).toContain("WHERE COALESCE(NULLIF(TRIM(cl.tenant_id), '')");
+
+      // 3. AH2-3: Inventory forecasting does not execute unscoped GROUP BY fallback for non-default tenant
+      const forecastSqls: string[] = [];
+      const forecastDb = {
+        prepare(sql: string) {
+          const makeStmt = () => ({
+            async first() {
+              if (/FROM staff_users|FROM staff_accounts|FROM users/i.test(sql)) {
+                return mgrStaffRow;
+              }
+              return null;
+            },
+            async all() {
+              forecastSqls.push(sql);
+              if (/FROM inventory_items/i.test(sql)) {
+                return {
+                  results: [
+                    { id: 'inv_sadec_1', sku: 'ARA-01', name: 'Hạt Arabica', current_stock: 10, min_stock: 5, unit: 'kg', tenant_id: 'sadec' },
+                  ],
+                };
+              }
+              if (/FROM inventory_transactions|FROM stock_movements/i.test(sql) && sql.includes('tenant_id')) {
+                throw new Error('D1_ERROR: no such column: tenant_id');
+              }
+              return { results: [] };
+            },
+          });
+          return {
+            bind: () => makeStmt(),
+            first: () => makeStmt().first(),
+            all: () => makeStmt().all(),
+          };
+        },
+      };
+      const fcRes = await inventoryForecastingRouter.request(
+        '/run-rate',
+        {
+          method: 'GET',
+          headers: {
+            Authorization: `Bearer ${sadecMgrToken}`,
+            'X-Tenant-ID': 'sadec',
+          },
+        },
+        { AURA_DB: forecastDb, JWT_SECRET: jwtSecret } as any
+      );
+      expect(fcRes.status).toBe(200);
+      expect(
+        forecastSqls.some(
+          (s) => (/FROM inventory_transactions/i.test(s) || /FROM stock_movements/i.test(s)) && !s.includes('tenant_id')
+        )
+      ).toBe(false);
+
+      // 4. AH2-4: Mixpost GET /posts does not run unscoped SELECT fallback when scoped query returns []
+      const mixSqls: string[] = [];
+      const mixDb = {
+        prepare(sql: string) {
+          const makeStmt = () => ({
+            async first() {
+              if (/FROM staff_users|FROM staff_accounts|FROM users/i.test(sql)) {
+                return mgrStaffRow;
+              }
+              return null;
+            },
+            async all() {
+              mixSqls.push(sql);
+              return { results: [] };
+            },
+          });
+          return {
+            bind: () => makeStmt(),
+            first: () => makeStmt().first(),
+            all: () => makeStmt().all(),
+          };
+        },
+      };
+      const mixRes = await mixpostRouter.request(
+        '/posts',
+        {
+          method: 'GET',
+          headers: {
+            Authorization: `Bearer ${sadecMgrToken}`,
+            'X-Tenant-ID': 'sadec',
+          },
+        },
+        { AURA_DB: mixDb, JWT_SECRET: jwtSecret } as any
+      );
+      expect(mixRes.status).toBe(200);
+      expect(
+        mixSqls.some((s) => /FROM mixpost_posts/i.test(s) && !s.includes('tenant_id'))
+      ).toBe(false);
+    });
+
+    it('fails closed on missing customer tenant in POS lookup, filters cron run fallbacks, scopes realtime DO channels via idFromName, and enforces default-tenant & kitchen/barista boundaries in domain policies (AH3)', async () => {
+      const { matchesCronRunTenant } = await import('../../routes/openapi-cron-handlers/helpers');
+      const { realtimeOrdersRouter } = await import('../../routes/realtime-orders');
+      const { authorizeAction, validateOperatingUnitScope } = await import('../../../../packages/domain/staff/src/policies/authorization-policy');
+      const { validateAccessControl } = await import('../../../../packages/domain/security/src/policies/security-policy');
+
+      const jwtSecret = TEST_JWT_SECRET;
+      const sadecCashierToken = await generateJWT(
+        {
+          id: 'user-cashier',
+          sub: 'user-cashier',
+          role: 'cashier',
+          email: 'cashier@test.aura',
+          name: 'User cashier',
+          tenantId: 'sadec',
+          tenant_id: 'sadec',
+          authVersion: 1,
+          authTime: Math.floor(Date.now() / 1000),
+          sessionType: 'staff-web',
+        } as any,
+        jwtSecret,
+        28800
+      );
+
+      // 1. AH3-1: POS customer lookup fails closed for non-default tenant when customers.tenant_id column is missing
+      const posDb = {
+        prepare(sql: string) {
+          const makeStmt = () => ({
+            async first() {
+              if (/FROM staff_users|FROM staff_accounts|FROM users/i.test(sql)) {
+                return staffAccountRow('cashier', 'sadec');
+              }
+              if (sql.includes('c.tenant_id')) {
+                throw new Error('D1_ERROR: no such column: c.tenant_id');
+              }
+              return { id: 'cust_default_1', name: 'Default Customer', phone: '0903334444' };
+            },
+          });
+          return {
+            bind: () => makeStmt(),
+            first: () => makeStmt().first(),
+          };
+        },
+      };
+      const posRes = await posCustomerRouter.request(
+        '/?phone=0903334444',
+        {
+          method: 'GET',
+          headers: {
+            Authorization: `Bearer ${sadecCashierToken}`,
+            'X-Tenant-ID': 'sadec',
+          },
+        },
+        { AURA_DB: posDb, JWT_SECRET: jwtSecret } as any
+      );
+      expect(posRes.status).toBe(200);
+      const posJson = (await posRes.json()) as { found?: boolean; customer?: unknown };
+      expect(posJson.found).toBe(false);
+      expect(posJson.customer).toBeUndefined();
+
+      // 2. AH3-2: matchesCronRunTenant rejects cross-tenant run rows and cross-tenant JSON payload runs
+      expect(matchesCronRunTenant({ id: 'run1', job_id: 'job1', tenant_id: 'other_store' }, 'sadec', 'job1')).toBe(false);
+      expect(
+        matchesCronRunTenant(
+          { id: 'run2', job_id: 'job1', payload: JSON.stringify({ tenant_id: 'other_store' }) },
+          'sadec',
+          'job1'
+        )
+      ).toBe(false);
+      expect(matchesCronRunTenant({ id: 'run3', job_id: 'job1', tenant_id: 'sadec' }, 'sadec', 'job1')).toBe(true);
+
+      // 3. AH3-4: realtimeOrdersRouter matches /api/realtime/:channelId, rejects foreign prefix, and resolves DO via idFromName with tenant prefix
+      const resolvedNames: string[] = [];
+      const doEnv = {
+        ORDER_BROADCASTER: {
+          idFromName(name: string) {
+            resolvedNames.push(name);
+            return { toString: () => `id:${name}` } as unknown as DurableObjectId;
+          },
+          get() {
+            return {
+              async fetch() {
+                return new Response(JSON.stringify({ connected: true }), { status: 200 });
+              },
+            };
+          },
+        },
+      };
+      const foreignWsRes = await realtimeOrdersRouter.request(
+        '/api/realtime/other_store:orders',
+        { method: 'GET', headers: { 'X-Tenant-ID': 'sadec' } },
+        doEnv as any
+      );
+      expect(foreignWsRes.status).toBe(403);
+
+      const validWsRes = await realtimeOrdersRouter.request(
+        '/api/realtime/orders-stream',
+        { method: 'GET', headers: { 'X-Tenant-ID': 'sadec' } },
+        doEnv as any
+      );
+      expect(validWsRes.status).toBe(200);
+      expect(resolvedNames).toContain('sadec:orders-stream');
+
+      // 4. AH3-5: Domain policies normalize empty/undefined tenantId to 'default' and restrict barista/kitchen/cashier catalog writes
+      const scopeMismatch = validateOperatingUnitScope(
+        { id: 'staff_1', role: 'staff', tenantId: undefined },
+        { type: 'order', tenantId: 'sadec' }
+      );
+      expect(scopeMismatch.allowed).toBe(false);
+      expect(scopeMismatch.code).toBe('tenant_mismatch');
+
+      const secMismatch = validateAccessControl(
+        { userId: 'staff_1', userRole: 'staff', userTenantId: '' },
+        { resourceType: 'order', tenantId: 'sadec' }
+      );
+      expect(secMismatch.allowed).toBe(false);
+      expect(secMismatch.code).toBe('FORBIDDEN_TENANT');
+
+      expect(
+        authorizeAction(
+          { id: 'barista_1', role: 'barista', tenantId: 'sadec' },
+          { type: 'catalog', tenantId: 'sadec' },
+          'create'
+        ).allowed
+      ).toBe(false);
+      expect(
+        authorizeAction(
+          { id: 'barista_1', role: 'barista', tenantId: 'sadec' },
+          { type: 'payment', tenantId: 'sadec' },
+          'create'
+        ).allowed
+      ).toBe(false);
+      expect(
+        authorizeAction(
+          { id: 'cashier_1', role: 'cashier', tenantId: 'sadec' },
+          { type: 'catalog', tenantId: 'sadec' },
+          'update'
+        ).allowed
+      ).toBe(false);
+      expect(
+        authorizeAction(
+          { id: 'cashier_1', role: 'cashier', tenantId: 'sadec' },
+          { type: 'payment', tenantId: 'sadec' },
+          'create'
+        ).allowed
+      ).toBe(true);
+    });
+  });
+
+  describe('Suite 42 — Phase AQ1–AQ4: OpenAPI Audit Tenant Attribution, Menu Modifier Projection Tenant Propagation & Alert Dispatcher Per-Tenant Scoping', () => {
+    it('stamps audit_logs.tenant_id on OpenAPI catalog/promotions/loyalty mutations, propagates group tenant to menu_modifiers projections, and scopes AlertDispatcher metrics & cooldown keys per tenant', async () => {
+      const { OpenAPIHono } = await import('@hono/zod-openapi');
+      const { registerProductMutationHandlers } = await import('../../routes/openapi-products-handlers/mutation-handlers');
+      const { registerCategoryMutationHandlers } = await import('../../routes/openapi-categories-handlers/mutation-handlers');
+      const { registerUsageHandlers } = await import('../../routes/openapi-promotions-handlers/usage-handlers');
+      const { registerTierHandlers } = await import('../../routes/openapi-loyalty-handlers/tier-handlers');
+      const { menuModifiersRouter } = await import('@aura/domain-catalog');
+      const { createAlertDispatcher } = await import('../../lib/alerts/factory');
+
+      // 1. AQ1: OpenAPI product/category mutations & HQ promotion usage stamp store tenant_id on audit_logs & promotion_usages
+      const aq1Execs: Array<{ sql: string; args: unknown[] }> = [];
+      const aq1Db = {
+        prepare(sql: string) {
+          const makeStmt = (args: unknown[]) => ({
+            async first() {
+              if (sql.includes('FROM categories WHERE id = ?')) {
+                return { id: 'cat-sadec-1', name: 'Cà Phê', slug: 'ca-phe', tenant_id: 'sadec' };
+              }
+              if (sql.includes('FROM products p')) {
+                return {
+                  id: String(args[0] ?? 'prod-1'),
+                  category_id: 'cat-sadec-1',
+                  name: 'Cà Phê Muối',
+                  slug: 'ca-phe-muoi',
+                  price: 39000,
+                  is_available: 1,
+                  tenant_id: 'sadec',
+                };
+              }
+              if (sql.includes('FROM promotions')) {
+                return {
+                  id: '550e8400-e29b-41d4-a716-446655440001',
+                  code: 'SADEC20',
+                  name: 'Sa Đéc 20%',
+                  type: 'percentage',
+                  value: 20,
+                  is_active: 1,
+                  current_uses: 0,
+                  max_uses: 100,
+                  tenant_id: '  sadec  ',
+                };
+              }
+              if (sql.includes('FROM orders')) {
+                return {
+                  id: '550e8400-e29b-41d4-a716-446655440002',
+                  subtotal: 100000,
+                  status: 'pending',
+                  tenant_id: 'sadec',
+                };
+              }
+              if (sql.includes('COUNT(*) as count FROM promotion_usages')) {
+                return { count: 0 };
+              }
+              if (sql.includes('FROM loyalty_tier_configs WHERE tier = ?')) {
+                const requestedTier = String(args[0] ?? '');
+                if (requestedTier === 'platinum') {
+                  return { tier: 'platinum', min_points: 100, tenant_id: 'other_store' };
+                }
+                return { tier: requestedTier, min_points: 500, tenant_id: '  sadec  ' };
+              }
+              return null;
+            },
+            async all() {
+              if (sql.includes('FROM loyalty_tier_configs')) {
+                return {
+                  results: [
+                    { tier: 'bronze', min_points: 0, tenant_id: 'default' },
+                    { tier: 'gold', min_points: 500, tenant_id: 'other_store' },
+                  ],
+                };
+              }
+              return { results: [] };
+            },
+            async run() {
+              aq1Execs.push({ sql, args });
+              return { success: true, meta: { changes: 1 } };
+            },
+          });
+          return {
+            bind: (...args: unknown[]) => makeStmt(args),
+            first: () => makeStmt([]).first(),
+            all: () => makeStmt([]).all(),
+            run: () => makeStmt([]).run(),
+          };
+        },
+      };
+
+      const catApp = new OpenAPIHono<any>();
+      catApp.use('*', async (c, next) => {
+        c.set('tenantId', 'sadec');
+        c.set('user', { id: 'mgr-sadec', role: 'manager', tenantId: 'sadec' });
+        await next();
+      });
+      registerCategoryMutationHandlers(catApp);
+
+      const catRes = await catApp.request(
+        '/api/categories',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            slug: 'tra-sen',
+            type: 'drink',
+            translations: [{ locale: 'vi', name: 'Trà Sen' }],
+          }),
+        },
+        { AURA_DB: aq1Db } as any
+      );
+      expect(catRes.status).toBe(201);
+      expect(
+        aq1Execs.some(
+          (q) =>
+            q.sql.includes('UPDATE audit_logs SET tenant_id = ?') &&
+            q.args[0] === 'sadec' &&
+            q.args[3] === 'category_create'
+        )
+      ).toBe(true);
+
+      const prodApp = new OpenAPIHono<any>();
+      prodApp.use('*', async (c, next) => {
+        c.set('tenantId', 'sadec');
+        c.set('user', { id: 'mgr-sadec', role: 'manager', tenantId: 'sadec' });
+        await next();
+      });
+      registerProductMutationHandlers(prodApp);
+
+      const prodRes = await prodApp.request(
+        '/api/products',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            slug: 'ca-phe-muoi',
+            categoryId: 'cat-sadec-1',
+            basePrice: 39000,
+            translations: [{ locale: 'vi', name: 'Cà Phê Muối' }],
+          }),
+        },
+        { AURA_DB: aq1Db } as any
+      );
+      expect(prodRes.status).toBe(201);
+      expect(
+        aq1Execs.some(
+          (q) =>
+            q.sql.includes('UPDATE audit_logs SET tenant_id = ?') &&
+            q.args[0] === 'sadec' &&
+            q.args[3] === 'product_create'
+        )
+      ).toBe(true);
+
+      // HQ calling POST /api/promotions/use inherits promotion.tenant_id ('sadec')
+      const promoUseApp = new OpenAPIHono<any>();
+      promoUseApp.use('*', async (c, next) => {
+        c.set('tenantId', '*');
+        c.set('user', { id: 'hq-owner-1', role: 'owner', tenantId: '*' });
+        await next();
+      });
+      registerUsageHandlers(promoUseApp);
+
+      const useRes = await promoUseApp.request(
+        '/api/promotions/use',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            promotionId: '550e8400-e29b-41d4-a716-446655440001',
+            orderId: '550e8400-e29b-41d4-a716-446655440002',
+            customerId: '550e8400-e29b-41d4-a716-446655440003',
+            discountAmount: 15000,
+          }),
+        },
+        { AURA_DB: aq1Db } as any
+      );
+      expect(useRes.status).toBe(200);
+      expect(
+        aq1Execs.some(
+          (q) =>
+            q.sql.includes('INSERT INTO promotion_usages') &&
+            q.args.includes('sadec')
+        )
+      ).toBe(true);
+      expect(
+        aq1Execs.some(
+          (q) =>
+            q.sql.includes('UPDATE audit_logs SET tenant_id = ?') &&
+            q.args[0] === 'sadec' &&
+            q.args[3] === 'promotion_use'
+        )
+      ).toBe(true);
+
+      // OpenAPI GET /api/loyalty/tiers falls back to 'default' rows when store has no custom rows and hides 'other_store'
+      const tierApp = new OpenAPIHono<any>();
+      registerTierHandlers(tierApp);
+      const listTiersRes = await tierApp.request(
+        '/api/loyalty/tiers?tenant_id=sadec',
+        { method: 'GET' },
+        { AURA_DB: aq1Db, PILOT_TENANT_ID: 'sadec' } as any
+      );
+      expect(listTiersRes.status).toBe(200);
+      const listTiersJson = (await listTiersRes.json()) as { data: Array<{ tier: string }> };
+      expect(listTiersJson.data.map((t) => t.tier)).toEqual(['bronze']);
+
+      const getOtherTierRes = await tierApp.request(
+        '/api/loyalty/tiers/platinum?tenant_id=sadec',
+        { method: 'GET' },
+        { AURA_DB: aq1Db, PILOT_TENANT_ID: 'sadec' } as any
+      );
+      expect(getOtherTierRes.status).toBe(404);
+
+      // 2. AQ2: menuModifiersRouter propagates group's tenant_id ('sadec') to menu_modifiers projection upserts/updates/deletes
+      const modExecs: Array<{ sql: string; args: unknown[] }> = [];
+      const modDb = {
+        prepare(sql: string) {
+          if (isAccountLookup(sql)) {
+            return accountStatement('manager', 'sadec');
+          }
+          const makeStmt = (args: unknown[]) => ({
+            async first() {
+              if (sql.includes('FROM modifier_groups WHERE id = ?')) {
+                return { id: 'mg-sadec-1', name: 'Topping Sa Đéc', is_active: 1, tenant_id: '  sadec  ' };
+              }
+              if (sql.includes('FROM modifier_choices WHERE id = ?')) {
+                return { id: 'mc-sadec-1', group_id: 'mg-sadec-1', name: 'Kem Muối', price_delta: 10000, is_available: 1 };
+              }
+              return null;
+            },
+            async all() {
+              return { results: [] };
+            },
+            async run() {
+              modExecs.push({ sql, args });
+              return { success: true, meta: { changes: 1 } };
+            },
+          });
+          return {
+            bind: (...args: unknown[]) => makeStmt(args),
+            first: () => makeStmt([]).first(),
+            all: () => makeStmt([]).all(),
+            run: () => makeStmt([]).run(),
+          };
+        },
+      };
+
+      const modEnv = createMockEnv({ JWT_SECRET: TEST_JWT_SECRET, AURA_DB: modDb as any });
+
+      const createChoiceReq = await authRequest('POST', '/groups/mg-sadec-1/choices', 'manager', 'sadec', {
+        name: 'Kem Muối',
+        price_delta: 10000,
+      });
+      const createChoiceRes = await menuModifiersRouter.fetch(createChoiceReq, modEnv);
+      expect(createChoiceRes.status).toBe(201);
+      expect(
+        modExecs.some(
+          (q) =>
+            q.sql.includes('INSERT INTO menu_modifiers') &&
+            q.args.includes('sadec')
+        )
+      ).toBe(true);
+
+      const patchGroupReq = await authRequest('PATCH', '/groups/mg-sadec-1', 'manager', 'sadec', {
+        is_active: false,
+      });
+      const patchGroupRes = await menuModifiersRouter.fetch(patchGroupReq, modEnv);
+      expect(patchGroupRes.status).toBe(200);
+      expect(
+        modExecs.some(
+          (q) =>
+            q.sql.includes('UPDATE menu_modifiers SET available = 0') &&
+            q.sql.includes("COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?") &&
+            q.args[1] === 'sadec'
+        )
+      ).toBe(true);
+
+      // 3. AQ3: createAlertDispatcher(db, 'sadec') scopes _metrics queries and namespaces alert cooldown keys per tenant
+      const alertSqls: Array<{ sql: string; args: unknown[] }> = [];
+      const alertDb = {
+        prepare(sql: string) {
+          const makeStmt = (args: unknown[]) => ({
+            async first() {
+              alertSqls.push({ sql, args });
+              if (sql.includes("name = 'order_stuck'")) {
+                return { value: 2 };
+              }
+              if (sql.includes('FROM _alerts')) {
+                return null;
+              }
+              if (sql.includes("name = 'order_created'") && sql.includes('COUNT(*) as c')) {
+                return { c: 12 };
+              }
+              if (sql.includes("name = 'revenue'")) {
+                return { s: 480000 };
+              }
+              return { value: 0, c: 0, s: 0 };
+            },
+            async run() {
+              alertSqls.push({ sql, args });
+              return { success: true, meta: { changes: 1, last_row_id: 77 } };
+            },
+          });
+          return {
+            bind: (...args: unknown[]) => makeStmt(args),
+            first: () => makeStmt([]).first(),
+            run: () => makeStmt([]).run(),
+          };
+        },
+      };
+
+      const sentAlerts: string[] = [];
+      const dispatcher = createAlertDispatcher(alertDb as any, 'sadec');
+      const fired = await dispatcher.dispatchAlerts(async (msg) => {
+        sentAlerts.push(msg);
+      });
+      expect(fired).toEqual(['order_stuck']);
+      expect(sentAlerts).toHaveLength(1);
+      expect(
+        alertSqls.some(
+          (q) =>
+            q.sql.includes("name = 'order_stuck'") &&
+            q.sql.includes("COALESCE(NULLIF(TRIM(json_extract(tags, '$.tenant_id')), ''), 'default') = ?") &&
+            q.args[0] === 'sadec'
+        )
+      ).toBe(true);
+      expect(
+        alertSqls.some(
+          (q) =>
+            q.sql.includes('INSERT INTO _alerts') &&
+            q.args[0] === 'order_stuck:sadec'
+        )
+      ).toBe(true);
+
+      const digestMsgs: string[] = [];
+      await dispatcher.dispatchDigest(async (msg) => {
+        digestMsgs.push(msg);
+      }, 'en');
+      expect(digestMsgs).toHaveLength(1);
+      expect(digestMsgs[0]).toContain('12');
+    });
+  });
+
+  describe('Suite 43: Phase AR1–AR4 AuditLogger / createAuditMiddleware Tenant Attribution, filterAuditRowsByTenant Canonical tenantId Extraction & SOP/Tables Audit Stamp Convergence', () => {
+    it('AR1: AuditLogger.log, createAuditMiddleware & AuditLogger.prune enforce per-tenant attribution and pruning', async () => {
+      const { AuditLogger, createAuditMiddleware } = await import('../../lib/audit-logger');
+      const { Hono } = await import('hono');
+
+      const auditRows: Array<Record<string, any>> = [];
+      const mockDb = {
+        prepare(sql: string) {
+          return {
+            bind(...args: unknown[]) {
+              return {
+                async run() {
+                  if (sql.includes('INSERT INTO audit_logs') && sql.includes('operating_unit_id, tenant_id')) {
+                    auditRows.push({
+                      id: args[0],
+                      actor_id: args[1],
+                      actor_name: args[2],
+                      action: args[4],
+                      resource_type: args[5],
+                      resource_id: args[6],
+                      tenant_id: args[10],
+                      details: args[12],
+                      metadata: args[13],
+                      created_at: '2020-01-01T00:00:00.000Z',
+                    });
+                    return { success: true, meta: { changes: 1 } };
+                  }
+                  if (sql.includes('DELETE FROM audit_logs') && sql.includes('COALESCE(NULLIF(TRIM(tenant_id)')) {
+                    const targetTenant = String(args[1]);
+                    const before = auditRows.length;
+                    for (let i = auditRows.length - 1; i >= 0; i--) {
+                      const rowTenant = String(auditRows[i].tenant_id ?? '').trim() || 'default';
+                      if (rowTenant === targetTenant) {
+                        auditRows.splice(i, 1);
+                      }
+                    }
+                    return { success: true, meta: { changes: before - auditRows.length } };
+                  }
+                  return { success: true, meta: { changes: 0 } };
+                },
+              };
+            },
+          };
+        },
+      };
+
+      const app = new Hono<{ Bindings: { AURA_DB: any }; Variables: { user: any; tenantId: string } }>();
+      app.use('/api/admin/*', async (c, next) => {
+        c.set('user', { id: 'hq-owner-1', name: 'HQ Owner', role: 'owner', tenantId: '*' });
+        c.set('tenantId', c.req.header('X-Tenant-ID') || '*');
+        await next();
+      });
+      app.use('/api/admin/*', createAuditMiddleware() as any);
+      app.post('/api/admin/settings', (c) => c.json({ ok: true }));
+
+      const resB = await app.request(
+        '/api/admin/settings',
+        { method: 'POST', headers: { 'X-Tenant-ID': 'store-b' } },
+        { AURA_DB: mockDb }
+      );
+      expect(resB.status).toBe(200);
+
+      const logger = new AuditLogger(undefined as any, mockDb as any);
+      await logger.log({
+        actor_id: 'mgr-a',
+        actor_name: 'Manager A',
+        action: 'admin.patch',
+        resource_type: 'admin',
+        tenant_id: 'store-a',
+        details: JSON.stringify({ path: '/api/admin/config', method: 'PATCH' }),
+      });
+
+      expect(auditRows).toHaveLength(2);
+      expect(auditRows[0].tenant_id).toBe('store-b');
+      expect(JSON.parse(auditRows[0].details).tenantId).toBe('store-b');
+      expect(auditRows[1].tenant_id).toBe('store-a');
+
+      const pruned = await logger.prune(90, 'store-b');
+      expect(pruned.deleted).toBe(1);
+      expect(auditRows).toHaveLength(1);
+      expect(auditRows[0].tenant_id).toBe('store-a');
+    });
+
+    it('AR2: filterAuditRowsByTenant extracts camelCase tenantId and nested metadata.tenantId from canonical audit records', async () => {
+      const { filterAuditRowsByTenant } = await import('../../routes/admin-audit-logs-handlers/query-handler');
+
+      const legacyRows = [
+        {
+          id: 'aud-1',
+          actor_id: 'sys-1',
+          action: 'sop_run.started',
+          details: JSON.stringify({ outcome: 'success', tenantId: 'store-b', metadata: { shiftType: 'morning' } }),
+        },
+        {
+          id: 'aud-2',
+          actor_id: 'sys-1',
+          action: 'sop_run.completed',
+          details: JSON.stringify({ outcome: 'success', metadata: { tenantId: 'store-a' } }),
+        },
+        {
+          id: 'aud-3',
+          actor_id: 'sys-1',
+          action: 'admin.post',
+          details: JSON.stringify({ path: '/api/admin/settings', tenant_id: 'store-b' }),
+        },
+      ];
+
+      const storeBRows = await filterAuditRowsByTenant(null, legacyRows, 'store-b');
+      expect(storeBRows.map((r) => r.id)).toEqual(['aud-1', 'aud-3']);
+
+      const storeARows = await filterAuditRowsByTenant(null, legacyRows, 'store-a');
+      expect(storeARows.map((r) => r.id)).toEqual(['aud-2']);
+    });
+
+    it('AR3: auditActor resolves HQ X-Tenant-ID store override and writeTableAuditLog / writePromotionAuditLog stamp legacy 7-column fallback rows', async () => {
+      const { auditActor } = await import('../../routes/openapi-sop-handlers/sop-audit');
+      const { writeTableAuditLog } = await import('../../routes/openapi-tables-handlers/helpers');
+
+      const fakeCtx: any = {
+        env: {},
+        get(key: string) {
+          if (key === 'user') return { id: 'hq-1', name: 'HQ Admin', role: 'owner', tenantId: '*' };
+          if (key === 'tenantId') return 'store-b';
+          return undefined;
+        },
+        req: {
+          header(name: string) {
+            if (name.toLowerCase() === 'x-tenant-id') return 'store-b';
+            return undefined;
+          },
+          query() {
+            return undefined;
+          },
+        },
+      };
+
+      const actor = auditActor(fakeCtx);
+      expect(actor.tenantId).toBe('store-b');
+
+      const stampedUpdates: Array<{ tenantId: string; entityId: string; action: string }> = [];
+      const legacy7ColDb = {
+        prepare(sql: string) {
+          return {
+            bind(...args: unknown[]) {
+              return {
+                async run() {
+                  if (sql.includes('INSERT INTO audit_logs') && sql.includes('tenant_id')) {
+                    throw new Error('no such column: tenant_id in legacy insert matcher');
+                  }
+                  if (sql.startsWith('UPDATE audit_logs SET tenant_id = ?')) {
+                    stampedUpdates.push({
+                      tenantId: String(args[0]),
+                      entityId: String(args[1]),
+                      action: String(args[3]),
+                    });
+                  }
+                  return { success: true, meta: { changes: 1 } };
+                },
+              };
+            },
+          };
+        },
+      };
+
+      await writeTableAuditLog(
+        legacy7ColDb,
+        'hq-1',
+        'table_zone_update',
+        'table_zone',
+        'zone-b-1',
+        JSON.stringify({ name: 'VIP Rooftop' }),
+        '2026-11-03T00:00:00.000Z',
+        'store-b'
+      );
+
+      expect(stampedUpdates).toEqual([
+        { tenantId: 'store-b', entityId: 'zone-b-1', action: 'table_zone_update' },
+      ]);
+    });
+  });
+
+  // =========================================================================
+  // Suite 44 — Phase AI1–AI3: Order Stream/WiFi/Signage, Cal.com/Mautic/ERPNext/Mixpost
+  //            & TastyIgniter/Subscriptions/Reservations Tenant Isolation & RBAC
+  // =========================================================================
+  describe('Suite 44 — Phase AI1–AI3: Order Stream/WiFi/Signage, Cal.com/Mautic/ERPNext/Mixpost & TastyIgniter/Subscriptions/Reservations Tenant Isolation & RBAC', () => {
+    it('enforces tenant isolation across order-stream, wifi, signage, cal-booking, mautic, mixpost, tastyigniter, subscriptions, and reservations waitlist seat', async () => {
+      const { Hono } = await import('hono');
+      const { orderStreamRouter } = await import('../../routes/order-stream');
+      const { checkWifiSessionStatus } = await import('../../tree/wifi/session');
+      const { signageRouter } = await import('../../routes/signage');
+      const { createReservationFromBooking } = await import('../../tree/cal-booking/process-booking');
+      const { syncMauticContacts } = await import('../../tree/mautic/contact-sync-cron');
+      const { autoPostDailySpecials } = await import('../../tree/mixpost/auto-post-daily-specials');
+      const { processTIWebhook, matchesWebhookOrderTenant } = await import(
+        '../../tree/integrations/tastyigniter/webhook'
+      );
+      const { getTiMenuCache } = await import('../../tree/integrations/tastyigniter/sync');
+      const { reservationsRouter } = await import(
+        '../../../../packages/domain/reservation/src/routes/reservations'
+      );
+
+      // 1. AI1: order-stream rejects non-HQ staff user with wildcard tenantId='*'
+      const streamApp = new Hono<{ Bindings: Env }>();
+      streamApp.use('*', async (c, next) => {
+        c.set('user' as never, { id: 'waiter-wild', role: 'waiter', tenantId: '*' } as never);
+        c.set('tenantId' as never, '*' as never);
+        await next();
+      });
+      streamApp.route('/api/orders', orderStreamRouter);
+      const streamRes = await streamApp.fetch(
+        new Request('https://api.test/api/orders/ord-1/events'),
+        createMockEnv({ JWT_SECRET: TEST_JWT_SECRET })
+      );
+      expect(streamRes.status).toBe(403);
+
+      // 2. AI1: WiFi checkWifiSessionStatus pushes tenant_id filter before LIMIT and Signage fails closed on non-default schema fallback
+      const wifiSqls: string[] = [];
+      const wifiDb = {
+        prepare(sql: string) {
+          wifiSqls.push(sql);
+          return {
+            bind(..._args: unknown[]) {
+              return {
+                async first() {
+                  return {
+                    id: 'ws-b-1',
+                    client_mac: 'AA:BB:CC:DD:EE:01',
+                    status: 'authorized',
+                    expires_at: '2099-01-01T00:00:00.000Z',
+                    tenant_id: 'store-b',
+                  };
+                },
+              };
+            },
+          };
+        },
+      };
+      const wifiStatus = await checkWifiSessionStatus({ AURA_DB: wifiDb } as any, 'AA:BB:CC:DD:EE:01', 'store-b');
+      expect(wifiStatus.authorized).toBe(true);
+      expect(wifiSqls[0]).toContain("COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?");
+
+      const throwingSignageDb = {
+        prepare(_sql: string) {
+          return {
+            bind(..._args: unknown[]) {
+              return {
+                async all() {
+                  throw new Error('no such column: tenant_id');
+                },
+                async first() {
+                  throw new Error('no such column: tenant_id');
+                },
+              };
+            },
+            async all() {
+              return { results: [{ id: 'promo-leaked', code: 'LEAK', percent: 50, is_active: 1 }] };
+            },
+          };
+        },
+      };
+      const signageRes = await signageRouter.fetch(
+        new Request('https://api.test/promos'),
+        createMockEnv({ AURA_DB: throwingSignageDb as any, PILOT_TENANT_ID: 'store-b', JWT_SECRET: TEST_JWT_SECRET })
+      );
+      expect(signageRes.status).toBe(200);
+      const signageBody = (await signageRes.json()) as { success: boolean; data: unknown[] };
+      expect(signageBody.data).toEqual([]);
+
+      // 3. AI2: Cal.com booking rejects wildcard metadata.tenant_id='*' (defaults to 'default'), Mautic isolates KV sync cursor per tenant, Mixpost scopes SQL before LIMIT
+      const calSqls: Array<{ sql: string; args: unknown[] }> = [];
+      const calDb = {
+        prepare(sql: string) {
+          return {
+            bind(...args: unknown[]) {
+              calSqls.push({ sql, args });
+              return {
+                async first() {
+                  return null;
+                },
+                async all() {
+                  if (sql.includes('FROM cafe_tables')) {
+                    return { results: [{ id: 'tbl-def-1', capacity: 4, zone: 'indoor', status: 'available', tenant_id: 'default' }] };
+                  }
+                  return { results: [] };
+                },
+                async run() {
+                  return { success: true, meta: { changes: 1 } };
+                },
+              };
+            },
+          };
+        },
+      };
+      const calResult = await createReservationFromBooking(
+        calDb as any,
+        {
+          uid: 'cal-uid-wild-1',
+          title: 'Table Booking',
+          startTime: '2026-11-04T12:00:00.000Z',
+          endTime: '2026-11-04T13:00:00.000Z',
+          attendees: [{ name: 'Guest', email: 'guest@example.com' }],
+          metadata: { tenant_id: '*', guest_count: 2 },
+        }
+      );
+      expect('table_id' in calResult && calResult.table_id).toBe('tbl-def-1');
+      const calInsert = calSqls.find((q) => q.sql.includes('INSERT INTO reservations'));
+      expect(calInsert?.args).toContain('default');
+      expect(calInsert?.args).not.toContain('*');
+
+      const mauticKvKeys: string[] = [];
+      const mauticEnv = createMockEnv({
+        MAUTIC_BASE_URL: 'https://mautic.example.com',
+        MAUTIC_CLIENT_ID: 'cid',
+        MAUTIC_CLIENT_SECRET: 'csec',
+        AURA_DB: {
+          prepare(_sql: string) {
+            return {
+              bind(..._args: unknown[]) {
+                return {
+                  async all() {
+                    return { results: [] };
+                  },
+                };
+              },
+            };
+          },
+        } as any,
+        AUTH_KV: {
+          async get(key: string) {
+            mauticKvKeys.push(`get:${key}`);
+            return null;
+          },
+          async put(key: string, _val: string) {
+            mauticKvKeys.push(`put:${key}`);
+          },
+        } as any,
+      });
+      await syncMauticContacts(mauticEnv as any, 'store-b');
+      expect(mauticKvKeys).toContain('get:mautic_last_sync_ts:store-b');
+
+      const mixpostSqls: string[] = [];
+      const mixpostDb = {
+        prepare(sql: string) {
+          mixpostSqls.push(sql);
+          return {
+            bind(..._args: unknown[]) {
+              return {
+                async all() {
+                  return { results: [] };
+                },
+              };
+            },
+            async all() {
+              mixpostSqls.push(`unscoped:${sql}`);
+              return { results: [{ id: 'leaked-prod', name: 'Leak', price: 50000 }] };
+            },
+          };
+        },
+      };
+      const mixpostRes = await autoPostDailySpecials(
+        {
+          MIXPOST_API_URL: 'https://mixpost.example.com',
+          MIXPOST_API_TOKEN: 'tok',
+          MIXPOST_ACCOUNTS: '1',
+          AURA_DB: mixpostDb,
+        } as any,
+        'store-b'
+      );
+      expect(mixpostRes.posted).toBe(0);
+      expect(mixpostSqls.some((s) => s.startsWith('unscoped:'))).toBe(false);
+
+      // 4. AI3: TastyIgniter matchesWebhookOrderTenant fails closed on '*', processTIWebhook blocks cross-tenant bridge collision, getTiMenuCache fails closed for non-default tenant, and reservations waitlist seat requires staff auth
+      expect(matchesWebhookOrderTenant({ id: 'o-1', tenant_id: 'store-a' }, '*')).toBe(false);
+      const tiCrossRes = await processTIWebhook(
+        {
+          AURA_DB: {
+            prepare(sql: string) {
+              return {
+                bind(..._args: unknown[]) {
+                  return {
+                    async first() {
+                      if (sql.includes('FROM ti_order_bridge')) {
+                        return { id: 'br-a', local_order_id: 'ord-a', tenant_id: 'store-a' };
+                      }
+                      return null;
+                    },
+                  };
+                },
+              };
+            },
+          },
+        } as any,
+        { event: 'order.status_updated', order_id: 999, status_code: 'preparation' } as any,
+        'store-b'
+      );
+      expect(tiCrossRes.success).toBe(false);
+
+      const tiCacheRes = await getTiMenuCache({ AURA_DB: throwingSignageDb as any }, 'store-b');
+      expect(tiCacheRes.items).toEqual([]);
+
+      const unauthSeatRes = await reservationsRouter.fetch(
+        new Request('https://api.test/waitlist/wl-1/seat', { method: 'POST' }),
+        createMockEnv({ JWT_SECRET: TEST_JWT_SECRET })
+      );
+      expect(unauthSeatRes.status).toBe(401);
+    });
+  });
+
+  // =========================================================================
+  // Suite 45 — Phase AK1–AK3: Reports/Analytics/Admin Metrics/Sales, Campaign Triggers/Push/Zalo/Alerts
+  //            & Auth/Loyalty/Referrals Tenant Isolation & Hardening
+  // =========================================================================
+  describe('Suite 45 — Phase AK1–AK3: Reports/Analytics/Admin Metrics/Sales, Campaign Triggers/Push/Zalo/Alerts & Auth/Loyalty/Referrals Tenant Isolation & Hardening', () => {
+    it('enforces RBAC & date-window bounds on reports/analytics, fails closed on admin-metrics/sales wildcard non-HQ, isolates campaign triggers/push/zalo/alerts, and scopes referral/password/campaign lookups', async () => {
+      const { Hono } = await import('hono');
+      const { reportsRouter } = await import('../../routes/reports');
+      const adminMetrics = (await import('../../routes/admin-metrics')).default;
+      const { adminSalesRouter } = await import('../../routes/admin-sales');
+      const { resolveAnalyticsTenant } = await import('../../tree/analytics/summary');
+      const { detectBirthdayCandidates } = await import('../../tree/campaigns/triggers/birthday');
+      const { detectWelcomeCandidates } = await import('../../tree/campaigns/triggers/welcome');
+      const { getActiveCampaign } = await import('../../tree/loyalty/campaign');
+      const { applyReferralForNewCustomer } = await import('../../tree/referrals/apply-referral');
+      const { handleZaloRequest } = await import('../../routes/zalo');
+      const { dispatchAlerts } = await import('../../lib/alerts/dispatcher');
+
+      // 1. AK1: grouped-sales-handlers enforces RBAC (waiter -> 403), analytics-handlers enforces <=366d range window (400), and resolveAnalyticsTenant rejects non-HQ user with tenantId='*'
+      const waiterReportsApp = new Hono<{ Bindings: Env }>();
+      waiterReportsApp.use('*', async (c, next) => {
+        c.set('user' as never, { id: 'waiter-ak1', role: 'waiter', tenantId: 'store-a' } as never);
+        c.set('tenantId' as never, 'store-a' as never);
+        await next();
+      });
+      waiterReportsApp.route('/', reportsRouter);
+      const waiterSalesRes = await waiterReportsApp.fetch(
+        new Request('https://api.test/sales-by-hour'),
+        createMockEnv({ JWT_SECRET: TEST_JWT_SECRET })
+      );
+      expect(waiterSalesRes.status).toBe(403);
+
+      const mgrReportsApp = new Hono<{ Bindings: Env }>();
+      mgrReportsApp.use('*', async (c, next) => {
+        c.set('user' as never, { id: 'mgr-ak1', role: 'manager', tenantId: 'store-a' } as never);
+        c.set('tenantId' as never, 'store-a' as never);
+        await next();
+      });
+      mgrReportsApp.route('/', reportsRouter);
+      const wideRangeOrdersRes = await mgrReportsApp.fetch(
+        new Request('https://api.test/orders?from=2024-01-01&to=2026-06-01'),
+        createMockEnv({ JWT_SECRET: TEST_JWT_SECRET })
+      );
+      expect(wideRangeOrdersRes.status).toBe(400);
+
+      const resolvedWildcardMgr = resolveAnalyticsTenant({
+        get: (k: string) => (k === 'user' ? { id: 'mgr-w', role: 'manager', tenantId: '*' } : undefined),
+        req: { query: () => undefined, header: () => undefined },
+      });
+      expect(resolvedWildcardMgr.forbidden).toBe(true);
+      expect(resolvedWildcardMgr.tenantId).toBe('default');
+
+      // 2. AK1: admin-metrics and admin-sales reject non-HQ manager with tenantId='*' (403)
+      const wildcardMgrApp = new Hono<{ Bindings: Env }>();
+      wildcardMgrApp.use('*', async (c, next) => {
+        c.set('user' as never, { id: 'mgr-wild', role: 'manager', tenantId: '*' } as never);
+        c.set('tenantId' as never, '*' as never);
+        await next();
+      });
+      wildcardMgrApp.route('/metrics', adminMetrics);
+      wildcardMgrApp.route('/sales', adminSalesRouter);
+
+      const metricsWildRes = await wildcardMgrApp.fetch(
+        new Request('https://api.test/metrics?range=24h'),
+        createMockEnv({ JWT_SECRET: TEST_JWT_SECRET })
+      );
+      expect(metricsWildRes.status).toBe(403);
+
+      const salesWildRes = await wildcardMgrApp.fetch(
+        new Request('https://api.test/sales/csv?range=24h'),
+        createMockEnv({ JWT_SECRET: TEST_JWT_SECRET })
+      );
+      expect(salesWildRes.status).toBe(403);
+
+      // 3. AK2: campaign triggers fail closed ([]) for non-default tenant when schema throws, handleZaloRequest ignores untrusted X-Tenant-ID header when resolvedTenantId is omitted, and AlertDispatcher scopes _alerts by tenant key prefix
+      const legacyThrowingDb = {
+        prepare(_sql: string) {
+          return {
+            bind(..._args: unknown[]) {
+              return {
+                async all() {
+                  throw new Error('no such column: tenant_id');
+                },
+                async first() {
+                  throw new Error('no such column: tenant_id');
+                },
+              };
+            },
+            async all() {
+              return { results: [{ id: 'leaked-cust', name: 'Leak', phone: '0900000000' }] };
+            },
+          };
+        },
+      };
+      expect(await detectBirthdayCandidates(legacyThrowingDb as any, 'store-b')).toEqual([]);
+      expect(await detectWelcomeCandidates(legacyThrowingDb as any, 'store-b')).toEqual([]);
+
+      const zaloCrossCustomerRes = await handleZaloRequest(
+        new Request('https://api.test/api/zalo/send', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-Tenant-ID': 'store-b' },
+          body: JSON.stringify({ customer_id: 'cust-store-b', template_key: 'order_confirmed', data: {} }),
+        }),
+        createMockEnv({
+          AURA_DB: {
+            prepare(_sql: string) {
+              return {
+                bind(...args: unknown[]) {
+                  return {
+                    async first() {
+                      // When resolvedTenantId is omitted, handleZaloRequest defaults to 'default' rather than trusting X-Tenant-ID='store-b'
+                      const boundTenant = args[1];
+                      return boundTenant === 'store-b'
+                        ? { id: 'cust-store-b', name: 'B', phone: '0911111111', tenant_id: 'store-b' }
+                        : null;
+                    },
+                  };
+                },
+              };
+            },
+          } as any,
+        })
+      );
+      const zaloCrossCustomerBody = (await zaloCrossCustomerRes.json()) as {
+        success: boolean;
+        data?: { ok: boolean; reason?: string };
+      };
+      expect(zaloCrossCustomerBody.success).toBe(false);
+      expect(zaloCrossCustomerBody.data?.reason).toBe('customer_not_found');
+
+      const alertSqls: Array<{ sql: string; args: unknown[] }> = [];
+      await dispatchAlerts(
+        createMockEnv({
+          PILOT_TENANT_ID: 'store-b',
+          TELEGRAM_BOT_TOKEN: 'bot-tok',
+          TELEGRAM_CHAT_ID: 'chat-1',
+          AURA_DB: {
+            prepare(sql: string) {
+              return {
+                bind(...args: unknown[]) {
+                  alertSqls.push({ sql, args });
+                  return {
+                    async all() {
+                      return { results: [] };
+                    },
+                    async run() {
+                      return { success: true, meta: { changes: 1 } };
+                    },
+                  };
+                },
+              };
+            },
+          } as any,
+        })
+      );
+      expect(alertSqls[0]?.sql).toContain('alert_key LIKE ?');
+      expect(alertSqls[0]?.args).toContain('store-b:%');
+
+      // 4. AK3: getActiveCampaign does not fall back to unscoped bonus_campaigns when non-default tenant has 0 rows, and applyReferralForNewCustomer scopes referral_codes before LIMIT 1
+      let unscopedCampaignQueried = false;
+      const campaignDb = {
+        prepare(sql: string) {
+          return {
+            bind(..._args: unknown[]) {
+              if (!sql.includes('tenant_id')) {
+                unscopedCampaignQueried = true;
+              }
+              return {
+                async first() {
+                  return null;
+                },
+              };
+            },
+          };
+        },
+      };
+      const activeCamp = await getActiveCampaign(campaignDb as any, 'store-b');
+      expect(activeCamp).toBeNull();
+      expect(unscopedCampaignQueried).toBe(false);
+
+      const refSqls: string[] = [];
+      const refDb = {
+        prepare(sql: string) {
+          refSqls.push(sql);
+          return {
+            bind(..._args: unknown[]) {
+              return {
+                async first() {
+                  return null;
+                },
+              };
+            },
+          };
+        },
+      };
+      const applyRefRes = await applyReferralForNewCustomer(
+        refDb as any,
+        'cust-ref-b',
+        'SHAREDCODE',
+        'store-b'
+      );
+      expect(applyRefRes.success).toBe(false);
+      expect(applyRefRes.reason).toBe('invalid_code');
+      expect(
+        refSqls.some(
+          (s) =>
+            s.includes('FROM referral_codes') &&
+            s.includes("COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?")
+        )
+      ).toBe(true);
+    });
+  });
+
+  // =========================================================================
+  // Suite 46 — Phase AS1–AS4: OpenAPI Cron Run Trigger/Retry HQ Tenant Inheritance,
+  //            Purchase Order/Ingredient/Supplier HQ Tenant Inheritance & Order/Inventory Audit Stamp Convergence
+  // =========================================================================
+  describe('Suite 46 — Phase AS1–AS4: OpenAPI Cron Run Trigger/Retry HQ Tenant Inheritance, Purchase Order/Ingredient/Supplier HQ Tenant Inheritance & Order/Inventory Audit Stamp Convergence', () => {
+    it('AS1: HQ (tenantId=*) triggering, retrying, or updating/deleting a store-scoped cron job/run inherits store tenant_id onto cron_runs and audit_logs', async () => {
+      const { OpenAPIHono } = await import('@hono/zod-openapi');
+      const { registerRunHandlers } = await import('../../routes/openapi-cron-handlers/run-handlers');
+      const { registerJobCrudHandlers } = await import('../../routes/openapi-cron-handlers/job-crud-handlers');
+
+      const jobUuid = '00000000-0000-4000-8000-000000000001';
+      const failedRunUuid = '00000000-0000-4000-8000-000000000002';
+      const cronRuns: Array<Record<string, any>> = [];
+      const auditLogs: Array<Record<string, any>> = [];
+      const mockCronDb = {
+        prepare(sql: string) {
+          return {
+            bind(...args: unknown[]) {
+              return {
+                async first() {
+                  if (sql.includes('SELECT * FROM cron_jobs WHERE id = ?')) {
+                    return {
+                      id: args[0],
+                      name: 'Sa Dec Daily Sync',
+                      cron_expression: '0 2 * * *',
+                      handler: 'daily_sync',
+                      payload: JSON.stringify({ tenant_id: 'sadec' }),
+                      is_active: 1,
+                      tenant_id: 'sadec',
+                    };
+                  }
+                  if (sql.includes('SELECT * FROM cron_runs WHERE id = ?')) {
+                    const found = cronRuns.find((r) => r.id === args[0]);
+                    if (found) return found;
+                    if (args[0] === failedRunUuid) {
+                      return {
+                        id: failedRunUuid,
+                        job_id: jobUuid,
+                        status: 'failed',
+                        payload: JSON.stringify({ tenant_id: 'sadec' }),
+                        tenant_id: 'sadec',
+                      };
+                    }
+                    return null;
+                  }
+                  return null;
+                },
+                async run() {
+                  if (sql.includes('INSERT INTO cron_runs')) {
+                    cronRuns.push({
+                      id: args[0],
+                      job_id: args[1],
+                      status: args[2],
+                      payload: args[3],
+                      tenant_id: args[4],
+                      started_at: args[5],
+                      created_at: args[6],
+                    });
+                  }
+                  if (sql.includes('INSERT INTO audit_logs')) {
+                    auditLogs.push({
+                      action: args[2],
+                      entity_id: args[4],
+                      metadata: args[5],
+                      tenant_id: args[6],
+                    });
+                  }
+                  return { success: true, meta: { changes: 1 } };
+                },
+              };
+            },
+          };
+        },
+      };
+
+      const app = new OpenAPIHono<{ Bindings: Env; Variables: { user: any; tenantId: string } }>();
+      app.use('*', async (c, next) => {
+        c.set('user', { id: 'hq-owner', role: 'owner', tenantId: '*' });
+        c.set('tenantId', '*');
+        await next();
+      });
+      registerRunHandlers(app as any);
+      registerJobCrudHandlers(app as any);
+
+      const triggerRes = await app.request(
+        `/api/cron/jobs/${jobUuid}/trigger`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({}),
+        },
+        { AURA_DB: mockCronDb } as any
+      );
+      expect(triggerRes.status).toBe(200);
+      expect(cronRuns[0]?.tenant_id).toBe('sadec');
+      expect(JSON.parse(String(cronRuns[0]?.payload)).tenant_id).toBe('sadec');
+      expect(auditLogs.find((a) => a.action === 'cron_job_trigger')?.tenant_id).toBe('sadec');
+
+      const retryRes = await app.request(
+        `/api/cron/runs/${failedRunUuid}/retry`,
+        { method: 'POST' },
+        { AURA_DB: mockCronDb } as any
+      );
+      expect(retryRes.status).toBe(200);
+      expect(cronRuns[1]?.tenant_id).toBe('sadec');
+      expect(auditLogs.find((a) => a.action === 'cron_run_retry')?.tenant_id).toBe('sadec');
+
+      const deleteRes = await app.request(
+        `/api/cron/jobs/${jobUuid}`,
+        { method: 'DELETE' },
+        { AURA_DB: mockCronDb } as any
+      );
+      expect(deleteRes.status).toBe(200);
+      expect(auditLogs.find((a) => a.action === 'cron_job_delete')?.tenant_id).toBe('sadec');
+    });
+
+    it('AS2 & AS3: HQ ingredient/supplier updates inherit store tenant_id on audit logs and claimGuestOrder stamps tenant_id in metadata & legacy 7-column fallback', async () => {
+      const { OpenAPIHono } = await import('@hono/zod-openapi');
+      const { registerIngredientHandlers } = await import('../../routes/openapi-inventory-handlers/ingredient-handlers');
+      const { registerSupplierHandlers } = await import('../../routes/openapi-inventory-handlers/supplier-handlers');
+      const { claimGuestOrder } = await import('../../../../packages/domain/customer/policies/order-ownership-policy');
+
+      const invAuditLogs: Array<Record<string, any>> = [];
+      const mockInvDb = {
+        prepare(sql: string) {
+          return {
+            bind(...args: unknown[]) {
+              return {
+                async first() {
+                  if (sql.includes('SELECT * FROM ingredients WHERE id = ?')) {
+                    return { id: args[0], name: 'Sữa Tươi Sa Đéc', sku: 'MILK-SD', unit: 'ml', tenant_id: 'sadec' };
+                  }
+                  if (sql.includes('SELECT * FROM suppliers WHERE id = ?')) {
+                    return { id: args[0], name: 'Viva Star Sa Đéc', tenant_id: 'sadec' };
+                  }
+                  return null;
+                },
+                async run() {
+                  if (sql.includes('INSERT INTO audit_logs')) {
+                    invAuditLogs.push({
+                      action: args[3],
+                      entity_id: args[5],
+                      tenant_id: args[8],
+                      metadata: args[10],
+                    });
+                  }
+                  return { success: true, meta: { changes: 1 } };
+                },
+              };
+            },
+          };
+        },
+      };
+
+      const invApp = new OpenAPIHono<{ Bindings: Env; Variables: { user: any; tenantId: string } }>();
+      invApp.use('*', async (c, next) => {
+        c.set('user', { id: 'hq-owner', role: 'owner', tenantId: '*' });
+        c.set('tenantId', '*');
+        await next();
+      });
+      registerIngredientHandlers(invApp as any);
+      registerSupplierHandlers(invApp as any);
+
+      const patchIngRes = await invApp.request(
+        '/api/inventory/ingredients/ing-sadec-1',
+        {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name: 'Sữa Tươi Thanh Trùng Sa Đéc' }),
+        },
+        { AURA_DB: mockInvDb } as any
+      );
+      expect(patchIngRes.status).toBe(200);
+      const ingUpdateAudit = invAuditLogs.find((a) => a.action === 'ingredient_update');
+      expect(ingUpdateAudit?.tenant_id).toBe('sadec');
+      expect(JSON.parse(String(ingUpdateAudit?.metadata)).tenant_id).toBe('sadec');
+
+      const patchSupRes = await invApp.request(
+        '/api/inventory/suppliers/sup-sadec-1',
+        {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ phone: '0909888777' }),
+        },
+        { AURA_DB: mockInvDb } as any
+      );
+      expect(patchSupRes.status).toBe(200);
+      const supUpdateAudit = invAuditLogs.find((a) => a.action === 'supplier_update');
+      expect(supUpdateAudit?.tenant_id).toBe('sadec');
+      expect(JSON.parse(String(supUpdateAudit?.metadata)).tenant_id).toBe('sadec');
+
+      // AS3: claimGuestOrder on a legacy 7-column audit_logs table stamps tenant_id in metadata and runs UPDATE audit_logs SET tenant_id = ?
+      const claimAuditRows: Array<Record<string, any>> = [];
+      const mockClaimDb = {
+        prepare(sql: string) {
+          return {
+            bind(...args: unknown[]) {
+              return {
+                async first() {
+                  if (sql.includes('FROM orders WHERE id = ?')) {
+                    return {
+                      id: 'ord-claim-sadec',
+                      customer_id: null,
+                      customer_phone: '0000000000',
+                      total: 65000,
+                      order_type: 'dine_in',
+                      tenant_id: 'sadec',
+                    };
+                  }
+                  return null;
+                },
+                async run() {
+                  if (sql.includes('INSERT INTO audit_logs') && sql.includes('tenant_id')) {
+                    throw new Error('7-column legacy audit_logs schema');
+                  }
+                  if (sql.includes('INSERT INTO audit_logs (id, user_id, action, entity_type, entity_id, metadata, created_at)')) {
+                    claimAuditRows.push({
+                      id: args[0],
+                      action: args[2],
+                      entity_id: args[4],
+                      metadata: args[5],
+                      created_at: args[6],
+                      tenant_id: null,
+                    });
+                    return { success: true, meta: { changes: 1 } };
+                  }
+                  if (sql.includes("UPDATE audit_logs SET tenant_id = ?") && sql.includes("action = 'order_claimed'")) {
+                    for (const row of claimAuditRows) {
+                      if (row.entity_id === args[1] && row.created_at === args[3]) {
+                        row.tenant_id = args[0];
+                      }
+                    }
+                    return { success: true, meta: { changes: 1 } };
+                  }
+                  return { success: true, meta: { changes: 1 } };
+                },
+              };
+            },
+          };
+        },
+      };
+
+      const claimRes = await claimGuestOrder({
+        db: mockClaimDb as any,
+        orderId: 'ord-claim-sadec',
+        actor: { id: 'cust-sadec-9', role: 'customer' },
+        tenantId: 'sadec',
+      });
+      expect(claimRes.success).toBe(true);
+      expect(claimAuditRows).toHaveLength(1);
+      expect(claimAuditRows[0]?.tenant_id).toBe('sadec');
+      expect(JSON.parse(String(claimAuditRows[0]?.metadata)).tenant_id).toBe('sadec');
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // Suite 47: Phase AT1–AT3 — OpenAPI Promotions/Loyalty/Auth/Catalog/Staff/Tables
+  //           Atomic audit_logs.tenant_id Column Priority & Metadata Enrichment
+  // -------------------------------------------------------------------------
+  describe('Suite 47: Phase AT1–AT3 — OpenAPI Audit Helpers Atomic tenant_id Column Priority & Metadata Enrichment', () => {
+    it('AT1: POST /api/promotions/use and promotion CRUD atomically persist tenant_id in column and metadata across 8-col and 12-col audit_logs schemas', async () => {
+      const promoUseAuditCols: Array<{ sql: string; args: unknown[] }> = [];
+      const mockPromoUseDb = {
+        prepare(sql: string) {
+          return {
+            bind(...args: unknown[]) {
+              return {
+                async first() {
+                  if (sql.includes('FROM promotions WHERE id = ?')) {
+                    return {
+                      id: '00000000-0000-4000-8000-000000000011',
+                      code: 'SADEC25',
+                      is_active: 1,
+                      used_count: 1,
+                      max_uses: 50,
+                      max_uses_per_customer: 5,
+                      tenant_id: 'sadec',
+                    };
+                  }
+                  if (sql.includes('FROM orders WHERE id = ?')) {
+                    return { id: String(args[0]), tenant_id: 'sadec' };
+                  }
+                  if (sql.includes('FROM promotion_usages WHERE promotion_id = ? AND order_id = ?')) {
+                    return null;
+                  }
+                  return null;
+                },
+                async all() {
+                  return { results: [] };
+                },
+                async run() {
+                  if (sql.includes('INSERT INTO audit_logs')) {
+                    if (sql.includes('(id, user_id, action, entity_type, entity_id, metadata, tenant_id, created_at)')) {
+                      throw new Error('force 12-col tenant_id schema');
+                    }
+                    promoUseAuditCols.push({ sql, args });
+                  }
+                  return { success: true, meta: { changes: 1 } };
+                },
+              };
+            },
+          };
+        },
+      };
+
+      const { OpenAPIHono } = await import('@hono/zod-openapi');
+      const { registerUsageHandlers } = await import('../../routes/openapi-promotions-handlers/usage-handlers');
+      const promoUseApp = new OpenAPIHono<{ Bindings: Env }>();
+      promoUseApp.use('*', async (c, next) => {
+        c.set('tenantId' as never, 'sadec' as never);
+        c.set('user' as never, { id: 'cashier-sadec', role: 'cashier', tenantId: 'sadec', tenant_id: 'sadec' } as never);
+        await next();
+      });
+      registerUsageHandlers(promoUseApp);
+
+      const useRes = await promoUseApp.request(
+        '/api/promotions/use',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-Tenant-ID': 'sadec' },
+          body: JSON.stringify({
+            promotionId: '00000000-0000-4000-8000-000000000011',
+            orderId: '00000000-0000-4000-8000-000000000022',
+            discountAmount: 25000,
+          }),
+        },
+        { AURA_DB: mockPromoUseDb, DB: mockPromoUseDb } as unknown as Env
+      );
+      expect(useRes.status).toBe(200);
+      expect(promoUseAuditCols).toHaveLength(1);
+      expect(promoUseAuditCols[0]?.sql).toContain('tenant_id, created_at');
+      expect(promoUseAuditCols[0]?.args[10]).toBe('sadec');
+      expect(JSON.parse(String(promoUseAuditCols[0]?.args[9])).tenant_id).toBe('sadec');
+    });
+
+    it('AT2: writeLoyaltyAuditLog and writeAuthAuditLog atomically persist tenant_id in column and metadata on first-attempt INSERT', async () => {
+      const { writeLoyaltyAuditLog } = await import('../../routes/openapi-loyalty-handlers/loyalty-db-helpers');
+      const { writeAuthAuditLog } = await import('../../routes/openapi-auth-handlers/helpers');
+
+      const loyaltyInserts: Array<{ sql: string; args: unknown[] }> = [];
+      const mockLoyaltyDb = {
+        prepare(sql: string) {
+          return {
+            bind(...args: unknown[]) {
+              return {
+                async run() {
+                  if (sql.includes('INSERT INTO audit_logs')) {
+                    loyaltyInserts.push({ sql, args });
+                  }
+                  return { success: true, meta: { changes: 1 } };
+                },
+              };
+            },
+          };
+        },
+      };
+
+      await writeLoyaltyAuditLog(
+        mockLoyaltyDb,
+        'mgr-sadec',
+        'tier_create',
+        'loyalty_tier',
+        'tier-gold-sadec',
+        JSON.stringify({ name: 'Gold' }),
+        '2026-11-04T11:00:00.000Z',
+        'sadec'
+      );
+      expect(loyaltyInserts).toHaveLength(1);
+      expect(loyaltyInserts[0]?.sql).toContain('tenant_id, created_at');
+      expect(loyaltyInserts[0]?.args[10]).toBe('sadec');
+      expect(JSON.parse(String(loyaltyInserts[0]?.args[9])).tenant_id).toBe('sadec');
+
+      const authInserts: Array<{ sql: string; args: unknown[] }> = [];
+      const mockAuthDb = {
+        prepare(sql: string) {
+          return {
+            bind(...args: unknown[]) {
+              return {
+                async run() {
+                  if (sql.includes('INSERT INTO audit_logs')) {
+                    authInserts.push({ sql, args });
+                  }
+                  return { success: true, meta: { changes: 1 } };
+                },
+              };
+            },
+          };
+        },
+      };
+
+      await writeAuthAuditLog(
+        mockAuthDb,
+        'user-sadec-1',
+        'user_login',
+        'user',
+        'user-sadec-1',
+        JSON.stringify({ email: 'sadec@auraspace.vn' }),
+        '2026-11-04T11:05:00.000Z',
+        'sadec'
+      );
+      expect(authInserts).toHaveLength(1);
+      expect(authInserts[0]?.sql).toContain('tenant_id, created_at');
+      expect(authInserts[0]?.args[6]).toBe('sadec');
+      expect(JSON.parse(String(authInserts[0]?.args[5])).tenant_id).toBe('sadec');
+    });
+
+    it('AT3: Catalog (categories/products), Staff, and Tables audit helpers prioritize tenant_id-bearing INSERTs and enrich metadata across 8-col and 12-col schemas', async () => {
+      const { OpenAPIHono } = await import('@hono/zod-openapi');
+      const { writeTableAuditLog } = await import('../../routes/openapi-tables-handlers/helpers');
+      const { registerCategoryMutationHandlers } = await import('../../routes/openapi-categories-handlers/mutation-handlers');
+
+      // 1. writeTableAuditLog on 8-column schema (when 12-column schema throws)
+      const tableInserts: Array<{ sql: string; args: unknown[] }> = [];
+      const mockTableDb = {
+        prepare(sql: string) {
+          return {
+            bind(...args: unknown[]) {
+              return {
+                async run() {
+                  if (sql.includes('INSERT INTO audit_logs')) {
+                    if (sql.includes('actor_id, actor_name')) {
+                      throw new Error('8-col schema only');
+                    }
+                    tableInserts.push({ sql, args });
+                  }
+                  return { success: true, meta: { changes: 1 } };
+                },
+              };
+            },
+          };
+        },
+      };
+
+      await writeTableAuditLog(
+        mockTableDb,
+        'mgr-sadec',
+        'table_create',
+        'table',
+        'tbl-sadec-1',
+        JSON.stringify({ code: 'T01' }),
+        '2026-11-04T11:10:00.000Z',
+        'sadec'
+      );
+      expect(tableInserts).toHaveLength(1);
+      expect(tableInserts[0]?.sql).toContain('(id, user_id, action, entity_type, entity_id, metadata, tenant_id, created_at)');
+      expect(tableInserts[0]?.args[6]).toBe('sadec');
+      expect(JSON.parse(String(tableInserts[0]?.args[5])).tenant_id).toBe('sadec');
+
+      // 2. Category DELETE on 12-column schema (when 8-column schema throws)
+      const catAuditInserts: Array<{ sql: string; args: unknown[] }> = [];
+      const mockCatDb = {
+        prepare(sql: string) {
+          return {
+            bind(...args: unknown[]) {
+              return {
+                async first() {
+                  if (sql.includes('FROM categories WHERE id = ?')) {
+                    return { id: '00000000-0000-4000-8000-000000000021', name: 'Cà Phê Sa Đéc', tenant_id: 'sadec' };
+                  }
+                  if (sql.includes('FROM products WHERE category_id = ?')) {
+                    return { count: 0 };
+                  }
+                  return null;
+                },
+                async all() {
+                  return { results: [] };
+                },
+                async run() {
+                  if (sql.includes('INSERT INTO audit_logs')) {
+                    if (sql.includes('(id, user_id, action, entity_type, entity_id, metadata, tenant_id, created_at)')) {
+                      throw new Error('12-col schema only');
+                    }
+                    catAuditInserts.push({ sql, args });
+                  }
+                  return { success: true, meta: { changes: 1 } };
+                },
+              };
+            },
+          };
+        },
+      };
+
+      const catApp = new OpenAPIHono<{ Bindings: Env }>();
+      catApp.use('*', async (c, next) => {
+        c.set('tenantId' as never, 'sadec' as never);
+        c.set('user' as never, { id: 'mgr-sadec', role: 'manager', tenant_id: 'sadec' } as never);
+        await next();
+      });
+      registerCategoryMutationHandlers(catApp as any);
+
+      const delCatRes = await catApp.request(
+        '/api/categories/00000000-0000-4000-8000-000000000021',
+        { method: 'DELETE', headers: { 'X-Tenant-ID': 'sadec' } },
+        { AURA_DB: mockCatDb } as unknown as Env
+      );
+      expect(delCatRes.status).toBe(200);
+      expect(catAuditInserts).toHaveLength(1);
+      expect(catAuditInserts[0]?.sql).toContain('tenant_id, created_at');
+      expect(catAuditInserts[0]?.args[10]).toBe('sadec');
+      expect(JSON.parse(String(catAuditInserts[0]?.args[9])).tenant_id).toBe('sadec');
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // Suite 48: Phase AU1–AU4 — OpenAPI Loyalty Rewards, Birthday Bonus, Tables Bulk-Status,
+  //           Table Zones Fallback & Category Reorder HQ Tenant Inheritance
+  // -------------------------------------------------------------------------
+  describe('Suite 48: Phase AU1–AU4 — HQ Tenant Inheritance on Loyalty, Tables, Zones & Categories', () => {
+    it('AU1: OpenAPI Loyalty Rewards (PATCH, redeem) and Birthday Bonus inherit store tenant under HQ wildcard (*)', async () => {
+      const { OpenAPIHono } = await import('@hono/zod-openapi');
+      const { registerRewardHandlers } = await import('../../routes/openapi-loyalty-handlers/reward-handlers');
+      const { registerAccountHandlers } = await import('../../routes/openapi-loyalty-handlers/account-handlers');
+
+      const loyaltyAuditInserts: Array<{ sql: string; args: unknown[] }> = [];
+      const txDualWrites: Array<{ sql: string; args: unknown[] }> = [];
+
+      const mockLoyaltyDb = {
+        prepare(sql: string) {
+          return {
+            bind(...args: unknown[]) {
+              return {
+                async first() {
+                  if (sql.includes('FROM loyalty_rewards WHERE id = ?')) {
+                    return {
+                      id: '00000000-0000-4000-8000-000000000001',
+                      name: 'Free Drink Sadec',
+                      tenant_id: 'sadec',
+                      points_cost: 100,
+                      is_active: 1,
+                      min_tier: 'bronze',
+                      created_at: '2026-11-04T12:00:00.000Z',
+                      updated_at: '2026-11-04T12:00:00.000Z',
+                    };
+                  }
+                  if (sql.includes('FROM loyalty_accounts WHERE customer_id = ?') || sql.includes('FROM loyalty_accounts WHERE id = ?')) {
+                    const custId = String(args[0]);
+                    const tenant = custId.includes('hanoi') ? 'hanoi' : 'sadec';
+                    return {
+                      id: `acc-${tenant}-1`,
+                      customer_id: custId,
+                      tenant_id: tenant,
+                      tier: 'bronze',
+                      current_points: 500,
+                      lifetime_points: 500,
+                      birthday: '1995-11-15',
+                      created_at: '2026-11-04T12:00:00.000Z',
+                      updated_at: '2026-11-04T12:00:00.000Z',
+                    };
+                  }
+                  if (sql.includes('FROM customers WHERE id = ?')) {
+                    return {
+                      id: String(args[0]),
+                      tenant_id: 'sadec',
+                      birthday: '1995-11-15',
+                    };
+                  }
+                  if (sql.includes('FROM loyalty_transactions')) {
+                    return null;
+                  }
+                  if (sql.includes('birthday_bonus FROM loyalty_tier_configs') || sql.includes('birthday_bonus FROM loyalty_tiers')) {
+                    return { birthday_bonus: 500 };
+                  }
+                  return null;
+                },
+                async all() {
+                  return { results: [] };
+                },
+                async run() {
+                  if (sql.includes('INSERT INTO audit_logs')) {
+                    loyaltyAuditInserts.push({ sql, args });
+                  }
+                  if (sql.includes('INSERT INTO loyalty_transactions') || sql.includes('INSERT INTO loyalty_point_logs')) {
+                    txDualWrites.push({ sql, args });
+                  }
+                  return { success: true, meta: { changes: 1 } };
+                },
+              };
+            },
+          };
+        },
+      };
+
+      const rewardHqApp = new OpenAPIHono<{ Bindings: Env }>();
+      rewardHqApp.use('*', async (c, next) => {
+        c.set('tenantId' as never, '*' as never);
+        c.set('user' as never, { id: 'hq-superadmin', role: 'admin', tenantId: '*', tenant_id: '*' } as never);
+        await next();
+      });
+      registerRewardHandlers(rewardHqApp as any);
+
+      // 1. PATCH reward under HQ wildcard -> inherits 'sadec' in audit log
+      const patchRes = await rewardHqApp.request(
+        '/api/loyalty/rewards/00000000-0000-4000-8000-000000000001',
+        {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name: 'Free Drink Sadec Updated' }),
+        },
+        { AURA_DB: mockLoyaltyDb } as unknown as Env
+      );
+      expect(patchRes.status).toBe(200);
+      expect(loyaltyAuditInserts.length).toBeGreaterThanOrEqual(1);
+      const patchAudit = loyaltyAuditInserts.find((i) => i.args.includes('loyalty_reward_update'));
+      expect(patchAudit).toBeDefined();
+      expect(patchAudit?.args[10]).toBe('sadec');
+      expect(JSON.parse(String(patchAudit?.args[9])).tenant_id).toBe('sadec');
+
+      // 2. POST redeem under HQ wildcard with matching sadec account -> inherits 'sadec'
+      const redeemRes = await rewardHqApp.request(
+        '/api/loyalty/rewards/redeem',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            rewardId: '00000000-0000-4000-8000-000000000001',
+            idempotencyKey: 'idemp-hq-redeem-1',
+          }),
+        },
+        { AURA_DB: mockLoyaltyDb } as unknown as Env
+      );
+      expect(redeemRes.status).toBe(200);
+      const redeemAudit = loyaltyAuditInserts.find((i) => i.args.includes('loyalty_reward_redeem'));
+      expect(redeemAudit).toBeDefined();
+      expect(redeemAudit?.args[10]).toBe('sadec');
+      expect(JSON.parse(String(redeemAudit?.args[9])).tenant_id).toBe('sadec');
+
+      // 3. Cross-tenant redemption boundary guard: sadec reward vs hanoi customer under HQ -> 404
+      const hanoiApp = new OpenAPIHono<{ Bindings: Env }>();
+      hanoiApp.use('*', async (c, next) => {
+        c.set('tenantId' as never, '*' as never);
+        c.set('user' as never, { id: 'cust-hanoi-1', customerId: 'cust-hanoi-1', role: 'customer', tenantId: 'hanoi', tenant_id: 'hanoi' } as never);
+        await next();
+      });
+      registerRewardHandlers(hanoiApp as any);
+
+      const crossRedeemRes = await hanoiApp.request(
+        '/api/loyalty/rewards/redeem',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            rewardId: '00000000-0000-4000-8000-000000000001',
+            idempotencyKey: 'idemp-hq-redeem-cross',
+          }),
+        },
+        { AURA_DB: mockLoyaltyDb } as unknown as Env
+      );
+      expect(crossRedeemRes.status).toBe(404);
+
+      // 4. POST birthday-bonus claim under HQ wildcard -> inherits 'sadec'
+      const bdayApp = new OpenAPIHono<{ Bindings: Env }>();
+      bdayApp.use('*', async (c, next) => {
+        c.set('tenantId' as never, '*' as never);
+        c.set('user' as never, { id: 'cust-sadec-1', customerId: 'cust-sadec-1', role: 'customer' } as never);
+        await next();
+      });
+      registerAccountHandlers(bdayApp as any);
+
+      const bdayRes = await bdayApp.request(
+        '/api/loyalty/account/birthday-bonus',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({}),
+        },
+        { AURA_DB: mockLoyaltyDb } as unknown as Env
+      );
+      expect(bdayRes.status).toBe(200);
+      const bdayAudit = loyaltyAuditInserts.find((i) => i.args.includes('loyalty_birthday_claim'));
+      expect(bdayAudit).toBeDefined();
+      expect(bdayAudit?.args[10]).toBe('sadec');
+      expect(JSON.parse(String(bdayAudit?.args[9])).tenant_id).toBe('sadec');
+    });
+
+    it('AU2: OpenAPI Tables bulk-status and Table Zones fallback inherit store tenant under HQ wildcard (*)', async () => {
+      const { OpenAPIHono } = await import('@hono/zod-openapi');
+      const { registerTableCrudHandlers } = await import('../../routes/openapi-tables-handlers/table-crud-handlers');
+      const { registerZoneCrudHandlers } = await import('../../routes/openapi-tables-handlers/zone-crud-handlers');
+
+      const tableAuditInserts: Array<{ sql: string; args: unknown[] }> = [];
+      const mockTableDb = {
+        prepare(sql: string) {
+          return {
+            bind(...args: unknown[]) {
+              return {
+                async first() {
+                  if (sql.includes('FROM cafe_tables WHERE id = ?') || sql.includes('FROM tables WHERE id = ?')) {
+                    const tid = String(args[0]);
+                    return {
+                      id: tid,
+                      table_number: tid,
+                      tenant_id: 'sadec',
+                      status: 'occupied',
+                    };
+                  }
+                  if (sql.includes('FROM table_zones WHERE id = ?')) {
+                    // Throw to trigger fallback to cafe_tables zone lookup
+                    throw new Error('simulate table_zones table missing');
+                  }
+                  return null;
+                },
+                async all() {
+                  if (sql.includes('FROM cafe_tables WHERE LOWER(zone) = LOWER(?)')) {
+                    return {
+                      results: [
+                        { zone: 'san-vuon', tenant_id: 'sadec' },
+                      ],
+                    };
+                  }
+                  return { results: [] };
+                },
+                async run() {
+                  if (sql.includes('INSERT INTO audit_logs')) {
+                    tableAuditInserts.push({ sql, args });
+                  }
+                  return { success: true, meta: { changes: 1 } };
+                },
+              };
+            },
+          };
+        },
+      };
+
+      const tableHqApp = new OpenAPIHono<{ Bindings: Env }>();
+      tableHqApp.use('*', async (c, next) => {
+        c.set('tenantId' as never, '*' as never);
+        c.set('user' as never, { id: 'hq-superadmin', role: 'admin', tenantId: '*', tenant_id: '*' } as never);
+        await next();
+      });
+      registerTableCrudHandlers(tableHqApp as any);
+      registerZoneCrudHandlers(tableHqApp as any);
+
+      // 1. POST /api/tables/bulk-status under HQ wildcard -> inherits 'sadec'
+      const bulkRes = await tableHqApp.request(
+        '/api/tables/bulk-status',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            tableIds: ['tbl-sadec-1', 'tbl-sadec-2'],
+            status: 'available',
+          }),
+        },
+        { AURA_DB: mockTableDb } as unknown as Env
+      );
+      expect(bulkRes.status).toBe(200);
+      const bulkAudit = tableAuditInserts.find((i) => i.sql.includes('table_bulk_status') || String(i.args[4]) === 'table_bulk_status');
+      expect(bulkAudit).toBeDefined();
+      expect(bulkAudit?.args[11]).toBe('sadec');
+      expect(JSON.parse(String(bulkAudit?.args[10])).tenant_id).toBe('sadec');
+
+      // 2. PATCH /api/table-zones/:id under HQ wildcard via cafe_tables fallback -> inherits 'sadec'
+      const zonePatchRes = await tableHqApp.request(
+        '/api/table-zones/san-vuon',
+        {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name: 'Sân Vườn Sa Đéc' }),
+        },
+        { AURA_DB: mockTableDb } as unknown as Env
+      );
+      expect(zonePatchRes.status).toBe(200);
+      const zoneAudit = tableAuditInserts.find((i) => i.sql.includes('table_zone_update') || String(i.args[4]) === 'table_zone_update');
+      expect(zoneAudit).toBeDefined();
+      expect(zoneAudit?.args[11]).toBe('sadec');
+      expect(JSON.parse(String(zoneAudit?.args[10])).tenant_id).toBe('sadec');
+    });
+
+    it('AU3: OpenAPI Categories reorder inherits store tenant under HQ wildcard (*)', async () => {
+      const { OpenAPIHono } = await import('@hono/zod-openapi');
+      const { registerCategoryMutationHandlers } = await import('../../routes/openapi-categories-handlers/mutation-handlers');
+
+      const catAuditInserts: Array<{ sql: string; args: unknown[] }> = [];
+      const mockCatDb = {
+        prepare(sql: string) {
+          return {
+            bind(...args: unknown[]) {
+              return {
+                async first() {
+                  if (sql.includes('FROM categories WHERE id = ?')) {
+                    const cid = String(args[0]);
+                    return {
+                      id: cid,
+                      name: `Category ${cid}`,
+                      tenant_id: 'sadec',
+                    };
+                  }
+                  return null;
+                },
+                async all() {
+                  return { results: [] };
+                },
+                async run() {
+                  if (sql.includes('INSERT INTO audit_logs')) {
+                    catAuditInserts.push({ sql, args });
+                  }
+                  return { success: true, meta: { changes: 1 } };
+                },
+              };
+            },
+          };
+        },
+      };
+
+      const catHqApp = new OpenAPIHono<{ Bindings: Env }>();
+      catHqApp.use('*', async (c, next) => {
+        c.set('tenantId' as never, '*' as never);
+        c.set('user' as never, { id: 'hq-superadmin', role: 'admin', tenantId: '*', tenant_id: '*' } as never);
+        await next();
+      });
+      registerCategoryMutationHandlers(catHqApp as any);
+
+      const reorderRes = await catHqApp.request(
+        '/api/categories/reorder',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            items: [
+              { id: 'cat-sadec-1', displayOrder: 1 },
+              { id: 'cat-sadec-2', displayOrder: 2 },
+            ],
+          }),
+        },
+        { AURA_DB: mockCatDb } as unknown as Env
+      );
+      expect(reorderRes.status).toBe(200);
+      expect(catAuditInserts.length).toBeGreaterThanOrEqual(1);
+      const reorderAudit = catAuditInserts.find((i) => i.args.includes('category_reorder'));
+      expect(reorderAudit).toBeDefined();
+      expect(reorderAudit?.sql).toContain('tenant_id, created_at');
+      const effectiveTenantArg = reorderAudit?.args[ reorderAudit.args.length - 2 ];
+      expect(effectiveTenantArg).toBe('sadec');
+      const metaArg = reorderAudit?.args[ reorderAudit.args.length - 3 ];
+      expect(JSON.parse(String(metaArg)).tenant_id).toBe('sadec');
+    });
+  });
+
+  // =========================================================================
+  // Suite 49: Phase AV1–AV4 — HQ Tenant Inheritance on Point Adjustment, Zone
+  //           Table-Count Guard, Category Product Guard & Staff Resolution
+  // =========================================================================
+  describe('Suite 49: Phase AV1–AV4 — HQ Store-Tenant Resolution on Point Adjustment, Zone Table Guard, Category Product Guard & Staff Mutations', () => {
+    it('AV1: OpenAPI Loyalty admin adjust-points inherits the account store tenant under HQ wildcard (*)', async () => {
+      const { OpenAPIHono } = await import('@hono/zod-openapi');
+      const { registerAdminHandlers } = await import('../../routes/openapi-loyalty-handlers/admin-handlers');
+
+      const loyaltyAuditInserts: Array<{ sql: string; args: unknown[] }> = [];
+      const accountUpdates: Array<{ sql: string; args: unknown[] }> = [];
+      const loyaltyTxs: Array<{ sql: string; args: unknown[] }> = [];
+
+      const mockAdjustDb = {
+        prepare(sql: string) {
+          return {
+            bind(...args: unknown[]) {
+              return {
+                async first() {
+                  if (/FROM loyalty_accounts WHERE customer_id = \? AND COALESCE/i.test(sql)) {
+                    return {
+                      id: 'la-av1-1',
+                      customer_id: 'cust-av1-1',
+                      tenant_id: 'sadec',
+                      current_points: 500,
+                      lifetime_points: 500,
+                      tier: 'bronze',
+                      updated_at: '2026-11-04T12:00:00.000Z',
+                    };
+                  }
+                  if (/FROM loyalty_accounts WHERE customer_id = \?/i.test(sql)) {
+                    return {
+                      id: 'la-av1-1',
+                      customer_id: 'cust-av1-1',
+                      tenant_id: 'sadec',
+                      current_points: 500,
+                      lifetime_points: 500,
+                      tier: 'bronze',
+                      updated_at: '2026-11-04T12:00:00.000Z',
+                    };
+                  }
+                  if (/FROM customers WHERE id = \?/i.test(sql)) {
+                    return { id: 'cust-av1-1', tenant_id: 'sadec', loyalty_points: 500, lifetime_points: 500 };
+                  }
+                  if (/FROM users WHERE id = \?/i.test(sql)) {
+                    return { id: 'cust-av1-1', tenant_id: 'sadec' };
+                  }
+                  if (/FROM loyalty_transactions WHERE id = \?/i.test(sql)) {
+                    return null;
+                  }
+                  if (/current_points, lifetime_points FROM loyalty_accounts/i.test(sql)) {
+                    return { current_points: 550, lifetime_points: 550 };
+                  }
+                  if (/loyalty_points, lifetime_points FROM customers/i.test(sql)) {
+                    return { loyalty_points: 550, lifetime_points: 550 };
+                  }
+                  return null;
+                },
+                async all() {
+                  return { results: [] };
+                },
+                async run() {
+                  if (sql.includes('INSERT INTO audit_logs')) {
+                    loyaltyAuditInserts.push({ sql, args });
+                  }
+                  if (/UPDATE loyalty_accounts SET/i.test(sql)) {
+                    accountUpdates.push({ sql, args });
+                  }
+                  if (
+                    /INSERT INTO loyalty_transactions/i.test(sql) ||
+                    /INSERT INTO loyalty_point_logs/i.test(sql) ||
+                    /UPDATE loyalty_transactions SET tenant_id/i.test(sql) ||
+                    /UPDATE loyalty_point_logs SET tenant_id/i.test(sql)
+                  ) {
+                    loyaltyTxs.push({ sql, args });
+                  }
+                  return { success: true, meta: { changes: 1 } };
+                },
+              };
+            },
+          };
+        },
+      };
+
+      const adjustApp = new OpenAPIHono<{ Bindings: Env }>();
+      adjustApp.use('*', async (c, next) => {
+        c.set('tenantId' as never, '*' as never);
+        c.set('user' as never, { id: 'hq-superadmin', role: 'admin', tenantId: '*', tenant_id: '*' } as never);
+        await next();
+      });
+      registerAdminHandlers(adjustApp as any);
+
+      const adjustRes = await adjustApp.request(
+        '/api/loyalty/admin/adjust-points',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            customerId: 'cust-av1-1',
+            points: 50,
+            reason: 'HQ manual correction',
+            idempotencyKey: 'idem-av1-hq-1',
+          }),
+        },
+        { AURA_DB: mockAdjustDb } as unknown as Env
+      );
+      expect(adjustRes.status).toBe(200);
+
+      // AV1: balance sync, dual-write ledger, and audit log inherit the account's store tenant
+      const adjustAudit = loyaltyAuditInserts.find((i) => i.args.includes('loyalty_points_adjust'));
+      expect(adjustAudit).toBeDefined();
+      expect(adjustAudit?.args[10]).toBe('sadec');
+      expect(JSON.parse(String(adjustAudit?.args[9])).tenant_id).toBe('sadec');
+      expect(
+        accountUpdates.some((u) => u.args.includes('sadec') || /COALESCE\(NULLIF\(TRIM\(tenant_id\)/i.test(u.sql))
+      ).toBe(true);
+      expect(loyaltyTxs.length).toBeGreaterThanOrEqual(1);
+      expect(loyaltyTxs.some((t) => t.args.includes('sadec'))).toBe(true);
+    });
+
+    it('AV2: OpenAPI Table Zones PATCH fallback rename and DELETE table-count guard inherit the store tenant under HQ wildcard (*)', async () => {
+      const { OpenAPIHono } = await import('@hono/zod-openapi');
+      const { registerZoneCrudHandlers } = await import('../../routes/openapi-tables-handlers/zone-crud-handlers');
+
+      const tableAuditInserts: Array<{ sql: string; args: unknown[] }> = [];
+      const tableZoneUpdates: Array<{ sql: string; args: unknown[] }> = [];
+
+      const zoneRows: Array<{ id: string; zone: string; tenant_id: string }> = [
+        { id: 'tbl-av2-1', zone: 'san-vuon', tenant_id: 'sadec' },
+      ];
+      const deleteZoneRows: Array<{ id: string; zone: string; tenant_id: string }> = [
+        { id: 'tbl-av2-2', zone: 'san-vuon', tenant_id: 'hanoi' },
+      ];
+
+      const makeZoneDb = (rows: Array<{ id: string; zone: string; tenant_id: string }>, allowZoneSelect = false) => ({
+        prepare(sql: string) {
+          return {
+            bind(...args: unknown[]) {
+              return {
+                async first() {
+                  if (/FROM table_zones WHERE id = \?/i.test(sql)) {
+                    if (allowZoneSelect) {
+                      return { id: String(args[0]), name: 'san-vuon', slug: 'san-vuon', tenant_id: 'sadec' };
+                    }
+                    throw new Error('simulate table_zones table missing');
+                  }
+                  return null;
+                },
+                async all() {
+                  if (/SELECT zone, tenant_id FROM cafe_tables WHERE LOWER\(zone\) = LOWER\(\?\)/i.test(sql)) {
+                    return { results: rows.map((r) => ({ zone: r.zone, tenant_id: r.tenant_id })) };
+                  }
+                  if (/SELECT id, tenant_id FROM cafe_tables WHERE/i.test(sql)) {
+                    const wanted = String(args[args.length - 1]);
+                    return {
+                      results: rows
+                        .filter((r) => String(r.tenant_id || 'default') === wanted)
+                        .map((r) => ({ id: r.id, tenant_id: r.tenant_id })),
+                    };
+                  }
+                  return { results: [] };
+                },
+                async run() {
+                  if (sql.includes('INSERT INTO audit_logs')) {
+                    tableAuditInserts.push({ sql, args });
+                  }
+                  if (/UPDATE cafe_tables SET zone = \?/i.test(sql)) {
+                    tableZoneUpdates.push({ sql, args });
+                  }
+                  return { success: true, meta: { changes: 1 } };
+                },
+              };
+            },
+          };
+        },
+      });
+
+      // 1. PATCH under HQ wildcard resolves 'sadec' from cafe_tables and scopes the zone rename
+      const patchApp = new OpenAPIHono<{ Bindings: Env }>();
+      patchApp.use('*', async (c, next) => {
+        c.set('tenantId' as never, '*' as never);
+        c.set('user' as never, { id: 'hq-superadmin', role: 'admin', tenantId: '*', tenant_id: '*' } as never);
+        await next();
+      });
+      registerZoneCrudHandlers(patchApp as any);
+      const zoneUpdate = await patchApp.request(
+        '/api/table-zones/san-vuon',
+        {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name: 'Sân Vườn Sa Đéc' }),
+        },
+        { AURA_DB: makeZoneDb(zoneRows, false) } as unknown as Env
+      );
+      expect(zoneUpdate.status).toBe(200);
+      const patchAudit = tableAuditInserts.find((i) => String(i.args[4]) === 'table_zone_update');
+      expect(patchAudit).toBeDefined();
+      expect(patchAudit?.args[11]).toBe('sadec');
+      expect(tableZoneUpdates.length).toBeGreaterThanOrEqual(1);
+      expect(tableZoneUpdates[0]?.args[tableZoneUpdates[0].args.length - 1]).toBe('sadec');
+
+      // 2. DELETE only counts tables in the resolved zone tenant — hanoi rows never block a sadec deletion
+      const deleteApp = new OpenAPIHono<{ Bindings: Env }>();
+      deleteApp.use('*', async (c, next) => {
+        c.set('tenantId' as never, '*' as never);
+        c.set('user' as never, { id: 'hq-superadmin', role: 'admin', tenantId: '*', tenant_id: '*' } as never);
+        await next();
+      });
+      registerZoneCrudHandlers(deleteApp as any);
+      const zoneDelete = await deleteApp.request(
+        '/api/table-zones/san-vuon',
+        {
+          method: 'DELETE',
+        },
+        { AURA_DB: makeZoneDb(deleteZoneRows, true) } as unknown as Env
+      );
+      expect(zoneDelete.status).toBe(200);
+      const deleteAudit = tableAuditInserts.find((i) => String(i.args[4]) === 'table_zone_delete');
+      expect(deleteAudit).toBeDefined();
+      expect(deleteAudit?.args[11]).toBe('sadec');
+    });
+
+    it('AV3: OpenAPI Category product guard and Staff PATCH/DELETE resolve the target tenant under HQ wildcard (*)', async () => {
+      const { OpenAPIHono } = await import('@hono/zod-openapi');
+      const { registerCategoryMutationHandlers } = await import('../../routes/openapi-categories-handlers/mutation-handlers');
+      const { registerStaffHandlers } = await import('../../routes/openapi-staff-handlers/staff-handlers');
+
+      const catAuditInserts: Array<{ sql: string; args: unknown[] }> = [];
+      const staffAuditInserts: Array<{ sql: string; args: unknown[] }> = [];
+
+      const mockCatGuardDb = {
+        prepare(sql: string) {
+          return {
+            bind(...args: unknown[]) {
+              return {
+                async first() {
+                  if (/FROM categories WHERE id = \?/i.test(sql)) {
+                    return {
+                      id: String(args[0]),
+                      name: 'Cà Phê Muối',
+                      tenant_id: 'sadec',
+                    };
+                  }
+                  if (/SELECT COUNT\(\*\) as count FROM products WHERE category_id = \?/i.test(sql)) {
+                    return { count: 1 };
+                  }
+                  return null;
+                },
+                async all() {
+                  if (/SELECT \* FROM products WHERE category_id = \?/i.test(sql)) {
+                    // The only product referencing this category belongs to another store.
+                    return { results: [{ id: 'prod-hanoi-1', category_id: 'cat-av3-1', tenant_id: 'hanoi' }] };
+                  }
+                  return { results: [] };
+                },
+                async run() {
+                  if (sql.includes('INSERT INTO audit_logs')) {
+                    catAuditInserts.push({ sql, args });
+                  }
+                  return { success: true, meta: { changes: 1 } };
+                },
+              };
+            },
+          };
+        },
+      };
+
+      const catHqApp = new OpenAPIHono<{ Bindings: Env }>();
+      catHqApp.use('*', async (c, next) => {
+        c.set('tenantId' as never, '*' as never);
+        c.set('user' as never, { id: 'hq-superadmin', role: 'admin', tenantId: '*', tenant_id: '*' } as never);
+        await next();
+      });
+      registerCategoryMutationHandlers(catHqApp as any);
+
+      const catDeleteRes = await catHqApp.request(
+        '/api/categories/cat-av3-1',
+        { method: 'DELETE' },
+        { AURA_DB: mockCatGuardDb } as unknown as Env
+      );
+      expect(catDeleteRes.status).toBe(200);
+      const catAudit = catAuditInserts.find((i) => i.args.includes('category_delete'));
+      expect(catAudit).toBeDefined();
+      expect(catAudit?.args[6]).toBe('sadec');
+      expect(JSON.parse(String(catAudit?.args[5])).tenant_id).toBe('sadec');
+
+      const mockStaffDb = {
+        prepare(sql: string) {
+          return {
+            bind(...args: unknown[]) {
+              return {
+                async first() {
+                  // Simulate authority.account.tenant_id being empty so existing.tenant_id fallback is exercised
+                  if (/SELECT id, name, phone, role, tenant_id, is_active, auth_version FROM users WHERE id = \?/i.test(sql)) {
+                    return { id: String(args[0]), name: 'AV3 Staff', phone: null, role: 'waiter', tenant_id: '', is_active: 1, auth_version: 1 };
+                  }
+                  if (/FROM users WHERE id = \? AND role != 'customer'/i.test(sql)) {
+                    return {
+                      id: String(args[0]),
+                      name: 'AV3 Staff',
+                      role: 'waiter',
+                      tenant_id: 'sadec',
+                      is_active: 1,
+                      auth_version: 1,
+                    };
+                  }
+                  if (/SELECT \* FROM users WHERE id = \?/i.test(sql)) {
+                    return {
+                      id: String(args[0]),
+                      name: 'AV3 Staff',
+                      role: 'waiter',
+                      tenant_id: 'sadec',
+                      is_active: 1,
+                      auth_version: 1,
+                    };
+                  }
+                  if (/FROM users WHERE email = \?/i.test(sql) || /FROM users WHERE phone = \?/i.test(sql)) {
+                    return null;
+                  }
+                  if (/FROM users WHERE id = \?/i.test(sql)) {
+                    return {
+                      id: String(args[0]),
+                      name: 'AV3 Staff Updated',
+                      role: 'waiter',
+                      tenant_id: 'sadec',
+                      is_active: 1,
+                      auth_version: 1,
+                      created_at: '2026-11-04T12:00:00.000Z',
+                      updated_at: '2026-11-04T12:00:00.000Z',
+                    };
+                  }
+                  return null;
+                },
+                async all() {
+                  return { results: [] };
+                },
+                async run() {
+                  if (sql.includes('INSERT INTO audit_logs')) {
+                    staffAuditInserts.push({ sql, args });
+                  }
+                  return { success: true, meta: { changes: 1 } };
+                },
+              };
+            },
+          };
+        },
+      };
+
+      const staffHqApp = new OpenAPIHono<{ Bindings: Env }>();
+      staffHqApp.use('*', async (c, next) => {
+        c.set('tenantId' as never, '*' as never);
+        c.set('user' as never, { id: 'hq-superadmin', role: 'admin', tenantId: '', tenant_id: '*' } as never);
+        await next();
+      });
+      registerStaffHandlers(staffHqApp as any);
+
+      const staffPatchRes = await staffHqApp.request(
+        '/api/staff/staff-av3-1',
+        {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name: 'AV3 Staff Updated' }),
+        },
+        { AURA_DB: mockStaffDb } as unknown as Env
+      );
+      expect(staffPatchRes.status).toBe(200);
+      const staffPatchAudit = staffAuditInserts.find((i) => i.args.includes('staff_update'));
+      expect(staffPatchAudit).toBeDefined();
+      expect(staffPatchAudit?.args[6]).toBe('sadec');
+      expect(JSON.parse(String(staffPatchAudit?.args[5])).tenant_id).toBe('sadec');
+
+      const staffDeleteRes = await staffHqApp.request(
+        '/api/staff/staff-av3-2',
+        { method: 'DELETE' },
+        { AURA_DB: mockStaffDb } as unknown as Env
+      );
+      expect(staffDeleteRes.status).toBe(200);
+      const staffDeleteAudit = staffAuditInserts.find((i) => i.args.includes('staff_delete'));
+      expect(staffDeleteAudit).toBeDefined();
+      expect(staffDeleteAudit?.args[6]).toBe('sadec');
+      expect(JSON.parse(String(staffDeleteAudit?.args[5])).tenant_id).toBe('sadec');
+    });
+  });
+
+  // =========================================================================
+  // Suite 50: Phase AW1–AW4 — OpenAPI & Domain Catalog Products/Categories
+  //           HQ Store SQL Scoping, Order-Items Tenant Guard & Slug Parity
+  // =========================================================================
+  describe('Suite 50: Phase AW1–AW4 — OpenAPI & Domain Catalog Products/Categories HQ Store SQL Scoping, Order-Items Tenant Guard & Slug Parity', () => {
+    it('AW1: OpenAPI Products PATCH and DELETE scope SQL to effectiveTenant and ignore cross-tenant order_items on DELETE', async () => {
+      const { OpenAPIHono } = await import('@hono/zod-openapi');
+      const { registerProductMutationHandlers } = await import('../../routes/openapi-products-handlers/mutation-handlers');
+
+      const prodSqlCalls: Array<{ sql: string; args: unknown[] }> = [];
+
+      const mockProdDb = {
+        prepare(sql: string) {
+          return {
+            bind(...args: unknown[]) {
+              return {
+                async first() {
+                  if (/FROM products WHERE id = \?/i.test(sql) || /FROM products p[\s\S]*WHERE p\.id = \?/i.test(sql)) {
+                    return {
+                      id: String(args[0]),
+                      name: 'Trà Sen Sa Đéc',
+                      slug: 'tra-sen-sa-dec',
+                      price: 45000,
+                      category_id: 'cat-sadec-1',
+                      is_available: 1,
+                      tenant_id: 'sadec',
+                      created_at: '2026-11-04T12:00:00.000Z',
+                      updated_at: '2026-11-04T12:00:00.000Z',
+                    };
+                  }
+                  if (/SELECT COUNT\(\*\) as count FROM order_items WHERE product_id = \?/i.test(sql)) {
+                    // Simulate 1 order_item row globally, belonging to another store ('hanoi')
+                    return { count: 1 };
+                  }
+                  return null;
+                },
+                async all() {
+                  if (/SELECT \* FROM order_items WHERE product_id = \?/i.test(sql)) {
+                    return {
+                      results: [{ id: 'oi-hanoi-1', product_id: String(args[0]), tenant_id: 'hanoi' }],
+                    };
+                  }
+                  return { results: [] };
+                },
+                async run() {
+                  if (/UPDATE products SET/i.test(sql) || /DELETE FROM products/i.test(sql)) {
+                    prodSqlCalls.push({ sql, args });
+                  }
+                  return { success: true, meta: { changes: 1 } };
+                },
+              };
+            },
+          };
+        },
+      };
+
+      const prodHqApp = new OpenAPIHono<{ Bindings: Env }>();
+      prodHqApp.use('*', async (c, next) => {
+        c.set('tenantId' as never, '*' as never);
+        c.set('user' as never, { id: 'hq-superadmin', role: 'admin', tenantId: '*', tenant_id: '*' } as never);
+        await next();
+      });
+      registerProductMutationHandlers(prodHqApp as any);
+
+      // 1. PATCH under HQ wildcard scopes UPDATE products to 'sadec'
+      const patchRes = await prodHqApp.request(
+        '/api/products/prod-aw1-1',
+        {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name: 'Trà Sen Sa Đéc Đặc Biệt', basePrice: 49000 }),
+        },
+        { AURA_DB: mockProdDb } as unknown as Env
+      );
+      expect(patchRes.status).toBe(200);
+      const updateCall = prodSqlCalls.find((c) => /UPDATE products SET/i.test(c.sql));
+      expect(updateCall).toBeDefined();
+      expect(updateCall?.sql).toContain("COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?");
+      expect(updateCall?.args[updateCall.args.length - 1]).toBe('sadec');
+
+      // 2. DELETE under HQ wildcard ignores hanoi order_items and hard-deletes scoped to 'sadec'
+      const delRes = await prodHqApp.request(
+        '/api/products/prod-aw1-1',
+        { method: 'DELETE' },
+        { AURA_DB: mockProdDb } as unknown as Env
+      );
+      expect(delRes.status).toBe(200);
+      const deleteCall = prodSqlCalls.find((c) => /DELETE FROM products/i.test(c.sql));
+      expect(deleteCall).toBeDefined();
+      expect(deleteCall?.sql).toContain("COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?");
+      expect(deleteCall?.args).toEqual(['prod-aw1-1', 'sadec']);
+    });
+
+    it('AW2: Domain Catalog Products DELETE verifies order_items tenant match and scopes hard DELETE to targetTenant under HQ wildcard (*)', async () => {
+      const { productsRouter } = await import('../../../../packages/domain/catalog/commands/products');
+      const { issueStaffSession } = await import('../../lib/staff-session');
+      const { Hono } = await import('hono');
+
+      const TEST_SECRET = 'test-jwt-secret-multi-tenant-aw2';
+      const hqAccount = {
+        id: 'hq-superadmin',
+        name: 'HQ Admin',
+        phone: null,
+        role: 'admin',
+        tenant_id: '*',
+        is_active: 1,
+        auth_version: 1,
+      };
+      const { token: hqToken } = await issueStaffSession(
+        { JWT_SECRET: TEST_SECRET },
+        hqAccount,
+        { email: 'hq@aura.vn', sessionType: 'staff-web' }
+      );
+
+      const domainProdSqlCalls: Array<{ sql: string; args: unknown[] }> = [];
+
+      const mockDomainProdDb = {
+        prepare(sql: string) {
+          return {
+            bind(...args: unknown[]) {
+              return {
+                async first() {
+                  if (/FROM users WHERE id = \?/i.test(sql)) {
+                    return {
+                      id: 'hq-superadmin',
+                      name: 'HQ Admin',
+                      phone: null,
+                      role: 'admin',
+                      tenant_id: '*',
+                      is_active: 1,
+                      auth_version: 1,
+                    };
+                  }
+                  if (/SELECT \* FROM products WHERE id = \?/i.test(sql)) {
+                    return {
+                      id: String(args[0]),
+                      name: 'Bạc Xỉu Sa Đéc',
+                      slug: 'bac-xiu-sa-dec',
+                      price: 39000,
+                      category_id: 'cat-sadec-1',
+                      is_available: 1,
+                      tenant_id: 'sadec',
+                    };
+                  }
+                  if (/SELECT COUNT\(\*\) as count FROM order_items WHERE product_id = \?/i.test(sql)) {
+                    return { count: 1 };
+                  }
+                  return null;
+                },
+                async all() {
+                  if (/SELECT \* FROM order_items WHERE product_id = \?/i.test(sql)) {
+                    return {
+                      results: [{ id: 'oi-hanoi-2', product_id: String(args[0]), tenant_id: 'hanoi' }],
+                    };
+                  }
+                  return { results: [] };
+                },
+                async run() {
+                  if (/DELETE FROM products/i.test(sql) || /UPDATE products SET is_available = 0/i.test(sql)) {
+                    domainProdSqlCalls.push({ sql, args });
+                  }
+                  return { success: true, meta: { changes: 1 } };
+                },
+              };
+            },
+          };
+        },
+      };
+
+      const app = new Hono<{ Bindings: Env }>();
+      app.use('*', async (c, next) => {
+        c.set('tenantId' as never, '*' as never);
+        await next();
+      });
+      app.route('/api/products', productsRouter);
+
+      const delRes = await app.request(
+        '/api/products/prod-aw2-1',
+        {
+          method: 'DELETE',
+          headers: { Authorization: `Bearer ${hqToken}`, 'X-Tenant-ID': '*' },
+        },
+        { AURA_DB: mockDomainProdDb, JWT_SECRET: TEST_SECRET } as unknown as Env
+      );
+      expect(delRes.status).toBe(200);
+      expect(domainProdSqlCalls.some((c) => /UPDATE products SET is_available = 0/i.test(c.sql))).toBe(false);
+      const hardDel = domainProdSqlCalls.find((c) => /DELETE FROM products/i.test(c.sql));
+      expect(hardDel).toBeDefined();
+      expect(hardDel?.args).toEqual(['prod-aw2-1', 'sadec', 'sadec']);
+    });
+
+    it('AW3: OpenAPI & Domain Catalog Categories PATCH/DELETE/reorder scope SQL to effectiveTenant and enforce slug uniqueness per store under HQ wildcard (*)', async () => {
+      const { OpenAPIHono } = await import('@hono/zod-openapi');
+      const { registerCategoryMutationHandlers } = await import('../../routes/openapi-categories-handlers/mutation-handlers');
+      const { categoriesRouter } = await import('../../../../packages/domain/catalog/commands/categories');
+      const { issueStaffSession } = await import('../../lib/staff-session');
+      const { Hono } = await import('hono');
+
+      const TEST_SECRET = 'test-jwt-secret-multi-tenant-aw3';
+      const hqAccount = {
+        id: 'hq-superadmin',
+        name: 'HQ Admin',
+        phone: null,
+        role: 'admin',
+        tenant_id: '*',
+        is_active: 1,
+        auth_version: 1,
+      };
+      const { token: hqToken } = await issueStaffSession(
+        { JWT_SECRET: TEST_SECRET },
+        hqAccount,
+        { email: 'hq@aura.vn', sessionType: 'staff-web' }
+      );
+
+      const openApiCatSqls: Array<{ sql: string; args: unknown[] }> = [];
+      const mockOpenApiCatDb = {
+        prepare(sql: string) {
+          return {
+            bind(...args: unknown[]) {
+              return {
+                async first() {
+                  if (/FROM categories WHERE id = \?/i.test(sql) || /FROM categories c WHERE c\.id = \?/i.test(sql)) {
+                    return {
+                      id: String(args[0]),
+                      name: 'Trà Trái Cây',
+                      slug: 'tra-trai-cay',
+                      sort_order: 1,
+                      tenant_id: 'sadec',
+                      created_at: '2026-11-04T12:00:00.000Z',
+                      updated_at: '2026-11-04T12:00:00.000Z',
+                    };
+                  }
+                  if (/SELECT COUNT\(\*\) as count FROM products WHERE category_id = \?/i.test(sql)) {
+                    return { count: 0 };
+                  }
+                  return null;
+                },
+                async all() {
+                  return { results: [] };
+                },
+                async run() {
+                  if (/UPDATE categories SET/i.test(sql) || /DELETE FROM categories/i.test(sql)) {
+                    openApiCatSqls.push({ sql, args });
+                  }
+                  return { success: true, meta: { changes: 1 } };
+                },
+              };
+            },
+          };
+        },
+      };
+
+      const openApiCatApp = new OpenAPIHono<{ Bindings: Env }>();
+      openApiCatApp.use('*', async (c, next) => {
+        c.set('tenantId' as never, '*' as never);
+        c.set('user' as never, { id: 'hq-superadmin', role: 'admin', tenantId: '*', tenant_id: '*' } as never);
+        await next();
+      });
+      registerCategoryMutationHandlers(openApiCatApp as any);
+
+      const patchOpenApiRes = await openApiCatApp.request(
+        '/api/categories/cat-aw3-1',
+        {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            displayOrder: 3,
+            translations: [{ locale: 'vi', name: 'Trà Trái Cây Sa Đéc' }],
+          }),
+        },
+        { AURA_DB: mockOpenApiCatDb } as unknown as Env
+      );
+      expect(patchOpenApiRes.status).toBe(200);
+      const openApiUpdate = openApiCatSqls.find((c) => /UPDATE categories SET/i.test(c.sql));
+      expect(openApiUpdate).toBeDefined();
+      expect(openApiUpdate?.sql).toContain("COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?");
+      expect(openApiUpdate?.args[openApiUpdate.args.length - 1]).toBe('sadec');
+
+      const delOpenApiRes = await openApiCatApp.request(
+        '/api/categories/cat-aw3-1',
+        { method: 'DELETE' },
+        { AURA_DB: mockOpenApiCatDb } as unknown as Env
+      );
+      expect(delOpenApiRes.status).toBe(200);
+      const openApiDelete = openApiCatSqls.find((c) => /DELETE FROM categories/i.test(c.sql));
+      expect(openApiDelete).toBeDefined();
+      expect(openApiDelete?.args).toEqual(['cat-aw3-1', 'sadec']);
+
+      // Domain categoriesRouter: slug conflict in same store -> 409, slug in other store -> 200 & scoped SQL
+      const domainCatSqls: Array<{ sql: string; args: unknown[] }> = [];
+      const mockDomainCatDb = {
+        prepare(sql: string) {
+          return {
+            bind(...args: unknown[]) {
+              return {
+                async first() {
+                  if (/FROM users WHERE id = \?/i.test(sql)) {
+                    return {
+                      id: 'hq-superadmin',
+                      name: 'HQ Admin',
+                      phone: null,
+                      role: 'admin',
+                      tenant_id: '*',
+                      is_active: 1,
+                      auth_version: 1,
+                    };
+                  }
+                  if (/SELECT \* FROM categories WHERE id = \?/i.test(sql)) {
+                    return {
+                      id: String(args[0]),
+                      name: 'Đá Xay',
+                      slug: 'da-xay',
+                      sort_order: 2,
+                      image_url: '',
+                      tenant_id: 'sadec',
+                    };
+                  }
+                  return null;
+                },
+                async all() {
+                  if (/SELECT \* FROM categories WHERE slug = \? AND id != \?/i.test(sql)) {
+                    const targetSlug = String(args[0]);
+                    if (targetSlug === 'ca-phe-sadec-dup') {
+                      return { results: [{ id: 'cat-other-sadec', slug: targetSlug, tenant_id: 'sadec' }] };
+                    }
+                    return { results: [{ id: 'cat-other-hanoi', slug: targetSlug, tenant_id: 'hanoi' }] };
+                  }
+                  return { results: [] };
+                },
+                async run() {
+                  if (
+                    /UPDATE categories SET/i.test(sql) ||
+                    /UPDATE menu_items SET category = \?/i.test(sql) ||
+                    /UPDATE products SET category = \?/i.test(sql)
+                  ) {
+                    domainCatSqls.push({ sql, args });
+                  }
+                  return { success: true, meta: { changes: 1 } };
+                },
+              };
+            },
+          };
+        },
+      };
+
+      const domainCatApp = new Hono<{ Bindings: Env }>();
+      domainCatApp.use('*', async (c, next) => {
+        c.set('tenantId' as never, '*' as never);
+        await next();
+      });
+      domainCatApp.route('/api/categories', categoriesRouter);
+
+      const dupSlugRes = await domainCatApp.request(
+        '/api/categories/cat-aw3-2',
+        {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${hqToken}`,
+            'X-Tenant-ID': '*',
+          },
+          body: JSON.stringify({ slug: 'ca-phe-sadec-dup' }),
+        },
+        { AURA_DB: mockDomainCatDb, JWT_SECRET: TEST_SECRET } as unknown as Env
+      );
+      expect(dupSlugRes.status).toBe(409);
+
+      const renameSlugRes = await domainCatApp.request(
+        '/api/categories/cat-aw3-2',
+        {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${hqToken}`,
+            'X-Tenant-ID': '*',
+          },
+          body: JSON.stringify({ slug: 'da-xay-sadec' }),
+        },
+        { AURA_DB: mockDomainCatDb, JWT_SECRET: TEST_SECRET } as unknown as Env
+      );
+      expect(renameSlugRes.status).toBe(200);
+      const catUpdateCall = domainCatSqls.find((c) => /UPDATE categories SET name=\?/i.test(c.sql));
+      expect(catUpdateCall).toBeDefined();
+      expect(catUpdateCall?.args.slice(-2)).toEqual(['sadec', 'sadec']);
+      expect(
+        domainCatSqls.some(
+          (c) => /UPDATE menu_items SET category = \?/i.test(c.sql) && c.args.includes('sadec')
+        )
+      ).toBe(true);
+      expect(
+        domainCatSqls.some(
+          (c) => /UPDATE products SET category = \?/i.test(c.sql) && c.args.includes('sadec')
+        )
+      ).toBe(true);
+    });
+  });
+
+  describe('51. Phase AX1-AX4: Domain Happy-Hour & Menu-Modifiers HQ Store SQL Scoping & Parent Guards + Promotions Admin HQ Store Inheritance', () => {
+    const TEST_SECRET = 'test-jwt-secret-key-for-testing-only';
+
+    it('AX1: Domain /happy-hour enforces cross-tenant 403 for store staff, requires concrete tenant on HQ POST (400), and binds effectiveTenant on HQ PATCH & DELETE', async () => {
+      const { Hono } = await import('hono');
+      const hqToken = await generateJWT(
+        {
+          id: 'hq-owner-ax1',
+          sub: 'hq-owner-ax1',
+          role: 'owner',
+          email: 'hq-ax1@aura.vn',
+          name: 'HQ Owner AX1',
+          tenantId: '*',
+          authVersion: 1,
+          authTime: Math.floor(Date.now() / 1000),
+          sessionType: 'staff-web',
+        },
+        TEST_SECRET,
+        28800
+      );
+      const storeAToken = await generateJWT(
+        {
+          id: 'mgr-store-a-ax1',
+          sub: 'mgr-store-a-ax1',
+          role: 'manager',
+          email: 'mgr-a@aura.vn',
+          name: 'Store A Manager',
+          tenantId: 'store-a',
+          authVersion: 1,
+          authTime: Math.floor(Date.now() / 1000),
+          sessionType: 'staff-web',
+        },
+        TEST_SECRET,
+        28800
+      );
+
+      const hhSqlCalls: Array<{ sql: string; args: unknown[] }> = [];
+      const mockHhDb = {
+        prepare(sql: string) {
+          return {
+            bind(...args: unknown[]) {
+              return {
+                async first() {
+                  if (isAccountLookup(sql)) {
+                    const uid = String(args[0] ?? '');
+                    return uid === 'mgr-store-a-ax1'
+                      ? {
+                          id: uid,
+                          name: 'Store A Mgr',
+                          phone: null,
+                          role: 'manager',
+                          tenant_id: 'store-a',
+                          is_active: 1,
+                          auth_version: 1,
+                        }
+                      : {
+                          id: uid,
+                          name: 'HQ Owner',
+                          phone: null,
+                          role: 'owner',
+                          tenant_id: '*',
+                          is_active: 1,
+                          auth_version: 1,
+                        };
+                  }
+                  if (/SELECT \* FROM happy_hour_windows WHERE id = \?/i.test(sql)) {
+                    return {
+                      id: 'HH-SADEC-1',
+                      name: 'Sa Dec Morning',
+                      day_of_week: 1,
+                      start_time: '07:00',
+                      end_time: '10:00',
+                      discount_rate: 0.15,
+                      apply_to: 'all',
+                      apply_ids: null,
+                      priority: 1,
+                      active: 1,
+                      tenant_id: 'sadec',
+                    };
+                  }
+                  return null;
+                },
+                async all() {
+                  return { results: [] };
+                },
+                async run() {
+                  if (/UPDATE happy_hour_windows/i.test(sql) || /DELETE FROM happy_hour_windows/i.test(sql)) {
+                    hhSqlCalls.push({ sql, args });
+                  }
+                  return { success: true, meta: { changes: 1 } };
+                },
+              };
+            },
+          };
+        },
+      };
+
+      const hhApp = new Hono<{ Bindings: Env }>();
+      hhApp.route('/api/menu-modifiers', menuModifiersRouter);
+
+      // 1. Store A manager attempting cross-tenant override to store-b gets 403
+      const crossPostRes = await hhApp.request(
+        '/api/menu-modifiers/happy-hour',
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${storeAToken}`,
+            'X-Tenant-ID': 'store-b',
+          },
+          body: JSON.stringify({
+            name: 'Cross Store HH',
+            day_of_week: 1,
+            start_time: '08:00',
+            end_time: '10:00',
+            discount_rate: 0.1,
+          }),
+        },
+        { AURA_DB: mockHhDb, JWT_SECRET: TEST_SECRET } as unknown as Env
+      );
+      expect(crossPostRes.status).toBe(403);
+
+      // 2. HQ wildcard POST without concrete store tenant gets 400
+      const hqWildPostRes = await hhApp.request(
+        '/api/menu-modifiers/happy-hour',
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${hqToken}`,
+            'X-Tenant-ID': '*',
+          },
+          body: JSON.stringify({
+            name: 'Wildcard HH',
+            day_of_week: 1,
+            start_time: '08:00',
+            end_time: '10:00',
+            discount_rate: 0.1,
+          }),
+        },
+        { AURA_DB: mockHhDb, JWT_SECRET: TEST_SECRET } as unknown as Env
+      );
+      expect(hqWildPostRes.status).toBe(400);
+
+      // 3. HQ wildcard PATCH & DELETE bind effectiveTenant ('sadec') in SQL
+      const hqPatchRes = await hhApp.request(
+        '/api/menu-modifiers/happy-hour/HH-SADEC-1',
+        {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${hqToken}`,
+            'X-Tenant-ID': '*',
+          },
+          body: JSON.stringify({ name: 'Sa Dec Morning Updated' }),
+        },
+        { AURA_DB: mockHhDb, JWT_SECRET: TEST_SECRET } as unknown as Env
+      );
+      expect(hqPatchRes.status).toBe(200);
+      const hhUpdateCall = hhSqlCalls.find((c) => /UPDATE happy_hour_windows/i.test(c.sql));
+      expect(hhUpdateCall).toBeDefined();
+      expect(hhUpdateCall?.sql).toContain("COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?");
+      expect(hhUpdateCall?.args[hhUpdateCall.args.length - 1]).toBe('sadec');
+
+      const hqDeleteRes = await hhApp.request(
+        '/api/menu-modifiers/happy-hour/HH-SADEC-1',
+        {
+          method: 'DELETE',
+          headers: {
+            Authorization: `Bearer ${hqToken}`,
+            'X-Tenant-ID': '*',
+          },
+        },
+        { AURA_DB: mockHhDb, JWT_SECRET: TEST_SECRET } as unknown as Env
+      );
+      expect(hqDeleteRes.status).toBe(200);
+      const hhDeleteCall = hhSqlCalls.find((c) => /DELETE FROM happy_hour_windows/i.test(c.sql));
+      expect(hhDeleteCall).toBeDefined();
+      expect(hhDeleteCall?.sql).toContain("COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?");
+      expect(hhDeleteCall?.args).toEqual(['HH-SADEC-1', 'sadec']);
+    });
+
+    it('AX2: Domain /api/menu-modifiers binds effectiveGroupTenant on HQ group PATCH/DELETE and enforces parent existence & cross-store product-group match on HQ mutations', async () => {
+      const { Hono } = await import('hono');
+      const hqToken = await generateJWT(
+        {
+          id: 'hq-owner-ax2',
+          sub: 'hq-owner-ax2',
+          role: 'owner',
+          email: 'hq-ax2@aura.vn',
+          name: 'HQ Owner AX2',
+          tenantId: '*',
+          authVersion: 1,
+          authTime: Math.floor(Date.now() / 1000),
+          sessionType: 'staff-web',
+        },
+        TEST_SECRET,
+        28800
+      );
+
+      const modSqlCalls: Array<{ sql: string; args: unknown[] }> = [];
+      const mockModDb = {
+        prepare(sql: string) {
+          return {
+            bind(...args: unknown[]) {
+              return {
+                async first() {
+                  if (isAccountLookup(sql)) {
+                    return {
+                      id: String(args[0] ?? 'hq-owner-ax2'),
+                      name: 'HQ Owner',
+                      phone: null,
+                      role: 'owner',
+                      tenant_id: '*',
+                      is_active: 1,
+                      auth_version: 1,
+                    };
+                  }
+                  if (/SELECT \* FROM modifier_groups WHERE id = \?/i.test(sql)) {
+                    if (args[0] === 'MG-SADEC-1') {
+                      return { id: 'MG-SADEC-1', name: 'Đá Sa Đéc', type: 'single', required: 0, is_active: 1, tenant_id: 'sadec' };
+                    }
+                    if (args[0] === 'MG-STORE-B') {
+                      return { id: 'MG-STORE-B', name: 'Đá Store B', type: 'single', required: 0, is_active: 1, tenant_id: 'store-b' };
+                    }
+                    return null;
+                  }
+                  if (/SELECT \* FROM products WHERE id = \?/i.test(sql)) {
+                    if (args[0] === 'PROD-SADEC-1') {
+                      return { id: 'PROD-SADEC-1', name: 'Trà Sen Sa Đéc', price: 45000, tenant_id: 'sadec' };
+                    }
+                    return null;
+                  }
+                  return null;
+                },
+                async all() {
+                  return { results: [] };
+                },
+                async run() {
+                  if (/UPDATE modifier_groups/i.test(sql) || /DELETE FROM modifier_groups/i.test(sql)) {
+                    modSqlCalls.push({ sql, args });
+                  }
+                  return { success: true, meta: { changes: 1 } };
+                },
+              };
+            },
+          };
+        },
+      };
+
+      const modApp = new Hono<{ Bindings: Env }>();
+      modApp.route('/api/menu-modifiers', menuModifiersRouter);
+
+      // 1. HQ PATCH & DELETE /groups/:id bind effectiveGroupTenant ('sadec') in SQL
+      const patchGroupRes = await modApp.request(
+        '/api/menu-modifiers/groups/MG-SADEC-1',
+        {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${hqToken}`,
+            'X-Tenant-ID': '*',
+          },
+          body: JSON.stringify({ name: 'Đá Sa Đéc Đặc Biệt' }),
+        },
+        { AURA_DB: mockModDb, JWT_SECRET: TEST_SECRET } as unknown as Env
+      );
+      expect(patchGroupRes.status).toBe(200);
+      const groupUpdateCall = modSqlCalls.find((c) => /UPDATE modifier_groups/i.test(c.sql));
+      expect(groupUpdateCall).toBeDefined();
+      expect(groupUpdateCall?.sql).toContain("COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?");
+      expect(groupUpdateCall?.args[groupUpdateCall.args.length - 1]).toBe('sadec');
+
+      const delGroupRes = await modApp.request(
+        '/api/menu-modifiers/groups/MG-SADEC-1',
+        {
+          method: 'DELETE',
+          headers: {
+            Authorization: `Bearer ${hqToken}`,
+            'X-Tenant-ID': '*',
+          },
+        },
+        { AURA_DB: mockModDb, JWT_SECRET: TEST_SECRET } as unknown as Env
+      );
+      expect(delGroupRes.status).toBe(200);
+      const groupDeleteCall = modSqlCalls.find((c) => /DELETE FROM modifier_groups/i.test(c.sql));
+      expect(groupDeleteCall).toBeDefined();
+      expect(groupDeleteCall?.sql).toContain("COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?");
+      expect(groupDeleteCall?.args).toEqual(['MG-SADEC-1', 'sadec']);
+
+      // 2. HQ PATCH choice under nonexistent parent group returns 404
+      const missingGroupChoiceRes = await modApp.request(
+        '/api/menu-modifiers/groups/MG-MISSING/choices/MC-1',
+        {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${hqToken}`,
+            'X-Tenant-ID': '*',
+          },
+          body: JSON.stringify({ name: 'Orphan Choice', price_delta: 5000 }),
+        },
+        { AURA_DB: mockModDb, JWT_SECRET: TEST_SECRET } as unknown as Env
+      );
+      expect(missingGroupChoiceRes.status).toBe(404);
+
+      // 3. HQ DELETE /products/:productId/groups/:groupId rejects cross-store product ('sadec') vs group ('store-b') with 404
+      const crossStoreUnlinkRes = await modApp.request(
+        '/api/menu-modifiers/products/PROD-SADEC-1/groups/MG-STORE-B',
+        {
+          method: 'DELETE',
+          headers: {
+            Authorization: `Bearer ${hqToken}`,
+            'X-Tenant-ID': '*',
+          },
+        },
+        { AURA_DB: mockModDb, JWT_SECRET: TEST_SECRET } as unknown as Env
+      );
+      expect(crossStoreUnlinkRes.status).toBe(404);
+    });
+
+    it('AX3: Legacy /api/promotions PATCH /:code and DELETE /:code resolve HQ wildcard (*) store promotions and bind existing.tenant_id in SQL', async () => {
+      const { Hono } = await import('hono');
+      const hqToken = await generateJWT(
+        {
+          id: 'hq-owner-ax3',
+          sub: 'hq-owner-ax3',
+          role: 'owner',
+          email: 'hq-ax3@aura.vn',
+          name: 'HQ Owner AX3',
+          tenantId: '*',
+          authVersion: 1,
+          authTime: Math.floor(Date.now() / 1000),
+          sessionType: 'staff-web',
+        },
+        TEST_SECRET,
+        28800
+      );
+
+      let promoPercent = 15;
+      const promoSqlCalls: Array<{ sql: string; args: unknown[] }> = [];
+      const mockPromoDb = {
+        prepare(sql: string) {
+          return {
+            bind(...args: unknown[]) {
+              return {
+                async first() {
+                  if (isAccountLookup(sql)) {
+                    return {
+                      id: String(args[0] ?? 'hq-owner-ax3'),
+                      name: 'HQ Owner',
+                      phone: null,
+                      role: 'owner',
+                      tenant_id: '*',
+                      is_active: 1,
+                      auth_version: 1,
+                    };
+                  }
+                  if (/SELECT \* FROM promotions WHERE/i.test(sql)) {
+                    const boundTenant = args[2];
+                    if (!boundTenant || boundTenant === 'sadec') {
+                      return {
+                        id: 'PROMO-SADEC-1',
+                        code: 'SADECVIP',
+                        percent: promoPercent,
+                        max_discount: 30000,
+                        min_order: 50000,
+                        usage_limit: 100,
+                        usage_count: 2,
+                        is_active: 1,
+                        tenant_id: 'sadec',
+                      };
+                    }
+                    return null;
+                  }
+                  return null;
+                },
+                async all() {
+                  return { results: [] };
+                },
+                async run() {
+                  if (/UPDATE promotions SET/i.test(sql) || /DELETE FROM promotions/i.test(sql)) {
+                    promoSqlCalls.push({ sql, args });
+                    if (/UPDATE promotions SET/i.test(sql) && typeof args[0] === 'number') {
+                      promoPercent = args[0];
+                    }
+                  }
+                  return { success: true, meta: { changes: 1 } };
+                },
+              };
+            },
+          };
+        },
+      };
+
+      const promoApp = new Hono<{ Bindings: Env }>();
+      promoApp.use('*', async (c, next) => {
+        c.set('tenantId' as never, '*' as never);
+        await next();
+      });
+      promoApp.route('/api/promotions', promotionsRouter);
+
+      const patchPromoRes = await promoApp.request(
+        '/api/promotions/SADECVIP',
+        {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${hqToken}`,
+            'X-Tenant-ID': '*',
+          },
+          body: JSON.stringify({ percent: 25 }),
+        },
+        { AURA_DB: mockPromoDb, JWT_SECRET: TEST_SECRET } as unknown as Env
+      );
+      expect(patchPromoRes.status).toBe(200);
+      const patchPromoBody = (await patchPromoRes.json()) as { success: boolean; data?: { percent: number; tenant_id: string } };
+      expect(patchPromoBody.data?.percent).toBe(25);
+      expect(patchPromoBody.data?.tenant_id).toBe('sadec');
+      const promoUpdateCall = promoSqlCalls.find((c) => /UPDATE promotions SET/i.test(c.sql));
+      expect(promoUpdateCall).toBeDefined();
+      expect(promoUpdateCall?.args[promoUpdateCall.args.length - 1]).toBe('sadec');
+
+      const delPromoRes = await promoApp.request(
+        '/api/promotions/SADECVIP',
+        {
+          method: 'DELETE',
+          headers: {
+            Authorization: `Bearer ${hqToken}`,
+            'X-Tenant-ID': '*',
+          },
+        },
+        { AURA_DB: mockPromoDb, JWT_SECRET: TEST_SECRET } as unknown as Env
+      );
+      expect(delPromoRes.status).toBe(200);
+      const promoDeleteCall = promoSqlCalls.find((c) => /DELETE FROM promotions/i.test(c.sql));
+      expect(promoDeleteCall).toBeDefined();
+      expect(promoDeleteCall?.args).toEqual(['SADECVIP', 'SADECVIP', 'sadec']);
+    });
+  });
+
+  describe('52. Phase AY1-AY4: Domain Kitchen Stations & Station Tickets HQ Store SQL Scoping, Inventory CRUD SKU/Purchasing Cross-Tenant Guards, and Reservations Staff/Waitlist HQ Store Inheritance', () => {
+    it('AY1: kitchenStationsRouter and stationTicketsRouter scope HQ (*) station PATCH/DELETE, category mappings, and station tickets/transitions to effectiveStationTenant', async () => {
+      const { Hono } = await import('hono');
+      const { kitchenStationsRouter } = await import('../../../../packages/domain/kitchen/commands/kitchen-stations');
+
+      const sqlCalls: Array<{ sql: string; args: unknown[] }> = [];
+      const mockDb = {
+        prepare(sql: string) {
+          if (isAccountLookup(sql)) return accountStatement('owner', '*');
+          return {
+            bind(...args: unknown[]) {
+              return {
+                async first() {
+                  if (/FROM kitchen_stations WHERE id = \?/i.test(sql)) {
+                    if (args[0] === 'st-sadec-bar') {
+                      return { id: 'st-sadec-bar', name: 'Quầy Bar Sa Đéc', slug: 'bar-sadec', active: 1, tenant_id: 'sadec' };
+                    }
+                    return null;
+                  }
+                  if (/FROM categories WHERE id = \?/i.test(sql)) {
+                    if (args[0] === 'cat-cantho-coffee') {
+                      return { id: 'cat-cantho-coffee', name: 'Cà Phê Cần Thơ', tenant_id: 'cantho' };
+                    }
+                    if (args[0] === 'cat-sadec-coffee') {
+                      return { id: 'cat-sadec-coffee', name: 'Cà Phê Sa Đéc', tenant_id: 'sadec' };
+                    }
+                    return null;
+                  }
+                  if (/FROM orders WHERE id = \?/i.test(sql)) {
+                    sqlCalls.push({ sql, args });
+                    if (args[0] === 'ord-cantho-1' && args[1] === 'sadec') {
+                      return null;
+                    }
+                    if (args[0] === 'ord-sadec-1' && args[1] === 'sadec') {
+                      return {
+                        id: 'ord-sadec-1',
+                        status: 'confirmed',
+                        items: JSON.stringify([{ id: 'item-1', name: 'Bạc Xỉu', qty: 1, category_id: 'cat-sadec-coffee' }]),
+                        tenant_id: 'sadec',
+                      };
+                    }
+                    return null;
+                  }
+                  return null;
+                },
+                async all() {
+                  if (/FROM orders o LEFT JOIN cafe_tables/i.test(sql)) {
+                    sqlCalls.push({ sql, args });
+                    return {
+                      results: [
+                        {
+                          id: 'ord-sadec-1',
+                          table_id: 'tbl-sadec-1',
+                          table_name: 'SD-01',
+                          status: 'confirmed',
+                          created_at: '2026-11-04T10:00:00Z',
+                          items: JSON.stringify([{ id: 'item-1', name: 'Bạc Xỉu', qty: 1, category_id: 'cat-sadec-coffee' }]),
+                        },
+                      ],
+                    };
+                  }
+                  if (/FROM category_stations cs JOIN kitchen_stations/i.test(sql)) {
+                    return {
+                      results: [
+                        { category_id: 'cat-sadec-coffee', station_id: 'st-sadec-bar', station_name: 'Quầy Bar Sa Đéc', tenant_id: 'sadec' },
+                        { category_id: 'cat-sadec-coffee', station_id: 'st-cantho-bar', station_name: 'Quầy Bar Cần Thơ', tenant_id: 'cantho' },
+                      ],
+                    };
+                  }
+                  return { results: [] };
+                },
+                async run() {
+                  sqlCalls.push({ sql, args });
+                  return { success: true, meta: { changes: 1 } };
+                },
+              };
+            },
+            async all() {
+              if (/FROM category_stations cs JOIN kitchen_stations/i.test(sql)) {
+                return {
+                  results: [
+                    { category_id: 'cat-sadec-coffee', station_id: 'st-sadec-bar', station_name: 'Quầy Bar Sa Đéc', tenant_id: 'sadec' },
+                    { category_id: 'cat-sadec-coffee', station_id: 'st-cantho-bar', station_name: 'Quầy Bar Cần Thơ', tenant_id: 'cantho' },
+                  ],
+                };
+              }
+              return { results: [] };
+            },
+          };
+        },
+      };
+
+      const app = new Hono<{ Bindings: Env }>();
+      app.use('*', async (c, next) => {
+        c.set('user' as never, { id: 'user-owner', role: 'owner', tenantId: '*', tenant_id: '*' } as never);
+        c.set('tenantId' as never, '*' as never);
+        await next();
+      });
+      app.route('/api/kitchen/stations', kitchenStationsRouter);
+      const env = createMockEnv({ JWT_SECRET: TEST_JWT_SECRET, AURA_DB: mockDb as never });
+
+      // 1. HQ (*) PATCH /api/kitchen/stations/:id binds effectiveStationTenant ('sadec')
+      const patchRes = await app.fetch(
+        await authRequest('PATCH', '/api/kitchen/stations/st-sadec-bar', 'owner', '*', { name: 'Quầy Bar Sa Đéc VIP' }),
+        env
+      );
+      expect(patchRes.status).toBe(200);
+      const stationUpdateCall = sqlCalls.find((c) => /UPDATE kitchen_stations/i.test(c.sql));
+      expect(stationUpdateCall).toBeDefined();
+      expect(stationUpdateCall?.args[stationUpdateCall.args.length - 1]).toBe('sadec');
+
+      // 2. HQ (*) POST /api/kitchen/stations/categories rejects cross-store category ('cantho') for 'sadec' station (403)
+      const crossCatRes = await app.fetch(
+        await authRequest('POST', '/api/kitchen/stations/categories', 'owner', '*', {
+          category_id: 'cat-cantho-coffee',
+          station_id: 'st-sadec-bar',
+        }),
+        env
+      );
+      expect(crossCatRes.status).toBe(403);
+
+      // 3. HQ (*) POST /api/kitchen/stations/categories stamps stationTenant ('sadec') on same-store mapping
+      const sameCatRes = await app.fetch(
+        await authRequest('POST', '/api/kitchen/stations/categories', 'owner', '*', {
+          category_id: 'cat-sadec-coffee',
+          station_id: 'st-sadec-bar',
+        }),
+        env
+      );
+      expect(sameCatRes.status).toBe(200);
+      const mapInsertCall = sqlCalls.find((c) => /INSERT OR REPLACE INTO category_stations/i.test(c.sql));
+      expect(mapInsertCall?.args).toEqual(['cat-sadec-coffee', 'st-sadec-bar', 'sadec']);
+
+      // 4. HQ (*) GET /api/kitchen/stations/:id/tickets scopes active orders to station.tenant_id ('sadec')
+      const ticketsRes = await app.fetch(
+        await authRequest('GET', '/api/kitchen/stations/st-sadec-bar/tickets', 'owner', '*'),
+        env
+      );
+      expect(ticketsRes.status).toBe(200);
+      const ticketsOrderSelect = sqlCalls.find((c) => /FROM orders o LEFT JOIN cafe_tables/i.test(c.sql));
+      expect(ticketsOrderSelect).toBeDefined();
+      expect(ticketsOrderSelect?.args[ticketsOrderSelect.args.length - 1]).toBe('sadec');
+
+      // 5. HQ (*) POST /api/kitchen/stations/tickets/:orderId/items/:itemId/start rejects cross-store order ('ord-cantho-1') for 'sadec' station (404)
+      const crossStartRes = await app.fetch(
+        await authRequest('POST', '/api/kitchen/stations/tickets/ord-cantho-1/items/item-1/start?station_id=st-sadec-bar', 'owner', '*'),
+        env
+      );
+      expect(crossStartRes.status).toBe(404);
+
+      // 6. HQ (*) DELETE /api/kitchen/stations/:id scopes both category_stations and kitchen_stations deletes to 'sadec'
+      const delRes = await app.fetch(
+        await authRequest('DELETE', '/api/kitchen/stations/st-sadec-bar', 'owner', '*'),
+        env
+      );
+      expect(delRes.status).toBe(200);
+      const delCatStationCall = sqlCalls.find((c) => /DELETE FROM category_stations WHERE station_id = \?/i.test(c.sql));
+      const delStationCall = sqlCalls.find((c) => /DELETE FROM kitchen_stations WHERE id = \?/i.test(c.sql));
+      expect(delCatStationCall?.args).toEqual(['st-sadec-bar', 'sadec']);
+      expect(delStationCall?.args).toEqual(['st-sadec-bar', 'sadec']);
+    });
+
+    it('AY2: inventoryCRUD PUT /:id scopes duplicate SKU checks to effectiveRowTenant under HQ (*) and purchasing blocks cross-tenant store spoofing', async () => {
+      const { Hono } = await import('hono');
+      const { inventoryCRUD } = await import('../../../../packages/domain/inventory/src/routes/inventory-crud');
+      const { purchasing } = await import('../../../../packages/domain/inventory/src/routes/purchasing');
+
+      const invUpdateCalls: Array<{ sql: string; args: unknown[] }> = [];
+      const mockInvDb = {
+        prepare(sql: string) {
+          return {
+            bind(...args: unknown[]) {
+              return {
+                async first() {
+                  if (/SELECT \* FROM inventory_items WHERE id = \?/i.test(sql)) {
+                    if (args[0] === 'inv-sadec-1') {
+                      return {
+                        id: 'inv-sadec-1',
+                        sku: 'CF-OLD',
+                        name: 'Cà phê hạt Sa Đéc',
+                        category: 'coffee',
+                        unit: 'kg',
+                        current_stock: 10,
+                        min_stock: 2,
+                        max_stock: 50,
+                        cost_per_unit: 180000,
+                        tenant_id: 'sadec',
+                      };
+                    }
+                    return null;
+                  }
+                  return null;
+                },
+                async all() {
+                  if (/SELECT \* FROM inventory_items WHERE sku = \? AND id != \?/i.test(sql)) {
+                    // Another store ('cantho') has SKU 'CF-SHARED', but 'sadec' does not!
+                    return {
+                      results: [
+                        { id: 'inv-cantho-99', sku: 'CF-SHARED', tenant_id: 'cantho' },
+                      ],
+                    };
+                  }
+                  return { results: [] };
+                },
+                async run() {
+                  invUpdateCalls.push({ sql, args });
+                  return { success: true, meta: { changes: 1 } };
+                },
+              };
+            },
+          };
+        },
+      };
+
+      const invApp = new Hono();
+      invApp.use('*', async (c, next) => {
+        c.set('user' as never, { id: 'hq-owner-1', role: 'owner', tenantId: '*', tenant_id: '*' } as never);
+        c.set('tenantId' as never, '*' as never);
+        await next();
+      });
+      inventoryCRUD(invApp as never);
+
+      // 1. HQ (*) updating 'sadec' item SKU to 'CF-SHARED' succeeds (200) because 'CF-SHARED' only exists in 'cantho'
+      const putInvRes = await invApp.request(
+        '/inv-sadec-1',
+        {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ sku: 'CF-SHARED', name: 'Cà phê hạt Sa Đéc Mới' }),
+        },
+        { AURA_DB: mockInvDb } as unknown as Env
+      );
+      expect(putInvRes.status).toBe(200);
+      expect(invUpdateCalls).toHaveLength(1);
+      expect(invUpdateCalls[0].args[invUpdateCalls[0].args.length - 1]).toBe('sadec');
+
+      // 2. Purchasing routes reject cross-tenant store spoofing on both read and write (403)
+      const purApp = new Hono();
+      purApp.use('*', async (c, next) => {
+        c.set('user' as never, { id: 'mgr-sadec-1', role: 'manager', tenantId: 'sadec', tenant_id: 'sadec' } as never);
+        c.set('tenantId' as never, 'sadec' as never);
+        await next();
+      });
+      purchasing(purApp as never);
+
+      const crossReadPoRes = await purApp.request(
+        '/purchase-orders?tenant_id=cantho',
+        { method: 'GET', headers: { 'X-Tenant-ID': 'cantho' } },
+        { AURA_DB: mockInvDb } as unknown as Env
+      );
+      expect(crossReadPoRes.status).toBe(403);
+
+      const crossWritePoRes = await purApp.request(
+        '/purchase-orders',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-Tenant-ID': 'cantho' },
+          body: JSON.stringify({
+            supplier_id: 'sup-cantho-1',
+            items: [{ ingredient_id: 'ing-1', quantity: 5, unit_cost: 10000 }],
+          }),
+        },
+        { AURA_DB: mockInvDb } as unknown as Env
+      );
+      expect(crossWritePoRes.status).toBe(403);
+    });
+
+    it('AY3: reservationsRouter blocks cross-tenant staff header spoofing (403) and inherits entry.tenant_id when HQ (*) seats a franchise waitlist entry', async () => {
+      const { Hono } = await import('hono');
+      const { reservationsRouter } = await import('../../../../packages/domain/reservation/src/routes/reservations');
+
+      const rsvSqlCalls: Array<{ sql: string; args: unknown[] }> = [];
+      const mockRsvDb = {
+        prepare(sql: string) {
+          return {
+            bind(...args: unknown[]) {
+              return {
+                async first() {
+                  if (/FROM waitlist WHERE id = \?/i.test(sql)) {
+                    if (args[0] === 'wl-sadec-1') {
+                      return {
+                        id: 'wl-sadec-1',
+                        customer_name: 'Khách Sa Đéc',
+                        party_size: 4,
+                        status: 'waiting',
+                        tenant_id: 'sadec',
+                      };
+                    }
+                    return null;
+                  }
+                  if (/FROM cafe_tables WHERE/i.test(sql)) {
+                    rsvSqlCalls.push({ sql, args });
+                    const tblId = args[0];
+                    const targetTenant = args[2];
+                    if (tblId === 'tbl-sadec-05' && targetTenant === 'sadec') {
+                      return {
+                        id: 'tbl-sadec-05',
+                        table_number: 'SD-05',
+                        capacity: 6,
+                        status: 'Available',
+                        is_active: 1,
+                        tenant_id: 'sadec',
+                      };
+                    }
+                    return null;
+                  }
+                  return null;
+                },
+                async all() {
+                  return { results: [] };
+                },
+                async run() {
+                  rsvSqlCalls.push({ sql, args });
+                  return { success: true, meta: { changes: 1 } };
+                },
+              };
+            },
+          };
+        },
+      };
+
+      // 1. Store-bound staff ('sadec') spoofing X-Tenant-ID: 'cantho' on GET /api/reservations is rejected (403)
+      const staffApp = new Hono<{ Bindings: Env }>();
+      staffApp.use('*', async (c, next) => {
+        c.set('user' as never, { id: 'staff-sadec-1', role: 'manager', tenantId: 'sadec', tenant_id: 'sadec' } as never);
+        c.set('tenantId' as never, 'sadec' as never);
+        await next();
+      });
+      staffApp.route('/api/reservations', reservationsRouter);
+
+      const spoofListRes = await staffApp.request(
+        '/api/reservations?tenant_id=cantho',
+        { method: 'GET', headers: { 'X-Tenant-ID': 'cantho' } },
+        { AURA_DB: mockRsvDb } as unknown as Env
+      );
+      expect(spoofListRes.status).toBe(403);
+
+      // 2. HQ (*) seating a 'sadec' waitlist entry ('wl-sadec-1') resolves entry across stores and scopes table lookup & updates to 'sadec'
+      const hqApp = new Hono<{ Bindings: Env }>();
+      hqApp.use('*', async (c, next) => {
+        c.set('user' as never, { id: 'hq-owner-1', role: 'owner', tenantId: '*', tenant_id: '*' } as never);
+        c.set('tenantId' as never, '*' as never);
+        await next();
+      });
+      hqApp.route('/api/reservations', reservationsRouter);
+
+      const seatRes = await hqApp.request(
+        '/api/reservations/waitlist/wl-sadec-1/seat',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ table_id: 'tbl-sadec-05' }),
+        },
+        { AURA_DB: mockRsvDb } as unknown as Env
+      );
+      expect(seatRes.status).toBe(200);
+      const seatBody = (await seatRes.json()) as { success: boolean; data?: { status: string; table_id: string } };
+      expect(seatBody.success).toBe(true);
+      expect(seatBody.data?.status).toBe('seated');
+      const wlUpdateCall = rsvSqlCalls.find((c) => /UPDATE waitlist SET status = 'seated'/i.test(c.sql));
+      const tblUpdateCall = rsvSqlCalls.find((c) => /UPDATE cafe_tables SET status = 'occupied'/i.test(c.sql));
+      expect(wlUpdateCall?.args).toEqual(['tbl-sadec-05', 'wl-sadec-1', 'sadec']);
+      expect(tblUpdateCall?.args).toEqual(['tbl-sadec-05', 'sadec']);
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // Suite 53: Phase AZ1–AZ4 — Domain Kitchen COD & KDS Mobile Env Forwarding,
+  //           Inventory Snapshots/Transactions Guard, Staff Tips & Shift
+  //           Cash Reconciliation HQ Store Scoping & Tables Route Guard
+  // -------------------------------------------------------------------------
+  describe('Suite 53: Phase AZ1–AZ4 — Domain Kitchen COD/KDS Mobile, Inventory Snapshots/Transactions, Staff Tips/Cash Reconciliation & Tables HQ Store Scoping', () => {
+    it('AZ1: collectCodPayment inherits order.tenant_id under HQ (*) and isolates non-default store payment ledger rows; updateKdsStatus forwards env', async () => {
+      const { collectCodPayment } = await import('../../../../packages/domain/kitchen/commands/collect-cod-payment');
+
+      const batchStatements: Array<{ sql: string; args: unknown[] }> = [];
+      const ledgerQueries: Array<{ sql: string; args: unknown[] }> = [];
+      const mockCodDb = {
+        prepare(sql: string) {
+          const makeStmt = (boundArgs: unknown[]) => ({
+            sql,
+            args: boundArgs,
+            async first() {
+              if (/SELECT total, status, payment_status, payment_method, tenant_id FROM orders WHERE id = \?/i.test(sql)) {
+                return {
+                  total: 85000,
+                  status: 'preparing',
+                  payment_status: 'pending',
+                  payment_method: 'cod',
+                  tenant_id: 'sadec',
+                };
+              }
+              return null;
+            },
+            async all() {
+              if (/FROM payments WHERE order_id = \?/i.test(sql)) {
+                ledgerQueries.push({ sql, args: boundArgs });
+                return { results: [] };
+              }
+              return { results: [] };
+            },
+            async run() {
+              return { success: true, meta: { changes: 1 } };
+            },
+          });
+          return {
+            ...makeStmt([]),
+            bind(...args: unknown[]) {
+              return makeStmt(args);
+            },
+          };
+        },
+        async batch(ops: Array<{ sql: string; args: unknown[] }>) {
+          batchStatements.push(...ops);
+          return ops.map(() => ({ success: true, meta: { changes: 1 } }));
+        },
+      };
+
+      const res = await collectCodPayment(mockCodDb as never, 'ord-sadec-cod-1', '*');
+      expect(res).toEqual({ success: true, status: 'preparing' });
+      expect(ledgerQueries).toHaveLength(1);
+      // Non-default store ('sadec') payment ledger clause must NOT include COALESCE(..., 'default') = 'default'
+      expect(ledgerQueries[0]?.sql).not.toContain("COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = 'default'");
+      expect(ledgerQueries[0]?.args).toEqual(['ord-sadec-cod-1', 'sadec', 'sadec']);
+
+      // Batch INSERT INTO payments stamps 'sadec' (not 'default') even when caller is HQ (*)
+      expect(batchStatements).toHaveLength(3);
+      expect(batchStatements[2]?.args[2]).toBe('sadec');
+    });
+
+    it('AZ2: inventoryTransactions blocks default-store owner cross-tenant spoofing (403) and scopes GET /:id/transactions & GET /:id/snapshots to item.tenant_id under HQ (*)', async () => {
+      const { Hono } = await import('hono');
+      const { inventoryTransactions } = await import('../../../../packages/domain/inventory/src/routes/inventory-transactions');
+      const { inventorySnapshots } = await import('../../../../packages/domain/inventory/src/routes/inventory-snapshots');
+
+      const sqlCalls: Array<{ sql: string; args: unknown[] }> = [];
+      const mockInvDb = {
+        prepare(sql: string) {
+          return {
+            bind(...args: unknown[]) {
+              return {
+                async first() {
+                  if (/SELECT \* FROM inventory_items WHERE id = \?/i.test(sql)) {
+                    return {
+                      id: 'ing-sadec-1',
+                      sku: 'SD-MILK',
+                      name: 'Sữa tươi Sa Đéc',
+                      current_stock: 20,
+                      tenant_id: 'sadec',
+                    };
+                  }
+                  return null;
+                },
+                async all() {
+                  sqlCalls.push({ sql, args });
+                  if (/FROM inventory_transactions/i.test(sql)) {
+                    return {
+                      results: [
+                        { id: 'tx-sadec-1', item_id: 'ing-sadec-1', type: 'in', quantity: 10, tenant_id: 'sadec' },
+                        { id: 'tx-cantho-leak', item_id: 'ing-sadec-1', type: 'in', quantity: 99, tenant_id: 'cantho' },
+                      ],
+                    };
+                  }
+                  if (/FROM inventory_snapshots/i.test(sql)) {
+                    return {
+                      results: [
+                        { id: 'snap-sadec-1', item_id: 'ing-sadec-1', date: '2026-11-04', closing_stock: 20, tenant_id: 'sadec' },
+                        { id: 'snap-cantho-leak', item_id: 'ing-sadec-1', date: '2026-11-04', closing_stock: 99, tenant_id: 'cantho' },
+                      ],
+                    };
+                  }
+                  return { results: [] };
+                },
+              };
+            },
+          };
+        },
+      };
+
+      // 1. Default-store owner ('default') spoofing X-Tenant-ID: 'sadec' on GET /:id/transactions is rejected with 403
+      const defaultOwnerApp = new Hono();
+      defaultOwnerApp.use('*', async (c, next) => {
+        c.set('user' as never, { id: 'owner-def', role: 'owner', tenantId: 'default', tenant_id: 'default' } as never);
+        c.set('tenantId' as never, 'sadec' as never);
+        await next();
+      });
+      inventoryTransactions(defaultOwnerApp as never);
+
+      const spoofTxRes = await defaultOwnerApp.request(
+        '/ing-sadec-1/transactions?tenant_id=sadec',
+        { method: 'GET', headers: { 'X-Tenant-ID': 'sadec' } },
+        { AURA_DB: mockInvDb } as unknown as Env
+      );
+      expect(spoofTxRes.status).toBe(403);
+
+      // 2. HQ (*) GET /:id/transactions and GET /:id/snapshots inherit item.tenant_id ('sadec')
+      const hqApp = new Hono();
+      hqApp.use('*', async (c, next) => {
+        c.set('user' as never, { id: 'hq-owner', role: 'owner', tenantId: '*', tenant_id: '*' } as never);
+        c.set('tenantId' as never, '*' as never);
+        await next();
+      });
+      inventoryTransactions(hqApp as never);
+      inventorySnapshots(hqApp as never);
+
+      const hqTxRes = await hqApp.request(
+        '/ing-sadec-1/transactions',
+        { method: 'GET' },
+        { AURA_DB: mockInvDb } as unknown as Env
+      );
+      expect(hqTxRes.status).toBe(200);
+      const hqTxBody = (await hqTxRes.json()) as { data: { transactions: Array<{ id: string }> } };
+      expect(hqTxBody.data.transactions.map((t) => t.id)).toEqual(['tx-sadec-1']);
+
+      const hqSnapRes = await hqApp.request(
+        '/ing-sadec-1/snapshots',
+        { method: 'GET' },
+        { AURA_DB: mockInvDb } as unknown as Env
+      );
+      expect(hqSnapRes.status).toBe(200);
+      const hqSnapBody = (await hqSnapRes.json()) as { snapshots: Array<{ id: string }> };
+      expect(hqSnapBody.snapshots.map((s) => s.id)).toEqual(['snap-sadec-1']);
+      expect(sqlCalls.every((c) => c.args.includes('sadec'))).toBe(true);
+    });
+
+    it('AZ3: staffTipsRouter binds effectiveOrderTenant/effectiveStaffTenant under HQ (*) and cash-reconciliation-policy scopes duplicate & read queries by store', async () => {
+      const { Hono } = await import('hono');
+      const { staffTipsRouter } = await import('../../../../packages/domain/staff/commands/staff-tips');
+      const { reconcileShiftCash, getReconciliationForShift } = await import('../../../../packages/domain/shift/src/policies/cash-reconciliation-policy');
+
+      const TEST_SECRET = 'test-jwt-secret-key-for-testing-only';
+      const hqToken = await generateJWT(
+        {
+          id: 'hq-owner-1',
+          sub: 'hq-owner-1',
+          role: 'owner',
+          email: 'hq-owner-1@aura.vn',
+          name: 'HQ Owner 1',
+          tenantId: '*',
+          authVersion: 1,
+          authTime: Math.floor(Date.now() / 1000),
+          sessionType: 'staff-web',
+        },
+        TEST_SECRET,
+        28800
+      );
+
+      const tipSqlCalls: Array<{ sql: string; args: unknown[] }> = [];
+      const mockTipDb = {
+        prepare(sql: string) {
+          return {
+            bind(...args: unknown[]) {
+              return {
+                async first() {
+                  if (/FROM orders WHERE id = \?/i.test(sql)) {
+                    return {
+                      id: 'ord-sadec-tip-1',
+                      total: 100000,
+                      status: 'preparing',
+                      payment_status: 'pending',
+                      tip_amount: 0,
+                      tenant_id: 'sadec',
+                    };
+                  }
+                  if (/FROM users WHERE id = \?/i.test(sql) || isAccountLookup(sql)) {
+                    const uid = String(args[0] ?? '');
+                    if (uid === 'hq-owner-1') {
+                      return {
+                        id: 'hq-owner-1',
+                        name: 'HQ Owner 1',
+                        phone: null,
+                        role: 'owner',
+                        tenant_id: '*',
+                        is_active: 1,
+                        auth_version: 1,
+                      };
+                    }
+                    return {
+                      id: 'waiter-sadec-1',
+                      role: 'waiter',
+                      is_active: 1,
+                      tenant_id: 'sadec',
+                    };
+                  }
+                  return null;
+                },
+                async all() {
+                  tipSqlCalls.push({ sql, args });
+                  return {
+                    results: [{ date: '2026-11-04', tip_total: 15000, order_count: 1 }],
+                  };
+                },
+                async run() {
+                  tipSqlCalls.push({ sql, args });
+                  return { success: true, meta: { changes: 1 } };
+                },
+              };
+            },
+          };
+        },
+      };
+
+      const tipApp = new Hono<{ Bindings: Env }>();
+      tipApp.use('*', async (c, next) => {
+        c.set('tenantId' as never, '*' as never);
+        await next();
+      });
+      tipApp.route('/api/staff-tips', staffTipsRouter);
+
+      // 1. HQ (*) POST /api/staff-tips/assign binds effectiveOrderTenant ('sadec') in UPDATE orders
+      const assignRes = await tipApp.request(
+        '/api/staff-tips/assign',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${hqToken}` },
+          body: JSON.stringify({ order_id: 'ord-sadec-tip-1', staff_id: 'waiter-sadec-1', tip_amount: 15000 }),
+        },
+        { AURA_DB: mockTipDb, JWT_SECRET: TEST_SECRET } as unknown as Env
+      );
+      expect(assignRes.status).toBe(200);
+      const tipUpdateCall = tipSqlCalls.find((c) => /UPDATE orders SET tip_amount = \?/i.test(c.sql));
+      expect(tipUpdateCall?.args[tipUpdateCall.args.length - 1]).toBe('sadec');
+
+      // 2. HQ (*) GET /api/staff-tips/:staffId scopes orders tip history query to targetStaff.tenant_id ('sadec')
+      const histRes = await tipApp.request(
+        '/api/staff-tips/waiter-sadec-1',
+        { method: 'GET', headers: { Authorization: `Bearer ${hqToken}` } },
+        { AURA_DB: mockTipDb, JWT_SECRET: TEST_SECRET } as unknown as Env
+      );
+      expect(histRes.status).toBe(200);
+      const tipHistCall = tipSqlCalls.find((c) => /FROM orders o/i.test(c.sql));
+      expect(tipHistCall?.args[1]).toBe('sadec');
+
+      // 3. reconcileShiftCash under HQ (*) scopes duplicate reconciliation check to shift's store ('sadec'),
+      //    and getReconciliationForShift does NOT fall back to unscoped query for non-default tenant
+      const reconSqlCalls: Array<{ sql: string; args: unknown[] }> = [];
+      const mockReconDb = {
+        prepare(sql: string) {
+          return {
+            bind(...args: unknown[]) {
+              return {
+                async first() {
+                  reconSqlCalls.push({ sql, args });
+                  if (/FROM staff_shifts WHERE id = \?/i.test(sql)) {
+                    return {
+                      clock_in: '2026-11-04T01:00:00.000Z',
+                      clock_out: '2026-11-04T09:00:00.000Z',
+                      tenant_id: 'sadec',
+                    };
+                  }
+                  if (/FROM shift_reconciliations WHERE shift_id = \? AND COALESCE/i.test(sql)) {
+                    return null;
+                  }
+                  if (/SELECT \* FROM shift_reconciliations WHERE shift_id = \?$/i.test(sql.trim())) {
+                    // Unscoped fallback would leak a foreign row without tenant_id
+                    return {
+                      id: 'recon_leak',
+                      shift_id: 'shift-sadec-1',
+                      opening_float: 100000,
+                      expected_cash: 100000,
+                      actual_cash: 100000,
+                      variance: 0,
+                      variance_status: 'balanced',
+                      denominations: '{"denominations":[]}',
+                    };
+                  }
+                  return { total: 0 };
+                },
+                async run() {
+                  reconSqlCalls.push({ sql, args });
+                  return { meta: { changes: 1 } };
+                },
+              };
+            },
+          };
+        },
+      };
+
+      const reconRes = await reconcileShiftCash(
+        mockReconDb as never,
+        {
+          shift_id: 'shift-sadec-1',
+          opening_float: 200000,
+          denominations: { denominations: [{ denomination: 100000, count: 2 }] },
+        },
+        'mgr-hq',
+        '*'
+      );
+      expect(reconRes.shift_id).toBe('shift-sadec-1');
+      const dupCheckCall = reconSqlCalls.find((c) => /SELECT id, shift_id, tenant_id FROM shift_reconciliations/i.test(c.sql));
+      expect(dupCheckCall?.args).toEqual(['shift-sadec-1', 'sadec']);
+
+      const foreignRead = await getReconciliationForShift(mockReconDb as never, 'shift-sadec-1', 'cantho');
+      expect(foreignRead).toBeNull();
+    });
+
+    it('AZ4: tablesRouter blocks default-store owner cross-tenant spoofing (403) and binds effectiveTableTenant on HQ (*) PATCH & DELETE', async () => {
+      const { Hono } = await import('hono');
+      const { tablesRouter } = await import('../../../../packages/domain/table/commands/tables');
+
+      const tblSqlCalls: Array<{ sql: string; args: unknown[] }> = [];
+      const mockTblDb = {
+        prepare(sql: string) {
+          return {
+            bind(...args: unknown[]) {
+              return {
+                async first() {
+                  if (/SELECT \* FROM cafe_tables WHERE id = \?/i.test(sql)) {
+                    return {
+                      id: 'tbl-sadec-09',
+                      table_number: 'SD-09',
+                      zone: 'indoor',
+                      capacity: 4,
+                      status: 'Available',
+                      tenant_id: 'sadec',
+                    };
+                  }
+                  return null;
+                },
+                async all() {
+                  return { results: [] };
+                },
+                async run() {
+                  tblSqlCalls.push({ sql, args });
+                  return { success: true, meta: { changes: 1 } };
+                },
+              };
+            },
+          };
+        },
+      };
+
+      // 1. Default-store owner ('default') spoofing X-Tenant-ID: 'sadec' on GET /api/tables is rejected with 403
+      const defOwnerApp = new Hono<{ Bindings: Env }>();
+      defOwnerApp.use('*', async (c, next) => {
+        c.set('user' as never, { id: 'owner-def', role: 'owner', tenantId: 'default', tenant_id: 'default' } as never);
+        c.set('tenantId' as never, 'sadec' as never);
+        await next();
+      });
+      defOwnerApp.route('/api/tables', tablesRouter);
+
+      const spoofGetRes = await defOwnerApp.request(
+        'http://localhost:3000/api/tables?tenant_id=sadec',
+        { method: 'GET', headers: { 'X-Tenant-ID': 'sadec' } },
+        { AURA_DB: mockTblDb } as unknown as Env
+      );
+      expect(spoofGetRes.status).toBe(403);
+
+      // 2. HQ (*) PATCH /api/tables/:id/occupy and DELETE /api/tables/:id bind effectiveTableTenant ('sadec')
+      const hqApp = new Hono<{ Bindings: Env }>();
+      hqApp.use('*', async (c, next) => {
+        c.set('user' as never, { id: 'hq-owner', role: 'owner', tenantId: '*', tenant_id: '*' } as never);
+        c.set('tenantId' as never, '*' as never);
+        await next();
+      });
+      hqApp.route('/api/tables', tablesRouter);
+
+      const occupyRes = await hqApp.request(
+        'http://localhost:3000/api/tables/tbl-sadec-09/occupy',
+        { method: 'PATCH' },
+        { AURA_DB: mockTblDb } as unknown as Env
+      );
+      expect(occupyRes.status).toBe(200);
+      const updateTblCall = tblSqlCalls.find((c) => /UPDATE cafe_tables SET status = \?/i.test(c.sql));
+      expect(updateTblCall?.args).toEqual(['Occupied', 'tbl-sadec-09', 'sadec']);
+
+      const delRes = await hqApp.request(
+        'http://localhost:3000/api/tables/tbl-sadec-09',
+        { method: 'DELETE' },
+        { AURA_DB: mockTblDb } as unknown as Env
+      );
+      expect(delRes.status).toBe(200);
+      const delTblCall = tblSqlCalls.find((c) => /DELETE FROM cafe_tables WHERE id = \?/i.test(c.sql));
+      expect(delTblCall?.args).toEqual(['tbl-sadec-09', 'sadec']);
+    });
+  });
+
+  // =========================================================================
+  // Suite 54: Phase BA1–BA4 — Shift Lifecycle HQ Store Scoping, Table Availability/Seating
+  //           Cross-Store Guards, QR Scan HQ Resolution & SOP Route Tenant Override Forwarding
+  // =========================================================================
+  describe('Suite 54: Phase BA1–BA4 — Shift Lifecycle, Table Availability/Seating, QR Scan & SOP Route Tenant Scope', () => {
+    it('BA1: recordShiftSale and closeCanonicalShift inherit shift.tenant_id under HQ (*) and reject missing tenant_id for non-default stores', async () => {
+      const { recordShiftSale, closeCanonicalShift } = await import(
+        '../../../../packages/domain/shift/src/policies/shift-lifecycle-policy'
+      );
+
+      const shiftSqlCalls: Array<{ sql: string; args: unknown[] }> = [];
+      const mockShiftDb = {
+        prepare(sql: string) {
+          return {
+            bind(...args: unknown[]) {
+              return {
+                async first() {
+                  if (/FROM staff_shifts WHERE id = \?/i.test(sql)) {
+                    const id = String(args[0]);
+                    if (id === 'shift-sadec-ba1') {
+                      return {
+                        id: 'shift-sadec-ba1',
+                        staff_id: 'stf-sadec-1',
+                        tenant_id: 'sadec',
+                        operating_unit_id: 'sadec',
+                        status: 'open',
+                        opening_cash: 500000,
+                        cash_sales: 100000,
+                        online_sales: 0,
+                        total_sales: 100000,
+                        order_count: 1,
+                      };
+                    }
+                    if (id === 'shift-legacy-no-tenant') {
+                      return {
+                        id: 'shift-legacy-no-tenant',
+                        staff_id: 'stf-legacy-1',
+                        status: 'open',
+                        opening_cash: 100000,
+                        cash_sales: 0,
+                      };
+                    }
+                  }
+                  return null;
+                },
+                async run() {
+                  shiftSqlCalls.push({ sql, args });
+                  return { success: true, meta: { changes: 1 } };
+                },
+              };
+            },
+          };
+        },
+      };
+
+      const saleRes = await recordShiftSale(mockShiftDb as never, {
+        shiftId: 'shift-sadec-ba1',
+        staffId: 'stf-sadec-1',
+        amount: 75000,
+        paymentMethod: 'cash',
+        tenantId: '*',
+      });
+      expect(saleRes.ok).toBe(true);
+      const saleUpdate = shiftSqlCalls.find((c) => /UPDATE staff_shifts[\s\S]*SET cash_sales/i.test(c.sql));
+      expect(saleUpdate?.sql).toMatch(/COALESCE\(NULLIF\(TRIM\(tenant_id\), ''\), 'default'\) = \?/i);
+      expect(saleUpdate?.args[saleUpdate.args.length - 1]).toBe('sadec');
+
+      const closeRes = await closeCanonicalShift(mockShiftDb as never, {
+        shiftId: 'shift-sadec-ba1',
+        closedByStaffId: 'hq-owner',
+        closedByRole: 'owner',
+        actualCash: 600000,
+        tenantId: '*',
+      });
+      expect(closeRes.ok).toBe(true);
+      const closeUpdate = shiftSqlCalls.find((c) => /UPDATE staff_shifts[\s\S]*SET status = 'closed'/i.test(c.sql));
+      expect(closeUpdate?.sql).toMatch(/COALESCE\(NULLIF\(TRIM\(tenant_id\), ''\), 'default'\) = \?/i);
+      expect(closeUpdate?.args[closeUpdate.args.length - 1]).toBe('sadec');
+
+      // Non-default store ('cantho') must reject legacy shift row lacking tenant_id
+      const legacyForeignSale = await recordShiftSale(mockShiftDb as never, {
+        shiftId: 'shift-legacy-no-tenant',
+        staffId: 'stf-legacy-1',
+        amount: 50000,
+        paymentMethod: 'cash',
+        tenantId: 'cantho',
+      });
+      expect(legacyForeignSale.ok).toBe(false);
+      expect(legacyForeignSale.error).toBe('shift_not_found');
+    });
+
+    it('BA2: checkTableAvailability isolates same table_number across stores under HQ (*) and seatTable blocks cross-store reservation seating under HQ (*)', async () => {
+      const { checkTableAvailability } = await import(
+        '../../../../packages/domain/table/src/policies/table-availability-policy'
+      );
+      const { seatTable } = await import(
+        '../../../../packages/domain/table/src/policies/table-reservation-policy'
+      );
+
+      const mockTableDb = {
+        prepare(sql: string) {
+          const makeOps = (args: unknown[]) => ({
+            async all() {
+              if (/FROM cafe_tables/i.test(sql)) {
+                return {
+                  results: [
+                    { id: 'tbl-sadec-1', table_number: 1, zone: 'Indoor', capacity: 4, status: 'Available', tenant_id: 'sadec' },
+                    { id: 'tbl-cantho-1', table_number: 1, zone: 'Indoor', capacity: 4, status: 'Available', tenant_id: 'cantho' },
+                  ],
+                };
+              }
+              if (/FROM reservations/i.test(sql)) {
+                return {
+                  results: [
+                    { id: 'rsv-cantho-1', table_id: '1', date: '2026-11-04', time: '19:00', status: 'confirmed', tenant_id: 'cantho' },
+                  ],
+                };
+              }
+              return { results: [] };
+            },
+            async first() {
+              if (/FROM cafe_tables WHERE id = \?/i.test(sql) && args[0] === 'tbl-sadec-1') {
+                return { id: 'tbl-sadec-1', table_number: 1, zone: 'Indoor', capacity: 4, status: 'Available', tenant_id: 'sadec' };
+              }
+              if (/FROM reservations WHERE id = \?/i.test(sql) && args[0] === 'rsv-cantho-1') {
+                return { id: 'rsv-cantho-1', table_id: '1', date: '2026-11-04', time: '19:00', status: 'confirmed', tenant_id: 'cantho' };
+              }
+              return null;
+            },
+            async run() {
+              return { success: true, meta: { changes: 1 } };
+            },
+          });
+          return {
+            ...makeOps([]),
+            bind(...args: unknown[]) {
+              return makeOps(args);
+            },
+          };
+        },
+      };
+
+      const availRes = await checkTableAvailability(mockTableDb as never, {
+        date: '2026-11-04',
+        time: '19:00',
+        operatingUnitId: '*',
+      });
+      expect(availRes.ok).toBe(true);
+      const sadecTable = availRes.tables.find((t) => t.id === 'tbl-sadec-1');
+      const canthoTable = availRes.tables.find((t) => t.id === 'tbl-cantho-1');
+      expect(sadecTable?.available).toBe(true);
+      expect(canthoTable?.available).toBe(false);
+
+      const crossStoreSeat = await seatTable(mockTableDb as never, {
+        tableId: 'tbl-sadec-1',
+        reservationId: 'rsv-cantho-1',
+        operatingUnitId: '*',
+      });
+      expect(crossStoreSeat.ok).toBe(false);
+      expect(crossStoreSeat.error).toBe('cross_operating_unit_mismatch');
+    });
+
+    it('BA3: scanQrAndResolveTable resolves non-default store QR code and table under HQ (*) and qrRouter blocks null-tenant QR spoofing', async () => {
+      const { qrRouter, scanQrAndResolveTable } = await import('../../../../packages/domain/table/commands/qr-scan');
+      const { signQRUrl } = await import('../../tree/qr/signer');
+
+      const mockQrDb = {
+        prepare(sql: string) {
+          return {
+            bind(...args: unknown[]) {
+              return {
+                async first() {
+                  if (/FROM table_qr_codes/i.test(sql)) {
+                    const slugArg = String(args[0]);
+                    if (slugArg === 'slug-sadec-ba3') {
+                      if (args.length > 1 && args[1] !== 'sadec') return null;
+                      return { table_id: 'tbl-sadec-ba3', qr_slug: 'slug-sadec-ba3', is_active: 1, tenant_id: 'sadec' };
+                    }
+                    if (slugArg === 'slug-null-tenant') {
+                      if (args.length > 1 && args[1] !== 'default') return null;
+                      return { table_id: 'tbl-def-1', slug: 'slug-null-tenant', is_active: 1, tenant_id: null };
+                    }
+                  }
+                  if (/FROM cafe_tables/i.test(sql)) {
+                    const tblId = String(args[0]);
+                    if (tblId === 'tbl-sadec-ba3') {
+                      if (args.length > 1 && args[1] !== 'sadec') return null;
+                      return { id: 'tbl-sadec-ba3', table_number: 'SD-03', status: 'Available', is_active: 1, tenant_id: 'sadec' };
+                    }
+                    if (tblId === 'tbl-def-1') {
+                      return { id: 'tbl-def-1', table_number: 'D-01', status: 'Available', is_active: 1, tenant_id: null };
+                    }
+                  }
+                  return null;
+                },
+                async run() {
+                  return { success: true, meta: { changes: 1 } };
+                },
+              };
+            },
+          };
+        },
+      };
+
+      const hqResolved = await scanQrAndResolveTable(mockQrDb as never, {
+        slug: 'slug-sadec-ba3',
+        tenantId: '*',
+      });
+      expect(hqResolved.ok).toBe(true);
+      if (hqResolved.ok) {
+        expect(hqResolved.table.id).toBe('tbl-sadec-ba3');
+        expect(hqResolved.table.tenant_id).toBe('sadec');
+      }
+
+      const secret = 'test-qr-secret-ba3-1234567890';
+      const signedUrl = await signQRUrl('slug-null-tenant', secret, 'http://localhost:3000');
+      const queryPart = signedUrl.split('?')[1];
+      const res = await qrRouter.request(
+        `http://localhost:3000/slug-null-tenant?${queryPart}&tenant_id=cantho`,
+        { method: 'GET' },
+        { AURA_DB: mockQrDb, QR_SIGNING_SECRET: secret } as unknown as Env
+      );
+      expect(res.status).toBe(404);
+    });
+
+    it('BA4: SOP mobile/admin handlers forward request context to sopScope (rejecting cross-tenant staff header with 403 and attributing HQ store override in auditActor)', async () => {
+      const { Hono } = await import('hono');
+      const { getSopTemplates } = await import('../../routes/sop-mobile/queries');
+      const { sopScope } = await import('../../../../packages/domain/sop/commands/sop-access');
+      const { auditActor } = await import('../../routes/openapi-sop-handlers/sop-audit');
+
+      // 1. sopScope allows HQ owner with userTenant '*' when concrete store override ('sadec') is provided,
+      //    and rejects unoverridden '*' scope with 403
+      const hqScope = sopScope({} as Env, { id: 'hq-owner', role: 'owner', tenantId: '*' } as never, 'sadec');
+      expect(hqScope.tenantId).toBe('sadec');
+      expect(() => sopScope({} as Env, { id: 'hq-owner', role: 'owner', tenantId: '*' } as never)).toThrow(
+        /Invalid tenant scope/
+      );
+
+      // 2. Non-HQ staff ('sadec') sending X-Tenant-ID: 'cantho' to getSopTemplates is rejected with 403
+      const sopApp = new Hono<{ Bindings: Env }>();
+      sopApp.use('*', async (c, next) => {
+        c.set('user' as never, { id: 'stf-sadec', role: 'staff', tenantId: 'sadec', tenant_id: 'sadec' } as never);
+        await next();
+      });
+      sopApp.get('/api/sop/templates', (c) => getSopTemplates(c));
+
+      const crossTenantSopRes = await sopApp.request(
+        'http://localhost:3000/api/sop/templates',
+        { method: 'GET', headers: { 'X-Tenant-ID': 'cantho' } },
+        {} as unknown as Env
+      );
+      expect(crossTenantSopRes.status).toBe(403);
+
+      // 3. auditActor(c, scope.tenantId) attributes HQ owner ('hq') action to target store ('sadec')
+      const fakeCtx = {
+        get(key: string) {
+          if (key === 'user') return { id: 'hq-owner', name: 'HQ Owner', role: 'owner', tenantId: 'hq' };
+          return undefined;
+        },
+        req: {
+          header: () => undefined,
+          query: () => undefined,
+        },
+        env: {},
+      };
+      const actor = auditActor(fakeCtx as never, 'sadec');
+      expect(actor.tenantId).toBe('sadec');
+    });
+  });
+
+  // =========================================================================
+  // Suite 55: Phase BB1–BB4 (Staff Device Auth HQ Target Tenant, Customer
+  //           Guest Order Claim Cross-Store Guard, Kitchen HQ Write Override
+  //           & Ticket Item Scoping, CRM Accrual & Order Transition Store
+  //           Inheritance)
+  // =========================================================================
+  describe('Suite 55: Phase BB1–BB4 — Staff Device Auth HQ Binding, Guest Order Claim Guard, Kitchen HQ Write & CRM/Order Store Inheritance', () => {
+    it('BB1: revokeStaffDevice binds target staff account tenant_id in UPDATE users auth_version for HQ admin (tenantId="hq") and listStaffDevices honors ?tenant_id override', async () => {
+      const { Hono } = await import('hono');
+      const { revokeStaffDevice, listStaffDevices, registerStaffDevice } = await import('../../../../packages/domain/staff/commands/staff-auth');
+
+      const userUpdateBinds: unknown[][] = [];
+      const listBinds: unknown[][] = [];
+
+      const mockStaffDb = {
+        prepare(sql: string) {
+          return {
+            bind(...args: unknown[]) {
+              return {
+                sql,
+                args,
+                async first() {
+                  if (/FROM staff_devices WHERE id = \?/i.test(sql)) {
+                    return { id: 'dev-sadec-1', staff_id: 'usr-sadec-1', role: 'staff', device_token: 'tok-sadec-1' };
+                  }
+                  if (/FROM users WHERE id = \?/i.test(sql)) {
+                    const idArg = String(args[0]);
+                    if (idArg === 'usr-sadec-1') {
+                      return { id: 'usr-sadec-1', name: 'Staff Sa Dec', role: 'staff', status: 'active', is_active: 1, auth_version: 2, tenant_id: 'sadec' };
+                    }
+                  }
+                  return null;
+                },
+                async all() {
+                  if (/FROM staff_devices d JOIN users u/i.test(sql)) {
+                    listBinds.push(args);
+                    return {
+                      results: [
+                        { id: 'dev-sadec-1', staff_id: 'usr-sadec-1', device_name: 'iPad Sa Dec', role: 'staff', last_login_at: null, created_at: '2026-11-04T00:00:00Z' },
+                      ],
+                    };
+                  }
+                  return { results: [] };
+                },
+              };
+            },
+          };
+        },
+        async batch(stmts: Array<{ sql: string; args: unknown[] }>) {
+          for (const s of stmts) {
+            if (/UPDATE users SET auth_version/i.test(s.sql)) {
+              userUpdateBinds.push(s.args);
+            }
+          }
+          return stmts.map(() => ({ success: true, meta: { changes: 1 } }));
+        },
+      };
+
+      const app = new Hono<{ Bindings: Env }>();
+      app.use('*', async (c, next) => {
+        c.set('user' as never, { id: 'hq-owner', role: 'owner', tenantId: 'hq', tenant_id: 'hq' } as never);
+        await next();
+      });
+      app.post('/mobile/devices/register', (c) => registerStaffDevice(c));
+      app.delete('/mobile/devices/:device_id', (c) => revokeStaffDevice(c));
+      app.get('/mobile/devices', (c) => listStaffDevices(c));
+
+      // 1. HQ owner scoped to 'cantho' cannot register or revoke a 'sadec' staff device
+      const regMismatchRes = await app.request(
+        'http://localhost:3000/mobile/devices/register?tenant_id=cantho',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            device_token: 'device-token-sadec-0001',
+            device_name: 'POS iPad',
+            staff_id: 'usr-sadec-1',
+            pin: '1234',
+          }),
+        },
+        { AURA_DB: mockStaffDb } as unknown as Env
+      );
+      expect(regMismatchRes.status).toBe(403);
+
+      const revMismatchRes = await app.request(
+        'http://localhost:3000/mobile/devices/dev-sadec-1?tenant_id=cantho',
+        { method: 'DELETE' },
+        { AURA_DB: mockStaffDb } as unknown as Env
+      );
+      expect(revMismatchRes.status).toBe(404);
+
+      // 2. HQ owner revoking 'dev-sadec-1' binds 'sadec' (targetTenant), not 'hq' (callerTenant), on UPDATE users
+      const revOkRes = await app.request(
+        'http://localhost:3000/mobile/devices/dev-sadec-1?tenant_id=sadec',
+        { method: 'DELETE' },
+        { AURA_DB: mockStaffDb } as unknown as Env
+      );
+      expect(revOkRes.status).toBe(200);
+      expect(userUpdateBinds).toHaveLength(1);
+      expect(userUpdateBinds[0][1]).toBe('usr-sadec-1');
+      expect(userUpdateBinds[0][2]).toBe('sadec');
+
+      // 3. HQ owner listing devices with ?tenant_id=sadec filters by 'sadec' instead of 'hq'
+      const listRes = await app.request(
+        'http://localhost:3000/mobile/devices?tenant_id=sadec',
+        { method: 'GET' },
+        { AURA_DB: mockStaffDb } as unknown as Env
+      );
+      expect(listRes.status).toBe(200);
+      expect(listBinds[0]).toEqual(['sadec']);
+    });
+
+    it('BB2: findCustomerByIdentifier fails closed for non-default tenants and claimGuestOrder rejects cross-store customer claim and scopes UPDATE orders by order tenant', async () => {
+      const { findCustomerByIdentifier, claimGuestOrder } = await import('../../../../packages/domain/customer/policies/order-ownership-policy');
+
+      let unscopedCustomerLookupRan = false;
+      const identDb = {
+        prepare(sql: string) {
+          return {
+            bind() {
+              return {
+                async first() {
+                  if (sql.includes('tenant_id')) {
+                    throw new Error('D1_ERROR: no such column: tenant_id');
+                  }
+                  unscopedCustomerLookupRan = true;
+                  return { id: 'cust-default-leak', customer_id: 'cust-default-leak' };
+                },
+              };
+            },
+          };
+        },
+      };
+
+      const found = await findCustomerByIdentifier(identDb as never, '0901234567', 'sadec');
+      expect(found).toBeNull();
+      expect(unscopedCustomerLookupRan).toBe(false);
+
+      const updateOrderBinds: unknown[][] = [];
+      const claimDb = {
+        prepare(sql: string) {
+          return {
+            bind(...args: unknown[]) {
+              return {
+                async first() {
+                  if (/FROM orders WHERE id = \?/i.test(sql)) {
+                    return {
+                      id: 'ord-sadec-guest-1',
+                      customer_id: null,
+                      customer_phone: '0909111222',
+                      table_id: 'tbl-sadec-1',
+                      order_token: 'tok-sadec-1',
+                      total: 85000,
+                      order_type: 'dine_in',
+                      tenant_id: 'sadec',
+                    };
+                  }
+                  if (/FROM customers WHERE id = \?/i.test(sql)) {
+                    const cid = String(args[0]);
+                    if (cid === 'cust-cantho-1') {
+                      return { id: 'cust-cantho-1', phone: '0909111222', tenant_id: 'cantho' };
+                    }
+                    if (cid === 'cust-sadec-1') {
+                      return { id: 'cust-sadec-1', phone: '0909111222', tenant_id: 'sadec' };
+                    }
+                  }
+                  return null;
+                },
+                async run() {
+                  if (/UPDATE orders SET customer_id = \?/i.test(sql)) {
+                    updateOrderBinds.push(args);
+                  }
+                  return { meta: { changes: 1 } };
+                },
+              };
+            },
+          };
+        },
+      };
+
+      // Cross-store customer ('cantho') cannot claim 'sadec' guest order even when tenantId is '*'
+      const crossClaim = await claimGuestOrder({
+        db: claimDb as never,
+        orderId: 'ord-sadec-guest-1',
+        actor: { id: 'cust-cantho-1', role: 'customer' },
+        tenantId: '*',
+      });
+      expect(crossClaim.success).toBe(false);
+      expect(crossClaim.statusCode).toBe(404);
+      expect(updateOrderBinds).toHaveLength(0);
+
+      // Matching store customer ('sadec') claiming under '*' scopes UPDATE orders to 'sadec'
+      const validClaim = await claimGuestOrder({
+        db: claimDb as never,
+        orderId: 'ord-sadec-guest-1',
+        actor: { id: 'cust-sadec-1', role: 'customer' },
+        tenantId: '*',
+      });
+      expect(validClaim.success).toBe(true);
+      expect(updateOrderBinds).toHaveLength(1);
+      expect(updateOrderBinds[0][3]).toBe('sadec');
+    });
+
+    it('BB3: HQ admin (tenantId="hq") can mutate store kitchen stations and KDS mobile status via X-Tenant-ID, and station ticket ready scopes pending check to orderId:rawItemId', async () => {
+      const { Hono } = await import('hono');
+      const { updateKdsStatus } = await import('../../../../packages/domain/kitchen/commands/kds-mobile');
+      const { stationTicketsRouter } = await import('../../../../packages/domain/kitchen/commands/kitchen-station-tickets');
+
+      const pendingCheckBinds: unknown[][] = [];
+      const orderUpdateBinds: unknown[][] = [];
+
+      const kdsDb = {
+        prepare(sql: string) {
+          return {
+            bind(...args: unknown[]) {
+              return {
+                async first() {
+                  if (/SELECT \* FROM kitchen_stations WHERE id = \?/i.test(sql)) {
+                    return { id: 'st-sadec-bar', name: 'Bar Sa Dec', tenant_id: 'sadec' };
+                  }
+                  if (/FROM orders WHERE id = \?/i.test(sql)) {
+                    return {
+                      id: 'ord-sadec-kds-1',
+                      status: 'preparing',
+                      tenant_id: 'sadec',
+                      items: JSON.stringify([{ id: 'item-1', name: 'Matcha Latte', qty: 1 }]),
+                    };
+                  }
+                  if (/SELECT ready_at FROM order_item_stations/i.test(sql)) {
+                    return { ready_at: '2026-11-04T08:00:00Z' };
+                  }
+                  if (/SELECT station_id FROM order_item_stations/i.test(sql)) {
+                    return null;
+                  }
+                  if (/SELECT COUNT\(\*\) as pending FROM order_item_stations/i.test(sql)) {
+                    pendingCheckBinds.push(args);
+                    return { pending: 0 };
+                  }
+                  return null;
+                },
+                async all() {
+                  return { results: [] };
+                },
+                async run() {
+                  if (/UPDATE orders SET status = \?/i.test(sql)) {
+                    orderUpdateBinds.push(args);
+                  }
+                  return { meta: { changes: 1 } };
+                },
+              };
+            },
+          };
+        },
+      };
+
+      // 1. HQ admin (tenantId: 'hq') can update KDS status for 'sadec' via X-Tenant-ID: 'sadec'
+      const kdsApp = new Hono<{ Bindings: Env }>();
+      kdsApp.use('*', async (c, next) => {
+        c.set('user' as never, { id: 'hq-owner', role: 'owner', tenantId: 'hq', tenant_id: 'hq' } as never);
+        await next();
+      });
+      kdsApp.patch('/mobile/kds/orders/:id/status', (c) => updateKdsStatus(c));
+
+      const kdsRes = await kdsApp.request(
+        'http://localhost:3000/mobile/kds/orders/ord-sadec-kds-1/status',
+        {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json', 'X-Tenant-ID': 'sadec' },
+          body: JSON.stringify({ status: 'ready' }),
+        },
+        { AURA_DB: kdsDb } as unknown as Env
+      );
+      expect(kdsRes.status).toBe(200);
+      expect(orderUpdateBinds).toHaveLength(1);
+      expect(orderUpdateBinds[0][4]).toBe('sadec');
+
+      // 2. Station ticket item ready binds order-prefixed item ID ('ord-sadec-kds-1:item-1'), never bare 'item-1'
+      const ticketApp = new Hono<{ Bindings: Env }>();
+      ticketApp.use('*', async (c, next) => {
+        c.set('user' as never, { id: 'hq-owner', role: 'owner', tenantId: '*' } as never);
+        await next();
+      });
+      ticketApp.route('/stations', stationTicketsRouter);
+
+      const readyRes = await ticketApp.request(
+        'http://localhost:3000/stations/tickets/ord-sadec-kds-1/items/item-1/ready?station_id=st-sadec-bar',
+        { method: 'POST' },
+        { AURA_DB: kdsDb } as unknown as Env
+      );
+      expect(readyRes.status).toBe(200);
+      expect(pendingCheckBinds).toHaveLength(1);
+      expect(pendingCheckBinds[0]).toEqual(['ord-sadec-kds-1:item-1', 'ord-sadec-kds-1:item-1']);
+    });
+
+    it('BB4: applyAccrual and transitionOrderStatus inherit order.tenant_id when called with tenantId="*"', async () => {
+      const { applyAccrual } = await import('../../../../packages/domain/crm/commands/accrual');
+      const { loadPolicy } = await import('../../../../packages/domain/crm/commands/loyalty-policy');
+      const { transitionOrderStatus } = await import('../../../../packages/domain/order/policies/order-status-transition');
+
+      const walletInsertBinds: unknown[][] = [];
+      const pointLogTenantUpdates: unknown[][] = [];
+
+      const accrualDb = {
+        prepare(sql: string) {
+          return {
+            sql,
+            args: [] as unknown[],
+            bind(...args: unknown[]) {
+              return {
+                sql,
+                args,
+                async first() {
+                  if (/FROM orders WHERE id = \?/i.test(sql)) {
+                    return {
+                      id: 'ord-sadec-acc-1',
+                      total: 100000,
+                      cashback_used: 0,
+                      customer_id: 'cust-sadec-acc-1',
+                      tenant_id: 'sadec',
+                      status: 'completed',
+                      payment_status: 'paid',
+                    };
+                  }
+                  if (/FROM cashback_transactions WHERE order_id = \?/i.test(sql)) {
+                    return null;
+                  }
+                  if (/FROM loyalty_point_logs WHERE order_id = \?/i.test(sql)) {
+                    return null;
+                  }
+                  if (/FROM customers WHERE id = \?/i.test(sql)) {
+                    if (args[1] && args[1] !== 'sadec') return null;
+                    return {
+                      id: 'cust-sadec-acc-1',
+                      loyalty_points: 10,
+                      lifetime_points: 10,
+                      loyalty_tier: 'bronze',
+                      tenant_id: 'sadec',
+                    };
+                  }
+                  if (/FROM cashback_wallets WHERE customer_id = \?/i.test(sql)) {
+                    return null;
+                  }
+                  return null;
+                },
+                async run() {
+                  if (/INSERT INTO cashback_wallets/i.test(sql)) {
+                    walletInsertBinds.push(args);
+                  }
+                  if (/UPDATE loyalty_point_logs SET tenant_id = \?/i.test(sql)) {
+                    pointLogTenantUpdates.push(args);
+                  }
+                  return { success: true, meta: { changes: 1 } };
+                },
+              };
+            },
+          };
+        },
+        async batch(stmts: Array<{ sql: string; args: unknown[] }>) {
+          for (const s of stmts) {
+            if (/UPDATE loyalty_point_logs SET tenant_id = \?/i.test(s.sql)) {
+              pointLogTenantUpdates.push(s.args);
+            }
+          }
+          return stmts.map(() => ({ success: true, meta: { changes: 1 } }));
+        },
+      };
+
+      const policy = await loadPolicy(accrualDb as never);
+      const accRes = await applyAccrual(accrualDb as never, policy, {
+        orderId: 'ord-sadec-acc-1',
+        customerId: 'cust-sadec-acc-1',
+        orderTotalVnd: 100000,
+        tenantId: '*',
+      });
+      expect(accRes.ok).toBe(true);
+      expect(walletInsertBinds).toHaveLength(1);
+      expect(walletInsertBinds[0][4]).toBe('sadec');
+      expect(pointLogTenantUpdates).toHaveLength(1);
+      expect(pointLogTenantUpdates[0][0]).toBe('sadec');
+
+      const statusUpdateSqls: Array<{ sql: string; args: unknown[] }> = [];
+      const transDb = {
+        prepare(sql: string) {
+          return {
+            bind(...args: unknown[]) {
+              return {
+                async first() {
+                  if (/SELECT id, status, tenant_id FROM orders WHERE id = \?/i.test(sql)) {
+                    return { id: 'ord-sadec-tr-1', status: 'confirmed', tenant_id: 'sadec' };
+                  }
+                  if (/SELECT order_type, payment_status FROM orders/i.test(sql)) {
+                    return { order_type: 'dine_in', payment_status: 'paid' };
+                  }
+                  return null;
+                },
+                async run() {
+                  if (/UPDATE orders SET status = \?/i.test(sql)) {
+                    statusUpdateSqls.push({ sql, args });
+                  }
+                  return { meta: { changes: 1 } };
+                },
+              };
+            },
+          };
+        },
+      };
+
+      const trRes = await transitionOrderStatus(transDb as never, 'ord-sadec-tr-1', 'preparing', 'kitchen', {
+        tenantId: '*',
+      });
+      expect(trRes.success).toBe(true);
+      expect(statusUpdateSqls).toHaveLength(1);
+      expect(statusUpdateSqls[0].sql).toContain('AND tenant_id = ?');
+      expect(statusUpdateSqls[0].args[4]).toBe('sadec');
+    });
+  });
+
+  // =========================================================================
+  // Suite 56: Phase BC1–BC4 — Payment Access Scope & PayOS Create-Link/Attempt
+  //           Store Tenant Binding, Table QR Scan Non-Default Unscoped Fallback
+  //           Removal & Tables HQ Override, Reservations HQ 'hq' Wildcard &
+  //           Scoped Mutations, and CRM Refund Reversal Store Inheritance
+  // =========================================================================
+  describe('Suite 56: Phase BC1–BC4 — Payment Scope & PayOS Attempt, Table QR/Tables HQ Override, Reservations HQ Wildcard & CRM Refund Reversal', () => {
+    it('BC1: paymentTenantScope treats HQ "hq" without override as wildcard (null), OpenAPI payment list rejects cross-tenant mismatch, and PayOS attempt resolves order.tenant_id when tenantId="*"', async () => {
+      const { paymentTenantScope } = await import('../../../../packages/domain/payment/policies/payment-access');
+      const { registerPaymentReadHandlers } = await import('../../routes/openapi-payments-handlers/read-handlers');
+      const { getOrCreatePayOSAttempt } = await import('../../../../packages/domain/payment/commands/payos-attempt');
+      const { OpenAPIHono } = await import('@hono/zod-openapi');
+
+      // 1. paymentTenantScope returns null for HQ admin (tenantId: 'hq') with no override, and 'sadec' with override
+      const hqNoOverrideCtx = {
+        get: (k: string) => (k === 'user' ? { id: 'hq-1', role: 'owner', tenantId: 'hq' } : undefined),
+        req: { query: () => undefined, header: () => undefined },
+      };
+      expect(paymentTenantScope(hqNoOverrideCtx)).toBeNull();
+
+      const hqOverrideCtx = {
+        get: (k: string) => (k === 'user' ? { id: 'hq-1', role: 'owner', tenantId: 'hq' } : undefined),
+        req: {
+          query: (q: string) => (q === 'tenant_id' ? 'sadec' : undefined),
+          header: () => undefined,
+        },
+      };
+      expect(paymentTenantScope(hqOverrideCtx)).toBe('sadec');
+
+      // 2. OpenAPI PaymentRoutes.list rejects store staff spoofing X-Tenant-ID: 'cantho' with 403
+      const payApp = new OpenAPIHono<{ Bindings: Env }>();
+      payApp.use('*', async (c, next) => {
+        c.set('user' as never, { id: 'staff-sadec', role: 'cashier', tenantId: 'sadec', tenant_id: 'sadec' } as never);
+        await next();
+      });
+      registerPaymentReadHandlers(payApp);
+      const listSpoofRes = await payApp.request(
+        'http://localhost:3000/api/payments?page=1&limit=10',
+        { headers: { 'X-Tenant-ID': 'cantho' } },
+        { AURA_DB: {} } as unknown as Env
+      );
+      expect(listSpoofRes.status).toBe(403);
+
+      // 3. getOrCreatePayOSAttempt with tenantId='*' resolves order.tenant_id ('sadec') instead of '*'
+      const lookupBinds: unknown[][] = [];
+      const attemptDb = {
+        prepare(sql: string) {
+          return {
+            bind(...args: unknown[]) {
+              return {
+                async first() {
+                  if (/SELECT tenant_id FROM orders WHERE id = \?/i.test(sql)) {
+                    return { tenant_id: 'sadec' };
+                  }
+                  return null;
+                },
+                async all() {
+                  if (/FROM payments WHERE order_id = \? AND method = 'payos'/i.test(sql)) {
+                    lookupBinds.push(args);
+                    return {
+                      results: [
+                        {
+                          id: 'payos:ord-sadec-pay-1',
+                          order_id: 'ord-sadec-pay-1',
+                          amount: 55000,
+                          transaction_id: '12345678',
+                          payment_url: 'https://pay.payos.vn/web/link123',
+                          status: 'pending',
+                          tenant_id: 'sadec',
+                          created_at: new Date().toISOString(),
+                          updated_at: new Date().toISOString(),
+                        },
+                      ],
+                    };
+                  }
+                  return { results: [] };
+                },
+              };
+            },
+          };
+        },
+      };
+
+      const attemptRes = await getOrCreatePayOSAttempt({
+        db: attemptDb as never,
+        orderId: 'ord-sadec-pay-1',
+        amount: 55000,
+        clientId: 'cid',
+        apiKey: 'akey',
+        checksumKey: 'ckey',
+        description: 'Order #ord-sadec-pay-1',
+        returnUrl: 'https://auraspace.cafe/ok',
+        cancelUrl: 'https://auraspace.cafe/cancel',
+        tenantId: '*',
+      });
+      expect(attemptRes.ok).toBe(true);
+      expect(lookupBinds).toHaveLength(1);
+      expect(lookupBinds[0]).toEqual(['ord-sadec-pay-1', 'sadec']);
+    });
+
+    it('BC2: qrRouter.get("/:slug") blocks unscoped QR/table fallback for non-default stores, and tablesRouter honors HQ X-Tenant-ID overrides on table mutations', async () => {
+      const { qrRouter } = await import('../../../../packages/domain/table/commands/qr-scan');
+      const { tablesRouter } = await import('../../../../packages/domain/table/commands/tables');
+      const { signQRUrl } = await import('../../tree/qr/signer');
+      const { Hono } = await import('hono');
+
+      // 1. qrRouter.get('/:slug') with X-Tenant-ID: 'sadec' does NOT run unscoped table_qr_codes fallback
+      let unscopedQrQueried = false;
+      const qrDb = {
+        prepare(sql: string) {
+          return {
+            bind(..._args: unknown[]) {
+              return {
+                async first() {
+                  if (/FROM table_qr_codes/i.test(sql) && !/COALESCE\(NULLIF\(TRIM\(tenant_id\)/i.test(sql)) {
+                    unscopedQrQueried = true;
+                    return { table_id: 'tbl-def-1', slug: 'table-01', is_active: 1 };
+                  }
+                  return null;
+                },
+              };
+            },
+          };
+        },
+      };
+      const secret = 'test-qr-secret-bc2-32-chars-minimum!';
+      const signedUrl = new URL(await signQRUrl('table-01', secret, 'http://localhost:3000'));
+      const qrRes = await qrRouter.request(
+        `http://localhost:3000/table-01${signedUrl.search}`,
+        { headers: { 'X-Tenant-ID': 'sadec' } },
+        { AURA_DB: qrDb, QR_SIGNING_SECRET: secret } as unknown as Env
+      );
+      expect(qrRes.status).toBe(404);
+      expect(unscopedQrQueried).toBe(false);
+
+      // 2. tablesRouter PATCH /:id/occupy with HQ admin (tenantId: 'hq') and X-Tenant-ID: 'sadec' scopes to 'sadec'
+      const updateTableBinds: unknown[][] = [];
+      const tblDb = {
+        prepare(sql: string) {
+          return {
+            bind(...args: unknown[]) {
+              return {
+                async first() {
+                  if (/SELECT \* FROM cafe_tables WHERE id = \?/i.test(sql)) {
+                    if (args[0] === 'tbl-sadec-1') {
+                      return { id: 'tbl-sadec-1', table_number: '1', status: 'Available', tenant_id: 'sadec' };
+                    }
+                    if (args[0] === 'tbl-cantho-1') {
+                      return { id: 'tbl-cantho-1', table_number: '1', status: 'Available', tenant_id: 'cantho' };
+                    }
+                  }
+                  return null;
+                },
+                async run() {
+                  if (/UPDATE cafe_tables SET status = \?/i.test(sql)) {
+                    updateTableBinds.push(args);
+                  }
+                  return { meta: { changes: 1 } };
+                },
+              };
+            },
+          };
+        },
+      };
+
+      const tblApp = new Hono<{ Bindings: Env }>();
+      tblApp.use('*', async (c, next) => {
+        c.set('user' as never, { id: 'hq-owner', role: 'owner', tenantId: 'hq', tenant_id: 'hq' } as never);
+        await next();
+      });
+      tblApp.route('/tables', tablesRouter);
+
+      // Cross-store table ('cantho') rejected with 404 when HQ admin targets 'sadec'
+      const wrongStoreRes = await tblApp.request(
+        'http://localhost:3000/tables/tbl-cantho-1/occupy',
+        { method: 'PATCH', headers: { 'X-Tenant-ID': 'sadec' } },
+        { AURA_DB: tblDb } as unknown as Env
+      );
+      expect(wrongStoreRes.status).toBe(404);
+
+      const rightStoreRes = await tblApp.request(
+        'http://localhost:3000/tables/tbl-sadec-1/occupy',
+        { method: 'PATCH', headers: { 'X-Tenant-ID': 'sadec' } },
+        { AURA_DB: tblDb } as unknown as Env
+      );
+      expect(rightStoreRes.status).toBe(200);
+      expect(updateTableBinds).toHaveLength(1);
+      expect(updateTableBinds[0]).toEqual(['Occupied', 'tbl-sadec-1', 'sadec']);
+    });
+
+    it('BC3: reservationsRouter treats HQ "hq" without override as wildcard "*" and scopes approve/reject/delete SQL lookups by tenant', async () => {
+      const { reservationsRouter } = await import('../../../../packages/domain/reservation/src/routes/reservations');
+      const { Hono } = await import('hono');
+
+      const rsvSelectBinds: unknown[][] = [];
+      const rsvUpdateBinds: unknown[][] = [];
+      const rsvDb = {
+        prepare(sql: string) {
+          return {
+            bind(...args: unknown[]) {
+              return {
+                async all() {
+                  if (/FROM reservations r LEFT JOIN cafe_tables t/i.test(sql)) {
+                    return {
+                      results: [
+                        { id: 'rsv-sadec-1', table_id: 'tbl-sadec-1', status: 'pending', tenant_id: 'sadec', date: '2026-12-01', time: '18:00' },
+                        { id: 'rsv-cantho-1', table_id: 'tbl-cantho-1', status: 'pending', tenant_id: 'cantho', date: '2026-12-01', time: '19:00' },
+                      ],
+                    };
+                  }
+                  return { results: [] };
+                },
+                async first() {
+                  if (/SELECT \* FROM reservations WHERE id = \? AND \(\? = '\*'/i.test(sql)) {
+                    rsvSelectBinds.push(args);
+                    const [id, wildcard, tenant] = args;
+                    if (id === 'rsv-sadec-1' && (wildcard === '*' || tenant === 'sadec')) {
+                      return { id: 'rsv-sadec-1', table_id: 'tbl-sadec-1', status: 'pending', tenant_id: 'sadec' };
+                    }
+                    return null;
+                  }
+                  return null;
+                },
+                async run() {
+                  if (/UPDATE reservations SET status = 'confirmed'/i.test(sql)) {
+                    rsvUpdateBinds.push(args);
+                  }
+                  return { meta: { changes: 1 } };
+                },
+              };
+            },
+          };
+        },
+      };
+
+      const rsvApp = new Hono<{ Bindings: Env }>();
+      rsvApp.use('*', async (c, next) => {
+        c.set('user' as never, { id: 'hq-owner', role: 'owner', tenantId: 'hq', tenant_id: 'hq' } as never);
+        await next();
+      });
+      rsvApp.route('/reservations', reservationsRouter);
+
+      // 1. HQ admin with tenantId: 'hq' and no override lists reservations across all stores ('*')
+      const listRes = await rsvApp.request(
+        'http://localhost:3000/reservations',
+        { method: 'GET' },
+        { AURA_DB: rsvDb } as unknown as Env
+      );
+      expect(listRes.status).toBe(200);
+      const listBody = (await listRes.json()) as { data: Array<{ id: string }> };
+      expect(listBody.data.map((r) => r.id)).toEqual(['rsv-sadec-1', 'rsv-cantho-1']);
+
+      // 2. PATCH /reservations/:id/approve with X-Tenant-ID: 'cantho' cannot approve 'sadec' reservation
+      const wrongApprove = await rsvApp.request(
+        'http://localhost:3000/reservations/rsv-sadec-1/approve',
+        { method: 'PATCH', headers: { 'X-Tenant-ID': 'cantho' } },
+        { AURA_DB: rsvDb } as unknown as Env
+      );
+      expect(wrongApprove.status).toBe(404);
+      expect(rsvSelectBinds[0]).toEqual(['rsv-sadec-1', 'cantho', 'cantho']);
+
+      // 3. PATCH /reservations/:id/approve with X-Tenant-ID: 'sadec' succeeds and scopes UPDATE to 'sadec'
+      const okApprove = await rsvApp.request(
+        'http://localhost:3000/reservations/rsv-sadec-1/approve',
+        { method: 'PATCH', headers: { 'X-Tenant-ID': 'sadec' } },
+        { AURA_DB: rsvDb } as unknown as Env
+      );
+      expect(okApprove.status).toBe(200);
+      expect(rsvUpdateBinds).toHaveLength(1);
+      expect(rsvUpdateBinds[0][1]).toBe('rsv-sadec-1');
+      expect(rsvUpdateBinds[0][2]).toBe('sadec');
+    });
+
+    it('BC4: reverseAccrual inherits order.tenant_id when called with tenantId="*" and stamps store tenant on reversal logs and transactions', async () => {
+      const { reverseAccrual } = await import('../../../../packages/domain/crm/commands/refund-reversal');
+      const { loadPolicy } = await import('../../../../packages/domain/crm/commands/loyalty-policy');
+
+      const customerLookupBinds: unknown[][] = [];
+      const pointLogTenantUpdates: unknown[][] = [];
+      const auditLogTenantUpdates: unknown[][] = [];
+      const cbTxTenantUpdates: unknown[][] = [];
+      const orderUpdateBinds: unknown[][] = [];
+
+      const revDb = {
+        prepare(sql: string) {
+          return {
+            sql,
+            args: [] as unknown[],
+            bind(...args: unknown[]) {
+              return {
+                sql,
+                args,
+                async all() {
+                  return { results: [] };
+                },
+                async first() {
+                  if (/FROM orders WHERE id = \?/i.test(sql)) {
+                    return {
+                      id: 'ord-sadec-rev-1',
+                      total: 100000,
+                      points_earned: 10,
+                      cashback_earned: 2000,
+                      customer_id: 'cust-sadec-rev-1',
+                      tenant_id: 'sadec',
+                    };
+                  }
+                  if (/FROM customers WHERE id = \?/i.test(sql)) {
+                    customerLookupBinds.push(args);
+                    if (args[1] !== 'sadec') return null;
+                    return {
+                      id: 'cust-sadec-rev-1',
+                      loyalty_points: 25,
+                      lifetime_points: 25,
+                      loyalty_tier: 'bronze',
+                      tenant_id: 'sadec',
+                    };
+                  }
+                  if (/FROM cashback_wallets WHERE customer_id = \?/i.test(sql)) {
+                    return { id: 'cbw-sadec-1', balance: 5000 };
+                  }
+                  return null;
+                },
+                async run() {
+                  if (/UPDATE loyalty_point_logs SET tenant_id = \?/i.test(sql)) {
+                    pointLogTenantUpdates.push(args);
+                  }
+                  if (/UPDATE loyalty_audit_log SET tenant_id = \?/i.test(sql)) {
+                    auditLogTenantUpdates.push(args);
+                  }
+                  if (/UPDATE cashback_transactions SET tenant_id = \?/i.test(sql)) {
+                    cbTxTenantUpdates.push(args);
+                  }
+                  if (/UPDATE orders[\s\S]*SET cashback_earned/i.test(sql)) {
+                    orderUpdateBinds.push(args);
+                  }
+                  return { success: true, meta: { changes: 1 } };
+                },
+              };
+            },
+          };
+        },
+        async batch(stmts: Array<{ sql: string; args: unknown[] }>) {
+          return stmts.map(() => ({ success: true, meta: { changes: 1 } }));
+        },
+      };
+
+      const policy = await loadPolicy(revDb as never);
+      const revRes = await reverseAccrual(revDb as never, policy, {
+        orderId: 'ord-sadec-rev-1',
+        customerId: 'cust-sadec-rev-1',
+        refundAmountVnd: 100000,
+        tenantId: '*',
+      });
+      expect(revRes.ok).toBe(true);
+      expect(customerLookupBinds).toHaveLength(1);
+      expect(customerLookupBinds[0]).toEqual(['cust-sadec-rev-1', 'sadec']);
+      expect(pointLogTenantUpdates).toHaveLength(1);
+      expect(pointLogTenantUpdates[0][0]).toBe('sadec');
+      expect(auditLogTenantUpdates).toHaveLength(1);
+      expect(auditLogTenantUpdates[0][0]).toBe('sadec');
+      expect(cbTxTenantUpdates).toHaveLength(1);
+      expect(cbTxTenantUpdates[0][0]).toBe('sadec');
+      expect(orderUpdateBinds).toHaveLength(1);
+      expect(orderUpdateBinds[0][3]).toBe('sadec');
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // Suite 57: Phase BD1-BD4 — Inventory Domain HQ 'hq' Read/Write Override,
+  //           Catalog HQ 'hq' Wildcard & Concrete-Store Enforcement,
+  //           Kitchen Mobile KDS HQ 'hq' Read/Write Override &
+  //           CRM Customer 360 / Event Aggregation Store Tenant Inheritance
+  // -------------------------------------------------------------------------
+  describe('Suite 57: Phase BD1-BD4 Inventory, Catalog, Mobile KDS & CRM 360 HQ Store Isolation', () => {
+    it('BD1: inventoryCRUD, inventorySnapshots & purchasing normalize HQ "hq" SuperAdmin to "*" on read and honor store overrides on write', async () => {
+      const { Hono } = await import('hono');
+      const { inventoryCRUD } = await import('../../../../packages/domain/inventory/src/routes/inventory-crud');
+      const { inventorySnapshots } = await import('../../../../packages/domain/inventory/src/routes/inventory-snapshots');
+      const { purchasing } = await import('../../../../packages/domain/inventory/src/routes/purchasing');
+
+      const insertedSnapshots: Array<{ sql: string; args: unknown[] }> = [];
+      const updatedItems: Array<{ sql: string; args: unknown[] }> = [];
+      const invDb = {
+        prepare(sql: string) {
+          return {
+            bind(...args: unknown[]) {
+              return {
+                async all() {
+                  if (/FROM inventory_items/i.test(sql)) {
+                    return {
+                      results: [
+                        { id: 'inv-sadec-1', sku: 'SKU-SD-1', name: 'Cà phê hạt Sa Đéc', current_stock: 50, active: 1, tenant_id: 'sadec' },
+                        { id: 'inv-cantho-1', sku: 'SKU-CT-1', name: 'Sữa tươi Cần Thơ', current_stock: 30, active: 1, tenant_id: 'cantho' },
+                      ],
+                    };
+                  }
+                  if (/FROM purchase_orders/i.test(sql)) {
+                    return {
+                      results: [
+                        { id: 'po-sadec-1', supplier_id: 'sup-1', status: 'draft', tenant_id: 'sadec' },
+                        { id: 'po-cantho-1', supplier_id: 'sup-2', status: 'draft', tenant_id: 'cantho' },
+                      ],
+                    };
+                  }
+                  return { results: [] };
+                },
+                async first() {
+                  if (/FROM inventory_items WHERE id = \?/i.test(sql)) {
+                    if (args[0] === 'inv-sadec-1') {
+                      return { id: 'inv-sadec-1', sku: 'SKU-SD-1', name: 'Cà phê hạt Sa Đéc', current_stock: 50, active: 1, tenant_id: 'sadec' };
+                    }
+                    return null;
+                  }
+                  return null;
+                },
+                async run() {
+                  if (/UPDATE inventory_items/i.test(sql)) {
+                    updatedItems.push({ sql, args });
+                  }
+                  if (/INSERT INTO inventory_snapshots/i.test(sql)) {
+                    insertedSnapshots.push({ sql, args });
+                  }
+                  return { meta: { changes: 1 } };
+                },
+              };
+            },
+          };
+        },
+        async batch() {
+          return [];
+        },
+      };
+
+      const app = new Hono<{ Bindings: { AURA_DB: typeof invDb }; Variables: { user: unknown } }>();
+      app.use('*', async (c, next) => {
+        c.set('user', { id: 'hq-owner-bd1', role: 'owner', tenantId: 'hq', tenant_id: 'hq' });
+        await next();
+      });
+      purchasing(app as never);
+      inventorySnapshots(app as never);
+      inventoryCRUD(app as never);
+
+      // 1. HQ owner ('hq') without override lists inventory items across all stores ('*')
+      const listRes = await app.request(
+        'http://localhost:3000/',
+        { method: 'GET' },
+        { AURA_DB: invDb } as never
+      );
+      expect(listRes.status).toBe(200);
+      const listBody = (await listRes.json()) as { data?: { items?: Array<{ id: string }> } };
+      expect(listBody.data?.items?.map((i) => i.id)).toEqual(['inv-sadec-1', 'inv-cantho-1']);
+
+      // 2. HQ owner ('hq') updates 'sadec' item in write mode without 403 and binds 'sadec' on UPDATE
+      const putRes = await app.request(
+        'http://localhost:3000/inv-sadec-1',
+        {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ current_stock: 65 }),
+        },
+        { AURA_DB: invDb } as never
+      );
+      expect(putRes.status).toBe(200);
+      expect(updatedItems).toHaveLength(1);
+      expect(updatedItems[0].args).toEqual(['pcs', 65, 0, 1000, 0, 'inv-sadec-1', 'sadec']);
+
+      // 3. HQ owner ('hq') records snapshot on 'sadec' item in write mode and stamps 'sadec'
+      const snapRes = await app.request(
+        'http://localhost:3000/inv-sadec-1/snapshots',
+        { method: 'POST' },
+        { AURA_DB: invDb } as never
+      );
+      expect(snapRes.status).toBe(201);
+      expect(insertedSnapshots).toHaveLength(1);
+      expect(insertedSnapshots[0].args[5]).toBe('sadec');
+
+      // 4. HQ owner ('hq') lists purchase orders across all stores ('*') and filters to 'sadec' when overridden
+      const poAllRes = await app.request(
+        'http://localhost:3000/purchase-orders',
+        { method: 'GET' },
+        { AURA_DB: invDb } as never
+      );
+      expect(poAllRes.status).toBe(200);
+      const poAllBody = (await poAllRes.json()) as { data?: Array<{ id: string }> };
+      expect(poAllBody.data?.map((p) => p.id)).toEqual(['po-sadec-1', 'po-cantho-1']);
+    });
+
+    it('BD2: categories, menuModifiers & happyHour normalize HQ "hq" SuperAdmin to "*" on read and require explicit concrete store on creation', async () => {
+      const { Hono } = await import('hono');
+      const { categoriesRouter } = await import('../../../../packages/domain/catalog/commands/categories');
+      const { verifyModifierReadTenant, verifyModifierWriteTenant } = await import('../../../../packages/domain/catalog/commands/menu-modifiers');
+
+      const catDb = {
+        prepare(sql: string) {
+          return {
+            bind() {
+              return this;
+            },
+            async all() {
+              if (/FROM categories/i.test(sql)) {
+                return {
+                  results: [
+                    { id: 'cat-sd-1', name: 'Coffee Sa Đéc', slug: 'coffee-sd', sort_order: 1, tenant_id: 'sadec' },
+                    { id: 'cat-ct-1', name: 'Tea Cần Thơ', slug: 'tea-ct', sort_order: 2, tenant_id: 'cantho' },
+                  ],
+                };
+              }
+              return { results: [] };
+            },
+          };
+        },
+      };
+
+      const app = new Hono<{ Bindings: { AURA_DB: typeof catDb }; Variables: { user: unknown } }>();
+      app.use('*', async (c, next) => {
+        c.set('user', { id: 'hq-admin-bd2', role: 'admin', tenantId: 'hq', tenant_id: 'hq' });
+        await next();
+      });
+      app.route('/api/categories', categoriesRouter as never);
+
+      // 1. HQ admin ('hq') without override reads categories across all stores ('*')
+      const treeRes = await app.request(
+        'http://localhost:3000/api/categories/tree',
+        { method: 'GET' },
+        { AURA_DB: catDb } as never
+      );
+      expect(treeRes.status).toBe(200);
+      const treeBody = (await treeRes.json()) as { data?: Array<{ id: string }> };
+      expect(treeBody.data?.map((c) => c.id)).toEqual(['cat-sd-1', 'cat-ct-1']);
+
+      // 2. HQ admin ('hq') without concrete store override gets 400 on POST /api/categories instead of stamping 'hq'
+      const createNoStoreRes = await app.request(
+        'http://localhost:3000/api/categories',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name: 'New Cat', slug: 'new-cat' }),
+        },
+        { AURA_DB: catDb } as never
+      );
+      expect(createNoStoreRes.status).toBe(400);
+
+      // 3. verifyModifierReadTenant & verifyModifierWriteTenant normalize 'hq' to '*' for HQ SuperAdmin
+      const mockCtx = {
+        get(k: string) {
+          if (k === 'user') return { id: 'hq-admin-bd2', role: 'admin', tenantId: 'hq', tenant_id: 'hq' };
+          return undefined;
+        },
+        req: {
+          query: () => undefined,
+          header: () => undefined,
+        },
+      };
+      const modRead = verifyModifierReadTenant(mockCtx);
+      expect(modRead).toEqual({ ok: true, tenantId: '*' });
+      const modCreate = verifyModifierWriteTenant(mockCtx, false);
+      expect(modCreate.ok).toBe(false);
+      if (!modCreate.ok) {
+        expect(modCreate.status).toBe(400);
+      }
+      const modIdLookup = verifyModifierWriteTenant(mockCtx, true);
+      expect(modIdLookup).toEqual({ ok: true, tenantId: '*' });
+    });
+
+    it('BD3: getKdsMobile and updateKdsStatus normalize HQ "hq" SuperAdmin to "*" on read and write', async () => {
+      const { getKdsMobile, updateKdsStatus } = await import('../../../../packages/domain/kitchen/commands/kds-mobile');
+
+      const updatedOrders: Array<{ sql: string; args: unknown[] }> = [];
+      const kdsDb = {
+        prepare(sql: string) {
+          const runQuery = async (args: unknown[]) => {
+            if (/FROM orders o/i.test(sql)) {
+              // If 'hq' were bound instead of '*', args would contain 'hq'
+              if (args.includes('hq')) return { results: [] };
+              return {
+                results: [
+                  { id: 'ord-sd-kds-1', order_number: 'SD-01', table_id: 't-1', items: '[]', status: 'pending', order_type: 'dine_in', payment_status: 'unpaid', created_at: '2026-11-05T08:00:00Z', updated_at: '2026-11-05T08:00:00Z', table_name: '1' },
+                ],
+              };
+            }
+            return { results: [] };
+          };
+          return {
+            all: () => runQuery([]),
+            bind(...args: unknown[]) {
+              return {
+                all: () => runQuery(args),
+                async first() {
+                  if (/FROM orders WHERE id = \?/i.test(sql)) {
+                    if (args.includes('hq')) return null;
+                    return { id: 'ord-sd-kds-1', status: 'pending', table_id: 't-1', order_type: 'dine_in', payment_status: 'unpaid', tenant_id: 'sadec' };
+                  }
+                  return null;
+                },
+                async run() {
+                  if (/UPDATE orders SET status = \?/i.test(sql)) {
+                    updatedOrders.push({ sql, args });
+                  }
+                  return { meta: { changes: 1 } };
+                },
+              };
+            },
+          };
+        },
+      };
+
+      const makeHqCtx = (body?: unknown) => ({
+        env: { AURA_DB: kdsDb },
+        get(k: string) {
+          if (k === 'user') return { id: 'hq-owner-bd3', role: 'owner', tenantId: 'hq', tenant_id: 'hq' };
+          return undefined;
+        },
+        req: {
+          query: () => undefined,
+          header: () => undefined,
+          param: (k: string) => (k === 'id' ? 'ord-sd-kds-1' : undefined),
+          json: async () => body,
+        },
+      });
+
+      const listRes = await getKdsMobile(makeHqCtx() as never);
+      expect(listRes.status).toBe(200);
+      const listBody = (await listRes.json()) as { orders?: Array<{ id: string }> };
+      expect(listBody.orders?.map((o) => o.id)).toEqual(['ord-sd-kds-1']);
+
+      const patchRes = await updateKdsStatus(makeHqCtx({ status: 'confirmed' }) as never);
+      expect(patchRes.status).toBe(200);
+      expect(updatedOrders).toHaveLength(1);
+      expect(updatedOrders[0].args).toContain('sadec');
+    });
+
+    it('BD4: aggregateEvents and getCustomer360 normalize HQ "hq"/"*" and inherit customer store tenant from customers.tenant_id', async () => {
+      const { getCustomer360 } = await import('../../../../packages/domain/crm/commands/customer-360');
+
+      const scopedEventTenants: Array<{ table: string; tenantArg: unknown }> = [];
+      const crmDb = {
+        prepare(sql: string) {
+          return {
+            bind(...args: unknown[]) {
+              return {
+                async first() {
+                  if (/FROM customers WHERE id = \?/i.test(sql)) {
+                    return {
+                      id: 'cust-sadec-360',
+                      name: 'Khách Sa Đéc',
+                      phone: '0909111222',
+                      email: 'khach@sadec.vn',
+                      loyalty_tier: 'silver',
+                      loyalty_points: 120,
+                      lifetime_points: 350,
+                      tenant_id: 'sadec',
+                    };
+                  }
+                  return null;
+                },
+                async all() {
+                  if (/FROM customer_identities/i.test(sql)) {
+                    scopedEventTenants.push({ table: 'customer_identities', tenantArg: args[1] });
+                  }
+                  if (/FROM visits/i.test(sql)) {
+                    scopedEventTenants.push({ table: 'visits', tenantArg: args[1] });
+                  }
+                  if (/FROM loyalty_point_logs/i.test(sql)) {
+                    scopedEventTenants.push({ table: 'loyalty_point_logs', tenantArg: args[1] });
+                  }
+                  return { results: [] };
+                },
+              };
+            },
+          };
+        },
+      };
+
+      const view = await getCustomer360(crmDb as never, 'cust-sadec-360', undefined, {
+        tenantId: 'hq',
+        eventLimit: 10,
+      });
+      expect(view.customerId).toBe('cust-sadec-360');
+      expect(view.account?.name).toBe('Khách Sa Đéc');
+      expect(scopedEventTenants).toEqual(
+        expect.arrayContaining([
+          { table: 'customer_identities', tenantArg: 'sadec' },
+          { table: 'visits', tenantArg: 'sadec' },
+          { table: 'loyalty_point_logs', tenantArg: 'sadec' },
+        ])
+      );
+    });
+  });
+
+  // =========================================================================
+  // 58. Phase BE1–BE4: Staff Tips HQ 'hq' Wildcard, Kitchen COD & KDS Stream
+  //     HQ 'hq' Wildcard, Order Admin/Stats/Update Store Attribution, and
+  //     Shift Router Override & Lifecycle/Reconciliation HQ 'hq' Wildcard
+  // =========================================================================
+  describe('Suite 58 (BE1-BE4): Staff Tips, Kitchen COD/Stream, Order Admin/Stats/Update & Shift Lifecycle/Reconciliation HQ Wildcard', () => {
+    it('BE1: staffTipsRouter normalizes HQ SuperAdmin "hq" to "*" across daily rollup, staff history, and tip assignment', async () => {
+      const { Hono } = await import('hono');
+      const { staffTipsRouter } = await import('../../../../packages/domain/staff/commands/staff-tips');
+
+      const assignedUpdates: Array<{ sql: string; args: unknown[] }> = [];
+      const tipsDb = {
+        prepare(sql: string) {
+          const makeRunner = (args: unknown[]) => ({
+            async all() {
+              if (/FROM orders o/i.test(sql)) {
+                if (args.includes('hq')) return { results: [] };
+                return {
+                  results: [
+                    {
+                      staff_id: 'staff-sd-1',
+                      staff_name: 'Waiter Sa Đéc',
+                      date: '2026-11-05',
+                      tip_total: 25000,
+                      order_count: 1,
+                      session_count: 1,
+                    },
+                  ],
+                };
+              }
+              return { results: [] };
+            },
+            async first() {
+              if (/FROM users WHERE id = \?/i.test(sql)) {
+                return { id: 'staff-sd-1', role: 'waiter', tenant_id: 'sadec', is_active: 1 };
+              }
+              if (/FROM orders WHERE id = \?/i.test(sql)) {
+                if (args.includes('hq')) return null;
+                return {
+                  id: 'ord-sd-tip-1',
+                  status: 'pending',
+                  payment_status: 'unpaid',
+                  total: 120000,
+                  tip_amount: 0,
+                  tenant_id: 'sadec',
+                };
+              }
+              return null;
+            },
+            async run() {
+              if (/UPDATE orders SET tip_amount = \?/i.test(sql)) {
+                assignedUpdates.push({ sql, args });
+              }
+              return { meta: { changes: 1 } };
+            },
+          });
+          return {
+            ...makeRunner([]),
+            bind(...args: unknown[]) {
+              return makeRunner(args);
+            },
+          };
+        },
+      };
+
+      const app = new Hono<{ Bindings: Record<string, unknown> }>();
+      app.use('*', async (c, next) => {
+        c.set('user' as never, { id: 'hq-owner-be1', role: 'owner', tenantId: 'hq', tenant_id: 'hq' } as never);
+        await next();
+      });
+      app.route('/api/staff-tips', staffTipsRouter as never);
+
+      const listRes = await app.request('http://localhost/api/staff-tips?date=2026-11-05', {}, { AURA_DB: tipsDb });
+      expect(listRes.status).toBe(200);
+      const listBody = (await listRes.json()) as { data?: Array<{ staff_id: string; tip_total: number }> };
+      expect(listBody.data?.[0]?.staff_id).toBe('staff-sd-1');
+      expect(listBody.data?.[0]?.tip_total).toBe(25000);
+
+      const historyRes = await app.request('http://localhost/api/staff-tips/staff-sd-1?days=7', {}, { AURA_DB: tipsDb });
+      expect(historyRes.status).toBe(200);
+      const historyBody = (await historyRes.json()) as { total_tip?: number };
+      expect(historyBody.total_tip).toBe(25000);
+
+      const assignRes = await app.request(
+        'http://localhost/api/staff-tips/assign',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ order_id: 'ord-sd-tip-1', staff_id: 'staff-sd-1', tip_amount: 25000 }),
+        },
+        { AURA_DB: tipsDb }
+      );
+      expect(assignRes.status).toBe(200);
+      expect(assignedUpdates).toHaveLength(1);
+      expect(assignedUpdates[0].args).toContain('sadec');
+    });
+
+    it('BE2: collectCodPayment normalizes HQ "hq" to "*" and binds order.tenant_id across orders and payments batch statements', async () => {
+      const { collectCodPayment } = await import('../../../../packages/domain/kitchen/commands/collect-cod-payment');
+
+      const batchedOps: Array<{ sql: string; args: unknown[] }> = [];
+      const codDb = {
+        prepare(sql: string) {
+          return {
+            bind(...args: unknown[]) {
+              return {
+                sql,
+                args,
+                async first() {
+                  if (/FROM orders WHERE id = \?/i.test(sql)) {
+                    if (args.includes('hq')) return null;
+                    return {
+                      total: 95000,
+                      status: 'ready',
+                      payment_status: 'unpaid',
+                      payment_method: 'cod',
+                      tenant_id: 'sadec',
+                    };
+                  }
+                  return null;
+                },
+                async all() {
+                  return { results: [] };
+                },
+                async run() {
+                  return { meta: { changes: 1 } };
+                },
+              };
+            },
+          };
+        },
+        async batch(ops: Array<{ sql: string; args: unknown[] }>) {
+          batchedOps.push(...ops);
+          return [
+            { success: true, meta: { changes: 1 } },
+            { success: true, meta: { changes: 0 } },
+            { success: true, meta: { changes: 1 } },
+          ];
+        },
+      };
+
+      const res = await collectCodPayment(codDb as never, 'ord-sd-cod-1', 'hq');
+      expect(res).toEqual({ success: true, status: 'ready' });
+      expect(batchedOps).toHaveLength(3);
+      expect(batchedOps[0].args).toContain('sadec');
+      expect(batchedOps[2].args).toContain('sadec');
+    });
+
+    it('BE3: getAdminOrders, getStats, and updateOrder normalize HQ "hq" to "*" and scope field-only order updates by loaded order tenant_id', async () => {
+      const { getAdminOrders } = await import('../../../../packages/domain/order/queries/admin-orders');
+      const { getStats } = await import('../../../../packages/domain/order/queries/stats');
+      const { updateOrder } = await import('../../../../packages/domain/order/commands/update-order');
+
+      const updateCalls: Array<{ sql: string; args: unknown[] }> = [];
+      const orderDb = {
+        prepare(sql: string) {
+          const makeRunner = (args: unknown[]) => ({
+            async all() {
+              if (args.includes('hq')) return { results: [] };
+              if (/COUNT\(\*\) as total/i.test(sql)) {
+                return { results: [{ total: 3, revenue: 210000 }] };
+              }
+              if (/GROUP BY status/i.test(sql)) {
+                return { results: [{ status: 'completed', count: 3 }] };
+              }
+              if (/SELECT items, COUNT\(\*\) as order_count/i.test(sql)) {
+                return { results: [] };
+              }
+              if (/GROUP BY date/i.test(sql)) {
+                return { results: [] };
+              }
+              if (/FROM orders/i.test(sql)) {
+                return {
+                  results: [
+                    {
+                      id: 'ord-sd-be3',
+                      status: 'pending',
+                      items: '[]',
+                      total: 70000,
+                      payment_status: 'unpaid',
+                      customer_name: 'Khách Sa Đéc',
+                      customer_phone: '0909000111',
+                      table_id: 'T1',
+                      created_at: '2026-11-05T08:00:00Z',
+                      tenant_id: 'sadec',
+                    },
+                  ],
+                };
+              }
+              return { results: [] };
+            },
+            async first() {
+              if (/COUNT\(\*\) as total/i.test(sql)) {
+                return { total: args.includes('hq') ? 0 : 1 };
+              }
+              return null;
+            },
+            async run() {
+              if (/UPDATE orders SET/i.test(sql)) {
+                updateCalls.push({ sql, args });
+              }
+              return { meta: { changes: 1 } };
+            },
+          });
+          return {
+            ...makeRunner([]),
+            bind(...args: unknown[]) {
+              return makeRunner(args);
+            },
+          };
+        },
+      };
+
+      const adminRes = await getAdminOrders(
+        new Request('http://localhost/api/orders?tenant_id=sadec'),
+        { AURA_DB: orderDb },
+        'hq'
+      );
+      expect(adminRes.status).toBe(200);
+      const adminBody = (await adminRes.json()) as { orders?: Array<{ id: string }> };
+      expect(adminBody.orders?.map((o) => o.id)).toEqual(['ord-sd-be3']);
+
+      const statsRes = await getStats(
+        new Request('http://localhost/api/orders/stats?tenant_id=sadec'),
+        { AURA_DB: orderDb },
+        'hq'
+      );
+      expect(statsRes.status).toBe(200);
+      const statsBody = (await statsRes.json()) as { stats?: { orders_today?: number; revenue_today?: number } };
+      expect(statsBody.stats?.orders_today).toBe(3);
+      expect(statsBody.stats?.revenue_today).toBe(210000);
+
+      const updRes = await updateOrder(
+        new Request('http://localhost/api/orders/ord-sd-be3', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ notes: 'Ít đá' }),
+        }),
+        { AURA_DB: orderDb },
+        'ord-sd-be3',
+        'owner',
+        'hq'
+      );
+      expect(updRes.status).toBe(200);
+      expect(updateCalls).toHaveLength(1);
+      expect(updateCalls[0].sql).toContain('AND tenant_id = ?');
+      expect(updateCalls[0].args).toContain('sadec');
+    });
+
+    it('BE4: shiftsRouter forwards reqTenant override to shiftScope and shift-lifecycle/reconciliation policies normalize HQ "hq" to "*"', async () => {
+      const { Hono } = await import('hono');
+      const { shiftsRouter } = await import('../../../../packages/domain/shift/commands/shifts');
+      const { recordShiftSale, closeCanonicalShift } = await import(
+        '../../../../packages/domain/shift/src/policies/shift-lifecycle-policy'
+      );
+      const { reconcileShiftCash, getReconciliationForShift } = await import(
+        '../../../../packages/domain/shift/src/policies/cash-reconciliation-policy'
+      );
+
+      const app = new Hono<{ Bindings: Record<string, unknown> }>();
+      app.use('*', async (c, next) => {
+        c.set('user' as never, { id: 'staff-sd-1', role: 'staff', tenantId: 'sadec', tenant_id: 'sadec' } as never);
+        await next();
+      });
+      app.route('/api/shifts', shiftsRouter as never);
+
+      const spoofDb = {
+        prepare() {
+          return {
+            bind() {
+              return {
+                async first() {
+                  return {
+                    id: 'staff-sd-1',
+                    name: 'Staff Sa Đéc',
+                    email: 'staff@sadec.vn',
+                    role: 'staff',
+                    is_active: 1,
+                    auth_version: 1,
+                    tenant_id: 'sadec',
+                  };
+                },
+              };
+            },
+          };
+        },
+      };
+      const spoofRes = await app.request(
+        'http://localhost/api/shifts/today',
+        { headers: { 'X-Tenant-ID': 'cantho' } },
+        { AURA_DB: spoofDb }
+      );
+      expect(spoofRes.status).toBe(403);
+
+      const shiftUpdates: Array<{ sql: string; args: unknown[] }> = [];
+      const reconInserts: Array<{ sql: string; args: unknown[] }> = [];
+      const shiftDb = {
+        prepare(sql: string) {
+          return {
+            bind(...args: unknown[]) {
+              return {
+                async first() {
+                  if (/FROM staff_shifts WHERE id = \?/i.test(sql)) {
+                    return {
+                      id: 'shift-sd-1',
+                      staff_id: 'staff-sd-1',
+                      staff_name: 'Thu Ngân Sa Đéc',
+                      role: 'cashier',
+                      operating_unit_id: 'sadec',
+                      tenant_id: 'sadec',
+                      status: 'open',
+                      clock_in: '2026-11-05T07:00:00.000Z',
+                      clock_out: '2026-11-05T15:00:00.000Z',
+                      opening_cash: 500000,
+                      cash_sales: 150000,
+                      online_sales: 0,
+                      total_sales: 150000,
+                      order_count: 2,
+                    };
+                  }
+                  if (/FROM shift_reconciliations WHERE shift_id = \?/i.test(sql)) {
+                    if (reconInserts.length === 0) return null;
+                    if (args.includes('hq')) return null;
+                    return {
+                      id: 'recon_sd_1',
+                      shift_id: 'shift-sd-1',
+                      staff_id: 'staff-sd-1',
+                      opening_float: 500000,
+                      expected_cash: 650000,
+                      actual_cash: 650000,
+                      variance: 0,
+                      variance_status: 'balanced',
+                      denominations: JSON.stringify({ denominations: [{ denomination: 500000, count: 1 }, { denomination: 50000, count: 3 }] }),
+                      cash_payment_total: 150000,
+                      cash_payout_total: 0,
+                      tenant_id: 'sadec',
+                      created_at: '2026-11-05T15:05:00.000Z',
+                    };
+                  }
+                  if (/FROM payments/i.test(sql)) {
+                    return { total: args.includes('sadec') ? 150000 : 0 };
+                  }
+                  if (/FROM cash_payouts/i.test(sql)) {
+                    return { total: 0 };
+                  }
+                  return null;
+                },
+                async run() {
+                  if (/UPDATE staff_shifts/i.test(sql)) {
+                    shiftUpdates.push({ sql, args });
+                  }
+                  if (/INSERT INTO shift_reconciliations/i.test(sql)) {
+                    reconInserts.push({ sql, args });
+                  }
+                  return { meta: { changes: 1 } };
+                },
+              };
+            },
+          };
+        },
+      };
+
+      const saleRes = await recordShiftSale(shiftDb as never, {
+        shiftId: 'shift-sd-1',
+        orderId: 'ord-sd-1',
+        amount: 50000,
+        paymentMethod: 'cash',
+        staffId: 'staff-sd-1',
+        tenantId: 'hq',
+      });
+      expect(saleRes.ok).toBe(true);
+      expect(shiftUpdates[0].args).toContain('sadec');
+
+      const closeRes = await closeCanonicalShift(shiftDb as never, {
+        shiftId: 'shift-sd-1',
+        actualCash: 650000,
+        closedByStaffId: 'hq-owner-1',
+        closedByRole: 'owner',
+        tenantId: 'hq',
+      });
+      expect(closeRes.ok).toBe(true);
+      expect(shiftUpdates[1].args).toContain('sadec');
+
+      const recon = await reconcileShiftCash(
+        shiftDb as never,
+        {
+          shift_id: 'shift-sd-1',
+          opening_float: 500000,
+          denominations: {
+            denominations: [
+              { denomination: 500000, count: 1 },
+              { denomination: 50000, count: 3 },
+            ],
+          },
+        },
+        'staff-sd-1',
+        'hq'
+      );
+      expect(recon.expected_cash).toBe(650000);
+      expect(reconInserts).toHaveLength(1);
+      expect(reconInserts[0].args).toContain('sadec');
+
+      const fetchedRecon = await getReconciliationForShift(shiftDb as never, 'shift-sd-1', 'hq');
+      expect(fetchedRecon?.shift_id).toBe('shift-sd-1');
+    });
+  });
+
+  describe('Suite 59: Phase BF1–BF4 — Kitchen Stations & Station KDS Tickets HQ Wildcard & Store Attribution, Payment Access Scope & PayOS Reconcile HQ Wildcard Resolution, OpenAPI Tables / Domain Tables / Reservations HQ Wildcard & Store Guards, and SOP Access Scope HQ Guard & store_id Override Support', () => {
+    it('BF1: kitchenStationsRouter and stationTicketsRouter normalize HQ tenantId "hq" to wildcard "*" while attributing station/category/KDS mutations to the target store and rejecting non-HQ "hq" staff', async () => {
+      const { Hono } = await import('hono');
+      const { issueStaffSession } = await import('../../lib/staff-session');
+      const { kitchenStationsRouter } = await import('../../../../packages/domain/kitchen/commands/kitchen-stations');
+
+      const TEST_SECRET = 'test-jwt-secret-multi-tenant-bf1';
+      const hqAccount = {
+        id: 'hq-owner-1',
+        name: 'HQ Owner',
+        phone: null,
+        role: 'owner',
+        tenant_id: 'hq',
+        is_active: 1,
+        auth_version: 1,
+      };
+      const { token: hqToken } = await issueStaffSession(
+        { JWT_SECRET: TEST_SECRET },
+        hqAccount,
+        { email: 'hq@aura.vn', sessionType: 'staff-web' }
+      );
+
+      const stationUpdates: Array<{ sql: string; args: unknown[] }> = [];
+      const orderUpdates: Array<{ sql: string; args: unknown[] }> = [];
+      const stationDb = {
+        prepare(sql: string) {
+          return {
+            bind(...args: unknown[]) {
+              return {
+                async all() {
+                  if (/FROM kitchen_stations/i.test(sql)) {
+                    if (args.includes('hq')) return { results: [] };
+                    return {
+                      results: [
+                        { id: 'KS-SD-1', name: 'Quầy Bar Sa Đéc', slug: 'bar-sadec', sort_order: 1, active: 1, tenant_id: 'sadec' },
+                      ],
+                    };
+                  }
+                  if (/FROM orders/i.test(sql)) {
+                    return {
+                      results: [
+                        {
+                          id: 'ORD-SD-1',
+                          status: 'confirmed',
+                          items: JSON.stringify([{ id: 'ITEM-SD-1', product_id: 'PROD-1', name: 'Cà phê sữa', quantity: 1 }]),
+                          created_at: '2026-11-05T08:00:00.000Z',
+                          tenant_id: 'sadec',
+                        },
+                      ],
+                    };
+                  }
+                  if (/FROM category_stations/i.test(sql)) {
+                    return { results: [{ category_id: 'CAT-1', station_id: 'KS-SD-1', tenant_id: 'sadec' }] };
+                  }
+                  if (/FROM products/i.test(sql)) {
+                    return { results: [{ id: 'PROD-1', category_id: 'CAT-1', tenant_id: 'sadec' }] };
+                  }
+                  if (/FROM order_item_stations/i.test(sql)) {
+                    return { results: [] };
+                  }
+                  return { results: [] };
+                },
+                async first() {
+                  if (/FROM users WHERE id = \?/i.test(sql)) {
+                    return hqAccount;
+                  }
+                  if (/FROM kitchen_stations WHERE id = \?/i.test(sql)) {
+                    return { id: 'KS-SD-1', name: 'Quầy Bar Sa Đéc', slug: 'bar-sadec', sort_order: 1, active: 1, tenant_id: 'sadec' };
+                  }
+                  if (/FROM orders WHERE id = \?/i.test(sql)) {
+                    if (args.includes('hq')) return null;
+                    return {
+                      id: 'ORD-SD-1',
+                      status: 'confirmed',
+                      items: JSON.stringify([{ id: 'ITEM-SD-1', product_id: 'PROD-1', name: 'Cà phê sữa', quantity: 1 }]),
+                      tenant_id: 'sadec',
+                    };
+                  }
+                  if (/FROM order_items/i.test(sql)) {
+                    return { id: 'ITEM-SD-1' };
+                  }
+                  if (/FROM order_item_stations/i.test(sql)) {
+                    return { order_item_id: 'ITEM-SD-1', station_id: 'KS-SD-1', started_at: '2026-11-05T08:01:00.000Z', ready_at: null };
+                  }
+                  return null;
+                },
+                async run() {
+                  if (/UPDATE kitchen_stations/i.test(sql)) {
+                    stationUpdates.push({ sql, args });
+                  }
+                  if (/UPDATE orders/i.test(sql)) {
+                    orderUpdates.push({ sql, args });
+                  }
+                  return { success: true, meta: { changes: 1 } };
+                },
+              };
+            },
+            async all() {
+              if (/FROM kitchen_stations/i.test(sql)) {
+                return {
+                  results: [
+                    { id: 'KS-SD-1', name: 'Quầy Bar Sa Đéc', slug: 'bar-sadec', sort_order: 1, active: 1, tenant_id: 'sadec' },
+                  ],
+                };
+              }
+              return { results: [] };
+            },
+          };
+        },
+      };
+
+      const app = new Hono<{ Bindings: Env }>();
+      app.use('/*', async (c, next) => {
+        const forgedRole = c.req.header('X-Test-Role');
+        const forgedTenant = c.req.header('X-Test-User-Tenant');
+        if (forgedRole && forgedTenant) {
+          c.set('user' as never, { id: 'barista-1', role: forgedRole, tenantId: forgedTenant } as never);
+          c.set('tenantId' as never, forgedTenant as never);
+        } else {
+          c.set('tenantId' as never, 'hq' as never);
+        }
+        await next();
+      });
+      app.route('/api/kitchen-stations', kitchenStationsRouter);
+      const testEnv = { AURA_DB: stationDb, JWT_SECRET: TEST_SECRET } as unknown as Env;
+
+      // 1. HQ owner with tenantId: 'hq' lists store stations across stores
+      const listRes = await app.request(
+        'http://localhost/api/kitchen-stations',
+        { method: 'GET', headers: { Authorization: `Bearer ${hqToken}` } },
+        testEnv
+      );
+      expect(listRes.status).toBe(200);
+      const listJson = (await listRes.json()) as { data?: Array<{ id: string }> };
+      expect(listJson.data).toHaveLength(1);
+      expect(listJson.data?.[0]?.id).toBe('KS-SD-1');
+
+      // 2. HQ owner updates sadec station -> SQL binds sadec (not 'hq')
+      const patchRes = await app.request(
+        'http://localhost/api/kitchen-stations/KS-SD-1',
+        {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${hqToken}` },
+          body: JSON.stringify({ name: 'Quầy Pha Chế Sa Đéc' }),
+        },
+        testEnv
+      );
+      expect(patchRes.status).toBe(200);
+      expect(stationUpdates).toHaveLength(1);
+      expect(stationUpdates[0].args).toContain('sadec');
+
+      // 3. HQ owner starts ticket item with ?station_id=KS-SD-1 -> transitions order under station/order tenant ('sadec')
+      const startRes = await app.request(
+        'http://localhost/api/kitchen-stations/tickets/ORD-SD-1/items/ITEM-SD-1/start?station_id=KS-SD-1',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${hqToken}` },
+          body: JSON.stringify({}),
+        },
+        testEnv
+      );
+      expect(startRes.status).toBe(200);
+      expect(orderUpdates.length).toBeGreaterThanOrEqual(1);
+      expect(orderUpdates[0].args).toContain('sadec');
+
+      // 4. Non-HQ staff with forged 'hq' tenant override is rejected with 403
+      const baristaAccount = {
+        id: 'barista-sd-1',
+        name: 'Barista Sa Đéc',
+        phone: null,
+        role: 'barista',
+        tenant_id: 'sadec',
+        is_active: 1,
+        auth_version: 1,
+      };
+      const { token: baristaToken } = await issueStaffSession(
+        { JWT_SECRET: TEST_SECRET },
+        baristaAccount,
+        { email: 'barista@aura.vn', sessionType: 'staff-web' }
+      );
+      const baristaDb = {
+        ...stationDb,
+        prepare(sql: string) {
+          if (/FROM users WHERE id = \?/i.test(sql)) {
+            return { bind: () => ({ first: async () => baristaAccount }) };
+          }
+          return stationDb.prepare(sql);
+        },
+      };
+      const forgedRes = await app.request(
+        'http://localhost/api/kitchen-stations?tenant_id=hq',
+        {
+          method: 'GET',
+          headers: { Authorization: `Bearer ${baristaToken}` },
+        },
+        { AURA_DB: baristaDb, JWT_SECRET: TEST_SECRET } as unknown as Env
+      );
+      expect(forgedRes.status).toBe(403);
+    });
+
+    it('BF2: resolvePaymentTenantScope, paymentTenantScope, and reconcilePayOSPayment treat HQ SuperAdmin tenantId "hq" as wildcard "*"', async () => {
+      const { resolvePaymentTenantScope, paymentTenantScope, canAccessPaymentOrder } = await import('../../../../packages/domain/payment/policies/payment-access');
+      const { reconcilePayOSPayment } = await import('../../../../packages/domain/payment/commands/payos-reconcile');
+
+      const hqCtx = {
+        get(key: string) {
+          if (key === 'user') return { id: 'hq-admin-1', role: 'admin', tenantId: 'hq' };
+          if (key === 'tenantId') return 'hq';
+          return undefined;
+        },
+        req: {
+          query: () => undefined,
+          header: () => undefined,
+        },
+      };
+
+      const scope = resolvePaymentTenantScope(hqCtx);
+      expect(scope).toEqual({ tenantId: '*', wildcard: true });
+      expect(paymentTenantScope(hqCtx)).toBeNull();
+      expect(canAccessPaymentOrder(hqCtx, { tenant_id: 'sadec', customer_id: 'cust-1' })).toBe(true);
+
+      // Explicit store override narrows HQ scope to that store
+      const hqOverrideCtx = {
+        ...hqCtx,
+        req: {
+          query: (k: string) => (k === 'store_id' ? 'sadec' : undefined),
+          header: () => undefined,
+        },
+      };
+      expect(resolvePaymentTenantScope(hqOverrideCtx)).toEqual({ tenantId: 'sadec', wildcard: false });
+      expect(paymentTenantScope(hqOverrideCtx)).toBe('sadec');
+
+      // reconcilePayOSPayment accepts tenantId: 'hq' for a sadec payment
+      const mockPayDb = {
+        prepare() {
+          return {
+            bind() {
+              return {
+                async first() {
+                  return {
+                    id: 'pay-sd-1',
+                    order_id: 'ord-sd-1',
+                    method: 'payos',
+                    amount: 55000,
+                    status: 'completed',
+                    transaction_id: '12345678',
+                    payment_url: 'https://pay.payos.vn/web/link123',
+                    refund_status: null,
+                    order_total: 55000,
+                    order_payment_status: 'paid',
+                    order_payment_method: 'payos',
+                    order_status: 'confirmed',
+                    order_tenant_id: 'sadec',
+                  };
+                },
+              };
+            },
+          };
+        },
+      };
+
+      const reconRes = await reconcilePayOSPayment({
+        db: mockPayDb as never,
+        paymentId: 'pay-sd-1',
+        tenantId: 'hq',
+        clientId: 'cid',
+        apiKey: 'akey',
+        checksumKey: 'ckey',
+        source: 'manual',
+      });
+      expect(reconRes.ok).toBe(true);
+      expect(reconRes.status).toBe(200);
+      expect(reconRes.outcome).toBe('already_settled');
+    });
+
+    it('BF3: resolveOpenApiTablesTenant, tablesRouter, and reservationsRouter normalize HQ "hq" to wildcard "*" while rejecting non-HQ "hq" staff', async () => {
+      const { Hono } = await import('hono');
+      const { resolveOpenApiTablesTenant } = await import('../../routes/openapi-tables-handlers/helpers');
+      const { tablesRouter } = await import('../../../../packages/domain/table/commands/tables');
+      const { reservationsRouter } = await import('../../../../packages/domain/reservation/src/routes/reservations');
+
+      // 1. resolveOpenApiTablesTenant normalizes HQ 'hq' without override to '*'
+      const hqOpenApiCtx = {
+        get(key: string) {
+          if (key === 'user') return { id: 'hq-owner-1', role: 'owner', tenantId: 'hq' };
+          if (key === 'tenantId') return 'hq';
+          return undefined;
+        },
+        req: {
+          query: () => undefined,
+          header: () => undefined,
+        },
+        json: (body: unknown, status: number) => new Response(JSON.stringify(body), { status }),
+      };
+      const hqResolved = resolveOpenApiTablesTenant(hqOpenApiCtx, 'write');
+      expect(hqResolved).toEqual({ ok: true, tenantId: '*' });
+
+      // Non-HQ staff with 'hq' boundTenant is rejected with 403
+      const nonHqOpenApiCtx = {
+        ...hqOpenApiCtx,
+        get(key: string) {
+          if (key === 'user') return { id: 'waiter-1', role: 'waiter', tenantId: 'hq' };
+          if (key === 'tenantId') return 'hq';
+          return undefined;
+        },
+      };
+      const nonHqResolved = resolveOpenApiTablesTenant(nonHqOpenApiCtx, 'read');
+      expect(nonHqResolved.ok).toBe(false);
+      if (!nonHqResolved.ok) {
+        expect(nonHqResolved.response.status).toBe(403);
+      }
+
+      // 2. tablesRouter rejects non-HQ staff with X-Tenant-ID: hq (403)
+      const tableApp = new Hono<{ Bindings: Env }>();
+      tableApp.use('/*', async (c, next) => {
+        c.set('user' as never, { id: 'waiter-sd', role: 'waiter', tenantId: 'sadec' } as never);
+        c.set('tenantId' as never, 'sadec' as never);
+        await next();
+      });
+      tableApp.route('/api/tables', tablesRouter);
+
+      const tblRes = await tableApp.request(
+        'http://localhost/api/tables?tenant_id=hq',
+        { method: 'GET' },
+        { AURA_DB: {} } as unknown as Env
+      );
+      expect(tblRes.status).toBe(403);
+
+      // 3. reservationsRouter rejects non-HQ staff with X-Tenant-ID: hq (403)
+      const rsvApp = new Hono<{ Bindings: Env }>();
+      rsvApp.use('/*', async (c, next) => {
+        c.set('user' as never, { id: 'waiter-sd', role: 'waiter', tenantId: 'sadec' } as never);
+        c.set('tenantId' as never, 'sadec' as never);
+        await next();
+      });
+      rsvApp.route('/api/reservations', reservationsRouter);
+
+      const rsvRes = await rsvApp.request(
+        'http://localhost/api/reservations?tenant_id=hq',
+        { method: 'GET' },
+        { AURA_DB: {} } as unknown as Env
+      );
+      expect(rsvRes.status).toBe(403);
+    });
+
+    it('BF4: sopScope supports store_id/storeId query overrides for HQ admins and rejects "hq" / "*" wildcard scopes without a concrete store override', async () => {
+      const { sopScope, SopAccessError } = await import('../../../../packages/domain/sop/commands/sop-access');
+
+      // 1. HQ owner with ?store_id=sadec resolves to tenantId: 'sadec'
+      const hqStoreScope = sopScope(
+        {} as unknown as Env,
+        { id: 'hq-owner-1', email: 'hq@aurathink.vn', role: 'owner', tenantId: 'hq' },
+        {
+          req: {
+            query: (k: string) => (k === 'store_id' ? 'sadec' : undefined),
+            header: () => undefined,
+          },
+        }
+      );
+      expect(hqStoreScope.tenantId).toBe('sadec');
+
+      // 2. HQ owner with tenantId: 'hq' and no concrete store override throws SopAccessError(403)
+      expect(() =>
+        sopScope(
+          {} as unknown as Env,
+          { id: 'hq-owner-1', email: 'hq@aurathink.vn', role: 'owner', tenantId: 'hq' }
+        )
+      ).toThrow(SopAccessError);
+
+      // 3. Non-HQ staff with tenantId: 'hq' throws SopAccessError(403)
+      expect(() =>
+        sopScope(
+          {} as unknown as Env,
+          { id: 'staff-1', email: 'staff@aurathink.vn', role: 'barista', tenantId: 'hq' },
+          'sadec'
+        )
+      ).toThrow(SopAccessError);
+    });
+  });
+
+  // =========================================================================
+  // 60. Phase BG1–BG4: OpenAPI Orders HQ 'hq' Wildcard & Scoped Updates,
+  //     OpenAPI Categories/Products HQ 'hq' Wildcard & Concrete-Store Guards,
+  //     Domain Catalog Non-HQ 'hq' Rejection & Scoped Modifier Mutations, and
+  //     CRM Referral / Segments / Accrual / Reversal HQ 'hq' Wildcard & Store Attribution
+  // =========================================================================
+  describe('60. Phase BG1–BG4: OpenAPI Orders/Catalog HQ "hq" Wildcard, Domain Catalog Non-HQ "hq" Rejection, & CRM Referral Store Attribution', () => {
+    it('BG1: resolveOpenApiOrdersTenant normalizes HQ "hq" to "*" in read/write modes, supports X-Store-ID, rejects non-HQ "hq" with 403, and handleOpenApiUpdateOrder scopes UPDATE orders by effectiveOrderTenant', async () => {
+      const { Hono } = await import('hono');
+      const { resolveOpenApiOrdersTenant, isAllowedOrderLocationForTenant } = await import('../../routes/openapi-orders-handlers/helpers');
+      const { handleOpenApiUpdateOrder } = await import('../../routes/openapi-orders-handlers/order-write-handlers');
+
+      const makeCtx = (user: Record<string, unknown>, query: Record<string, string> = {}, headers: Record<string, string> = {}, ctxTenant = 'hq') => ({
+        get: (k: string) => (k === 'user' ? user : k === 'tenantId' ? ctxTenant : undefined),
+        req: {
+          query: (k: string) => query[k],
+          header: (k: string) => headers[k] ?? headers[k.toLowerCase()],
+        },
+        json: (body: unknown, status = 200) => new Response(JSON.stringify(body), { status }),
+      });
+
+      // 1. HQ owner with tenantId: 'hq' and no override resolves to '*' in both read and write modes
+      const hqRead = resolveOpenApiOrdersTenant(makeCtx({ id: 'hq-1', role: 'owner', tenantId: 'hq' }), 'read');
+      expect(hqRead).toEqual({ ok: true, tenantId: '*' });
+      const hqWrite = resolveOpenApiOrdersTenant(makeCtx({ id: 'hq-1', role: 'owner', tenantId: 'hq' }), 'write');
+      expect(hqWrite).toEqual({ ok: true, tenantId: '*' });
+
+      // 2. HQ owner with X-Store-ID: sadec resolves to 'sadec'
+      const hqStore = resolveOpenApiOrdersTenant(
+        makeCtx({ id: 'hq-1', role: 'owner', tenantId: 'hq' }, {}, { 'X-Store-ID': 'sadec' }),
+        'write'
+      );
+      expect(hqStore).toEqual({ ok: true, tenantId: 'sadec' });
+
+      // 3. Non-HQ staff with tenantId: 'hq' or X-Store-ID: 'hq' is rejected with 403
+      const nonHqBound = resolveOpenApiOrdersTenant(makeCtx({ id: 'st-1', role: 'staff', tenantId: 'hq' }, {}, {}, 'hq'), 'read');
+      expect(nonHqBound.ok).toBe(false);
+      if (!nonHqBound.ok) expect(nonHqBound.response.status).toBe(403);
+
+      const nonHqHeader = resolveOpenApiOrdersTenant(
+        makeCtx({ id: 'st-2', role: 'staff', tenantId: 'sadec' }, {}, { 'X-Store-ID': 'hq' }, 'sadec'),
+        'write'
+      );
+      expect(nonHqHeader.ok).toBe(false);
+      if (!nonHqHeader.ok) expect(nonHqHeader.response.status).toBe(403);
+
+      // 4. isAllowedOrderLocationForTenant treats 'hq' as wildcard
+      const locAllowed = await isAllowedOrderLocationForTenant({} as never, 'loc-sadec', 'hq');
+      expect(locAllowed).toBe(true);
+
+      // 5. handleOpenApiUpdateOrder under HQ 'hq' updates a 'sadec' order and binds 'sadec' on UPDATE orders
+      const updateBinds: Array<{ sql: string; args: unknown[] }> = [];
+      const mockDb = {
+        prepare: (sql: string) => ({
+          bind: (...args: unknown[]) => ({
+            first: async () => {
+              if (/FROM orders WHERE id = \?/i.test(sql)) {
+                return { id: 'ord-sd-1', status: 'pending', tenant_id: 'sadec', total: 55000 };
+              }
+              return null;
+            },
+            all: async () => ({ results: [] }),
+            run: async () => {
+              if (/UPDATE orders SET/i.test(sql)) {
+                updateBinds.push({ sql, args });
+              }
+              return { meta: { changes: 1 } };
+            },
+          }),
+        }),
+      };
+
+      const app = new Hono<{ Bindings: Env }>();
+      app.use('/*', async (c, next) => {
+        c.set('user' as never, { id: 'hq-1', role: 'owner', tenantId: 'hq' } as never);
+        c.set('tenantId' as never, 'hq' as never);
+        await next();
+      });
+      app.patch('/api/orders/:id', (c) => handleOpenApiUpdateOrder(c as never));
+
+      const patchRes = await app.request(
+        'http://localhost/api/orders/ord-sd-1',
+        {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ notes: 'HQ updated note' }),
+        },
+        { AURA_DB: mockDb } as unknown as Env
+      );
+      expect(patchRes.status).toBe(200);
+      expect(updateBinds.length).toBeGreaterThan(0);
+      expect(updateBinds[0].args).toContain('sadec');
+    });
+
+    it('BG2: OpenAPI Categories & Products normalize HQ "hq" to "*", require concrete store on POST (400), and reject non-HQ "hq" overrides (403)', async () => {
+      const { OpenAPIHono } = await import('@hono/zod-openapi');
+      const { resolveCatalogTenantId: resolveCatTenant, matchesCatalogTenant: matchCat } = await import('../../routes/openapi-categories-handlers/helpers');
+      const { registerCategoryMutationHandlers } = await import('../../routes/openapi-categories-handlers/mutation-handlers');
+      const { resolveCatalogTenantId: resolveProdTenant, matchesCatalogTenant: matchProd } = await import('../../routes/openapi-products-handlers/helpers');
+      const { registerProductMutationHandlers } = await import('../../routes/openapi-products-handlers/mutation-handlers');
+
+      expect(matchCat({ tenant_id: 'sadec' }, 'hq')).toBe(true);
+      expect(matchProd({ tenant_id: 'sadec' }, 'hq')).toBe(true);
+
+      const hqCatCtx = {
+        get: (k: string) => (k === 'user' ? { id: 'hq-1', role: 'owner', tenantId: 'hq' } : k === 'tenantId' ? 'hq' : undefined),
+        req: { query: () => undefined, header: () => undefined },
+      };
+      expect(resolveCatTenant(hqCatCtx)).toBe('*');
+      expect(resolveProdTenant(hqCatCtx)).toBe('*');
+
+      // 1. HQ owner with tenantId: 'hq' and no concrete store override gets 400 on POST /api/categories and POST /api/products
+      const hqApp = new OpenAPIHono<{ Bindings: Env }>();
+      hqApp.use('/*', async (c, next) => {
+        c.set('user' as never, { id: 'hq-1', role: 'owner', tenantId: 'hq' } as never);
+        c.set('tenantId' as never, 'hq' as never);
+        await next();
+      });
+      registerCategoryMutationHandlers(hqApp);
+      registerProductMutationHandlers(hqApp);
+
+      const validCatPayload = {
+        slug: 'coffee',
+        type: 'drink',
+        translations: [{ locale: 'vi', name: 'Cà phê' }],
+      };
+
+      const catPostHq = await hqApp.request(
+        'http://localhost/api/categories',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(validCatPayload),
+        },
+        { AURA_DB: {} } as unknown as Env
+      );
+      expect(catPostHq.status).toBe(400);
+
+      // 2. Non-HQ manager with ?store_id=hq gets 403 on POST /api/categories
+      const mgrApp = new OpenAPIHono<{ Bindings: Env }>();
+      mgrApp.use('/*', async (c, next) => {
+        c.set('user' as never, { id: 'mgr-sd', role: 'manager', tenantId: 'sadec' } as never);
+        c.set('tenantId' as never, 'sadec' as never);
+        await next();
+      });
+      registerCategoryMutationHandlers(mgrApp);
+
+      const catPostMgr = await mgrApp.request(
+        'http://localhost/api/categories?store_id=hq',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(validCatPayload),
+        },
+        { AURA_DB: {} } as unknown as Env
+      );
+      expect(catPostMgr.status).toBe(403);
+    });
+
+    it('BG3: Domain Catalog (categories, products, happy-hour, menu-modifiers) rejects non-HQ "hq" scopes/overrides with 403 and scopes modifier choice/link mutations by groupTenant', async () => {
+      const { Hono } = await import('hono');
+      const { categoriesRouter } = await import('../../../../packages/domain/catalog/commands/categories');
+      const { productsRouter } = await import('../../../../packages/domain/catalog/commands/products');
+      const { menuModifiersRouter } = await import('../../../../packages/domain/catalog/commands/menu-modifiers');
+
+      // 1. Non-HQ staff with tenantId: 'hq' is rejected with 403 on categoriesRouter and productsRouter
+      const catApp = new Hono<{ Bindings: Env }>();
+      catApp.use('/*', async (c, next) => {
+        c.set('user' as never, { id: 'st-hq', role: 'staff', tenantId: 'hq' } as never);
+        c.set('tenantId' as never, 'hq' as never);
+        await next();
+      });
+      catApp.route('/api/categories', categoriesRouter);
+      catApp.route('/api/products', productsRouter);
+
+      const catRes = await catApp.request('http://localhost/api/categories', { method: 'GET' }, { AURA_DB: {} } as unknown as Env);
+      expect(catRes.status).toBe(403);
+
+      const prodRes = await catApp.request('http://localhost/api/products', { method: 'GET' }, { AURA_DB: {} } as unknown as Env);
+      expect(prodRes.status).toBe(403);
+
+      // 2. menuModifiersRouter scopes DELETE /groups/:groupId/choices/:choiceId by groupTenant ('sadec')
+      const executedSql: Array<{ sql: string; args: unknown[] }> = [];
+      const mockModDb = {
+        prepare: (sql: string) => {
+          if (isAccountLookup(sql)) {
+            return accountStatement('owner', 'hq');
+          }
+          return {
+            bind: (...args: unknown[]) => ({
+              first: async () => {
+                if (/FROM modifier_groups WHERE id = \?/i.test(sql)) {
+                  return { id: 'mg-sd-1', name: 'Sugar', tenant_id: 'sadec', is_active: 1 };
+                }
+                if (/FROM modifier_choices WHERE id = \? AND group_id = \?/i.test(sql)) {
+                  return { id: 'mc-sd-1', name: '50% Sugar', price_delta: 0, is_available: 1 };
+                }
+                return null;
+              },
+              run: async () => {
+                executedSql.push({ sql, args });
+                return { meta: { changes: 1 } };
+              },
+            }),
+          };
+        },
+      };
+
+      const modApp = new Hono<{ Bindings: Env }>();
+      modApp.route('/api/menu-modifiers', menuModifiersRouter);
+
+      const delReq = await authRequest('DELETE', '/api/menu-modifiers/groups/mg-sd-1/choices/mc-sd-1', 'owner', 'hq');
+      const delChoiceRes = await modApp.fetch(
+        delReq,
+        createMockEnv({ AURA_DB: mockModDb as never, JWT_SECRET: TEST_JWT_SECRET })
+      );
+      expect(delChoiceRes.status).toBe(200);
+      const choiceDelete = executedSql.find((q) => /DELETE FROM modifier_choices/i.test(q.sql));
+      expect(choiceDelete).toBeDefined();
+      expect(choiceDelete?.args).toContain('sadec');
+    });
+
+    it('BG4: CRM referral (getOrCreateReferralCode, rewardReferralOnFirstOrder, reverseReferralCashback), segments, accrual, and refund-reversal normalize "hq" to wildcard and inherit store tenant_id', async () => {
+      const {
+        getOrCreateReferralCode,
+        rewardReferralOnFirstOrder,
+        reverseReferralCashback,
+        DEFAULT_REFERRAL_POLICY,
+      } = await import('../../../../packages/domain/crm/commands/referral');
+      const { getSegmentsKvKey, getBandPolicyKvKey } = await import('../../../../packages/domain/crm/commands/segments');
+
+      // 1. Segments KV keys treat 'hq' identically to '*' / 'default'
+      expect(getSegmentsKvKey('hq')).toBe('crm:segments');
+      expect(getBandPolicyKvKey('hq')).toBe('crm:band_policy');
+
+      // 2. Referral lifecycle under 'hq' inherits store tenant ('sadec') from customer and referral rows
+      const stampedTenants: Array<{ sql: string; args: unknown[] }> = [];
+      const mockCrmDb = {
+        prepare: (sql: string) => ({
+          bind: (...args: unknown[]) => ({
+            first: async () => {
+              if (/SELECT tenant_id FROM customers WHERE id = \?/i.test(sql)) {
+                return { tenant_id: 'sadec' };
+              }
+              if (/SELECT \* FROM referral_codes WHERE customer_id = \?/i.test(sql)) {
+                return null;
+              }
+              if (/SELECT \* FROM referrals WHERE referred_customer_id = \?/i.test(sql)) {
+                return {
+                  id: 'ref-sd-1',
+                  referrer_id: 'cust-ref-sd',
+                  referred_customer_id: 'cust-new-sd',
+                  referral_code: 'SADEC1',
+                  status: 'pending',
+                  tenant_id: 'sadec',
+                };
+              }
+              if (/SELECT \* FROM referrals WHERE id = \? AND status = 'completed'/i.test(sql)) {
+                return {
+                  id: 'ref-sd-1',
+                  referrer_id: 'cust-ref-sd',
+                  referred_customer_id: 'cust-new-sd',
+                  referral_code: 'SADEC1',
+                  status: 'completed',
+                  bonus_type: 'points',
+                  points_awarded: 50,
+                  cashback_awarded_vnd: 0,
+                  first_order_id: 'ord-sd-1',
+                  tenant_id: 'sadec',
+                };
+              }
+              if (/FROM customers WHERE id = \?/i.test(sql)) {
+                return {
+                  id: 'cust-ref-sd',
+                  loyalty_points: 100,
+                  lifetime_points: 200,
+                  loyalty_tier: 'silver',
+                  tenant_id: 'sadec',
+                };
+              }
+              return null;
+            },
+            run: async () => {
+              if (/SET tenant_id = \?|COALESCE\(NULLIF\(TRIM\(tenant_id\)/i.test(sql)) {
+                stampedTenants.push({ sql, args });
+              }
+              return { meta: { changes: 1 } };
+            },
+          }),
+        }),
+        batch: async () => [],
+      };
+
+      const createdCode = await getOrCreateReferralCode(mockCrmDb as never, 'cust-ref-sd', 'hq');
+      expect(createdCode.isNew).toBe(true);
+      expect(stampedTenants.some((q) => /UPDATE referral_codes SET tenant_id = \?/i.test(q.sql) && q.args[0] === 'sadec')).toBe(true);
+
+      const rewarded = await rewardReferralOnFirstOrder(
+        mockCrmDb as never,
+        'cust-new-sd',
+        'ord-sd-1',
+        120000,
+        { ...DEFAULT_REFERRAL_POLICY, bonusType: 'points', pointsReferrer: 50, pointsReferee: 0, minOrderVnd: 50000 },
+        'hq'
+      );
+      expect(rewarded.success).toBe(true);
+      expect(stampedTenants.some((q) => /UPDATE loyalty_point_logs SET tenant_id = \?/i.test(q.sql) && q.args[0] === 'sadec')).toBe(true);
+
+      const reversed = await reverseReferralCashback(mockCrmDb as never, 'ref-sd-1', 'hq');
+      expect(reversed.success).toBe(true);
+      expect(stampedTenants.some((q) => /UPDATE referrals SET status = 'reversed'/i.test(q.sql) && q.args.includes('sadec'))).toBe(true);
+    });
+  });
+
+  // ── 61. Phase BH1–BH4: CRM Campaigns & Dedup, Event Consumer & Consent, KDS Mobile & Cancel Rollback, and Catalog Pricing / Customer Menu / Order Ownership HQ 'hq' Wildcard Parity ──
+  describe('61. Phase BH1–BH4: CRM Campaigns, Event Consumer/Consent, KDS Mobile/Cancel Rollback, and Catalog Pricing HQ Wildcard Parity', () => {
+    it('BH1: Campaign detectors (detectWelcomeCandidates, detectCashbackExpiry) and dedup (deduplicate, logSend) treat hq as wildcard and stamp concrete store tenant_id', async () => {
+      const { detectWelcomeCandidates, detectCashbackExpiry, markExpiryNotified } = await import('@aura/domain-crm/commands/campaign/detect');
+      const { deduplicate, logSend } = await import('@aura/domain-crm/commands/campaign/dedup');
+
+      const campaignQueries: Array<{ sql: string; args: unknown[] }> = [];
+      const mockCampaignDb = {
+        prepare: (sql: string) => ({
+          bind: (...args: unknown[]) => ({
+            all: async () => {
+              campaignQueries.push({ sql, args });
+              if (/FROM customers c/i.test(sql)) {
+                return {
+                  results: [
+                    { id: 'cust-sd-1', name: 'Lan Sa Dec', phone: '0901112222', loyalty_tier: 'silver', total_spent: 150000, tenant_id: 'sadec' },
+                  ],
+                };
+              }
+              if (/FROM cashback_transactions ct/i.test(sql)) {
+                return {
+                  results: [
+                    { customer_id: 'cust-sd-1', name: 'Lan Sa Dec', phone: '0901112222', total_expiring: 25000, tenant_id: 'sadec' },
+                  ],
+                };
+              }
+              return { results: [] };
+            },
+            first: async () => {
+              campaignQueries.push({ sql, args });
+              if (/FROM campaign_logs/i.test(sql)) {
+                return { id: 'camp-1', tenant_id: 'sadec' };
+              }
+              if (/SELECT tenant_id FROM customers WHERE id = \?/i.test(sql)) {
+                return { tenant_id: 'sadec' };
+              }
+              return null;
+            },
+            run: async () => {
+              campaignQueries.push({ sql, args });
+              return { meta: { changes: 1 } };
+            },
+          }),
+        }),
+        batch: async (stmts: unknown[]) => stmts,
+      };
+
+      const welcome = await detectWelcomeCandidates(mockCampaignDb as never, 'hq');
+      expect(welcome).toHaveLength(1);
+      expect(welcome[0]?.id).toBe('cust-sd-1');
+
+      const expiring = await detectCashbackExpiry(mockCampaignDb as never, 'hq');
+      expect(expiring).toHaveLength(1);
+      expect(expiring[0]?.tenant_id).toBe('sadec');
+
+      const notifiedCount = await markExpiryNotified(mockCampaignDb as never, ['cust-sd-1'], 'hq');
+      expect(notifiedCount).toBe(1);
+
+      const isDup = await deduplicate(mockCampaignDb as never, 'cust-sd-1', 'welcome', 7, 'hq');
+      expect(isDup).toBe(true);
+
+      await logSend(
+        mockCampaignDb as never,
+        { customer_id: 'cust-sd-1', trigger: 'welcome', channel: 'zalo', sent: true },
+        'hq',
+      );
+      expect(
+        campaignQueries.some(
+          (q) => /UPDATE campaign_logs SET tenant_id = \?/i.test(q.sql) && q.args[0] === 'sadec',
+        ),
+      ).toBe(true);
+    });
+
+    it('BH2: consumeCrmEvent, updateConsent, getFulfillment, and placeOrder resolve concrete store tenant_id under hq wildcard', async () => {
+      const { consumeCrmEvent } = await import('@aura/domain-crm/commands/consume-crm-event');
+      const { updateConsent } = await import('@aura/domain-crm/commands/update-consent');
+      const { getFulfillment } = await import('@aura/domain-crm/commands/get-fulfillment');
+      const { placeOrder } = await import('@aura/domain-crm/commands/place-order');
+
+      const recordedSql: Array<{ sql: string; args: unknown[] }> = [];
+      const mockDb = {
+        prepare: (sql: string) => ({
+          bind: (...args: unknown[]) => ({
+            first: async () => {
+              recordedSql.push({ sql, args });
+              if (/SELECT tenant_id FROM orders WHERE id = \?/i.test(sql)) {
+                return { tenant_id: 'sadec' };
+              }
+              if (/SELECT id, status, order_type AS channel, customer_id, created_at, tenant_id FROM orders WHERE id = \?/i.test(sql)) {
+                return {
+                  id: 'ord-sd-99',
+                  status: 'pending',
+                  channel: 'pickup',
+                  customer_id: 'cust-sd-99',
+                  created_at: '2026-11-02T10:00:00.000Z',
+                  tenant_id: 'sadec',
+                };
+              }
+              if (/SELECT COUNT\(\*\) AS c FROM orders/i.test(sql)) {
+                return { c: 2 };
+              }
+              if (/SELECT id, tenant_id FROM customers WHERE id = \?/i.test(sql) || /SELECT tenant_id FROM customers WHERE id = \?/i.test(sql)) {
+                return { id: 'cust-sd-99', tenant_id: 'sadec' };
+              }
+              if (/FROM menu_items WHERE id = \?/i.test(sql)) {
+                return { id: 'item-sd-1', name: 'Cà Phê Sa Đéc', price: 35000, available: 1, tenant_id: 'sadec' };
+              }
+              return null;
+            },
+            all: async () => ({ results: [] }),
+            run: async () => {
+              recordedSql.push({ sql, args });
+              return { meta: { changes: 1 } };
+            },
+          }),
+        }),
+      };
+
+      const consentRes = await updateConsent(
+        mockDb as never,
+        {
+          customerId: 'cust-sd-99',
+          purpose: 'marketing',
+          granted: true,
+          source: 'staff_action',
+          actorId: 'hq-admin-1',
+          actorRole: 'owner',
+          tenantId: 'hq',
+        },
+        'hq',
+      );
+      expect(consentRes.ok).toBe(true);
+      expect(
+        recordedSql.some(
+          (q) => /INSERT INTO consents/i.test(q.sql) && q.args.includes('sadec'),
+        ),
+      ).toBe(true);
+
+      const fulfillmentRes = await getFulfillment(mockDb as never, 'ord-sd-99', undefined, undefined, 'hq');
+      expect(fulfillmentRes.ok).toBe(true);
+      if (fulfillmentRes.ok) {
+        expect(fulfillmentRes.fulfillment.queueDepth).toBe(2);
+      }
+
+      const orderRes = await placeOrder(mockDb as never, {
+        customerId: 'cust-sd-99',
+        customerPhone: '0909123456',
+        channel: 'pickup',
+        items: [{ menuItemId: 'item-sd-1', quantity: 2 }],
+        tenantId: 'hq',
+      });
+      expect(orderRes.ok).toBe(true);
+      expect(
+        recordedSql.some(
+          (q) => /INSERT INTO orders/i.test(q.sql) && q.args.includes('sadec'),
+        ),
+      ).toBe(true);
+
+      const eventRes = await consumeCrmEvent({
+        db: mockDb as never,
+        event: {
+          eventId: 'ev-hq-1',
+          eventType: 'order_created',
+          customerId: 'cust-sd-99',
+          orderId: 'ord-sd-99',
+          occurredAt: new Date().toISOString(),
+          payload: { channel: 'in_store', totalAmount: 70000, tenantId: 'hq' },
+        },
+      });
+      expect(eventRes.ok).toBe(true);
+    });
+
+    it('BH3: KDS Mobile rejects non-HQ hq scope (403), normalizes HQ hq to wildcard (*), and executeKdsStatusTransition resolves concrete store tenant on HQ cancel', async () => {
+      const { Hono } = await import('hono');
+      const { getKdsMobile } = await import('@aura/domain-kitchen/commands/kds-mobile');
+      const { executeKdsStatusTransition } = await import('@aura/domain-kitchen/commands/kds-status-transition');
+
+      const kdsSql: Array<{ sql: string; args: unknown[] }> = [];
+      const mockKdsDb = {
+        prepare: (sql: string) => ({
+          bind: (...args: unknown[]) => ({
+            all: async () => {
+              kdsSql.push({ sql, args });
+              return {
+                results: [
+                  {
+                    id: 'ord-kds-sd',
+                    order_number: 'ORD-SD-1',
+                    table_id: 'T1',
+                    table_name: 'Bàn 1',
+                    items: '[]',
+                    status: 'pending',
+                    order_type: 'dine_in',
+                    payment_status: 'unpaid',
+                    created_at: '2026-11-02T10:00:00Z',
+                    updated_at: '2026-11-02T10:00:00Z',
+                  },
+                ],
+              };
+            },
+            first: async () => {
+              kdsSql.push({ sql, args });
+              if (/SELECT id, status FROM orders WHERE id = \?/i.test(sql) || /SELECT \* FROM orders WHERE id = \?/i.test(sql)) {
+                return { id: 'ord-kds-sd', status: 'pending', tenant_id: 'sadec' };
+              }
+              if (/SELECT total, total_amount, tenant_id, customer_id, cashback_used FROM orders WHERE id = \?/i.test(sql)) {
+                return { total: 80000, tenant_id: 'sadec', customer_id: 'cust-sd-1', cashback_used: 10000 };
+              }
+              if (/FROM cashback_wallets WHERE customer_id = \?/i.test(sql)) {
+                return { id: 'wal-sd-1', balance: 5000 };
+              }
+              return null;
+            },
+            run: async () => {
+              kdsSql.push({ sql, args });
+              return { meta: { changes: 1 } };
+            },
+          }),
+        }),
+      };
+
+      const forgedApp = new Hono<{ Bindings: Record<string, unknown>; Variables: Record<string, unknown> }>();
+      forgedApp.use('*', async (c, next) => {
+        c.set('user', { id: 'barista-1', role: 'barista', tenantId: 'hq' });
+        c.set('tenantId', 'hq');
+        await next();
+      });
+      forgedApp.get('/mobile/kds/orders', (c) => getKdsMobile(c as never));
+
+      const forgedRes = await forgedApp.request('http://localhost/mobile/kds/orders', {}, { AURA_DB: mockKdsDb });
+      expect(forgedRes.status).toBe(403);
+
+      const hqApp = new Hono<{ Bindings: Record<string, unknown>; Variables: Record<string, unknown> }>();
+      hqApp.use('*', async (c, next) => {
+        c.set('user', { id: 'hq-owner', role: 'owner', tenantId: 'hq' });
+        c.set('tenantId', 'hq');
+        await next();
+      });
+      hqApp.get('/mobile/kds/orders', (c) => getKdsMobile(c as never));
+
+      const hqRes = await hqApp.request('http://localhost/mobile/kds/orders', {}, { AURA_DB: mockKdsDb });
+      expect(hqRes.status).toBe(200);
+      const hqBody = (await hqRes.json()) as { orders: Array<{ id: string }> };
+      expect(hqBody.orders).toHaveLength(1);
+
+      const cancelRes = await executeKdsStatusTransition(mockKdsDb as never, 'ord-kds-sd', 'cancelled', 'owner', {
+        tenantId: 'hq',
+      });
+      expect(cancelRes.success).toBe(true);
+      expect(
+        kdsSql.some(
+          (q) => /INSERT INTO cashback_transactions/i.test(q.sql) && q.args.includes('sadec'),
+        ),
+      ).toBe(true);
+    });
+
+    it('BH4: resolveServerProductPrice, getCustomerMenu, and claimGuestOrder treat hq as wildcard and inherit store tenant_id', async () => {
+      const { resolveServerProductPrice } = await import('@aura/domain-catalog/policies/pricing-resolver');
+      const { getCustomerMenu } = await import('@aura/domain-catalog/commands/get-customer-menu');
+      const { claimGuestOrder } = await import('@aura/domain-customer');
+
+      const mockCatalogDb = {
+        prepare: (sql: string) => ({
+          bind: (...args: unknown[]) => ({
+            first: async () => {
+              if (/FROM products WHERE id = \?/i.test(sql)) {
+                return { id: 'prod-sd-1', name: 'Trà Sen Sa Đéc', price: 45000, available: 1, category_id: 'tea', tenant_id: 'sadec' };
+              }
+              if (/FROM orders WHERE id = \?/i.test(sql)) {
+                return {
+                  id: 'ord-guest-sd',
+                  customer_id: null,
+                  customer_phone: '0909888777',
+                  total: 45000,
+                  order_type: 'dine_in',
+                  tenant_id: 'sadec',
+                };
+              }
+              return null;
+            },
+            all: async () => {
+              if (/FROM menu_items/i.test(sql)) {
+                return {
+                  results: [
+                    {
+                      id: 'prod-sd-1',
+                      name: 'Trà Sen Sa Đéc',
+                      description: 'Đặc sản Sa Đéc',
+                      price: 45000,
+                      category: 'tea',
+                      image_url: null,
+                      tags: '[]',
+                      available: 1,
+                      tenant_id: 'sadec',
+                    },
+                  ],
+                };
+              }
+              return { results: [] };
+            },
+            run: async () => ({ meta: { changes: 1 } }),
+          }),
+          all: async () => ({ results: [] }),
+        }),
+      };
+
+      const priceRes = await resolveServerProductPrice(mockCatalogDb as never, {
+        productId: 'prod-sd-1',
+        tenantId: 'hq',
+      });
+      expect(priceRes.available).toBe(true);
+      expect(priceRes.unitPriceCents).toBe(45000);
+
+      const menuRes = await getCustomerMenu(mockCatalogDb as never, { tenantId: 'hq' });
+      expect(menuRes.totalItems).toBe(1);
+      expect(menuRes.categories[0]?.items[0]?.id).toBe('prod-sd-1');
+
+      const claimRes = await claimGuestOrder({
+        db: mockCatalogDb as never,
+        orderId: 'ord-guest-sd',
+        actor: { id: 'hq-owner-1', role: 'owner' },
+        tenantId: 'hq',
+      });
+      expect(claimRes.success).toBe(true);
+    });
+  });
+
+  // =========================================================================
+  // Suite 62: Phase BI1–BI4 — Inventory Order Deduction & Restoration, BOM & Canonical Recipe Policy,
+  //           Purchasing Route & Receiving Policy, and Order Transition / Notifications / Side-Effects / PayOS Attempt HQ 'hq' Wildcard
+  // =========================================================================
+  describe('Suite 62: Phase BI1–BI4 — Inventory Order Deduction, BOM/Recipe Policy, Purchasing/Receiving & Order/PayOS HQ Wildcard', () => {
+    it('BI1: restoreInventoryForOrder and deductInventoryForOrder normalize hq to wildcard and resolve orders.tenant_id', async () => {
+      const { restoreInventoryForOrder, deductInventoryForOrder } = await import('@aura/domain-inventory');
+
+      const executedSql: Array<{ sql: string; args: unknown[] }> = [];
+      const mockInvDb = {
+        prepare: (sql: string) => ({
+          bind: (...args: unknown[]) => ({
+            first: async () => {
+              executedSql.push({ sql, args });
+              if (/FROM orders WHERE id = \?/i.test(sql)) {
+                return { id: 'ord-sd-bi1', status: 'confirmed', payment_status: 'paid', tenant_id: 'sadec' };
+              }
+              if (/FROM inventory_items WHERE id = \?/i.test(sql)) {
+                return { id: 'item-sd-1', current_stock: 20, tenant_id: 'sadec' };
+              }
+              return null;
+            },
+            all: async () => {
+              executedSql.push({ sql, args });
+              if (/FROM inventory_transactions/i.test(sql) && /reference_id = \?/i.test(sql)) {
+                return {
+                  results: [{ id: 'tx-res-sd-1', item_id: 'item-sd-1', quantity: -2, tenant_id: 'sadec' }],
+                };
+              }
+              return { results: [] };
+            },
+            run: async () => {
+              executedSql.push({ sql, args });
+              return { meta: { changes: 1 } };
+            },
+          }),
+        }),
+        batch: async (ops: Array<{ run?: () => Promise<unknown> }>) => {
+          for (const op of ops) {
+            if (typeof op?.run === 'function') await op.run();
+          }
+          return [];
+        },
+      };
+
+      await restoreInventoryForOrder({ AURA_DB: mockInvDb as never }, 'ord-sd-bi1', 'hq');
+      expect(
+        executedSql.some(
+          (q) =>
+            /INSERT INTO inventory_transactions/i.test(q.sql) &&
+            q.args.includes('release') &&
+            q.args.includes('sadec')
+        )
+      ).toBe(true);
+
+      executedSql.length = 0;
+      const mockDeductDb = {
+        prepare: (sql: string) => ({
+          bind: (...args: unknown[]) => ({
+            first: async () => {
+              executedSql.push({ sql, args });
+              if (/FROM orders WHERE id = \?/i.test(sql)) {
+                return { id: 'ord-sd-bi1-ded', status: 'completed', payment_status: 'paid', tenant_id: 'sadec' };
+              }
+              if (/FROM recipes WHERE product_id = \?/i.test(sql)) {
+                return { id: 'rec-sd-1', product_id: 'prod-sd-1', name: 'Cà Phê Sa Đéc', tenant_id: 'sadec' };
+              }
+              if (/FROM ingredients WHERE id = \?/i.test(sql)) {
+                return { id: 'ing-sd-1', current_stock: 100, tenant_id: 'sadec' };
+              }
+              return null;
+            },
+            all: async () => {
+              executedSql.push({ sql, args });
+              if (/FROM recipe_items ri/i.test(sql)) {
+                return {
+                  results: [{ ingredient_id: 'ing-sd-1', quantity: 15, unit: 'g', ing_name: 'Hạt Cafe', cost_per_unit: 500 }],
+                };
+              }
+              return { results: [] };
+            },
+            run: async () => {
+              executedSql.push({ sql, args });
+              return { meta: { changes: 1 } };
+            },
+          }),
+        }),
+        batch: async () => [],
+      };
+
+      await deductInventoryForOrder(
+        { AURA_DB: mockDeductDb as never },
+        'ord-sd-bi1-ded',
+        [{ product_id: 'prod-sd-1', quantity: 2 }],
+        'hq'
+      );
+      expect(
+        executedSql.some(
+          (q) => /INSERT INTO stock_movements/i.test(q.sql) && q.args.includes('sadec')
+        )
+      ).toBe(true);
+    });
+
+    it('BI2: getRecipeForProduct, deductIngredientsForOrder, getCanonicalRecipe, and deductOrderStock treat hq as wildcard and inherit store tenant_id', async () => {
+      const {
+        getRecipeForProduct,
+        deductIngredientsForOrder,
+        getCanonicalRecipe,
+        deductOrderStock,
+      } = await import('@aura/domain-inventory');
+
+      const executedSql: Array<{ sql: string; args: unknown[] }> = [];
+      const mockBomDb = {
+        prepare: (sql: string) => ({
+          bind: (...args: unknown[]) => ({
+            first: async () => {
+              executedSql.push({ sql, args });
+              if (/FROM orders WHERE id = \?/i.test(sql)) {
+                return { id: 'ord-sd-bi2', tenant_id: 'sadec' };
+              }
+              if (/FROM recipes WHERE product_id = \?/i.test(sql)) {
+                return { id: 'rec-sd-bi2', product_id: 'prod-sd-bi2', name: 'Bạc Xỉu Sa Đéc', tenant_id: 'sadec' };
+              }
+              if (/FROM ingredients WHERE id = \?/i.test(sql)) {
+                return { id: 'ing-sd-bi2', current_stock: 200, tenant_id: 'sadec' };
+              }
+              return null;
+            },
+            all: async () => {
+              executedSql.push({ sql, args });
+              if (/FROM recipe_items ri/i.test(sql)) {
+                return {
+                  results: [{ ingredient_id: 'ing-sd-bi2', quantity: 20, unit: 'ml', ing_name: 'Sữa Đặc', cost_per_unit: 300 }],
+                };
+              }
+              return { results: [] };
+            },
+            run: async () => {
+              executedSql.push({ sql, args });
+              return { meta: { changes: 1 } };
+            },
+          }),
+        }),
+        batch: async (ops: Array<{ run?: () => Promise<unknown> }>) => {
+          for (const op of ops) {
+            if (typeof op?.run === 'function') await op.run();
+          }
+          return [];
+        },
+      };
+
+      const recipeComponents = await getRecipeForProduct(mockBomDb as never, 'prod-sd-bi2', 'hq');
+      expect(recipeComponents).toEqual([{ ingredient_id: 'ing-sd-bi2', quantity: 20, unit: 'ml', ing_name: 'Sữa Đặc', cost_per_unit: 300 }]);
+
+      const canonicalRecipe = await getCanonicalRecipe(mockBomDb as never, 'prod-sd-bi2', 'hq');
+      expect(canonicalRecipe?.id).toBe('rec-sd-bi2');
+      expect(canonicalRecipe?.components).toHaveLength(1);
+
+      await deductIngredientsForOrder(
+        { AURA_DB: mockBomDb as never },
+        'ord-sd-bi2',
+        [{ product_id: 'prod-sd-bi2', quantity: 1 }],
+        'hq'
+      );
+      expect(
+        executedSql.some(
+          (q) => /INSERT INTO inventory_transactions/i.test(q.sql) && q.args.includes('sadec')
+        )
+      ).toBe(true);
+
+      executedSql.length = 0;
+      const deductRes = await deductOrderStock(
+        mockBomDb as never,
+        'ord-sd-bi2',
+        [{ productId: 'prod-sd-bi2', quantity: 2 }],
+        { tenantId: 'hq' }
+      );
+      expect(deductRes.ok).toBe(true);
+      expect(
+        executedSql.some(
+          (q) => /INSERT INTO stock_movements/i.test(q.sql) && q.args.includes('sadec')
+        )
+      ).toBe(true);
+    });
+
+    it('BI3: purchasing routes and receivePurchaseOrder/cancelPurchaseOrder support X-Store-ID, reject non-HQ hq scope, and inherit store tenant_id for HQ', async () => {
+      const { Hono } = await import('hono');
+      const { purchasing } = await import('@aura/domain-inventory/src/routes/purchasing');
+      const { receivePurchaseOrder, cancelPurchaseOrder } = await import('@aura/domain-inventory');
+
+      const executedSql: Array<{ sql: string; args: unknown[] }> = [];
+      let poStatus = 'ordered';
+      const mockPoDb = {
+        prepare: (sql: string) => ({
+          bind: (...args: unknown[]) => ({
+            first: async () => {
+              executedSql.push({ sql, args });
+              if (/FROM purchase_orders WHERE id = \?/i.test(sql)) {
+                return { id: 'po-sd-bi3', po_number: 'PO-SD01', status: poStatus, supplier_id: 'sup-sd-1', tenant_id: 'sadec' };
+              }
+              return null;
+            },
+            all: async () => {
+              executedSql.push({ sql, args });
+              if (/FROM purchase_order_items WHERE purchase_order_id = \?/i.test(sql)) {
+                return {
+                  results: [
+                    { id: 'poi-sd-1', ingredient_id: 'ing-sd-1', quantity: 10, unit_price: 50000, received_quantity: 0, tenant_id: 'sadec' },
+                  ],
+                };
+              }
+              if (/FROM suppliers/i.test(sql)) {
+                return {
+                  results: [{ id: 'sup-sd-1', name: 'Viva Star Sa Đéc', is_active: 1, tenant_id: 'sadec' }],
+                };
+              }
+              return { results: [] };
+            },
+            run: async () => {
+              executedSql.push({ sql, args });
+              return { meta: { changes: 1 } };
+            },
+          }),
+        }),
+        batch: async () => [],
+      };
+
+      const staffSpoofApp = new Hono();
+      staffSpoofApp.use('*', async (c, next) => {
+        c.set('user', { id: 'mgr-1', role: 'manager', tenantId: 'sadec' });
+        c.set('tenantId', 'sadec');
+        await next();
+      });
+      purchasing(staffSpoofApp as never);
+
+      const spoofRes = await staffSpoofApp.request(
+        'http://localhost/suppliers',
+        { headers: { 'X-Store-ID': 'hq' } },
+        { AURA_DB: mockPoDb }
+      );
+      expect(spoofRes.status).toBe(403);
+
+      const hqStoreApp = new Hono();
+      hqStoreApp.use('*', async (c, next) => {
+        c.set('user', { id: 'hq-admin-1', role: 'owner', tenantId: 'hq' });
+        c.set('tenantId', 'hq');
+        await next();
+      });
+      purchasing(hqStoreApp as never);
+
+      const hqSupRes = await hqStoreApp.request(
+        'http://localhost/suppliers',
+        { headers: { 'X-Store-ID': 'sadec' } },
+        { AURA_DB: mockPoDb }
+      );
+      expect(hqSupRes.status).toBe(200);
+
+      const rcvRes = await receivePurchaseOrder(
+        mockPoDb as never,
+        'po-sd-bi3',
+        [{ ingredientId: 'ing-sd-1', receivedQuantity: 5 }],
+        { tenantId: 'hq', receiptId: 'grn-sd-bi3' }
+      );
+      expect(rcvRes.ok).toBe(true);
+      expect(rcvRes.status).toBe('partially_received');
+      expect(
+        executedSql.some(
+          (q) => /INSERT INTO stock_movements/i.test(q.sql) && q.args.includes('sadec')
+        )
+      ).toBe(true);
+
+      poStatus = 'ordered';
+      const cancelRes = await cancelPurchaseOrder(mockPoDb as never, 'po-sd-bi3', 'hq');
+      expect(cancelRes.ok).toBe(true);
+      expect(
+        executedSql.some(
+          (q) => /UPDATE purchase_orders SET status = 'cancelled'/i.test(q.sql) && q.args.includes('sadec')
+        )
+      ).toBe(true);
+    });
+
+    it('BI4: transitionOrderStatus, runPostOrderSideEffects, and getOrCreatePayOSAttempt normalize hq to wildcard and resolve orders.tenant_id', async () => {
+      const { transitionOrderStatus } = await import('@aura/domain-order/policies/order-status-transition');
+      const { runPostOrderSideEffects } = await import('@aura/domain-order/commands/create-order-side-effects');
+      const { getOrCreatePayOSAttempt } = await import('@aura/domain-payment/commands/payos-attempt');
+
+      const executedSql: Array<{ sql: string; args: unknown[] }> = [];
+      const mockBi4Db = {
+        prepare: (sql: string) => ({
+          bind: (...args: unknown[]) => ({
+            first: async () => {
+              executedSql.push({ sql, args });
+              if (/FROM orders WHERE id = \?/i.test(sql)) {
+                return {
+                  id: 'ord-sd-bi4',
+                  status: 'pending',
+                  order_type: 'dine_in',
+                  payment_status: 'paid',
+                  tenant_id: 'sadec',
+                };
+              }
+              return null;
+            },
+            all: async () => {
+              executedSql.push({ sql, args });
+              if (/FROM payments WHERE order_id = \?/i.test(sql)) {
+                return {
+                  results: [
+                    {
+                      id: 'payos:ord-sd-bi4',
+                      order_id: 'ord-sd-bi4',
+                      amount: 55000,
+                      transaction_id: '12345678',
+                      payment_url: 'https://pay.payos.vn/web/linkbi4',
+                      status: 'pending',
+                      tenant_id: 'sadec',
+                      created_at: new Date().toISOString(),
+                      updated_at: new Date().toISOString(),
+                    },
+                  ],
+                };
+              }
+              return { results: [] };
+            },
+            run: async () => {
+              executedSql.push({ sql, args });
+              return { meta: { changes: 1 } };
+            },
+          }),
+        }),
+        batch: async () => [],
+      };
+
+      const transRes = await transitionOrderStatus(mockBi4Db as never, 'ord-sd-bi4', 'confirmed', 'owner', {
+        tenantId: 'hq',
+      });
+      expect(transRes.success).toBe(true);
+      expect(
+        executedSql.some(
+          (q) => /UPDATE orders SET status = \?/i.test(q.sql) && q.args.includes('sadec')
+        )
+      ).toBe(true);
+
+      executedSql.length = 0;
+      await runPostOrderSideEffects({
+        db: mockBi4Db as never,
+        env: { AURA_DB: mockBi4Db },
+        orderId: 'ord-sd-bi4',
+        tenantId: 'hq',
+        data: {
+          customer_name: 'Khách Sa Đéc',
+          customer_phone: '0909123456',
+          customer_email: 'khach.sadec@aura.vn',
+        },
+        snapshot: {
+          items: [],
+          subtotal: 55000,
+          discount: 0,
+          shippingFee: 0,
+          total: 55000,
+          loyaltyPointsUsed: 0,
+          cashbackUsed: 0,
+        } as never,
+        validatedMethod: 'cash',
+        resolvedTableId: null,
+      });
+      expect(
+        executedSql.some(
+          (q) => /INSERT INTO customers/i.test(q.sql) && q.args.includes('sadec')
+        )
+      ).toBe(true);
+
+      executedSql.length = 0;
+      const attemptRes = await getOrCreatePayOSAttempt({
+        db: mockBi4Db as never,
+        orderId: 'ord-sd-bi4',
+        amount: 55000,
+        clientId: 'cid',
+        apiKey: 'key',
+        checksumKey: 'chk',
+        description: 'Order SD BI4',
+        returnUrl: 'https://aura.vn/return',
+        cancelUrl: 'https://aura.vn/cancel',
+        tenantId: 'hq',
+      });
+      expect(attemptRes.ok).toBe(true);
+      expect(
+        executedSql.some(
+          (q) => /FROM payments WHERE order_id = \?/i.test(q.sql) && q.args.includes('sadec')
+        )
+      ).toBe(true);
+    });
+  });
+
+  // =========================================================================
+  // Suite 63: Phase BJ1–BJ4 — Inventory CRUD/Snapshots/Transactions Conflicting-Override & Context Tenant,
+  //           Table Availability & Reservation Lifecycle Policies HQ 'hq' Wildcard,
+  //           Reservations/Tables/QR Scan X-Store-ID & Conflicting-Override Guards,
+  //           and Payment Access Policy & PayOS Create-Link Conflicting-Override & 'hq' Normalization
+  // =========================================================================
+  describe('Suite 63: Phase BJ1–BJ4 — Inventory CRUD/Snapshots/Transactions, Table/Reservation Policies, Reservations/Tables/QR & Payment Access HQ Wildcard', () => {
+    it('BJ1: inventoryCRUD, inventorySnapshots, and inventoryTransactions support c.get("tenantId") fallback and reject conflicting overrides or non-HQ hq scopes', async () => {
+      const { Hono } = await import('hono');
+      const { inventoryCRUD } = await import('@aura/domain-inventory/src/routes/inventory-crud');
+      const { inventorySnapshots } = await import('@aura/domain-inventory/src/routes/inventory-snapshots');
+      const { inventoryTransactions } = await import('@aura/domain-inventory/src/routes/inventory-transactions');
+
+      const mockInvDb = {
+        prepare: (sql: string) => ({
+          bind: () => ({
+            first: async () => {
+              if (/FROM inventory_items WHERE id = \?/i.test(sql)) {
+                return { id: 'inv-sd-bj1', sku: 'SKU-SD1', name: 'Sữa Tươi', current_stock: 15, tenant_id: 'sadec' };
+              }
+              return null;
+            },
+            all: async () => {
+              if (/FROM inventory_items/i.test(sql)) {
+                return {
+                  results: [{ id: 'inv-sd-bj1', sku: 'SKU-SD1', name: 'Sữa Tươi', current_stock: 15, tenant_id: 'sadec' }],
+                };
+              }
+              if (/FROM inventory_snapshots/i.test(sql)) {
+                return {
+                  results: [{ id: 'snap-sd-1', item_id: 'inv-sd-bj1', date: '2026-11-02', opening_stock: 10, closing_stock: 15, tenant_id: 'sadec' }],
+                };
+              }
+              if (/FROM inventory_transactions/i.test(sql)) {
+                return {
+                  results: [{ id: 'tx-sd-1', item_id: 'inv-sd-bj1', type: 'in', quantity: 5, tenant_id: 'sadec' }],
+                };
+              }
+              return { results: [] };
+            },
+            run: async () => ({ meta: { changes: 1 } }),
+          }),
+        }),
+        batch: async () => [],
+      };
+
+      const ctxBoundApp = new Hono();
+      ctxBoundApp.use('*', async (c, next) => {
+        c.set('user', { id: 'mgr-ctx-1', role: 'manager' });
+        c.set('tenantId', 'sadec');
+        await next();
+      });
+      inventoryCRUD(ctxBoundApp as never);
+      inventorySnapshots(ctxBoundApp as never);
+      inventoryTransactions(ctxBoundApp as never);
+
+      // 1. Store manager with tenant bound via c.set('tenantId', 'sadec') succeeds on GET /, GET /:id/snapshots, and GET /:id/transactions
+      const listRes = await ctxBoundApp.request('http://localhost/', {}, { AURA_DB: mockInvDb });
+      expect(listRes.status).toBe(200);
+      const snapRes = await ctxBoundApp.request('http://localhost/inv-sd-bj1/snapshots', {}, { AURA_DB: mockInvDb });
+      expect(snapRes.status).toBe(200);
+      const txRes = await ctxBoundApp.request('http://localhost/inv-sd-bj1/transactions', {}, { AURA_DB: mockInvDb });
+      expect(txRes.status).toBe(200);
+
+      // 2. Conflicting query + header overrides (?tenant_id=sadec & X-Store-ID: cantho) are rejected with 403 even for HQ admin
+      const hqConflictApp = new Hono();
+      hqConflictApp.use('*', async (c, next) => {
+        c.set('user', { id: 'hq-owner-bj1', role: 'owner', tenantId: 'hq' });
+        c.set('tenantId', 'hq');
+        await next();
+      });
+      inventoryCRUD(hqConflictApp as never);
+      inventorySnapshots(hqConflictApp as never);
+      inventoryTransactions(hqConflictApp as never);
+
+      const conflictCrudRes = await hqConflictApp.request(
+        'http://localhost/?tenant_id=sadec',
+        { headers: { 'X-Store-ID': 'cantho' } },
+        { AURA_DB: mockInvDb }
+      );
+      expect(conflictCrudRes.status).toBe(403);
+
+      const conflictSnapRes = await hqConflictApp.request(
+        'http://localhost/inv-sd-bj1/snapshots?tenant_id=sadec',
+        { headers: { 'X-Store-ID': 'cantho' } },
+        { AURA_DB: mockInvDb }
+      );
+      expect(conflictSnapRes.status).toBe(403);
+
+      const conflictTxRes = await hqConflictApp.request(
+        'http://localhost/inv-sd-bj1/transactions?tenant_id=sadec',
+        { headers: { 'X-Store-ID': 'cantho' } },
+        { AURA_DB: mockInvDb }
+      );
+      expect(conflictTxRes.status).toBe(403);
+    });
+
+    it('BJ2: matchesOperatingUnit, validateOrderTable, createCanonicalReservation, updateReservationStatus, seatTable, and releaseTable normalize hq to wildcard and inherit store tenant_id', async () => {
+      const {
+        matchesOperatingUnit,
+        validateOrderTable,
+        createCanonicalReservation,
+        updateReservationStatus,
+        seatTable,
+        releaseTable,
+      } = await import('@aura/domain-table');
+
+      expect(matchesOperatingUnit({ id: 't-sd-1', tenant_id: 'sadec' }, 'hq')).toBe(true);
+
+      const executedSql: Array<{ sql: string; args: unknown[] }> = [];
+      let currentTableStatus = 'Available';
+      const mockTableDb = {
+        prepare: (sql: string) => ({
+          bind: (...args: unknown[]) => ({
+            first: async () => {
+              executedSql.push({ sql, args });
+              if (/FROM cafe_tables WHERE id = \?/i.test(sql)) {
+                return {
+                  id: 't-sd-bj2',
+                  table_number: 5,
+                  zone: 'Indoor',
+                  capacity: 4,
+                  status: currentTableStatus,
+                  tenant_id: 'sadec',
+                };
+              }
+              if (/FROM reservations WHERE id = \?/i.test(sql)) {
+                return {
+                  id: 'rsv-sd-bj2',
+                  table_id: 't-sd-bj2',
+                  customer_name: 'Khách Sa Đéc',
+                  customer_phone: '0909111222',
+                  guest_count: 2,
+                  date: '2026-11-10',
+                  time: '18:00',
+                  status: 'confirmed',
+                  tenant_id: 'sadec',
+                };
+              }
+              return null;
+            },
+            all: async () => {
+              executedSql.push({ sql, args });
+              return { results: [] };
+            },
+            run: async () => {
+              executedSql.push({ sql, args });
+              return { meta: { changes: 1 } };
+            },
+          }),
+        }),
+      };
+
+      const checkRes = await validateOrderTable(mockTableDb as never, 't-sd-bj2', 'hq');
+      expect(checkRes.ok).toBe(true);
+      expect(checkRes.table?.tenant_id).toBe('sadec');
+
+      const createRes = await createCanonicalReservation(mockTableDb as never, {
+        tableId: 't-sd-bj2',
+        customerName: 'Khách Sa Đéc',
+        customerPhone: '0909111222',
+        guestCount: 2,
+        date: '2026-11-10',
+        time: '18:00',
+        operatingUnitId: 'hq',
+      });
+      expect(createRes.ok).toBe(true);
+      expect(createRes.reservation?.tenant_id).toBe('sadec');
+
+      const seatRes = await seatTable(mockTableDb as never, {
+        tableId: 't-sd-bj2',
+        reservationId: 'rsv-sd-bj2',
+        operatingUnitId: 'hq',
+      });
+      expect(seatRes.ok).toBe(true);
+      expect(
+        executedSql.some(
+          (q) => /UPDATE cafe_tables SET status = 'Occupied'/i.test(q.sql) && q.args.includes('sadec')
+        )
+      ).toBe(true);
+
+      currentTableStatus = 'Occupied';
+      executedSql.length = 0;
+      const releaseRes = await releaseTable(mockTableDb as never, 't-sd-bj2', 'hq');
+      expect(releaseRes.ok).toBe(true);
+      expect(
+        executedSql.some(
+          (q) => /UPDATE cafe_tables SET status = 'Available'/i.test(q.sql) && q.args.includes('sadec')
+        )
+      ).toBe(true);
+
+      executedSql.length = 0;
+      const statusRes = await updateReservationStatus(mockTableDb as never, 'rsv-sd-bj2', 'cancelled', 'Guest cancelled', 'hq');
+      expect(statusRes.ok).toBe(true);
+      expect(
+        executedSql.some(
+          (q) => /UPDATE reservations/i.test(q.sql) && q.args.includes('sadec')
+        )
+      ).toBe(true);
+    });
+
+    it('BJ3: reservationsRouter, tablesRouter, and qrRouter support X-Store-ID override, reject conflicting tenant overrides (403), and normalize HQ hq to wildcard', async () => {
+      const { Hono } = await import('hono');
+      const { reservationsRouter } = await import('@aura/domain-reservation/src/routes/reservations');
+      const { tablesRouter } = await import('@aura/domain-table/commands/tables');
+      const { qrRouter } = await import('@aura/domain-table/commands/qr-scan');
+      const { signQRUrl } = await import('../../tree/qr/signer');
+
+      const mockRsvTableDb = {
+        prepare: (sql: string) => ({
+          bind: () => ({
+            first: async () => {
+              if (/FROM table_qr_codes/i.test(sql)) {
+                return { table_id: 't-sd-bj3', slug: 'ban-5-sd', is_active: 1, tenant_id: 'sadec' };
+              }
+              if (/FROM cafe_tables WHERE id = \?/i.test(sql)) {
+                return { id: 't-sd-bj3', table_number: 5, zone: 'Indoor', status: 'Available', is_active: 1, tenant_id: 'sadec' };
+              }
+              return null;
+            },
+            all: async () => {
+              if (/FROM cafe_tables/i.test(sql)) {
+                return {
+                  results: [{ id: 't-sd-bj3', table_number: 5, zone: 'Indoor', status: 'Available', capacity: 4, tenant_id: 'sadec' }],
+                };
+              }
+              if (/FROM reservations/i.test(sql)) {
+                return {
+                  results: [{ id: 'rsv-sd-bj3', table_id: 't-sd-bj3', date: '2026-11-10', time: '19:00', status: 'confirmed', tenant_id: 'sadec' }],
+                };
+              }
+              return { results: [] };
+            },
+            run: async () => ({ meta: { changes: 1 } }),
+          }),
+          all: async () => ({
+            results: [{ id: 't-sd-bj3', table_number: 5, zone: 'Indoor', status: 'Available', capacity: 4, tenant_id: 'sadec' }],
+          }),
+        }),
+      };
+
+      const hqApp = new Hono();
+      hqApp.use('*', async (c, next) => {
+        c.set('user', { id: 'hq-owner-bj3', role: 'owner', tenantId: 'hq' });
+        c.set('tenantId', 'hq');
+        await next();
+      });
+      hqApp.route('/reservations', reservationsRouter as never);
+      hqApp.route('/tables', tablesRouter as never);
+
+      // 1. Conflicting query + header overrides are rejected with 403 on reservations and tables
+      const rsvConflictRes = await hqApp.request(
+        'http://localhost/reservations?tenant_id=sadec',
+        { headers: { 'X-Store-ID': 'cantho' } },
+        { AURA_DB: mockRsvTableDb }
+      );
+      expect(rsvConflictRes.status).toBe(403);
+
+      const tblConflictRes = await hqApp.request(
+        'http://localhost/tables?tenant_id=sadec',
+        { headers: { 'X-Store-ID': 'cantho' } },
+        { AURA_DB: mockRsvTableDb }
+      );
+      expect(tblConflictRes.status).toBe(403);
+
+      // 2. HQ owner with X-Store-ID: sadec lists sadec reservations and tables
+      const rsvStoreRes = await hqApp.request(
+        'http://localhost/reservations',
+        { headers: { 'X-Store-ID': 'sadec' } },
+        { AURA_DB: mockRsvTableDb }
+      );
+      expect(rsvStoreRes.status).toBe(200);
+
+      const tblStoreRes = await hqApp.request(
+        'http://localhost/tables',
+        { headers: { 'X-Store-ID': 'sadec' } },
+        { AURA_DB: mockRsvTableDb }
+      );
+      expect(tblStoreRes.status).toBe(200);
+
+      // 3. qrRouter supports X-Store-ID: sadec and ?store_id=hq wildcard
+      const signedUrl = await signQRUrl('ban-5-sd', 'qr-secret-bj3', 'http://localhost');
+      const parsedUrl = new URL(signedUrl);
+      const ts = parsedUrl.searchParams.get('ts');
+      const sig = parsedUrl.searchParams.get('sig');
+
+      const qrApp = new Hono();
+      qrApp.route('/qr', qrRouter as never);
+      const qrRes = await qrApp.request(
+        `http://localhost/qr/ban-5-sd?ts=${ts}&sig=${sig}`,
+        { headers: { 'X-Store-ID': 'sadec', host: 'localhost:3000' } },
+        { AURA_DB: mockRsvTableDb, QR_SIGNING_SECRET: 'qr-secret-bj3' }
+      );
+      expect(qrRes.status).toBe(200);
+      expect(qrRes.headers.get('Content-Type')).toBe('image/png');
+    });
+
+    it('BJ4: resolvePaymentTenantScope, canAccessPaymentOrder, and handleCreateLink reject conflicting tenant overrides and normalize hq to default/wildcard', async () => {
+      const { resolvePaymentTenantScope, canAccessPaymentOrder } = await import('@aura/domain-payment/policies/payment-access');
+      const { handleCreateLink } = await import('@aura/domain-payment/commands/payos-create-link');
+
+      // 1. Conflicting query + header overrides return null in resolvePaymentTenantScope and false in canAccessPaymentOrder
+      const conflictCtx = {
+        get: (k: string) => (k === 'user' ? { id: 'hq-1', role: 'owner', tenantId: 'hq' } : 'hq'),
+        req: {
+          query: (k: string) => (k === 'tenant_id' ? 'sadec' : undefined),
+          header: (k: string) => (k === 'X-Store-ID' ? 'cantho' : undefined),
+        },
+      };
+      expect(resolvePaymentTenantScope(conflictCtx, true)).toBeNull();
+      expect(canAccessPaymentOrder(conflictCtx, { tenant_id: 'sadec' }, true)).toBe(false);
+
+      // 2. Guest with X-Order-Token and legacy 'hq' order tenant normalizes to 'default'
+      const guestCtx = {
+        get: () => undefined,
+        req: {
+          query: () => undefined,
+          header: (k: string) => (k === 'X-Order-Token' ? 'tok-guest-bj4' : undefined),
+        },
+      };
+      expect(
+        canAccessPaymentOrder(
+          guestCtx,
+          { tenant_id: 'hq', order_token: 'tok-guest-bj4' },
+          true
+        )
+      ).toBe(true);
+
+      // 3. handleCreateLink rejects conflicting tenant overrides with 403
+      const createLinkConflictRes = await handleCreateLink({
+        env: { AURA_DB: {} },
+        get: conflictCtx.get,
+        req: {
+          ...conflictCtx.req,
+          json: async () => ({ order_id: 'ord-sd-bj4' }),
+        },
+        json: (body: unknown, status = 200) => new Response(JSON.stringify(body), { status }),
+      });
+      expect(createLinkConflictRes.status).toBe(403);
+    });
+  });
+
+  describe('Suite 64: Phase BK1–BK4 — Kitchen Stations/Tickets, Shift Access/Schedules, SOP Access Scope, & PayOS Reconcile / NowPayments IPN Tenant Hardening', () => {
+    it('BK1: kitchenStationsRouter and stationTicketsRouter reject conflicting overrides (403) and honor HQ concrete X-Store-ID override when c.get("tenantId") is "*"', async () => {
+      const { Hono } = await import('hono');
+      const { kitchenStationsRouter } = await import('@aura/domain-kitchen/commands/kitchen-stations');
+      const { issueStaffSession } = await import('../../lib/staff-session');
+
+      const TEST_SECRET = 'bk1-station-secret-32-chars-minimum!!';
+      const hqAccount = {
+        id: 'hq-owner-bk1',
+        name: 'HQ Owner BK1',
+        phone: null,
+        role: 'owner',
+        tenant_id: 'hq',
+        is_active: 1,
+        auth_version: 1,
+      };
+      const { token: hqToken } = await issueStaffSession(
+        { JWT_SECRET: TEST_SECRET },
+        hqAccount,
+        { email: 'hq-bk1@aura.vn', sessionType: 'staff-web' }
+      );
+
+      const stationDbCalls: Array<{ sql: string; args: unknown[] }> = [];
+      const mockStationDb = {
+        prepare(sql: string) {
+          const makeStmt = (args: unknown[]) => ({
+            async first() {
+              stationDbCalls.push({ sql, args });
+              if (/FROM users WHERE id = \?/i.test(sql)) {
+                return hqAccount;
+              }
+              if (/FROM kitchen_stations WHERE id = \?/i.test(sql)) {
+                return { id: String(args[0] || 'KS-SD-1'), name: 'Bar Sa Dec', slug: 'bar-sd', sort_order: 1, active: 1, tenant_id: 'sadec' };
+              }
+              return null;
+            },
+            async all() {
+              stationDbCalls.push({ sql, args });
+              if (/FROM kitchen_stations/i.test(sql)) {
+                return {
+                  results: [
+                    { id: 'KS-SD-1', name: 'Bar Sa Dec', slug: 'bar-sd', sort_order: 1, active: 1, tenant_id: 'sadec' },
+                    { id: 'KS-CT-1', name: 'Bar Can Tho', slug: 'bar-ct', sort_order: 1, active: 1, tenant_id: 'cantho' },
+                  ],
+                };
+              }
+              return { results: [] };
+            },
+            async run() {
+              stationDbCalls.push({ sql, args });
+              return { success: true, meta: { changes: 1 } };
+            },
+          });
+          return {
+            ...makeStmt([]),
+            bind(...args: unknown[]) {
+              return makeStmt(args);
+            },
+          };
+        },
+      };
+
+      const hqApp = new Hono();
+      hqApp.use('*', async (c, next) => {
+        c.set('tenantId' as never, '*' as never);
+        await next();
+      });
+      hqApp.route('/stations', kitchenStationsRouter as never);
+      const bk1Env = { AURA_DB: mockStationDb, JWT_SECRET: TEST_SECRET };
+
+      // 1. Conflicting query + header override is rejected with 403
+      const conflictRes = await hqApp.request(
+        'http://localhost/stations?tenant_id=sadec',
+        { headers: { Authorization: `Bearer ${hqToken}`, 'X-Store-ID': 'cantho' } },
+        bk1Env
+      );
+      expect(conflictRes.status).toBe(403);
+
+      // 2. HQ admin with c.get('tenantId') === '*' and X-Store-ID: sadec creates station in 'sadec' (not 'default')
+      const createRes = await hqApp.request(
+        'http://localhost/stations',
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${hqToken}`,
+            'X-Store-ID': 'sadec',
+          },
+          body: JSON.stringify({ name: 'Bar Sa Dec', slug: 'bar-sd' }),
+        },
+        bk1Env
+      );
+      expect(createRes.status).toBe(201);
+      const insertCall = stationDbCalls.find((c) => /INSERT INTO kitchen_stations/i.test(c.sql));
+      expect(insertCall?.args[5]).toBe('sadec');
+
+      // 3. Station tickets route rejects conflicting overrides with 403
+      const ticketsConflictRes = await hqApp.request(
+        'http://localhost/stations/KS-SD-1/tickets?tenant_id=sadec',
+        { headers: { Authorization: `Bearer ${hqToken}`, 'X-Tenant-ID': 'cantho' } },
+        bk1Env
+      );
+      expect(ticketsConflictRes.status).toBe(403);
+    });
+
+    it('BK2: extractRequestedShiftTenant / shiftScope reject conflicting overrides (403) and scheduleInput rejects wildcard locationId ("*" / "hq")', async () => {
+      const { extractRequestedShiftTenant, shiftScope } = await import('@aura/domain-shift/commands/shift-access');
+      const { scheduleInput } = await import('@aura/domain-shift/commands/schedules');
+
+      const conflictCtx = {
+        req: {
+          query: (k: string) => (k === 'tenant_id' ? 'sadec' : undefined),
+          header: (k: string) => (k === 'X-Store-ID' ? 'cantho' : undefined),
+        },
+      };
+      const extracted = extractRequestedShiftTenant(conflictCtx);
+      expect(extracted).toBe('__CONFLICT__');
+
+      await expect(
+        shiftScope({ AURA_DB: {} } as never, { id: 'hq-1', email: 'hq@aura.vn', role: 'owner' }, extracted)
+      ).rejects.toMatchObject({ status: 403, message: 'Cross-tenant shift access denied' });
+
+      const hqScope = {
+        env: { AURA_DB: {} } as never,
+        tenantId: '*',
+        actor: { id: 'hq-1', name: 'HQ Owner', role: 'owner', active: true, tenant_id: 'hq' },
+        canManage: true,
+      };
+      expect(() =>
+        scheduleInput(hqScope as never, {
+          locationId: 'hq',
+          date: '2026-11-08',
+          startTime: '08:00',
+          endTime: '16:00',
+        })
+      ).toThrow('Location does not match store');
+      expect(() =>
+        scheduleInput(hqScope as never, {
+          locationId: '*',
+          date: '2026-11-08',
+          startTime: '08:00',
+          endTime: '16:00',
+        })
+      ).toThrow('Location does not match store');
+    });
+
+    it('BK3: sopScope honors X-Store-ID / x-store-id headers and rejects conflicting query/header tenant overrides with 403', async () => {
+      const { sopScope } = await import('@aura/domain-sop/commands/sop-access');
+
+      // 1. HQ owner with X-Store-ID: sadec scopes to sadec
+      const hqStoreScope = sopScope(
+        {} as never,
+        { id: 'hq-1', email: 'hq@aura.vn', role: 'owner', tenantId: 'hq' } as never,
+        {
+          req: {
+            query: () => undefined,
+            header: (k: string) => (k === 'X-Store-ID' ? 'sadec' : undefined),
+          },
+        }
+      );
+      expect(hqStoreScope.tenantId).toBe('sadec');
+
+      // 2. Conflicting query + header override is rejected with 403
+      expect(() =>
+        sopScope(
+          {} as never,
+          { id: 'hq-1', email: 'hq@aura.vn', role: 'owner', tenantId: 'hq' } as never,
+          {
+            req: {
+              query: (k: string) => (k === 'tenant_id' ? 'sadec' : undefined),
+              header: (k: string) => (k === 'X-Store-ID' ? 'cantho' : undefined),
+            },
+          }
+        )
+      ).toThrow('Cross-tenant access denied');
+    });
+
+    it('BK4: reconcilePayOSPayment and processNowPaymentsIpn normalize wildcard/hq tenants to concrete store or default and stamp tenant on KV events', async () => {
+      const { reconcilePayOSPayment } = await import('@aura/domain-payment/commands/payos-reconcile');
+      const { processNowPaymentsIpn } = await import('@aura/domain-payment/commands/nowpayments-ipn');
+
+      // 1. reconcilePayOSPayment normalizes order_tenant_id: 'hq' to 'default' and stamps tenant_id on KV events
+      const kvPuts: Array<{ key: string; value: string }> = [];
+      const mockPayosDb = {
+        prepare(sql: string) {
+          return {
+            bind(..._args: unknown[]) {
+              return {
+                async first() {
+                  if (/SELECT p\.id, p\.order_id, p\.method/i.test(sql)) {
+                    return {
+                      id: 'pay-bk4-1',
+                      order_id: 'ord-bk4-1',
+                      method: 'payos',
+                      amount: 55000,
+                      status: 'pending',
+                      transaction_id: '998877',
+                      payment_url: 'https://pay.payos.vn/web/link123',
+                      refund_status: null,
+                      order_total: 55000,
+                      order_payment_status: 'pending',
+                      order_payment_method: 'payos',
+                      order_status: 'confirmed',
+                      order_tenant_id: 'hq',
+                    };
+                  }
+                  if (/SELECT p\.status, p\.refund_status/i.test(sql)) {
+                    return {
+                      status: 'pending',
+                      refund_status: null,
+                      payment_status: 'pending',
+                      order_status: 'confirmed',
+                    };
+                  }
+                  if (/SELECT p\.status, o\.payment_status/i.test(sql)) {
+                    return {
+                      status: 'completed',
+                      payment_status: 'paid',
+                      order_status: 'confirmed',
+                    };
+                  }
+                  return null;
+                },
+                async all() {
+                  return { results: [] };
+                },
+                async run() {
+                  return { meta: { changes: 1 } };
+                },
+              };
+            },
+          };
+        },
+        async batch() {
+          return [
+            { success: true, meta: { changes: 1 } },
+            { success: true, meta: { changes: 1 } },
+          ];
+        },
+      };
+
+      const reconOut = await reconcilePayOSPayment({
+        db: mockPayosDb as never,
+        kv: {
+          put: async (key: string, value: string) => {
+            kvPuts.push({ key, value });
+          },
+          get: async () => null,
+        } as never,
+        paymentId: 'pay-bk4-1',
+        tenantId: 'hq',
+        clientId: 'cid',
+        apiKey: 'akey',
+        checksumKey: 'ckey',
+        source: 'manual',
+        preVerified: {
+          ok: true,
+          status: 'PAID',
+          amount: 55000,
+          amountPaid: 55000,
+          amountRemaining: 0,
+        },
+      });
+      expect(reconOut.ok).toBe(true);
+      const orderEventWrite = kvPuts.find((p) => p.key === 'order_event:ord-bk4-1');
+      expect(orderEventWrite).toBeDefined();
+      expect(JSON.parse(orderEventWrite!.value)).toMatchObject({
+        orderId: 'ord-bk4-1',
+        tenant_id: 'default',
+        tenantId: 'default',
+      });
+
+      // 2. processNowPaymentsIpn normalizes inv.tenant_id = 'hq' so subscription update binds sub.tenant_id ('sadec')
+      const ipnSqlCalls: Array<{ sql: string; args: unknown[] }> = [];
+      const mockIpnDb = {
+        prepare(sql: string) {
+          return {
+            bind(...args: unknown[]) {
+              return {
+                async first() {
+                  ipnSqlCalls.push({ sql, args });
+                  if (/FROM subscription_invoices WHERE payment_ref = \?/i.test(sql)) {
+                    return {
+                      id: 'inv-bk4-1',
+                      subscription_id: 'sub-bk4-1',
+                      status: 'pending',
+                      amount_vnd: 500000,
+                      payment_ref: 'np-pay-bk4',
+                      tenant_id: 'hq',
+                    };
+                  }
+                  if (/FROM subscriptions WHERE id = \?/i.test(sql)) {
+                    return {
+                      id: 'sub-bk4-1',
+                      status: 'active',
+                      billing_cycle: 'monthly',
+                      current_period_start: '2026-10-01',
+                      current_period_end: '2026-11-01',
+                      tenant_id: 'sadec',
+                    };
+                  }
+                  return { count: 0, mrr: 500000, active_count: 1 };
+                },
+                async all() {
+                  return { results: [] };
+                },
+                async run() {
+                  ipnSqlCalls.push({ sql, args });
+                  return { meta: { changes: 1 } };
+                },
+              };
+            },
+          };
+        },
+      };
+
+      const ipnRes = await processNowPaymentsIpn(mockIpnDb, {
+        payment_id: 'np-pay-bk4',
+        payment_status: 'finished',
+        price_amount: 500000,
+        price_currency: 'vnd',
+      });
+      expect(ipnRes).toMatchObject({ ok: true, status: 200 });
+      const subUpdateCall = ipnSqlCalls.find((c) => /UPDATE subscriptions SET status = 'active'/i.test(c.sql));
+      expect(subUpdateCall?.args[5]).toBe('sadec');
+    });
+  });
+
+  describe('Suite 65: Phase BL1–BL4 Staff Tips, Kitchen KDS Mobile & Stream, OpenAPI Orders & Tables Helpers, and Catalog Categories & Products Hardening', () => {
+    it('BL1: staffTipsRouter rejects conflicting query/header tenant overrides with 403 and honors concrete X-Store-ID override for HQ admin when c.get("tenantId") is "*"', async () => {
+      const { Hono } = await import('hono');
+      const { staffTipsRouter } = await import('@aura/domain-staff/commands/staff-tips');
+      const suiteSecret = 'test-jwt-secret-multi-tenant-32chars';
+
+      const tipsSqlCalls: Array<{ sql: string; args: unknown[] }> = [];
+      const mockTipsDb = {
+        prepare(sql: string) {
+          return {
+            bind(...args: unknown[]) {
+              return {
+                async first() {
+                  tipsSqlCalls.push({ sql, args });
+                  return null;
+                },
+                async all() {
+                  tipsSqlCalls.push({ sql, args });
+                  return {
+                    results: [
+                      {
+                        staff_id: 'staff-sadec-1',
+                        staff_name: 'Waiter SaDec',
+                        date: '2026-11-07',
+                        tip_total: 25000,
+                        order_count: 2,
+                        session_count: 2,
+                      },
+                    ],
+                  };
+                },
+                async run() {
+                  tipsSqlCalls.push({ sql, args });
+                  return { meta: { changes: 1 } };
+                },
+              };
+            },
+          };
+        },
+      };
+
+      const app = new Hono<{ Bindings: Env }>();
+      app.use('*', async (c, next) => {
+        c.set('user' as never, { id: 'hq-bl1', role: 'owner', tenantId: 'hq' } as never);
+        c.set('tenantId' as never, '*' as never);
+        await next();
+      });
+      app.route('/api/staff-tips', staffTipsRouter);
+
+      // 1. Conflicting query/header overrides rejected with 403
+      const conflictRes = await app.request(
+        '/api/staff-tips?date=2026-11-07&tenant_id=sadec',
+        { headers: { 'X-Store-ID': 'cantho' } },
+        { AURA_DB: mockTipsDb, JWT_SECRET: suiteSecret } as unknown as Env
+      );
+      expect(conflictRes.status).toBe(403);
+
+      // 2. HQ admin with c.set('tenantId', '*') + X-Store-ID: sadec scopes SQL query to 'sadec'
+      tipsSqlCalls.length = 0;
+      const hqStoreRes = await app.request(
+        '/api/staff-tips?date=2026-11-07',
+        { headers: { 'X-Store-ID': 'sadec' } },
+        { AURA_DB: mockTipsDb, JWT_SECRET: suiteSecret } as unknown as Env
+      );
+      expect(hqStoreRes.status).toBe(200);
+      expect(tipsSqlCalls[0]?.args).toContain('sadec');
+    });
+
+    it('BL2: getKdsMobile and kdsStreamRouter reject conflicting query/header tenant overrides with 403 and honor concrete X-Store-ID override for HQ admin even when c.get("tenantId") is "*"', async () => {
+      const { Hono } = await import('hono');
+      const { getKdsMobile } = await import('@aura/domain-kitchen/commands/kds-mobile');
+      const { kdsStreamRouter } = await import('@aura/domain-kitchen/commands/kds-stream');
+      const suiteSecret = 'test-jwt-secret-multi-tenant-32chars';
+
+      const kdsSqlCalls: Array<{ sql: string; args: unknown[] }> = [];
+      const mockKdsDb = {
+        prepare(sql: string) {
+          const makeStmt = (args: unknown[]) => ({
+            async first() {
+              kdsSqlCalls.push({ sql, args });
+              return null;
+            },
+            async all() {
+              kdsSqlCalls.push({ sql, args });
+              return { results: [] };
+            },
+            async run() {
+              kdsSqlCalls.push({ sql, args });
+              return { meta: { changes: 1 } };
+            },
+          });
+          return {
+            bind: (...args: unknown[]) => makeStmt(args),
+            all: () => makeStmt([]).all(),
+            first: () => makeStmt([]).first(),
+            run: () => makeStmt([]).run(),
+          };
+        },
+      };
+
+      const app = new Hono<{ Bindings: Env }>();
+      app.use('*', async (c, next) => {
+        c.set('user' as never, { id: 'hq-bl2', role: 'owner', tenantId: 'hq' } as never);
+        c.set('tenantId' as never, '*' as never);
+        await next();
+      });
+      app.get('/mobile/kds/orders', (c) => getKdsMobile(c));
+      app.route('/api/kds/orders', kdsStreamRouter);
+
+      // 1. Conflicting query/header overrides rejected with 403 on mobile KDS and KDS stream
+      const mobileConflict = await app.request(
+        '/mobile/kds/orders?tenant_id=sadec',
+        { headers: { 'X-Store-ID': 'cantho' } },
+        { AURA_DB: mockKdsDb, JWT_SECRET: suiteSecret } as unknown as Env
+      );
+      expect(mobileConflict.status).toBe(403);
+
+      const streamConflict = await app.request(
+        '/api/kds/orders/stream?tenant_id=sadec',
+        { headers: { 'X-Store-ID': 'cantho' } },
+        { AURA_DB: mockKdsDb, JWT_SECRET: suiteSecret } as unknown as Env
+      );
+      expect(streamConflict.status).toBe(403);
+
+      // 2. HQ admin with c.set('tenantId', '*') + X-Store-ID: sadec scopes getKdsMobile to 'sadec'
+      kdsSqlCalls.length = 0;
+      const mobileHqStore = await app.request(
+        '/mobile/kds/orders',
+        { headers: { 'X-Store-ID': 'sadec' } },
+        { AURA_DB: mockKdsDb, JWT_SECRET: suiteSecret } as unknown as Env
+      );
+      expect(mobileHqStore.status).toBe(200);
+      expect(kdsSqlCalls[0]?.args).toEqual(['sadec']);
+    });
+
+    it('BL3: resolveOpenApiOrdersTenant, resolveOpenApiTablesTenant, isAllowedOrderLocationForTenant, isAllowedLocationForTenant, and writeTableAuditLog reject conflicting overrides and wildcard locations', async () => {
+      const { resolveOpenApiOrdersTenant, isAllowedOrderLocationForTenant } = await import(
+        '../../routes/openapi-orders-handlers/helpers'
+      );
+      const { resolveOpenApiTablesTenant, isAllowedLocationForTenant, writeTableAuditLog } = await import(
+        '../../routes/openapi-tables-handlers/helpers'
+      );
+
+      const makeMockCtx = (queryMap: Record<string, string>, headerMap: Record<string, string>, user?: unknown) => ({
+        get: (k: string) => (k === 'user' ? user : undefined),
+        req: {
+          query: (k: string) => queryMap[k],
+          header: (k: string) => headerMap[k],
+        },
+        json: (body: unknown, status: number) =>
+          new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } }),
+      });
+
+      // 1. Conflicting query/header overrides rejected with 403
+      const ordConflict = resolveOpenApiOrdersTenant(
+        makeMockCtx({ tenant_id: 'sadec' }, { 'X-Store-ID': 'cantho' }, { id: 'hq-1', role: 'owner', tenantId: 'hq' }),
+        'read'
+      );
+      expect(ordConflict.ok).toBe(false);
+      if (!ordConflict.ok) expect(ordConflict.response.status).toBe(403);
+
+      const tblConflict = resolveOpenApiTablesTenant(
+        makeMockCtx({ tenant_id: 'sadec' }, { 'X-Store-ID': 'cantho' }, { id: 'hq-1', role: 'owner', tenantId: 'hq' }),
+        'read'
+      );
+      expect(tblConflict.ok).toBe(false);
+      if (!tblConflict.ok) expect(tblConflict.response.status).toBe(403);
+
+      // 2. Wildcard locationId ('*' or 'hq') rejected for concrete store tenants
+      const emptyDb = { prepare: () => ({ bind: () => ({ first: async () => null }) }) } as unknown as D1Database;
+      await expect(isAllowedOrderLocationForTenant(emptyDb, '*', 'sadec')).resolves.toBe(false);
+      await expect(isAllowedOrderLocationForTenant(emptyDb, 'hq', 'sadec')).resolves.toBe(false);
+      await expect(isAllowedLocationForTenant(emptyDb, '*', 'sadec')).resolves.toBe(false);
+      await expect(isAllowedLocationForTenant(emptyDb, 'hq', 'sadec')).resolves.toBe(false);
+      await expect(isAllowedLocationForTenant(emptyDb, 'store-cantho', 'default')).resolves.toBe(false);
+
+      // 3. writeTableAuditLog normalizes 'hq' to 'default'
+      const auditArgs: unknown[][] = [];
+      const mockAuditDb = {
+        prepare: () => ({
+          bind: (...args: unknown[]) => ({
+            run: async () => {
+              auditArgs.push(args);
+              return { meta: { last_row_id: 1 } };
+            },
+          }),
+        }),
+      };
+      await writeTableAuditLog(mockAuditDb, 'hq-user-1', 'table.update', 'cafe_table', 'tbl-1', '{"table":"T1"}', '2026-11-07T00:00:00.000Z', 'hq');
+      expect(auditArgs[0]?.[11]).toBe('default');
+    });
+
+    it('BL4: OpenAPI and Domain Catalog Categories & Products helpers reject conflicting tenant overrides and honor HQ concrete X-Store-ID override when c.get("tenantId") is "*"', async () => {
+      const { Hono } = await import('hono');
+      const { resolveCatalogTenantId: resolveCatOpenApi, FORBIDDEN_TENANT_SENTINEL } = await import(
+        '../../routes/openapi-categories-handlers/helpers'
+      );
+      const { resolveCatalogTenantId: resolveProdOpenApi } = await import(
+        '../../routes/openapi-products-handlers/helpers'
+      );
+      const { categoriesRouter } = await import('@aura/domain-catalog/commands/categories');
+      const { productsRouter } = await import('@aura/domain-catalog/commands/products');
+      const suiteSecret = 'test-jwt-secret-multi-tenant-32chars';
+
+      // 1. OpenAPI helpers return FORBIDDEN_TENANT_SENTINEL on conflicting overrides and resolve HQ X-Store-ID when c.get('tenantId') is '*'
+      const conflictCtx = {
+        get: (k: string) => (k === 'user' ? { id: 'hq-1', role: 'owner', tenantId: 'hq' } : k === 'tenantId' ? '*' : undefined),
+        req: {
+          query: (k: string) => (k === 'tenant_id' ? 'sadec' : undefined),
+          header: (k: string) => (k === 'X-Store-ID' ? 'cantho' : undefined),
+        },
+      };
+      expect(resolveCatOpenApi(conflictCtx)).toBe(FORBIDDEN_TENANT_SENTINEL);
+      expect(resolveProdOpenApi(conflictCtx)).toBe(FORBIDDEN_TENANT_SENTINEL);
+
+      const hqStoreCtx = {
+        get: (k: string) => (k === 'user' ? { id: 'hq-1', role: 'owner', tenantId: 'hq' } : k === 'tenantId' ? '*' : undefined),
+        req: {
+          query: () => undefined,
+          header: (k: string) => (k === 'X-Store-ID' ? 'sadec' : undefined),
+        },
+      };
+      expect(resolveCatOpenApi(hqStoreCtx)).toBe('sadec');
+      expect(resolveProdOpenApi(hqStoreCtx)).toBe('sadec');
+
+      // 2. Domain categoriesRouter & productsRouter reject conflicting overrides with 403 and scope HQ X-Store-ID reads/writes to 'sadec'
+      const mockCatalogDb = {
+        prepare() {
+          const makeStmt = () => ({
+            first: async () => null,
+            all: async () => ({
+              results: [
+                { id: 'cat-sadec', name: 'Cà Phê Sa Đéc', slug: 'ca-phe-sadec', price: 35000, tenant_id: 'sadec' },
+                { id: 'cat-cantho', name: 'Cà Phê Cần Thơ', slug: 'ca-phe-cantho', price: 35000, tenant_id: 'cantho' },
+              ],
+            }),
+            run: async () => ({ meta: { changes: 1 } }),
+          });
+          return {
+            bind: () => makeStmt(),
+            all: () => makeStmt().all(),
+            first: () => makeStmt().first(),
+            run: () => makeStmt().run(),
+          };
+        },
+      };
+
+      const app = new Hono<{ Bindings: Env }>();
+      app.use('*', async (c, next) => {
+        c.set('user' as never, { id: 'hq-bl4', role: 'owner', tenantId: 'hq' } as never);
+        c.set('tenantId' as never, '*' as never);
+        await next();
+      });
+      app.route('/api/categories', categoriesRouter);
+      app.route('/api/products', productsRouter);
+
+      const catConflictRes = await app.request(
+        '/api/categories/tree?tenant_id=sadec',
+        { headers: { 'X-Store-ID': 'cantho' } },
+        { AURA_DB: mockCatalogDb, JWT_SECRET: suiteSecret } as unknown as Env
+      );
+      expect(catConflictRes.status).toBe(403);
+
+      const catHqStoreRes = await app.request(
+        '/api/categories/tree',
+        { headers: { 'X-Store-ID': 'sadec' } },
+        { AURA_DB: mockCatalogDb, JWT_SECRET: suiteSecret } as unknown as Env
+      );
+      expect(catHqStoreRes.status).toBe(200);
+      const catBody = (await catHqStoreRes.json()) as { data: Array<{ id: string }> };
+      expect(catBody.data.map((r) => r.id)).toEqual(['cat-sadec']);
+
+      const prodConflictRes = await app.request(
+        '/api/products?tenant_id=sadec',
+        { headers: { 'X-Store-ID': 'cantho' } },
+        { AURA_DB: mockCatalogDb, JWT_SECRET: suiteSecret } as unknown as Env
+      );
+      expect(prodConflictRes.status).toBe(403);
+
+      const prodHqStoreRes = await app.request(
+        '/api/products',
+        { headers: { 'X-Store-ID': 'sadec' } },
+        { AURA_DB: mockCatalogDb, JWT_SECRET: suiteSecret } as unknown as Env
+      );
+      expect(prodHqStoreRes.status).toBe(200);
+      const prodBody = (await prodHqStoreRes.json()) as { data: Array<{ id: string }> };
+      expect(prodBody.data.map((r) => r.id)).toEqual(['cat-sadec']);
+    });
+  });
+
+  // =========================================================================
+  // Suite 66: Phase BM1–BM4 — Catalog Happy Hour / Modifiers / Menu Query Conflicting-Override & HQ Target Resolution,
+  //           OpenAPI Promotions & Loyalty Helpers Conflicting-Override & 'hq' Normalization, and OpenAPI Staff & SOP Audit
+  // =========================================================================
+  describe('Suite 66: Phase BM1–BM4 — Catalog Happy Hour / Modifiers / Menu Query, OpenAPI Promotions & Loyalty Helpers, and OpenAPI Staff & SOP Audit', () => {
+    it('BM1: happyHourRouter, menuModifiersRouter, and getMenu reject conflicting tenant overrides with 403 and honor HQ concrete X-Store-ID when c.get("tenantId") / tenantIdOverride is "*"', async () => {
+      const { Hono } = await import('hono');
+      const { happyHourRouter } = await import('@aura/domain-catalog/commands/happy-hour');
+      const {
+        menuModifiersRouter,
+        verifyModifierReadTenant,
+        verifyModifierWriteTenant,
+        resolveWriteCatalogTenantId,
+      } = await import('@aura/domain-catalog/commands/menu-modifiers');
+      const { getMenu } = await import('@aura/domain-catalog/queries/menu');
+      const suiteSecret = 'test-jwt-secret-multi-tenant-32chars';
+
+      const hqToken = await generateJWT(
+        { sub: 'hq-bm1', id: 'hq-bm1', role: 'owner', tenantId: 'hq' } as never,
+        suiteSecret
+      );
+
+      // 1. verifyModifierReadTenant & verifyModifierWriteTenant reject conflicting overrides and resolve HQ X-Store-ID when c.get('tenantId') is '*'
+      const conflictCtx = {
+        get: (k: string) => (k === 'user' ? { id: 'hq-bm1', role: 'owner', tenantId: 'hq' } : k === 'tenantId' ? '*' : undefined),
+        req: {
+          query: (k: string) => (k === 'tenant_id' ? 'sadec' : undefined),
+          header: (k: string) => (k === 'X-Store-ID' ? 'cantho' : undefined),
+        },
+      };
+      expect(verifyModifierReadTenant(conflictCtx).ok).toBe(false);
+      expect(verifyModifierWriteTenant(conflictCtx, false).ok).toBe(false);
+
+      const hqStoreCtx = {
+        get: (k: string) => (k === 'user' ? { id: 'hq-bm1', role: 'owner', tenantId: 'hq' } : k === 'tenantId' ? '*' : undefined),
+        req: {
+          query: () => undefined,
+          header: (k: string) => (k === 'X-Store-ID' ? 'sadec' : undefined),
+        },
+      };
+      expect(verifyModifierReadTenant(hqStoreCtx)).toEqual({ ok: true, tenantId: 'sadec' });
+      expect(verifyModifierWriteTenant(hqStoreCtx, false)).toEqual({ ok: true, tenantId: 'sadec' });
+      expect(resolveWriteCatalogTenantId(hqStoreCtx)).toBe('sadec');
+
+      // 2. happyHourRouter & menuModifiersRouter reject conflicting overrides with 403 and allow HQ creation with X-Store-ID: sadec when c.set('tenantId', '*')
+      const insertedRows: Array<{ sql: string; args: unknown[] }> = [];
+      const mockCatalogDb = {
+        prepare(sql: string) {
+          const makeStmt = (args: unknown[]) => ({
+            first: async () => {
+              if (/FROM users|FROM staff/i.test(sql)) {
+                return { id: 'hq-bm1', role: 'owner', is_active: 1, tenant_id: 'hq' };
+              }
+              return { id: 'MG-SADEC-1', name: 'Độ ngọt', tenant_id: 'sadec' };
+            },
+            all: async () => ({
+              results: [
+                { id: 'item-sadec', name: 'Cà Phê Sa Đéc', price: 29000, available: 1, tenant_id: 'sadec' },
+                { id: 'item-cantho', name: 'Cà Phê Cần Thơ', price: 29000, available: 1, tenant_id: 'cantho' },
+              ],
+            }),
+            run: async () => {
+              insertedRows.push({ sql, args });
+              return { meta: { changes: 1, last_row_id: 10 } };
+            },
+          });
+          return {
+            bind: (...args: unknown[]) => makeStmt(args),
+            all: () => makeStmt([]).all(),
+            first: () => makeStmt([]).first(),
+            run: () => makeStmt([]).run(),
+          };
+        },
+      };
+
+      const app = new Hono<{ Bindings: Env }>();
+      app.use('*', async (c, next) => {
+        c.set('user' as never, { id: 'hq-bm1', role: 'owner', tenantId: 'hq' } as never);
+        c.set('tenantId' as never, '*' as never);
+        await next();
+      });
+      app.route('/api', happyHourRouter);
+      app.route('/api/menu-modifiers', menuModifiersRouter);
+
+      const hhConflictRes = await app.request(
+        '/api/happy-hour?tenant_id=sadec',
+        { headers: { 'X-Store-ID': 'cantho' } },
+        { AURA_DB: mockCatalogDb, JWT_SECRET: suiteSecret } as unknown as Env
+      );
+      expect(hhConflictRes.status).toBe(403);
+
+      const modCreateRes = await app.request(
+        '/api/menu-modifiers/groups',
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Store-ID': 'sadec',
+          },
+          body: JSON.stringify({ name: 'Độ ngọt Sa Đéc', type: 'single', required: true }),
+        },
+        { AURA_DB: mockCatalogDb, JWT_SECRET: suiteSecret } as unknown as Env
+      );
+      expect(modCreateRes.status).toBe(201);
+      expect(insertedRows[0]?.args[6]).toBe('sadec');
+
+      // 3. getMenu rejects conflicting query/header overrides with 403 and honors HQ X-Store-ID: sadec when tenantIdOverride is '*'
+      const menuConflictRes = await getMenu(
+        new Request('https://api.test/api/menu?tenant_id=sadec', {
+          headers: { Authorization: `Bearer ${hqToken}`, 'X-Store-ID': 'cantho' },
+        }),
+        { AURA_DB: mockCatalogDb, JWT_SECRET: suiteSecret },
+        '*'
+      );
+      expect(menuConflictRes.status).toBe(403);
+
+      const menuHqStoreRes = await getMenu(
+        new Request('https://api.test/api/menu', {
+          headers: { Authorization: `Bearer ${hqToken}`, 'X-Store-ID': 'sadec' },
+        }),
+        { AURA_DB: mockCatalogDb, JWT_SECRET: suiteSecret },
+        '*'
+      );
+      expect(menuHqStoreRes.status).toBe(200);
+      const menuBody = (await menuHqStoreRes.json()) as { items: Array<{ id: string }> };
+      expect(menuBody.items.map((i) => i.id)).toEqual(['item-sadec']);
+    });
+
+    it('BM2: verifyOpenApiPromoTenant, resolveOpenApiPromoReadTenantId, and writePromotionAuditLog reject conflicting/wildcard overrides and normalize hq to default', async () => {
+      const {
+        verifyOpenApiPromoTenant,
+        resolveOpenApiPromoReadTenantId,
+        writePromotionAuditLog,
+        PROMO_READ_ROLES,
+      } = await import('../../routes/openapi-promotions-handlers/helpers');
+
+      const makePromoCtx = (queryMap: Record<string, string>, headerMap: Record<string, string>, user?: unknown, ctxTenant?: string) => ({
+        get: (k: string) => (k === 'user' ? user : k === 'tenantId' ? ctxTenant : undefined),
+        req: {
+          query: (k: string) => queryMap[k],
+          header: (k: string) => headerMap[k],
+        },
+        json: (body: unknown, status: number) =>
+          new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } }),
+      });
+
+      // 1. Conflicting query/header overrides rejected with 403 even for HQ admin
+      const hqConflict = verifyOpenApiPromoTenant(
+        makePromoCtx({ tenant_id: 'sadec' }, { 'X-Store-ID': 'cantho' }, { id: 'hq-1', role: 'owner', tenantId: 'hq' }),
+        PROMO_READ_ROLES,
+        true
+      );
+      expect(hqConflict?.status).toBe(403);
+
+      // 2. Anonymous caller with wildcard override rejected with 403 when requireUser = false
+      const anonWildcard = verifyOpenApiPromoTenant(
+        makePromoCtx({ tenant_id: '*' }, {}),
+        PROMO_READ_ROLES,
+        false
+      );
+      expect(anonWildcard?.status).toBe(403);
+
+      // 3. resolveOpenApiPromoReadTenantId honors explicit reqTenant = 'default' and 'sadec' for HQ admin
+      expect(
+        resolveOpenApiPromoReadTenantId(
+          makePromoCtx({ tenant_id: 'default' }, {}, { id: 'hq-1', role: 'owner', tenantId: 'hq' }, '*')
+        )
+      ).toBe('default');
+      expect(
+        resolveOpenApiPromoReadTenantId(
+          makePromoCtx({}, { 'X-Store-ID': 'sadec' }, { id: 'hq-1', role: 'owner', tenantId: 'hq' }, '*')
+        )
+      ).toBe('sadec');
+
+      // 4. writePromotionAuditLog normalizes 'hq' to 'default'
+      const promoAuditArgs: unknown[][] = [];
+      const mockPromoAuditDb = {
+        prepare: () => ({
+          bind: (...args: unknown[]) => ({
+            run: async () => {
+              promoAuditArgs.push(args);
+              return { meta: { changes: 1 } };
+            },
+          }),
+        }),
+      };
+      await writePromotionAuditLog(
+        mockPromoAuditDb,
+        'hq-1',
+        'promotion_create',
+        'promo-1',
+        '{"code":"TET2026"}',
+        '2026-11-07T00:00:00.000Z',
+        'hq'
+      );
+      expect(promoAuditArgs[0]?.[6]).toBe('default');
+    });
+
+    it('BM3: hasOpenApiLoyaltyTenantMismatch, writeLoyaltyAuditLog, matchesLoyaltyTenant, checkRewardTenant, and resolveRewardTenantId reject conflicting overrides and normalize hq wildcard', async () => {
+      const {
+        hasOpenApiLoyaltyTenantMismatch,
+        writeLoyaltyAuditLog,
+        matchesLoyaltyTenant,
+        checkRewardTenant,
+        resolveRewardTenantId,
+      } = await import('../../routes/openapi-loyalty-handlers/loyalty-db-helpers');
+
+      // 1. Conflicting query/header overrides return true in hasOpenApiLoyaltyTenantMismatch even for HQ admin
+      const loyaltyConflictCtx = {
+        get: (k: string) => (k === 'user' ? { id: 'hq-1', role: 'owner', tenantId: 'hq' } : undefined),
+        req: {
+          query: (k: string) => (k === 'tenant_id' ? 'sadec' : undefined),
+          header: (k: string) => (k === 'X-Store-ID' ? 'cantho' : undefined),
+        },
+      };
+      expect(hasOpenApiLoyaltyTenantMismatch(loyaltyConflictCtx, '*')).toBe(true);
+
+      // 2. matchesLoyaltyTenant & checkRewardTenant treat 'hq' as wildcard, and resolveRewardTenantId resolves reward.tenant_id when passed 'hq'
+      expect(matchesLoyaltyTenant({ id: 'rw-1', tenant_id: 'sadec' }, 'hq')).toBe(true);
+      await expect(checkRewardTenant({}, { id: 'rw-1', tenant_id: 'sadec' }, 'hq')).resolves.toBe(true);
+      await expect(resolveRewardTenantId({}, { id: 'rw-1', tenant_id: 'sadec' }, 'hq')).resolves.toBe('sadec');
+
+      // 3. writeLoyaltyAuditLog normalizes 'hq' to 'default'
+      const loyaltyAuditArgs: unknown[][] = [];
+      const mockLoyaltyAuditDb = {
+        prepare: () => ({
+          bind: (...args: unknown[]) => ({
+            run: async () => {
+              loyaltyAuditArgs.push(args);
+              return { meta: { changes: 1 } };
+            },
+          }),
+        }),
+      };
+      await writeLoyaltyAuditLog(
+        mockLoyaltyAuditDb,
+        'hq-1',
+        'loyalty_reward_create',
+        'loyalty_reward',
+        'rw-1',
+        '{"name":"Free Coffee"}',
+        '2026-11-07T00:00:00.000Z',
+        'hq'
+      );
+      expect(loyaltyAuditArgs[0]?.[10]).toBe('default');
+    });
+
+    it('BM4: registerStaffHandlers rejects conflicting tenant overrides for HQ and non-HQ callers and auditActor (sop-audit.ts) normalizes hq wildcard to concrete or default tenant', async () => {
+      const { OpenAPIHono } = await import('@hono/zod-openapi');
+      const { registerStaffHandlers } = await import('../../routes/openapi-staff-handlers/staff-handlers');
+      const { auditActor } = await import('../../routes/openapi-sop-handlers/sop-audit');
+
+      // 1. auditActor normalizes 'hq' and '*' to concrete store or 'default'
+      const hqSopCtx = {
+        get: (k: string) =>
+          k === 'user'
+            ? { id: 'hq-sop-1', name: 'HQ Owner', role: 'owner', tenantId: 'hq' }
+            : k === 'tenantId'
+              ? '*'
+              : undefined,
+        req: {
+          query: () => undefined,
+          header: () => undefined,
+        },
+        env: {},
+      };
+      expect(auditActor(hqSopCtx as never, 'hq').tenantId).toBe('default');
+      expect(auditActor(hqSopCtx as never, 'sadec').tenantId).toBe('sadec');
+
+      // 2. registerStaffHandlers rejects conflicting query/header overrides (403) even for HQ admin
+      const staffApp = new OpenAPIHono<{ Bindings: Env }>();
+      staffApp.use('*', async (c, next) => {
+        c.set('user' as never, { id: 'hq-staff-1', role: 'owner', tenantId: 'hq' } as never);
+        c.set('tenantId' as never, '*' as never);
+        await next();
+      });
+      registerStaffHandlers(staffApp);
+
+      const mockStaffDb = {
+        prepare: () => ({
+          bind: () => ({
+            first: async () => ({ total: 0 }),
+            all: async () => ({ results: [] }),
+          }),
+        }),
+      };
+      const staffConflictRes = await staffApp.request(
+        '/api/staff?tenant_id=sadec',
+        { headers: { 'X-Store-ID': 'cantho' } },
+        { AURA_DB: mockStaffDb } as unknown as Env
+      );
+      expect(staffConflictRes.status).toBe(403);
+    });
+  });
+
+  // =========================================================================
+  // Suite 67: Phase BN1–BN4 — Admin Loyalty / Sales / QR & Canonical Tenant Helper,
+  //           Birthday & Reviews, Checkin / Floor Plan / Signage, and Broadcast & Campaigns
+  // =========================================================================
+  describe('Suite 67: Phase BN1–BN4 — Admin Loyalty / Sales / QR, Birthday & Reviews, Checkin / Floor Plan / Signage, and Broadcast & Campaigns', () => {
+    it('BN1: adminLoyaltyRouter, adminSalesRouter, and adminQRRouter reject conflicting overrides with 403 and honor HQ concrete store overrides when c.get("tenantId") is "*"', async () => {
+      const { Hono } = await import('hono');
+      const { adminLoyaltyRouter } = await import('../../routes/admin-loyalty');
+      const { adminSalesRouter } = await import('../../routes/admin-sales');
+      const { adminQRRouter } = await import('../../routes/admin-qr');
+      const suiteSecret = 'test-jwt-secret-multi-tenant-32chars';
+
+      const hqToken = await generateJWT(
+        {
+          sub: 'hq-bn1',
+          id: 'hq-bn1',
+          role: 'owner',
+          tenantId: 'hq',
+          authVersion: 1,
+          authTime: Math.floor(Date.now() / 1000),
+          sessionType: 'staff-web',
+        } as never,
+        suiteSecret,
+        3600
+      );
+
+      const mockDb = {
+        prepare(sql: string) {
+          const makeStmt = () => ({
+            first: async () => {
+              if (/FROM users|FROM staff/i.test(sql)) {
+                return { id: 'hq-bn1', name: 'HQ Admin', phone: null, role: 'owner', is_active: 1, auth_version: 1, tenant_id: 'hq' };
+              }
+              return { total: 5, active: 3, points_issued: 100, points_redeemed: 20 };
+            },
+            all: async () => ({
+              results: [
+                {
+                  id: 'ord-sadec-1',
+                  customer_name: 'Khách Sa Đéc',
+                  items: '[]',
+                  total: 45000,
+                  payment_method: 'cash',
+                  status: 'completed',
+                  created_at: '2026-11-07T08:00:00Z',
+                  tenant_id: 'sadec',
+                  table_number: 1,
+                },
+              ],
+            }),
+            run: async () => ({ meta: { changes: 1 } }),
+          });
+          return {
+            bind: () => makeStmt(),
+            first: () => makeStmt().first(),
+            all: () => makeStmt().all(),
+            run: () => makeStmt().run(),
+          };
+        },
+      };
+
+      const app = new Hono<{ Bindings: Env }>();
+      app.use('*', async (c, next) => {
+        c.set('user' as never, { id: 'hq-bn1', role: 'owner', tenantId: 'hq' } as never);
+        c.set('tenantId' as never, '*' as never);
+        await next();
+      });
+      app.route('/api/admin/loyalty', adminLoyaltyRouter);
+      app.route('/api/admin/sales', adminSalesRouter);
+      app.route('/api/admin/qr', adminQRRouter);
+
+      // 1. adminLoyaltyRouter rejects conflicting overrides with 403 even for HQ admin
+      const loyaltyConflictRes = await app.request(
+        '/api/admin/loyalty/stats?tenant_id=sadec',
+        {
+          headers: {
+            Authorization: `Bearer ${hqToken}`,
+            'X-Store-ID': 'cantho',
+          },
+        },
+        { AURA_DB: mockDb, JWT_SECRET: suiteSecret } as unknown as Env
+      );
+      expect(loyaltyConflictRes.status).toBe(403);
+
+      // 2. adminSalesRouter rejects conflicting overrides with 403 and exports CSV when HQ passes X-Store-ID: sadec
+      const salesConflictRes = await app.request(
+        '/api/admin/sales/csv?tenant_id=sadec',
+        { headers: { 'X-Store-ID': 'cantho' } },
+        { AURA_DB: mockDb, JWT_SECRET: suiteSecret } as unknown as Env
+      );
+      expect(salesConflictRes.status).toBe(403);
+
+      const salesHqStoreRes = await app.request(
+        '/api/admin/sales/csv?range=24h',
+        { headers: { 'X-Store-ID': 'sadec' } },
+        { AURA_DB: mockDb, JWT_SECRET: suiteSecret } as unknown as Env
+      );
+      expect(salesHqStoreRes.status).toBe(200);
+
+      // 3. adminQRRouter honors HQ X-Store-ID: sadec even when c.get('tenantId') is '*'
+      const qrHqStoreRes = await app.request(
+        '/api/admin/qr/tables',
+        { headers: { 'X-Store-ID': 'sadec' } },
+        { AURA_DB: mockDb, JWT_SECRET: suiteSecret, QR_SIGNING_SECRET: suiteSecret } as unknown as Env
+      );
+      expect(qrHqStoreRes.status).toBe(200);
+    });
+
+    it('BN2: birthdayRouter and reviewsRouter reject conflicting query/header overrides with 403 and normalize hq wildcard', async () => {
+      const { Hono } = await import('hono');
+      const { birthdayRouter } = await import('../../routes/birthday');
+      const { reviewsRouter } = await import('../../routes/reviews');
+      const suiteSecret = 'test-jwt-secret-multi-tenant-32chars';
+
+      const hqToken = await generateJWT(
+        {
+          sub: 'hq-bn2',
+          id: 'hq-bn2',
+          role: 'owner',
+          tenantId: 'hq',
+          authVersion: 1,
+          authTime: Math.floor(Date.now() / 1000),
+          sessionType: 'staff-web',
+        } as never,
+        suiteSecret,
+        3600
+      );
+
+      const mockDb = {
+        prepare() {
+          const makeStmt = () => ({
+            first: async () => ({ id: 'hq-bn2', name: 'HQ Admin', phone: null, role: 'owner', is_active: 1, auth_version: 1, tenant_id: 'hq' }),
+            all: async () => ({
+              results: [
+                {
+                  id: 'rev-sadec-1',
+                  order_id: 'ord-sadec-1',
+                  rating: 5,
+                  comment: 'Tuyệt vời',
+                  customer_name: 'Anh Minh',
+                  created_at: '2026-11-07T08:00:00Z',
+                  tenant_id: 'sadec',
+                },
+                {
+                  id: 'rev-cantho-1',
+                  order_id: 'ord-cantho-1',
+                  rating: 4,
+                  comment: 'Tốt',
+                  customer_name: 'Chị Lan',
+                  created_at: '2026-11-07T09:00:00Z',
+                  tenant_id: 'cantho',
+                },
+              ],
+            }),
+            run: async () => ({ meta: { changes: 1 } }),
+          });
+          return {
+            bind: () => makeStmt(),
+            first: () => makeStmt().first(),
+            all: () => makeStmt().all(),
+            run: () => makeStmt().run(),
+          };
+        },
+      };
+
+      const app = new Hono<{ Bindings: Env }>();
+      app.use('*', async (c, next) => {
+        c.set('user' as never, { id: 'hq-bn2', role: 'owner', tenantId: 'hq' } as never);
+        c.set('tenantId' as never, '*' as never);
+        await next();
+      });
+      app.route('/api/birthday', birthdayRouter);
+      app.route('/api/reviews', reviewsRouter);
+
+      // 1. birthdayRouter rejects conflicting overrides with 403 even for HQ admin
+      const bdayConflictRes = await app.request(
+        '/api/birthday/config?tenant_id=sadec',
+        {
+          headers: {
+            Authorization: `Bearer ${hqToken}`,
+            'X-Store-ID': 'cantho',
+          },
+        },
+        { AURA_DB: mockDb, JWT_SECRET: suiteSecret } as unknown as Env
+      );
+      expect(bdayConflictRes.status).toBe(403);
+
+      // 2. reviewsRouter rejects conflicting overrides with 403 and scopes HQ GET /api/reviews to X-Store-ID: sadec
+      const revConflictRes = await app.request(
+        '/api/reviews?tenant_id=sadec',
+        { headers: { 'X-Store-ID': 'cantho' } },
+        { AURA_DB: mockDb, JWT_SECRET: suiteSecret } as unknown as Env
+      );
+      expect(revConflictRes.status).toBe(403);
+
+      const revHqStoreRes = await app.request(
+        '/api/reviews',
+        { headers: { 'X-Store-ID': 'sadec' } },
+        { AURA_DB: mockDb, JWT_SECRET: suiteSecret } as unknown as Env
+      );
+      expect(revHqStoreRes.status).toBe(200);
+      const revBody = (await revHqStoreRes.json()) as { data: Array<{ id: string }> };
+      expect(revBody.data.map((r) => r.id)).toEqual(['rev-sadec-1']);
+    });
+
+    it('BN3: checkinRouter, floorPlanRouter, and signageRouter reject conflicting query/header overrides with 403 and honor HQ concrete X-Store-ID when c.get("tenantId") is "*"', async () => {
+      const { Hono } = await import('hono');
+      const { checkinRouter } = await import('../../routes/checkin');
+      const floorPlanMod = await import('../../routes/floor-plan');
+      const floorPlanRouter = floorPlanMod.default || (floorPlanMod as unknown as { floorPlanRouter: typeof checkinRouter }).floorPlanRouter;
+      const { signageRouter } = await import('../../routes/signage');
+      const suiteSecret = 'test-jwt-secret-multi-tenant-32chars';
+
+      const hqToken = await generateJWT(
+        {
+          sub: 'hq-bn3',
+          id: 'hq-bn3',
+          role: 'owner',
+          tenantId: 'hq',
+          authVersion: 1,
+          authTime: Math.floor(Date.now() / 1000),
+          sessionType: 'staff-web',
+        } as never,
+        suiteSecret,
+        3600
+      );
+
+      const mockDb = {
+        prepare() {
+          const makeStmt = () => ({
+            first: async () => ({ id: 'hq-bn3', name: 'HQ Admin', phone: null, role: 'owner', is_active: 1, auth_version: 1, tenant_id: 'hq' }),
+            all: async () => ({
+              results: [
+                {
+                  product_name: 'Trà Sen Sa Đéc',
+                  price: 39000,
+                  image_url: null,
+                  description: null,
+                  category_id: 1,
+                  category_name: 'Đặc Sản',
+                  category_sort_order: 1,
+                  tenant_id: 'sadec',
+                  category_tenant_id: 'sadec',
+                },
+                {
+                  product_name: 'Trà Cần Thơ',
+                  price: 39000,
+                  image_url: null,
+                  description: null,
+                  category_id: 2,
+                  category_name: 'Khác',
+                  category_sort_order: 2,
+                  tenant_id: 'cantho',
+                  category_tenant_id: 'cantho',
+                },
+              ],
+            }),
+            run: async () => ({ meta: { changes: 1 } }),
+          });
+          return {
+            bind: () => makeStmt(),
+            first: () => makeStmt().first(),
+            all: () => makeStmt().all(),
+            run: () => makeStmt().run(),
+          };
+        },
+      };
+
+      const app = new Hono<{ Bindings: Env }>();
+      app.use('*', async (c, next) => {
+        c.set('user' as never, { id: 'hq-bn3', role: 'owner', tenantId: 'hq' } as never);
+        c.set('tenantId' as never, '*' as never);
+        await next();
+      });
+      app.route('/api/checkin', checkinRouter);
+      app.route('/api/floor-plan', floorPlanRouter);
+      app.route('/api/signage', signageRouter);
+
+      // 1. checkinRouter rejects conflicting overrides with 403
+      const checkinConflictRes = await app.request(
+        '/api/checkin?status=pending&tenant_id=sadec',
+        { headers: { 'X-Store-ID': 'cantho' } },
+        { AURA_DB: mockDb, JWT_SECRET: suiteSecret } as unknown as Env
+      );
+      expect(checkinConflictRes.status).toBe(403);
+
+      // 2. floorPlanRouter rejects conflicting overrides with 403
+      const fpConflictRes = await app.request(
+        '/api/floor-plan?tenant_id=sadec',
+        {
+          headers: {
+            Authorization: `Bearer ${hqToken}`,
+            'X-Store-ID': 'cantho',
+          },
+        },
+        { AURA_DB: mockDb, JWT_SECRET: suiteSecret } as unknown as Env
+      );
+      expect(fpConflictRes.status).toBe(403);
+
+      // 3. signageRouter rejects conflicting overrides with 403 and scopes HQ menu to X-Store-ID: sadec
+      const signageConflictRes = await app.request(
+        '/api/signage/menu?tenant_id=sadec',
+        { headers: { 'X-Store-ID': 'cantho' } },
+        { AURA_DB: mockDb, JWT_SECRET: suiteSecret } as unknown as Env
+      );
+      expect(signageConflictRes.status).toBe(403);
+
+      const signageHqStoreRes = await app.request(
+        '/api/signage/menu',
+        { headers: { 'X-Store-ID': 'sadec' } },
+        { AURA_DB: mockDb, JWT_SECRET: suiteSecret } as unknown as Env
+      );
+      expect(signageHqStoreRes.status).toBe(200);
+      const signageBody = (await signageHqStoreRes.json()) as { data: Array<{ id: number }> };
+      expect(signageBody.data.map((c) => c.id)).toEqual([1]);
+    });
+
+    it('BN4: broadcastRouter and campaignsRouter reject conflicting tenant overrides with 403 and honor HQ concrete tenant overrides', async () => {
+      const { Hono } = await import('hono');
+      const { registerSendHandler } = await import('../../routes/broadcast-handlers/send-handler');
+      const { campaignsRouter } = await import('../../routes/campaigns-handlers/routes');
+      const suiteSecret = 'test-jwt-secret-multi-tenant-32chars';
+
+      const hqToken = await generateJWT(
+        {
+          sub: 'hq-bn4',
+          id: 'hq-bn4',
+          role: 'owner',
+          tenantId: 'hq',
+          authVersion: 1,
+          authTime: Math.floor(Date.now() / 1000),
+          sessionType: 'staff-web',
+        } as never,
+        suiteSecret,
+        3600
+      );
+
+      const broadcastSqlArgs: unknown[][] = [];
+      const mockDb = {
+        prepare(sql: string) {
+          const makeStmt = (args: unknown[]) => ({
+            first: async () => {
+              if (/FROM users|FROM staff/i.test(sql)) {
+                return { id: 'hq-bn4', name: 'HQ Admin', phone: null, role: 'owner', is_active: 1, auth_version: 1, tenant_id: 'hq' };
+              }
+              return null;
+            },
+            all: async () => {
+              broadcastSqlArgs.push(args);
+              return { results: [] };
+            },
+            run: async () => ({ meta: { changes: 1 } }),
+          });
+          return {
+            bind: (...args: unknown[]) => makeStmt(args),
+            first: () => makeStmt([]).first(),
+            all: () => makeStmt([]).all(),
+            run: () => makeStmt([]).run(),
+          };
+        },
+      };
+
+      const app = new Hono<{ Bindings: Env }>();
+      app.use('*', async (c, next) => {
+        c.set('user' as never, { id: 'hq-bn4', role: 'owner', tenantId: 'hq' } as never);
+        c.set('tenantId' as never, '*' as never);
+        await next();
+      });
+      const bcastRouter = new Hono<{ Bindings: Env }>();
+      registerSendHandler(bcastRouter);
+      app.route('/api/broadcast', bcastRouter);
+      app.route('/api/campaigns', campaignsRouter);
+
+      // 1. broadcastRouter rejects conflicting header + body tenant overrides with 403 even for HQ admin
+      const bcastConflictRes = await app.request(
+        '/api/broadcast/send',
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Store-ID': 'cantho',
+          },
+          body: JSON.stringify({
+            segment: 'all',
+            channel: 'sms',
+            message: 'Khuyến mãi',
+            tenant_id: 'sadec',
+          }),
+        },
+        { AURA_DB: mockDb, JWT_SECRET: suiteSecret } as unknown as Env
+      );
+      expect(bcastConflictRes.status).toBe(403);
+
+      // 2. broadcastRouter honors HQ body.tenant_id = 'sadec' even when c.get('tenantId') is '*'
+      const bcastHqStoreRes = await app.request(
+        '/api/broadcast/send',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            segment: 'all',
+            channel: 'sms',
+            message: 'Khuyến mãi Sa Đéc',
+            tenant_id: 'sadec',
+          }),
+        },
+        { AURA_DB: mockDb, JWT_SECRET: suiteSecret } as unknown as Env
+      );
+      expect(bcastHqStoreRes.status).toBe(400);
+      expect(broadcastSqlArgs.some((args) => args.includes('sadec'))).toBe(true);
+
+      // 3. campaignsRouter rejects conflicting query/header overrides with 403 even for HQ admin
+      const campConflictRes = await app.request(
+        '/api/campaigns?tenant_id=sadec',
+        {
+          headers: {
+            Authorization: `Bearer ${hqToken}`,
+            'X-Store-ID': 'cantho',
+          },
+        },
+        { AURA_DB: mockDb, JWT_SECRET: suiteSecret } as unknown as Env
+      );
+      expect(campConflictRes.status).toBe(403);
+    });
+  });
+
+  describe('Suite 68: Phase BO1–BO4 — Franchise Locations, Recommendations, Referrals, WiFi, Container Telemetry, Push, AI Barista, Customer Assistant, Dynamic Pricing & Forecasting Override Hardening', () => {
+    it('BO1: franchiseRouter and recommendationsRouter reject conflicting tenant overrides with 403 and honor HQ concrete store overrides', async () => {
+      const { Hono } = await import('hono');
+      const { franchiseRouter } = await import('../../routes/franchise-locations');
+      const { recommendationsRouter } = await import('../../routes/recommendations');
+      const suiteSecret = 'test-jwt-secret-multi-tenant-32chars';
+
+      const hqToken = await generateJWT(
+        {
+          sub: 'hq-bo1',
+          id: 'hq-bo1',
+          role: 'owner',
+          tenantId: 'hq',
+          authVersion: 1,
+          authTime: Math.floor(Date.now() / 1000),
+          sessionType: 'staff-web',
+        } as never,
+        suiteSecret,
+        3600
+      );
+
+      const recSqlArgs: unknown[][] = [];
+      const mockDb = {
+        prepare(sql: string) {
+          const makeStmt = (args: unknown[]) => ({
+            first: async () => {
+              if (/FROM users|FROM staff/i.test(sql)) {
+                return { id: 'hq-bo1', name: 'HQ Admin', phone: null, role: 'owner', is_active: 1, auth_version: 1, tenant_id: 'hq' };
+              }
+              if (/FROM franchise_locations WHERE id = \?/i.test(sql)) {
+                return { id: 'loc-hq-1', code: 'HQ01', name: 'HQ Flagship', tenant_id: 'hq', royalty_percentage: 5.0 };
+              }
+              if (/SELECT COUNT\(\*\) as order_count/i.test(sql)) {
+                recSqlArgs.push(args);
+                return { order_count: 4, gross_sales: 400000 };
+              }
+              return null;
+            },
+            all: async () => {
+              if (/FROM ai_product_affinities/i.test(sql)) {
+                recSqlArgs.push(args);
+                return {
+                  results: [{ id: 'tra_sen_sadec', co_occurrence_count: 12, affinity_score: 0.91 }],
+                };
+              }
+              return { results: [] };
+            },
+            run: async () => ({ meta: { changes: 1 } }),
+          });
+          return {
+            bind: (...args: unknown[]) => makeStmt(args),
+            first: () => makeStmt([]).first(),
+            all: () => makeStmt([]).all(),
+            run: () => makeStmt([]).run(),
+          };
+        },
+      };
+
+      const app = new Hono<{ Bindings: Env }>();
+      app.use('*', async (c, next) => {
+        c.set('user' as never, { id: 'hq-bo1', role: 'owner', tenantId: 'hq' } as never);
+        c.set('tenantId' as never, '*' as never);
+        await next();
+      });
+      app.route('/api/franchise', franchiseRouter);
+      app.route('/api/recommendations', recommendationsRouter);
+
+      // 1. franchiseRouter rejects conflicting query/header overrides with 403 even for HQ admin
+      const franConflictRes = await app.request(
+        '/api/franchise/locations?tenant_id=sadec',
+        {
+          headers: {
+            Authorization: `Bearer ${hqToken}`,
+            'X-Store-ID': 'cantho',
+          },
+        },
+        { AURA_DB: mockDb, JWT_SECRET: suiteSecret } as unknown as Env
+      );
+      expect(franConflictRes.status).toBe(403);
+
+      // 2. franchiseRouter GET /locations/:id/metrics normalizes location.tenant_id='hq' to 'default'
+      const metricsRes = await app.request(
+        '/api/franchise/locations/loc-hq-1/metrics',
+        { headers: { Authorization: `Bearer ${hqToken}` } },
+        { AURA_DB: mockDb, JWT_SECRET: suiteSecret } as unknown as Env
+      );
+      expect(metricsRes.status).toBe(200);
+      expect(recSqlArgs.some((a) => a[0] === 'default')).toBe(true);
+
+      // 3. recommendationsRouter rejects conflicting query/header overrides with 403 and scopes HQ concrete override
+      const recConflictRes = await app.request(
+        '/api/recommendations/frequently-bought-together?item_id=cafe_muoi_sadec&tenant_id=sadec&store_id=cantho',
+        { headers: { Authorization: `Bearer ${hqToken}` } },
+        { AURA_DB: mockDb, JWT_SECRET: suiteSecret } as unknown as Env
+      );
+      expect(recConflictRes.status).toBe(403);
+
+      recSqlArgs.length = 0;
+      const recHqStoreRes = await app.request(
+        '/api/recommendations/frequently-bought-together?item_id=cafe_muoi_sadec',
+        {
+          headers: {
+            Authorization: `Bearer ${hqToken}`,
+            'X-Store-ID': 'sadec',
+          },
+        },
+        { AURA_DB: mockDb, JWT_SECRET: suiteSecret } as unknown as Env
+      );
+      expect(recHqStoreRes.status).toBe(200);
+      expect(recSqlArgs.some((a) => a.includes('sadec'))).toBe(true);
+    });
+
+    it('BO2: referralRouter and createWifiRoutes reject conflicting tenant overrides with 403 and normalize HQ wildcard in WiFi sessions', async () => {
+      const { Hono } = await import('hono');
+      const { createWifiRoutes } = await import('../../routes/wifi');
+      const { checkWifiSessionStatus, authorizeWifiOverride } = await import('../../tree/wifi/session');
+      const suiteSecret = 'test-jwt-secret-multi-tenant-32chars';
+
+      const hqToken = await generateJWT(
+        {
+          sub: 'hq-bo2',
+          id: 'hq-bo2',
+          role: 'owner',
+          tenantId: 'hq',
+          authVersion: 1,
+          authTime: Math.floor(Date.now() / 1000),
+          sessionType: 'staff-web',
+        } as never,
+        suiteSecret,
+        3600
+      );
+
+      const wifiInsertArgs: unknown[][] = [];
+      const mockDb = {
+        prepare(sql: string) {
+          const makeStmt = (args: unknown[]) => ({
+            first: async () => {
+              if (/FROM users|FROM staff/i.test(sql)) {
+                return { id: 'hq-bo2', name: 'HQ Admin', phone: null, role: 'owner', is_active: 1, auth_version: 1, tenant_id: 'hq' };
+              }
+              if (/FROM wifi_sessions/i.test(sql)) {
+                return {
+                  id: 'ws-sadec-1',
+                  client_mac: 'AA:BB:CC:DD:EE:FF',
+                  phone: '0901234567',
+                  status: 'authorized',
+                  authorized_at: new Date().toISOString(),
+                  expires_at: new Date(Date.now() + 3600_000).toISOString(),
+                  tenant_id: 'sadec',
+                };
+              }
+              return null;
+            },
+            all: async () => ({ results: [] }),
+            run: async () => {
+              if (/INSERT INTO wifi_sessions/i.test(sql)) {
+                wifiInsertArgs.push(args);
+              }
+              return { meta: { changes: 1 } };
+            },
+          });
+          return {
+            bind: (...args: unknown[]) => makeStmt(args),
+            first: () => makeStmt([]).first(),
+            all: () => makeStmt([]).all(),
+            run: () => makeStmt([]).run(),
+          };
+        },
+      };
+
+      const app = new Hono<{ Bindings: Env }>();
+      app.use('*', async (c, next) => {
+        c.set('user' as never, { id: 'hq-bo2', role: 'owner', tenantId: 'hq' } as never);
+        c.set('tenantId' as never, '*' as never);
+        await next();
+      });
+      app.route('/api/wifi', createWifiRoutes());
+
+      // 1. wifiRouter rejects conflicting query/header overrides with 403
+      const wifiConflictRes = await app.request(
+        '/api/wifi/status?mac=AA:BB:CC:DD:EE:FF&tenant_id=sadec&store_id=cantho',
+        { headers: { Authorization: `Bearer ${hqToken}` } },
+        { AURA_DB: mockDb, JWT_SECRET: suiteSecret } as unknown as Env
+      );
+      expect(wifiConflictRes.status).toBe(403);
+
+      // 2. wifiRouter POST /authorize honors HQ concrete store override (X-Store-ID: sadec) even when c.get('tenantId') is '*'
+      const wifiAuthRes = await app.request(
+        '/api/wifi/authorize',
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${hqToken}`,
+            'X-Store-ID': 'sadec',
+          },
+          body: JSON.stringify({ mac: 'AA:BB:CC:DD:EE:FF', action: 'grant', duration_seconds: 1800 }),
+        },
+        { AURA_DB: mockDb, JWT_SECRET: suiteSecret } as unknown as Env
+      );
+      expect(wifiAuthRes.status).toBe(200);
+      expect(wifiInsertArgs).toHaveLength(1);
+      expect(wifiInsertArgs[0][6]).toBe('sadec');
+
+      // 3. checkWifiSessionStatus treats 'hq' as wildcard and authorizeWifiOverride rejects 'hq'
+      const statusHq = await checkWifiSessionStatus({ AURA_DB: mockDb }, 'AA:BB:CC:DD:EE:FF', 'hq');
+      expect(statusHq.authorized).toBe(true);
+      await expect(
+        authorizeWifiOverride({ AURA_DB: mockDb }, { mac: 'AA:BB:CC:DD:EE:FF', action: 'grant' }, 'hq')
+      ).rejects.toThrow('Explicit tenant scope required');
+    });
+
+    it('BO3: containerTelemetryRouter and pushRouter reject conflicting tenant overrides with 403 and honor HQ concrete store overrides', async () => {
+      const { Hono } = await import('hono');
+      const { containerTelemetryRouter } = await import('../../routes/container-telemetry');
+      const { pushRouter } = await import('../../routes/push');
+      const suiteSecret = 'test-jwt-secret-multi-tenant-32chars';
+
+      const hqToken = await generateJWT(
+        {
+          sub: 'hq-bo3',
+          id: 'hq-bo3',
+          role: 'owner',
+          tenantId: 'hq',
+          authVersion: 1,
+          authTime: Math.floor(Date.now() / 1000),
+          sessionType: 'staff-web',
+        } as never,
+        suiteSecret,
+        3600
+      );
+
+      const queryArgs: unknown[][] = [];
+      const mockDb = {
+        prepare(sql: string) {
+          const makeStmt = (args: unknown[]) => ({
+            first: async () => {
+              if (/FROM users|FROM staff/i.test(sql)) {
+                return { id: 'hq-bo3', name: 'HQ Admin', phone: null, role: 'owner', is_active: 1, auth_version: 1, tenant_id: 'hq' };
+              }
+              return null;
+            },
+            all: async () => {
+              queryArgs.push(args);
+              return { results: [] };
+            },
+            run: async () => ({ meta: { changes: 1 } }),
+          });
+          return {
+            bind: (...args: unknown[]) => makeStmt(args),
+            first: () => makeStmt([]).first(),
+            all: () => makeStmt([]).all(),
+            run: () => makeStmt([]).run(),
+          };
+        },
+      };
+
+      const app = new Hono<{ Bindings: Env }>();
+      app.use('*', async (c, next) => {
+        c.set('user' as never, { id: 'hq-bo3', role: 'owner', tenantId: 'hq' } as never);
+        c.set('tenantId' as never, '*' as never);
+        await next();
+      });
+      app.route('/api/edge', containerTelemetryRouter);
+      app.route('/api/push', pushRouter);
+
+      // 1. containerTelemetryRouter rejects conflicting query/header overrides with 403 and scopes HQ status to X-Store-ID: sadec
+      const telConflictRes = await app.request(
+        '/api/edge/containers/status?tenant_id=sadec',
+        {
+          headers: {
+            Authorization: `Bearer ${hqToken}`,
+            'X-Store-ID': 'cantho',
+          },
+        },
+        { AURA_DB: mockDb, JWT_SECRET: suiteSecret } as unknown as Env
+      );
+      expect(telConflictRes.status).toBe(403);
+
+      queryArgs.length = 0;
+      const telHqStoreRes = await app.request(
+        '/api/edge/containers/status',
+        {
+          headers: {
+            Authorization: `Bearer ${hqToken}`,
+            'X-Store-ID': 'sadec',
+          },
+        },
+        { AURA_DB: mockDb, JWT_SECRET: suiteSecret } as unknown as Env
+      );
+      expect(telHqStoreRes.status).toBe(200);
+      expect(queryArgs.some((a) => a.includes('sadec'))).toBe(true);
+
+      // 2. pushRouter scopes HQ list-subscriptions to X-Store-ID: sadec even when c.get('tenantId') is '*'
+      queryArgs.length = 0;
+      const pushHqStoreRes = await app.request(
+        '/api/push/list-subscriptions',
+        {
+          headers: {
+            Authorization: `Bearer ${hqToken}`,
+            'X-Store-ID': 'sadec',
+          },
+        },
+        { AURA_DB: mockDb, JWT_SECRET: suiteSecret } as unknown as Env
+      );
+      expect(pushHqStoreRes.status).toBe(200);
+      expect(queryArgs.some((a) => a.includes('sadec'))).toBe(true);
+    });
+
+    it('BO4: aiBaristaRouter, customerAssistantRouter, dynamicPricingRouter, demandForecastRouter, and inventoryForecastingRouter reject conflicting overrides with 403 and honor HQ concrete store overrides', async () => {
+      const { Hono } = await import('hono');
+      const { aiBaristaRouter } = await import('../../routes/ai-barista');
+      const { customerAssistantRouter } = await import('../../routes/customer-assistant');
+      const { dynamicPricingRouter } = await import('../../routes/dynamic-pricing');
+      const { demandForecastRouter } = await import('../../routes/demand-forecast');
+      const { inventoryForecastingRouter } = await import('../../routes/inventory-forecasting');
+      const suiteSecret = 'test-jwt-secret-multi-tenant-32chars';
+
+      const hqToken = await generateJWT(
+        {
+          sub: 'hq-bo4',
+          id: 'hq-bo4',
+          role: 'owner',
+          tenantId: 'hq',
+          authVersion: 1,
+          authTime: Math.floor(Date.now() / 1000),
+          sessionType: 'staff-web',
+        } as never,
+        suiteSecret,
+        3600
+      );
+
+      const sqlArgs: unknown[][] = [];
+      const mockDb = {
+        prepare(sql: string) {
+          const makeStmt = (args: unknown[]) => ({
+            first: async () => {
+              if (/FROM users|FROM staff/i.test(sql)) {
+                return { id: 'hq-bo4', name: 'HQ Admin', phone: null, role: 'owner', is_active: 1, auth_version: 1, tenant_id: 'hq' };
+              }
+              return null;
+            },
+            all: async () => {
+              sqlArgs.push(args);
+              return { results: [] };
+            },
+            run: async () => {
+              sqlArgs.push(args);
+              return { meta: { changes: 1 } };
+            },
+          });
+          return {
+            bind: (...args: unknown[]) => makeStmt(args),
+            first: () => makeStmt([]).first(),
+            all: () => makeStmt([]).all(),
+            run: () => makeStmt([]).run(),
+          };
+        },
+      };
+
+      const app = new Hono<{ Bindings: Env }>();
+      app.use('*', async (c, next) => {
+        c.set('user' as never, { id: 'hq-bo4', role: 'owner', tenantId: 'hq' } as never);
+        c.set('tenantId' as never, '*' as never);
+        await next();
+      });
+      app.route('/api/barista', aiBaristaRouter);
+      app.route('/api/assistant', customerAssistantRouter);
+      app.route('/api/pricing', dynamicPricingRouter);
+      app.route('/api/forecast', demandForecastRouter);
+      app.route('/api/inv-forecast', inventoryForecastingRouter);
+
+      // 1. aiBaristaRouter, customerAssistantRouter, and dynamicPricingRouter reject conflicting query/header overrides with 403
+      const baristaConflictRes = await app.request(
+        '/api/barista/recommend?tenant_id=sadec&store_id=cantho',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${hqToken}` },
+          body: JSON.stringify({ mood: 'tỉnh táo' }),
+        },
+        { AURA_DB: mockDb, JWT_SECRET: suiteSecret } as unknown as Env
+      );
+      expect(baristaConflictRes.status).toBe(403);
+
+      const asstConflictRes = await app.request(
+        '/api/assistant?tenant_id=sadec',
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${hqToken}`,
+            'X-Store-ID': 'cantho',
+          },
+          body: JSON.stringify({ query: 'wifi pass' }),
+        },
+        { AURA_DB: mockDb, JWT_SECRET: suiteSecret } as unknown as Env
+      );
+      expect(asstConflictRes.status).toBe(403);
+
+      const pricingConflictRes = await app.request(
+        '/api/pricing/rules?tenant_id=sadec',
+        {
+          headers: {
+            Authorization: `Bearer ${hqToken}`,
+            'X-Store-ID': 'cantho',
+          },
+        },
+        { AURA_DB: mockDb, JWT_SECRET: suiteSecret } as unknown as Env
+      );
+      expect(pricingConflictRes.status).toBe(403);
+
+      // 2. demandForecastRouter and inventoryForecastingRouter honor HQ concrete store override (X-Store-ID: sadec)
+      const dfRes = await app.request(
+        '/api/forecast/forecast',
+        {
+          headers: {
+            Authorization: `Bearer ${hqToken}`,
+            'X-Store-ID': 'sadec',
+          },
+        },
+        { AURA_DB: mockDb, JWT_SECRET: suiteSecret } as unknown as Env
+      );
+      expect(dfRes.status).toBe(200);
+      const dfBody = (await dfRes.json()) as { data: { tenant_id: string } };
+      expect(dfBody.data.tenant_id).toBe('sadec');
+
+      sqlArgs.length = 0;
+      const invForecastRes = await app.request(
+        '/api/inv-forecast/run-rate',
+        {
+          headers: {
+            Authorization: `Bearer ${hqToken}`,
+            'X-Store-ID': 'sadec',
+          },
+        },
+        { AURA_DB: mockDb, JWT_SECRET: suiteSecret } as unknown as Env
+      );
+      expect(invForecastRes.status).toBe(200);
+      expect(sqlArgs.some((a) => a.includes('sadec'))).toBe(true);
+    });
+  });
+
+  // =========================================================================
+  // Suite 70 — Phase BQ1–BQ4: Customer Assistant/Chat, OpenAPI Catalog Read &
+  // Dynamic Pricing, Mobile Staff Routes, and Loyalty/Auth-Register Guardrails
+  // =========================================================================
+  describe('Suite 70 — Phase BQ1–BQ4: Customer Assistant/Chat, OpenAPI Catalog Read & Dynamic Pricing, Mobile Staff Routes, and Loyalty/Auth-Register Multi-Source Tenant Guardrails', () => {
+    it('BQ1: customerAssistantRouter and chatRouter reject conflicting multi-source tenant overrides with 403', async () => {
+      const { Hono } = await import('hono');
+      const { customerAssistantRouter } = await import('../../routes/customer-assistant');
+      const { chatRouter } = await import('../../routes/chat');
+      const { issueStaffSession } = await import('../../lib/staff-session');
+      const suiteSecret = 'test-jwt-secret-multi-tenant-32chars';
+
+      const asstApp = new Hono<{ Bindings: Env }>();
+      asstApp.use('*', async (c, next) => {
+        c.set('tenantId' as never, 'sadec' as never);
+        await next();
+      });
+      asstApp.route('/assistant', customerAssistantRouter);
+
+      const asstRes = await asstApp.request(
+        'http://localhost/assistant?tenant_id=sadec&store_id=cantho',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ query: 'menu hôm nay có gì?' }),
+        },
+        { AURA_DB: {} } as unknown as Env
+      );
+      expect(asstRes.status).toBe(403);
+
+      const staffAccount = {
+        id: 'staff-bq1',
+        name: 'Staff BQ1',
+        phone: null,
+        role: 'manager' as const,
+        tenant_id: 'sadec',
+        is_active: 1,
+        auth_version: 1,
+      };
+      const { token } = await issueStaffSession(
+        { JWT_SECRET: suiteSecret },
+        staffAccount,
+        { sessionType: 'staff-web' }
+      );
+      const chatEnv = {
+        JWT_SECRET: suiteSecret,
+        PILOT_TENANT_ID: 'sadec',
+        AURA_DB: {
+          prepare: () => ({
+            bind: () => ({
+              first: async () => staffAccount,
+              all: async () => ({ results: [] }),
+              run: async () => ({ success: true }),
+            }),
+          }),
+        },
+      } as unknown as Env;
+
+      const chatApp = new Hono<{ Bindings: Env }>();
+      chatApp.route('/chat', chatRouter);
+
+      const chatRes = await chatApp.request(
+        'http://localhost/chat/conversations?tenant_id=sadec',
+        {
+          method: 'GET',
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'X-Store-ID': 'cantho',
+          },
+        },
+        chatEnv
+      );
+      expect(chatRes.status).toBe(403);
+    });
+
+    it('BQ2: OpenAPI category/product read handlers and dynamicPricingRouter reject FORBIDDEN_TENANT_SENTINEL (hq, wildcard, conflicting overrides) with 403', async () => {
+      const { Hono } = await import('hono');
+      const { OpenAPIHono } = await import('@hono/zod-openapi');
+      const { registerCategoryReadHandlers } = await import('../../routes/openapi-categories-handlers/read-handlers');
+      const { registerProductReadHandlers } = await import('../../routes/openapi-products-handlers/read-handlers');
+      const { dynamicPricingRouter } = await import('../../routes/dynamic-pricing');
+
+      const app = new OpenAPIHono<{ Bindings: Env }>();
+      registerCategoryReadHandlers(app);
+      registerProductReadHandlers(app);
+
+      const env = {
+        AURA_DB: {
+          prepare: () => ({
+            bind() { return this; },
+            all: async () => ({ results: [] }),
+            first: async () => null,
+          }),
+        },
+      } as unknown as Env;
+
+      expect((await app.request('http://localhost/api/categories?tenant_id=hq', { method: 'GET' }, env)).status).toBe(403);
+      expect(
+        (await app.request('http://localhost/api/categories?tenant_id=sadec&store_id=cantho', { method: 'GET' }, env)).status
+      ).toBe(403);
+      expect((await app.request('http://localhost/api/categories/cat-1?tenant_id=*', { method: 'GET' }, env)).status).toBe(403);
+      expect(
+        (
+          await app.request(
+            'http://localhost/api/categories/tree?tenant_id=sadec',
+            { method: 'GET', headers: { 'X-Store-ID': 'cantho' } },
+            env
+          )
+        ).status
+      ).toBe(403);
+
+      expect((await app.request('http://localhost/api/products?tenant_id=hq', { method: 'GET' }, env)).status).toBe(403);
+      expect(
+        (await app.request('http://localhost/api/products/prod-1?tenant_id=sadec&store_id=cantho', { method: 'GET' }, env)).status
+      ).toBe(403);
+      expect(
+        (await app.request('http://localhost/api/products/slug/espresso?tenant_id=*', { method: 'GET' }, env)).status
+      ).toBe(403);
+
+      const pricingApp = new Hono<{ Bindings: Env }>();
+      pricingApp.use('*', async (c, next) => {
+        c.set('tenantId' as never, 'sadec' as never);
+        c.set('user' as never, { id: 'mgr-1', role: 'manager', tenantId: 'sadec' } as never);
+        await next();
+      });
+      pricingApp.route('/pricing', dynamicPricingRouter);
+
+      const pricingRes = await pricingApp.request(
+        'http://localhost/pricing/active?tenant_id=sadec&store_id=cantho',
+        { method: 'GET' },
+        { AURA_DB: {} } as unknown as Env
+      );
+      expect(pricingRes.status).toBe(403);
+    });
+
+    it('BQ3: orders-mobile, tables-mobile, and notifications-mobile reject conflicting query/header tenant overrides with 403', async () => {
+      const { getOrdersMobile, createOrderMobile, getOrderDetail } = await import('../../routes/orders-mobile');
+      const { getTablesMobile, updateTableStatus } = await import('../../routes/tables-mobile');
+      const { getNotifications, markNotificationRead, subscribePush } = await import('../../routes/notifications-mobile');
+
+      const makeMobileCtx = (opts: {
+        user?: Record<string, unknown>;
+        tenantId?: string;
+        query?: Record<string, string>;
+        headers?: Record<string, string>;
+        params?: Record<string, string>;
+        body?: unknown;
+      }) => {
+        const vars = new Map<string, unknown>();
+        if (opts.user) vars.set('user', opts.user);
+        if (opts.tenantId) vars.set('tenantId', opts.tenantId);
+        const queryMap = opts.query ?? {};
+        const headerMap: Record<string, string> = {};
+        for (const [k, v] of Object.entries(opts.headers ?? {})) {
+          headerMap[k.toLowerCase()] = v;
+        }
+        const paramMap = opts.params ?? {};
+        const qs = new URLSearchParams(queryMap).toString();
+        const fullUrl = `http://localhost/test${qs ? `?${qs}` : ''}`;
+        return {
+          get: (k: string) => vars.get(k),
+          set: (k: string, v: unknown) => vars.set(k, v),
+          env: { AURA_DB: {} },
+          req: {
+            url: fullUrl,
+            query: (k?: string) => (k ? queryMap[k] : queryMap),
+            header: (k: string) => headerMap[k.toLowerCase()],
+            param: (k: string) => paramMap[k],
+            json: async () => opts.body ?? {},
+            raw: new Request(fullUrl, { headers: opts.headers ?? {} }),
+          },
+          json: (body: unknown, status = 200) =>
+            new Response(JSON.stringify(body), {
+              status,
+              headers: { 'Content-Type': 'application/json' },
+            }),
+        } as any;
+      };
+
+      expect(
+        (
+          await getOrdersMobile(
+            makeMobileCtx({
+              user: { id: 'staff-a', role: 'waiter', tenantId: 'sadec' },
+              tenantId: 'sadec',
+              query: { tenant_id: 'sadec', store_id: 'cantho' },
+            })
+          )
+        ).status
+      ).toBe(403);
+      expect(
+        (
+          await createOrderMobile(
+            makeMobileCtx({
+              user: { id: 'staff-a', role: 'waiter', tenantId: 'sadec' },
+              tenantId: 'sadec',
+              query: { tenant_id: 'sadec' },
+              headers: { 'X-Store-ID': 'cantho' },
+              body: { table_id: 'tbl-1', items: [{ menu_item_id: 'item-1', quantity: 1 }] },
+            })
+          )
+        ).status
+      ).toBe(403);
+      expect(
+        (
+          await getOrderDetail(
+            makeMobileCtx({
+              user: { id: 'hq-1', role: 'owner', tenantId: 'hq' },
+              tenantId: '*',
+              params: { id: 'ord-1' },
+              query: { tenant_id: 'sadec', store_id: 'cantho' },
+            })
+          )
+        ).status
+      ).toBe(403);
+
+      expect(
+        (
+          await getTablesMobile(
+            makeMobileCtx({
+              user: { id: 'staff-a', role: 'waiter', tenantId: 'sadec' },
+              tenantId: 'sadec',
+              query: { tenant_id: 'sadec', store_id: 'cantho' },
+            })
+          )
+        ).status
+      ).toBe(403);
+      expect(
+        (
+          await updateTableStatus(
+            makeMobileCtx({
+              user: { id: 'staff-a', role: 'waiter', tenantId: 'sadec' },
+              tenantId: 'sadec',
+              params: { id: 'tbl-1' },
+              query: { tenant_id: 'sadec' },
+              headers: { 'X-Store-ID': 'cantho' },
+              body: { status: 'occupied' },
+            })
+          )
+        ).status
+      ).toBe(403);
+
+      expect(
+        (
+          await getNotifications(
+            makeMobileCtx({
+              user: { id: 'staff-a', role: 'staff', tenantId: 'sadec' },
+              tenantId: 'sadec',
+              query: { tenant_id: 'sadec', store_id: 'cantho' },
+            })
+          )
+        ).status
+      ).toBe(403);
+      expect(
+        (
+          await markNotificationRead(
+            makeMobileCtx({
+              user: { id: 'staff-a', role: 'staff', tenantId: 'sadec' },
+              tenantId: 'sadec',
+              params: { id: 'notif-1' },
+              query: { tenant_id: 'sadec' },
+              headers: { 'X-Store-ID': 'cantho' },
+            })
+          )
+        ).status
+      ).toBe(403);
+      expect(
+        (
+          await subscribePush(
+            makeMobileCtx({
+              user: { id: 'hq-1', role: 'owner', tenantId: 'hq' },
+              tenantId: 'hq',
+              query: { tenant_id: 'sadec', store_id: 'cantho' },
+              body: {
+                endpoint: 'https://fcm.googleapis.com/fcm/send/abc',
+                keys: { p256dh: 'key1', auth: 'key2' },
+              },
+            })
+          )
+        ).status
+      ).toBe(403);
+    });
+
+    it('BQ4: loyaltyRouter isolates legacy null-tenant logs/redemptions, rejects hq/wildcard/conflicting overrides on active-campaign & tiers, adminLoyaltyRouter rejects conflicting overrides for HQ, and auth-register / registerUser guard reserved hq/wildcard overrides', async () => {
+      const { Hono } = await import('hono');
+      const { loyaltyRouter } = await import('../../routes/loyalty');
+      const { adminLoyaltyRouter } = await import('../../routes/admin-loyalty');
+      const { registerWithVerification } = await import('../../routes/auth-register');
+      const { registerUser } = await import('../../tree/auth/register');
+      const { issueStaffSession } = await import('../../lib/staff-session');
+      const suiteSecret = 'test-jwt-secret-multi-tenant-32chars';
+
+      const custToken = await generateJWT(
+        { id: 'cust-sadec', email: 'custsadec@example.com', role: 'customer', tenantId: 'sadec' } as never,
+        suiteSecret,
+        3600
+      );
+
+      const loyaltyDb = {
+        prepare: (sql: string) => ({
+          bind: () => ({
+            first: async () => {
+              if (sql.includes('FROM customers')) {
+                return {
+                  id: 'cust-sadec',
+                  email: 'custsadec@example.com',
+                  name: 'Cust Sadec',
+                  loyalty_points: 100,
+                  lifetime_points: 100,
+                  loyalty_tier: 'bronze',
+                  tenant_id: 'sadec',
+                };
+              }
+              return null;
+            },
+            all: async () => {
+              if (
+                sql.includes("COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?") ||
+                sql.includes("COALESCE(NULLIF(TRIM(ur.tenant_id), ''), 'default') = ?")
+              ) {
+                throw new Error('forced fallback to legacy query');
+              }
+              if (sql.includes('FROM loyalty_point_logs')) {
+                return {
+                  results: [
+                    { id: 'log-default-null', points_change: 50, tenant_id: null },
+                    { id: 'log-sadec', points_change: 25, tenant_id: 'sadec' },
+                  ],
+                };
+              }
+              if (sql.includes('FROM user_rewards')) {
+                return {
+                  results: [
+                    { id: 'red-default-null', title: 'Legacy Default', tenant_id: null },
+                    { id: 'red-sadec', title: 'Sadec Reward', tenant_id: 'sadec' },
+                  ],
+                };
+              }
+              return { results: [] };
+            },
+          }),
+        }),
+      };
+
+      const loyaltyEnv = { JWT_SECRET: suiteSecret, AURA_DB: loyaltyDb } as unknown as Env;
+      const pointsRes = await loyaltyRouter.request(
+        'http://localhost/points',
+        { headers: { Authorization: `Bearer ${custToken}` } },
+        loyaltyEnv
+      );
+      expect(pointsRes.status).toBe(200);
+      const pointsBody = (await pointsRes.json()) as { data: Array<{ id: string }> };
+      expect(pointsBody.data.map((r) => r.id)).toEqual(['log-sadec']);
+
+      const rewardsRes = await loyaltyRouter.request(
+        'http://localhost/my-rewards',
+        { headers: { Authorization: `Bearer ${custToken}` } },
+        loyaltyEnv
+      );
+      expect(rewardsRes.status).toBe(200);
+      const rewardsBody = (await rewardsRes.json()) as { data: Array<{ id: string }> };
+      expect(rewardsBody.data.map((r) => r.id)).toEqual(['red-sadec']);
+
+      expect(
+        (await loyaltyRouter.request('http://localhost/active-campaign?tenant_id=sadec&store_id=cantho', { method: 'GET' }, loyaltyEnv)).status
+      ).toBe(403);
+      expect(
+        (await loyaltyRouter.request('http://localhost/tiers?tenant_id=hq', { method: 'GET' }, loyaltyEnv)).status
+      ).toBe(403);
+      expect(
+        (
+          await loyaltyRouter.request(
+            'http://localhost/tiers?tenant_id=sadec',
+            { method: 'GET', headers: { 'X-Store-ID': 'cantho' } },
+            loyaltyEnv
+          )
+        ).status
+      ).toBe(403);
+
+      const hqAccount = {
+        id: 'hq-bq4',
+        name: 'HQ Owner',
+        phone: null,
+        role: 'owner' as const,
+        tenant_id: 'hq',
+        is_active: 1,
+        auth_version: 1,
+      };
+      const { token: hqToken } = await issueStaffSession(
+        { JWT_SECRET: suiteSecret },
+        hqAccount,
+        { sessionType: 'staff-web' }
+      );
+      const adminApp = new Hono<{ Bindings: Env }>();
+      adminApp.route('/admin/loyalty', adminLoyaltyRouter);
+      const adminConflictRes = await adminApp.request(
+        'http://localhost/admin/loyalty/campaigns?tenant_id=sadec&store_id=cantho',
+        { method: 'GET', headers: { Authorization: `Bearer ${hqToken}` } },
+        {
+          JWT_SECRET: suiteSecret,
+          AURA_DB: {
+            prepare: () => ({
+              bind: () => ({
+                first: async () => hqAccount,
+                all: async () => ({ results: [] }),
+                run: async () => ({ success: true }),
+              }),
+            }),
+          },
+        } as unknown as Env
+      );
+      expect(adminConflictRes.status).toBe(403);
+
+      const boundCustomerArgs: unknown[][] = [];
+      const regDb = {
+        prepare: (sql: string) => ({
+          bind: (...args: unknown[]) => {
+            if (sql.includes('INSERT OR IGNORE INTO customers')) {
+              boundCustomerArgs.push(args);
+            }
+            return {
+              first: async () => null,
+              run: async () => ({ success: true }),
+            };
+          },
+        }),
+      };
+      const regKV = { get: async () => null, put: async () => undefined };
+
+      const regConflictRes = await registerWithVerification(
+        new Request('http://localhost/auth/register?tenant_id=cantho', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-Tenant-ID': 'sadec' },
+          body: JSON.stringify({ email: 'u1@example.com', password: 'Password123!', name: 'U1' }),
+        }),
+        { AUTH_KV: regKV, AURA_DB: regDb } as any
+      );
+      expect(regConflictRes.status).toBe(403);
+
+      const regHqRes = await registerWithVerification(
+        new Request('http://localhost/auth/register', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-Tenant-ID': 'hq' },
+          body: JSON.stringify({ email: 'u2@example.com', password: 'Password123!', name: 'U2' }),
+        }),
+        { AUTH_KV: regKV, AURA_DB: regDb } as any
+      );
+      expect(regHqRes.status).toBe(403);
+
+      const treeRes = await registerUser(
+        new Request('http://localhost/auth/register-legacy', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-Tenant-ID': 'HQ' },
+          body: JSON.stringify({ email: 'u3@example.com', password: 'Password123!', name: 'U3' }),
+        }),
+        { AUTH_KV: regKV, AURA_DB: regDb, JWT_SECRET: suiteSecret } as any
+      );
+      expect(treeRes.status).toBe(201);
+      expect(boundCustomerArgs.length).toBeGreaterThan(0);
+      expect(boundCustomerArgs[0][4]).toBe('default');
+    });
+  });
 });
+
 
 
 

@@ -23,7 +23,7 @@ import { staffMobileRouter } from './routes/staff-mobile';
 import { ordersUnifiedRouter } from './routes/orders-unified';
 import { kdsOrdersRouter } from './routes/kds-orders';
 import { KDS_ROLES } from './routes/orders-hono-handlers/kds-handlers';
-import { realtimeOrdersRouter } from './routes/realtime-orders';
+import { handleRealtimeChannel } from './routes/realtime-orders';
 import { kdsStreamRouter } from '@aura/domain-kitchen';
 import { registerFeatureRoutes } from './routes/features-router';
 import { registerIntegrationRoutes } from './routes/integrations-router';
@@ -114,12 +114,34 @@ app.route('/api/kds/orders', kdsOrdersRouter);
 app.get('/api/realtime/:channelId', requireAuth(KDS_ROLES), tenantMiddleware, (c) => {
   const user = c.get('user');
   const channelId = c.req.param('channelId');
-  const tenantId = user?.tenantId || 'default';
-  const isDefaultKitchenAlias = channelId === 'kitchen' && tenantId === 'default';
-  if (channelId !== tenantId && !channelId.startsWith(`${tenantId}:`) && !isDefaultKitchenAlias) {
+  const rawUserTenant = (user as { tenantId?: string; tenant_id?: string } | undefined)?.tenantId ??
+    (user as { tenantId?: string; tenant_id?: string } | undefined)?.tenant_id;
+  const tenantId = (rawUserTenant && String(rawUserTenant).trim()) || 'default';
+  const role = String(user?.role || '').trim().toLowerCase();
+  const isHq = (role === 'owner' || role === 'admin') && (tenantId === 'hq' || tenantId === '*');
+  const requestedTenant = (
+    c.req.query('tenant_id') ||
+    c.req.query('tenantId') ||
+    c.req.query('store_id') ||
+    c.req.query('storeId') ||
+    c.req.header('X-Tenant-ID') ||
+    c.req.header('x-tenant-id') ||
+    ''
+  ).trim();
+  if (!isHq && (tenantId === '*' || (requestedTenant && requestedTenant !== tenantId))) {
     return c.json({ success: false, error: 'Không đủ quyền truy cập kênh thời gian thực của cửa hàng khác' }, 403);
   }
-  return realtimeOrdersRouter.fetch(c.req.raw, c.env, c.executionCtx);
+  const effectiveTenant = isHq ? (requestedTenant || c.get('tenantId') || tenantId) : tenantId;
+  const isDefaultKitchenAlias = channelId === 'kitchen' && effectiveTenant === 'default';
+  if (
+    effectiveTenant !== '*' &&
+    channelId !== effectiveTenant &&
+    !channelId.startsWith(`${effectiveTenant}:`) &&
+    !isDefaultKitchenAlias
+  ) {
+    return c.json({ success: false, error: 'Không đủ quyền truy cập kênh thời gian thực của cửa hàng khác' }, 403);
+  }
+  return handleRealtimeChannel(c);
 });
 
 // ── Auth & Mobile ──

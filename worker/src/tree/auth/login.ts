@@ -48,14 +48,29 @@ export async function loginUser(request: Request, env: Record<string, unknown>, 
     const user = await findLoginUser(env as unknown as Env, email);
     const failedPassword = async () => {
       await recordEmailFailure();
-      ctx?.waitUntil?.(createMetricsCollector(env.AURA_DB as Env['AURA_DB']).recordMetric('login_failed', 1, { reason: 'wrong_password' }));
+      const failedTenant = String(user?.tenant_id ?? '').trim();
+      const failedTags: Record<string, string | number | boolean> =
+        failedTenant && failedTenant !== 'default' && failedTenant !== '*'
+          ? { reason: 'wrong_password', tenant_id: failedTenant }
+          : { reason: 'wrong_password' };
+      ctx?.waitUntil?.(createMetricsCollector(env.AURA_DB as Env['AURA_DB']).recordMetric('login_failed', 1, failedTags));
       return errorResponse('Email hoặc mật khẩu không đúng', 401);
     };
     if (!user) {
       await recordEmailFailure();
       const db = env.AURA_DB as import('@cloudflare/workers-types').D1Database;
       const mc = createMetricsCollector(db);
-      ctx?.waitUntil?.(mc.recordMetric('login_failed', 1, { reason: 'user_not_found' }));
+      const reqTenant = String(
+        request.headers?.get?.('x-tenant-id') ||
+          request.headers?.get?.('X-Tenant-ID') ||
+          (typeof env.PILOT_TENANT_ID === 'string' ? env.PILOT_TENANT_ID : '') ||
+          ''
+      ).trim();
+      const notFoundTags: Record<string, string | number | boolean> =
+        reqTenant && reqTenant !== 'default' && reqTenant !== '*'
+          ? { reason: 'user_not_found', tenant_id: reqTenant }
+          : { reason: 'user_not_found' };
+      ctx?.waitUntil?.(mc.recordMetric('login_failed', 1, notFoundTags));
       return errorResponse('Email hoặc mật khẩu không đúng', 401);
     }
 
@@ -93,36 +108,59 @@ export async function loginUser(request: Request, env: Record<string, unknown>, 
         const defaultPilotTenant = typeof env.PILOT_TENANT_ID === 'string' && env.PILOT_TENANT_ID.trim() && env.PILOT_TENANT_ID.trim() !== '*'
           ? env.PILOT_TENANT_ID.trim()
           : 'default';
+        const isLegacyGeneratedTenant = (val: unknown) => /^tenant_[a-z0-9]{7,}_[a-z0-9]+$/i.test(String(val || ''));
         if (!tenantId) {
-          tenantId = (user.tenant_id && !String(user.tenant_id).startsWith('tenant_')) ? String(user.tenant_id) : defaultPilotTenant;
+          tenantId = (user.tenant_id && !isLegacyGeneratedTenant(user.tenant_id)) ? String(user.tenant_id).trim() : defaultPilotTenant;
         }
+        const effectiveTenant = tenantId || defaultPilotTenant;
         if (db?.prepare) {
-          const existingCust = await db.prepare(
-            'SELECT id, tenant_id FROM customers WHERE id = ? OR lower(email) = lower(?) OR (? != \'\' AND phone = ?) LIMIT 1'
-          ).bind(user.id, email, user.phone || '', user.phone || '').first<{ id: string; tenant_id?: string | null }>().catch(() => null);
-          if (existingCust?.id) {
-            user.id = existingCust.id;
-            if (existingCust.tenant_id && String(existingCust.tenant_id).trim()) {
-              tenantId = String(existingCust.tenant_id).trim();
+          let existingCust: { id: string; email?: string | null; tenant_id?: string | null } | null = null;
+          try {
+            existingCust = await db.prepare(
+              `SELECT id, email, tenant_id FROM customers
+               WHERE (id = ? OR lower(email) = lower(?))
+                 AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?
+               LIMIT 1`
+            ).bind(user.id, email, effectiveTenant).first<{ id: string; email?: string | null; tenant_id?: string | null }>();
+          } catch {
+            if (effectiveTenant === 'default') {
+              existingCust = await db.prepare(
+                'SELECT id, email FROM customers WHERE id = ? OR lower(email) = lower(?) LIMIT 1'
+              ).bind(user.id, email).first<{ id: string; email?: string | null; tenant_id?: string | null }>().catch(() => null);
             }
+          }
+          const custTenant = String(existingCust?.tenant_id || '').trim() || effectiveTenant;
+          const custEmail = String(existingCust?.email || '').trim().toLowerCase();
+          const canBindCust = Boolean(
+            existingCust?.id &&
+            custTenant === effectiveTenant &&
+            (!custEmail || custEmail === email.trim().toLowerCase())
+          );
+          if (canBindCust && existingCust) {
+            user.id = existingCust.id;
+            tenantId = custTenant;
           } else {
             const nowIso = new Date().toISOString();
             try {
               await db.prepare(
                 'INSERT INTO customers (id, email, name, phone, loyalty_points, lifetime_points, loyalty_tier, tenant_id, created_at, updated_at) VALUES (?, ?, ?, ?, 0, 0, ?, ?, ?, ?)'
-              ).bind(user.id, email, user.name || 'Thành viên', user.phone || '', 'bronze', tenantId || defaultPilotTenant, nowIso, nowIso).run();
+              ).bind(user.id, email, user.name || 'Thành viên', user.phone || '', 'bronze', effectiveTenant, nowIso, nowIso).run();
             } catch {
-              await db.prepare(
-                'INSERT INTO customers (id, email, name, phone, loyalty_points, loyalty_tier, created_at) VALUES (?, ?, ?, ?, 0, ?, ?)'
-              ).bind(user.id, email, user.name || 'Thành viên', user.phone || '', 'bronze', nowIso).run().catch(() => {});
+              if (effectiveTenant === 'default') {
+                await db.prepare(
+                  'INSERT INTO customers (id, email, name, phone, loyalty_points, loyalty_tier, created_at) VALUES (?, ?, ?, ?, 0, ?, ?)'
+                ).bind(user.id, email, user.name || 'Thành viên', user.phone || '', 'bronze', nowIso).run().catch(() => {});
+              }
             }
             const walletId = `wal_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
             await db.prepare(
               'INSERT INTO cashback_wallets (id, customer_id, balance, total_earned, total_spent, tenant_id, created_at, updated_at) VALUES (?, ?, 0, 0, 0, ?, ?, ?)'
-            ).bind(walletId, user.id, tenantId || defaultPilotTenant, nowIso, nowIso).run().catch(async () => {
-              await db.prepare(
-                'INSERT INTO cashback_wallets (id, customer_id, balance, total_earned, total_spent, created_at, updated_at) VALUES (?, ?, 0, 0, 0, ?, ?)'
-              ).bind(walletId, user.id, nowIso, nowIso).run().catch(() => {});
+            ).bind(walletId, user.id, effectiveTenant, nowIso, nowIso).run().catch(async () => {
+              if (effectiveTenant === 'default') {
+                await db.prepare(
+                  'INSERT INTO cashback_wallets (id, customer_id, balance, total_earned, total_spent, created_at, updated_at) VALUES (?, ?, 0, 0, 0, ?, ?)'
+                ).bind(walletId, user.id, nowIso, nowIso).run().catch(() => {});
+              }
             });
           }
         }
@@ -147,7 +185,17 @@ export async function loginUser(request: Request, env: Record<string, unknown>, 
 
     const db = env.AURA_DB as import('@cloudflare/workers-types').D1Database;
     const mc = createMetricsCollector(db);
-    ctx?.waitUntil?.(mc.recordMetric('login_success', 1));
+    const successTenant = String(
+      (sessionUser as Record<string, unknown>)?.tenantId ??
+        (sessionUser as Record<string, unknown>)?.tenant_id ??
+        user?.tenant_id ??
+        ''
+    ).trim();
+    const successTags =
+      successTenant && successTenant !== 'default' && successTenant !== '*'
+        ? { tenant_id: successTenant }
+        : undefined;
+    ctx?.waitUntil?.(mc.recordMetric('login_success', 1, successTags));
 
     // Session cookie — FE EventSource (SSE) cannot set Authorization headers,
     // so the web client relies on this cookie; getAuthToken() reads it as fallback.

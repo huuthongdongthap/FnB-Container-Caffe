@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { apiFetch } from '@/lib/api-client';
+import { useAuthStore } from '@/hooks/stores/use-auth-store';
 
 export interface TierConfig {
   rank: string;
@@ -60,8 +61,14 @@ export function getNextTier(currentTier: string): TierConfig | null {
 }
 
 export function useLoyalty() {
+  const user = useAuthStore((s) => s.user);
+  const sessionVersion = useAuthStore((s) => s.sessionVersion);
+  const queryKey =
+    user?.id || user?.tenantId || sessionVersion > 0
+      ? ['loyalty', user?.id ?? null, user?.tenantId ?? 'default', sessionVersion]
+      : ['loyalty'];
   return useQuery<LoyaltyData>({
-    queryKey: ['loyalty'],
+    queryKey,
     queryFn: async () => {
       const res = await apiFetch<
         ApiResponse<

@@ -1,25 +1,20 @@
 import { create } from 'zustand';
 import { apiFetch, ApiClientError } from '@/lib/api-client';
 import { offlineDb } from '@/lib/offline-db';
+import {
+  readSessionSnapshot,
+  isSameSessionSnapshot,
+  subscribeSessionChange,
+} from '@/lib/client-session';
 import { resolveMenuDrinkImage } from '@/lib/menu-drink-images';
+import { normalizeMenuItem, type MenuItem, type RawMenuItem } from '@/lib/menu-item';
+
+export type { MenuItem };
 
 /* ═══════════════════════════════════════════════════════════════════
    Menu store — Zustand, no persistence.
    Fetches GET /api/menu, caches items + derived categories in state.
    ═══════════════════════════════════════════════════════════════════ */
-
-
-export interface MenuItem {
-  id: string;
-  name: string;
-  description: string;
-  price: number;
-  category: string;
-  image_url?: string;
-  available: boolean;
-  tags: string[];
-  prep_time?: number; // estimated prep time in minutes
-}
 
 export interface MenuCategory {
   id: string;
@@ -57,42 +52,16 @@ interface MenuState {
   searchMenu: (query: string) => void;
 }
 
-interface RawStoreMenuItem {
-  id: string;
-  name: string;
-  description?: string;
-  priceCents?: number;
-  price?: number | string;
-  category: string;
-  imageUrl?: string;
-  image_url?: string;
-  available?: boolean;
-  tags?: string[];
-}
-
 interface RawMenuStoreResponse {
-  items?: RawStoreMenuItem[];
+  items?: RawMenuItem[];
   data?: {
-    categories?: Array<{ items?: RawStoreMenuItem[] }>;
+    categories?: Array<{ items?: RawMenuItem[] }>;
   };
 }
 
 interface RawSingleMenuStoreResponse {
-  item?: RawStoreMenuItem;
-  data?: RawStoreMenuItem;
-}
-
-function mapRawStoreMenuItem(item: RawStoreMenuItem): MenuItem {
-  return {
-    id: item.id,
-    name: item.name,
-    description: item.description ?? '',
-    price: item.priceCents ?? (typeof item.price === 'string' ? parseInt(item.price, 10) : item.price) ?? 0,
-    category: item.category,
-    image_url: resolveMenuDrinkImage(item.id, item.imageUrl ?? item.image_url),
-    available: Boolean(item.available),
-    tags: Array.isArray(item.tags) ? item.tags : [],
-  };
+  item?: RawMenuItem;
+  data?: RawMenuItem;
 }
 
 function extractCategories(items: MenuItem[]): MenuCategory[] {
@@ -118,15 +87,18 @@ export const useMenuStore = create<MenuState>((set, get) => ({
   searchResults: null,
 
   fetchMenu: async () => {
+    const sessionSnap = readSessionSnapshot();
+    const tenantId = sessionSnap.tenantId;
     set({ loading: true, error: null });
 
     // Offline path: hydrate from IndexedDB before attempting network
     if (!navigator.onLine) {
       try {
         const [cachedItems, cachedCats] = await Promise.all([
-          offlineDb.getMenuItems(),
-          offlineDb.getMenuCategories(),
+          tenantId !== 'default' ? offlineDb.getMenuItems(tenantId) : offlineDb.getMenuItems(),
+          tenantId !== 'default' ? offlineDb.getMenuCategories(tenantId) : offlineDb.getMenuCategories(),
         ]);
+        if (!isSameSessionSnapshot(sessionSnap, readSessionSnapshot())) return;
         if (cachedItems.length > 0) {
           const items = (cachedItems as MenuItem[]).map((item) => ({
             ...item,
@@ -152,27 +124,34 @@ export const useMenuStore = create<MenuState>((set, get) => ({
     // Online: normal fetch
     try {
       const body = await apiFetch<RawMenuStoreResponse>('/api/menu?available=true');
+      if (!isSameSessionSnapshot(sessionSnap, readSessionSnapshot())) return;
 
-      let rawList: RawStoreMenuItem[] = [];
+      let rawList: RawMenuItem[] = [];
       if (Array.isArray(body?.items) && body.items.length > 0) {
         rawList = body.items;
       } else if (Array.isArray(body?.data?.categories)) {
         rawList = body.data.categories.flatMap((cat) => cat.items || []);
       }
 
-      const items: MenuItem[] = rawList.map(mapRawStoreMenuItem);
+      const items: MenuItem[] = rawList.map(normalizeMenuItem);
 
       const categories = extractCategories(items);
       set({ items, categories, loading: false, error: null, searchResults: null });
 
       // Persist to IndexedDB for next offline visit
       try {
-        await offlineDb.saveMenuItems(items as unknown[]);
-        await offlineDb.saveMenuCategories(categories);
+        if (tenantId !== 'default') {
+          await offlineDb.saveMenuItems(items as unknown[], tenantId);
+          await offlineDb.saveMenuCategories(categories, tenantId);
+        } else {
+          await offlineDb.saveMenuItems(items as unknown[]);
+          await offlineDb.saveMenuCategories(categories);
+        }
       } catch {
         // non-fatal
       }
     } catch (err) {
+      if (!isSameSessionSnapshot(sessionSnap, readSessionSnapshot())) return;
       const message =
         err instanceof ApiClientError
           ? (err.status === 0 ? 'Lỗi kết nối' : err.message)
@@ -186,7 +165,7 @@ export const useMenuStore = create<MenuState>((set, get) => ({
       const body = await apiFetch<RawSingleMenuStoreResponse>(`/api/menu/${id}`);
       const raw = body?.item ?? body?.data;
       if (!raw) return null;
-      return mapRawStoreMenuItem(raw);
+      return normalizeMenuItem(raw);
     } catch {
       return null;
     }
@@ -207,3 +186,19 @@ export const useMenuStore = create<MenuState>((set, get) => ({
     set({ searchResults: results });
   },
 }));
+
+// Reset cached in-memory menu items when the active tenant scope changes
+// so catalog items from a previous tenant never bleed into the next tenant view.
+if (typeof window !== 'undefined') {
+  subscribeSessionChange((next, prev) => {
+    if (next.tenantId !== prev.tenantId) {
+      useMenuStore.setState({
+        items: [],
+        categories: [],
+        loading: false,
+        error: null,
+        searchResults: null,
+      });
+    }
+  });
+}

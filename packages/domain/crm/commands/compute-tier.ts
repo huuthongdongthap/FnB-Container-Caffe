@@ -26,11 +26,19 @@ export function computeTier(
   currentTierName: string | null,
   policy: LoyaltyPolicy,
 ): ComputedTier {
-  const tiers = policy.tiers;
+  const safeLifetimePoints = Math.max(
+    0,
+    Number.isFinite(Number(lifetimePoints)) ? Math.floor(Number(lifetimePoints)) : 0,
+  );
+  const tiers = [...policy.tiers].sort(
+    (a, b) =>
+      (Number.isFinite(Number(a.minPoints)) ? Number(a.minPoints) : 0) -
+      (Number.isFinite(Number(b.minPoints)) ? Number(b.minPoints) : 0),
+  );
   if (tiers.length === 0) {
     return {
       tierName: policy.defaultTier.tierName,
-      lifetimePoints,
+      lifetimePoints: safeLifetimePoints,
       nextTier: null,
       changed: currentTierName !== policy.defaultTier.tierName,
     };
@@ -38,18 +46,19 @@ export function computeTier(
 
   let resolved = tiers[0];
   for (const t of tiers) {
-    if (lifetimePoints >= t.minPoints) {
+    const minPts = Math.max(0, Number.isFinite(Number(t.minPoints)) ? Number(t.minPoints) : 0);
+    if (safeLifetimePoints >= minPts) {
       resolved = t;
     } else {
       break;
     }
   }
 
-  const nextTier = findNextTier(lifetimePoints, resolved, tiers);
+  const nextTier = findNextTier(safeLifetimePoints, resolved, tiers);
 
   return {
     tierName: resolved.tierName,
-    lifetimePoints,
+    lifetimePoints: safeLifetimePoints,
     nextTier,
     changed: resolved.tierName !== (currentTierName ?? resolved.tierName),
   };
@@ -63,9 +72,10 @@ function findNextTier(
   const idx = tiers.findIndex((t) => t.tierName === current.tierName);
   if (idx === -1 || idx >= tiers.length - 1) return null;
   const next = tiers[idx + 1];
+  const nextMinPoints = Math.max(0, Number.isFinite(Number(next.minPoints)) ? Number(next.minPoints) : 0);
   return {
     name: next.tierName,
-    minPoints: next.minPoints,
-    pointsNeeded: Math.max(0, next.minPoints - lifetimePoints),
+    minPoints: nextMinPoints,
+    pointsNeeded: Math.max(0, nextMinPoints - lifetimePoints),
   };
 }

@@ -46,28 +46,79 @@ interface PaymentOrderRow {
   order_tenant_id: string | null;
 }
 
-export async function reconcilePayOSPayment(input: ReconcilePayOSInput): Promise<ReconcilePayOSResult> {
-  const row = await input.db.prepare(
-    `SELECT p.id, p.order_id, p.method, p.amount, p.status, p.transaction_id, p.payment_url, p.refund_status,
-            o.total AS order_total, o.payment_status AS order_payment_status, o.payment_method AS order_payment_method,
-            o.status AS order_status, o.tenant_id AS order_tenant_id
-     FROM payments p
-     JOIN orders o ON o.id = p.order_id
-     WHERE p.id = ?`
-  ).bind(input.paymentId).first<PaymentOrderRow>();
+const TERMINAL_NON_PAYABLE_ORDER_STATUSES = ['cancelled', 'canceled', 'rejected', 'failed', 'expired', 'refunded'];
 
-  const rowTenant = row?.order_tenant_id && String(row.order_tenant_id).trim() ? String(row.order_tenant_id).trim() : 'default';
-  const normInputTenant = input.tenantId ? input.tenantId.trim() : '';
+export async function reconcilePayOSPayment(input: ReconcilePayOSInput): Promise<ReconcilePayOSResult> {
+  let row: PaymentOrderRow | null = null;
+  try {
+    row = await input.db.prepare(
+      `SELECT p.id, p.order_id, p.method, p.amount, p.status, p.transaction_id, p.payment_url, p.refund_status,
+              COALESCE(o.total, o.total_amount) AS order_total, o.payment_status AS order_payment_status, o.payment_method AS order_payment_method,
+              o.status AS order_status, o.tenant_id AS order_tenant_id
+       FROM payments p
+       JOIN orders o ON o.id = p.order_id
+       WHERE p.id = ?`
+    ).bind(input.paymentId).first<PaymentOrderRow>();
+  } catch {
+    try {
+      row = await input.db.prepare(
+        `SELECT p.id, p.order_id, p.method, p.amount, p.status, p.transaction_id, p.payment_url, p.refund_status,
+                o.total AS order_total, o.payment_status AS order_payment_status, o.payment_method AS order_payment_method,
+                o.status AS order_status, o.tenant_id AS order_tenant_id
+         FROM payments p
+         JOIN orders o ON o.id = p.order_id
+         WHERE p.id = ?`
+      ).bind(input.paymentId).first<PaymentOrderRow>();
+    } catch {
+      try {
+        row = await input.db.prepare(
+          `SELECT p.id, p.order_id, p.method, p.amount, p.status, p.transaction_id, p.payment_url, p.refund_status,
+                  o.total_amount AS order_total, o.payment_status AS order_payment_status, o.payment_method AS order_payment_method,
+                  o.status AS order_status, o.tenant_id AS order_tenant_id
+           FROM payments p
+           JOIN orders o ON o.id = p.order_id
+           WHERE p.id = ?`
+        ).bind(input.paymentId).first<PaymentOrderRow>();
+      } catch {
+        try {
+          row = await input.db.prepare(
+            `SELECT p.id, p.order_id, p.method, p.amount, p.status, p.transaction_id, p.payment_url, NULL AS refund_status,
+                    COALESCE(o.total, o.total_amount) AS order_total, o.payment_status AS order_payment_status, o.payment_method AS order_payment_method,
+                    o.status AS order_status, o.tenant_id AS order_tenant_id
+             FROM payments p
+             JOIN orders o ON o.id = p.order_id
+             WHERE p.id = ?`
+          ).bind(input.paymentId).first<PaymentOrderRow>();
+        } catch {
+          row = await input.db.prepare(
+            `SELECT p.id, p.order_id, p.method, p.amount, p.status, p.transaction_id, p.payment_url, NULL AS refund_status,
+                    o.total AS order_total, o.payment_status AS order_payment_status, o.payment_method AS order_payment_method,
+                    o.status AS order_status, NULL AS order_tenant_id
+             FROM payments p
+             JOIN orders o ON o.id = p.order_id
+             WHERE p.id = ?`
+          ).bind(input.paymentId).first<PaymentOrderRow>();
+        }
+      }
+    }
+  }
+
+  const rawRowTenant = row?.order_tenant_id ? String(row.order_tenant_id).trim() : '';
+  const rowTenant = rawRowTenant && rawRowTenant !== '*' && rawRowTenant.toLowerCase() !== 'hq' ? rawRowTenant : 'default';
+  const rawInputTenant = input.tenantId ? input.tenantId.trim() : '';
+  const normInputTenant = rawInputTenant.toLowerCase() === 'hq' ? '*' : rawInputTenant;
   if (!row || (normInputTenant && normInputTenant !== '*' && rowTenant !== normInputTenant)) {
     return { ok: false, status: 404, outcome: 'not_found', error: 'Payment not found' };
   }
 
   const baseIds = { paymentId: row.id, orderId: row.order_id, orderCode: row.transaction_id };
+  const initialOrderStatus = String(row.order_status || '').trim().toLowerCase();
   if (
     row.status === 'refunded' ||
     row.refund_status === 'completed' ||
     row.order_payment_status === 'refunded' ||
-    row.order_payment_status === 'paid'
+    row.order_payment_status === 'paid' ||
+    (row.status === 'completed' && TERMINAL_NON_PAYABLE_ORDER_STATUSES.includes(initialOrderStatus))
   ) {
     return { ok: true, status: 200, outcome: 'already_settled', ...baseIds, paymentChanged: false };
   }
@@ -99,19 +150,29 @@ export async function reconcilePayOSPayment(input: ReconcilePayOSInput): Promise
     timeoutMs: input.timeoutMs,
   });
 
-  const fresh = await input.db.prepare(
-    `SELECT p.status, p.refund_status, o.payment_status, o.status AS order_status
-     FROM payments p JOIN orders o ON o.id = p.order_id WHERE p.id = ?`
-  ).bind(row.id).first<{ status: string; refund_status: string | null; payment_status: string; order_status: string }>();
+  let fresh: { status: string; refund_status: string | null; payment_status: string; order_status: string } | null = null;
+  try {
+    fresh = await input.db.prepare(
+      `SELECT p.status, p.refund_status, o.payment_status, o.status AS order_status
+       FROM payments p JOIN orders o ON o.id = p.order_id WHERE p.id = ?`
+    ).bind(row.id).first<{ status: string; refund_status: string | null; payment_status: string; order_status: string }>();
+  } catch {
+    fresh = await input.db.prepare(
+      `SELECT p.status, NULL AS refund_status, o.payment_status, o.status AS order_status
+       FROM payments p JOIN orders o ON o.id = p.order_id WHERE p.id = ?`
+    ).bind(row.id).first<{ status: string; refund_status: string | null; payment_status: string; order_status: string }>();
+  }
 
   if (!fresh) {
     return { ok: false, status: 404, outcome: 'not_found', error: 'Payment not found' };
   }
+  const freshOrderStatus = String(fresh.order_status || '').trim().toLowerCase();
   if (
     fresh.status === 'refunded' ||
     fresh.refund_status === 'completed' ||
     fresh.payment_status === 'refunded' ||
-    fresh.payment_status === 'paid'
+    fresh.payment_status === 'paid' ||
+    (fresh.status === 'completed' && TERMINAL_NON_PAYABLE_ORDER_STATUSES.includes(freshOrderStatus))
   ) {
     return { ok: true, status: 200, outcome: 'already_settled', ...baseIds, paymentChanged: false };
   }
@@ -157,7 +218,12 @@ export async function reconcilePayOSPayment(input: ReconcilePayOSInput): Promise
       'SELECT p.status, o.payment_status, o.status AS order_status FROM payments p JOIN orders o ON o.id = p.order_id WHERE p.id = ?'
     ).bind(row.id).first<{ status: string; payment_status: string; order_status: string }>();
 
-    if (!paymentChanged && (after?.status !== 'completed' || after?.payment_status !== 'paid')) {
+    const afterOrderStatus = String(after?.order_status ?? fresh.order_status ?? '').trim().toLowerCase();
+    const isTerminalNonPayable =
+      TERMINAL_NON_PAYABLE_ORDER_STATUSES.includes(afterOrderStatus) ||
+      TERMINAL_NON_PAYABLE_ORDER_STATUSES.includes(freshOrderStatus);
+
+    if (!paymentChanged && (after?.status !== 'completed' || (!isTerminalNonPayable && after?.payment_status !== 'paid'))) {
       await writePaymentReviewMarker(input.kv, { ...baseIds, source: input.source, stage: 'settlement_cas', errorCode: 'CAS_REJECTED' });
       return { ok: false, status: 409, outcome: 'requires_review', error: 'Payment requires reconciliation', ...baseIds };
     }
@@ -166,31 +232,39 @@ export async function reconcilePayOSPayment(input: ReconcilePayOSInput): Promise
       await input.db.prepare('INSERT INTO _metrics (name, value, tags, created_at) VALUES (?, 1, ?, ?)')
         .bind('payment_success', JSON.stringify({ method: 'payos', source: input.source, tenant_id: rowTenant }), nowIso)
         .run().catch(() => {});
-      if (input.kv) {
+      if (input.kv && !isTerminalNonPayable) {
         await input.kv.put(
           `payment_event:${row.order_id}`,
-          JSON.stringify({ type: 'payment_confirmed', orderId: row.order_id, amount: expectedAmount, reference: '', timestamp: nowIso }),
+          JSON.stringify({ type: 'payment_confirmed', orderId: row.order_id, amount: expectedAmount, reference: '', tenant_id: rowTenant, tenantId: rowTenant, timestamp: nowIso }),
           { expirationTtl: 300 }
         ).catch(() => {});
         await input.kv.put(
           `order_event:${row.order_id}`,
-          JSON.stringify({ orderId: row.order_id, status: after?.order_status ?? fresh.order_status, payment_status: 'paid', timestamp: nowIso }),
+          JSON.stringify({ orderId: row.order_id, status: after?.order_status ?? fresh.order_status, payment_status: 'paid', tenant_id: rowTenant, tenantId: rowTenant, timestamp: nowIso }),
           { expirationTtl: 60 }
         ).catch(() => {});
       }
-      if (fresh.order_status !== 'cancelled' && after?.order_status !== 'cancelled') {
+      if (!isTerminalNonPayable) {
         try {
           const { creditLoyaltyIfEligible, sanitizeCustomerIdentity } = await import('../../order/policies/loyalty-trigger');
           const envForLoyalty: Record<string, unknown> = input.kv ? { AUTH_KV: input.kv } : {};
           await creditLoyaltyIfEligible(input.db, envForLoyalty, row.order_id).catch(() => {});
 
           const ordRow = await input.db
-            .prepare('SELECT total, customer_id, customer_email, customer_phone, tenant_id FROM orders WHERE id = ?')
+            .prepare('SELECT COALESCE(total, total_amount) AS total, customer_id, customer_email, customer_phone, tenant_id FROM orders WHERE id = ?')
             .bind(row.order_id)
             .first<{ total?: number | null; customer_id?: string | null; customer_email?: string | null; customer_phone?: string | null; tenant_id?: string | null }>()
-            .catch(() => null);
+            .catch(() =>
+              input.db
+                .prepare('SELECT total, customer_id, customer_email, customer_phone, tenant_id FROM orders WHERE id = ?')
+                .bind(row.order_id)
+                .first<{ total?: number | null; customer_id?: string | null; customer_email?: string | null; customer_phone?: string | null; tenant_id?: string | null }>()
+                .catch(() => null)
+            );
           const totalVnd = Number(ordRow?.total ?? expectedOrderTotal ?? 0);
           if (ordRow && totalVnd >= 20000) {
+            const rawOrdTenant = ordRow.tenant_id ? String(ordRow.tenant_id).trim() : '';
+            const cleanOrdTenant = rawOrdTenant && rawOrdTenant !== '*' && rawOrdTenant.toLowerCase() !== 'hq' ? rawOrdTenant : '';
             let resolvedCustId = ordRow.customer_id ? String(ordRow.customer_id).trim() || null : null;
             if (!resolvedCustId) {
               const { normalizedPhone, email: sanitizedEmail } = sanitizeCustomerIdentity(
@@ -198,25 +272,28 @@ export async function reconcilePayOSPayment(input: ReconcilePayOSInput): Promise
                 ordRow.customer_email ?? null,
               );
               if (normalizedPhone || sanitizedEmail) {
+                const effectiveTenant = cleanOrdTenant || rowTenant || 'default';
                 const cust = await input.db
                   .prepare(
                     "SELECT id FROM customers WHERE ((email = ? AND email IS NOT NULL) OR (phone = ? AND phone IS NOT NULL)) AND (? = '*' OR COALESCE(NULLIF(tenant_id, ''), 'default') = ? OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?4) LIMIT 1",
                   )
-                  .bind(sanitizedEmail, normalizedPhone, rowTenant, rowTenant)
+                  .bind(sanitizedEmail, normalizedPhone, effectiveTenant, effectiveTenant)
                   .first<{ id: string }>()
                   .catch(() =>
-                    input.db
-                      .prepare('SELECT id FROM customers WHERE (email = ? AND email IS NOT NULL) OR (phone = ? AND phone IS NOT NULL) LIMIT 1')
-                      .bind(sanitizedEmail, normalizedPhone)
-                      .first<{ id: string }>()
-                      .catch(() => null),
+                    !effectiveTenant || effectiveTenant === 'default'
+                      ? input.db
+                          .prepare('SELECT id FROM customers WHERE (email = ? AND email IS NOT NULL) OR (phone = ? AND phone IS NOT NULL) LIMIT 1')
+                          .bind(sanitizedEmail, normalizedPhone)
+                          .first<{ id: string }>()
+                          .catch(() => null)
+                      : null,
                   );
                 resolvedCustId = cust?.id ?? null;
               }
             }
             if (resolvedCustId) {
               const { rewardReferralOnFirstOrder, resolveReferralPolicy, DEFAULT_REFERRAL_POLICY } = await import('@aura/domain-crm');
-              const refTenant = rowTenant !== '*' ? rowTenant : undefined;
+              const refTenant = cleanOrdTenant || (rowTenant !== '*' && rowTenant.toLowerCase() !== 'hq' ? rowTenant : undefined);
               const refPolicy = await resolveReferralPolicy(input.kv as any, refTenant).catch(() => DEFAULT_REFERRAL_POLICY);
               await rewardReferralOnFirstOrder(input.db, resolvedCustId, row.order_id, totalVnd, refPolicy, refTenant).catch(() => {});
             }
@@ -227,7 +304,44 @@ export async function reconcilePayOSPayment(input: ReconcilePayOSInput): Promise
       }
     }
 
-    if (fresh.order_status === 'cancelled' || after?.order_status === 'cancelled') {
+    if (isTerminalNonPayable) {
+      const reviewTag = '[PAID_ON_CANCELLED_ORDER_REQUIRES_REVIEW]';
+      const paidStatusSet =
+        afterOrderStatus === 'cancelled' || afterOrderStatus === 'canceled'
+          ? "payment_status = 'paid',\n             "
+          : '';
+      try {
+        await input.db
+          .prepare(
+            `UPDATE orders
+             SET ${paidStatusSet}notes = CASE
+               WHEN notes IS NULL OR TRIM(notes) = '' THEN ?
+               WHEN INSTR(notes, ?) > 0 THEN notes
+               ELSE notes || ' ' || ?
+             END,
+             updated_at = ?
+             WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?`
+          )
+          .bind(reviewTag, reviewTag, reviewTag, nowIso, row.order_id, rowTenant)
+          .run();
+      } catch {
+        if (rowTenant === 'default') {
+          await input.db
+            .prepare(
+              `UPDATE orders
+               SET ${paidStatusSet}notes = CASE
+                 WHEN notes IS NULL OR TRIM(notes) = '' THEN ?
+                 WHEN INSTR(notes, ?) > 0 THEN notes
+                 ELSE notes || ' ' || ?
+               END,
+               updated_at = ?
+               WHERE id = ?`
+            )
+            .bind(reviewTag, reviewTag, reviewTag, nowIso, row.order_id)
+            .run()
+            .catch(() => {});
+        }
+      }
       await writePaymentReviewMarker(input.kv, { ...baseIds, source: input.source, stage: 'cancelled_order_paid', errorCode: 'PAID_ON_CANCELLED_ORDER' });
     }
 

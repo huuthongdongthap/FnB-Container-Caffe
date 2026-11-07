@@ -8,25 +8,113 @@ import type { Env } from '../types/env';
 
 const log = createLogger({ route: 'receipt' });
 
+const ALLOWED_RECEIPT_STAFF_ROLES = new Set([
+  'owner',
+  'admin',
+  'manager',
+  'supervisor',
+  'cashier',
+]);
+
 export async function getInvoiceReceipt(c: Context<{ Bindings: Env }>) {
   try {
+    const user = (
+      c as unknown as {
+        get?: (k: string) => {
+          id?: string;
+          sub?: string;
+          customerId?: string;
+          email?: string;
+          role?: string;
+          tenantId?: string;
+          tenant_id?: string;
+        } | undefined;
+      }
+    ).get?.('user');
+    const userRole = typeof user?.role === 'string' ? user.role.trim().toLowerCase() : '';
+    if (!user || !userRole) {
+      return errorResponse('Unauthorized', 401);
+    }
+    const isSelfServiceRole = userRole === 'customer' || userRole === 'vendor';
+    if (!isSelfServiceRole && !ALLOWED_RECEIPT_STAFF_ROLES.has(userRole)) {
+      return errorResponse('Forbidden', 403);
+    }
+    const userTenant = String(user.tenantId ?? user.tenant_id ?? '').trim();
+    const isHq =
+      (userRole === 'owner' || userRole === 'admin') &&
+      (userTenant.toLowerCase() === 'hq' || userTenant === '*');
+    const headerCandidates = [
+      c.req.header?.('X-Tenant-ID'),
+      c.req.header?.('x-tenant-id'),
+      c.req.header?.('X-Store-ID'),
+      c.req.header?.('x-store-id'),
+    ]
+      .map((v) => (typeof v === 'string' ? v.trim() : ''))
+      .filter((v) => Boolean(v) && !/^Bearer\s+/i.test(v));
+    const reqCandidates = [
+      c.req.query?.('tenant_id'),
+      c.req.query?.('tenantId'),
+      c.req.query?.('store_id'),
+      c.req.query?.('storeId'),
+      ...headerCandidates,
+    ]
+      .map((v) => (typeof v === 'string' ? v.trim() : ''))
+      .filter(Boolean);
+    if (new Set(reqCandidates).size > 1) {
+      return errorResponse('Cross-tenant access denied', 403);
+    }
+    const explicitReqTenant = reqCandidates[0] || '';
+    const contextTenant = String(
+      (c as unknown as { get?: (k: string) => unknown }).get?.('tenantId') ?? ''
+    ).trim();
+    const rawResolvedTenant = getTenantId(c).trim() || 'default';
+    if (!isHq) {
+      const boundTenant = userTenant || contextTenant || 'default';
+      if (
+        userTenant === '*' ||
+        userTenant.toLowerCase() === 'hq' ||
+        contextTenant === '*' ||
+        contextTenant.toLowerCase() === 'hq' ||
+        explicitReqTenant === '*' ||
+        explicitReqTenant.toLowerCase() === 'hq' ||
+        rawResolvedTenant === '*' ||
+        rawResolvedTenant.toLowerCase() === 'hq' ||
+        (userTenant && contextTenant && contextTenant !== userTenant) ||
+        (explicitReqTenant && explicitReqTenant !== boundTenant) ||
+        rawResolvedTenant !== boundTenant
+      ) {
+        return errorResponse('Cross-tenant access denied', 403);
+      }
+    }
+
     const invoiceId = c.req.param('id');
     const db = c.env.AURA_DB;
-    const tenantId = getTenantId(c).trim() || 'default';
+    const tenantId = isHq
+      ? (explicitReqTenant
+          ? (explicitReqTenant.toLowerCase() === 'hq' ? '*' : explicitReqTenant)
+          : (rawResolvedTenant.toLowerCase() === 'hq' ? '*' : rawResolvedTenant))
+      : (userTenant || contextTenant || 'default');
 
     let inv: Record<string, unknown> | null = null;
+    let tenantColumnVerified = true;
     try {
       inv = await db
         .prepare('SELECT i.*, s.customer_id, s.customer_name, s.customer_email, s.tenant_id as subscription_tenant_id, p.name as plan_name FROM subscription_invoices i LEFT JOIN subscriptions s ON i.subscription_id = s.id LEFT JOIN subscription_plans p ON s.plan_id = p.id WHERE i.id = ?')
         .bind(invoiceId)
         .first<Record<string, unknown>>();
     } catch {
+      if (tenantId !== 'default' && tenantId !== '*') {
+        tenantColumnVerified = false;
+      }
       try {
         inv = await db
           .prepare('SELECT i.*, s.customer_id, s.customer_name, s.customer_email, p.name as plan_name FROM subscription_invoices i LEFT JOIN subscriptions s ON i.subscription_id = s.id LEFT JOIN subscription_plans p ON s.plan_id = p.id WHERE i.id = ?')
           .bind(invoiceId)
           .first<Record<string, unknown>>();
       } catch {
+        if (tenantId !== 'default' && tenantId !== '*') {
+          return errorResponse('Invoice not found', 404);
+        }
         inv = await db
           .prepare('SELECT i.*, s.customer_name, s.customer_email, p.name as plan_name FROM subscription_invoices i LEFT JOIN subscriptions s ON i.subscription_id = s.id LEFT JOIN subscription_plans p ON s.plan_id = p.id WHERE i.id = ?')
           .bind(invoiceId)
@@ -44,21 +132,29 @@ export async function getInvoiceReceipt(c: Context<{ Bindings: Env }>) {
     const invTenant = inv.tenant_id !== undefined && inv.tenant_id !== null
       ? String(inv.tenant_id).trim()
       : '';
-    const rawTenant = subTenant || invTenant || (inv.subscription_tenant_id !== undefined || inv.tenant_id !== undefined ? 'default' : undefined);
+    const hasExplicitTenantColumn =
+      inv.subscription_tenant_id !== undefined || inv.tenant_id !== undefined;
+    if (!hasExplicitTenantColumn && tenantId !== 'default' && tenantId !== '*') {
+      return errorResponse('Invoice not found', 404);
+    }
+    if (!tenantColumnVerified && !invTenant && tenantId !== 'default' && tenantId !== '*') {
+      return errorResponse('Invoice not found', 404);
+    }
+    const rawTenant = subTenant || invTenant || (hasExplicitTenantColumn ? 'default' : undefined);
     const rowForMatch = rawTenant !== undefined ? { tenant_id: rawTenant } : {};
     if (!matchesTenantRow(rowForMatch, tenantId)) {
       return errorResponse('Invoice not found', 404);
     }
 
-    const user = (c as unknown as { get: (k: string) => { id?: string; email?: string; role?: string } | undefined }).get('user');
-    if (user?.role === 'customer' || user?.role === 'vendor') {
+    if (isSelfServiceRole) {
+      const callerId = user.id ?? user.customerId ?? user.sub;
       const hasCustomerId = Boolean(inv.customer_id && String(inv.customer_id).trim());
-      const matchesId = Boolean(user.id && hasCustomerId && String(inv.customer_id) === String(user.id));
+      const matchesId = Boolean(callerId && hasCustomerId && String(inv.customer_id).trim() === String(callerId).trim());
       const matchesEmail = Boolean(
         !hasCustomerId &&
         user.email &&
         inv.customer_email &&
-        String(inv.customer_email).toLowerCase() === String(user.email).toLowerCase()
+        String(inv.customer_email).trim().toLowerCase() === String(user.email).trim().toLowerCase()
       );
       if (!matchesId && !matchesEmail) {
         return errorResponse('Forbidden', 403);

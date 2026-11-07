@@ -916,11 +916,14 @@ describe('M4-C Phase 04: OpenAPI Orders Contract & Customer Security', () => {
       expect(matchesTenantRow({ id: 'r1', tenant_id: 'store-sadec-2' }, '  store-sadec-2  ')).toBe(true);
       expect(matchesTenantRow({ id: 'r1', tenant_id: 'store-sadec-2' }, '  *  ')).toBe(true);
       expect(matchesTenantRow({ id: 'r1' }, '   ')).toBe(true);
+      // 'default'-store owners/admins are NOT HQ super-admins: HQ status requires
+      // an explicit 'hq' or '*' binding (whitespace-normalized).
       expect(
         isHQSuperAdmin({
           get: (k: string) => (k === 'user' ? { role: 'owner', tenantId: ' default ' } : undefined),
         } as any)
-      ).toBe(true);
+      ).toBe(false);
+      expect(isHQSuperAdmin({ role: 'owner', tenantId: ' hq ' })).toBe(true);
 
       const categories = [
         { id: 'cat_s1', name: 'Coffee S1', slug: 'coffee-s1', sort_order: 1, tenant_id: 'store-sadec-1' },
@@ -1373,6 +1376,450 @@ describe('M4-C Phase 04: OpenAPI Orders Contract & Customer Security', () => {
       const s1Policy = await resolveReferralPolicy(mockReferralKv, 'store-sadec-1');
       expect(s1Policy.cashbackReferrerVnd).toBe(12000);
       expect(s1Policy.minOrderVnd).toBe(20000);
+    });
+  });
+
+  describe('Phase AK1-AK3: Per-tenant CRM band policy, ZNS/Push order status tenant attribution, and guest/auth metric scoping', () => {
+    it('resolves per-tenant crm:band_policy:<tenantId> in resolveBandPolicy, buildSegment, and getCustomer360', async () => {
+      const { resolveBandPolicy } = await import('../../../../packages/domain/crm/commands/frequency-band');
+      const { buildSegment } = await import('../../../../packages/domain/crm/commands/segments');
+      const { getCustomer360 } = await import('../../../../packages/domain/crm/commands/customer-360');
+
+      const accessedKeys: string[] = [];
+      const mockBandKv = {
+        get: async (key: string) => {
+          accessedKeys.push(key);
+          if (key === 'crm:band_policy:store-sadec-2') {
+            return JSON.stringify({ newMaxDays: 14, regularMaxDays: 45, dormantMinDays: 90, resurrectWindowDays: 21 });
+          }
+          if (key === 'crm:band_policy') {
+            return JSON.stringify({ newMaxDays: 30, regularMaxDays: 60, dormantMinDays: 120, resurrectWindowDays: 30 });
+          }
+          return null;
+        },
+      } as any;
+
+      const s2Policy = await resolveBandPolicy(mockBandKv, ' store-sadec-2 ');
+      expect(s2Policy.newMaxDays).toBe(14);
+      expect(s2Policy.regularMaxDays).toBe(45);
+      expect(s2Policy.dormantMinDays).toBe(90);
+
+      const s1Policy = await resolveBandPolicy(mockBandKv, 'store-sadec-1');
+      expect(s1Policy.newMaxDays).toBe(30);
+      expect(s1Policy.regularMaxDays).toBe(60);
+
+      accessedKeys.length = 0;
+      const mockSegmentDb = {
+        prepare: () => ({
+          bind: () => ({
+            all: async () => ({
+              results: [
+                {
+                  id: 'cust_s2_1',
+                  name: 'Khach S2',
+                  phone: '0901234567',
+                  tier: 'silver',
+                  lifetime_points: 20,
+                  last_order_at: '2026-10-01T00:00:00.000Z',
+                  first_order_at: '2026-08-01T00:00:00.000Z',
+                  order_count: 5,
+                  tenant_id: ' store-sadec-2 ',
+                },
+              ],
+            }),
+            first: async () => null,
+          }),
+        }),
+      } as any;
+
+      // With now = 2026-11-20 (50 days since last_order_at):
+      // Under store-sadec-2 policy (regularMaxDays: 45), customer is 'lapsing'.
+      // Under default policy (regularMaxDays: 60), customer would be 'regular'.
+      const seg = await buildSegment(
+        mockSegmentDb,
+        'lapsing_30d',
+        mockBandKv,
+        { tenantId: ' store-sadec-2 ' },
+        new Date('2026-11-20T00:00:00.000Z')
+      );
+      expect(accessedKeys).toContain('crm:band_policy:store-sadec-2');
+      expect(seg.count).toBe(1);
+      expect(seg.customers[0]?.id).toBe('cust_s2_1');
+
+      accessedKeys.length = 0;
+      await getCustomer360(mockSegmentDb, 'cust_s2_1', mockBandKv, { tenantId: 'store-sadec-2' });
+      expect(accessedKeys).toContain('crm:band_policy:store-sadec-2');
+    });
+
+    it('attributes notifyOrderStatus ZNS audit rows to the order tenant, blocks cross-tenant status notification, and scopes sendPushToUser by tenantId', async () => {
+      const { notifyOrderStatus } = await import('../../../../packages/domain/order/notifications/notify-order-status');
+      const { TEMPLATE_IDS } = await import('../../tree/zalo/zns-templates');
+      const { sendPushToUser } = await import('../../lib/push-notifier');
+
+      const auditTenants: string[] = [];
+      const mockOrderNotifyDb = {
+        prepare: (sql: string) => ({
+          bind: (...args: unknown[]) => ({
+            first: async () => {
+              if (sql.includes('FROM orders WHERE id = ?')) {
+                return {
+                  customer_name: 'Nguyen Van B',
+                  customer_phone: '0909888777',
+                  total: 65000,
+                  status: 'ready',
+                  tenant_id: ' store-sadec-2 ',
+                };
+              }
+              return null;
+            },
+            run: async () => {
+              if (sql.includes('INSERT INTO notification_audit_log')) {
+                auditTenants.push(String(args[args.length - 1]));
+              }
+              return { meta: { changes: 1 } };
+            },
+          }),
+        }),
+      } as any;
+
+      const origFetch = globalThis.fetch;
+      const origTpl = TEMPLATE_IDS.order_status_update;
+      TEMPLATE_IDS.order_status_update = 'TPL_ORDER_STATUS_01';
+      globalThis.fetch = (async () =>
+        new Response(JSON.stringify({ error: 0, message: 'Success', data: { msg_id: 'zns_ak_1' } }), { status: 200 })) as any;
+      try {
+        // Cross-tenant caller ('store-sadec-1') should be blocked from firing notifications for a 'store-sadec-2' order
+        await notifyOrderStatus(
+          { AURA_DB: mockOrderNotifyDb, ZALO_ACCESS_TOKEN: 'tok_test' },
+          'ORD_AK_S2',
+          'store-sadec-1'
+        );
+        expect(auditTenants).toHaveLength(0);
+
+        // Matching tenant caller ('store-sadec-2') attributes ZNS audit log to 'store-sadec-2'
+        await notifyOrderStatus(
+          { AURA_DB: mockOrderNotifyDb, ZALO_ACCESS_TOKEN: 'tok_test' },
+          'ORD_AK_S2',
+          'store-sadec-2'
+        );
+        expect(auditTenants).toEqual(['store-sadec-2']);
+      } finally {
+        globalThis.fetch = origFetch;
+        if (origTpl === undefined) delete TEMPLATE_IDS.order_status_update;
+        else TEMPLATE_IDS.order_status_update = origTpl;
+      }
+
+      const pushSqlQueries: Array<{ sql: string; binds: unknown[] }> = [];
+      const mockPushDb = {
+        prepare: (sql: string) => ({
+          bind: (...binds: unknown[]) => ({
+            all: async () => {
+              pushSqlQueries.push({ sql, binds });
+              return { results: [] };
+            },
+          }),
+        }),
+      } as any;
+
+      await sendPushToUser(
+        { AURA_DB: mockPushDb, VAPID_PUBLIC_KEY: 'pub_k', VAPID_PRIVATE_KEY: 'priv_k' },
+        'user_s2',
+        { title_vi: 'Đơn sẵn sàng', title_en: 'Order ready' },
+        ' store-sadec-2 '
+      );
+      expect(pushSqlQueries).toHaveLength(1);
+      expect(pushSqlQueries[0]?.sql).toContain("COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?");
+      expect(pushSqlQueries[0]?.binds).toEqual(['user_s2', 'store-sadec-2']);
+    });
+  });
+
+  describe('Phase AL1-AL3: Per-Tenant KV Loyalty Policy in Account/360/Consumer, KDS Referral Policy & TI Webhook Tenant Normalization', () => {
+    it('forwards KV to loadPolicy in getCustomerAccount, getCustomer360, and consumeCrmEvent so per-tenant loyalty:policy:<tenantId> overrides apply', async () => {
+      const { getCustomerAccount } = await import('../../../../packages/domain/crm/commands/get-customer-account');
+      const { getCustomer360 } = await import('../../../../packages/domain/crm/commands/customer-360');
+      const { consumeCrmEvent } = await import('../../../../packages/domain/crm/commands/consume-crm-event');
+
+      const accessedKvKeys: string[] = [];
+      const mockLoyaltyKv = {
+        get: async (key: string) => {
+          accessedKvKeys.push(key);
+          if (key === 'loyalty:policy:store-sadec-2') {
+            return JSON.stringify({
+              maxCapPerTx: 120000,
+              tiers: [
+                { tierName: 'bronze', minPoints: 0, cashbackRate: 0.04, pointMultiplier: 1.2 },
+                { tierName: 'silver', minPoints: 250, cashbackRate: 0.08, pointMultiplier: 1.5 },
+              ],
+            });
+          }
+          return null;
+        },
+      } as any;
+
+      const mockCrmDb = {
+        prepare: (sql: string) => ({
+          bind: (..._args: unknown[]) => ({
+            first: async () => {
+              if (sql.includes('FROM customers WHERE id = ?')) {
+                return {
+                  id: 'cust_al_s2',
+                  name: 'Le Van C',
+                  phone: '0912345678',
+                  email: 'c@example.com',
+                  loyalty_tier: 'bronze',
+                  loyalty_points: 100,
+                  lifetime_points: 100,
+                  tenant_id: ' store-sadec-2 ',
+                };
+              }
+              return null;
+            },
+            all: async () => ({ results: [] }),
+            run: async () => ({ meta: { changes: 1 } }),
+          }),
+        }),
+      } as any;
+
+      const account = await getCustomerAccount(mockCrmDb, 'cust_al_s2', {
+        tenantId: 'store-sadec-2',
+        kv: mockLoyaltyKv,
+      });
+      expect(accessedKvKeys).toContain('loyalty:policy:store-sadec-2');
+      expect(account.nextTier).toEqual({
+        name: 'silver',
+        minPoints: 250,
+        pointsNeeded: 150,
+      });
+
+      accessedKvKeys.length = 0;
+      const c360 = await getCustomer360(mockCrmDb, 'cust_al_s2', mockLoyaltyKv, {
+        tenantId: 'store-sadec-2',
+      });
+      expect(accessedKvKeys).toContain('loyalty:policy:store-sadec-2');
+      expect(c360.tier).toEqual({
+        name: 'bronze',
+        cashbackRate: 0.04,
+        pointMultiplier: 1.2,
+      });
+
+      accessedKvKeys.length = 0;
+      await consumeCrmEvent({
+        db: mockCrmDb,
+        env: { AUTH_KV: mockLoyaltyKv },
+        event: {
+          eventId: 'evt_al_1',
+          eventType: 'order_paid',
+          occurredAt: '2026-11-03T00:00:00.000Z',
+          customerId: 'cust_al_s2',
+          orderId: 'ord_al_1',
+          payload: { totalAmount: 50000, tenantId: 'store-sadec-2' },
+        } as any,
+      });
+      expect(accessedKvKeys).toContain('loyalty:policy:store-sadec-2');
+    });
+
+    it('normalizes whitespace tenant_id for non-default tenants in processTIWebhook order status updates', async () => {
+      const { processTIWebhook } = await import('../../tree/integrations/tastyigniter/webhook');
+
+      const executedUpdates: Array<{ sql: string; binds: unknown[] }> = [];
+      const mockTiDb = {
+        prepare: (sql: string) => ({
+          bind: (...binds: unknown[]) => ({
+            first: async () => {
+              if (sql.includes('FROM ti_order_bridge')) {
+                return {
+                  id: 'br_al_1',
+                  local_order_id: 'ord_ti_s2',
+                  ti_order_id: 777,
+                  status: 'confirmed',
+                  tenant_id: ' store-sadec-2 ',
+                };
+              }
+              if (sql.includes('FROM orders WHERE id = ?')) {
+                return {
+                  id: 'ord_ti_s2',
+                  status: 'confirmed',
+                  order_type: 'dine_in',
+                  payment_status: 'paid',
+                  tenant_id: ' store-sadec-2 ',
+                };
+              }
+              return null;
+            },
+            run: async () => {
+              if (sql.includes('UPDATE orders SET status')) {
+                executedUpdates.push({ sql, binds });
+              }
+              return { meta: { changes: 1 } };
+            },
+          }),
+        }),
+      } as any;
+
+      const res = await processTIWebhook(
+        { AURA_DB: mockTiDb },
+        { event: 'order.preparing', ti_order_id: 777, status: 'preparing' },
+        'store-sadec-2'
+      );
+      expect(res.success).toBe(true);
+      expect(res.updated).toBe(true);
+      expect(executedUpdates).toHaveLength(1);
+      expect(executedUpdates[0]?.sql).toContain('AND (tenant_id = ? OR TRIM(tenant_id) = ?)');
+      expect(executedUpdates[0]?.binds).toEqual(['preparing', 'ord_ti_s2', 'confirmed', 'store-sadec-2', 'store-sadec-2']);
+    });
+  });
+
+  describe('Phase AM1-AM4: Tenant-isolated loyalty & promotion idempotency keys, quota reservation scoping, and KV policy fallback in loyalty-trigger', () => {
+    it('isolates findExistingLoyaltyIdempotencyTx across tenants on both tenant_id and legacy loyalty_transactions schemas while rejecting same-tenant duplicates', async () => {
+      const { findExistingLoyaltyIdempotencyTx } = await import(
+        '../../routes/openapi-loyalty-handlers/loyalty-db-helpers'
+      );
+
+      // 1. Schema with tenant_id on loyalty_transactions
+      const txRowsWithTenant = [
+        {
+          id: 'tx_def_1',
+          account_id: 'la_cust_def',
+          customer_id: 'cust_def',
+          idempotency_key: 'shared-idem-am1',
+          tenant_id: 'default',
+        },
+      ];
+      const mockDbWithTenant = {
+        prepare: (sql: string) => ({
+          bind: (...binds: unknown[]) => ({
+            first: async () => {
+              if (sql.includes("COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?")) {
+                return (
+                  txRowsWithTenant.find(
+                    (r) => r.idempotency_key === binds[0] && (r.tenant_id || 'default') === binds[1]
+                  ) ?? null
+                );
+              }
+              return txRowsWithTenant.find((r) => r.idempotency_key === binds[0]) ?? null;
+            },
+            all: async () => ({
+              results: txRowsWithTenant.filter((r) => r.idempotency_key === binds[0]),
+            }),
+          }),
+        }),
+      };
+
+      const crossTenantMatch = await findExistingLoyaltyIdempotencyTx(
+        mockDbWithTenant,
+        'shared-idem-am1',
+        { tenantId: 'store-sadec-2', customerId: 'cust_s2', accountId: 'la_cust_s2' }
+      );
+      expect(crossTenantMatch).toBeNull();
+
+      const sameTenantMatch = await findExistingLoyaltyIdempotencyTx(
+        mockDbWithTenant,
+        'shared-idem-am1',
+        { tenantId: 'default', customerId: 'cust_def', accountId: 'la_cust_def' }
+      );
+      expect(sameTenantMatch?.id).toBe('tx_def_1');
+
+      // 2. Legacy schema WITHOUT tenant_id on loyalty_transactions (resolved via customer ownership)
+      const legacyTxRows = [
+        {
+          id: 'tx_leg_def',
+          account_id: 'la_cust_def',
+          customer_id: 'cust_def',
+          idempotency_key: 'shared-idem-legacy',
+        },
+        {
+          id: 'tx_leg_s2',
+          account_id: 'la_cust_s2',
+          customer_id: 'cust_s2',
+          idempotency_key: 'shared-idem-legacy',
+        },
+      ];
+      const mockLegacyDb = {
+        prepare: (sql: string) => ({
+          bind: (...binds: unknown[]) => ({
+            first: async () => {
+              if (sql.includes('FROM loyalty_transactions') && sql.includes('tenant_id')) {
+                throw new Error('no such column: tenant_id');
+              }
+              if (sql.includes('SELECT tenant_id FROM customers WHERE id = ?')) {
+                if (binds[0] === 'cust_def') return { tenant_id: 'default' };
+                if (binds[0] === 'cust_s2') return { tenant_id: 'store-sadec-2' };
+                return null;
+              }
+              return legacyTxRows.find((r) => r.idempotency_key === binds[0]) ?? null;
+            },
+            all: async () => {
+              if (sql.includes('FROM loyalty_transactions') && sql.includes('tenant_id')) {
+                throw new Error('no such column: tenant_id');
+              }
+              return {
+                results: legacyTxRows.filter((r) => r.idempotency_key === binds[0]),
+              };
+            },
+          }),
+        }),
+      };
+
+      const legacyS2Match = await findExistingLoyaltyIdempotencyTx(
+        mockLegacyDb,
+        'shared-idem-legacy',
+        { tenantId: 'store-sadec-2', customerId: 'cust_s2', accountId: 'la_cust_s2' }
+      );
+      expect(legacyS2Match?.id).toBe('tx_leg_s2');
+
+      const legacyS3Match = await findExistingLoyaltyIdempotencyTx(
+        mockLegacyDb,
+        'shared-idem-legacy',
+        { tenantId: 'store-sadec-3', customerId: 'cust_s3', accountId: 'la_cust_s3' }
+      );
+      expect(legacyS3Match).toBeNull();
+    });
+
+    it('forwards env.AUTH_KV on initial loadPolicy in creditLoyaltyIfEligible so KV-only loyalty policies do not skip order accrual', async () => {
+      const { creditLoyaltyIfEligible } = await import(
+        '../../../../packages/domain/order/policies/loyalty-trigger'
+      );
+
+      const kvLookups: string[] = [];
+      const mockKv = {
+        get: async (key: string) => {
+          kvLookups.push(key);
+          if (key === 'loyalty:policy' || key === 'loyalty:policy:store-sadec-2') {
+            return JSON.stringify({
+              maxCapPerTx: 100000,
+              tiers: [{ tierName: 'bronze', minPoints: 0, cashbackRate: 0.05, pointMultiplier: 1 }],
+            });
+          }
+          return null;
+        },
+      };
+
+      const mockOrderDb = {
+        prepare: (sql: string) => ({
+          bind: (..._binds: unknown[]) => ({
+            first: async () => {
+              if (sql.includes('FROM cashback_transactions')) return null;
+              if (sql.includes('FROM orders WHERE id = ?')) {
+                return {
+                  id: 'ord_am3_s2',
+                  total: 100000,
+                  customer_id: 'cust_s2',
+                  status: 'completed',
+                  payment_status: 'paid',
+                  tenant_id: 'store-sadec-2',
+                };
+              }
+              return null;
+            },
+            all: async () => ({ results: [] }),
+            run: async () => ({ meta: { changes: 1 } }),
+          }),
+        }),
+      } as any;
+
+      await creditLoyaltyIfEligible(mockOrderDb, { AUTH_KV: mockKv }, 'ord_am3_s2');
+      expect(kvLookups).toContain('loyalty:policy');
+      expect(kvLookups).toContain('loyalty:policy:store-sadec-2');
     });
   });
 });

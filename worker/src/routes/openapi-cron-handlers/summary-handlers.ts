@@ -1,17 +1,68 @@
 import type { OpenAPIHono } from '@hono/zod-openapi';
 import type { Env } from '../../types/env';
 import { CronRoutes } from '../../schemas/cron';
-import { getDatabase } from '../../lib/db';
-import { getTenantId } from '../../middleware/tenant';
+import { getDatabase, matchesTenantRow } from '../../lib/db';
+import { getTenantId, isHQSuperAdmin } from '../../middleware/tenant';
 import { checkCronJobTenant } from './helpers';
+
+function extractRequestedCronTenant(c: any): string {
+  const candidates = [
+    c.req?.query?.('tenant_id'),
+    c.req?.query?.('tenantId'),
+    c.req?.query?.('store_id'),
+    c.req?.query?.('storeId'),
+    c.req?.header?.('X-Tenant-ID'),
+    c.req?.header?.('x-tenant-id'),
+    c.req?.header?.('X-Store-ID'),
+    c.req?.header?.('x-store-id'),
+  ]
+    .map((v) => (typeof v === 'string' ? v.trim() : ''))
+    .filter(Boolean);
+  if (new Set(candidates).size > 1) {
+    return '__CONFLICT__';
+  }
+  return candidates[0] || '';
+}
+
+function hasCrossTenantCronOverride(c: any): boolean {
+  const user = c.get?.('user') as { id?: string; role?: string; tenantId?: string; tenant_id?: string } | undefined;
+  const headerOrQueryTenant = extractRequestedCronTenant(c);
+  if (headerOrQueryTenant === '__CONFLICT__') return true;
+  if (!user) return false;
+  const userTenant = (user.tenantId ?? user.tenant_id ?? '').trim();
+  const isHq = isHQSuperAdmin(user);
+  if (isHq) return false;
+  if (userTenant === '*' || userTenant.toLowerCase() === 'hq') return true;
+  if (!headerOrQueryTenant) return false;
+  if (headerOrQueryTenant === '*' || headerOrQueryTenant.toLowerCase() === 'hq') return true;
+  const boundTenant = userTenant || 'default';
+  return headerOrQueryTenant !== boundTenant;
+}
+
+function resolveOpenApiCronTenant(c: any): string {
+  const user = c.get?.('user') as { id?: string; role?: string; tenantId?: string; tenant_id?: string } | undefined;
+  const isHq = isHQSuperAdmin(user);
+  const requested = extractRequestedCronTenant(c);
+  const rawCtx = getTenantId(c).trim();
+  if (isHq) {
+    const chosen = requested && requested !== '__CONFLICT__' ? requested : (rawCtx || '*');
+    return chosen.toLowerCase() === 'hq' || chosen === '*' ? '*' : chosen;
+  }
+  const userTenant = (user?.tenantId ?? user?.tenant_id ?? '').trim();
+  const resolved = userTenant || rawCtx || 'default';
+  return resolved.toLowerCase() === 'hq' ? '*' : resolved;
+}
 
 export function registerSummaryHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
   // GET /api/cron/summary - Get cron summary
   app.openapi(CronRoutes.summary as any, async (c: any) => {
+    if (hasCrossTenantCronOverride(c)) {
+      return c.json({ success: false, error: 'Cross-tenant access denied' }, 403);
+    }
     const db = getDatabase(c);
     const query = c.req.valid('query');
     const { locationId, dateFrom, dateTo } = query;
-    const tenantId = getTenantId(c).trim() || 'default';
+    const tenantId = resolveOpenApiCronTenant(c);
 
     let whereClause = 'WHERE 1=1';
     const params: (string | number)[] = [];
@@ -36,17 +87,24 @@ export function registerSummaryHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
           `SELECT * FROM cron_jobs ${whereClause} AND (COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ? OR location_id = ?) LIMIT 1000`
         ).bind(...params, tenantId, tenantId).all();
         rawJobs = ((scopedJobsRes as any)?.results || []) as Record<string, any>[];
-        if (rawJobs.length === 0) {
+        if (rawJobs.length === 0 && tenantId === 'default') {
           const allJobsRes = await db.prepare(
             `SELECT * FROM cron_jobs ${whereClause} LIMIT 1000`
           ).bind(...params).all().catch(() => ({ results: [] }));
           rawJobs = ((allJobsRes as any)?.results || []) as Record<string, any>[];
         }
       } catch {
-        const allJobsRes = await db.prepare(
-          `SELECT * FROM cron_jobs ${whereClause} LIMIT 1000`
-        ).bind(...params).all().catch(() => ({ results: [] }));
-        rawJobs = ((allJobsRes as any)?.results || []) as Record<string, any>[];
+        if (tenantId === 'default') {
+          const allJobsRes = await db.prepare(
+            `SELECT * FROM cron_jobs ${whereClause} LIMIT 1000`
+          ).bind(...params).all().catch(() => ({ results: [] }));
+          rawJobs = ((allJobsRes as any)?.results || []) as Record<string, any>[];
+        } else {
+          const locJobsRes = await db.prepare(
+            `SELECT * FROM cron_jobs ${whereClause} AND location_id = ? LIMIT 1000`
+          ).bind(...params, tenantId).all().catch(() => ({ results: [] }));
+          rawJobs = ((locJobsRes as any)?.results || []) as Record<string, any>[];
+        }
       }
 
       if (tenantId !== '*') {
@@ -75,37 +133,38 @@ export function registerSummaryHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
           runWhere += ' AND date(started_at) <= ?';
           runParams.push(dateTo);
         }
+        const matchesAllowedJobRun = (r: Record<string, any>): boolean => {
+          if (!allowedJobIds.has(r.job_id)) return false;
+          const runTenant = typeof r.tenant_id === 'string' ? r.tenant_id.trim() : '';
+          return !runTenant || matchesTenantRow(r, tenantId);
+        };
         let rawRuns: Record<string, any>[] = [];
         try {
           const scopedRunsRes = await db.prepare(
             `SELECT * FROM cron_runs ${runWhere} AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ? ORDER BY started_at DESC LIMIT 1000`
           ).bind(...runParams, tenantId).all();
-          rawRuns = (((scopedRunsRes as any)?.results || []) as Record<string, any>[]).filter(
-            (r) => allowedJobIds.has(r.job_id)
-          );
+          rawRuns = (((scopedRunsRes as any)?.results || []) as Record<string, any>[]).filter(matchesAllowedJobRun);
           if (rawRuns.length === 0 && allowedJobIds.size > 0) {
             const byJobRunsRes = await db.prepare(
-              `SELECT * FROM cron_runs ${runWhere} AND job_id IN (SELECT id FROM cron_jobs WHERE COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?) ORDER BY started_at DESC LIMIT 1000`
-            ).bind(...runParams, tenantId).all();
-            rawRuns = (((byJobRunsRes as any)?.results || []) as Record<string, any>[]).filter(
-              (r) => allowedJobIds.has(r.job_id)
-            );
+              `SELECT * FROM cron_runs ${runWhere} AND job_id IN (SELECT id FROM cron_jobs WHERE COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ? OR location_id = ?) ORDER BY started_at DESC LIMIT 1000`
+            ).bind(...runParams, tenantId, tenantId).all();
+            rawRuns = (((byJobRunsRes as any)?.results || []) as Record<string, any>[]).filter(matchesAllowedJobRun);
           }
         } catch {
-          const allRunsRes = await db.prepare(
-            `SELECT * FROM cron_runs ${runWhere} ORDER BY started_at DESC LIMIT 1000`
-          ).bind(...runParams).all().catch(() => ({ results: [] }));
-          rawRuns = (((allRunsRes as any)?.results || []) as Record<string, any>[]).filter(
-            (r) => allowedJobIds.has(r.job_id)
-          );
+          if (tenantId === 'default' || allowedJobIds.size > 0) {
+            const allRunsRes = await db.prepare(
+              `SELECT * FROM cron_runs ${runWhere} ORDER BY started_at DESC LIMIT 1000`
+            ).bind(...runParams).all().catch(() => ({ results: [] }));
+            rawRuns = (((allRunsRes as any)?.results || []) as Record<string, any>[]).filter(matchesAllowedJobRun);
+          } else {
+            rawRuns = [];
+          }
         }
         if (rawRuns.length === 0 && allowedJobIds.size > 0) {
           const allRunsRes = await db.prepare(
             `SELECT * FROM cron_runs ${runWhere} ORDER BY started_at DESC LIMIT 1000`
           ).bind(...runParams).all().catch(() => ({ results: [] }));
-          rawRuns = (((allRunsRes as any)?.results || []) as Record<string, any>[]).filter(
-            (r) => allowedJobIds.has(r.job_id)
-          );
+          rawRuns = (((allRunsRes as any)?.results || []) as Record<string, any>[]).filter(matchesAllowedJobRun);
         }
 
         let successfulRuns = 0;

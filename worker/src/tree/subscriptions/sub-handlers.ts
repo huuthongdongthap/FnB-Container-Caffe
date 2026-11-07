@@ -3,61 +3,210 @@
 import type { Context } from 'hono';
 import type { Env } from '../../types/env';
 import type { PlanRecord, SubscriptionRecord, InvoiceRecord, JwtPayload } from './types';
-import { requireAdmin } from './middleware';
+import {
+  hasConflictingSubscriptionTenantOverride,
+  requireAdmin,
+} from './auth-helpers';
 import { generateId, today, nowStr, addMonths } from './helpers';
 import { updateMRRSnapshot } from './mrr-calculator';
 import { verifyJWT } from '../../lib/jwt';
 import { createSubscriptionSchema, cancelSubscriptionSchema, updateSubscriptionSchema } from '../../lib/validators';
 import { getTenantId, matchesTenantRow } from '../../lib/db';
 
+const SUBSCRIPTION_LIST_STAFF_ROLES = new Set(['owner', 'manager', 'supervisor', 'admin']);
+
 export async function listSubscriptions(c: Context<{ Bindings: Env }>) {
+  if (hasConflictingSubscriptionTenantOverride(c)) {
+    return c.json({ success: false, error: 'Cross-tenant access denied' }, 403);
+  }
   const db = c.env.AURA_DB;
-  const tenantId = getTenantId(c).trim() || 'default';
+  let tenantId = getTenantId(c).trim() || 'default';
   const authHeader = c.req.header('Authorization');
   const statusFilter = c.req.query('status');
   const zoneFilter = c.req.query('zone');
 
+  let callerRole: string | undefined;
+  let callerTenant = '';
   let vendorId: string | null = null;
   let vendorEmail: string | null = null;
-  const ctxUser = (c as unknown as { get?: (k: string) => { id?: string; sub?: string; customerId?: string; email?: string; role?: string } | undefined }).get?.('user');
-  if (ctxUser && ['vendor', 'customer'].includes(ctxUser.role || '')) {
-    vendorId = ctxUser.customerId || ctxUser.sub || ctxUser.id || null;
-    vendorEmail = ctxUser.email || null;
-  } else if (authHeader && authHeader.startsWith('Bearer ')) {
+  const ctxUser = (c as unknown as { get?: (k: string) => { id?: string; sub?: string; customerId?: string; email?: string; role?: string; tenantId?: string; tenant_id?: string } | undefined }).get?.('user');
+  if (ctxUser?.role) {
+    callerRole = ctxUser.role;
+    callerTenant = String(ctxUser.tenantId ?? ctxUser.tenant_id ?? '').trim();
+    if (['vendor', 'customer'].includes(callerRole)) {
+      vendorId = ctxUser.customerId || ctxUser.sub || ctxUser.id || null;
+      vendorEmail = ctxUser.email || null;
+    }
+  }
+  if (!callerRole && authHeader && authHeader.startsWith('Bearer ')) {
     const token = authHeader.substring(7);
     const revoked = typeof c.env.AUTH_KV?.get === 'function' ? await c.env.AUTH_KV.get(`revoked:${token}`) : null;
     if (revoked) {
       return c.json({ success: false, error: 'Token đã bị thu hồi' }, 401);
     }
     const payload = await verifyJWT(token, c.env.JWT_SECRET) as JwtPayload | null;
-    if (payload && ['vendor', 'customer'].includes(payload.role || '')) {
-      vendorId = payload.customerId || payload.sub || payload.id || null;
-      vendorEmail = typeof (payload as unknown as Record<string, unknown>).email === 'string'
-        ? String((payload as unknown as Record<string, unknown>).email)
-        : null;
+    if (payload?.role) {
+      callerRole = payload.role;
+      const rawPayload = payload as unknown as Record<string, unknown>;
+      callerTenant = typeof rawPayload.tenantId === 'string'
+        ? rawPayload.tenantId.trim()
+        : typeof rawPayload.tenant_id === 'string'
+          ? rawPayload.tenant_id.trim()
+          : '';
+      if (['vendor', 'customer'].includes(callerRole)) {
+        vendorId = payload.customerId || payload.sub || payload.id || null;
+        vendorEmail = typeof rawPayload.email === 'string'
+          ? String(rawPayload.email)
+          : null;
+      }
+      const roleLower = String(callerRole).trim().toLowerCase();
+      const isHq = (roleLower === 'owner' || roleLower === 'admin') && (callerTenant.toLowerCase() === 'hq' || callerTenant === '*');
+      if (isHq) {
+        const reqOverride = (
+          c.req.query?.('tenant_id') ||
+          c.req.query?.('tenantId') ||
+          c.req.query?.('store_id') ||
+          c.req.query?.('storeId') ||
+          c.req.header?.('x-tenant-id') ||
+          c.req.header?.('X-Tenant-ID') ||
+          c.req.header?.('x-store-id') ||
+          c.req.header?.('X-Store-ID') ||
+          ''
+        ).trim();
+        tenantId = reqOverride ? (reqOverride.toLowerCase() === 'hq' ? '*' : reqOverride) : '*';
+      } else if (callerTenant) {
+        tenantId = callerTenant;
+      }
     }
   }
 
-  let query = 'SELECT s.*, p.name as plan_name, p.slug as plan_slug, p.container_size, p.monthly_price_vnd as plan_price, p.features FROM subscriptions s LEFT JOIN subscription_plans p ON s.plan_id = p.id WHERE 1=1';
-  const params: unknown[] = [];
+  if (callerRole === 'vendor' || callerRole === 'customer') {
+    if (!vendorId && !vendorEmail) {
+      return c.json({ success: false, error: 'Forbidden' }, 403);
+    }
+    const rawHeaderTenant = (
+      c.req.header?.('x-tenant-id') ||
+      c.req.header?.('X-Tenant-ID') ||
+      c.req.header?.('x-store-id') ||
+      c.req.header?.('X-Store-ID') ||
+      ''
+    ).trim();
+    const headerTenant = /^Bearer\s+/i.test(rawHeaderTenant) ? '' : rawHeaderTenant;
+    const explicitReqTenant = (
+      c.req.query?.('tenant_id') ||
+      c.req.query?.('tenantId') ||
+      c.req.query?.('store_id') ||
+      c.req.query?.('storeId') ||
+      headerTenant ||
+      ''
+    ).trim();
+    const boundVendorTenant = callerTenant || 'default';
+    if (
+      callerTenant === '*' ||
+      callerTenant.toLowerCase() === 'hq' ||
+      explicitReqTenant === '*' ||
+      explicitReqTenant.toLowerCase() === 'hq' ||
+      (explicitReqTenant && explicitReqTenant !== boundVendorTenant)
+    ) {
+      return c.json({ success: false, error: 'Cross-tenant access denied' }, 403);
+    }
+  } else if (callerRole && !SUBSCRIPTION_LIST_STAFF_ROLES.has(callerRole)) {
+    return c.json({ success: false, error: 'Forbidden: insufficient permissions' }, 403);
+  } else if (callerRole) {
+    const isHq = (callerRole === 'owner' || callerRole === 'admin') && (callerTenant.toLowerCase() === 'hq' || callerTenant === '*');
+    const rawHeaderTenant = (
+      c.req.header?.('x-tenant-id') ||
+      c.req.header?.('X-Tenant-ID') ||
+      c.req.header?.('x-store-id') ||
+      c.req.header?.('X-Store-ID') ||
+      ''
+    ).trim();
+    const headerTenant = /^Bearer\s+/i.test(rawHeaderTenant) ? '' : rawHeaderTenant;
+    const explicitReqTenant = (
+      c.req.query?.('tenant_id') ||
+      c.req.query?.('tenantId') ||
+      c.req.query?.('store_id') ||
+      c.req.query?.('storeId') ||
+      headerTenant ||
+      ''
+    ).trim();
+    if (!isHq) {
+      const boundTenant = callerTenant || 'default';
+      if (
+        callerTenant === '*' ||
+        callerTenant.toLowerCase() === 'hq' ||
+        explicitReqTenant === '*' ||
+        explicitReqTenant.toLowerCase() === 'hq' ||
+        (explicitReqTenant && explicitReqTenant !== boundTenant)
+      ) {
+        return c.json({ success: false, error: 'Cross-tenant access denied' }, 403);
+      }
+    }
+  }
+
+  let filterClause = '';
+  const filterParams: unknown[] = [];
 
   if (vendorId) {
-    query += ' AND s.customer_id = ?'; params.push(vendorId);
+    filterClause += ' AND s.customer_id = ?'; filterParams.push(vendorId);
   } else if (vendorEmail) {
-    query += ' AND LOWER(s.customer_email) = LOWER(?)'; params.push(vendorEmail);
+    filterClause += ' AND LOWER(s.customer_email) = LOWER(?)'; filterParams.push(vendorEmail);
   }
   if (statusFilter) {
-    query += ' AND s.status = ?'; params.push(statusFilter);
+    filterClause += ' AND s.status = ?'; filterParams.push(statusFilter);
   }
   if (zoneFilter) {
-    query += ' AND s.zone = ?'; params.push(zoneFilter);
+    filterClause += ' AND s.zone = ?'; filterParams.push(zoneFilter);
   }
-  query += ' ORDER BY s.created_at DESC';
+
+  const scopedQuery =
+    'SELECT s.*, p.name as plan_name, p.slug as plan_slug, p.container_size, p.monthly_price_vnd as plan_price, p.features ' +
+    "FROM subscriptions s LEFT JOIN subscription_plans p ON s.plan_id = p.id AND (? = '*' OR COALESCE(NULLIF(TRIM(p.tenant_id), ''), 'default') = ?) " +
+    'WHERE 1=1' +
+    filterClause +
+    " AND (? = '*' OR COALESCE(NULLIF(TRIM(s.tenant_id), ''), 'default') = ?) ORDER BY s.created_at DESC LIMIT 200";
+  const subScopedFallbackQuery =
+    'SELECT s.*, p.name as plan_name, p.slug as plan_slug, p.container_size, p.monthly_price_vnd as plan_price, p.features ' +
+    'FROM subscriptions s LEFT JOIN subscription_plans p ON s.plan_id = p.id ' +
+    'WHERE 1=1' +
+    filterClause +
+    " AND (? = '*' OR COALESCE(NULLIF(TRIM(s.tenant_id), ''), 'default') = ?) ORDER BY s.created_at DESC LIMIT 200";
+  const legacyQuery =
+    'SELECT s.*, p.name as plan_name, p.slug as plan_slug, p.container_size, p.monthly_price_vnd as plan_price, p.features ' +
+    'FROM subscriptions s LEFT JOIN subscription_plans p ON s.plan_id = p.id WHERE 1=1' +
+    filterClause +
+    ' ORDER BY s.created_at DESC LIMIT 200';
 
   try {
-    const subs = await db.prepare(query).bind(...params).all<SubscriptionRecord>();
-    const results = (subs.results || [])
+    let rawRows: SubscriptionRecord[] = [];
+    try {
+      const scopedSubs = await db
+        .prepare(scopedQuery)
+        .bind(tenantId, tenantId, ...filterParams, tenantId, tenantId)
+        .all<SubscriptionRecord>();
+      rawRows = scopedSubs.results || [];
+      if (rawRows.length === 0 && (tenantId === 'default' || tenantId === '*')) {
+        const fallbackSubs = await db.prepare(legacyQuery).bind(...filterParams).all<SubscriptionRecord>();
+        rawRows = fallbackSubs.results || [];
+      }
+    } catch {
+      try {
+        const subOnlySubs = await db
+          .prepare(subScopedFallbackQuery)
+          .bind(...filterParams, tenantId, tenantId)
+          .all<SubscriptionRecord>();
+        rawRows = subOnlySubs.results || [];
+      } catch {
+        if (tenantId === 'default' || tenantId === '*') {
+          const fallbackSubs = await db.prepare(legacyQuery).bind(...filterParams).all<SubscriptionRecord>();
+          rawRows = fallbackSubs.results || [];
+        }
+      }
+    }
+
+    const results = rawRows
       .filter(s => matchesTenantRow(s as unknown as Record<string, unknown>, tenantId))
+      .slice(0, 200)
       .map(s => ({
         ...s,
         plan_features: s.features ? JSON.parse(s.features) : []
@@ -70,22 +219,44 @@ export async function listSubscriptions(c: Context<{ Bindings: Env }>) {
 }
 
 export async function getStatsHandler(c: Context<{ Bindings: Env }>) {
+  if (hasConflictingSubscriptionTenantOverride(c)) {
+    return c.json({ success: false, error: 'Cross-tenant access denied' }, 403);
+  }
   const db = c.env.AURA_DB;
-  const tenantId = getTenantId(c).trim() || 'default';
+  const rawTenantId = getTenantId(c).trim() || 'default';
+  const tenantId = rawTenantId.toLowerCase() === 'hq' ? '*' : rawTenantId;
 
   try {
-    const activeResult = await db.prepare(
-      'SELECT COALESCE(SUM(amount_vnd), 0) as mrr, COUNT(*) as count FROM subscriptions WHERE status = \'active\' AND (? = \'*\' OR COALESCE(NULLIF(TRIM(tenant_id), \'\'), \'default\') = ?)'
-    ).bind(tenantId, tenantId).first<{ mrr: number; count: number }>();
+    let activeResult = await db.prepare(
+      "SELECT COALESCE(SUM(amount_vnd), 0) as mrr, COUNT(*) as count, COALESCE(SUM(CASE WHEN LOWER(TRIM(COALESCE(billing_cycle, 'monthly'))) = 'quarterly' THEN amount_vnd / 3.0 WHEN LOWER(TRIM(COALESCE(billing_cycle, 'monthly'))) IN ('annual', 'yearly') THEN amount_vnd / 12.0 ELSE amount_vnd END), 0) as normalized_mrr FROM subscriptions WHERE status = 'active' AND (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?)"
+    ).bind(tenantId, tenantId).first<{ mrr: number; count: number; normalized_mrr?: number }>().catch(() => null);
+    if (!activeResult) {
+      activeResult = await db.prepare(
+        "SELECT COALESCE(SUM(amount_vnd), 0) as mrr, COUNT(*) as count FROM subscriptions WHERE status = 'active' AND (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?)"
+      ).bind(tenantId, tenantId).first<{ mrr: number; count: number; normalized_mrr?: number }>().catch(() => null);
+    }
 
+    const normalizedRevenueExpr = `
+      CASE
+        WHEN LOWER(COALESCE(billing_cycle, 'monthly')) = 'quarterly' THEN amount_vnd / 3.0
+        WHEN LOWER(COALESCE(billing_cycle, 'monthly')) IN ('annual', 'yearly') THEN amount_vnd / 12.0
+        ELSE amount_vnd
+      END
+    `;
     const byZone = await db.prepare(
-      'SELECT zone, COUNT(*) as count, COALESCE(SUM(amount_vnd), 0) as revenue FROM subscriptions WHERE status = \'active\' AND (? = \'*\' OR COALESCE(NULLIF(TRIM(tenant_id), \'\'), \'default\') = ?) GROUP BY zone ORDER BY revenue DESC'
+      `SELECT zone, COUNT(*) as count, COALESCE(SUM(${normalizedRevenueExpr}), 0) as revenue FROM subscriptions WHERE status = 'active' AND (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?) GROUP BY zone ORDER BY revenue DESC`
     ).bind(tenantId, tenantId).all<{ zone: string; count: number; revenue: number }>();
 
     let byPlan: { results?: Array<{ name: string; slug: string; count: number; revenue: number }> };
     try {
       byPlan = await db.prepare(
-        `SELECT p.name, p.slug, COUNT(s.id) as count, COALESCE(SUM(s.amount_vnd), 0) as revenue
+        `SELECT p.name, p.slug, COUNT(s.id) as count, COALESCE(SUM(
+          CASE
+            WHEN LOWER(COALESCE(s.billing_cycle, 'monthly')) = 'quarterly' THEN s.amount_vnd / 3.0
+            WHEN LOWER(COALESCE(s.billing_cycle, 'monthly')) IN ('annual', 'yearly') THEN s.amount_vnd / 12.0
+            ELSE s.amount_vnd
+          END
+        ), 0) as revenue
          FROM subscriptions s JOIN subscription_plans p ON s.plan_id = p.id
          WHERE s.status = 'active'
            AND (? = '*' OR COALESCE(NULLIF(TRIM(s.tenant_id), ''), 'default') = ?)
@@ -94,7 +265,13 @@ export async function getStatsHandler(c: Context<{ Bindings: Env }>) {
       ).bind(tenantId, tenantId, tenantId, tenantId).all<{ name: string; slug: string; count: number; revenue: number }>();
     } catch {
       byPlan = await db.prepare(
-        `SELECT p.name, p.slug, COUNT(s.id) as count, COALESCE(SUM(s.amount_vnd), 0) as revenue
+        `SELECT p.name, p.slug, COUNT(s.id) as count, COALESCE(SUM(
+          CASE
+            WHEN LOWER(COALESCE(s.billing_cycle, 'monthly')) = 'quarterly' THEN s.amount_vnd / 3.0
+            WHEN LOWER(COALESCE(s.billing_cycle, 'monthly')) IN ('annual', 'yearly') THEN s.amount_vnd / 12.0
+            ELSE s.amount_vnd
+          END
+        ), 0) as revenue
          FROM subscriptions s JOIN subscription_plans p ON s.plan_id = p.id
          WHERE s.status = 'active' AND (? = '*' OR COALESCE(NULLIF(TRIM(s.tenant_id), ''), 'default') = ?) GROUP BY p.id ORDER BY revenue DESC`
       ).bind(tenantId, tenantId).all<{ name: string; slug: string; count: number; revenue: number }>();
@@ -118,12 +295,13 @@ export async function getStatsHandler(c: Context<{ Bindings: Env }>) {
     interface Bucket {
       under_1m: number; from_1m_to_3m: number; from_3m_to_5m: number; above_5m: number;
     }
+    const normalizedMonthlyExpr = `CASE WHEN LOWER(TRIM(COALESCE(billing_cycle, 'monthly'))) = 'quarterly' THEN amount_vnd / 3.0 WHEN LOWER(TRIM(COALESCE(billing_cycle, 'monthly'))) IN ('annual', 'yearly') THEN amount_vnd / 12.0 ELSE amount_vnd END`;
     const bucketData = await db.prepare(`
       SELECT
-        COUNT(CASE WHEN amount_vnd < 1000000 THEN 1 END) as under_1m,
-        COUNT(CASE WHEN amount_vnd >= 1000000 AND amount_vnd < 3000000 THEN 1 END) as from_1m_to_3m,
-        COUNT(CASE WHEN amount_vnd >= 3000000 AND amount_vnd < 5000000 THEN 1 END) as from_3m_to_5m,
-        COUNT(CASE WHEN amount_vnd >= 5000000 THEN 1 END) as above_5m
+        COUNT(CASE WHEN (${normalizedMonthlyExpr}) < 1000000 THEN 1 END) as under_1m,
+        COUNT(CASE WHEN (${normalizedMonthlyExpr}) >= 1000000 AND (${normalizedMonthlyExpr}) < 3000000 THEN 1 END) as from_1m_to_3m,
+        COUNT(CASE WHEN (${normalizedMonthlyExpr}) >= 3000000 AND (${normalizedMonthlyExpr}) < 5000000 THEN 1 END) as from_3m_to_5m,
+        COUNT(CASE WHEN (${normalizedMonthlyExpr}) >= 5000000 THEN 1 END) as above_5m
       FROM subscriptions WHERE status = 'active' AND (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?)
     `).bind(tenantId, tenantId).first<Bucket>();
 
@@ -135,7 +313,11 @@ export async function getStatsHandler(c: Context<{ Bindings: Env }>) {
       'SELECT COUNT(*) as count FROM subscriptions WHERE (? = \'*\' OR COALESCE(NULLIF(TRIM(tenant_id), \'\'), \'default\') = ?)'
     ).bind(tenantId, tenantId).first<{ count: number }>();
 
-    const mrr = activeResult?.mrr || 0;
+    const rawMrr =
+      activeResult?.normalized_mrr !== undefined && activeResult?.normalized_mrr !== null
+        ? Number(activeResult.normalized_mrr)
+        : Number(activeResult?.mrr || 0);
+    const mrr = Math.round(Number.isFinite(rawMrr) ? rawMrr : 0);
     const activeCount = activeResult?.count || 0;
 
     return c.json({
@@ -182,17 +364,42 @@ export async function getStatsHandler(c: Context<{ Bindings: Env }>) {
 }
 
 export async function getMRRTrend(c: Context<{ Bindings: Env }>) {
+  if (hasConflictingSubscriptionTenantOverride(c)) {
+    return c.json({ success: false, error: 'Cross-tenant access denied' }, 403);
+  }
   const db = c.env.AURA_DB;
-  const tenantId = getTenantId(c).trim() || 'default';
-  const days = parseInt(c.req.query('days') || '30', 10);
+  const rawTenantId = getTenantId(c).trim() || 'default';
+  const tenantId = rawTenantId.toLowerCase() === 'hq' ? '*' : rawTenantId;
+  const parsedDays = parseInt(c.req.query('days') || '30', 10);
+  const days = Number.isFinite(parsedDays) ? Math.min(Math.max(1, parsedDays), 365) : 30;
 
-  if (tenantId !== 'default' && tenantId !== '*') {
-    const live = await db.prepare(
-      'SELECT COALESCE(SUM(amount_vnd), 0) as mrr, COUNT(*) as count FROM subscriptions WHERE status = \'active\' AND COALESCE(NULLIF(TRIM(tenant_id), \'\'), \'default\') = ?'
-    ).bind(tenantId).first<{ mrr: number; count: number }>();
+  if (tenantId !== 'default') {
+    let live = await db.prepare(
+      "SELECT COALESCE(SUM(amount_vnd), 0) as mrr, COUNT(*) as count, COALESCE(SUM(CASE WHEN LOWER(TRIM(COALESCE(billing_cycle, 'monthly'))) = 'quarterly' THEN amount_vnd / 3.0 WHEN LOWER(TRIM(COALESCE(billing_cycle, 'monthly'))) IN ('annual', 'yearly') THEN amount_vnd / 12.0 ELSE amount_vnd END), 0) as normalized_mrr FROM subscriptions WHERE status = 'active' AND (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?)"
+    ).bind(tenantId, tenantId).first<{ mrr: number; count: number; normalized_mrr?: number }>().catch(() => null);
+    if (!live) {
+      live = await db.prepare(
+        'SELECT COALESCE(SUM(amount_vnd), 0) as mrr, COUNT(*) as count FROM subscriptions WHERE status = \'active\' AND (? = \'*\' OR COALESCE(NULLIF(TRIM(tenant_id), \'\'), \'default\') = ?)'
+      ).bind(tenantId, tenantId).first<{ mrr: number; count: number; normalized_mrr?: number }>().catch(() => null);
+    }
+    const liveMrr =
+      live?.normalized_mrr !== undefined && live?.normalized_mrr !== null
+        ? Math.round(Number(live.normalized_mrr))
+        : (live?.mrr || 0);
+    if (tenantId === '*' && (live?.count || 0) === 0 && liveMrr === 0) {
+      const groupedSnaps = await db.prepare(
+        'SELECT snapshot_date, COALESCE(SUM(mrr_vnd), 0) as mrr_vnd, COALESCE(SUM(arr_vnd), 0) as arr_vnd, COALESCE(SUM(active_subscriptions), 0) as active_subscriptions FROM mrr_snapshots GROUP BY snapshot_date ORDER BY snapshot_date DESC LIMIT ?'
+      ).bind(days).all<{ snapshot_date: string; mrr_vnd: number; arr_vnd?: number; active_subscriptions: number }>().catch(() => ({ results: [] }));
+      if ((groupedSnaps.results || []).length > 0) {
+        return c.json({
+          success: true,
+          data: { snapshots: (groupedSnaps.results || []).slice().reverse(), source: 'snapshots' }
+        });
+      }
+    }
     return c.json({
       success: true,
-      data: { snapshots: [{ snapshot_date: today(), mrr_vnd: live?.mrr || 0, active_subscriptions: live?.count || 0 }], source: 'live' }
+      data: { snapshots: [{ snapshot_date: today(), mrr_vnd: liveMrr, arr_vnd: liveMrr * 12, active_subscriptions: live?.count || 0 }], source: 'live' }
     });
   }
 
@@ -203,11 +410,19 @@ export async function getMRRTrend(c: Context<{ Bindings: Env }>) {
   const results = snapshots.results || [];
   if (results.length === 0) {
     const live = await db.prepare(
-      'SELECT COALESCE(SUM(amount_vnd), 0) as mrr, COUNT(*) as count FROM subscriptions WHERE status = \'active\' AND (? = \'*\' OR COALESCE(NULLIF(TRIM(tenant_id), \'\'), \'default\') = ?)'
-    ).bind(tenantId, tenantId).first<{ mrr: number; count: number }>();
+      "SELECT COALESCE(SUM(amount_vnd), 0) as mrr, COUNT(*) as count, COALESCE(SUM(CASE WHEN LOWER(TRIM(COALESCE(billing_cycle, 'monthly'))) = 'quarterly' THEN amount_vnd / 3.0 WHEN LOWER(TRIM(COALESCE(billing_cycle, 'monthly'))) IN ('annual', 'yearly') THEN amount_vnd / 12.0 ELSE amount_vnd END), 0) as normalized_mrr FROM subscriptions WHERE status = 'active' AND (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?)"
+    ).bind(tenantId, tenantId).first<{ mrr: number; count: number; normalized_mrr?: number }>().catch(() =>
+      db.prepare(
+        'SELECT COALESCE(SUM(amount_vnd), 0) as mrr, COUNT(*) as count FROM subscriptions WHERE status = \'active\' AND (? = \'*\' OR COALESCE(NULLIF(TRIM(tenant_id), \'\'), \'default\') = ?)'
+      ).bind(tenantId, tenantId).first<{ mrr: number; count: number; normalized_mrr?: number }>()
+    );
+    const liveMrr =
+      live?.normalized_mrr !== undefined && live?.normalized_mrr !== null
+        ? Math.round(Number(live.normalized_mrr))
+        : (live?.mrr || 0);
     return c.json({
       success: true,
-      data: { snapshots: [{ snapshot_date: today(), mrr_vnd: live?.mrr || 0, active_subscriptions: live?.count || 0 }], source: 'live' }
+      data: { snapshots: [{ snapshot_date: today(), mrr_vnd: liveMrr, active_subscriptions: live?.count || 0 }], source: 'live' }
     });
   }
 
@@ -215,8 +430,12 @@ export async function getMRRTrend(c: Context<{ Bindings: Env }>) {
 }
 
 export async function getSubscription(c: Context<{ Bindings: Env }>) {
+  if (hasConflictingSubscriptionTenantOverride(c)) {
+    return c.json({ success: false, error: 'Cross-tenant access denied' }, 403);
+  }
   const db = c.env.AURA_DB;
-  const tenantId = getTenantId(c).trim() || 'default';
+  const rawTenantId = getTenantId(c).trim() || 'default';
+  const tenantId = rawTenantId.toLowerCase() === 'hq' ? '*' : rawTenantId;
   const sub = await db.prepare(
     'SELECT s.*, p.name as plan_name, p.slug as plan_slug, p.container_size, p.features as plan_features FROM subscriptions s LEFT JOIN subscription_plans p ON s.plan_id = p.id WHERE s.id = ?'
   ).bind(c.req.param('id')).first<SubscriptionRecord>();
@@ -256,24 +475,45 @@ export async function getSubscription(c: Context<{ Bindings: Env }>) {
     }
   }
 
-  const invoices = await db.prepare(
-    'SELECT * FROM subscription_invoices WHERE subscription_id = ? ORDER BY created_at DESC LIMIT 5'
-  ).bind(sub.id).all<InvoiceRecord>();
+  let rawInvoices: InvoiceRecord[] = [];
+  try {
+    const scopedInvoices = await db.prepare(
+      "SELECT * FROM subscription_invoices WHERE subscription_id = ? AND (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?) ORDER BY created_at DESC LIMIT 5"
+    ).bind(sub.id, tenantId, tenantId).all<InvoiceRecord>();
+    rawInvoices = scopedInvoices.results || [];
+    if (rawInvoices.length === 0) {
+      const fallbackInvoices = await db.prepare(
+        'SELECT * FROM subscription_invoices WHERE subscription_id = ? ORDER BY created_at DESC LIMIT 5'
+      ).bind(sub.id).all<InvoiceRecord>();
+      rawInvoices = fallbackInvoices.results || [];
+    }
+  } catch {
+    const fallbackInvoices = await db.prepare(
+      'SELECT * FROM subscription_invoices WHERE subscription_id = ? ORDER BY created_at DESC LIMIT 5'
+    ).bind(sub.id).all<InvoiceRecord>();
+    rawInvoices = fallbackInvoices.results || [];
+  }
+  const recentInvoices = rawInvoices.filter((inv) =>
+    matchesTenantRow(inv as unknown as Record<string, unknown>, tenantId)
+  );
 
   return c.json({
     success: true,
     data: {
       ...sub,
       plan_features: sub.plan_features ? JSON.parse(sub.plan_features) : [],
-      recent_invoices: invoices.results || []
+      recent_invoices: recentInvoices
     }
   });
 }
 
 export async function createSubscription(c: Context<{ Bindings: Env }>) {
+  if (hasConflictingSubscriptionTenantOverride(c)) {
+    return c.json({ success: false, error: 'Cross-tenant access denied' }, 403);
+  }
   const db = c.env.AURA_DB;
   const rawTenantId = getTenantId(c).trim() || 'default';
-  const tenantId = rawTenantId === '*' ? 'default' : rawTenantId;
+  const tenantId = rawTenantId === '*' || rawTenantId.toLowerCase() === 'hq' ? 'default' : rawTenantId;
   const body = await c.req.json();
   const parsed = createSubscriptionSchema.safeParse(body);
   if (!parsed.success) {
@@ -321,7 +561,8 @@ export async function createSubscription(c: Context<{ Bindings: Env }>) {
 
   const isSelfServiceCaller = callerRole === 'customer' || callerRole === 'vendor';
   const explicitCustomerId = body.customer_id as string | undefined;
-  const cycleMonths = (body.billing_cycle as string) === 'quarterly' ? 3 : (body.billing_cycle as string) === 'yearly' ? 12 : 1;
+  const rawCycle = String(body.billing_cycle || '').trim().toLowerCase();
+  const cycleMonths = rawCycle === 'quarterly' ? 3 : (rawCycle === 'yearly' || rawCycle === 'annual') ? 12 : 1;
   const cyclePlanAmount = Number(plan.monthly_price_vnd) * cycleMonths;
   if (isSelfServiceCaller) {
     if (explicitCustomerId && callerUserId && explicitCustomerId !== callerUserId) {
@@ -364,7 +605,10 @@ export async function createSubscription(c: Context<{ Bindings: Env }>) {
       periodStart, periodEnd, periodEnd, amount,
       depositPaidFlag, depositAmount, body.notes || '', tenantId, nowStr(), nowStr()
     ).run();
-  } catch {
+  } catch (err) {
+    if (tenantId !== 'default' && tenantId !== '*') {
+      return c.json({ success: false, error: 'Tenant-scoped subscription creation failed', detail: (err as Error).message }, 500);
+    }
     await db.prepare(
       `INSERT INTO subscriptions (id, plan_id, customer_id, customer_name, customer_email, customer_phone,
        container_number, zone, status, billing_cycle, current_period_start, current_period_end,
@@ -392,7 +636,10 @@ export async function createSubscription(c: Context<{ Bindings: Env }>) {
         `INSERT INTO subscription_invoices (id, subscription_id, amount_vnd, status, period_start, period_end, invoice_number, tenant_id, created_at)
          VALUES (?, ?, ?, 'pending', ?, ?, ?, ?, ?)`
       ).bind(invoiceId, id, amount, periodStart, periodEnd, invoiceNumber, tenantId, createdAt).run();
-    } catch {
+    } catch (err) {
+      if (tenantId !== 'default' && tenantId !== '*') {
+        return c.json({ success: false, error: 'Tenant-scoped invoice creation failed', detail: (err as Error).message }, 500);
+      }
       await db.prepare(
         `INSERT INTO subscription_invoices (id, subscription_id, amount_vnd, status, period_start, period_end, invoice_number, created_at)
          VALUES (?, ?, ?, 'pending', ?, ?, ?, ?)`
@@ -400,7 +647,10 @@ export async function createSubscription(c: Context<{ Bindings: Env }>) {
     }
   }
 
-  await updateMRRSnapshot(db);
+  await updateMRRSnapshot(db, rawTenantId);
+  if (rawTenantId !== 'default' && rawTenantId !== '*') {
+    await updateMRRSnapshot(db, 'default');
+  }
 
   const sub = await db.prepare(
     'SELECT s.*, p.name as plan_name, p.slug as plan_slug, p.container_size FROM subscriptions s LEFT JOIN subscription_plans p ON s.plan_id = p.id WHERE s.id = ?'
@@ -426,9 +676,13 @@ export async function updateSubscription(c: Context<{ Bindings: Env }>) {
 
   const existing = await db.prepare('SELECT * FROM subscriptions WHERE id = ?').bind(id).first<SubscriptionRecord>();
   const rawTenantId = getTenantId(c).trim() || 'default';
-  if (!existing || !matchesTenantRow(existing as unknown as Record<string, unknown>, rawTenantId)) {
+  const tenantId = rawTenantId.toLowerCase() === 'hq' ? '*' : rawTenantId;
+  if (!existing || !matchesTenantRow(existing as unknown as Record<string, unknown>, tenantId)) {
     return c.json({ success: false, error: 'Subscription not found' }, 404);
   }
+  const effectiveSubTenant =
+    (existing as unknown as { tenant_id?: string | null }).tenant_id?.trim() ||
+    (tenantId === '*' ? 'default' : tenantId);
 
   const bodyAny = body as unknown as Record<string, unknown>;
   const requestedPlanId = bodyAny.plan_id ?? rawBody.plan_id;
@@ -445,17 +699,23 @@ export async function updateSubscription(c: Context<{ Bindings: Env }>) {
       planRow.tenant_id !== undefined &&
       planRow.tenant_id !== null &&
       String(planRow.tenant_id).trim() !== '' &&
-      !matchesTenantRow(planRow, rawTenantId)
+      !matchesTenantRow(planRow, effectiveSubTenant)
     ) {
       return c.json({ success: false, error: 'Plan not found' }, 404);
     }
     bodyAny.plan_id = requestedPlanId;
+    if (bodyAny.amount_vnd === undefined && rawBody.amount_vnd === undefined) {
+      const planMonthly = Number(plan.monthly_price_vnd ?? 0);
+      const subCycle = String(existing.billing_cycle || '').trim().toLowerCase();
+      const cycleMultiplier = subCycle === 'quarterly' ? 3 : (subCycle === 'yearly' || subCycle === 'annual') ? 12 : 1;
+      bodyAny.amount_vnd = planMonthly * cycleMultiplier;
+    }
   }
 
   const updates: string[] = [];
   const params: unknown[] = [];
 
-  const updatable = ['plan_id', 'customer_name', 'customer_phone', 'customer_email', 'container_number', 'zone', 'deposit_vnd', 'deposit_paid', 'notes'];
+  const updatable = ['plan_id', 'amount_vnd', 'customer_name', 'customer_phone', 'customer_email', 'container_number', 'zone', 'deposit_vnd', 'deposit_paid', 'notes'];
   for (const key of updatable) {
     if (bodyAny[key] !== undefined) {
       updates.push(`${key} = ?`); params.push(bodyAny[key]);
@@ -473,8 +733,11 @@ export async function updateSubscription(c: Context<{ Bindings: Env }>) {
   try {
     await db.prepare(
       `UPDATE subscriptions SET ${updates.join(', ')} WHERE id = ? AND (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?)`
-    ).bind(...params, rawTenantId, rawTenantId).run();
-  } catch {
+    ).bind(...params, tenantId, tenantId).run();
+  } catch (err) {
+    if (tenantId !== 'default' && tenantId !== '*') {
+      return c.json({ success: false, error: 'Tenant-scoped subscription update failed', detail: (err as Error).message }, 500);
+    }
     await db.prepare(`UPDATE subscriptions SET ${updates.join(', ')} WHERE id = ?`).bind(...params).run();
   }
 
@@ -482,16 +745,32 @@ export async function updateSubscription(c: Context<{ Bindings: Env }>) {
     'SELECT s.*, p.name as plan_name, p.slug as plan_slug FROM subscriptions s LEFT JOIN subscription_plans p ON s.plan_id = p.id WHERE s.id = ?'
   ).bind(id).first<SubscriptionRecord>();
 
+  await updateMRRSnapshot(db, effectiveSubTenant).catch(() => null);
+  if (effectiveSubTenant !== 'default') {
+    await updateMRRSnapshot(db, 'default').catch(() => null);
+  }
+
   return c.json({ success: true, data: sub });
 }
 
 export async function cancelSubscription(c: Context<{ Bindings: Env }>) {
+  if (hasConflictingSubscriptionTenantOverride(c)) {
+    return c.json({ success: false, error: 'Cross-tenant access denied' }, 403);
+  }
   const adminErr = await requireAdmin(c);
   let callerUserId: string | null = null;
+  let callerEmail: string | null = null;
+  let callerRole = '';
+  let callerTenant = '';
   if (adminErr) {
-    const ctxUser = (c as unknown as { get?: (k: string) => { id?: string; sub?: string; customerId?: string } | undefined }).get?.('user');
-    if (ctxUser?.customerId || ctxUser?.id || ctxUser?.sub) {
+    const ctxUser = (c as unknown as {
+      get?: (k: string) => { id?: string; sub?: string; customerId?: string; email?: string; role?: string; tenantId?: string; tenant_id?: string } | undefined;
+    }).get?.('user');
+    if (ctxUser?.customerId || ctxUser?.id || ctxUser?.sub || ctxUser?.role) {
       callerUserId = ctxUser.customerId || ctxUser.id || ctxUser.sub || null;
+      callerEmail = ctxUser.email ? String(ctxUser.email).toLowerCase() : null;
+      callerRole = String(ctxUser.role || '').trim().toLowerCase();
+      callerTenant = String(ctxUser.tenantId ?? ctxUser.tenant_id ?? '').trim();
     } else {
       const authHeader = c.req.header('Authorization');
       if (authHeader && authHeader.startsWith('Bearer ')) {
@@ -500,13 +779,52 @@ export async function cancelSubscription(c: Context<{ Bindings: Env }>) {
         if (!revoked) {
           const payload = await verifyJWT(token, c.env.JWT_SECRET) as JwtPayload | null;
           if (payload) {
+            const rawPayload = payload as unknown as Record<string, unknown>;
             callerUserId = payload.customerId || payload.id || payload.sub || null;
+            callerEmail = rawPayload.email
+              ? String(rawPayload.email).toLowerCase()
+              : null;
+            callerRole = String(payload.role || '').trim().toLowerCase();
+            callerTenant = typeof rawPayload.tenantId === 'string'
+              ? rawPayload.tenantId.trim()
+              : typeof rawPayload.tenant_id === 'string'
+                ? rawPayload.tenant_id.trim()
+                : '';
           }
         }
       }
     }
-    if (!callerUserId) {
+    if (callerRole && callerRole !== 'customer' && callerRole !== 'vendor') {
       return adminErr;
+    }
+    if (!callerUserId && !callerEmail) {
+      return adminErr;
+    }
+    const rawHeaderTenant = (
+      c.req.header?.('x-tenant-id') ||
+      c.req.header?.('X-Tenant-ID') ||
+      c.req.header?.('x-store-id') ||
+      c.req.header?.('X-Store-ID') ||
+      ''
+    ).trim();
+    const headerTenant = /^Bearer\s+/i.test(rawHeaderTenant) ? '' : rawHeaderTenant;
+    const explicitReqTenant = (
+      c.req.query?.('tenant_id') ||
+      c.req.query?.('tenantId') ||
+      c.req.query?.('store_id') ||
+      c.req.query?.('storeId') ||
+      headerTenant ||
+      ''
+    ).trim();
+    const boundCallerTenant = callerTenant || 'default';
+    if (
+      callerTenant === '*' ||
+      callerTenant.toLowerCase() === 'hq' ||
+      explicitReqTenant === '*' ||
+      explicitReqTenant.toLowerCase() === 'hq' ||
+      (explicitReqTenant && explicitReqTenant !== boundCallerTenant)
+    ) {
+      return c.json({ success: false, error: 'Cross-tenant access denied' }, 403);
     }
   }
 
@@ -517,12 +835,23 @@ export async function cancelSubscription(c: Context<{ Bindings: Env }>) {
   const data = parsed.success ? parsed.data : {};
 
   const sub = await db.prepare('SELECT * FROM subscriptions WHERE id = ?').bind(id).first<SubscriptionRecord>();
-  const tenantId = getTenantId(c).trim() || 'default';
+  const resolvedTenant = getTenantId(c).trim() || 'default';
+  const rawTenantId = adminErr && callerTenant && resolvedTenant === 'default' ? callerTenant : resolvedTenant;
+  const tenantId = rawTenantId.toLowerCase() === 'hq' ? '*' : rawTenantId;
   if (!sub || !matchesTenantRow(sub as unknown as Record<string, unknown>, tenantId)) {
     return c.json({ success: false, error: 'Subscription not found' }, 404);
   }
-  if (adminErr && (!sub.customer_id || sub.customer_id !== callerUserId)) {
-    return adminErr;
+  const effectiveSubTenant =
+    (sub as unknown as { tenant_id?: string | null }).tenant_id?.trim() ||
+    (tenantId === '*' ? 'default' : tenantId);
+  if (adminErr) {
+    const subCustId = sub.customer_id ? String(sub.customer_id) : '';
+    const subEmail = sub.customer_email ? String(sub.customer_email).toLowerCase() : '';
+    const ownsById = Boolean(callerUserId && subCustId && subCustId === callerUserId);
+    const ownsByEmail = Boolean(!subCustId && callerEmail && subEmail && subEmail === callerEmail);
+    if (!ownsById && !ownsByEmail) {
+      return adminErr;
+    }
   }
   if (sub.status === 'cancelled') {
     return c.json({ success: false, error: 'Already cancelled' }, 400);
@@ -533,13 +862,28 @@ export async function cancelSubscription(c: Context<{ Bindings: Env }>) {
     await db.prepare(
       'UPDATE subscriptions SET status = \'cancelled\', cancelled_at = ?, cancellation_reason = ?, updated_at = ? WHERE id = ? AND (? = \'*\' OR COALESCE(NULLIF(TRIM(tenant_id), \'\'), \'default\') = ?)'
     ).bind(cancelledAt, data.reason || '', cancelledAt, id, tenantId, tenantId).run();
-  } catch {
+  } catch (err) {
+    if (tenantId !== 'default' && tenantId !== '*') {
+      return c.json({ success: false, error: 'Tenant-scoped subscription cancellation failed', detail: (err as Error).message }, 500);
+    }
     await db.prepare(
       'UPDATE subscriptions SET status = \'cancelled\', cancelled_at = ?, cancellation_reason = ?, updated_at = ? WHERE id = ?'
     ).bind(cancelledAt, data.reason || '', cancelledAt, id).run();
   }
 
-  await updateMRRSnapshot(db, tenantId);
+  try {
+    await db.prepare(
+      'UPDATE subscription_invoices SET status = \'cancelled\', updated_at = ? WHERE subscription_id = ? AND status = \'pending\' AND (? = \'*\' OR COALESCE(NULLIF(TRIM(tenant_id), \'\'), \'default\') = ?)'
+    ).bind(cancelledAt, id, effectiveSubTenant, effectiveSubTenant).run();
+  } catch {
+    if (effectiveSubTenant === 'default') {
+      await db.prepare(
+        'UPDATE subscription_invoices SET status = \'cancelled\', updated_at = ? WHERE subscription_id = ? AND status = \'pending\''
+      ).bind(cancelledAt, id).run().catch(() => null);
+    }
+  }
+
+  await updateMRRSnapshot(db, effectiveSubTenant);
 
   return c.json({ success: true, message: 'Subscription cancelled' });
 }
@@ -552,13 +896,23 @@ export async function pauseSubscription(c: Context<{ Bindings: Env }>) {
 
   const db = c.env.AURA_DB;
   const id = c.req.param('id');
-  const tenantId = getTenantId(c).trim() || 'default';
+  const rawTenantId = getTenantId(c).trim() || 'default';
+  const tenantId = rawTenantId.toLowerCase() === 'hq' ? '*' : rawTenantId;
 
   const sub = await db.prepare('SELECT * FROM subscriptions WHERE id = ?').bind(id).first<SubscriptionRecord>();
   if (!sub || !matchesTenantRow(sub as unknown as Record<string, unknown>, tenantId)) {
     return c.json({ success: false, error: 'Subscription not found' }, 404);
   }
+  const effectiveSubTenant =
+    (sub as unknown as { tenant_id?: string | null }).tenant_id?.trim() ||
+    (tenantId === '*' ? 'default' : tenantId);
 
+  if (String(sub.status || '').trim().toLowerCase() !== 'active') {
+    return c.json({ success: false, error: `Only active subscriptions can be paused (current: ${sub.status || 'unknown'})` }, 409);
+  }
+  if (sub.paused_at) {
+    return c.json({ success: false, error: 'Subscription already paused' }, 409);
+  }
   const pausedAt = nowStr();
   try {
     await db.prepare(
@@ -567,16 +921,25 @@ export async function pauseSubscription(c: Context<{ Bindings: Env }>) {
   } catch {
     try {
       await db.prepare(
-        'UPDATE subscriptions SET status = \'paused\', paused_at = ?, updated_at = ? WHERE id = ?'
-      ).bind(pausedAt, pausedAt, id).run();
-    } catch {
-      await db.prepare(
-        'UPDATE subscriptions SET status = \'paused\', updated_at = ? WHERE id = ?'
-      ).bind(pausedAt, id).run();
+        'UPDATE subscriptions SET status = \'paused\', updated_at = ? WHERE id = ? AND (? = \'*\' OR COALESCE(NULLIF(TRIM(tenant_id), \'\'), \'default\') = ?)'
+      ).bind(pausedAt, id, tenantId, tenantId).run();
+    } catch (err) {
+      if (tenantId !== 'default' && tenantId !== '*') {
+        return c.json({ success: false, error: 'Tenant-scoped subscription pause failed', detail: (err as Error).message }, 500);
+      }
+      try {
+        await db.prepare(
+          'UPDATE subscriptions SET status = \'paused\', paused_at = ?, updated_at = ? WHERE id = ?'
+        ).bind(pausedAt, pausedAt, id).run();
+      } catch {
+        await db.prepare(
+          'UPDATE subscriptions SET status = \'paused\', updated_at = ? WHERE id = ?'
+        ).bind(pausedAt, id).run();
+      }
     }
   }
 
-  await updateMRRSnapshot(db, tenantId);
+  await updateMRRSnapshot(db, effectiveSubTenant);
   return c.json({ success: true, message: 'Subscription paused' });
 }
 
@@ -588,11 +951,15 @@ export async function resumeSubscription(c: Context<{ Bindings: Env }>) {
     return adminErr;
   }
 
-  const tenantId = getTenantId(c).trim() || 'default';
+  const rawTenantId = getTenantId(c).trim() || 'default';
+  const tenantId = rawTenantId.toLowerCase() === 'hq' ? '*' : rawTenantId;
   const sub = await db.prepare('SELECT * FROM subscriptions WHERE id = ?').bind(id).first<SubscriptionRecord>();
   if (!sub || !matchesTenantRow(sub as unknown as Record<string, unknown>, tenantId)) {
     return c.json({ success: false, error: 'Subscription not found' }, 404);
   }
+  const effectiveSubTenant =
+    (sub as unknown as { tenant_id?: string | null }).tenant_id?.trim() ||
+    (tenantId === '*' ? 'default' : tenantId);
   if (sub.status !== 'paused') {
     return c.json({ success: false, error: 'Subscription is not paused' }, 400);
   }
@@ -609,13 +976,16 @@ export async function resumeSubscription(c: Context<{ Bindings: Env }>) {
     await db.prepare(
       'UPDATE subscriptions SET status = \'active\', current_period_end = ?, next_billing_date = ?, updated_at = ? WHERE id = ? AND (? = \'*\' OR COALESCE(NULLIF(TRIM(tenant_id), \'\'), \'default\') = ?)'
     ).bind(newPeriodEnd, newPeriodEnd, resumedAt, id, tenantId, tenantId).run();
-  } catch {
+  } catch (err) {
+    if (tenantId !== 'default' && tenantId !== '*') {
+      return c.json({ success: false, error: 'Tenant-scoped subscription resume failed', detail: (err as Error).message }, 500);
+    }
     await db.prepare(
       'UPDATE subscriptions SET status = \'active\', current_period_end = ?, next_billing_date = ?, updated_at = ? WHERE id = ?'
     ).bind(newPeriodEnd, newPeriodEnd, resumedAt, id).run();
   }
 
-  await updateMRRSnapshot(db, tenantId);
+  await updateMRRSnapshot(db, effectiveSubTenant);
   return c.json({ success: true, message: 'Subscription resumed', new_period_end: newPeriodEnd });
 }
 
@@ -641,14 +1011,20 @@ export async function deleteSubscription(c: Context<{ Bindings: Env }>) {
     await db.prepare(
       'DELETE FROM subscription_invoices WHERE subscription_id = ? AND (? = \'*\' OR COALESCE(NULLIF(TRIM(tenant_id), \'\'), \'default\') = ?)'
     ).bind(id, tenantId, tenantId).run();
-  } catch {
+  } catch (err) {
+    if (tenantId !== 'default' && tenantId !== '*') {
+      return c.json({ success: false, error: 'Tenant-scoped invoice deletion failed', detail: (err as Error).message }, 500);
+    }
     await db.prepare('DELETE FROM subscription_invoices WHERE subscription_id = ?').bind(id).run();
   }
   try {
     await db.prepare(
       'DELETE FROM subscriptions WHERE id = ? AND (? = \'*\' OR COALESCE(NULLIF(TRIM(tenant_id), \'\'), \'default\') = ?)'
     ).bind(id, tenantId, tenantId).run();
-  } catch {
+  } catch (err) {
+    if (tenantId !== 'default' && tenantId !== '*') {
+      return c.json({ success: false, error: 'Tenant-scoped subscription deletion failed', detail: (err as Error).message }, 500);
+    }
     await db.prepare('DELETE FROM subscriptions WHERE id = ?').bind(id).run();
   }
 
@@ -671,10 +1047,26 @@ export async function deletePlan(c: Context<{ Bindings: Env }>) {
   }
 
   try {
+    const activeSubs = await db.prepare(
+      "SELECT COUNT(*) as count FROM subscriptions WHERE plan_id = ? AND status IN ('active', 'paused') AND (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?)"
+    ).bind(id, tenantId, tenantId).first<{ count: number }>();
+    if (activeSubs && Number(activeSubs.count) > 0) {
+      return c.json({ success: false, error: 'Cannot delete plan with active or paused subscriptions' }, 409);
+    }
+  } catch (err) {
+    if (tenantId !== 'default' && tenantId !== '*') {
+      return c.json({ success: false, error: 'Tenant-scoped plan dependency check failed', detail: (err as Error).message }, 500);
+    }
+  }
+
+  try {
     await db.prepare(
       'DELETE FROM subscription_plans WHERE id = ? AND (? = \'*\' OR COALESCE(NULLIF(TRIM(tenant_id), \'\'), \'default\') = ?)'
     ).bind(id, tenantId, tenantId).run();
-  } catch {
+  } catch (err) {
+    if (tenantId !== 'default' && tenantId !== '*') {
+      return c.json({ success: false, error: 'Tenant-scoped plan deletion failed', detail: (err as Error).message }, 500);
+    }
     await db.prepare('DELETE FROM subscription_plans WHERE id = ?').bind(id).run();
   }
   return c.json({ success: true, message: 'Plan deleted' });

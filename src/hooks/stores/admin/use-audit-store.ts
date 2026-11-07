@@ -107,6 +107,8 @@ function normalizeAuditEntry(raw: Record<string, unknown>): AuditEntry {
   };
 }
 
+let latestFetchLogsSeq = 0;
+
 export const useAuditStore = create<AuditStoreState>((set, get) => ({
   entries: [],
   total: 0,
@@ -119,6 +121,7 @@ export const useAuditStore = create<AuditStoreState>((set, get) => ({
     if (filters.dateFrom && filters.dateTo && filters.dateFrom > filters.dateTo) {
       return;
     }
+    const seq = ++latestFetchLogsSeq;
     set({ loading: true, error: null });
 
     try {
@@ -132,6 +135,7 @@ export const useAuditStore = create<AuditStoreState>((set, get) => ({
       if (filters.dateTo) params.set('date_to', filters.dateTo);
 
       const body = await apiFetch<any>(`/api/admin/audit-logs?${params}`);
+      if (seq !== latestFetchLogsSeq) return;
       const rawRows: Array<Record<string, unknown>> = body?.rows || body?.data || [];
       set({
         entries: rawRows.map(normalizeAuditEntry),
@@ -140,6 +144,7 @@ export const useAuditStore = create<AuditStoreState>((set, get) => ({
         error: null,
       });
     } catch (err) {
+      if (seq !== latestFetchLogsSeq) return;
       const message = err instanceof Error ? err.message : 'Lỗi kết nối';
       set({ loading: false, error: message });
     }

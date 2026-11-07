@@ -1,6 +1,6 @@
-import { API_BASE } from '@/lib/api-client';
+import { API_BASE } from '../lib/api-client';
 import { AUTH_TOKEN_KEY } from './stores/use-auth-store';
-import { invalidateClientSession, sessionErrorRequiresLogin } from '@/lib/client-session';
+import { invalidateClientSession, sessionErrorRequiresLogin } from '../lib/client-session';
 
 /** Authenticated streaming fetch keeps the bearer token out of request URLs. */
 export async function consumeKdsStream(signal: AbortSignal, snapshot: (orders: unknown[]) => void) {

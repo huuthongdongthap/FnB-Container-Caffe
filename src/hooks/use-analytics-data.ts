@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { apiFetch, API_BASE } from '@/lib/api-client';
 import { getAuthHeaders } from '@/hooks/stores/admin/admin-utils';
+import { useClientSessionScope } from '@/lib/client-session';
 
 /* ─── Types matching backend analytics endpoints ─── */
 
@@ -58,8 +59,9 @@ interface CustomerMetricsResponse {
  * GET /api/analytics/top-products?limit=N
  */
 export function useTopProducts(limit = 10) {
+  const session = useClientSessionScope();
   return useQuery<TopProduct[]>({
-    queryKey: ['analytics', 'top-products', limit],
+    queryKey: ['analytics', 'top-products', session.tenantId, session.userScope, limit],
     queryFn: async () => {
       const res = await apiFetch<ApiSuccess<TopProduct[]>>(
         `/api/analytics/top-products?limit=${limit}`,
@@ -75,8 +77,9 @@ export function useTopProducts(limit = 10) {
  * GET /api/analytics/peak-hours?days=N
  */
 export function usePeakHours(days = 30) {
+  const session = useClientSessionScope();
   return useQuery<PeakHour[]>({
-    queryKey: ['analytics', 'peak-hours', days],
+    queryKey: ['analytics', 'peak-hours', session.tenantId, session.userScope, days],
     queryFn: async () => {
       const res = await apiFetch<ApiSuccess<PeakHour[]>>(
         `/api/analytics/peak-hours?days=${days}`,
@@ -92,8 +95,9 @@ export function usePeakHours(days = 30) {
  * GET /api/analytics/customer-metrics
  */
 export function useCustomerMetrics() {
+  const session = useClientSessionScope();
   return useQuery<CustomerMetricsData>({
-    queryKey: ['analytics', 'customer-metrics'],
+    queryKey: ['analytics', 'customer-metrics', session.tenantId, session.userScope],
     queryFn: async () => {
       const res = await apiFetch<CustomerMetricsResponse>(
         '/api/analytics/customer-metrics',
@@ -109,8 +113,9 @@ export function useCustomerMetrics() {
  * GET /api/analytics/zones?days=N
  */
 export function useZoneStats(days = 30) {
+  const session = useClientSessionScope();
   return useQuery<ZoneRow[]>({
-    queryKey: ['analytics', 'zones', days],
+    queryKey: ['analytics', 'zones', session.tenantId, session.userScope, days],
     queryFn: async () => {
       const res = await apiFetch<ApiSuccess<ZoneRow[]>>(`/api/analytics/zones?days=${days}`);
       return res.data;
@@ -124,11 +129,12 @@ export function useZoneStats(days = 30) {
  * GET /api/reports/daily?from=YYYY-MM-DD&to=YYYY-MM-DD
  */
 export function useDailyRevenue(from?: string, to?: string) {
+  const session = useClientSessionScope();
   const end = to || new Date().toISOString().slice(0, 10);
   const start = from || new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10);
 
   return useQuery<DailyRevenueRow[]>({
-    queryKey: ['reports', 'daily', start, end],
+    queryKey: ['reports', 'daily', session.tenantId, session.userScope, start, end],
     queryFn: async () => {
       const res = await apiFetch<ApiSuccess<DailyRevenueRow[]>>(
         `/api/reports/daily?from=${start}&to=${end}`,

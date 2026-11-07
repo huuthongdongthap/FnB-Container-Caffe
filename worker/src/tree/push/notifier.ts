@@ -48,6 +48,9 @@ export async function sendPushToCustomer(
   payload: PushPayload,
   tenantId?: string
 ): Promise<{ sent: number; failed: number }> {
+  if (customerId !== null && customerId !== undefined && !String(customerId).trim()) {
+    return { sent: 0, failed: 0 };
+  }
   if (!env.VAPID_PUBLIC_KEY || !env.VAPID_PRIVATE_KEY) {
     log.warn('VAPID keys not configured');
     return { sent: 0, failed: 0 };
@@ -58,23 +61,28 @@ export async function sendPushToCustomer(
 
   // Get subscriptions for this customer
   let subscriptions: Subscription[];
-  if (customerId) {
+  if (customerId !== null && customerId !== undefined) {
+    const cleanCustomerId = String(customerId).trim();
     if (effectiveTenant && effectiveTenant !== '*') {
       try {
         const { results } = await env.AURA_DB.prepare(
           "SELECT id, endpoint, auth_key, p256dh_key, customer_id, role, tenant_id FROM push_subscriptions WHERE customer_id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
-        ).bind(customerId, effectiveTenant).all<Subscription>();
+        ).bind(cleanCustomerId, effectiveTenant).all<Subscription>();
         subscriptions = results || [];
       } catch {
-        const { results } = await env.AURA_DB.prepare(
-          'SELECT id, endpoint, auth_key, p256dh_key, customer_id, role FROM push_subscriptions WHERE customer_id = ?'
-        ).bind(customerId).all<Subscription>();
-        subscriptions = results || [];
+        if (effectiveTenant === 'default') {
+          const { results } = await env.AURA_DB.prepare(
+            'SELECT id, endpoint, auth_key, p256dh_key, customer_id, role FROM push_subscriptions WHERE customer_id = ?'
+          ).bind(cleanCustomerId).all<Subscription>();
+          subscriptions = results || [];
+        } else {
+          subscriptions = [];
+        }
       }
     } else {
       const { results } = await env.AURA_DB.prepare(
         'SELECT id, endpoint, auth_key, p256dh_key, customer_id, role FROM push_subscriptions WHERE customer_id = ?'
-      ).bind(customerId).all<Subscription>();
+      ).bind(cleanCustomerId).all<Subscription>();
       subscriptions = results || [];
     }
   } else {
@@ -86,10 +94,14 @@ export async function sendPushToCustomer(
         ).bind(effectiveTenant).all<Subscription>();
         subscriptions = results || [];
       } catch {
-        const { results } = await env.AURA_DB.prepare(
-          'SELECT id, endpoint, auth_key, p256dh_key, customer_id, role FROM push_subscriptions'
-        ).all<Subscription>();
-        subscriptions = results || [];
+        if (effectiveTenant === 'default') {
+          const { results } = await env.AURA_DB.prepare(
+            'SELECT id, endpoint, auth_key, p256dh_key, customer_id, role FROM push_subscriptions'
+          ).all<Subscription>();
+          subscriptions = results || [];
+        } else {
+          subscriptions = [];
+        }
       }
     } else {
       const { results } = await env.AURA_DB.prepare(
@@ -103,7 +115,7 @@ export async function sendPushToCustomer(
       s.endpoint &&
       !s.endpoint.startsWith('https://manual.auraspace.local/') &&
       (!customerId ? !s.role || s.role === 'customer' : true) &&
-      (!('tenant_id' in s) || matchesTenantRow(s, effectiveTenant))
+      matchesTenantRow(s, effectiveTenant)
   );
 
   let sent = 0;
@@ -129,7 +141,9 @@ export async function sendPushToCustomer(
           await env.AURA_DB.prepare(
             "DELETE FROM push_subscriptions WHERE endpoint = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
           ).bind(sub.endpoint, effectiveTenant).run().catch(async () => {
-            await env.AURA_DB.prepare('DELETE FROM push_subscriptions WHERE endpoint = ?').bind(sub.endpoint).run();
+            if (effectiveTenant === 'default') {
+              await env.AURA_DB.prepare('DELETE FROM push_subscriptions WHERE endpoint = ?').bind(sub.endpoint).run();
+            }
           });
         } else {
           await env.AURA_DB.prepare(
@@ -185,14 +199,18 @@ export async function sendPushToStaff(
       const { results } = await env.AURA_DB.prepare(tenantQuery).bind(...params, effectiveTenant).all<Subscription>();
       subscriptions = results || [];
     } catch {
-      const { results } = await env.AURA_DB.prepare(query).bind(...params).all<Subscription>();
-      subscriptions = results || [];
+      if (effectiveTenant === 'default') {
+        const { results } = await env.AURA_DB.prepare(query).bind(...params).all<Subscription>();
+        subscriptions = results || [];
+      } else {
+        subscriptions = [];
+      }
     }
   } else {
     const { results } = await env.AURA_DB.prepare(query).bind(...params).all<Subscription>();
     subscriptions = results || [];
   }
-  subscriptions = subscriptions.filter(s => !('tenant_id' in s) || matchesTenantRow(s, effectiveTenant));
+  subscriptions = subscriptions.filter(s => matchesTenantRow(s, effectiveTenant));
 
   // Exclude manual placeholder entries that have not yet paired a browser WebPush endpoint
   subscriptions = subscriptions.filter(s => s.endpoint && !s.endpoint.startsWith('https://manual.auraspace.local/'));
@@ -224,7 +242,9 @@ export async function sendPushToStaff(
           await env.AURA_DB.prepare(
             "DELETE FROM push_subscriptions WHERE endpoint = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
           ).bind(sub.endpoint, effectiveTenant).run().catch(async () => {
-            await env.AURA_DB.prepare('DELETE FROM push_subscriptions WHERE endpoint = ?').bind(sub.endpoint).run();
+            if (effectiveTenant === 'default') {
+              await env.AURA_DB.prepare('DELETE FROM push_subscriptions WHERE endpoint = ?').bind(sub.endpoint).run();
+            }
           });
         } else {
           await env.AURA_DB.prepare('DELETE FROM push_subscriptions WHERE endpoint = ?').bind(sub.endpoint).run();

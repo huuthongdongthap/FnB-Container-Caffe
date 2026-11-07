@@ -40,12 +40,28 @@ export async function registerUser(request: Request, env: Record<string, unknown
     await authKV.put(`user:${email}`, JSON.stringify(user));
 
     const db = env.AURA_DB as import('@cloudflare/workers-types').D1Database;
+    const rawStoreTenant = String(
+      request.headers?.get?.('x-tenant-id') ||
+        request.headers?.get?.('X-Tenant-ID') ||
+        (typeof env.PILOT_TENANT_ID === 'string' ? env.PILOT_TENANT_ID : '') ||
+        ''
+    ).trim();
+    const storeTenant =
+      rawStoreTenant && rawStoreTenant !== '*' && rawStoreTenant.toLowerCase() !== 'hq'
+        ? rawStoreTenant
+        : 'default';
     try {
       const customerId = generateId('CUS_');
       const now = new Date().toISOString();
-      await db.prepare(
-        'INSERT OR IGNORE INTO customers (id, email, name, phone, loyalty_points, loyalty_tier, created_at, updated_at) VALUES (?, ?, ?, ?, 0, \'bronze\', ?, ?)'
-      ).bind(customerId, email, name || '', phone || '', now, now).run();
+      try {
+        await db.prepare(
+          'INSERT OR IGNORE INTO customers (id, email, name, phone, loyalty_points, loyalty_tier, tenant_id, created_at, updated_at) VALUES (?, ?, ?, ?, 0, \'bronze\', ?, ?, ?)'
+        ).bind(customerId, email, name || '', phone || '', storeTenant, now, now).run();
+      } catch {
+        await db.prepare(
+          'INSERT OR IGNORE INTO customers (id, email, name, phone, loyalty_points, loyalty_tier, created_at, updated_at) VALUES (?, ?, ?, ?, 0, \'bronze\', ?, ?)'
+        ).bind(customerId, email, name || '', phone || '', now, now).run();
+      }
     } catch { /* non-fatal */ }
 
     const tenantId = `tenant_${user.id}`;

@@ -3,6 +3,7 @@
  */
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiFetch } from '@/lib/api-client';
+import { useClientSessionScope } from '@/lib/client-session';
 import { useCallback } from 'react';
 
 // ── Types ────────────────────────────────────────────────────────────
@@ -60,17 +61,20 @@ const CAMPAIGN_STATS_KEY = ['admin-campaign-stats'] as const;
 
 export function useCampaignsAdmin() {
   const queryClient = useQueryClient();
+  const session = useClientSessionScope();
+  const campaignsKey = [...CAMPAIGNS_KEY, session.tenantId, session.userScope] as const;
+  const campaignStatsKey = [...CAMPAIGN_STATS_KEY, session.tenantId, session.userScope] as const;
 
   // Fetch all campaign configs
   const campaignsQuery = useQuery<{ success: boolean; data: CampaignConfig[] }>({
-    queryKey: CAMPAIGNS_KEY,
+    queryKey: campaignsKey,
     queryFn: () => apiFetch('/api/campaigns'),
     staleTime: 30_000,
   });
 
   // Fetch campaign stats
   const statsQuery = useQuery<{ success: boolean; data: CampaignStatsMap }>({
-    queryKey: CAMPAIGN_STATS_KEY,
+    queryKey: campaignStatsKey,
     queryFn: () => apiFetch('/api/campaigns/stats/all'),
     staleTime: 15_000,
   });
@@ -86,7 +90,7 @@ export function useCampaignsAdmin() {
         body: JSON.stringify(updates),
       }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: CAMPAIGNS_KEY });
+      queryClient.invalidateQueries({ queryKey: campaignsKey });
     },
   });
 
@@ -95,7 +99,7 @@ export function useCampaignsAdmin() {
     mutationFn: (trigger) =>
       apiFetch(`/api/campaigns/${trigger}`, { method: 'DELETE' }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: CAMPAIGNS_KEY });
+      queryClient.invalidateQueries({ queryKey: campaignsKey });
     },
   });
 

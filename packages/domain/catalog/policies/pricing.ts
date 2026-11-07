@@ -31,6 +31,8 @@ const parseApplyIds = (raw: string | null | undefined): string[] => {
 export interface HappyHourMatchContext {
   productId?: string | null;
   categoryId?: string | null;
+  categorySlug?: string | null;
+  tenantId?: string | null;
 }
 
 /**
@@ -44,20 +46,38 @@ export function happyHourDiscountFor(
 ): HappyHourWindow | null {
   const currentTime = toHHMM(now);
   const dayOfWeek = now.getDay();
+  const reqTenant = context?.tenantId && context.tenantId.trim() && context.tenantId.trim() !== '*'
+    ? context.tenantId.trim()
+    : null;
   const matched = windows
     .filter((w) => {
       if (w.active !== 1 || w.day_of_week !== dayOfWeek) return false;
+      if (reqTenant) {
+        const row = w as unknown as Record<string, unknown>;
+        if ('tenant_id' in row && row.tenant_id !== undefined) {
+          const wTenant = (row.tenant_id && String(row.tenant_id).trim()) || 'default';
+          if (wTenant !== reqTenant) return false;
+        }
+      }
       const start = normalizeHHMM(w.start_time);
       const end = normalizeHHMM(w.end_time);
       if (start > end || currentTime < start || currentTime >= end) return false;
 
       const applyTo = (w.apply_to || 'all').toLowerCase();
-      if (applyTo === 'product_id' || applyTo === 'product' || applyTo === 'products') {
+      if (
+        applyTo === 'product_id' ||
+        applyTo === 'product' ||
+        applyTo === 'products' ||
+        applyTo === 'item' ||
+        applyTo === 'items'
+      ) {
         const ids = parseApplyIds(w.apply_ids);
         if (ids.length === 0 || !context?.productId || !ids.includes(context.productId)) return false;
       } else if (applyTo === 'category_id' || applyTo === 'category' || applyTo === 'categories') {
         const ids = parseApplyIds(w.apply_ids);
-        if (ids.length === 0 || !context?.categoryId || !ids.includes(context.categoryId)) return false;
+        const matchesCatId = Boolean(context?.categoryId && ids.includes(context.categoryId));
+        const matchesCatSlug = Boolean(context?.categorySlug && ids.includes(context.categorySlug));
+        if (ids.length === 0 || (!matchesCatId && !matchesCatSlug)) return false;
       }
       return true;
     })
@@ -101,6 +121,8 @@ export interface ResolveItemPriceInput {
   channelDeltas?: ChannelDeltaConfig;
   productId?: string | null;
   categoryId?: string | null;
+  categorySlug?: string | null;
+  tenantId?: string | null;
 }
 
 /**
@@ -151,6 +173,8 @@ export function resolveItemPrice(input: ResolveItemPriceInput): number {
   const hh = happyHourDiscountFor(happyHourWindows, now, {
     productId: input.productId,
     categoryId: input.categoryId,
+    categorySlug: input.categorySlug,
+    tenantId: input.tenantId,
   });
   if (hh) {
     const rawRate = Number(hh.discount_rate);

@@ -13,16 +13,17 @@
 
 import { authenticateRequest } from '../lib/staff-session-auth';
 import { StaffSessionError } from '../lib/staff-session';
-import { getTenantId } from '../middleware/tenant';
+import { getTenantId, resolvePublicTenantId, matchesTenantRow } from '../middleware/tenant';
 import { Hono, type Context } from 'hono';
 import type { Env } from '../types/env';
 import { isTerminal, canAccessOrder, projectCustomerOrderPayload } from '@aura/domain-order';
-import { appendEventToLog, getEventsAfter, fetchOrderRecord } from './order-stream-log';
+import { appendEventToLog, replayEventsSince, fetchOrderRecord, type OrderStreamEvent } from './order-stream-log';
 
 interface OrderEvent {
   orderId: string;
   status: string;
   timestamp: string;
+  tenantId?: string;
 }
 
 const SSE_TIMEOUT_MS = 120_000;
@@ -38,20 +39,163 @@ export const handleOrderStreamEvents: (c: Context<{ Bindings: Env }>) => Promise
 
   if (!kv) return c.json({ error: 'KV not available' }, 500);
 
-  const user = c.get('user') as { id?: string; role?: string; tenantId?: string } | undefined;
-  const resolvedTenant = user && user.role !== 'customer' ? getTenantId(c) : undefined;
-  const staffTenant = resolvedTenant === '*' ? undefined : resolvedTenant;
-  const scope = staffTenant === undefined
-    ? ''
-    : staffTenant === 'default'
-      ? " AND (tenant_id = ? OR tenant_id IS NULL OR tenant_id = '' OR TRIM(tenant_id) = '')"
-      : ' AND (tenant_id = ? OR TRIM(tenant_id) = ?2)';
-  const values = staffTenant === undefined ? [orderId] : [orderId, staffTenant];
-  const order = await db.prepare(`SELECT id, customer_id, status FROM orders WHERE id = ?${scope}`)
-    .bind(...values).first<{ id: string; customer_id?: string | null; status: string }>();
+  const user = c.get('user') as {
+    id?: string;
+    role?: string;
+    tenantId?: string;
+    tenant_id?: string;
+    customerId?: string;
+    customer_id?: string;
+  } | undefined;
+  const candidateOverrides = [
+    c.req.query('tenant_id'),
+    c.req.query('tenantId'),
+    c.req.query('store_id'),
+    c.req.query('storeId'),
+    c.req.header('X-Tenant-ID'),
+    c.req.header('x-tenant-id'),
+    c.req.header('X-Store-ID'),
+    c.req.header('x-store-id'),
+  ]
+    .map((v) => String(v || '').trim())
+    .filter(Boolean);
+  if (new Set(candidateOverrides).size > 1) {
+    return c.json({ error: 'Cross-tenant access denied' }, 403);
+  }
+  const explicitHeaderOrQuery = candidateOverrides[0] || '';
+  const ctxTenant = String((c.get('tenantId' as never) as string | undefined) || '').trim();
+
+  let tenantId: string;
+  if (user && user.role !== 'customer') {
+    const role = String(user.role || '').toLowerCase();
+    const userTenant = String(user.tenantId ?? user.tenant_id ?? '').trim();
+    const isHq = (role === 'owner' || role === 'admin') && (userTenant === '*' || userTenant.toLowerCase() === 'hq');
+    const boundTenant = userTenant || 'default';
+    const reqTenant = explicitHeaderOrQuery;
+    const resolved = (getTenantId(c as any) || boundTenant || 'default').trim() || 'default';
+    if (!isHq) {
+      if (
+        userTenant === '*' ||
+        userTenant.toLowerCase() === 'hq' ||
+        reqTenant === '*' ||
+        reqTenant.toLowerCase() === 'hq' ||
+        ctxTenant === '*' ||
+        ctxTenant.toLowerCase() === 'hq' ||
+        (reqTenant && reqTenant !== boundTenant) ||
+        (ctxTenant && ctxTenant !== boundTenant) ||
+        resolved !== boundTenant
+      ) {
+        return c.json({ error: 'Cross-tenant access denied' }, 403);
+      }
+      tenantId = boundTenant;
+    } else {
+      const rawTarget =
+        reqTenant ||
+        (ctxTenant && ctxTenant !== '*' && ctxTenant.toLowerCase() !== 'hq' ? ctxTenant : '') ||
+        (resolved && resolved !== '*' && resolved.toLowerCase() !== 'hq' ? resolved : '') ||
+        '*';
+      tenantId = rawTarget === '*' || rawTarget.toLowerCase() === 'hq' ? '*' : rawTarget;
+    }
+  } else {
+    const userTenant = String(user?.tenantId ?? user?.tenant_id ?? '').trim();
+    if (
+      userTenant === '*' ||
+      userTenant.toLowerCase() === 'hq' ||
+      explicitHeaderOrQuery === '*' ||
+      explicitHeaderOrQuery.toLowerCase() === 'hq' ||
+      ctxTenant === '*' ||
+      ctxTenant.toLowerCase() === 'hq'
+    ) {
+      return c.json({ error: 'Cross-tenant access denied' }, 403);
+    }
+    const resolvedPublic = String((await (resolvePublicTenantId as any)(c as any, c.env.AURA_DB)) || '').trim();
+    if (user?.role === 'customer' && userTenant) {
+      if (
+        (explicitHeaderOrQuery && explicitHeaderOrQuery !== userTenant) ||
+        (ctxTenant && ctxTenant !== 'default' && ctxTenant !== userTenant)
+      ) {
+        return c.json({ error: 'Cross-tenant access denied' }, 403);
+      }
+      tenantId = userTenant;
+    } else if (user?.role === 'customer' && !userTenant && (!resolvedPublic || resolvedPublic === 'default') && explicitHeaderOrQuery) {
+      tenantId = explicitHeaderOrQuery;
+    } else {
+      const fallbackTenant = resolvedPublic || (getTenantId(c as any) || 'default').trim() || 'default';
+      if (fallbackTenant === '*' || fallbackTenant.toLowerCase() === 'hq') {
+        return c.json({ error: 'Cross-tenant access denied' }, 403);
+      }
+      tenantId = explicitHeaderOrQuery || fallbackTenant;
+    }
+  }
+
+  let order: { id: string; customer_id?: string | null; status: string; tenant_id?: string | null } | null = null;
+  try {
+    order = await db.prepare(
+      `SELECT id, customer_id, status, tenant_id FROM orders WHERE id = ? AND (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?)`
+    ).bind(orderId, tenantId, tenantId).first<{ id: string; customer_id?: string | null; status: string; tenant_id?: string | null }>();
+    if (!order && tenantId === 'default') {
+      order = await db.prepare(
+        `SELECT id, customer_id, status FROM orders WHERE id = ? AND (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?)`
+      ).bind(orderId, tenantId, tenantId).first<{ id: string; customer_id?: string | null; status: string; tenant_id?: string | null }>();
+    }
+  } catch {
+    if (tenantId === 'default' || tenantId === '*') {
+      order = await db.prepare('SELECT id, customer_id, status, tenant_id FROM orders WHERE id = ?')
+        .bind(orderId)
+        .first<{ id: string; customer_id?: string | null; status: string; tenant_id?: string | null }>()
+        .catch(() =>
+          db.prepare('SELECT id, customer_id, status FROM orders WHERE id = ?')
+            .bind(orderId)
+            .first<{ id: string; customer_id?: string | null; status: string; tenant_id?: string | null }>()
+        );
+    } else {
+      order = null;
+    }
+  }
+  if (order && !matchesTenantRow(order, tenantId)) {
+    order = null;
+  }
   if (!order) return c.json({ error: 'Order not found' }, 404);
 
-  const access = canAccessOrder(user, order);
+  const rawOrderTenant = order.tenant_id && String(order.tenant_id).trim() ? String(order.tenant_id).trim() : '';
+  const orderTenant =
+    rawOrderTenant && rawOrderTenant !== '*' && rawOrderTenant.toLowerCase() !== 'hq'
+      ? rawOrderTenant
+      : tenantId !== '*' && tenantId.toLowerCase() !== 'hq'
+        ? tenantId
+        : 'default';
+
+  let effectiveUser = user;
+  if (effectiveUser && String(effectiveUser.role || '').toLowerCase() === 'customer' && order.customer_id) {
+    const ordCustId = String(order.customer_id).trim();
+    const directIds = [effectiveUser.id, effectiveUser.customerId, effectiveUser.customer_id]
+      .map((v) => (typeof v === 'string' ? v.trim() : ''))
+      .filter(Boolean);
+    let matched = directIds.includes(ordCustId);
+    if (!matched && effectiveUser.id) {
+      const linkedRow = await db
+        .prepare(
+          "SELECT id FROM customers WHERE id = ? AND user_id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ? LIMIT 1"
+        )
+        .bind(ordCustId, effectiveUser.id, orderTenant)
+        .first<{ id?: string }>()
+        .catch(() =>
+          orderTenant === 'default'
+            ? db
+                .prepare('SELECT id FROM customers WHERE id = ? AND user_id = ? LIMIT 1')
+                .bind(ordCustId, effectiveUser!.id)
+                .first<{ id?: string }>()
+                .catch(() => null)
+            : null
+        );
+      matched = Boolean(linkedRow?.id);
+    }
+    if (matched) {
+      effectiveUser = { ...effectiveUser, id: ordCustId };
+    }
+  }
+
+  const access = canAccessOrder(effectiveUser, order);
   if (!access.allowed) return c.json({ error: access.reason || 'Forbidden' }, 403);
 
   let currentStatus = order.status || '';
@@ -98,8 +242,11 @@ export const handleOrderStreamEvents: (c: Context<{ Bindings: Env }>) => Promise
       cancelStream = closeStream;
       let replayedCount = 0;
       if (lastEventId) {
-        const replayedEvents = await getEventsAfter(kv, orderId, lastEventId);
+        const replayedEvents = await replayEventsSince(kv, orderId, lastEventId, orderTenant);
         for (const ev of replayedEvents) {
+          if (ev.tenantId && String(ev.tenantId).trim() !== orderTenant) {
+            continue;
+          }
           const eventId: string = ev.eventId;
           send(ev.type, ev.data, eventId);
           if (ev.type === 'update_order' && typeof ev.data === 'object' && ev.data && 'status' in ev.data) {
@@ -109,18 +256,26 @@ export const handleOrderStreamEvents: (c: Context<{ Bindings: Env }>) => Promise
         }
       }
 
-      const initialOrder = await fetchOrderRecord(db, orderId, staffTenant);
+      const initialOrder = await fetchOrderRecord(db, orderId, tenantId === '*' ? orderTenant : tenantId);
       if (initialOrder) {
         const safePayload = projectCustomerOrderPayload(initialOrder);
         if (replayedCount === 0 || safePayload.status !== currentStatus) {
           currentStatus = safePayload.status;
           const initialEventId = String(Date.now());
           send('update_order', safePayload, initialEventId);
-          await appendEventToLog(kv, orderId, { eventId: initialEventId, orderId, type: 'update_order', data: safePayload, timestamp: new Date().toISOString() });
+          const streamEvent: OrderStreamEvent = {
+            eventId: initialEventId,
+            orderId,
+            type: 'update_order',
+            data: safePayload,
+            timestamp: new Date().toISOString(),
+            tenantId: orderTenant,
+          };
+          await appendEventToLog(kv, orderId, streamEvent, orderTenant);
         }
       }
 
-      if (!initialOrder && staffTenant !== undefined) { closeStream(); return; }
+      if (!initialOrder && tenantId !== '*') { closeStream(); return; }
       if (isTerminal(currentStatus as any)) {
         closeStream();
         return;
@@ -132,28 +287,66 @@ export const handleOrderStreamEvents: (c: Context<{ Bindings: Env }>) => Promise
           if (closed || !await checkSession()) break;
 
           try {
-            const eventRaw = await kv.get(`order_event:${orderId}`);
+            const eventKey = orderTenant && orderTenant !== 'default' && orderTenant !== '*'
+              ? `order_event:${orderTenant}:${orderId}`
+              : `order_event:${orderId}`;
+            const eventRaw =
+              (await kv.get(eventKey)) ??
+              (orderTenant && orderTenant !== '*' ? await kv.get(`order_status:${orderTenant}:${orderId}`) : null) ??
+              (eventKey !== `order_event:${orderId}` ? await kv.get(`order_event:${orderId}`) : null) ??
+              (orderTenant === 'default' ? await kv.get(`order_status:${orderId}`) : null);
             let shouldFetch = false;
             if (eventRaw) {
-              const event: OrderEvent = JSON.parse(eventRaw);
-              if (event.status !== currentStatus) shouldFetch = true;
+              try {
+                const event = JSON.parse(eventRaw) as OrderEvent & { tenant_id?: string };
+                const evTenant = (event.tenantId || event.tenant_id || '').trim();
+                const eventTenantMatches = !evTenant || evTenant === orderTenant;
+                if (eventTenantMatches && event.status && event.status !== currentStatus) shouldFetch = true;
+              } catch {
+                if (eventRaw !== currentStatus) shouldFetch = true;
+              }
             }
 
             if (!shouldFetch) {
-              const dbOrder = await db.prepare(`SELECT id, status FROM orders WHERE id = ?${scope}`).bind(...values).first<{ id: string; status: string }>();
-              if (!dbOrder && staffTenant !== undefined) { closeStream(); break; }
+              let dbOrder: { id: string; status: string; payment_status?: string; updated_at?: string; tenant_id?: string | null } | null = null;
+              try {
+                dbOrder = await db.prepare(
+                  `SELECT id, status, payment_status, updated_at, tenant_id FROM orders WHERE id = ? AND (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?)`
+                ).bind(orderId, orderTenant, orderTenant).first();
+                if (!dbOrder && orderTenant === 'default') {
+                  dbOrder = await db.prepare(
+                    `SELECT id, status, payment_status, updated_at FROM orders WHERE id = ? AND (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?)`
+                  ).bind(orderId, orderTenant, orderTenant).first();
+                }
+              } catch {
+                if (orderTenant === 'default' || tenantId === '*') {
+                  dbOrder = await db.prepare('SELECT id, status, payment_status, updated_at, tenant_id FROM orders WHERE id = ?')
+                    .bind(orderId)
+                    .first<{ id: string; status: string; payment_status?: string; updated_at?: string; tenant_id?: string | null }>()
+                    .catch(() =>
+                      db.prepare('SELECT id, status, payment_status, updated_at FROM orders WHERE id = ?')
+                        .bind(orderId)
+                        .first<{ id: string; status: string; payment_status?: string; updated_at?: string; tenant_id?: string | null }>()
+                    )
+                    .catch(() => db.prepare('SELECT id, status FROM orders WHERE id = ?').bind(orderId).first<{ id: string; status: string; payment_status?: string; updated_at?: string; tenant_id?: string | null }>());
+                } else {
+                  dbOrder = null;
+                }
+              }
+              if (dbOrder && !matchesTenantRow(dbOrder, orderTenant)) dbOrder = null;
+              if (!dbOrder && tenantId !== '*') { closeStream(); break; }
               if (dbOrder && (dbOrder.status ?? '') !== currentStatus) shouldFetch = true;
             }
 
             if (shouldFetch) {
-              const updated = await fetchOrderRecord(db, orderId, staffTenant);
-              if (!updated && staffTenant !== undefined) { closeStream(); break; }
+              const updated = await fetchOrderRecord(db, orderId, tenantId === '*' ? orderTenant : tenantId);
+              if (!updated && tenantId !== '*') { closeStream(); break; }
               if (updated) {
                 const payload = projectCustomerOrderPayload(updated);
                 currentStatus = payload.status;
                 const eventId = String(Date.now());
                 send('update_order', payload, eventId);
-                await appendEventToLog(kv, orderId, { eventId, orderId, type: 'update_order', data: payload, timestamp: new Date().toISOString() });
+                await appendEventToLog(kv, orderId, { eventId, orderId, type: 'update_order', data: payload, timestamp: new Date().toISOString(), tenantId: orderTenant }, orderTenant);
 
                 if (isTerminal(currentStatus as any)) {
                   closeStream();

@@ -11,7 +11,8 @@ function genId(prefix: string): string {
 export async function processReferralCashbackOnFirstOrder(db: D1Database, customerId: string, orderId: string, orderAmount: number, tenantId?: string): Promise<Record<string, unknown>> {
   const MIN_ORDER_AMOUNT = 20000;
   const REFERRER_CASHBACK_VND = 10000;
-  const effectiveTenant = tenantId && tenantId !== '*' ? tenantId.trim() || 'default' : null;
+  const rawTenant = tenantId ? tenantId.trim() : '';
+  let effectiveTenant = rawTenant && rawTenant !== '*' && rawTenant.toLowerCase() !== 'hq' ? rawTenant : null;
 
   if (orderAmount < MIN_ORDER_AMOUNT) {
     return { success: false, reason: 'order_below_min', min_required: MIN_ORDER_AMOUNT };
@@ -35,6 +36,12 @@ export async function processReferralCashbackOnFirstOrder(db: D1Database, custom
     }
   } else {
     pending = await db.prepare('SELECT * FROM referrals WHERE referred_customer_id = ? AND status = ?').bind(customerId, 'pending').first<Referral & { tenant_id?: string | null }>();
+    if (pending && 'tenant_id' in pending && pending.tenant_id !== undefined) {
+      const pTenant = String(pending.tenant_id ?? '').trim();
+      if (pTenant && pTenant !== '*' && pTenant.toLowerCase() !== 'hq') {
+        effectiveTenant = pTenant;
+      }
+    }
   }
   if (!pending) {
     return { success: false, reason: 'no_pending_referral' };
@@ -99,11 +106,18 @@ export async function processReferralCashbackOnFirstOrder(db: D1Database, custom
   const txId = `cbt_ref_${pending.id}_referrer`;
   const stampTenant = effectiveTenant || 'default';
 
-  batch.push(db.prepare('UPDATE cashback_wallets SET balance = balance + ?, total_earned = total_earned + ?, updated_at = ? WHERE id = ?').bind(REFERRER_CASHBACK_VND, REFERRER_CASHBACK_VND, now, wallet.id));
+  batch.push(
+    effectiveTenant
+      ? db.prepare(
+          "UPDATE cashback_wallets SET balance = balance + ?, total_earned = total_earned + ?, updated_at = ? WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
+        ).bind(REFERRER_CASHBACK_VND, REFERRER_CASHBACK_VND, now, wallet.id, effectiveTenant)
+      : db.prepare('UPDATE cashback_wallets SET balance = balance + ?, total_earned = total_earned + ?, updated_at = ? WHERE id = ?').bind(REFERRER_CASHBACK_VND, REFERRER_CASHBACK_VND, now, wallet.id)
+  );
   batch.push(db.prepare(
     `INSERT INTO cashback_transactions (id, wallet_id, customer_id, type, amount, balance_after, description, expires_at, tenant_id, created_at)
      VALUES (?, ?, ?, 'bonus', ?, ?, ?, datetime('now', '+90 days'), ?, ?)`
   ).bind(txId, wallet.id, referrer.id, REFERRER_CASHBACK_VND, newBalance, `Gi?i thi?u b?n (referral_id=${pending.id}): +${REFERRER_CASHBACK_VND}d cashback`, stampTenant, now));
+  const referralClaimBatchIndex = batch.length;
   batch.push(
     effectiveTenant
       ? db.prepare(
@@ -119,7 +133,11 @@ export async function processReferralCashbackOnFirstOrder(db: D1Database, custom
   ).bind(referrer.id, REFERRER_CASHBACK_VND, orderId, JSON.stringify({ referral_id: pending.id, referred_customer_id: customerId, order_amount: orderAmount }), stampTenant, now));
 
   try {
-    await db.batch(batch);
+    const batchRes = await db.batch(batch);
+    const claimStmtRes = Array.isArray(batchRes) ? (batchRes[referralClaimBatchIndex] as { meta?: { changes?: number } } | undefined) : undefined;
+    if (claimStmtRes?.meta?.changes === 0) {
+      return { success: false, reason: 'no_pending_referral' };
+    }
   } catch {
     const fallbackBatch: ReturnType<typeof db.prepare>[] = [];
     if (!hadExistingWallet) {
@@ -128,7 +146,7 @@ export async function processReferralCashbackOnFirstOrder(db: D1Database, custom
       );
     }
     fallbackBatch.push(
-      db.prepare('UPDATE cashback_wallets SET balance = balance + ?, total_earned = total_earned + ?, updated_at = ? WHERE id = ? OR customer_id = ?').bind(REFERRER_CASHBACK_VND, REFERRER_CASHBACK_VND, now, wallet.id, referrer.id),
+      db.prepare('UPDATE cashback_wallets SET balance = balance + ?, total_earned = total_earned + ?, updated_at = ? WHERE id = ?').bind(REFERRER_CASHBACK_VND, REFERRER_CASHBACK_VND, now, wallet.id),
       db.prepare(
         `INSERT INTO cashback_transactions (id, wallet_id, customer_id, type, amount, balance_after, description, expires_at, created_at)
          VALUES (?, ?, ?, 'bonus', ?, ?, ?, datetime('now', '+90 days'), ?)`

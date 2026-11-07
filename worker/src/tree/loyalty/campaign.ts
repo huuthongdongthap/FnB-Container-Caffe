@@ -9,17 +9,19 @@ export async function getActiveCampaign(
   tenantId: string = 'default'
 ): Promise<BonusCampaign | null> {
   const now = nowSqlTimestamp();
-  if (tenantId && tenantId !== '*' && tenantId !== 'default') {
+  const normalizedTenant = (tenantId && tenantId.trim()) || 'default';
+  if (normalizedTenant !== '*' && normalizedTenant !== 'default') {
     try {
       const scoped = await db.prepare(
         "SELECT * FROM bonus_campaigns WHERE active = 1 AND start_date <= ? AND end_date >= ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ? ORDER BY id DESC LIMIT 1"
-      ).bind(now, now, tenantId).first<BonusCampaign & { tenant_id?: string | null }>();
-      if (scoped) {
-        if ('tenant_id' in scoped && !matchesTenantRow(scoped, tenantId)) {
-          return null;
-        }
-        return scoped;
+      ).bind(now, now, normalizedTenant).first<BonusCampaign & { tenant_id?: string | null }>();
+      if (!scoped) {
+        return null;
       }
+      if (!matchesTenantRow(scoped, normalizedTenant)) {
+        return null;
+      }
+      return scoped;
     } catch {
       // Fallback if tenant_id column is absent
     }
@@ -27,13 +29,16 @@ export async function getActiveCampaign(
   const row = await db.prepare(
     'SELECT * FROM bonus_campaigns WHERE active = 1 AND start_date <= ? AND end_date >= ? ORDER BY id DESC LIMIT 1'
   ).bind(now, now).first<BonusCampaign & { tenant_id?: string | null }>() || null;
-  if (row && 'tenant_id' in row && !matchesTenantRow(row, tenantId)) {
-    if (tenantId && tenantId !== '*') {
+  if (row && !matchesTenantRow(row, normalizedTenant)) {
+    if (normalizedTenant !== '*') {
       try {
         const scoped = await db.prepare(
           "SELECT * FROM bonus_campaigns WHERE active = 1 AND start_date <= ? AND end_date >= ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ? ORDER BY id DESC LIMIT 1"
-        ).bind(now, now, tenantId).first<BonusCampaign>();
-        return scoped || null;
+        ).bind(now, now, normalizedTenant).first<BonusCampaign & { tenant_id?: string | null }>();
+        if (scoped && matchesTenantRow(scoped, normalizedTenant)) {
+          return scoped;
+        }
+        return null;
       } catch {
         return null;
       }

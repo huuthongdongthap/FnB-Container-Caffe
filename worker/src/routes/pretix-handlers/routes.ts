@@ -29,6 +29,7 @@ const guardPretixOps: MiddlewareHandler = async (c, next) => {
 };
 
 pretixRouter.use('/events', optionalAuth());
+pretixRouter.use('/events/*', optionalAuth());
 pretixRouter.use('/orders', guardPretixOps);
 pretixRouter.use('/checkin', guardPretixOps);
 pretixRouter.use('/generate', guardPretixOps);

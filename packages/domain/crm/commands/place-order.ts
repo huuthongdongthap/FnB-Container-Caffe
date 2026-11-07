@@ -71,7 +71,7 @@ async function fetchMenuPriceCents(
   db: D1Database,
   menuItemId: string,
   targetTenant: string,
-): Promise<{ ok: true; id: string; name: string; unitPriceCents: number } | PlaceOrderError> {
+): Promise<{ ok: true; id: string; name: string; unitPriceCents: number; itemTenant?: string } | PlaceOrderError> {
   let row: { id: string; name: string; price: number; available: number | boolean; tenant_id?: string | null } | null;
   try {
     row = await db
@@ -79,11 +79,13 @@ async function fetchMenuPriceCents(
       .bind(menuItemId)
       .first<{ id: string; name: string; price: number; available: number | boolean; tenant_id?: string | null }>()
       .catch(() =>
-        db
-          .prepare('SELECT id, name, price, available FROM menu_items WHERE id = ?')
-          .bind(menuItemId)
-          .first<{ id: string; name: string; price: number; available: number | boolean }>()
-          .catch(() => null)
+        targetTenant === 'default'
+          ? db
+              .prepare('SELECT id, name, price, available FROM menu_items WHERE id = ?')
+              .bind(menuItemId)
+              .first<{ id: string; name: string; price: number; available: number | boolean }>()
+              .catch(() => null)
+          : null
       );
     if (!row) {
       row = await db
@@ -91,11 +93,13 @@ async function fetchMenuPriceCents(
         .bind(menuItemId)
         .first<{ id: string; name: string; price: number; available: number | boolean; tenant_id?: string | null }>()
         .catch(() =>
-          db
-            .prepare('SELECT id, name, price, is_available as available FROM products WHERE id = ?')
-            .bind(menuItemId)
-            .first<{ id: string; name: string; price: number; available: number | boolean }>()
-            .catch(() => null)
+          targetTenant === 'default'
+            ? db
+                .prepare('SELECT id, name, price, is_available as available FROM products WHERE id = ?')
+                .bind(menuItemId)
+                .first<{ id: string; name: string; price: number; available: number | boolean }>()
+                .catch(() => null)
+            : null
         );
     }
   } catch (e) {
@@ -105,8 +109,11 @@ async function fetchMenuPriceCents(
   if (!row) {
     return { ok: false, code: 'invalid_item', error: `menu item not found: ${menuItemId}` };
   }
-  if (targetTenant !== '*' && 'tenant_id' in row && row.tenant_id !== undefined) {
-    const rowTenant = (row.tenant_id && String(row.tenant_id).trim()) || 'default';
+  const rowTenant =
+    'tenant_id' in row && row.tenant_id !== undefined
+      ? ((row.tenant_id && String(row.tenant_id).trim()) || 'default')
+      : undefined;
+  if (targetTenant !== '*' && rowTenant !== undefined) {
     if (rowTenant !== targetTenant) {
       return { ok: false, code: 'invalid_item', error: `menu item not found: ${menuItemId}` };
     }
@@ -120,6 +127,7 @@ async function fetchMenuPriceCents(
     id: row.id,
     name: row.name,
     unitPriceCents: Number(row.price) || 0,
+    itemTenant: rowTenant && rowTenant !== '*' && rowTenant.toLowerCase() !== 'hq' ? rowTenant : undefined,
   };
 }
 
@@ -143,7 +151,10 @@ export async function placeOrder(
     return { ok: false, status: 400, code: 'invalid_items', error: 'Invalid item count or quantity' };
   }
 
-  const targetTenant = (input.tenantId && input.tenantId.trim()) ? input.tenantId.trim() : 'default';
+  const rawTargetTenant = (input.tenantId && input.tenantId.trim()) ? input.tenantId.trim() : 'default';
+  const targetTenant =
+    rawTargetTenant === '*' || rawTargetTenant.toLowerCase() === 'hq' ? '*' : rawTargetTenant;
+  let inferredStoreTenant: string | undefined;
   const items: OrderItemResult[] = [];
   let totalCents = 0;
 
@@ -162,6 +173,9 @@ export async function placeOrder(
     const fetched = await fetchMenuPriceCents(db, line.menuItemId, targetTenant);
     if (!fetched.ok) {
       return fetched;
+    }
+    if (!inferredStoreTenant && fetched.itemTenant) {
+      inferredStoreTenant = fetched.itemTenant;
     }
 
     const unitPriceCents = fetched.unitPriceCents;
@@ -189,54 +203,37 @@ export async function placeOrder(
     note: i.note,
   })));
 
+  const effectiveTenant = (targetTenant !== '*' ? targetTenant : inferredStoreTenant) || 'default';
   try {
-    if (targetTenant !== '*') {
-      await db.prepare(`
-        INSERT INTO orders (
-          id, items, total, status, customer_name, customer_phone,
-          order_type, notes, customer_id, tenant_id, created_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `).bind(
-        orderId,
-        itemsJson,
-        totalCents,
-        'pending',
-        input.customerName ?? null,
-        input.customerPhone,
-        input.channel,
-        input.notes ?? null,
-        input.customerId,
-        targetTenant,
-        now,
-      ).run();
-    } else {
-      await db.prepare(`
-        INSERT INTO orders (
-          id, items, total, status, customer_name, customer_phone,
-          order_type, notes, customer_id, created_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `).bind(
-        orderId,
-        itemsJson,
-        totalCents,
-        'pending',
-        input.customerName ?? null,
-        input.customerPhone,
-        input.channel,
-        input.notes ?? null,
-        input.customerId,
-        now,
-      ).run();
-    }
-  } catch {
+    await db.prepare(`
+      INSERT INTO orders (
+        id, items, total, status, customer_name, customer_phone,
+        order_type, notes, customer_id, tenant_id, created_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).bind(
+      orderId,
+      itemsJson,
+      totalCents,
+      'pending',
+      input.customerName ?? null,
+      input.customerPhone,
+      input.channel,
+      input.notes ?? null,
+      input.customerId,
+      effectiveTenant,
+      now,
+    ).run();
+  } catch (firstErr) {
     try {
+      const orderNumber = `ORD-${orderId.replace(/^ord_/i, '').toUpperCase()}`;
       await db.prepare(`
         INSERT INTO orders (
-          id, items, total, status, customer_name, customer_phone,
-          order_type, notes, customer_id, created_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          id, order_number, items, total, status, customer_name, customer_phone,
+          order_type, notes, customer_id, tenant_id, created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `).bind(
         orderId,
+        orderNumber,
         itemsJson,
         totalCents,
         'pending',
@@ -245,19 +242,23 @@ export async function placeOrder(
         input.channel,
         input.notes ?? null,
         input.customerId,
+        effectiveTenant,
+        now,
         now,
       ).run();
-    } catch {
+    } catch (scopedErr) {
+      if (effectiveTenant !== 'default') {
+        const err = scopedErr ?? firstErr;
+        return { ok: false, code: 'd1_error', error: `failed to create order: ${(err as Error).message}` };
+      }
       try {
-        const orderNumber = `ORD-${orderId.replace(/^ord_/i, '').toUpperCase()}`;
         await db.prepare(`
           INSERT INTO orders (
-            id, order_number, items, total, status, customer_name, customer_phone,
-            order_type, notes, customer_id, tenant_id, created_at, updated_at
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            id, items, total, status, customer_name, customer_phone,
+            order_type, notes, customer_id, created_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `).bind(
           orderId,
-          orderNumber,
           itemsJson,
           totalCents,
           'pending',
@@ -266,8 +267,6 @@ export async function placeOrder(
           input.channel,
           input.notes ?? null,
           input.customerId,
-          targetTenant,
-          now,
           now,
         ).run();
       } catch {

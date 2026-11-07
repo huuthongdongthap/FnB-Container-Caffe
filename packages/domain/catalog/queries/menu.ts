@@ -4,28 +4,102 @@
  * Business logic preserved exactly.
  */
 import { jsonResponse, errorResponse } from 'worker/src/middleware/cors';
+import { verifyJWT } from 'worker/src/lib/jwt';
 import { createLogger } from 'worker/src/middleware/logger';
-import { matchesTenantRow, resolvePilotStore } from 'worker/src/middleware/tenant';
+import { isHQSuperAdmin, matchesTenantRow, resolvePilotStore } from 'worker/src/middleware/tenant';
 import type { MenuItem } from 'worker/src/types/models';
 import { parseAvailabilityFilter, toAvailabilityFlag } from '../policies/availability';
 
 const log = createLogger({ route: 'menu' });
 
-function resolveMenuTenantId(request: Request, env: Record<string, unknown>, tenantIdOverride?: string): string {
-  if (tenantIdOverride && tenantIdOverride.trim() && tenantIdOverride.trim() !== '*') {
-    return tenantIdOverride.trim();
-  }
+async function resolveMenuTenant(
+  request: Request,
+  env: Record<string, unknown>,
+  tenantIdOverride?: string
+): Promise<{ ok: true; tenantId: string } | { ok: false; status: 403; error: string }> {
   const url = new URL(request.url);
-  const raw = (
-    url.searchParams.get('tenant_id') ||
-    request.headers.get('X-Tenant-ID') ||
-    request.headers.get('x-tenant-id') ||
-    ''
-  ).trim();
-  if (!raw || raw === '*') {
-    return resolvePilotStore(env as unknown as Parameters<typeof resolvePilotStore>[0]);
+  const candidateOverrides = [
+    url.searchParams.get('tenant_id'),
+    url.searchParams.get('tenantId'),
+    url.searchParams.get('store_id'),
+    url.searchParams.get('storeId'),
+    request.headers.get('X-Tenant-ID'),
+    request.headers.get('x-tenant-id'),
+    request.headers.get('X-Store-ID'),
+    request.headers.get('x-store-id'),
+  ]
+    .map((v) => (typeof v === 'string' ? v.trim() : ''))
+    .filter(Boolean);
+  if (new Set(candidateOverrides).size > 1) {
+    return { ok: false, status: 403, error: 'Cross-tenant menu access denied' };
   }
-  return raw;
+  const requestedOverride = candidateOverrides[0] || '';
+  const explicitOverride = tenantIdOverride ? tenantIdOverride.trim() : '';
+
+  let callerUser =
+    ((request as unknown as { user?: Record<string, unknown> }).user ??
+      (env as { user?: Record<string, unknown> }).user) ||
+    null;
+  if (!callerUser) {
+    const authHeader = request.headers.get('Authorization') || request.headers.get('authorization') || '';
+    const jwtSecret = typeof env?.JWT_SECRET === 'string' ? env.JWT_SECRET : '';
+    if (authHeader.startsWith('Bearer ') && jwtSecret.length >= 16) {
+      const token = authHeader.slice(7).trim();
+      const verified = await verifyJWT(token, jwtSecret).catch(() => null);
+      if (verified && typeof verified === 'object') {
+        callerUser = verified as unknown as Record<string, unknown>;
+      }
+    }
+  }
+
+  if (callerUser) {
+    if (isHQSuperAdmin(callerUser as Parameters<typeof isHQSuperAdmin>[0])) {
+      const cleanReq = requestedOverride && requestedOverride !== '*' && requestedOverride.toLowerCase() !== 'hq' ? requestedOverride : '';
+      const cleanExp = explicitOverride && explicitOverride !== '*' && explicitOverride.toLowerCase() !== 'hq' ? explicitOverride : '';
+      const userT = String(callerUser.tenantId ?? callerUser.tenant_id ?? '').trim();
+      const cleanUser = userT && userT !== '*' && userT.toLowerCase() !== 'hq' ? userT : '';
+      const raw =
+        requestedOverride === '*' || requestedOverride.toLowerCase() === 'hq'
+          ? '*'
+          : cleanReq || cleanExp || cleanUser || '*';
+      return { ok: true, tenantId: !raw || raw.toLowerCase() === 'hq' || raw === '*' ? '*' : raw };
+    }
+    const userTenant = String(callerUser.tenantId ?? callerUser.tenant_id ?? '').trim() || 'default';
+    if (userTenant === '*' || userTenant.toLowerCase() === 'hq') {
+      return { ok: false, status: 403, error: 'Cross-tenant menu access denied' };
+    }
+    if (
+      requestedOverride &&
+      (requestedOverride === '*' ||
+        requestedOverride.toLowerCase() === 'hq' ||
+        requestedOverride !== userTenant)
+    ) {
+      return { ok: false, status: 403, error: 'Cross-tenant menu access denied' };
+    }
+    if (
+      explicitOverride &&
+      (explicitOverride === '*' ||
+        explicitOverride.toLowerCase() === 'hq' ||
+        explicitOverride !== userTenant)
+    ) {
+      return { ok: false, status: 403, error: 'Cross-tenant menu access denied' };
+    }
+    return { ok: true, tenantId: userTenant };
+  }
+
+  if (
+    (requestedOverride && (requestedOverride === '*' || requestedOverride.toLowerCase() === 'hq')) ||
+    (explicitOverride && (explicitOverride === '*' || explicitOverride.toLowerCase() === 'hq'))
+  ) {
+    return { ok: false, status: 403, error: 'Cross-tenant menu access denied' };
+  }
+  if (explicitOverride) {
+    return { ok: true, tenantId: explicitOverride };
+  }
+  if (requestedOverride) {
+    return { ok: true, tenantId: requestedOverride };
+  }
+  return { ok: true, tenantId: resolvePilotStore(env as unknown as Parameters<typeof resolvePilotStore>[0]) };
 }
 
 function parseTags(raw: unknown): unknown[] {
@@ -43,130 +117,166 @@ function parseTags(raw: unknown): unknown[] {
 
 export async function getMenu(request: Request, env: Record<string, unknown>, tenantIdOverride?: string) {
   try {
+    const tenantRes = await resolveMenuTenant(request, env, tenantIdOverride);
+    if (!tenantRes.ok) {
+      return errorResponse(tenantRes.error, tenantRes.status);
+    }
+    const tenantId = tenantRes.tenantId;
     const url = new URL(request.url);
     const category = url.searchParams.get('category');
     const available = url.searchParams.get('available');
     const search = url.searchParams.get('search');
     const limit = url.searchParams.get('limit') || '50';
     const offset = url.searchParams.get('offset') || '0';
+    const parsedLimit = Math.max(1, parseInt(limit) || 50);
+    const parsedOffset = Math.max(0, parseInt(offset) || 0);
     const db = env.AURA_DB as import('@cloudflare/workers-types').D1Database;
-    let query = 'SELECT * FROM menu_items WHERE 1=1';
-    const params: unknown[] = [];
-    if (category) {
-      query += ' AND category = ?';
-      params.push(category);
-    }
     const availableFlag = parseAvailabilityFilter(available);
-    if (availableFlag !== null) {
-      query += ' AND available = ?';
-      params.push(availableFlag);
-    }
-    if (search) {
-      query += ' AND (name LIKE ? OR description LIKE ?)';
-      params.push(`%${search}%`, `%${search}%`);
-    }
-    query += ' ORDER BY category, name LIMIT ? OFFSET ?';
-    params.push(parseInt(limit), parseInt(offset));
+
+    const buildMenuQuery = (table: 'menu_items' | 'products', includeTenantScope: boolean) => {
+      const selectPrefix =
+        table === 'products'
+          ? 'SELECT *, category_id as category, is_available as available FROM products WHERE 1=1'
+          : 'SELECT * FROM menu_items WHERE 1=1';
+      const catColumn = table === 'products' ? 'category_id' : 'category';
+      const availColumn = table === 'products' ? 'is_available' : 'available';
+      let sql = selectPrefix;
+      const queryParams: unknown[] = [];
+      if (includeTenantScope && tenantId !== '*') {
+        if (tenantId === 'default') {
+          sql += " AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = 'default'";
+        } else {
+          sql += " AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?";
+          queryParams.push(tenantId);
+        }
+      }
+      if (category) {
+        sql += ` AND ${catColumn} = ?`;
+        queryParams.push(category);
+      }
+      if (availableFlag !== null) {
+        sql += ` AND ${availColumn} = ?`;
+        queryParams.push(availableFlag);
+      }
+      if (search) {
+        sql += ' AND (name LIKE ? OR description LIKE ?)';
+        queryParams.push(`%${search}%`, `%${search}%`);
+      }
+      if (includeTenantScope || tenantId === '*') {
+        sql += ` ORDER BY ${catColumn}, name LIMIT ? OFFSET ?`;
+        queryParams.push(parsedLimit, parsedOffset);
+      } else {
+        sql += ` ORDER BY ${catColumn}, name`;
+      }
+      return { sql, params: queryParams };
+    };
 
     let results: MenuItem[] = [];
     let useProductsFallback = false;
+    let usedUnscopedFallback = false;
     try {
-      const res = await db.prepare(query).bind(...params).all<MenuItem>();
-      results = res.results ?? [];
+      if (tenantId !== '*') {
+        try {
+          const scoped = buildMenuQuery('menu_items', true);
+          const res = await db.prepare(scoped.sql).bind(...scoped.params).all<MenuItem>();
+          results = res.results ?? [];
+        } catch {
+          usedUnscopedFallback = true;
+          const unscoped = buildMenuQuery('menu_items', false);
+          const res = await db.prepare(unscoped.sql).bind(...unscoped.params).all<MenuItem>();
+          results = res.results ?? [];
+        }
+      } else {
+        const unscoped = buildMenuQuery('menu_items', false);
+        const res = await db.prepare(unscoped.sql).bind(...unscoped.params).all<MenuItem>();
+        results = res.results ?? [];
+      }
     } catch {
       useProductsFallback = true;
-      let prodQuery = 'SELECT *, category_id as category, is_available as available FROM products WHERE 1=1';
-      const prodParams: unknown[] = [];
-      if (category) {
-        prodQuery += ' AND category_id = ?';
-        prodParams.push(category);
+      usedUnscopedFallback = false;
+      if (tenantId !== '*') {
+        try {
+          const scopedProd = buildMenuQuery('products', true);
+          const res = await db.prepare(scopedProd.sql).bind(...scopedProd.params).all<MenuItem>();
+          results = res.results ?? [];
+        } catch {
+          usedUnscopedFallback = true;
+          const unscopedProd = buildMenuQuery('products', false);
+          const res = await db.prepare(unscopedProd.sql).bind(...unscopedProd.params).all<MenuItem>();
+          results = res.results ?? [];
+        }
+      } else {
+        const unscopedProd = buildMenuQuery('products', false);
+        const res = await db.prepare(unscopedProd.sql).bind(...unscopedProd.params).all<MenuItem>();
+        results = res.results ?? [];
       }
-      if (availableFlag !== null) {
-        prodQuery += ' AND is_available = ?';
-        prodParams.push(availableFlag);
-      }
-      if (search) {
-        prodQuery += ' AND (name LIKE ? OR description LIKE ?)';
-        prodParams.push(`%${search}%`, `%${search}%`);
-      }
-      prodQuery += ' ORDER BY category_id, name LIMIT ? OFFSET ?';
-      prodParams.push(parseInt(limit), parseInt(offset));
-      const res = await db.prepare(prodQuery).bind(...prodParams).all<MenuItem>();
-      results = res.results ?? [];
     }
-
-    const tenantId = resolveMenuTenantId(request, env, tenantIdOverride);
-    const hasTenantCol = results.some(
-      (r) => r && typeof r === 'object' && 'tenant_id' in r && (r as unknown as Record<string, unknown>).tenant_id !== undefined
-    );
-    let filteredResults = (results ?? []).filter((item) =>
-      matchesTenantRow(item as unknown as Record<string, unknown>, tenantId)
-    );
 
     const tableName = useProductsFallback ? 'products' : 'menu_items';
     const catCol = useProductsFallback ? 'category_id' : 'category';
     const availCol = useProductsFallback ? 'is_available' : 'available';
 
-    if (hasTenantCol && tenantId !== '*' && filteredResults.length < results.length) {
-      try {
-        const selectPrefix = useProductsFallback
-          ? 'SELECT *, category_id as category, is_available as available FROM products WHERE 1=1'
-          : 'SELECT * FROM menu_items WHERE 1=1';
-        let scopedQuery = `${selectPrefix} AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?`;
-        const scopedParams: unknown[] = [tenantId];
-        if (category) {
-          scopedQuery += ` AND ${catCol} = ?`;
-          scopedParams.push(category);
-        }
-        if (availableFlag !== null) {
-          scopedQuery += ` AND ${availCol} = ?`;
-          scopedParams.push(availableFlag);
-        }
-        if (search) {
-          scopedQuery += ' AND (name LIKE ? OR description LIKE ?)';
-          scopedParams.push(`%${search}%`, `%${search}%`);
-        }
-        scopedQuery += ` ORDER BY ${catCol}, name LIMIT ? OFFSET ?`;
-        scopedParams.push(parseInt(limit), parseInt(offset));
-        const scopedRes = await db.prepare(scopedQuery).bind(...scopedParams).all<MenuItem>();
-        filteredResults = (scopedRes.results ?? []).filter((item) =>
-          matchesTenantRow(item as unknown as Record<string, unknown>, tenantId)
-        );
-      } catch {
-        // Keep in-memory filtered results if tenant_id SQL expression is unsupported
-      }
-    }
-
-    const items = filteredResults.map((item: MenuItem) => ({
+    let items = (results ?? []).map((item: MenuItem) => ({
       ...item,
       tags: parseTags(item.tags),
       price: parseInt(item.price as unknown as string),
       available: toAvailabilityFlag(item.available ?? (item as unknown as { is_available?: unknown }).is_available)
     }));
-
-    const countQuery = `SELECT COUNT(*) as total FROM ${tableName} WHERE 1=1${
-      hasTenantCol && tenantId !== '*' ? " AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?" : ''
-    }${
-      category ? ` AND ${catCol} = ?` : ''
-    }${availableFlag !== null ? ` AND ${availCol} = ?` : ''
-    }${search ? ' AND (name LIKE ? OR description LIKE ?)' : ''}`;
-
-    const countParams: unknown[] = [];
-    if (hasTenantCol && tenantId !== '*') {
-      countParams.push(tenantId);
-    }
-    if (category) {
-      countParams.push(category);
-    }
-    if (availableFlag !== null) {
-      countParams.push(availableFlag);
-    }
-    if (search) {
-      countParams.push(`%${search}%`, `%${search}%`);
+    items = items.filter((item) => matchesTenantRow(item as unknown as Record<string, unknown>, tenantId));
+    const filteredTotalBeforeSlice = items.length;
+    if (usedUnscopedFallback && tenantId !== '*') {
+      items = items.slice(parsedOffset, parsedOffset + parsedLimit);
     }
 
-    const { results: countResult } = await db.prepare(countQuery).bind(...countParams).all<{ total: number }>();
-    const total = countResult[0]?.total || 0;
+    const buildCountQuery = (includeTenantScope: boolean) => {
+      let sql = `SELECT COUNT(*) as total FROM ${tableName} WHERE 1=1`;
+      const countParams: unknown[] = [];
+      if (includeTenantScope && tenantId !== '*') {
+        if (tenantId === 'default') {
+          sql += " AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = 'default'";
+        } else {
+          sql += " AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?";
+          countParams.push(tenantId);
+        }
+      }
+      if (category) {
+        sql += ` AND ${catCol} = ?`;
+        countParams.push(category);
+      }
+      if (availableFlag !== null) {
+        sql += ` AND ${availCol} = ?`;
+        countParams.push(availableFlag);
+      }
+      if (search) {
+        sql += ' AND (name LIKE ? OR description LIKE ?)';
+        countParams.push(`%${search}%`, `%${search}%`);
+      }
+      return { sql, params: countParams };
+    };
+
+    let countResult: { total: number }[] = [];
+    let countUsedUnscopedFallback = false;
+    if (tenantId !== '*') {
+      try {
+        const scopedCount = buildCountQuery(true);
+        const res = await db.prepare(scopedCount.sql).bind(...scopedCount.params).all<{ total: number }>();
+        countResult = res.results ?? [];
+      } catch {
+        countUsedUnscopedFallback = true;
+        const unscopedCount = buildCountQuery(false);
+        const res = await db.prepare(unscopedCount.sql).bind(...unscopedCount.params).all<{ total: number }>();
+        countResult = res.results ?? [];
+      }
+    } else {
+      const unscopedCount = buildCountQuery(false);
+      const res = await db.prepare(unscopedCount.sql).bind(...unscopedCount.params).all<{ total: number }>();
+      countResult = res.results ?? [];
+    }
+    const rawCount = countResult[0]?.total;
+    const total =
+      usedUnscopedFallback && countUsedUnscopedFallback && tenantId !== '*'
+        ? filteredTotalBeforeSlice || Number(rawCount || 0)
+        : rawCount || 0;
 
     return jsonResponse({
       success: true,
@@ -185,8 +295,12 @@ export async function getMenu(request: Request, env: Record<string, unknown>, te
 
 export async function getMenuItem(request: Request, env: Record<string, unknown>, id: string, tenantIdOverride?: string) {
   try {
+    const tenantRes = await resolveMenuTenant(request, env, tenantIdOverride);
+    if (!tenantRes.ok) {
+      return errorResponse(tenantRes.error, tenantRes.status);
+    }
+    const tenantId = tenantRes.tenantId;
     const db = env.AURA_DB as import('@cloudflare/workers-types').D1Database;
-    const tenantId = resolveMenuTenantId(request, env, tenantIdOverride);
     let rawItem: MenuItem | undefined;
     try {
       const { results } = await db.prepare('SELECT * FROM menu_items WHERE id = ?').bind(id).all<MenuItem>();

@@ -29,12 +29,23 @@ export interface ReconcileCronOptions {
 interface CandidateRow {
   payment_id: string;
   status: string;
+  refund_status?: string | null;
   created_at: string | null;
+  order_status?: string | null;
   order_payment_status: string;
   order_tenant_id?: string | null;
   attempts: number | null;
   last_checked_at: string | null;
 }
+
+const TERMINAL_ORDER_STATUSES = new Set([
+  'cancelled',
+  'canceled',
+  'rejected',
+  'failed',
+  'expired',
+  'refunded',
+]);
 
 export function parsePaymentTimestampMs(raw: string | null | undefined): number | null {
   if (!raw || typeof raw !== 'string') return null;
@@ -88,11 +99,15 @@ export async function runPaymentReconciliation(
       activeTenant = 'default';
     }
   }
+  if (activeTenant.toLowerCase() === 'hq') {
+    activeTenant = '*';
+  }
 
   let rows: CandidateRow[] = [];
   try {
     const queryResult = await db.prepare(
       `SELECT p.id AS payment_id, p.status, p.created_at,
+              o.status AS order_status,
               o.payment_status AS order_payment_status,
               o.tenant_id AS order_tenant_id,
               j.attempts, j.last_checked_at
@@ -103,44 +118,114 @@ export async function runPaymentReconciliation(
          AND p.status IN ('pending', 'completed')
          AND COALESCE(p.refund_status, '') != 'completed'
          AND o.payment_status NOT IN ('paid', 'refunded')
+         AND NOT (p.status = 'completed' AND LOWER(COALESCE(o.status, '')) IN ('cancelled', 'canceled', 'rejected', 'failed', 'expired', 'refunded'))
          AND (j.last_outcome IS NULL OR j.last_outcome NOT IN ('settled', 'already_settled', 'requires_review'))
-         AND (j.next_attempt_at IS NULL OR j.next_attempt_at <= ?)
-         AND (j.lease_until IS NULL OR j.lease_until < ?)
+         AND (j.next_attempt_at IS NULL OR CAST(j.next_attempt_at AS INTEGER) <= CAST(? AS INTEGER))
+         AND (j.lease_until IS NULL OR CAST(j.lease_until AS INTEGER) < CAST(? AS INTEGER))
          AND (? = '*' OR COALESCE(NULLIF(TRIM(o.tenant_id), ''), 'default') = ?)
-       ORDER BY COALESCE(j.attempts, 0) ASC, COALESCE(j.last_checked_at, '0') ASC, p.created_at ASC
+       ORDER BY COALESCE(j.attempts, 0) ASC, CAST(COALESCE(j.last_checked_at, '0') AS INTEGER) ASC, p.created_at ASC
        LIMIT 25`
     ).bind(nowStr, nowStr, activeTenant, activeTenant).all<CandidateRow>();
     rows = queryResult.results ?? [];
   } catch {
-    const queryResult = await db.prepare(
-      `SELECT p.id AS payment_id, p.status, p.created_at,
-              o.payment_status AS order_payment_status,
-              j.attempts, j.last_checked_at
-       FROM payments p
-       JOIN orders o ON o.id = p.order_id
-       LEFT JOIN payment_reconciliation_jobs j ON j.payment_id = p.id
-       WHERE p.method = 'payos'
-         AND p.status IN ('pending', 'completed')
-         AND COALESCE(p.refund_status, '') != 'completed'
-         AND o.payment_status NOT IN ('paid', 'refunded')
-         AND (j.last_outcome IS NULL OR j.last_outcome NOT IN ('settled', 'already_settled', 'requires_review'))
-         AND (j.next_attempt_at IS NULL OR j.next_attempt_at <= ?)
-         AND (j.lease_until IS NULL OR j.lease_until < ?)
-       ORDER BY COALESCE(j.attempts, 0) ASC, COALESCE(j.last_checked_at, '0') ASC, p.created_at ASC
-       LIMIT 25`
-    ).bind(nowStr, nowStr).all<CandidateRow>();
-    rows = queryResult.results ?? [];
+    try {
+      const queryResult = await db.prepare(
+        `SELECT p.id AS payment_id, p.status, p.created_at,
+                o.status AS order_status,
+                o.payment_status AS order_payment_status,
+                j.attempts, j.last_checked_at
+         FROM payments p
+         JOIN orders o ON o.id = p.order_id
+         LEFT JOIN payment_reconciliation_jobs j ON j.payment_id = p.id
+         WHERE p.method = 'payos'
+           AND p.status IN ('pending', 'completed')
+           AND COALESCE(p.refund_status, '') != 'completed'
+           AND o.payment_status NOT IN ('paid', 'refunded')
+           AND NOT (p.status = 'completed' AND LOWER(COALESCE(o.status, '')) IN ('cancelled', 'canceled', 'rejected', 'failed', 'expired', 'refunded'))
+           AND (j.last_outcome IS NULL OR j.last_outcome NOT IN ('settled', 'already_settled', 'requires_review'))
+           AND (j.next_attempt_at IS NULL OR CAST(j.next_attempt_at AS INTEGER) <= CAST(? AS INTEGER))
+           AND (j.lease_until IS NULL OR CAST(j.lease_until AS INTEGER) < CAST(? AS INTEGER))
+         ORDER BY COALESCE(j.attempts, 0) ASC, CAST(COALESCE(j.last_checked_at, '0') AS INTEGER) ASC, p.created_at ASC
+         LIMIT 25`
+      ).bind(nowStr, nowStr).all<CandidateRow>();
+      rows = queryResult.results ?? [];
+    } catch {
+      try {
+        const queryResult = await db.prepare(
+          `SELECT p.id AS payment_id, p.status, p.created_at,
+                  o.status AS order_status,
+                  o.payment_status AS order_payment_status,
+                  o.tenant_id AS order_tenant_id,
+                  j.attempts, j.last_checked_at
+           FROM payments p
+           JOIN orders o ON o.id = p.order_id
+           LEFT JOIN payment_reconciliation_jobs j ON j.payment_id = p.id
+           WHERE p.method = 'payos'
+             AND p.status IN ('pending', 'completed')
+             AND o.payment_status NOT IN ('paid', 'refunded')
+             AND NOT (p.status = 'completed' AND LOWER(COALESCE(o.status, '')) IN ('cancelled', 'canceled', 'rejected', 'failed', 'expired', 'refunded'))
+             AND (j.last_outcome IS NULL OR j.last_outcome NOT IN ('settled', 'already_settled', 'requires_review'))
+             AND (j.next_attempt_at IS NULL OR CAST(j.next_attempt_at AS INTEGER) <= CAST(? AS INTEGER))
+             AND (j.lease_until IS NULL OR CAST(j.lease_until AS INTEGER) < CAST(? AS INTEGER))
+             AND (? = '*' OR COALESCE(NULLIF(TRIM(o.tenant_id), ''), 'default') = ?)
+           ORDER BY COALESCE(j.attempts, 0) ASC, CAST(COALESCE(j.last_checked_at, '0') AS INTEGER) ASC, p.created_at ASC
+           LIMIT 25`
+        ).bind(nowStr, nowStr, activeTenant, activeTenant).all<CandidateRow>();
+        rows = queryResult.results ?? [];
+      } catch {
+        const queryResult = await db.prepare(
+          `SELECT p.id AS payment_id, p.status, p.created_at,
+                  o.status AS order_status,
+                  o.payment_status AS order_payment_status,
+                  o.tenant_id AS order_tenant_id,
+                  0 AS attempts, NULL AS last_checked_at
+           FROM payments p
+           JOIN orders o ON o.id = p.order_id
+           WHERE p.method = 'payos'
+             AND p.status IN ('pending', 'completed')
+             AND o.payment_status NOT IN ('paid', 'refunded')
+             AND NOT (p.status = 'completed' AND LOWER(COALESCE(o.status, '')) IN ('cancelled', 'canceled', 'rejected', 'failed', 'expired', 'refunded'))
+             AND (? = '*' OR COALESCE(NULLIF(TRIM(o.tenant_id), ''), 'default') = ?)
+           ORDER BY p.created_at ASC
+           LIMIT 25`
+        ).bind(activeTenant, activeTenant).all<CandidateRow>().catch(async () =>
+          db.prepare(
+            `SELECT p.id AS payment_id, p.status, p.created_at,
+                    o.status AS order_status,
+                    o.payment_status AS order_payment_status,
+                    0 AS attempts, NULL AS last_checked_at
+             FROM payments p
+             JOIN orders o ON o.id = p.order_id
+             WHERE p.method = 'payos'
+               AND p.status IN ('pending', 'completed')
+               AND o.payment_status NOT IN ('paid', 'refunded')
+               AND NOT (p.status = 'completed' AND LOWER(COALESCE(o.status, '')) IN ('cancelled', 'canceled', 'rejected', 'failed', 'expired', 'refunded'))
+             ORDER BY p.created_at ASC
+             LIMIT 25`
+          ).all<CandidateRow>()
+        );
+        rows = queryResult.results ?? [];
+      }
+    }
   }
 
-  if (activeTenant !== '*') {
-    rows = rows.filter((r) => {
+  rows = rows.filter((r) => {
+    const ordStatus = typeof r.order_status === 'string' ? r.order_status.trim().toLowerCase() : '';
+    if (r.status === 'completed' && TERMINAL_ORDER_STATUSES.has(ordStatus)) {
+      return false;
+    }
+    if (typeof r.refund_status === 'string' && r.refund_status.trim().toLowerCase() === 'completed') {
+      return false;
+    }
+    if (activeTenant !== '*') {
       if (!('order_tenant_id' in r) || r.order_tenant_id === undefined) {
         return activeTenant === 'default';
       }
       const rt = typeof r.order_tenant_id === 'string' && r.order_tenant_id.trim() ? r.order_tenant_id.trim() : 'default';
       return rt === activeTenant;
-    });
-  }
+    }
+    return true;
+  });
 
   const eligible: CandidateRow[] = [];
   for (const row of rows) {
@@ -176,18 +261,25 @@ export async function runPaymentReconciliation(
 
       processed++;
       try {
+        const rawCandidateTenant = candidate.order_tenant_id ? String(candidate.order_tenant_id).trim() : '';
+        const candidateTenant =
+          activeTenant === '*'
+            ? rawCandidateTenant && rawCandidateTenant !== '*' && rawCandidateTenant.toLowerCase() !== 'hq'
+              ? rawCandidateTenant
+              : 'default'
+            : activeTenant;
         const res = await reconcilePayOSPayment({
           db,
           kv,
           paymentId: candidate.payment_id,
-          tenantId: activeTenant === '*' ? (candidate.order_tenant_id?.trim() || 'default') : activeTenant,
+          tenantId: candidateTenant,
           clientId,
           apiKey,
           checksumKey,
           source: 'cron',
         });
         const jobRow = await db.prepare('SELECT attempts FROM payment_reconciliation_jobs WHERE payment_id = ?')
-          .bind(candidate.payment_id).first<{ attempts: number }>();
+          .bind(candidate.payment_id).first<{ attempts: number }>().catch(() => null);
         const attempts = Number(jobRow?.attempts ?? (candidate.attempts ?? 0) + 1);
         const nextMs = computeNextAttemptAtMs(res.outcome, attempts, currentNowMs);
         await releaseReconcileJob(db, candidate.payment_id, leaseOwner, res.outcome, nextMs, currentNowMs);

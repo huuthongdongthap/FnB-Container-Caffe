@@ -13,13 +13,17 @@ import { consumeCrmEvent, type CrmConsumeResult } from '@aura/domain-crm';
 
 const log = createLogger({ route: 'customer-events' });
 
-export interface DispatchCustomerEventInput {
-  db: D1Database;
+export interface CustomerDomainEvent {
   eventType: CanonicalEventType;
   customerId: string | null;
   orderId?: string | null;
+  tenantId?: string | null;
   payload: Record<string, unknown>;
   idempotencyKey?: string;
+}
+
+export interface DispatchCustomerEventInput extends CustomerDomainEvent {
+  db: D1Database;
   env?: unknown;
 }
 
@@ -31,21 +35,58 @@ export interface DispatchCustomerEventResult {
   error?: string;
 }
 
+function normalizeEventTenant(raw?: unknown): string {
+  const trimmed = typeof raw === 'string' ? raw.trim() : '';
+  if (!trimmed || trimmed === '*' || trimmed.toLowerCase() === 'hq') {
+    return 'default';
+  }
+  return trimmed;
+}
+
+export function buildIdempotencyKey(event: {
+  eventType: string;
+  customerId?: string | null;
+  orderId?: string | null;
+  tenantId?: string | null;
+  idempotencyKey?: string;
+}): string {
+  const effectiveTenant = normalizeEventTenant(event.tenantId);
+  const baseKey =
+    event.idempotencyKey?.trim() ||
+    `${event.eventType}:${event.customerId || 'anon'}:${event.orderId || 'none'}`;
+  if (baseKey.endsWith(`:${effectiveTenant}`) || baseKey.startsWith(`${effectiveTenant}:`)) {
+    return baseKey;
+  }
+  return `${baseKey}:${effectiveTenant}`;
+}
+
 /**
- * Checks if an event with identical idempotencyKey has already been recorded.
+ * Checks if an event with identical idempotencyKey has already been recorded within the tenant scope.
  */
 async function findExistingEvent(
   db: D1Database,
-  idempotencyKey: string
+  idempotencyKey: string,
+  tenantId: string = 'default'
 ): Promise<string | null> {
   const safeKey = idempotencyKey.replace(/[%"\\]/g, '');
   if (!safeKey) return null;
+  const effectiveTenant = normalizeEventTenant(tenantId);
   try {
     const row = await db.prepare(
-      "SELECT id FROM customer_events WHERE payload LIKE ? LIMIT 1"
-    ).bind(`%"idempotency_key":"${safeKey}"%`).first<{ id: string }>();
+      "SELECT id FROM customer_events WHERE payload LIKE ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ? LIMIT 1"
+    ).bind(`%"idempotency_key":"${safeKey}"%`, effectiveTenant).first<{ id: string }>();
     return row?.id ?? null;
   } catch {
+    if (effectiveTenant === 'default') {
+      try {
+        const row = await db.prepare(
+          "SELECT id FROM customer_events WHERE payload LIKE ? LIMIT 1"
+        ).bind(`%"idempotency_key":"${safeKey}"%`).first<{ id: string }>();
+        return row?.id ?? null;
+      } catch {
+        return null;
+      }
+    }
     return null;
   }
 }
@@ -57,18 +98,33 @@ export async function dispatchCustomerEvent(
   input: DispatchCustomerEventInput
 ): Promise<DispatchCustomerEventResult> {
   const { db, eventType, customerId, orderId, payload, env } = input;
+  const effectiveTenant = normalizeEventTenant(
+    input.tenantId ?? payload?.tenant_id ?? payload?.tenantId
+  );
 
   const event = createCanonicalCustomerEvent({
     eventType,
     customerId,
     orderId,
-    payload,
+    payload: {
+      ...payload,
+      tenant_id: effectiveTenant,
+    },
     idempotencyKey: input.idempotencyKey,
   });
-  (event.payload as Record<string, unknown>).idempotency_key = event.idempotencyKey;
+  const scopedIdempotencyKey = buildIdempotencyKey({
+    eventType,
+    customerId,
+    orderId,
+    tenantId: effectiveTenant,
+    idempotencyKey: event.idempotencyKey,
+  });
+  event.idempotencyKey = scopedIdempotencyKey;
+  (event.payload as Record<string, unknown>).idempotency_key = scopedIdempotencyKey;
+  (event.payload as Record<string, unknown>).tenant_id = effectiveTenant;
 
   try {
-    const existingId = await findExistingEvent(db, event.idempotencyKey);
+    const existingId = await findExistingEvent(db, event.idempotencyKey, effectiveTenant);
     if (existingId) {
       return { ok: true, eventId: existingId, created: false };
     }
@@ -78,37 +134,67 @@ export async function dispatchCustomerEvent(
     let persisted = false;
     try {
       await db.prepare(
-        'INSERT INTO customer_events (id, customer_id, event_type, payload, recorded_at) VALUES (?, ?, ?, ?, ?)'
+        'INSERT INTO customer_events (id, customer_id, event_type, payload, recorded_at, tenant_id) VALUES (?, ?, ?, ?, ?, ?)'
       ).bind(
         event.id,
         storageCustomerId,
         event.eventType,
         JSON.stringify(event.payload),
-        event.recordedAt
+        event.recordedAt,
+        effectiveTenant
       ).run();
       persisted = true;
     } catch (insertErr) {
       const errMsg = String((insertErr as Error)?.message || '');
+      const isMissingTenantCol = /no such column:\s*tenant_id/i.test(errMsg);
       const isConstraintOrSchemaErr =
         !customerId &&
         (errMsg.includes('FOREIGN KEY') ||
           errMsg.includes('constraint') ||
           errMsg.includes('no such table'));
-      if (isConstraintOrSchemaErr) {
+      if (effectiveTenant === 'default' && isMissingTenantCol) {
+        await db.prepare(
+          'INSERT INTO customer_events (id, customer_id, event_type, payload, recorded_at) VALUES (?, ?, ?, ?, ?)'
+        ).bind(
+          event.id,
+          storageCustomerId,
+          event.eventType,
+          JSON.stringify(event.payload),
+          event.recordedAt
+        ).run();
+        persisted = true;
+      } else if (isConstraintOrSchemaErr) {
         try {
           await db.prepare(
-            'INSERT INTO customer_events (id, customer_id, event_type, payload, recorded_at) VALUES (?, ?, ?, ?, ?)'
+            'INSERT INTO customer_events (id, customer_id, event_type, payload, recorded_at, tenant_id) VALUES (?, ?, ?, ?, ?, ?)'
           ).bind(
             event.id,
             null,
             event.eventType,
             JSON.stringify(event.payload),
-            event.recordedAt
+            event.recordedAt,
+            effectiveTenant
           ).run();
           persisted = true;
         } catch {
-          // Anonymous event on strict NOT NULL FK schema: continue to CRM consumer without failing
-          persisted = false;
+          if (effectiveTenant === 'default') {
+            try {
+              await db.prepare(
+                'INSERT INTO customer_events (id, customer_id, event_type, payload, recorded_at) VALUES (?, ?, ?, ?, ?)'
+              ).bind(
+                event.id,
+                null,
+                event.eventType,
+                JSON.stringify(event.payload),
+                event.recordedAt
+              ).run();
+              persisted = true;
+            } catch {
+              persisted = false;
+            }
+          } else {
+            persisted = false;
+          }
         }
       } else {
         throw insertErr;

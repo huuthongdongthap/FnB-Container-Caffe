@@ -1,12 +1,15 @@
-import type { Hono } from 'hono';
+import type { Context, Hono } from 'hono';
 import { publishOrderEvent } from '@aura/domain-order';
 import type { Env } from '../../types/env';
-import { queryFirst, execute, getTenantId, matchesTenantRow } from '../../lib/db';
+import { queryFirst, execute, matchesTenantRow } from '../../lib/db';
 import { kvGet, kvSet } from '../../lib/kv';
 import {
   dindinCheckoutSchema,
   err,
   errorResponse,
+  hasCrossTenantDindinOverride,
+  hasForbiddenTenantOverride,
+  resolveDinDinTenant,
   readCartRD,
   readConfigRaw,
   writeCart,
@@ -19,8 +22,14 @@ import {
 export function registerCheckoutHandlers(router: Hono<{ Bindings: Env }>): void {
   // ── GET /checkouts ──────────────────────────────────────────────────────────
   router.get('/checkouts', async (c) => {
+    if (
+      hasCrossTenantDindinOverride(c as unknown as Parameters<typeof hasCrossTenantDindinOverride>[0]) ||
+      hasForbiddenTenantOverride(c as unknown as Parameters<typeof hasForbiddenTenantOverride>[0])
+    ) {
+      return c.json({ success: false, error: 'Cross-tenant access denied' }, 403);
+    }
     const statusFilter = c.req.query('status');
-    const tenantId = getTenantId(c as unknown as Parameters<typeof getTenantId>[0]);
+    const tenantId = resolveDinDinTenant(c as unknown as Parameters<typeof resolveDinDinTenant>[0]);
     let checkouts: Array<Record<string, unknown>> = [];
     try {
       let rows: Array<{
@@ -43,14 +52,16 @@ export function registerCheckoutHandlers(router: Hono<{ Bindings: Env }>): void 
       } catch {
         try {
           const res = await c.env.AURA_DB.prepare(
-            "SELECT id, customer_name, customer_phone, payment_method, items, total, status, created_at, tenant_id FROM orders WHERE customer_name = 'DIN' OR id LIKE 'DIN%' ORDER BY created_at DESC LIMIT 50"
-          ).all<typeof rows[number]>();
+            "SELECT id, customer_name, customer_phone, payment_method, items, total, status, created_at, tenant_id FROM orders WHERE (customer_name = 'DIN' OR id LIKE 'DIN%') AND (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?) ORDER BY created_at DESC LIMIT 50"
+          ).bind(effectiveTenant, effectiveTenant).all<typeof rows[number]>();
           rows = res.results || [];
         } catch {
-          const res = await c.env.AURA_DB.prepare(
-            "SELECT id, customer_name, customer_phone, payment_method, items, total, status, created_at FROM orders WHERE customer_name = 'DIN' OR id LIKE 'DIN%' ORDER BY created_at DESC LIMIT 50"
-          ).all<typeof rows[number]>();
-          rows = res.results || [];
+          if (effectiveTenant === 'default' || effectiveTenant === '*') {
+            const res = await c.env.AURA_DB.prepare(
+              "SELECT id, customer_name, customer_phone, payment_method, items, total, status, created_at FROM orders WHERE customer_name = 'DIN' OR id LIKE 'DIN%' ORDER BY created_at DESC LIMIT 50"
+            ).all<typeof rows[number]>();
+            rows = res.results || [];
+          }
         }
       }
 
@@ -81,8 +92,11 @@ export function registerCheckoutHandlers(router: Hono<{ Bindings: Env }>): void 
         } catch {
           parsedItems = [];
         }
-        const printKey = tenantId !== 'default' && tenantId !== '*' ? `dindin:print:${tenantId}:${row.id}` : `dindin:print:${row.id}`;
-        const qcKey = tenantId !== 'default' && tenantId !== '*' ? `dindin:qc:${tenantId}:${row.id}` : `dindin:qc:${row.id}`;
+        const rowTenant =
+          (typeof row.tenant_id === 'string' && row.tenant_id.trim() ? row.tenant_id.trim() : '') ||
+          (tenantId && tenantId !== '*' && tenantId.toLowerCase() !== 'hq' ? tenantId : 'default');
+        const printKey = rowTenant !== 'default' ? `dindin:print:${rowTenant}:${row.id}` : `dindin:print:${row.id}`;
+        const qcKey = rowTenant !== 'default' ? `dindin:qc:${rowTenant}:${row.id}` : `dindin:qc:${row.id}`;
         const printedState = await kvGet<{ printed?: boolean }>(c.env.AUTH_KV, printKey);
         const qcState = await kvGet<{ qcPassed?: boolean }>(c.env.AUTH_KV, qcKey);
         checkouts.push({
@@ -108,27 +122,41 @@ export function registerCheckoutHandlers(router: Hono<{ Bindings: Env }>): void 
 
   // ── POST /checkout/:orderId/print ───────────────────────────────────────────
   router.post('/checkout/:orderId/print', async (c) => {
+    if (hasForbiddenTenantOverride(c as unknown as Parameters<typeof hasForbiddenTenantOverride>[0])) {
+      return c.json({ success: false, error: 'Cross-tenant access denied' }, 403);
+    }
     const { orderId } = c.req.param();
-    const tenantId = getTenantId(c as unknown as Parameters<typeof getTenantId>[0]);
+    const tenantId = resolveDinDinTenant(c as unknown as Parameters<typeof resolveDinDinTenant>[0]);
     let ordRow: { id: string; tenant_id?: string | null } | null = null;
     try {
       ordRow = await c.env.AURA_DB.prepare('SELECT id, tenant_id FROM orders WHERE id = ?').bind(orderId).first<{ id: string; tenant_id?: string | null }>();
     } catch {
-      ordRow = await c.env.AURA_DB.prepare('SELECT id FROM orders WHERE id = ?').bind(orderId).first<{ id: string }>().catch(() => null);
+      if (!tenantId || tenantId === 'default' || tenantId === '*') {
+        ordRow = await c.env.AURA_DB.prepare('SELECT id FROM orders WHERE id = ?').bind(orderId).first<{ id: string }>().catch(() => null);
+      } else {
+        ordRow = null;
+      }
     }
     if (!ordRow || !matchesTenantRow(ordRow, tenantId)) {
       return c.json({ success: false, error: 'Order not found' }, 404);
     }
     const printedAt = new Date().toISOString();
-    const printKey = tenantId !== 'default' && tenantId !== '*' ? `dindin:print:${tenantId}:${orderId}` : `dindin:print:${orderId}`;
+    const rowTenant =
+      (typeof ordRow.tenant_id === 'string' && ordRow.tenant_id.trim() ? ordRow.tenant_id.trim() : '') ||
+      (tenantId && tenantId !== '*' && tenantId.toLowerCase() !== 'hq' ? tenantId : 'default');
+    const printKey = rowTenant !== 'default' ? `dindin:print:${rowTenant}:${orderId}` : `dindin:print:${orderId}`;
     await kvSet(c.env.AUTH_KV, printKey, JSON.stringify({ printed: true, printedAt }), 86400);
     return c.json({ success: true, orderId, printed: true, printedAt });
   });
 
   // ── POST /checkout/:orderId/qc ──────────────────────────────────────────────
-  router.post('/checkout/:orderId/qc', async (c) => {
-    const { orderId } = c.req.param();
-    const tenantId = getTenantId(c as unknown as Parameters<typeof getTenantId>[0]);
+  const handleQcComplete = async (c: Context<{ Bindings: Env }>) => {
+    if (hasForbiddenTenantOverride(c as unknown as Parameters<typeof hasForbiddenTenantOverride>[0])) {
+      return c.json({ success: false, error: 'Cross-tenant access denied' }, 403);
+    }
+    const params = c.req.param() as { orderId?: string; id?: string };
+    const orderId = params.orderId || params.id || '';
+    const tenantId = resolveDinDinTenant(c as unknown as Parameters<typeof resolveDinDinTenant>[0]);
     type QcOrderRow = {
       id: string;
       status?: string | null;
@@ -146,13 +174,16 @@ export function registerCheckoutHandlers(router: Hono<{ Bindings: Env }>): void 
       ordRow = await c.env.AURA_DB.prepare(
         'SELECT id, status, customer_name, payment_method, tenant_id FROM orders WHERE id = ?'
       ).bind(orderId).first<QcOrderRow>().catch(async () =>
-        c.env.AURA_DB.prepare('SELECT id, status, customer_name, payment_method FROM orders WHERE id = ?').bind(orderId).first<QcOrderRow>().catch(async () =>
-          c.env.AURA_DB.prepare('SELECT id, status, tenant_id FROM orders WHERE id = ?').bind(orderId).first<QcOrderRow>().catch(async () =>
-            c.env.AURA_DB.prepare('SELECT id, status FROM orders WHERE id = ?').bind(orderId).first<QcOrderRow>().catch(async () =>
-              c.env.AURA_DB.prepare('SELECT id FROM orders WHERE id = ?').bind(orderId).first<QcOrderRow>().catch(() => null)
-            )
-          )
-        )
+        c.env.AURA_DB.prepare('SELECT id, status, tenant_id FROM orders WHERE id = ?').bind(orderId).first<QcOrderRow>().catch(async () => {
+          if (!tenantId || tenantId === 'default' || tenantId === '*') {
+            return c.env.AURA_DB.prepare('SELECT id, status, customer_name, payment_method FROM orders WHERE id = ?').bind(orderId).first<QcOrderRow>().catch(async () =>
+              c.env.AURA_DB.prepare('SELECT id, status FROM orders WHERE id = ?').bind(orderId).first<QcOrderRow>().catch(async () =>
+                c.env.AURA_DB.prepare('SELECT id FROM orders WHERE id = ?').bind(orderId).first<QcOrderRow>().catch(() => null)
+              )
+            );
+          }
+          return null;
+        })
       );
     }
     if (!ordRow || !matchesTenantRow(ordRow, tenantId)) {
@@ -164,62 +195,91 @@ export function registerCheckoutHandlers(router: Hono<{ Bindings: Env }>): void 
     if (!isDindinOrder) {
       return c.json({ success: false, error: 'Order is not a DinDin order' }, 400);
     }
-    if (ordRow.status && ['cancelled', 'failed', 'refunded', 'expired'].includes(String(ordRow.status).toLowerCase())) {
+    if (ordRow.status && ['cancelled', 'canceled', 'failed', 'refunded', 'expired', 'rejected'].includes(String(ordRow.status).trim().toLowerCase())) {
       return c.json({ success: false, error: 'Cannot complete QC for a cancelled or failed order' }, 409);
     }
     const paymentMethod = String(ordRow.payment_method || '').trim().toLowerCase();
     const paymentStatus = ordRow.payment_status != null ? String(ordRow.payment_status).trim().toLowerCase() : '';
-    if (paymentStatus && !['cash', 'cod', ''].includes(paymentMethod) && paymentStatus !== 'paid') {
-      return c.json({ success: false, error: 'Order payment has not been completed' }, 409);
+    const ordStatus = String(ordRow.status || '').trim().toLowerCase();
+    if (paymentStatus && ['refunded', 'failed', 'cancelled', 'canceled'].includes(paymentStatus)) {
+      return c.json({ success: false, error: 'Cannot complete QC for refunded or failed payment' }, 409);
+    }
+    if (paymentStatus && ['unpaid', 'pending'].includes(paymentStatus)) {
+      return c.json({ success: false, error: 'Cannot complete QC for unpaid non-cash order' }, 409);
+    }
+    if (
+      !['cash', 'cod', ''].includes(paymentMethod) &&
+      paymentStatus !== 'paid' &&
+      paymentStatus !== 'completed' &&
+      (Boolean(paymentStatus) || !['paid', 'processing', 'preparing', 'ready', 'completed'].includes(ordStatus))
+    ) {
+      return c.json({ success: false, error: 'Cannot complete QC for unpaid non-cash order' }, 409);
     }
     const checkedAt = new Date().toISOString();
-    const qcKey = tenantId !== 'default' && tenantId !== '*' ? `dindin:qc:${tenantId}:${orderId}` : `dindin:qc:${orderId}`;
-    await kvSet(c.env.AUTH_KV, qcKey, JSON.stringify({ qcPassed: true, checkedAt }), 86400);
+    const rowTenant =
+      (typeof ordRow.tenant_id === 'string' && ordRow.tenant_id.trim() ? ordRow.tenant_id.trim() : '') ||
+      (tenantId && tenantId !== '*' && tenantId.toLowerCase() !== 'hq' ? tenantId : 'default');
+    {
+      const tenantId = rowTenant;
+      const qcKey = tenantId !== 'default' ? `dindin:qc:${tenantId}:${orderId}` : `dindin:qc:${orderId}`;
+      await kvSet(c.env.AUTH_KV, qcKey, JSON.stringify({ qcPassed: true, checkedAt }), 86400);
+    }
     try {
-      if (tenantId !== '*') {
-        try {
+      try {
+        await execute(
+          c.env.AURA_DB,
+          "UPDATE orders SET status = ?, updated_at = ? WHERE id = ? AND status NOT IN ('cancelled', 'canceled', 'failed', 'refunded', 'expired', 'rejected') AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?",
+          'completed',
+          checkedAt,
+          orderId,
+          rowTenant
+        );
+      } catch {
+        if (rowTenant === 'default') {
           await execute(
             c.env.AURA_DB,
-            "UPDATE orders SET status = ?, updated_at = ? WHERE id = ? AND status NOT IN ('cancelled', 'failed', 'refunded', 'expired') AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?",
-            'completed',
-            checkedAt,
-            orderId,
-            tenantId || 'default'
-          );
-        } catch {
-          await execute(
-            c.env.AURA_DB,
-            "UPDATE orders SET status = ?, updated_at = ? WHERE id = ? AND status NOT IN ('cancelled', 'failed', 'refunded', 'expired')",
+            "UPDATE orders SET status = ?, updated_at = ? WHERE id = ? AND status NOT IN ('cancelled', 'canceled', 'failed', 'refunded', 'expired', 'rejected')",
             'completed',
             checkedAt,
             orderId
           );
         }
-      } else {
-        await execute(
-          c.env.AURA_DB,
-          "UPDATE orders SET status = ?, updated_at = ? WHERE id = ? AND status NOT IN ('cancelled', 'failed', 'refunded', 'expired')",
-          'completed',
-          checkedAt,
-          orderId
-        );
       }
     } catch {
       // Best-effort DB status update
     }
+    const effectiveOrderTenant = rowTenant;
     if (c.env.AUTH_KV) {
+      const eventPayload = JSON.stringify({
+        orderId,
+        status: 'completed',
+        tenant_id: effectiveOrderTenant,
+        tenantId: effectiveOrderTenant,
+        updatedAt: checkedAt,
+      });
       await Promise.all([
-        kvSet(c.env.AUTH_KV, 'latest_order_ts', checkedAt, 3600),
-        kvSet(c.env.AUTH_KV, 'orders:latest_updated_at', checkedAt, 3600),
-        publishOrderEvent(c.env.AUTH_KV, orderId, 'completed').catch(() => {}),
+        kvSet(c.env.AUTH_KV, effectiveOrderTenant === 'default' ? 'latest_order_ts' : `latest_order_ts:${effectiveOrderTenant}`, checkedAt, 3600),
+        kvSet(c.env.AUTH_KV, effectiveOrderTenant === 'default' ? 'orders:latest_updated_at' : `orders:latest_updated_at:${effectiveOrderTenant}`, checkedAt, 3600),
+        kvSet(c.env.AUTH_KV, `order_event:${effectiveOrderTenant}:${orderId}`, eventPayload, 3600),
+        ...(effectiveOrderTenant === 'default'
+          ? [kvSet(c.env.AUTH_KV, `order_event:${orderId}`, eventPayload, 3600)]
+          : []),
+        publishOrderEvent(c.env.AUTH_KV, orderId, 'completed', { tenantId: effectiveOrderTenant }).catch(() => {}),
       ]).catch(() => undefined);
     }
     return c.json({ success: true, orderId, qcPassed: true, status: 'completed', checkedAt });
-  });
+  };
+  router.post('/checkout/:orderId/qc', handleQcComplete);
+  router.post('/checkout/:orderId/complete-qc', handleQcComplete);
+  router.post('/orders/:id/qc-complete', handleQcComplete);
+  router.post('/orders/:id/complete-qc', handleQcComplete);
 
   // ── POST /checkout ──────────────────────────────────────────────────────────
   router.post('/checkout', async (c) => {
     try {
+      if (hasForbiddenTenantOverride(c as unknown as Parameters<typeof hasForbiddenTenantOverride>[0])) {
+        return c.json({ success: false, error: 'Cross-tenant access denied' }, 403);
+      }
       const body = await c.req.json<unknown>();
       const parsed = dindinCheckoutSchema.safeParse(body);
       if (!parsed.success) {
@@ -230,7 +290,67 @@ export function registerCheckoutHandlers(router: Hono<{ Bindings: Env }>): void 
         return errorResponse(c as DindinContext, err('D03', 400, 'Phương thức thanh toán không hợp lệ - chỉ hỗ trợ cod | payos'));
       }
 
-      const tenantId = getTenantId(c as unknown as Parameters<typeof getTenantId>[0]);
+      const rawTenantId = resolveDinDinTenant(c as unknown as Parameters<typeof resolveDinDinTenant>[0]);
+      let effectiveWriteTenant = rawTenantId && rawTenantId !== '*' && rawTenantId.toLowerCase() !== 'hq' ? rawTenantId : '';
+      let wildcardCartFallback: { items: Array<{ id?: string; name?: string; price?: number; qty?: number }>; total: number } | null = null;
+      if (!effectiveWriteTenant) {
+        if (sessionId.includes('::')) {
+          const prefix = sessionId.split('::')[0]?.trim() || '';
+          effectiveWriteTenant = prefix && prefix !== '*' && prefix.toLowerCase() !== 'hq' ? prefix : '';
+        }
+        try {
+          const cartRow = await queryFirst<{ raw?: string; cart?: string; tenant_id?: string | null; session_id?: string | null }>(
+            c.env.AURA_DB,
+            'SELECT COALESCE(raw, cart) as raw, tenant_id, session_id FROM dindin_cart WHERE session_id = ? OR session_id LIKE ? LIMIT 1',
+            sessionId,
+            `%::${sessionId}`
+          ).catch(() => null);
+          const fallbackRow =
+            cartRow ??
+            (await queryFirst<{ raw?: string; cart?: string; items?: string; total?: number; tenant_id?: string | null; session_id?: string | null }>(
+              c.env.AURA_DB,
+              'SELECT *, COALESCE(cart, items) as raw FROM dindin_carts WHERE session_id = ? OR session_id LIKE ? LIMIT 1',
+              sessionId,
+              `%::${sessionId}`
+            ).catch(() => null));
+          if (fallbackRow) {
+            const rowTenant = typeof fallbackRow.tenant_id === 'string' ? fallbackRow.tenant_id.trim() : '';
+            const rowSession = typeof fallbackRow.session_id === 'string' ? fallbackRow.session_id.trim() : '';
+            const sessionPrefix = rowSession.includes('::') ? rowSession.split('::')[0]?.trim() || '' : '';
+            effectiveWriteTenant =
+              (rowTenant && rowTenant !== '*' && rowTenant.toLowerCase() !== 'hq' ? rowTenant : '') ||
+              (sessionPrefix && sessionPrefix !== '*' && sessionPrefix.toLowerCase() !== 'hq' ? sessionPrefix : '') ||
+              effectiveWriteTenant;
+            const rawCartJson =
+              (typeof fallbackRow.raw === 'string' && fallbackRow.raw.trim()) ||
+              (typeof fallbackRow.cart === 'string' && fallbackRow.cart.trim()) ||
+              (typeof (fallbackRow as { items?: string }).items === 'string' && (fallbackRow as { items?: string }).items!.trim()) ||
+              '';
+            if (rawCartJson) {
+              try {
+                const parsedCart = JSON.parse(rawCartJson);
+                wildcardCartFallback = Array.isArray(parsedCart)
+                  ? {
+                      items: parsedCart,
+                      total: Number(
+                        (fallbackRow as { total?: number }).total ??
+                          parsedCart.reduce((s: number, i: { price?: number; qty?: number; quantity?: number }) => s + Number(i.price ?? 0) * Number(i.qty ?? i.quantity ?? 1), 0)
+                      ),
+                    }
+                  : parsedCart;
+              } catch {
+                wildcardCartFallback = null;
+              }
+            }
+          }
+        } catch {
+          // ignore lookup failure; fall back to default
+        }
+        if (!effectiveWriteTenant) {
+          effectiveWriteTenant = 'default';
+        }
+      }
+      const tenantId = effectiveWriteTenant;
       const idempotencyKey = c.req.header('Idempotency-Key');
       if (idempotencyKey) {
         const cached = await kvGet<{ ok?: boolean; queued?: boolean; orderId?: string; status?: string; at?: string }>(
@@ -245,7 +365,7 @@ export function registerCheckoutHandlers(router: Hono<{ Bindings: Env }>): void 
         }
       }
 
-      const cart = await readCartRD(c.env, sessionId, tenantId);
+      const cart = (await readCartRD(c.env, sessionId, tenantId)) ?? wildcardCartFallback;
       if (!cart || cart.items.length === 0) {
         return errorResponse(c as DindinContext, err('D01', 400, 'Giỏ hàng trống hoặc phiên đã hết hạn'));
       }
@@ -258,7 +378,7 @@ export function registerCheckoutHandlers(router: Hono<{ Bindings: Env }>): void 
           try {
             const candidate = await queryFirst<{ config: string; tenant_id?: string | null }>(
               c.env.AURA_DB,
-              "SELECT config FROM dindin_config WHERE COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = 'default' LIMIT 1"
+              "SELECT config, tenant_id FROM dindin_config WHERE COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = 'default' LIMIT 1"
             );
             if (candidate && matchesTenantRow(candidate, tenantId || 'default')) {
               configRow = candidate;
@@ -373,12 +493,14 @@ export function registerCheckoutHandlers(router: Hono<{ Bindings: Env }>): void 
       const randHex = Array.from(randBytes, (b) => b.toString(16).padStart(2, '0')).join('').toUpperCase();
       const orderId = `DIN${Date.now().toString(36).toUpperCase()}${randHex}`;
       const itemsJson = JSON.stringify(validatedOrderItems);
-      const writeTenant = !tenantId || tenantId === '*' ? 'default' : tenantId;
+      const writeTenant = effectiveWriteTenant;
+      const effectiveOrderTenant = effectiveWriteTenant;
+      const initialPaymentStatus = payment_method === 'cod' ? 'cod_pending' : 'pending';
       try {
         try {
           await execute(
             c.env.AURA_DB,
-            'INSERT INTO orders (id, customer_name, customer_phone, customer_email, payment_method, items, total, status, tenant_id, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)',
+            'INSERT INTO orders (id, customer_name, customer_phone, customer_email, payment_method, items, total, status, tenant_id, payment_status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)',
             orderId,
             'DIN',
             sessionId,
@@ -387,21 +509,42 @@ export function registerCheckoutHandlers(router: Hono<{ Bindings: Env }>): void 
             itemsJson,
             Math.max(0, totalFromMenu),
             'pending',
-            writeTenant
+            writeTenant,
+            initialPaymentStatus
           );
-        } catch {
-          await execute(
-            c.env.AURA_DB,
-            'INSERT INTO orders (id, customer_name, customer_phone, customer_email, payment_method, items, total, status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)',
-            orderId,
-            'DIN',
-            sessionId,
-            null,
-            payment_method,
-            itemsJson,
-            Math.max(0, totalFromMenu),
-            'pending'
-          );
+        } catch (insertErr) {
+          const msg = insertErr instanceof Error ? insertErr.message : String(insertErr);
+          if (msg.includes('payment_status')) {
+            await execute(
+              c.env.AURA_DB,
+              'INSERT INTO orders (id, customer_name, customer_phone, customer_email, payment_method, items, total, status, tenant_id, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)',
+              orderId,
+              'DIN',
+              sessionId,
+              null,
+              payment_method,
+              itemsJson,
+              Math.max(0, totalFromMenu),
+              'pending',
+              writeTenant
+            );
+          } else {
+            if (writeTenant !== 'default') {
+              throw insertErr;
+            }
+            await execute(
+              c.env.AURA_DB,
+              'INSERT INTO orders (id, customer_name, customer_phone, customer_email, payment_method, items, total, status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)',
+              orderId,
+              'DIN',
+              sessionId,
+              null,
+              payment_method,
+              itemsJson,
+              Math.max(0, totalFromMenu),
+              'pending'
+            );
+          }
         }
       } catch {
         if (idempotencyKey && c.env.AUTH_KV) {
@@ -414,11 +557,21 @@ export function registerCheckoutHandlers(router: Hono<{ Bindings: Env }>): void 
 
       if (c.env.AUTH_KV) {
         const ts = new Date().toISOString();
+        const eventPayload = JSON.stringify({
+          orderId,
+          status: 'pending',
+          tenant_id: effectiveOrderTenant,
+          tenantId: effectiveOrderTenant,
+          updatedAt: ts,
+        });
         await Promise.all([
-          kvSet(c.env.AUTH_KV, 'latest_order_ts', ts, 3600),
-          kvSet(c.env.AUTH_KV, 'orders:latest_updated_at', ts, 3600),
-          kvSet(c.env.AUTH_KV, `order_event:${orderId}`, JSON.stringify({ status: 'pending', updatedAt: ts }), 3600),
-          publishOrderEvent(c.env.AUTH_KV, orderId, 'pending').catch(() => {}),
+          kvSet(c.env.AUTH_KV, effectiveOrderTenant === 'default' ? 'latest_order_ts' : `latest_order_ts:${effectiveOrderTenant}`, ts, 3600),
+          kvSet(c.env.AUTH_KV, effectiveOrderTenant === 'default' ? 'orders:latest_updated_at' : `orders:latest_updated_at:${effectiveOrderTenant}`, ts, 3600),
+          kvSet(c.env.AUTH_KV, `order_event:${effectiveOrderTenant}:${orderId}`, eventPayload, 3600),
+          ...(effectiveOrderTenant === 'default'
+            ? [kvSet(c.env.AUTH_KV, `order_event:${orderId}`, eventPayload, 3600)]
+            : []),
+          publishOrderEvent(c.env.AUTH_KV, orderId, 'pending', { tenantId: effectiveOrderTenant }).catch(() => {}),
         ]).catch(() => undefined);
       }
 

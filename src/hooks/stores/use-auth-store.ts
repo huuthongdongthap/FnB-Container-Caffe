@@ -1,6 +1,6 @@
 import { create } from 'zustand';
-import { readClientSession, saveClientSession, invalidateClientSession, subscribeClientSession, sessionErrorRequiresLogin, beginClientLogin, isCurrentLogin } from '@/lib/client-session';
-import { apiFetch, ApiClientError } from '@/lib/api-client';
+import { readClientSession, saveClientSession, invalidateClientSession, subscribeClientSession, sessionErrorRequiresLogin, beginClientLogin, isCurrentLogin } from '../../lib/client-session';
+import { apiFetch, ApiClientError } from '../../lib/api-client';
 
 /* ═══════════════════════════════════════════════════════════════════
    Auth store — dual-mode auth (Bearer token in localStorage + cookie fallback).
@@ -10,6 +10,20 @@ import { apiFetch, ApiClientError } from '@/lib/api-client';
 
 export const AUTH_TOKEN_KEY = 'aura_auth_token';
 export const AUTH_USER_KEY = 'aura_auth_user';
+
+function clearScopedBrowserState(): void {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.removeItem(AUTH_TOKEN_KEY);
+    localStorage.removeItem(AUTH_USER_KEY);
+    for (const key of ['aura-cart', 'aura_pos_cart', 'aura_selected_table', 'aura_active_customer']) {
+      localStorage.removeItem(key);
+    }
+  } catch { /* restricted */ }
+  try {
+    sessionStorage.clear();
+  } catch { /* restricted */ }
+}
 
 export interface AuthUser {
   id: string;
@@ -124,12 +138,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   logout: async () => {
     // Begin the authenticated revoke request, then hide private state immediately.
     const revoke = apiFetch('/api/auth/logout', { method: 'POST' }).catch(() => {});
-    if (typeof window !== 'undefined') {
-      try {
-        localStorage.removeItem(AUTH_TOKEN_KEY);
-        localStorage.removeItem(AUTH_USER_KEY);
-      } catch { /* restricted */ }
-    }
+    clearScopedBrowserState();
     invalidateClientSession();
     set(state => ({ user: null, loading: false, error: null, sessionVersion: state.sessionVersion + 1 }));
     await revoke;
@@ -137,13 +146,38 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
   fetchMe: async () => {
     const generation = get().sessionVersion;
-    const token = readClientSession().token;
+    const token =
+      readClientSession().token ||
+      (typeof window !== 'undefined' ? localStorage.getItem(AUTH_TOKEN_KEY) : null);
     set({ loading: true, error: null });
     try {
-      const body = await apiFetch<AuthResponse>('/api/auth/me');
-      if (generation !== get().sessionVersion || token !== readClientSession().token) return;
+      const body = await apiFetch<AuthResponse>(
+        '/api/auth/me',
+        token ? { headers: { Authorization: `Bearer ${token}` } } : undefined,
+      );
+      const currentToken =
+        readClientSession().token ||
+        (typeof window !== 'undefined' ? localStorage.getItem(AUTH_TOKEN_KEY) : null);
+      if (generation !== get().sessionVersion || token !== currentToken) return;
       const resolvedUser = body?.user || body?.data?.user;
       if (resolvedUser) {
+        const prevUser = get().user;
+        if (prevUser && (prevUser.id !== resolvedUser.id || prevUser.tenantId !== resolvedUser.tenantId)) {
+          if (typeof window !== 'undefined') {
+            try {
+              for (const key of ['aura-cart', 'aura_pos_cart', 'aura_selected_table', 'aura_active_customer']) {
+                localStorage.removeItem(key);
+              }
+            } catch { /* restricted */ }
+          }
+        }
+        const activeToken =
+          body?.token ||
+          token ||
+          (typeof window !== 'undefined' ? localStorage.getItem(AUTH_TOKEN_KEY) : null);
+        if (activeToken) {
+          saveClientSession(activeToken, resolvedUser);
+        }
         if (typeof window !== 'undefined') {
           try {
             localStorage.setItem(AUTH_USER_KEY, JSON.stringify(resolvedUser));
@@ -154,16 +188,14 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         set({ loading: false, error: null });
       }
     } catch (err) {
-      if (generation !== get().sessionVersion || token !== readClientSession().token) return;
+      const currentToken =
+        readClientSession().token ||
+        (typeof window !== 'undefined' ? localStorage.getItem(AUTH_TOKEN_KEY) : null);
+      if (generation !== get().sessionVersion || token !== currentToken) return;
       if (err instanceof ApiClientError && sessionErrorRequiresLogin(err.status, err.code)) {
         invalidateClientSession(undefined, err.message);
-        if (typeof window !== 'undefined') {
-          try {
-            localStorage.removeItem(AUTH_TOKEN_KEY);
-            localStorage.removeItem(AUTH_USER_KEY);
-          } catch { /* restricted */ }
-        }
-        set({ user: null, loading: false, error: err.message });
+        clearScopedBrowserState();
+        set(state => ({ user: null, loading: false, error: err.message, sessionVersion: state.sessionVersion + 1 }));
         return;
       }
       set({ loading: false, error: err instanceof Error ? err.message : 'Network error' });

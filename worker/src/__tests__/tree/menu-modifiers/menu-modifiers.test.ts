@@ -178,7 +178,7 @@ describe('menu-modifiers routes', () => {
     // The projection is the customer-facing copy of this price; if the PATCH
     // updates modifier_choices alone the customer reads the stale number.
     const canonical = db._bound.find(e => e.sql.startsWith('UPDATE modifier_choices'))!;
-    expect(canonical.args).toEqual(['Nhiều đường', 5000, 1, 'MC-1', 'MG-1']);
+    expect(canonical.args).toEqual(['Nhiều đường', 5000, 1, 'MC-1', 'MG-1', 'default']);
 
     const projection = db._bound.find(e => e.sql.includes('menu_modifiers'))!;
     expect(projection.args[2]).toBe('Nhiều đường');

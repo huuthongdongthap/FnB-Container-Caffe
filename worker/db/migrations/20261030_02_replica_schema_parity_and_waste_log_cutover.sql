@@ -102,6 +102,8 @@ ALTER TABLE payment_transactions ADD COLUMN gateway_response TEXT;
 
 ALTER TABLE ha_device_states ADD COLUMN tenant_id TEXT NOT NULL DEFAULT 'default';
 ALTER TABLE happy_hour_windows ADD COLUMN tenant_id TEXT NOT NULL DEFAULT 'default';
+ALTER TABLE payments ADD COLUMN tenant_id TEXT NOT NULL DEFAULT 'default';
+ALTER TABLE ti_order_bridge ADD COLUMN tenant_id TEXT NOT NULL DEFAULT 'default';
 
 -- 6b. kds_stations table & 8 inventory/purchasing parity columns
 CREATE TABLE IF NOT EXISTS kds_stations (

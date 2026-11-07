@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useClientSessionScope } from '@/lib/client-session';
 import { apiFetch, slugify } from './menu-api';
 import { EMPTY_PRODUCT } from './types';
 import type { Product, ProductFormData } from './types';
@@ -8,14 +9,24 @@ import type { Product, ProductFormData } from './types';
 export function useProductManager() {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
+  const session = useClientSessionScope();
+  const productsKey = ['admin-products', session.tenantId, session.userScope] as const;
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<Product | null>(null);
   const [form, setForm] = useState<ProductFormData>(EMPTY_PRODUCT);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [deleteId, setDeleteId] = useState<string | null>(null);
 
+  useEffect(() => {
+    setModalOpen(false);
+    setEditing(null);
+    setForm(EMPTY_PRODUCT);
+    setErrors({});
+    setDeleteId(null);
+  }, [session.tenantId, session.userScope]);
+
   const query = useQuery<{ success: boolean; data: Product[] }>({
-    queryKey: ['admin-products'],
+    queryKey: productsKey,
     queryFn: () => apiFetch('/api/products'),
   });
 
@@ -44,7 +55,7 @@ export function useProductManager() {
       });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['admin-products'] });
+      queryClient.invalidateQueries({ queryKey: productsKey });
       closeModal();
     },
     onError: (err: Error) => {
@@ -56,7 +67,7 @@ export function useProductManager() {
     mutationFn: (id: string) =>
       apiFetch(`/api/products/${id}`, { method: 'DELETE' }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['admin-products'] });
+      queryClient.invalidateQueries({ queryKey: productsKey });
       setDeleteId(null);
     },
     onError: (err: Error) => {
@@ -82,7 +93,7 @@ export function useProductManager() {
       });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['admin-products'] });
+      queryClient.invalidateQueries({ queryKey: productsKey });
     },
   });
 

@@ -29,6 +29,8 @@ export interface GroupRow {
   name: string;
   type: 'single' | 'multiple';
   required: number;
+  is_required?: number | boolean;
+  min_selections?: number | null;
   is_active?: number | boolean;
   active?: number | boolean;
   tenant_id?: string | null;
@@ -39,10 +41,10 @@ async function matchesRowTenantIfPresent(
   table: 'modifier_choices' | 'modifier_groups' | 'product_modifier_groups',
   whereSql: string,
   bindArgs: unknown[],
-  row: { tenant_id?: string | null },
+  row: { tenant_id?: string | null; group_id?: string | null },
   tenantId?: string,
 ): Promise<boolean> {
-  if (!tenantId || !tenantId.trim() || tenantId.trim() === '*') return true;
+  if (!tenantId || !tenantId.trim() || tenantId.trim() === '*' || tenantId.trim().toLowerCase() === 'hq') return true;
   const normTenant = tenantId.trim() || 'default';
   let rowTenantVal: string | null | undefined = row.tenant_id;
   if (rowTenantVal === undefined) {
@@ -55,10 +57,31 @@ async function matchesRowTenantIfPresent(
         rowTenantVal = probe.tenant_id;
       }
     } catch {
-      return true;
+      // Fall through to parent group probe or fail-closed check
     }
   }
-  if (rowTenantVal === undefined) return true;
+  if (table !== 'modifier_groups' && row.group_id) {
+    try {
+      const groupProbe = await db
+        .prepare('SELECT tenant_id FROM modifier_groups WHERE id = ?')
+        .bind(row.group_id)
+        .first<{ tenant_id?: string | null }>();
+      if (groupProbe && 'tenant_id' in groupProbe && groupProbe.tenant_id !== undefined) {
+        const groupTenant = (groupProbe.tenant_id && String(groupProbe.tenant_id).trim()) || 'default';
+        if (groupTenant !== normTenant) {
+          return false;
+        }
+        if (rowTenantVal === undefined || rowTenantVal === null || String(rowTenantVal).trim() === '') {
+          rowTenantVal = groupProbe.tenant_id;
+        }
+      }
+    } catch {
+      // Fall through to fail-closed check
+    }
+  }
+  if (rowTenantVal === undefined) {
+    return normTenant === 'default';
+  }
   const resolved = (rowTenantVal && String(rowTenantVal).trim()) || 'default';
   return resolved === normTenant;
 }
@@ -88,19 +111,18 @@ export async function fetchModifierChoice(
           if (await matchesRowTenantIfPresent(db, 'modifier_choices', 'id = ?', [row.id], row, tenantId)) {
             return row;
           }
-          if (tenantId && tenantId.trim() && tenantId.trim() !== '*') {
-            const normTenant = tenantId.trim();
+          if (tenantId && tenantId.trim() && tenantId.trim() !== '*' && tenantId.trim().toLowerCase() !== 'hq') {
             const allRes = await db
               .prepare(`SELECT ${cols}, tenant_id FROM modifier_choices WHERE name = ?`)
               .bind(modName)
               .all<ChoiceRow>()
               .catch(() => null);
             const list = (Array.isArray(allRes) ? allRes : allRes?.results || []) as ChoiceRow[];
-            const matched = list.find((r) => {
-              if (!('tenant_id' in r) || r.tenant_id === undefined) return normTenant === 'default';
-              return ((r.tenant_id && String(r.tenant_id).trim()) || 'default') === normTenant;
-            });
-            if (matched) return matched;
+            for (const candidate of list) {
+              if (await matchesRowTenantIfPresent(db, 'modifier_choices', 'id = ?', [candidate.id], candidate, tenantId)) {
+                return candidate;
+              }
+            }
           }
         }
       }
@@ -166,4 +188,78 @@ export async function isGroupLinkedToProduct(
     }
   }
   return false;
+}
+
+export async function fetchRequiredModifierGroupsForProduct(
+  db: D1Like,
+  productIds: string[],
+  tenantId?: string,
+): Promise<GroupRow[]> {
+  const uniqueIds = Array.from(new Set(productIds.filter(Boolean)));
+  if (uniqueIds.length === 0) return [];
+  const seenGroupIds = new Set<string>();
+  const requiredGroups: GroupRow[] = [];
+
+  const queries = [
+    `SELECT mg.id, mg.name, mg.type, mg.required, mg.min_selections, mg.is_active, mg.tenant_id
+     FROM product_modifier_groups pm
+     JOIN modifier_groups mg ON mg.id = pm.group_id
+     WHERE pm.product_id = ?`,
+    `SELECT mg.id, mg.name, mg.type, mg.required, mg.is_active, mg.tenant_id
+     FROM product_modifier_groups pm
+     JOIN modifier_groups mg ON mg.id = pm.group_id
+     WHERE pm.product_id = ?`,
+    `SELECT mg.id, mg.name, mg.type, mg.required, mg.is_active
+     FROM product_modifier_groups pm
+     JOIN modifier_groups mg ON mg.id = pm.group_id
+     WHERE pm.product_id = ?`,
+  ];
+
+  for (const pid of uniqueIds) {
+    for (const sql of queries) {
+      try {
+        const stmt = db.prepare(sql).bind(pid);
+        if (typeof stmt.all !== 'function') break;
+        const res = await stmt.all<GroupRow>();
+        const rows = (Array.isArray(res) ? res : res?.results || []) as GroupRow[];
+        for (const row of rows) {
+          if (!row || !row.id || seenGroupIds.has(row.id)) continue;
+          if (!(await matchesRowTenantIfPresent(db, 'modifier_groups', 'id = ?', [row.id], row, tenantId))) {
+            continue;
+          }
+          if (
+            !(await matchesRowTenantIfPresent(
+              db,
+              'product_modifier_groups',
+              'product_id = ? AND group_id = ?',
+              [pid, row.id],
+              { group_id: row.id },
+              tenantId,
+            ))
+          ) {
+            continue;
+          }
+          const isGroupActive = row.is_active ?? row.active;
+          if (isGroupActive === 0 || isGroupActive === false) continue;
+          const isReq =
+            Number(row.required ?? row.is_required ?? 0) === 1 ||
+            Boolean(row.required) === true ||
+            row.is_required === true;
+          const minSel =
+            row.min_selections !== undefined && row.min_selections !== null
+              ? Number(row.min_selections)
+              : 0;
+          if (isReq || (Number.isFinite(minSel) && minSel > 0)) {
+            seenGroupIds.add(row.id);
+            requiredGroups.push(row);
+          }
+        }
+        break;
+      } catch {
+        // Fallback to narrower query projection or skip when table is absent
+      }
+    }
+  }
+
+  return requiredGroups;
 }

@@ -49,12 +49,42 @@ export interface SopScope {
  * before the multi-store rollout carries no claim, and such a session still
  * belongs to exactly one store.
  */
-function sessionTenantId(user: AuthUser | undefined): string {
-  const claimed = typeof user?.tenantId === 'string' ? user.tenantId.trim() : '';
-  return claimed.length > 0 ? claimed : 'default';
+function sessionTenantId(user: AuthUser | undefined, env?: Env): string {
+  const rawUserTenant = user?.tenantId ?? (user as { tenant_id?: string } | undefined)?.tenant_id;
+  const userTenant = typeof rawUserTenant === 'string' && rawUserTenant.trim().length > 0 ? rawUserTenant.trim() : undefined;
+  const envRecord = env as { SOP_TENANT_ID?: string; PILOT_TENANT_ID?: string } | undefined;
+  const envTenant = envRecord?.SOP_TENANT_ID?.trim() || envRecord?.PILOT_TENANT_ID?.trim() || undefined;
+  if (userTenant === '*' || (!userTenant && envTenant === '*')) {
+    return '*';
+  }
+  return userTenant || envTenant || 'default';
 }
 
-export function sopScope(env: Env, user: AuthUser | undefined): SopScope {
+export function sopScope(
+  env: Env,
+  user?: AuthUser | undefined,
+  requestOrTenantOverride?:
+    | string
+    | { req?: { query?: (_k: string) => string | undefined; header?: (_k: string) => string | undefined } }
+): SopScope {
+  const maybeCtx = env as unknown as {
+    env?: Env;
+    get?: (_k: string) => AuthUser | undefined;
+    req?: { query?: (_k: string) => string | undefined; header?: (_k: string) => string | undefined };
+  };
+  if (typeof maybeCtx?.get === 'function' && maybeCtx?.env !== undefined && user === undefined) {
+    return Promise.resolve().then(() => {
+      const ctxUser = maybeCtx.get!('user');
+      const enrichedEnv = {
+        ...(maybeCtx.env as Record<string, unknown>),
+        SOP_TENANT_ID:
+          (maybeCtx.env as { SOP_TENANT_ID?: string; PILOT_TENANT_ID?: string })?.SOP_TENANT_ID ||
+          (maybeCtx.env as { PILOT_TENANT_ID?: string })?.PILOT_TENANT_ID ||
+          'default',
+      } as unknown as Env;
+      return sopScope(enrichedEnv, ctxUser, maybeCtx);
+    }) as unknown as SopScope;
+  }
   if (!user?.id) throw new SopAccessError('Staff authentication required', 401);
 
   const role = String(user.role ?? '');
@@ -62,9 +92,64 @@ export function sopScope(env: Env, user: AuthUser | undefined): SopScope {
     throw new SopAccessError('Staff role required', 403);
   }
 
-  const configured = (env as { SOP_TENANT_ID?: string }).SOP_TENANT_ID?.trim();
-  const tenantId = configured && configured.length > 0 ? configured : sessionTenantId(user);
-  if (tenantId === '*') {
+  const rawUserTenant = user?.tenantId ?? (user as { tenant_id?: string } | undefined)?.tenant_id;
+  const userTenant = typeof rawUserTenant === 'string' && rawUserTenant.trim().length > 0 ? rawUserTenant.trim() : undefined;
+  const envRecord = env as { SOP_TENANT_ID?: string; PILOT_TENANT_ID?: string } | undefined;
+  const envTenant = envRecord?.SOP_TENANT_ID?.trim() || envRecord?.PILOT_TENANT_ID?.trim() || undefined;
+  const concreteEnvTenant =
+    envTenant && envTenant !== '*' && envTenant.toLowerCase() !== 'hq' ? envTenant : undefined;
+  const isHq =
+    (role === 'owner' || role === 'admin') &&
+    (!userTenant || userTenant === 'default' || userTenant.toLowerCase() === 'hq' || userTenant === '*');
+  if (
+    !isHq &&
+    (userTenant === '*' ||
+      userTenant?.toLowerCase() === 'hq' ||
+      (!userTenant && (envTenant === '*' || envTenant?.toLowerCase() === 'hq')))
+  ) {
+    throw new SopAccessError('Invalid tenant scope', 403);
+  }
+
+  let rawOverride = '';
+  if (typeof requestOrTenantOverride === 'string') {
+    rawOverride = requestOrTenantOverride.trim();
+  } else {
+    const candidateOverrides = [
+      requestOrTenantOverride?.req?.query?.('tenant_id'),
+      requestOrTenantOverride?.req?.query?.('tenantId'),
+      requestOrTenantOverride?.req?.query?.('store_id'),
+      requestOrTenantOverride?.req?.query?.('storeId'),
+      requestOrTenantOverride?.req?.header?.('X-Tenant-ID'),
+      requestOrTenantOverride?.req?.header?.('x-tenant-id'),
+      requestOrTenantOverride?.req?.header?.('X-Store-ID'),
+      requestOrTenantOverride?.req?.header?.('x-store-id'),
+      (user as { headerTenantId?: string; requestedTenantId?: string } | undefined)?.headerTenantId,
+      (user as { requestedTenantId?: string } | undefined)?.requestedTenantId,
+    ]
+      .map((v) => (typeof v === 'string' ? v.trim() : ''))
+      .filter(Boolean);
+    if (new Set(candidateOverrides).size > 1) {
+      throw new SopAccessError('Cross-tenant access denied', 403);
+    }
+    rawOverride = candidateOverrides[0] || '';
+  }
+  const explicitOverride = rawOverride;
+  const boundTenant = sessionTenantId(user, env);
+  if (explicitOverride) {
+    if (explicitOverride === '*' || explicitOverride.toLowerCase() === 'hq') {
+      throw new SopAccessError('Invalid tenant scope', 403);
+    }
+    if (!isHq && explicitOverride !== boundTenant) {
+      throw new SopAccessError('Cross-tenant access denied', 403);
+    }
+  }
+
+  const fallbackBoundTenant =
+    isHq && (boundTenant === '*' || boundTenant.toLowerCase() === 'hq') && concreteEnvTenant
+      ? concreteEnvTenant
+      : boundTenant;
+  const tenantId = isHq && explicitOverride ? explicitOverride : fallbackBoundTenant;
+  if (tenantId === '*' || tenantId.toLowerCase() === 'hq') {
     throw new SopAccessError('Invalid tenant scope', 403);
   }
 

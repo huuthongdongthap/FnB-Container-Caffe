@@ -12,7 +12,7 @@
 import type { MiddlewareHandler } from 'hono';
 import type { ExecutionContext } from 'hono';
 import type { D1Database } from '@cloudflare/workers-types';
-import { writeCanonicalAuditLog } from '@aura/domain-audit';
+import { buildCanonicalAuditRecord } from '@aura/domain-audit';
 
 // ── Types ──
 
@@ -28,6 +28,7 @@ export interface AuditEntry {
   resource_id?: string;
   details?: string;
   ip_address?: string;
+  tenant_id?: string;
   created_at: string;
 }
 
@@ -39,11 +40,17 @@ export interface AuditQueryFilters {
   dateTo?: string;
   page?: number;
   pageSize?: number;
+  maxPageSize?: number;
+  tenantId?: string;
 }
 
-export interface AuditQueryResult {
+export type AuditQueryResult = {
   rows: AuditEntry[];
   total: number;
+} & AuditEntry[];
+
+export function toAuditQueryResult(rows: AuditEntry[], total: number): AuditQueryResult {
+  return Object.assign([...rows], { rows, total });
 }
 
 // ── AuditLogger Class ──
@@ -56,10 +63,21 @@ export interface AuditQueryResult {
  * All INSERTs run via ctx.waitUntil so request latency is unaffected.
  */
 export class AuditLogger {
-  constructor(
-    private ctx: ExecutionContext,
-    private db: D1Database
-  ) {}
+  private ctx?: ExecutionContext;
+  private db: D1Database;
+
+  constructor(ctxOrDb: ExecutionContext | D1Database, maybeDb?: D1Database) {
+    if (maybeDb) {
+      this.ctx = ctxOrDb as ExecutionContext;
+      this.db = maybeDb;
+    } else if (ctxOrDb && typeof (ctxOrDb as D1Database).prepare === 'function') {
+      this.ctx = undefined;
+      this.db = ctxOrDb as D1Database;
+    } else {
+      this.ctx = ctxOrDb as ExecutionContext;
+      this.db = maybeDb as unknown as D1Database;
+    }
+  }
 
   /**
    * Ghi một bản ghi audit vào D1 (bất đồng bộ qua waitUntil)
@@ -79,15 +97,71 @@ export class AuditLogger {
             parsedDetails = { raw: entry.details };
           }
         }
+        const rawTenant =
+          entry.tenant_id ??
+          (typeof parsedDetails?.tenant_id === 'string' ? parsedDetails.tenant_id : undefined) ??
+          (typeof parsedDetails?.tenantId === 'string' ? parsedDetails.tenantId : undefined);
+        const resolvedTenant = (typeof rawTenant === 'string' && rawTenant.trim() ? rawTenant.trim() : 'default');
 
-        await writeCanonicalAuditLog(this.db, {
-          actor: { id: entry.actor_id, name: entry.actor_name },
+        const record = buildCanonicalAuditRecord({
+          actor: { id: entry.actor_id, name: entry.actor_name, tenantId: resolvedTenant },
           action: entry.action,
           resourceType: entry.resource_type,
           resourceId: entry.resource_id,
+          tenantId: resolvedTenant,
           metadata: parsedDetails || undefined,
           ipAddress: entry.ip_address,
-        }, { policy: 'best_effort' });
+        });
+
+        try {
+          await this.db.prepare(
+            `INSERT INTO audit_logs (
+              id, actor_id, actor_name, user_id, action,
+              resource_type, resource_id, entity_type, entity_id,
+              operating_unit_id, tenant_id, status, details, metadata,
+              correlation_id, ip_address, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+          ).bind(
+            record.id, record.actor_id, record.actor_name, record.user_id, record.action,
+            record.resource_type, record.resource_id, record.entity_type, record.entity_id,
+            record.operating_unit_id, record.tenant_id, record.status, record.details, record.metadata,
+            record.correlation_id, record.ip_address, record.created_at
+          ).run();
+        } catch {
+          try {
+            await this.db.prepare(
+              `INSERT INTO audit_logs (
+                actor_id, actor_name, action, resource_type, resource_id, details, ip_address, tenant_id, created_at
+              ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+            ).bind(
+              entry.actor_id,
+              entry.actor_name,
+              entry.action,
+              entry.resource_type,
+              entry.resource_id ?? null,
+              entry.details ?? record.details,
+              entry.ip_address ?? null,
+              resolvedTenant,
+              record.created_at
+            ).run();
+          } catch {
+            const fallbackDetails = `[tenant:${resolvedTenant}] ${entry.details || ''}`.trim();
+            await this.db.prepare(
+              `INSERT INTO audit_logs (
+                actor_id, actor_name, action, resource_type, resource_id, details, ip_address, created_at
+              ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+            ).bind(
+              entry.actor_id,
+              entry.actor_name,
+              entry.action,
+              entry.resource_type,
+              entry.resource_id ?? null,
+              fallbackDetails,
+              entry.ip_address ?? null,
+              record.created_at
+            ).run();
+          }
+        }
       } catch {
         // Ghi log không quan trọng — không làm crash request
         // Audit logging is best-effort — never crash the request
@@ -139,13 +213,59 @@ export class AuditLogger {
       params.push(filters.dateTo);
     }
 
+    const page = Math.max(1, filters.page ?? 1);
+    const maxPageSize = Math.max(1, filters.maxPageSize ?? 100);
+    const pageSize = Math.min(maxPageSize, Math.max(1, filters.pageSize ?? 20));
+    const offset = (page - 1) * pageSize;
+
+    const rawFilterTenant = typeof filters.tenantId === 'string' ? filters.tenantId.trim() : '';
+    const cleanTenant = !rawFilterTenant
+      ? 'default'
+      : rawFilterTenant.toLowerCase() === 'hq'
+        ? '*'
+        : rawFilterTenant;
+    if (cleanTenant && cleanTenant !== '*') {
+      try {
+        const scopedConditions = [
+          ...conditions,
+          "(COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ? OR json_extract(details, '$.tenant_id') = ? OR json_extract(details, '$.tenantId') = ?)",
+        ];
+        const scopedParams = [...params, cleanTenant, cleanTenant, cleanTenant];
+        const scopedWhere = `WHERE ${scopedConditions.join(' AND ')}`;
+        const countRow = await this.db.prepare(
+          `SELECT COUNT(*) as total FROM audit_logs ${scopedWhere}`
+        ).bind(...scopedParams).first<{ total: number }>();
+        const { results } = await this.db.prepare(
+          `SELECT * FROM audit_logs ${scopedWhere} ORDER BY created_at DESC LIMIT ? OFFSET ?`
+        ).bind(...scopedParams, pageSize, offset).all<AuditEntry>();
+        return toAuditQueryResult((results ?? []) as AuditEntry[], countRow?.total ?? 0);
+      } catch {
+        try {
+          const scopedConditions = [
+            ...conditions,
+            "COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?",
+          ];
+          const scopedParams = [...params, cleanTenant];
+          const scopedWhere = `WHERE ${scopedConditions.join(' AND ')}`;
+          const countRow = await this.db.prepare(
+            `SELECT COUNT(*) as total FROM audit_logs ${scopedWhere}`
+          ).bind(...scopedParams).first<{ total: number }>();
+          const { results } = await this.db.prepare(
+            `SELECT * FROM audit_logs ${scopedWhere} ORDER BY created_at DESC LIMIT ? OFFSET ?`
+          ).bind(...scopedParams, pageSize, offset).all<AuditEntry>();
+          return toAuditQueryResult((results ?? []) as AuditEntry[], countRow?.total ?? 0);
+        } catch (err) {
+          const msg = String((err as Error)?.message ?? err);
+          if (cleanTenant !== 'default' || !/no such column:\s*tenant_id/i.test(msg)) {
+            return toAuditQueryResult([], 0);
+          }
+        }
+      }
+    }
+
     const whereClause = conditions.length > 0
       ? `WHERE ${conditions.join(' AND ')}`
       : '';
-
-    const page = Math.max(1, filters.page ?? 1);
-    const pageSize = Math.min(100, Math.max(1, filters.pageSize ?? 20));
-    const offset = (page - 1) * pageSize;
 
     // Tổng số — total count
     const countRow = await this.db.prepare(
@@ -159,10 +279,7 @@ export class AuditLogger {
       `SELECT * FROM audit_logs ${whereClause} ORDER BY created_at DESC LIMIT ? OFFSET ?`
     ).bind(...dataParams).all<AuditEntry>();
 
-    return {
-      rows: (results ?? []) as AuditEntry[],
-      total
-    };
+    return toAuditQueryResult((results ?? []) as AuditEntry[], total);
   }
 
   /**
@@ -173,8 +290,27 @@ export class AuditLogger {
    *                        Retention period in days (default 90)
    * @returns Số bản ghi đã xoá / Number of deleted rows
    */
-  async prune(retentionDays: number = 90): Promise<{ deleted: number }> {
+  async prune(retentionDays: number = 90, tenantId: string = 'default'): Promise<{ deleted: number }> {
+    const rawTenant = typeof tenantId === 'string' ? tenantId.trim() : '';
+    const cleanTenant = !rawTenant
+      ? 'default'
+      : rawTenant.toLowerCase() === 'hq'
+        ? '*'
+        : rawTenant;
     try {
+      if (cleanTenant && cleanTenant !== '*') {
+        try {
+          const scopedResult = await this.db.prepare(
+            "DELETE FROM audit_logs WHERE created_at < datetime('now', ?) AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
+          ).bind(`-${retentionDays} days`, cleanTenant).run();
+          return { deleted: scopedResult.meta?.changes ?? 0 };
+        } catch (err) {
+          const msg = String((err as Error)?.message ?? err);
+          if (cleanTenant !== 'default' || !/no such column:\s*tenant_id/i.test(msg)) {
+            return { deleted: 0 };
+          }
+        }
+      }
       const result = await this.db.prepare(
         'DELETE FROM audit_logs WHERE created_at < datetime(\'now\', ?)'
       ).bind(`-${retentionDays} days`).run();
@@ -224,7 +360,7 @@ export function createAuditMiddleware(): MiddlewareHandler<{ Bindings: { AURA_DB
     await next();
 
     try {
-      const user = c.get('user') as { id?: string; name?: string } | undefined;
+      const user = c.get('user') as { id?: string; name?: string; role?: string; tenantId?: string; tenant_id?: string } | undefined;
       if (!user?.id) {
         return;
       }
@@ -254,6 +390,30 @@ export function createAuditMiddleware(): MiddlewareHandler<{ Bindings: { AURA_DB
 
       // Rút gọn path thành resource type / Derive resource type from path
       const resourceType = path.replace(/^\/api\//, '').split('/')[0] || 'unknown';
+      const ctxTenant = c.get('tenantId' as never) as string | undefined;
+      const rawUserTenant = String(user.tenantId ?? user.tenant_id ?? '').trim();
+      const isHqAdmin =
+        (user.role === 'owner' || user.role === 'admin') &&
+        (rawUserTenant.toLowerCase() === 'hq' || rawUserTenant === '*');
+      const headerTenant =
+        c.req.header('X-Tenant-ID') ||
+        c.req.header('x-tenant-id') ||
+        c.req.header('X-Store-ID') ||
+        c.req.header('x-store-id') ||
+        '';
+      const rawTenant = isHqAdmin
+        ? (
+            (ctxTenant && ctxTenant !== '*' && ctxTenant.toLowerCase() !== 'hq' ? ctxTenant : undefined) ||
+            (headerTenant && headerTenant !== '*' && headerTenant.toLowerCase() !== 'hq' ? headerTenant : undefined) ||
+            rawUserTenant ||
+            'default'
+          )
+        : (
+            (rawUserTenant && rawUserTenant !== '*' && rawUserTenant.toLowerCase() !== 'hq' ? rawUserTenant : undefined) ||
+            (ctxTenant && ctxTenant !== '*' && ctxTenant.toLowerCase() !== 'hq' ? ctxTenant : undefined) ||
+            'default'
+          );
+      const resolvedTenant = String(rawTenant).trim() || 'default';
 
       const entry: Omit<AuditEntry, 'created_at'> = {
         actor_id: user.id!,
@@ -261,7 +421,8 @@ export function createAuditMiddleware(): MiddlewareHandler<{ Bindings: { AURA_DB
         action: `${actionPrefix}.${method.toLowerCase()}`,
         resource_type: resourceType,
         resource_id: c.req.param('id') ?? undefined,
-        details: JSON.stringify({ path, method }),
+        tenant_id: resolvedTenant,
+        details: JSON.stringify({ path, method, tenant_id: resolvedTenant }),
         ip_address: c.req.header('cf-connecting-ip') ?? undefined
       };
 

@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useClientSessionScope } from '@/lib/client-session';
 import { apiFetch } from './menu-api';
 import type { ProductModifierLink } from './types';
 
@@ -13,8 +14,9 @@ import type { ProductModifierLink } from './types';
 
 /** Groups linked to one product, per the link endpoint's response shape. */
 export function useProductGroups(productId: string | null) {
+  const session = useClientSessionScope();
   return useQuery<{ success: boolean; data: ProductModifierLink[] }>({
-    queryKey: ['admin-product-groups', productId],
+    queryKey: ['admin-product-groups', session.tenantId, session.userScope, productId],
     queryFn: () => apiFetch(`/api/menu-modifiers/products/${productId}/groups`),
     enabled: productId !== null,
   });
@@ -22,14 +24,22 @@ export function useProductGroups(productId: string | null) {
 
 export function useModifierLinkEditor() {
   const queryClient = useQueryClient();
+  const session = useClientSessionScope();
   const [productId, setProductId] = useState<string>('');
   const [errors, setErrors] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    setProductId('');
+    setErrors({});
+  }, [session.tenantId, session.userScope]);
 
   const productGroupsQuery = useProductGroups(productId || null);
   const linkedGroupIds = new Set((productGroupsQuery.data?.data ?? []).map((l) => l.group_id));
 
   function invalidateLinks() {
-    queryClient.invalidateQueries({ queryKey: ['admin-product-groups'] });
+    queryClient.invalidateQueries({
+      queryKey: ['admin-product-groups', session.tenantId, session.userScope],
+    });
   }
 
   const linkMutation = useMutation({

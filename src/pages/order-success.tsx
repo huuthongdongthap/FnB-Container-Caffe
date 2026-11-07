@@ -23,7 +23,7 @@
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { useEffect, useCallback, useMemo } from 'react';
 import { HelmetHead } from '@/components/seo/HelmetHead';
-import { useOrderStoreWithOfflineFlush } from '@/hooks/stores/use-order-store';
+import { useOrderObservation } from '@/hooks/use-order-observation';
 import { useCartStore } from '@/hooks/stores/use-cart-store';
 import { useToast } from '@/components/ui/toast';
 import { StitchOrderSuccessNew, type OrderSuccessNewData } from '@/components/stitch/StitchOrderSuccessNew';
@@ -47,15 +47,15 @@ export function OrderSuccessPage(_props: Readonly<OrderSuccessPageProps>) {
   const orderId = searchParams.get('order_id');
   const POLL_TIMEOUT_MS = 10 * 60 * 1000; // 10 min
 
-  const { currentOrder, loading, error, fetchOrder, subscribeToOrder, unsubscribeFromOrder } =
-    useOrderStoreWithOfflineFlush();
+  const { currentOrder, matchedOrder, loading, error, refresh: handleRetry } =
+    useOrderObservation(orderId, { timeoutMs: POLL_TIMEOUT_MS });
 
   useEffect(() => {
-    if (orderId && currentOrder?.id === orderId
-      && ['paid', 'completed', 'refunded', 'partially_refunded'].includes(currentOrder.paymentStatus)) {
+    if (orderId && matchedOrder
+      && ['paid', 'completed', 'refunded', 'partially_refunded'].includes(matchedOrder.paymentStatus)) {
       acknowledgeCheckoutOrder(orderId);
     }
-  }, [orderId, currentOrder?.id, currentOrder?.paymentStatus]);
+  }, [orderId, matchedOrder]);
 
   // Remove legacy order caches; confirmation details always come from the order API.
   useEffect(() => {
@@ -68,30 +68,6 @@ export function OrderSuccessPage(_props: Readonly<OrderSuccessPageProps>) {
     // Ensure cart is cleared after completed order checkout
     useCartStore.getState().clearCart();
   }, []);
-
-  // Subscribe to SSE for real-time updates
-  useEffect(() => {
-    if (!orderId) return;
-
-    fetchOrder(orderId);
-    subscribeToOrder(orderId);
-
-    const timeout = setTimeout(() => {
-      unsubscribeFromOrder();
-    }, POLL_TIMEOUT_MS);
-
-    return () => {
-      clearTimeout(timeout);
-      unsubscribeFromOrder();
-    };
-  }, [orderId, fetchOrder, subscribeToOrder, unsubscribeFromOrder]);
-
-  const handleRetry = useCallback(() => {
-    if (orderId) {
-      fetchOrder(orderId);
-      subscribeToOrder(orderId);
-    }
-  }, [orderId, fetchOrder, subscribeToOrder]);
 
   // Navigation callbacks for StitchOrderSuccessNew
   const handleBack = useCallback(() => {
@@ -131,11 +107,11 @@ export function OrderSuccessPage(_props: Readonly<OrderSuccessPageProps>) {
     navigate('/menu');
   }, [currentOrder, clearCart, addItem, showToast, navigate]);
 
-  const orderForDisplay = currentOrder?.id === orderId && currentOrder.items.length > 0
-    ? currentOrder
+  const orderForDisplay = matchedOrder && matchedOrder.items.length > 0
+    ? matchedOrder
     : null;
   const missingOrderItems = Boolean(
-    orderId && currentOrder?.id === orderId && currentOrder.items.length === 0 && !loading
+    orderId && matchedOrder && matchedOrder.items.length === 0 && !loading
   );
   const orderLoadError = error || (missingOrderItems
     ? 'Không tải được chi tiết món trong đơn. Vui lòng thử lại.'

@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiFetch } from '@/lib/api-client';
+import { useClientSessionScope } from '@/lib/client-session';
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -73,8 +74,9 @@ export interface Invoice {
 // ── Invoices ──────────────────────────────────────────────────────────
 
 export function useMyInvoices() {
+  const session = useClientSessionScope();
   return useQuery<Invoice[]>({
-    queryKey: ['my-invoices'],
+    queryKey: ['my-invoices', session.tenantId, session.userScope],
     queryFn: async () => {
       try {
         const res = await apiFetch<ApiListResponse<Invoice>>('/api/subscriptions/invoices/list');
@@ -104,8 +106,9 @@ export interface CreateSubscriptionInput {
 // ── Queries ──────────────────────────────────────────────────────────
 
 export function usePlans() {
+  const session = useClientSessionScope();
   return useQuery<Plan[]>({
-    queryKey: ['subscription-plans'],
+    queryKey: ['subscription-plans', session.tenantId],
     queryFn: async () => {
       const res = await apiFetch<ApiListResponse<Plan>>('/api/subscriptions/plans');
       return res.data;
@@ -115,8 +118,9 @@ export function usePlans() {
 }
 
 export function useMySubscriptions() {
+  const session = useClientSessionScope();
   return useQuery<Subscription[]>({
-    queryKey: ['my-subscriptions'],
+    queryKey: ['my-subscriptions', session.tenantId, session.userScope],
     queryFn: async () => {
       const res = await apiFetch<ApiListResponse<Subscription>>('/api/subscriptions');
       return res.data;
@@ -138,6 +142,7 @@ export function useMyActiveSubscription() {
 
 export function useSubscribe() {
   const queryClient = useQueryClient();
+  const session = useClientSessionScope();
 
   return useMutation({
     mutationFn: async (input: CreateSubscriptionInput) => {
@@ -151,14 +156,15 @@ export function useSubscribe() {
       return res.data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['my-subscriptions'] });
-      queryClient.invalidateQueries({ queryKey: ['subscription-plans'] });
+      queryClient.invalidateQueries({ queryKey: ['my-subscriptions', session.tenantId, session.userScope] });
+      queryClient.invalidateQueries({ queryKey: ['subscription-plans', session.tenantId] });
     },
   });
 }
 
 export function useCancelSubscription() {
   const queryClient = useQueryClient();
+  const session = useClientSessionScope();
 
   return useMutation({
     mutationFn: async ({ id, reason }: { id: string; reason?: string }) => {
@@ -171,7 +177,7 @@ export function useCancelSubscription() {
       );
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['my-subscriptions'] });
+      queryClient.invalidateQueries({ queryKey: ['my-subscriptions', session.tenantId, session.userScope] });
     },
   });
 }

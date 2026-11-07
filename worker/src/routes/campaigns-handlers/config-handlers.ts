@@ -1,7 +1,7 @@
 import type { Hono } from 'hono';
 import type { CampaignTrigger, CampaignChannel } from '@aura/domain-crm';
 import { campaignConfigSchema, zodErrorResponse } from '../../lib/validators';
-import { getTenantId } from '../../middleware/tenant';
+import { getTenantId, matchesTenantRow } from '../../middleware/tenant';
 import type { Env } from '../../types/env';
 import {
   ALL_TRIGGERS,
@@ -82,7 +82,8 @@ export function registerCampaignConfigHandlers(router: Hono<{ Bindings: Env }>):
   // GET /api/campaigns — list all campaign configs with defaults for missing entries
   router.get('/', async (c) => {
     const db = c.env.AURA_DB;
-    const tenantId = getTenantId(c as any).trim() || 'default';
+    const rawTenant = getTenantId(c as any).trim() || 'default';
+    const tenantId = rawTenant.toLowerCase() === 'hq' ? '*' : rawTenant;
 
     if (tenantId !== 'default' && tenantId !== '*') {
       const all = await seedTenantCampaignDefaults(db, tenantId);
@@ -94,10 +95,12 @@ export function registerCampaignConfigHandlers(router: Hono<{ Bindings: Env }>):
       const res = await db.prepare(
         "SELECT * FROM campaign_configs WHERE (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?) ORDER BY trigger"
       ).bind(tenantId, tenantId).all<CampaignConfig>();
-      existing = res.results || [];
+      existing = (res.results || []).filter((r) => matchesTenantRow(r as unknown as Record<string, unknown>, tenantId));
     } catch {
-      const res = await db.prepare('SELECT * FROM campaign_configs ORDER BY trigger').all<CampaignConfig>();
-      existing = res.results || [];
+      if (tenantId === 'default') {
+        const res = await db.prepare('SELECT * FROM campaign_configs ORDER BY trigger').all<CampaignConfig>();
+        existing = (res.results || []).filter((r) => matchesTenantRow(r as unknown as Record<string, unknown>, tenantId));
+      }
     }
     const existingMap = new Map(existing.map((r) => [r.trigger, r]));
     const now = new Date().toISOString();
@@ -110,9 +113,11 @@ export function registerCampaignConfigHandlers(router: Hono<{ Bindings: Env }>):
             'INSERT OR IGNORE INTO campaign_configs (trigger, is_active, channels, timing, tenant_id, updated_at) VALUES (?, 1, ?, ?, ?, ?)'
           ).bind(trigger, JSON.stringify(meta.default_channels), meta.timing_hint, writeTenant, now).run();
         } catch {
-          await db.prepare(
-            'INSERT OR IGNORE INTO campaign_configs (trigger, is_active, channels, timing, updated_at) VALUES (?, 1, ?, ?, ?)'
-          ).bind(trigger, JSON.stringify(meta.default_channels), meta.timing_hint, now).run();
+          if (tenantId === 'default') {
+            await db.prepare(
+              'INSERT OR IGNORE INTO campaign_configs (trigger, is_active, channels, timing, updated_at) VALUES (?, 1, ?, ?, ?)'
+            ).bind(trigger, JSON.stringify(meta.default_channels), meta.timing_hint, now).run();
+          }
         }
       }
     }
@@ -122,10 +127,12 @@ export function registerCampaignConfigHandlers(router: Hono<{ Bindings: Env }>):
       const res = await db.prepare(
         "SELECT * FROM campaign_configs WHERE (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?) ORDER BY trigger"
       ).bind(tenantId, tenantId).all<CampaignConfig>();
-      all = res.results || [];
+      all = (res.results || []).filter((r) => matchesTenantRow(r as unknown as Record<string, unknown>, tenantId));
     } catch {
-      const res = await db.prepare('SELECT * FROM campaign_configs ORDER BY trigger').all<CampaignConfig>();
-      all = res.results || [];
+      if (tenantId === 'default') {
+        const res = await db.prepare('SELECT * FROM campaign_configs ORDER BY trigger').all<CampaignConfig>();
+        all = (res.results || []).filter((r) => matchesTenantRow(r as unknown as Record<string, unknown>, tenantId));
+      }
     }
     return c.json({ success: true, data: all.map(enrichRow) });
   });
@@ -133,7 +140,8 @@ export function registerCampaignConfigHandlers(router: Hono<{ Bindings: Env }>):
   // GET /api/campaigns/:trigger — single config
   router.get('/:trigger', async (c) => {
     const db = c.env.AURA_DB;
-    const tenantId = getTenantId(c as any).trim() || 'default';
+    const rawTenant = getTenantId(c as any).trim() || 'default';
+    const tenantId = rawTenant.toLowerCase() === 'hq' ? '*' : rawTenant;
     const trigger = c.req.param('trigger') as CampaignTrigger;
 
     if (tenantId !== 'default' && tenantId !== '*') {
@@ -154,9 +162,13 @@ export function registerCampaignConfigHandlers(router: Hono<{ Bindings: Env }>):
         "SELECT * FROM campaign_configs WHERE trigger = ? AND (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?)"
       ).bind(trigger, tenantId, tenantId).first<CampaignConfig>();
     } catch {
-      row = await db.prepare('SELECT * FROM campaign_configs WHERE trigger = ?').bind(trigger).first<CampaignConfig>();
+      if (tenantId === 'default') {
+        row = await db.prepare('SELECT * FROM campaign_configs WHERE trigger = ?').bind(trigger).first<CampaignConfig>();
+      }
     }
-    if (!row) return c.json({ success: false, error: 'Khong tim thay chien dich' }, 404);
+    if (!row || !matchesTenantRow(row as unknown as Record<string, unknown>, tenantId)) {
+      return c.json({ success: false, error: 'Khong tim thay chien dich' }, 404);
+    }
     return c.json({ success: true, data: enrichRow(row) });
   });
 
@@ -167,7 +179,11 @@ export function registerCampaignConfigHandlers(router: Hono<{ Bindings: Env }>):
       return c.json({ success: false, error: 'Forbidden' }, 403);
     }
     const db = c.env.AURA_DB;
-    const tenantId = getTenantId(c as any).trim() || 'default';
+    const rawTenant = getTenantId(c as any).trim() || 'default';
+    const tenantId = rawTenant.toLowerCase() === 'hq' ? '*' : rawTenant;
+    if (tenantId === '*') {
+      return c.json({ success: false, error: 'Concrete tenant context required for campaign config modification' }, 400);
+    }
     const trigger = c.req.param('trigger') as CampaignTrigger;
 
     if (!ALL_TRIGGERS.includes(trigger)) {
@@ -179,7 +195,7 @@ export function registerCampaignConfigHandlers(router: Hono<{ Bindings: Env }>):
     if (!parsed.success) return zodErrorResponse(c, parsed.error);
     const body = parsed.data;
 
-    if (tenantId !== 'default' && tenantId !== '*') {
+    if (tenantId !== 'default') {
       await ensureTenantCampaignTable(db);
       const selectSql = 'SELECT trigger, is_active, channels, timing, updated_at FROM tenant_campaign_configs WHERE (tenant_id = ? OR TRIM(tenant_id) = ?1) AND trigger = ?';
       let existing = await db.prepare(selectSql).bind(tenantId, trigger).first<CampaignConfig>();
@@ -203,32 +219,40 @@ export function registerCampaignConfigHandlers(router: Hono<{ Bindings: Env }>):
     let existing: CampaignConfig | null = null;
     try {
       existing = await db.prepare(
-        "SELECT * FROM campaign_configs WHERE trigger = ? AND (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?)"
-      ).bind(trigger, tenantId, tenantId).first<CampaignConfig>();
+        "SELECT * FROM campaign_configs WHERE trigger = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
+      ).bind(trigger, tenantId).first<CampaignConfig>();
     } catch {
-      existing = await db.prepare('SELECT * FROM campaign_configs WHERE trigger = ?').bind(trigger).first<CampaignConfig>();
+      if (tenantId === 'default') {
+        existing = await db.prepare('SELECT * FROM campaign_configs WHERE trigger = ?').bind(trigger).first<CampaignConfig>();
+      }
     }
-    if (!existing) return c.json({ success: false, error: 'Khong tim thay chien dich' }, 404);
+    if (!existing || !matchesTenantRow(existing as unknown as Record<string, unknown>, tenantId)) {
+      return c.json({ success: false, error: 'Khong tim thay chien dich' }, 404);
+    }
 
     const isActive = body.is_active !== undefined ? body.is_active : existing.is_active;
     const channels = resolveUpdatedChannels(body.channels, existing.channels);
     const now = new Date().toISOString();
     try {
       await db.prepare(
-        "UPDATE campaign_configs SET is_active = ?, channels = ?, updated_at = ? WHERE trigger = ? AND (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?)"
-      ).bind(isActive, channels, now, trigger, tenantId, tenantId).run();
+        "UPDATE campaign_configs SET is_active = ?, channels = ?, updated_at = ? WHERE trigger = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
+      ).bind(isActive, channels, now, trigger, tenantId).run();
     } catch {
-      await db.prepare('UPDATE campaign_configs SET is_active = ?, channels = ?, updated_at = ? WHERE trigger = ?')
-        .bind(isActive, channels, now, trigger).run();
+      if (tenantId === 'default') {
+        await db.prepare('UPDATE campaign_configs SET is_active = ?, channels = ?, updated_at = ? WHERE trigger = ?')
+          .bind(isActive, channels, now, trigger).run();
+      }
     }
 
     let updated: CampaignConfig | null = null;
     try {
       updated = await db.prepare(
-        "SELECT * FROM campaign_configs WHERE trigger = ? AND (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?)"
-      ).bind(trigger, tenantId, tenantId).first<CampaignConfig>();
+        "SELECT * FROM campaign_configs WHERE trigger = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
+      ).bind(trigger, tenantId).first<CampaignConfig>();
     } catch {
-      updated = await db.prepare('SELECT * FROM campaign_configs WHERE trigger = ?').bind(trigger).first<CampaignConfig>();
+      if (tenantId === 'default') {
+        updated = await db.prepare('SELECT * FROM campaign_configs WHERE trigger = ?').bind(trigger).first<CampaignConfig>();
+      }
     }
     return c.json({ success: true, data: enrichRow(updated!) });
   });
@@ -240,14 +264,18 @@ export function registerCampaignConfigHandlers(router: Hono<{ Bindings: Env }>):
       return c.json({ success: false, error: 'Forbidden' }, 403);
     }
     const db = c.env.AURA_DB;
-    const tenantId = getTenantId(c as any).trim() || 'default';
+    const rawTenant = getTenantId(c as any).trim() || 'default';
+    const tenantId = rawTenant.toLowerCase() === 'hq' ? '*' : rawTenant;
+    if (tenantId === '*') {
+      return c.json({ success: false, error: 'Concrete tenant context required for campaign config modification' }, 400);
+    }
     const trigger = c.req.param('trigger') as CampaignTrigger;
 
     if (!ALL_TRIGGERS.includes(trigger)) {
       return c.json({ success: false, error: 'Loai chien dich khong hop le' }, 400);
     }
 
-    if (tenantId !== 'default' && tenantId !== '*') {
+    if (tenantId !== 'default') {
       await ensureTenantCampaignTable(db);
       await db.prepare('DELETE FROM tenant_campaign_configs WHERE (tenant_id = ? OR TRIM(tenant_id) = ?1) AND trigger = ?').bind(tenantId, trigger).run();
       return c.json({ success: true, data: null });
@@ -255,10 +283,12 @@ export function registerCampaignConfigHandlers(router: Hono<{ Bindings: Env }>):
 
     try {
       await db.prepare(
-        "DELETE FROM campaign_configs WHERE trigger = ? AND (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?)"
-      ).bind(trigger, tenantId, tenantId).run();
+        "DELETE FROM campaign_configs WHERE trigger = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
+      ).bind(trigger, tenantId).run();
     } catch {
-      await db.prepare('DELETE FROM campaign_configs WHERE trigger = ?').bind(trigger).run();
+      if (tenantId === 'default') {
+        await db.prepare('DELETE FROM campaign_configs WHERE trigger = ?').bind(trigger).run();
+      }
     }
     return c.json({ success: true, data: null });
   });

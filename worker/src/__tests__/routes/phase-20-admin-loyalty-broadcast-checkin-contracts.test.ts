@@ -272,7 +272,10 @@ describe('Phase 20: Admin Loyalty, Broadcast, Checkin & Subscriptions Contracts'
       };
 
       const ctx: any = {
-        req: { query: vi.fn().mockReturnValue(null) },
+        req: {
+          query: vi.fn().mockReturnValue(null),
+          header: vi.fn().mockReturnValue(null),
+        },
         env: { AURA_DB: failingDb },
         json: vi.fn().mockImplementation((payload) => payload),
       };

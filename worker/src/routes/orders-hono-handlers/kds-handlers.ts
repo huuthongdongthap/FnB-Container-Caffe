@@ -9,10 +9,93 @@ import { buildOrderTail, publishOrderEvent } from '@aura/domain-order';
 import { executeKdsStatusTransition, buildIndexFromDbRows } from '@aura/domain-kitchen';
 import { type OrderRecord, type OrderItem, type KdsOrder } from './types';
 
+function verifyKdsOrderTenant(
+  c: Context<{ Bindings: Env }>,
+  mode: 'read' | 'write',
+): { ok: true; tenantId: string } | { ok: false } {
+  const user = c.get('user' as any) as
+    | { id?: string; role?: string; tenantId?: string; tenant_id?: string }
+    | undefined;
+  const rawResolvedTenant = getTenantId(c).trim() || 'default';
+  const resolvedTenant = rawResolvedTenant.toLowerCase() === 'hq' ? '*' : rawResolvedTenant;
+  const requestedTenant = (
+    c.req.query('tenant_id') ||
+    c.req.query('tenantId') ||
+    c.req.query('store_id') ||
+    c.req.query('storeId') ||
+    c.req.header('X-Tenant-ID') ||
+    c.req.header('x-tenant-id') ||
+    c.req.header('X-Store-ID') ||
+    c.req.header('x-store-id') ||
+    ''
+  ).trim();
+
+  if (!user) {
+    if ((requestedTenant === '*' || requestedTenant.toLowerCase() === 'hq' || (requestedTenant && requestedTenant !== 'default')) && mode === 'write') {
+      return { ok: false };
+    }
+    if (requestedTenant === '*' || requestedTenant.toLowerCase() === 'hq' || resolvedTenant === '*') {
+      return { ok: false };
+    }
+    return { ok: true, tenantId: resolvedTenant };
+  }
+
+  const rawUserTenant = user.tenantId ?? user.tenant_id;
+  const contextTenant =
+    typeof (c as unknown as { get?: (k: string) => unknown }).get === 'function' &&
+    typeof (c as unknown as { get: (k: string) => unknown }).get('tenantId') === 'string'
+      ? String((c as unknown as { get: (k: string) => unknown }).get('tenantId')).trim()
+      : '';
+  const userTenant =
+    (rawUserTenant && String(rawUserTenant).trim()) ||
+    (!requestedTenant && contextTenant ? contextTenant : 'default');
+  const isHqAdmin =
+    (user.role === 'owner' || user.role === 'admin') &&
+    (userTenant === '*' || userTenant.toLowerCase() === 'hq');
+
+  if (isHqAdmin) {
+    const cleanReq =
+      requestedTenant && requestedTenant !== '*' && requestedTenant.toLowerCase() !== 'hq'
+        ? requestedTenant
+        : '';
+    const cleanCtx =
+      contextTenant && contextTenant !== '*' && contextTenant.toLowerCase() !== 'hq' && contextTenant !== 'default'
+        ? contextTenant
+        : '';
+    const cleanResolved =
+      resolvedTenant && resolvedTenant !== '*' && resolvedTenant !== 'default'
+        ? resolvedTenant
+        : '';
+    return { ok: true, tenantId: cleanReq || cleanCtx || cleanResolved || '*' };
+  }
+
+  if (
+    userTenant === '*' ||
+    userTenant.toLowerCase() === 'hq' ||
+    requestedTenant === '*' ||
+    requestedTenant.toLowerCase() === 'hq' ||
+    resolvedTenant === '*'
+  ) {
+    return { ok: false };
+  }
+  if (resolvedTenant !== userTenant) {
+    return { ok: false };
+  }
+  if (requestedTenant && requestedTenant !== userTenant) {
+    return { ok: false };
+  }
+
+  return { ok: true, tenantId: userTenant };
+}
+
 export async function handleGetKdsOrders(c: Context<{ Bindings: Env }>) {
+  const tenantCheck = verifyKdsOrderTenant(c, 'read');
+  if (!tenantCheck.ok) {
+    return c.json({ success: false, error: 'Cross-tenant KDS access denied' }, 403);
+  }
   const db = c.env.AURA_DB;
   const stationId = c.req.query('station_id') || c.req.query('station');
-  const tenantId = getTenantId(c).trim() || 'default';
+  const tenantId = tenantCheck.tenantId;
 
   let categoryIndex: Map<string, { station_id: string; station_name: string | null }> | null = null;
   if (stationId) {
@@ -93,6 +176,10 @@ export async function handleGetKdsOrders(c: Context<{ Bindings: Env }>) {
 }
 
 export async function handleUpdateOrderStatus(c: Context<{ Bindings: Env }>, forcedStatus?: unknown) {
+  const tenantCheck = verifyKdsOrderTenant(c, 'write');
+  if (!tenantCheck.ok) {
+    return c.json({ success: false, error: 'Cross-tenant KDS access denied' }, 403);
+  }
   const db = c.env.AURA_DB;
   const id = c.req.param('id')!;
   const body = typeof forcedStatus === 'string' ? { status: forcedStatus } : await c.req.json().catch(() => null);
@@ -107,7 +194,7 @@ export async function handleUpdateOrderStatus(c: Context<{ Bindings: Env }>, for
   } catch { /* absent in test harness */ }
 
   const result = await executeKdsStatusTransition(db, id, status, user?.role, {
-    tenantId: getTenantId(c).trim() || 'default',
+    tenantId: tenantCheck.tenantId,
     kv: c.env.AUTH_KV,
     env: c.env as unknown as Record<string, unknown>,
     waitUntil: waitUntilFn,
@@ -129,24 +216,51 @@ type CodOrderLookupRow = {
 };
 
 export async function handleMarkCodPaid(c: Context<{ Bindings: Env }>) {
+  const tenantCheck = verifyKdsOrderTenant(c, 'write');
+  if (!tenantCheck.ok) {
+    return c.json({ success: false, error: 'Cross-tenant KDS access denied' }, 403);
+  }
   const id = c.req.param('id');
   if (!id) return c.json({ success: false, error: 'Missing order id' }, 400);
-  const callerTenant = getTenantId(c).trim() || 'default';
+  const callerTenant = tenantCheck.tenantId;
   const result = await collectCodPayment(c.env.AURA_DB, id, callerTenant);
   if (result.success === false) return c.json({ success: false, error: result.error }, result.statusCode);
-  if (!result.idempotent && c.env.AUTH_KV) {
-    await publishOrderEvent(c.env.AUTH_KV, id, result.status, { previousStatus: result.status }).catch(() => {});
-  }
+  let orderRow: CodOrderLookupRow | null = null;
   if (!result.idempotent) {
     try {
-      let orderRow = await c.env.AURA_DB.prepare(
-        'SELECT id, total, total_amount, customer_id, customer_phone, customer_email, tenant_id FROM orders WHERE id = ?'
-      ).bind(id).first<CodOrderLookupRow>().catch(() => null);
+      orderRow = await (callerTenant && callerTenant !== '*'
+        ? c.env.AURA_DB.prepare(
+            "SELECT id, total, total_amount, customer_id, customer_phone, customer_email, tenant_id FROM orders WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
+          ).bind(id, callerTenant).first<CodOrderLookupRow>().catch(() => null)
+        : c.env.AURA_DB.prepare(
+            'SELECT id, total, total_amount, customer_id, customer_phone, customer_email, tenant_id FROM orders WHERE id = ?'
+          ).bind(id).first<CodOrderLookupRow>().catch(() => null));
       if (!orderRow) {
         orderRow = await c.env.AURA_DB.prepare(
           'SELECT id, total, total_amount, customer_id, customer_phone, customer_email FROM orders WHERE id = ?'
         ).bind(id).first<CodOrderLookupRow>().catch(() => null);
       }
+    } catch {
+      orderRow = null;
+    }
+  }
+  const effectiveEventTenant =
+    typeof orderRow?.tenant_id === 'string' &&
+    orderRow.tenant_id.trim() &&
+    orderRow.tenant_id.trim() !== '*' &&
+    orderRow.tenant_id.trim().toLowerCase() !== 'hq'
+      ? orderRow.tenant_id.trim()
+      : callerTenant && callerTenant !== '*'
+        ? callerTenant
+        : 'default';
+  if (!result.idempotent && c.env.AUTH_KV) {
+    await publishOrderEvent(c.env.AUTH_KV, id, result.status, {
+      previousStatus: result.status,
+      tenantId: effectiveEventTenant,
+    }).catch(() => {});
+  }
+  if (!result.idempotent) {
+    try {
       if (orderRow && (orderRow.customer_id || orderRow.customer_phone || orderRow.customer_email)) {
         const { creditLoyaltyIfEligible } = await import('@aura/domain-order');
         await creditLoyaltyIfEligible(c.env.AURA_DB, c.env as unknown as Record<string, unknown>, id).catch(() => {});
@@ -165,19 +279,21 @@ export async function handleMarkCodPaid(c: Context<{ Bindings: Env }>) {
               "SELECT id FROM customers WHERE ((email = ? AND email IS NOT NULL) OR (phone = ? AND phone IS NOT NULL)) AND (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?) LIMIT 1"
             ).bind(sanitizedEmail, normalizedPhone, orderTenant, orderTenant).first<{ id: string }>();
           } catch {
-            cust = await c.env.AURA_DB.prepare(
-              'SELECT id FROM customers WHERE (email = ? AND email IS NOT NULL) OR (phone = ? AND phone IS NOT NULL) LIMIT 1'
-            ).bind(sanitizedEmail, normalizedPhone).first<{ id: string }>().catch(() => null);
+            if (orderTenant === 'default' || orderTenant === '*') {
+              cust = await c.env.AURA_DB.prepare(
+                'SELECT id FROM customers WHERE (email = ? AND email IS NOT NULL) OR (phone = ? AND phone IS NOT NULL) LIMIT 1'
+              ).bind(sanitizedEmail, normalizedPhone).first<{ id: string }>().catch(() => null);
+            }
           }
           refCustomerId = cust?.id ?? null;
         }
         const orderTotal = Number(orderRow.total ?? orderRow.total_amount ?? 0);
         if (refCustomerId && orderTotal >= 20000) {
           const { rewardReferralOnFirstOrder, resolveReferralPolicy, DEFAULT_REFERRAL_POLICY } = await import('@aura/domain-crm');
-          const refPolicy = await resolveReferralPolicy(c.env.AUTH_KV).catch(() => DEFAULT_REFERRAL_POLICY);
           const orderTenantForRef = typeof orderRow.tenant_id === 'string' && orderRow.tenant_id.trim()
             ? orderRow.tenant_id.trim()
-            : undefined;
+            : (callerTenant && callerTenant !== '*' ? callerTenant : undefined);
+          const refPolicy = await resolveReferralPolicy(c.env.AUTH_KV, orderTenantForRef).catch(() => DEFAULT_REFERRAL_POLICY);
           await rewardReferralOnFirstOrder(c.env.AURA_DB, refCustomerId, id, orderTotal, refPolicy, orderTenantForRef).catch(() => {});
         }
       }

@@ -68,21 +68,63 @@ export function createTenantRoutes() {
       return c.json({ ok: false, error: 'unauthenticated' } as const, 401);
     }
 
-    const userTenantId = (currentUser.tenantId || '').trim();
-    const headerOrQueryTenantId = (
-      c.req.header('X-Tenant-ID') ||
-      c.req.header('x-tenant-id') ||
-      c.req.query('tenant_id') ||
+    const userTenantId = (
+      currentUser.tenantId ||
+      (currentUser as { tenant_id?: string }).tenant_id ||
       ''
     ).trim();
-    const tenantId = (c.get('tenantId') || headerOrQueryTenantId || userTenantId || '').trim();
+    const overrideCandidates = [
+      c.req.query('tenant_id'),
+      c.req.query('tenantId'),
+      c.req.query('store_id'),
+      c.req.query('storeId'),
+      c.req.header('X-Tenant-ID'),
+      c.req.header('x-tenant-id'),
+      c.req.header('X-Store-ID'),
+      c.req.header('x-store-id'),
+    ]
+      .map((v) => (typeof v === 'string' ? v.trim() : ''))
+      .filter(Boolean);
+    if (new Set(overrideCandidates).size > 1) {
+      return c.json({ ok: false, error: 'forbidden' } as const, 403);
+    }
+    const headerOrQueryTenantId = overrideCandidates[0] || '';
+    const ctxTenantId = (c.get('tenantId') || '').trim();
+    const isHq = isHQSuperAdmin(currentUser);
+    if (!isHq) {
+      if (
+        userTenantId === '*' ||
+        userTenantId.toLowerCase() === 'hq' ||
+        headerOrQueryTenantId === '*' ||
+        headerOrQueryTenantId.toLowerCase() === 'hq' ||
+        ctxTenantId === '*' ||
+        ctxTenantId.toLowerCase() === 'hq' ||
+        (headerOrQueryTenantId && (!userTenantId || headerOrQueryTenantId !== userTenantId)) ||
+        (ctxTenantId && userTenantId && ctxTenantId !== userTenantId)
+      ) {
+        return c.json({ ok: false, error: 'forbidden' } as const, 403);
+      }
+    }
+    const tenantId = (headerOrQueryTenantId || (isHq ? ctxTenantId : userTenantId || ctxTenantId) || '').trim();
     if (!tenantId) {
       return c.json({ ok: false, error: 'no_tenant' } as const, 400);
     }
 
     try {
-      const db = c.env.AURA_DB as unknown as { prepare(sql: string): { bind(...a: unknown[]): { run(): Promise<{ rowCount: number }>; first<T = Record<string, unknown>>(): Promise<T | null> } } };
-      const row = await db.prepare('SELECT id, name, slug, owner_user_id, tier, status, trial_ends_at, current_period_end, created_at, updated_at FROM saas_tenants WHERE id = ?').bind(tenantId).first<Record<string, unknown>>();
+      const db = c.env.AURA_DB as unknown as {
+        prepare(sql: string): {
+          bind(...a: unknown[]): {
+            run(): Promise<{ rowCount: number }>;
+            first<T = Record<string, unknown>>(): Promise<T | null>;
+          };
+        };
+      };
+      const row = await db
+        .prepare(
+          'SELECT id, name, slug, owner_user_id, tier, status, trial_ends_at, current_period_end, created_at, updated_at FROM saas_tenants WHERE id = ? OR slug = ?'
+        )
+        .bind(tenantId, tenantId)
+        .first<Record<string, unknown>>();
       if (!row) {
         if (!isHQSuperAdmin(currentUser) && (!userTenantId || userTenantId !== tenantId)) {
           return c.json({ ok: false, error: 'forbidden' } as const, 403);
@@ -91,7 +133,8 @@ export function createTenantRoutes() {
       }
       const isAuthorized =
         isHQSuperAdmin(currentUser) ||
-        (Boolean(userTenantId) && userTenantId === tenantId) ||
+        (Boolean(userTenantId) &&
+          (userTenantId === tenantId || row.id === userTenantId || row.slug === userTenantId)) ||
         row.owner_user_id === currentUser.id;
       if (!isAuthorized) {
         return c.json({ ok: false, error: 'forbidden' } as const, 403);
@@ -113,6 +156,18 @@ export function createTenantRoutes() {
       return c.json({ ok: false, error: 'forbidden' } as const, 403);
     }
 
+    const callerTenantId = (
+      currentUser.tenantId ||
+      (currentUser as { tenant_id?: string }).tenant_id ||
+      ''
+    ).trim();
+    if (!isHQSuperAdmin(currentUser) && callerTenantId !== '') {
+      return c.json({ ok: false, error: 'forbidden' } as const, 403);
+    }
+    if (!isHQSuperAdmin(currentUser) && !callerTenantId) {
+      return c.json({ ok: false, error: 'forbidden' } as const, 403);
+    }
+
     let body: { name?: string; slug?: string };
     try {
       body = (await c.req.json()) as { name?: string; slug?: string };
@@ -126,7 +181,13 @@ export function createTenantRoutes() {
 
     try {
       const db = c.env.AURA_DB as unknown as {
-        prepare(sql: string): { bind(...a: unknown[]): { run(): Promise<{ rowCount: number }>; first<T = Record<string, unknown>>(): Promise<T | null> } };
+        prepare(sql: string): {
+          bind(...a: unknown[]): {
+            run(): Promise<{ rowCount: number }>;
+            first<T = Record<string, unknown>>(): Promise<T | null>;
+          };
+        };
+        batch?(statements: unknown[]): Promise<unknown[]>;
       };
       const cntRow = await db
         .prepare('SELECT COUNT(*) as cnt FROM saas_tenants WHERE owner_user_id = ?')
@@ -161,11 +222,23 @@ export function createTenantRoutes() {
       const now = new Date().toISOString();
       const trialEnds = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString();
 
-      await db.prepare(
-        'INSERT INTO saas_tenants (id, slug, name, tier, status, owner_user_id, trial_ends_at, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'
-      )
-        .bind(id, finalSlug, rawName, 'BASIC', 'trial', ownerUserId, trialEnds, now, now)
-        .run();
+      const tenantStmt = db
+        .prepare(
+          'INSERT INTO saas_tenants (id, slug, name, tier, status, owner_user_id, trial_ends_at, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'
+        )
+        .bind(id, finalSlug, rawName, 'BASIC', 'trial', ownerUserId, trialEnds, now, now);
+      const subscriptionStmt = db
+        .prepare(
+          'INSERT INTO tenant_subscriptions (id, tenant_id, tier, status, trial_ends_at, current_period_end, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
+        )
+        .bind(`sub_${id}`, id, 'BASIC', 'trial', trialEnds, trialEnds, now, now);
+
+      if (typeof db.batch === 'function') {
+        await db.batch([tenantStmt, subscriptionStmt]);
+      } else {
+        await tenantStmt.run();
+        await subscriptionStmt.run();
+      }
 
       const row = await db.prepare('SELECT * FROM saas_tenants WHERE id = ?').bind(id).first<Record<string, unknown>>();
       return c.json({ ok: true, data: row ? mapRow(row) : null } as const, 201);

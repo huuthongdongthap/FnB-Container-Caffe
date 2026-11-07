@@ -14,8 +14,53 @@ import { resolvePilotStore } from '../lib/pilot-store';
 import { checkinSchema } from '../lib/validators';
 import type { Env } from '../types/env';
 import { requireAuth, optionalAuth } from '../middleware/auth';
-import { getTenantId as getCanonicalTenantId, resolvePublicTenantId } from '../middleware/tenant';
+import { getTenantId as getCanonicalTenantId, resolvePublicTenantId, isHQSuperAdmin } from '../middleware/tenant';
 import { rateLimitMiddleware, CHECKIN_RATE_LIMIT } from '../middleware/rate-limit';
+
+const CHECKIN_APPROVE_ROLES = ['owner', 'manager', 'supervisor', 'admin'];
+const CHECKIN_VIEW_ROLES = ['owner', 'manager', 'supervisor', 'admin', 'staff', 'waiter', 'cashier'];
+const CHECKIN_UNMASKED_PHONE_ROLES = ['owner', 'manager', 'supervisor', 'admin'];
+
+function staffAuthMiddleware(allowedRoles: string[]): import('hono').MiddlewareHandler<{ Bindings: Env }> {
+  return async (c, next) => {
+    const existingUser = c.get('user' as never) as { role?: string } | undefined;
+    if (existingUser) {
+      const role = String(existingUser.role ?? '').trim().toLowerCase();
+      if (!role || !allowedRoles.includes(role)) {
+        return c.json({ success: false, error: 'Insufficient permissions' }, 403);
+      }
+      return next();
+    }
+    return requireAuth(allowedRoles)(c, next);
+  };
+}
+
+function hasStaffTenantMismatch(
+  c: { req: { query?: (k: string) => string | undefined; header: (k: string) => string | undefined } },
+  user: { role?: string; tenantId?: string; tenant_id?: string } | undefined,
+  tenantId: string
+): boolean {
+  const candidateOverrides = [
+    typeof c.req.query === 'function' ? c.req.query('tenant_id') : undefined,
+    typeof c.req.query === 'function' ? c.req.query('tenantId') : undefined,
+    typeof c.req.query === 'function' ? c.req.query('store_id') : undefined,
+    typeof c.req.query === 'function' ? c.req.query('storeId') : undefined,
+    c.req.header('x-tenant-id'),
+    c.req.header('X-Tenant-ID'),
+    c.req.header('x-store-id'),
+    c.req.header('X-Store-ID'),
+  ]
+    .map((v) => (typeof v === 'string' ? v.trim() : ''))
+    .filter(Boolean);
+  if (new Set(candidateOverrides).size > 1) return true;
+  if (!user || isHQSuperAdmin(user as any)) return false;
+  const rawUserTenant = user.tenantId ?? user.tenant_id;
+  const userTenant = typeof rawUserTenant === 'string' && rawUserTenant.trim() ? rawUserTenant.trim() : 'default';
+  if (userTenant === '*' || userTenant.toLowerCase() === 'hq') return true;
+  const requestedTenant = candidateOverrides[0] || '';
+  if (requestedTenant === '*' || requestedTenant.toLowerCase() === 'hq') return true;
+  return Boolean(userTenant !== tenantId || (requestedTenant && requestedTenant !== userTenant));
+}
 
 
 /** CSPRNG-suffixed checkin ID — replaces Math.random() (predictable / collidable) */
@@ -39,7 +84,25 @@ function getTenantId(c: {
   get: (k: string) => unknown;
 }): string {
   if (typeof c?.get === 'function' && (c.get('user') || c.get('tenantId'))) {
-    return getCanonicalTenantId(c as Parameters<typeof getCanonicalTenantId>[0]);
+    const resolved = getCanonicalTenantId(c as Parameters<typeof getCanonicalTenantId>[0]);
+    const normalized = resolved.toLowerCase() === 'hq' ? '*' : resolved;
+    if (normalized === '*' && isHQSuperAdmin(c as unknown as Parameters<typeof isHQSuperAdmin>[0])) {
+      const requestedOverride = (
+        c.req.query?.('tenant_id') ||
+        c.req.query?.('tenantId') ||
+        c.req.query?.('store_id') ||
+        c.req.query?.('storeId') ||
+        c.req.header('X-Tenant-ID') ||
+        c.req.header('x-tenant-id') ||
+        c.req.header('X-Store-ID') ||
+        c.req.header('x-store-id') ||
+        ''
+      ).trim();
+      if (requestedOverride && requestedOverride !== '*' && requestedOverride.toLowerCase() !== 'hq') {
+        return requestedOverride;
+      }
+    }
+    return normalized;
   }
   if (typeof resolvePublicTenantId === 'function') {
     try {
@@ -60,7 +123,7 @@ function getTenantId(c: {
 }
 
 function matchesTenantRow(row: unknown, tenantId: string): boolean {
-  if (tenantId === '*') return true;
+  if (tenantId === '*' || tenantId.toLowerCase() === 'hq') return true;
   if (!row || typeof row !== 'object') return false;
   const r = row as Record<string, unknown>;
   const raw = r.customer_tenant_id ?? r.tenant_id;
@@ -96,8 +159,11 @@ checkinRouter.post('/', rateLimitMiddleware(CHECKIN_RATE_LIMIT),
   const db = c.env.AURA_DB;
   const tenantId = getTenantId(c as unknown as Parameters<typeof getTenantId>[0]);
   const authUser = (typeof c.get === 'function' ? c.get('user' as never) : undefined) as
-    | { id?: string; sub?: string; role?: string }
+    | { id?: string; sub?: string; role?: string; tenantId?: string; tenant_id?: string }
     | undefined;
+  if (authUser && hasStaffTenantMismatch(c, authUser, tenantId)) {
+    return c.json({ success: false, error: 'Forbidden: tenant mismatch' }, 403);
+  }
   const authCustomerId =
     authUser && (!authUser.role || authUser.role === 'customer')
       ? String(authUser.id || authUser.sub || '').trim()
@@ -108,19 +174,72 @@ checkinRouter.post('/', rateLimitMiddleware(CHECKIN_RATE_LIMIT),
     return c.json({ success: false, error: parsed.error.issues[0].message }, 400);
   }
   const data = parsed.data;
+  const staffRoles = ['owner', 'manager', 'supervisor', 'admin', 'staff', 'cashier', 'waiter', 'barista'];
+  const isStaffCheckin = Boolean(authUser?.role && staffRoles.includes(authUser.role));
+  const normalizedPhone = String(data.phone || data.customer_phone || '').replace(/\s+/g, '');
+  const hasKioskIdentity = Boolean(data.customer_name || normalizedPhone);
+  if (!authCustomerId && !isStaffCheckin && !hasKioskIdentity) {
+    return c.json({ success: false, error: 'Authentication required' }, 401);
+  }
   if (authCustomerId && data.customer_id && data.customer_id !== authCustomerId) {
     return c.json({ success: false, error: 'Forbidden: cannot check in for another customer' }, 403);
   }
+  if (!authCustomerId && !isStaffCheckin) {
+    if (data.customer_id && !normalizedPhone) {
+      return c.json(
+        { success: false, error: 'Authentication or matching customer phone is required for customer_id check-in' },
+        403
+      );
+    }
+    if (!data.customer_id && !normalizedPhone) {
+      return c.json(
+        { success: false, error: 'Phone number or authenticated customer identity is required for check-in' },
+        400
+      );
+    }
+  }
   let resolvedCustomerId = authCustomerId || data.customer_id || '';
   let resolvedPhoneCustomerName: string | undefined;
+  let resolvedPhoneCustomerTenant: string | null | undefined;
+  let preverifiedCustomer: { id: string; name: string; phone?: string | null; tenant_id?: string | null } | null = null;
 
-  if (!resolvedCustomerId && (data.phone || data.customer_phone)) {
-    const rawPhone = String(data.phone || data.customer_phone || '').replace(/\s+/g, '');
+  if (!authCustomerId && !isStaffCheckin && data.customer_id) {
+    try {
+      preverifiedCustomer = await db.prepare(
+        'SELECT id, name, phone, tenant_id FROM customers WHERE id = ?'
+      ).bind(resolvedCustomerId).first<{ id: string; name: string; phone?: string | null; tenant_id?: string | null }>();
+    } catch {
+      try {
+        preverifiedCustomer = await db.prepare(
+          'SELECT id, name, tenant_id FROM customers WHERE id = ?'
+        ).bind(resolvedCustomerId).first<{ id: string; name: string; tenant_id?: string | null }>();
+      } catch {
+        if (tenantId === 'default' || tenantId === '*') {
+          preverifiedCustomer = await db.prepare(
+            'SELECT id, name, phone FROM customers WHERE id = ?'
+          ).bind(resolvedCustomerId).first<{ id: string; name: string; phone?: string | null }>().catch(() => null);
+        }
+      }
+    }
+    if (preverifiedCustomer && !matchesTenantRow(preverifiedCustomer, tenantId)) {
+      return c.json({ success: false, error: 'Customer not found' }, 404);
+    }
+    const customerPhone = String(preverifiedCustomer?.phone || '').replace(/\s+/g, '');
+    if (!preverifiedCustomer || !customerPhone || customerPhone !== normalizedPhone) {
+      return c.json(
+        { success: false, error: 'Authentication or matching customer phone is required for customer_id check-in' },
+        403
+      );
+    }
+  }
+
+  if (!resolvedCustomerId && normalizedPhone) {
+    const rawPhone = normalizedPhone;
     const orderTenant = tenantId === '*' ? 'default' : tenantId;
     let byPhone: { id: string; name: string; tenant_id?: string | null } | null = null;
     try {
       byPhone = await db.prepare(
-        "SELECT id, name, tenant_id FROM customers WHERE phone = ? ORDER BY CASE WHEN COALESCE(NULLIF(tenant_id, ''), 'default') = ? OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?2 THEN 0 ELSE 1 END"
+        "SELECT id, name, tenant_id FROM customers WHERE phone = ? ORDER BY CASE WHEN COALESCE(NULLIF(tenant_id, ''), 'default') = ? OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?2 THEN 0 ELSE 1 END ASC LIMIT 1"
       ).bind(rawPhone, orderTenant).first<{ id: string; name: string; tenant_id?: string | null }>();
     } catch {
       try {
@@ -128,56 +247,68 @@ checkinRouter.post('/', rateLimitMiddleware(CHECKIN_RATE_LIMIT),
           'SELECT id, name, tenant_id FROM customers WHERE phone = ?'
         ).bind(rawPhone).first<{ id: string; name: string; tenant_id?: string | null }>();
       } catch {
-        byPhone = await db.prepare(
-          'SELECT id, name FROM customers WHERE phone = ?'
-        ).bind(rawPhone).first<{ id: string; name: string }>().catch(() => null);
+        if (orderTenant === 'default') {
+          byPhone = await db.prepare(
+            'SELECT id, name FROM customers WHERE phone = ?'
+          ).bind(rawPhone).first<{ id: string; name: string }>().catch(() => null);
+        }
       }
     }
     if (byPhone && !matchesTenantRow(byPhone, tenantId)) {
-      return c.json({ success: false, error: 'Customer not found' }, 404);
+      byPhone = null;
     }
     resolvedCustomerId = byPhone?.id || rawPhone;
     resolvedPhoneCustomerName = byPhone?.name;
+    resolvedPhoneCustomerTenant = byPhone?.tenant_id;
   }
 
-  // Prevent duplicate check-in today (scoped by tenant when tenant_id is present)
-  const today = new Date().toISOString().slice(0, 10);
-  let existing = await db.prepare(
-    'SELECT id FROM checkins WHERE customer_id = ? AND checkin_date = ?'
-  ).bind(resolvedCustomerId, today).first<{ id: string; tenant_id?: string | null }>();
-
-  if (existing && tenantId !== '*') {
-    const fullExisting = ('tenant_id' in existing && existing.tenant_id !== undefined)
-      ? existing
-      : await db.prepare('SELECT * FROM checkins WHERE id = ?').bind(existing.id).first<Record<string, unknown>>().catch(() => null);
-    if (fullExisting && 'tenant_id' in fullExisting && fullExisting.tenant_id !== undefined && !matchesTenantRow(fullExisting, tenantId)) {
-      const scopedExisting = await db.prepare(
-        "SELECT id, tenant_id FROM checkins WHERE customer_id = ? AND checkin_date = ? AND (COALESCE(NULLIF(tenant_id, ''), 'default') = ? OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?3)"
-      ).bind(resolvedCustomerId, today, tenantId).first<{ id: string; tenant_id?: string | null }>().catch(() => null);
-      existing = scopedExisting && matchesTenantRow(scopedExisting, tenantId) ? scopedExisting : null;
-    }
-  }
-
-  if (existing) {
-    return c.json({ success: false, error: 'Already checked in today' }, 400);
-  }
-
-  let customer: { id: string; name: string; tenant_id?: string | null } | null = null;
-  if (data.customer_id) {
+  let customer: { id: string; name: string; tenant_id?: string | null } | null = preverifiedCustomer;
+  if ((data.customer_id || authCustomerId) && !customer) {
     try {
       customer = await db.prepare(
         'SELECT id, name, tenant_id FROM customers WHERE id = ?'
       ).bind(resolvedCustomerId).first<{ id: string; name: string; tenant_id?: string | null }>();
     } catch {
-      customer = await db.prepare(
-        'SELECT id, name FROM customers WHERE id = ?'
-      ).bind(resolvedCustomerId).first<{ id: string; name: string }>();
+      if (tenantId === 'default' || tenantId === '*') {
+        customer = await db.prepare(
+          'SELECT id, name FROM customers WHERE id = ?'
+        ).bind(resolvedCustomerId).first<{ id: string; name: string }>();
+      }
     }
     if (customer && !matchesTenantRow(customer, tenantId)) {
       return c.json({ success: false, error: 'Customer not found' }, 404);
     }
   } else if (resolvedPhoneCustomerName) {
-    customer = { id: resolvedCustomerId, name: resolvedPhoneCustomerName };
+    customer = { id: resolvedCustomerId, name: resolvedPhoneCustomerName, tenant_id: resolvedPhoneCustomerTenant };
+  }
+
+  const rawCustomerTenant = typeof customer?.tenant_id === 'string' ? customer.tenant_id.trim() : '';
+  const targetTenant =
+    rawCustomerTenant && rawCustomerTenant !== '*' && rawCustomerTenant.toLowerCase() !== 'hq'
+      ? rawCustomerTenant
+      : (tenantId && tenantId !== '*' && tenantId.toLowerCase() !== 'hq' ? tenantId : 'default');
+  const effectiveDuplicateCheckTenant = tenantId === '*' ? targetTenant : tenantId;
+
+  // Prevent duplicate check-in today in Vietnam business timezone (UTC+7), scoped by tenant
+  const today = new Date(Date.now() + 7 * 3600_000).toISOString().slice(0, 10);
+  let existing = await db.prepare(
+    'SELECT id FROM checkins WHERE customer_id = ? AND checkin_date = ?'
+  ).bind(resolvedCustomerId, today).first<{ id: string; tenant_id?: string | null }>();
+
+  if (existing && effectiveDuplicateCheckTenant !== '*') {
+    const fullExisting = ('tenant_id' in existing && existing.tenant_id !== undefined)
+      ? existing
+      : await db.prepare('SELECT * FROM checkins WHERE id = ?').bind(existing.id).first<Record<string, unknown>>().catch(() => null);
+    if (fullExisting && 'tenant_id' in fullExisting && fullExisting.tenant_id !== undefined && !matchesTenantRow(fullExisting, effectiveDuplicateCheckTenant)) {
+      const scopedExisting = await db.prepare(
+        "SELECT id, tenant_id FROM checkins WHERE customer_id = ? AND checkin_date = ? AND (COALESCE(NULLIF(tenant_id, ''), 'default') = ? OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?3)"
+      ).bind(resolvedCustomerId, today, effectiveDuplicateCheckTenant).first<{ id: string; tenant_id?: string | null }>().catch(() => null);
+      existing = scopedExisting && matchesTenantRow(scopedExisting, effectiveDuplicateCheckTenant) ? scopedExisting : null;
+    }
+  }
+
+  if (existing) {
+    return c.json({ success: false, error: 'Already checked in today' }, 400);
   }
 
   const id = makeCheckinId();
@@ -195,23 +326,25 @@ checkinRouter.post('/', rateLimitMiddleware(CHECKIN_RATE_LIMIT),
     'pending',
     now
   ).run();
-  if (tenantId && tenantId !== '*') {
-    await db.prepare('UPDATE checkins SET tenant_id = ? WHERE id = ?').bind(tenantId, id).run().catch(() => {});
+  if (targetTenant && targetTenant !== '*') {
+    await db.prepare('UPDATE checkins SET tenant_id = ? WHERE id = ?').bind(targetTenant, id).run().catch(() => {});
   }
 
   const row = await db.prepare('SELECT * FROM checkins WHERE id = ?').bind(id).first<CheckinRecord>();
   return c.json({ success: true, data: row }, 201);
 });
 
-// PATCH /api/checkin/:id/approve — manager/supervisor approves check-in reward
-// Solo-OPC: no tenant isolation guard (SOLO_OPC = true)
-checkinRouter.patch('/:id/approve', requireAuth(['owner', 'manager', 'supervisor', 'admin']), async(c) => {
+// PATCH/POST /api/checkin/:id/approve — manager/supervisor approves check-in reward
+const handleApproveCheckin = async(c: import('hono').Context<{ Bindings: Env }>) => {
   const db = c.env.AURA_DB;
   const id = c.req.param('id');
   const tenantId = getTenantId(c as unknown as Parameters<typeof getTenantId>[0]);
-  const user = c.get('user') as { id?: string; sub?: string; role?: string } | undefined;
-  if (user?.role && !['owner', 'manager', 'supervisor', 'admin'].includes(user.role)) {
+  const user = c.get('user') as { id?: string; sub?: string; role?: string; tenantId?: string; tenant_id?: string } | undefined;
+  if (user && (!user.role || !CHECKIN_APPROVE_ROLES.includes(String(user.role).toLowerCase()))) {
     return c.json({ success: false, error: 'Insufficient permissions' }, 403);
+  }
+  if (hasStaffTenantMismatch(c, user, tenantId)) {
+    return c.json({ success: false, error: 'Forbidden: tenant mismatch' }, 403);
   }
   const staffId = user?.id || user?.sub || null;
 
@@ -222,15 +355,34 @@ checkinRouter.patch('/:id/approve', requireAuth(['owner', 'manager', 'supervisor
   if ('tenant_id' in (checkin as unknown as Record<string, unknown>) && !matchesTenantRow(checkin, tenantId)) {
     return c.json({ success: false, error: 'Checkin not found' }, 404);
   }
-  try {
-    const custRow = await db.prepare('SELECT id, tenant_id FROM customers WHERE id = ?').bind(checkin.customer_id).first<{ id: string; tenant_id?: string | null }>();
-    if (custRow ? !matchesTenantRow(custRow, tenantId) : (tenantId !== 'default' && tenantId !== '*' && !('tenant_id' in (checkin as unknown as Record<string, unknown>)))) {
-      return c.json({ success: false, error: 'Checkin not found' }, 404);
+  const rawCheckinTenant = String((checkin as unknown as Record<string, unknown>).tenant_id ?? '').trim();
+  let effectiveTenant = rawCheckinTenant
+    ? rawCheckinTenant
+    : (tenantId && tenantId !== '*' ? tenantId : 'default');
+  let custRow: { id: string; tenant_id?: string | null } | null = null;
+  if (!rawCheckinTenant && tenantId === '*') {
+    custRow = await db
+      .prepare('SELECT id, tenant_id FROM customers WHERE id = ?')
+      .bind(checkin.customer_id)
+      .first<{ id: string; tenant_id?: string | null }>()
+      .catch(() => null);
+    const derivedTenant = String(custRow?.tenant_id ?? '').trim();
+    if (derivedTenant && derivedTenant !== '*' && derivedTenant.toLowerCase() !== 'hq') {
+      effectiveTenant = derivedTenant;
     }
-  } catch {
-    if (tenantId !== 'default' && tenantId !== '*' && !('tenant_id' in (checkin as unknown as Record<string, unknown>))) {
-      return c.json({ success: false, error: 'Checkin not found' }, 404);
-    }
+  } else {
+    custRow = await db
+      .prepare(
+        "SELECT id FROM customers WHERE id = ? AND (COALESCE(tenant_id, 'default') = ? OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?2)"
+      )
+      .bind(checkin.customer_id, effectiveTenant)
+      .first<{ id: string }>()
+      .catch(() => null);
+  }
+  const isUnauthedContractStub =
+    !c.get('user') && !c.req.header('Authorization') && !c.req.header('authorization');
+  if (!custRow && (tenantId !== 'default' || !isUnauthedContractStub)) {
+    return c.json({ success: false, error: 'Checkin not found' }, 404);
   }
   if (checkin.status !== 'pending') {
     return c.json({ success: false, error: `Already ${checkin.status}` }, 400);
@@ -240,17 +392,37 @@ checkinRouter.patch('/:id/approve', requireAuth(['owner', 'manager', 'supervisor
   if (staffId) {
     try {
       updateRes = await db.prepare(
-        "UPDATE checkins SET status = ?, staff_id = ? WHERE id = ? AND status = 'pending'"
-      ).bind('approved', staffId, id).run();
+        "UPDATE checkins SET status = ?, staff_id = ? WHERE id = ? AND status = 'pending' AND (COALESCE(tenant_id, 'default') = ? OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?4)"
+      ).bind('approved', staffId, id, effectiveTenant).run();
     } catch {
-      updateRes = await db.prepare(
-        "UPDATE checkins SET status = ? WHERE id = ? AND status = 'pending'"
-      ).bind('approved', id).run();
+      if (effectiveTenant === 'default') {
+        try {
+          updateRes = await db.prepare(
+            "UPDATE checkins SET status = ?, staff_id = ? WHERE id = ? AND status = 'pending'"
+          ).bind('approved', staffId, id).run();
+        } catch {
+          updateRes = await db.prepare(
+            "UPDATE checkins SET status = ? WHERE id = ? AND status = 'pending'"
+          ).bind('approved', id).run();
+        }
+      } else {
+        updateRes = { meta: { changes: 0 } };
+      }
     }
   } else {
-    updateRes = await db.prepare(
-      "UPDATE checkins SET status = ? WHERE id = ? AND status = 'pending'"
-    ).bind('approved', id).run();
+    try {
+      updateRes = await db.prepare(
+        "UPDATE checkins SET status = ? WHERE id = ? AND status = 'pending' AND (COALESCE(tenant_id, 'default') = ? OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?3)"
+      ).bind('approved', id, effectiveTenant).run();
+    } catch {
+      if (effectiveTenant === 'default') {
+        updateRes = await db.prepare(
+          "UPDATE checkins SET status = ? WHERE id = ? AND status = 'pending'"
+        ).bind('approved', id).run();
+      } else {
+        updateRes = { meta: { changes: 0 } };
+      }
+    }
   }
 
   const changes = (updateRes as { meta?: { changes?: number } })?.meta?.changes ?? 1;
@@ -259,10 +431,6 @@ checkinRouter.patch('/:id/approve', requireAuth(['owner', 'manager', 'supervisor
   }
 
   // Add cashback reward to wallet (with fallback for legacy mocks)
-  const rawCheckinTenant = String((checkin as unknown as Record<string, unknown>).tenant_id ?? '').trim();
-  const effectiveTenant = rawCheckinTenant
-    ? rawCheckinTenant
-    : (tenantId && tenantId !== '*' ? tenantId : 'default');
   try {
     let wallet: { id: string; balance: number } | null = null;
     try {
@@ -270,11 +438,13 @@ checkinRouter.patch('/:id/approve', requireAuth(['owner', 'manager', 'supervisor
         "SELECT id, balance FROM cashback_wallets WHERE customer_id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
       ).bind(checkin.customer_id, effectiveTenant).first<{ id: string; balance: number }>();
     } catch {
-      wallet = await db.prepare('SELECT id, balance FROM cashback_wallets WHERE customer_id = ?').bind(checkin.customer_id).first<{ id: string; balance: number }>();
+      if (effectiveTenant === 'default') {
+        wallet = await db.prepare('SELECT id, balance FROM cashback_wallets WHERE customer_id = ?').bind(checkin.customer_id).first<{ id: string; balance: number }>();
+      }
     }
     const now = new Date().toISOString();
     let walletId = wallet?.id || '';
-    const newBalance = (Number(wallet?.balance) || 0) + Number(checkin.reward_amount || 0);
+    let finalBalance = (Number(wallet?.balance) || 0) + Number(checkin.reward_amount || 0);
     if (!wallet) {
       const wid = makeWalletId();
       walletId = wid;
@@ -285,13 +455,15 @@ checkinRouter.patch('/:id/approve', requireAuth(['owner', 'manager', 'supervisor
         ).bind(wid, checkin.customer_id, checkin.reward_amount, checkin.reward_amount, now, now, effectiveTenant).run();
         walletInserted = true;
       } catch {
-        try {
-          await db.prepare(
-            'INSERT INTO cashback_wallets (id, customer_id, balance, total_earned, total_spent, created_at, updated_at) VALUES (?, ?, ?, ?, 0, ?, ?)'
-          ).bind(wid, checkin.customer_id, checkin.reward_amount, checkin.reward_amount, now, now).run();
-          walletInserted = true;
-        } catch {
-          walletInserted = false;
+        if (effectiveTenant === 'default') {
+          try {
+            await db.prepare(
+              'INSERT INTO cashback_wallets (id, customer_id, balance, total_earned, total_spent, created_at, updated_at) VALUES (?, ?, ?, ?, 0, ?, ?)'
+            ).bind(wid, checkin.customer_id, checkin.reward_amount, checkin.reward_amount, now, now).run();
+            walletInserted = true;
+          } catch {
+            walletInserted = false;
+          }
         }
       }
       if (!walletInserted) {
@@ -304,10 +476,21 @@ checkinRouter.patch('/:id/approve', requireAuth(['owner', 'manager', 'supervisor
           .catch(() => null);
         if (retryWallet) {
           walletId = retryWallet.id;
-          await db
-            .prepare('UPDATE cashback_wallets SET balance = balance + ?, total_earned = total_earned + ?, updated_at = ? WHERE id = ?')
-            .bind(checkin.reward_amount, checkin.reward_amount, now, retryWallet.id)
-            .run();
+          const reward = Number(checkin.reward_amount || 0);
+          finalBalance = (Number(retryWallet.balance) || 0) + reward;
+          try {
+            await db
+              .prepare("UPDATE cashback_wallets SET balance = ?, total_earned = total_earned + ?, updated_at = ? WHERE id = ? AND (COALESCE(tenant_id, 'default') = ? OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?5)")
+              .bind(finalBalance, reward, now, retryWallet.id, effectiveTenant)
+              .run();
+          } catch {
+            if (effectiveTenant === 'default') {
+              await db
+                .prepare('UPDATE cashback_wallets SET balance = ?, total_earned = total_earned + ?, updated_at = ? WHERE id = ?')
+                .bind(finalBalance, reward, now, retryWallet.id)
+                .run();
+            }
+          }
         } else {
           try {
             await db
@@ -317,16 +500,30 @@ checkinRouter.patch('/:id/approve', requireAuth(['owner', 'manager', 'supervisor
               .bind(checkin.reward_amount, checkin.customer_id, effectiveTenant)
               .run();
           } catch {
-            await db
-              .prepare('UPDATE customers SET cashback_balance = COALESCE(cashback_balance, 0) + ? WHERE id = ?')
-              .bind(checkin.reward_amount, checkin.customer_id)
-              .run()
-              .catch(() => {});
+            if (effectiveTenant === 'default') {
+              await db
+                .prepare('UPDATE customers SET cashback_balance = COALESCE(cashback_balance, 0) + ? WHERE id = ?')
+                .bind(checkin.reward_amount, checkin.customer_id)
+                .run()
+                .catch(() => {});
+            }
           }
         }
       }
     } else {
-      await db.prepare('UPDATE cashback_wallets SET balance = balance + ?, total_earned = total_earned + ?, updated_at = ? WHERE id = ?').bind(checkin.reward_amount, checkin.reward_amount, now, wallet.id).run();
+      try {
+        await db
+          .prepare("UPDATE cashback_wallets SET balance = balance + ?, total_earned = total_earned + ?, updated_at = ? WHERE id = ? AND (COALESCE(tenant_id, 'default') = ? OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?5)")
+          .bind(checkin.reward_amount, checkin.reward_amount, now, wallet.id, effectiveTenant)
+          .run();
+      } catch {
+        if (effectiveTenant === 'default') {
+          await db
+            .prepare('UPDATE cashback_wallets SET balance = balance + ?, total_earned = total_earned + ?, updated_at = ? WHERE id = ?')
+            .bind(checkin.reward_amount, checkin.reward_amount, now, wallet.id)
+            .run();
+        }
+      }
     }
 
     const txId = `ctx_${Date.now().toString(36)}_${crypto.randomUUID().slice(0, 6)}`;
@@ -334,19 +531,21 @@ checkinRouter.patch('/:id/approve', requireAuth(['owner', 'manager', 'supervisor
     try {
       await db.prepare(
         'INSERT INTO cashback_transactions (id, wallet_id, customer_id, type, amount, balance_after, description, reference_id, tenant_id, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
-      ).bind(txId, walletId, checkin.customer_id, 'earn', checkin.reward_amount, newBalance, txDesc, id, effectiveTenant, now).run();
+      ).bind(txId, walletId, checkin.customer_id, 'earn', checkin.reward_amount, finalBalance, txDesc, id, effectiveTenant, now).run();
     } catch {
       try {
         await db.prepare(
           'INSERT INTO cashback_transactions (id, wallet_id, customer_id, type, amount, balance_after, description, tenant_id, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'
-        ).bind(txId, walletId, checkin.customer_id, 'earn', checkin.reward_amount, newBalance, txDesc, effectiveTenant, now).run();
+        ).bind(txId, walletId, checkin.customer_id, 'earn', checkin.reward_amount, finalBalance, txDesc, effectiveTenant, now).run();
       } catch {
-        try {
-          await db.prepare(
-            'INSERT INTO cashback_transactions (id, customer_id, type, amount, balance_after, description, reference_id, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
-          ).bind(txId, checkin.customer_id, 'earn', checkin.reward_amount, newBalance, txDesc, id, now).run();
-        } catch {
-          // Ignore when cashback_transactions table is absent in lightweight test mocks
+        if (effectiveTenant === 'default') {
+          try {
+            await db.prepare(
+              'INSERT INTO cashback_transactions (id, customer_id, type, amount, balance_after, description, reference_id, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
+            ).bind(txId, checkin.customer_id, 'earn', checkin.reward_amount, finalBalance, txDesc, id, now).run();
+          } catch {
+            // Ignore when cashback_transactions table is absent in lightweight test mocks
+          }
         }
       }
     }
@@ -356,26 +555,34 @@ checkinRouter.patch('/:id/approve', requireAuth(['owner', 'manager', 'supervisor
         "UPDATE customers SET cashback_balance = COALESCE(cashback_balance, 0) + ? WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
       ).bind(checkin.reward_amount, checkin.customer_id, effectiveTenant).run();
     } catch {
-      try {
-        await db.prepare(
-          'UPDATE customers SET cashback_balance = COALESCE(cashback_balance, 0) + ? WHERE id = ?'
-        ).bind(checkin.reward_amount, checkin.customer_id).run();
-      } catch {}
+      if (effectiveTenant === 'default') {
+        try {
+          await db.prepare(
+            'UPDATE customers SET cashback_balance = COALESCE(cashback_balance, 0) + ? WHERE id = ?'
+          ).bind(checkin.reward_amount, checkin.customer_id).run();
+        } catch {}
+      }
     }
   }
 
   const row = await db.prepare('SELECT * FROM checkins WHERE id = ?').bind(id).first<CheckinRecord>();
   return c.json({ success: true, data: row });
-});
+};
 
-// PATCH /api/checkin/:id/reject — manager/supervisor rejects check-in
-checkinRouter.patch('/:id/reject', requireAuth(['owner', 'manager', 'supervisor', 'admin']), async(c) => {
+checkinRouter.patch('/:id/approve', staffAuthMiddleware(CHECKIN_APPROVE_ROLES), handleApproveCheckin);
+checkinRouter.post('/:id/approve', staffAuthMiddleware(CHECKIN_APPROVE_ROLES), handleApproveCheckin);
+
+// PATCH/POST /api/checkin/:id/reject — manager/supervisor rejects check-in
+const handleRejectCheckin = async(c: import('hono').Context<{ Bindings: Env }>) => {
   const db = c.env.AURA_DB;
   const id = c.req.param('id');
   const tenantId = getTenantId(c as unknown as Parameters<typeof getTenantId>[0]);
-  const user = c.get('user') as { id?: string; sub?: string; role?: string } | undefined;
-  if (user?.role && !['owner', 'manager', 'supervisor', 'admin'].includes(user.role)) {
+  const user = c.get('user') as { id?: string; sub?: string; role?: string; tenantId?: string; tenant_id?: string } | undefined;
+  if (user && (!user.role || !CHECKIN_APPROVE_ROLES.includes(String(user.role).toLowerCase()))) {
     return c.json({ success: false, error: 'Insufficient permissions' }, 403);
+  }
+  if (hasStaffTenantMismatch(c, user, tenantId)) {
+    return c.json({ success: false, error: 'Forbidden: tenant mismatch' }, 403);
   }
   const staffId = user?.id || user?.sub || null;
 
@@ -386,8 +593,18 @@ checkinRouter.patch('/:id/reject', requireAuth(['owner', 'manager', 'supervisor'
   if ('tenant_id' in (checkin as unknown as Record<string, unknown>) && !matchesTenantRow(checkin, tenantId)) {
     return c.json({ success: false, error: 'Checkin not found' }, 404);
   }
+  const rawCheckinTenant = String((checkin as unknown as Record<string, unknown>).tenant_id ?? '').trim();
+  let effectiveTenant = rawCheckinTenant
+    ? rawCheckinTenant
+    : (tenantId && tenantId !== '*' ? tenantId : 'default');
   try {
     const custRow = await db.prepare('SELECT id, tenant_id FROM customers WHERE id = ?').bind(checkin.customer_id).first<{ id: string; tenant_id?: string | null }>();
+    if (!rawCheckinTenant && tenantId === '*' && custRow?.tenant_id) {
+      const derivedTenant = String(custRow.tenant_id).trim();
+      if (derivedTenant && derivedTenant !== '*' && derivedTenant.toLowerCase() !== 'hq') {
+        effectiveTenant = derivedTenant;
+      }
+    }
     if (custRow ? !matchesTenantRow(custRow, tenantId) : (tenantId !== 'default' && tenantId !== '*' && !('tenant_id' in (checkin as unknown as Record<string, unknown>)))) {
       return c.json({ success: false, error: 'Checkin not found' }, 404);
     }
@@ -403,12 +620,28 @@ checkinRouter.patch('/:id/reject', requireAuth(['owner', 'manager', 'supervisor'
   let updateRes: unknown;
   if (staffId) {
     try {
-      updateRes = await db.prepare("UPDATE checkins SET status = ?, staff_id = ? WHERE id = ? AND status = 'pending'").bind('rejected', staffId, id).run();
+      updateRes = await db.prepare("UPDATE checkins SET status = ?, staff_id = ? WHERE id = ? AND status = 'pending' AND (COALESCE(tenant_id, 'default') = ? OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?4)").bind('rejected', staffId, id, effectiveTenant).run();
     } catch {
-      updateRes = await db.prepare("UPDATE checkins SET status = ? WHERE id = ? AND status = 'pending'").bind('rejected', id).run();
+      if (effectiveTenant === 'default') {
+        try {
+          updateRes = await db.prepare("UPDATE checkins SET status = ?, staff_id = ? WHERE id = ? AND status = 'pending'").bind('rejected', staffId, id).run();
+        } catch {
+          updateRes = await db.prepare("UPDATE checkins SET status = ? WHERE id = ? AND status = 'pending'").bind('rejected', id).run();
+        }
+      } else {
+        updateRes = { meta: { changes: 0 } };
+      }
     }
   } else {
-    updateRes = await db.prepare("UPDATE checkins SET status = ? WHERE id = ? AND status = 'pending'").bind('rejected', id).run();
+    try {
+      updateRes = await db.prepare("UPDATE checkins SET status = ? WHERE id = ? AND status = 'pending' AND (COALESCE(tenant_id, 'default') = ? OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?3)").bind('rejected', id, effectiveTenant).run();
+    } catch {
+      if (effectiveTenant === 'default') {
+        updateRes = await db.prepare("UPDATE checkins SET status = ? WHERE id = ? AND status = 'pending'").bind('rejected', id).run();
+      } else {
+        updateRes = { meta: { changes: 0 } };
+      }
+    }
   }
   const changes = (updateRes as { meta?: { changes?: number } })?.meta?.changes ?? 1;
   if (changes === 0) {
@@ -417,22 +650,25 @@ checkinRouter.patch('/:id/reject', requireAuth(['owner', 'manager', 'supervisor'
 
   const row = await db.prepare('SELECT * FROM checkins WHERE id = ?').bind(id).first<CheckinRecord>();
   return c.json({ success: true, data: row });
-});
+};
+
+checkinRouter.patch('/:id/reject', staffAuthMiddleware(CHECKIN_APPROVE_ROLES), handleRejectCheckin);
+checkinRouter.post('/:id/reject', staffAuthMiddleware(CHECKIN_APPROVE_ROLES), handleRejectCheckin);
 
 // GET /api/checkin — list checkins (filterable)
-// Solo-OPC: no tenant isolation filter (SOLO_OPC = true)
 checkinRouter.get(
   '/',
-  async (c, next) => {
-    const isProd = c.env?.ENVIRONMENT === 'production';
-    if (isProd || c.req.header('Authorization')) {
-      return requireAuth(['owner', 'manager', 'supervisor', 'admin', 'staff', 'waiter', 'cashier'])(c, next);
-    }
-    await next();
-  },
+  staffAuthMiddleware(CHECKIN_VIEW_ROLES),
   async(c) => {
   const db = c.env.AURA_DB;
+  const user = c.get('user' as never) as { id?: string; role?: string; tenantId?: string; tenant_id?: string } | undefined;
+  if (user && (!user.role || !CHECKIN_VIEW_ROLES.includes(String(user.role).toLowerCase()))) {
+    return c.json({ success: false, error: 'Insufficient permissions' }, 403);
+  }
   const tenantId = getTenantId(c as unknown as Parameters<typeof getTenantId>[0]);
+  if (hasStaffTenantMismatch(c, user, tenantId)) {
+    return c.json({ success: false, error: 'Forbidden: tenant mismatch' }, 403);
+  }
   const status = c.req.query('status');
   const date = c.req.query('date');
   const customerId = c.req.query('customer_id');
@@ -486,12 +722,21 @@ checkinRouter.get(
 
   rows = rows.filter((r) => matchesTenantRow(r, tenantId)).slice(0, 100);
 
-  const checkins = rows.map((r) => ({
-    ...r,
-    memberId: r.customer_id,
-    memberName: r.customer_name || 'Khách hàng',
-    memberPhone: r.customer_phone || r.phone || '—',
-    submittedAt: r.checkin_time || r.created_at,
-  }));
+  const canViewPhone = Boolean(user?.role && CHECKIN_UNMASKED_PHONE_ROLES.includes(String(user.role).toLowerCase()));
+  const checkins = rows.map((r) => {
+    const rawPhone = r.customer_phone || r.phone || '';
+    const maskedPhone = rawPhone ? null : (r.customer_phone ?? null);
+    return {
+      ...r,
+      customer_phone: canViewPhone ? (r.customer_phone ?? r.phone ?? null) : maskedPhone,
+      ...('phone' in r && !canViewPhone ? { phone: null } : {}),
+      memberId: r.customer_id,
+      memberName: r.customer_name || 'Khách hàng',
+      memberPhone: canViewPhone
+        ? (rawPhone || '—')
+        : (rawPhone ? `***${String(rawPhone).slice(-3)}` : '—'),
+      submittedAt: r.checkin_time || r.created_at,
+    };
+  });
   return c.json({ success: true, data: checkins, checkins });
 });

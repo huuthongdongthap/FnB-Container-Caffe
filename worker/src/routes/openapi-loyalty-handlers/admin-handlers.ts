@@ -4,20 +4,39 @@ import { LoyaltyRoutes } from '../../schemas/loyalty';
 import { getDatabase } from '../../lib/db';
 import { getTenantId, matchesTenantRow } from '../../middleware/tenant';
 import {
+  findExistingLoyaltyIdempotencyTx,
   getLoyaltyAccountWithFallback,
+  hasOpenApiLoyaltyTenantMismatch,
   recordLoyaltyTransactionDualWrite,
   syncLoyaltyAccountAndCustomerBalance,
   writeLoyaltyAuditLog,
 } from './loyalty-db-helpers';
 
 const LOYALTY_ADMIN_ROLES = ['owner', 'manager', 'supervisor', 'admin'];
+const LOYALTY_POINT_ADJUST_ROLES = ['owner', 'manager', 'admin'];
 
-async function loadCustomerTenantMap(db: any): Promise<Map<string, Record<string, unknown>>> {
+async function loadCustomerTenantMap(db: any, tenantId = '*'): Promise<Map<string, Record<string, unknown>>> {
   const map = new Map<string, Record<string, unknown>>();
+  const allowUnscopedFallback = !tenantId || tenantId === 'default';
   try {
-    const res = (await db.prepare('SELECT * FROM customers LIMIT 1000').all()) as {
-      results?: Array<Record<string, unknown>>;
-    } | null;
+    let res: { results?: Array<Record<string, unknown>> } | null = null;
+    let scopedMapFailed = false;
+    if (tenantId && tenantId !== '*') {
+      try {
+        res = (await db
+          .prepare("SELECT * FROM customers WHERE COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ? LIMIT 1000")
+          .bind(tenantId)
+          .all()) as { results?: Array<Record<string, unknown>> } | null;
+      } catch {
+        scopedMapFailed = true;
+        res = null;
+      }
+    }
+    if (tenantId === '*' || (scopedMapFailed && allowUnscopedFallback)) {
+      res = (await db.prepare('SELECT * FROM customers LIMIT 1000').all()) as {
+        results?: Array<Record<string, unknown>>;
+      } | null;
+    }
     for (const c of res?.results || []) {
       if (c && c.id !== undefined && c.id !== null) {
         map.set(String(c.id), c);
@@ -36,11 +55,11 @@ async function accountBelongsToTenant(
   customerMap?: Map<string, Record<string, unknown>>
 ): Promise<boolean> {
   if (tenantId === '*') return true;
-  const rawAccountTenant = 'tenant_id' in row && row.tenant_id !== undefined
-    ? String(row.tenant_id ?? '').trim()
+  const rawAccountTenant = 'tenant_id' in row && row.tenant_id !== undefined && row.tenant_id !== null
+    ? String(row.tenant_id).trim()
     : '';
-  if (rawAccountTenant && rawAccountTenant !== 'default' && !matchesTenantRow(row, tenantId)) {
-    return false;
+  if (rawAccountTenant !== '' && rawAccountTenant !== 'default') {
+    return rawAccountTenant === tenantId;
   }
   const custId = String(row.customer_id ?? row.user_id ?? row.id ?? '').replace(/^la_/, '');
   if (custId) {
@@ -85,8 +104,12 @@ export function registerAdminHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
     const tenantId = getTenantId(c);
 
     // Verify admin role
-    if (!user || !LOYALTY_ADMIN_ROLES.includes(user.role)) {
+    const isAuthBearerSupervisor = user?.role === 'supervisor' && Boolean(c.req?.header?.('Authorization') || c.req?.header?.('authorization'));
+    if (!user || (!LOYALTY_POINT_ADJUST_ROLES.includes(user.role) && !isAuthBearerSupervisor)) {
       return c.json({ success: false, error: 'Admin access required' }, 403);
+    }
+    if (hasOpenApiLoyaltyTenantMismatch(c, tenantId)) {
+      return c.json({ success: false, error: 'Forbidden: cross-tenant access denied' }, 403);
     }
 
     if (tenantId !== '*') {
@@ -111,22 +134,27 @@ export function registerAdminHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
       }
     }
 
-    // Check idempotency
-    let existing: any = null;
-    try {
-      existing = await db.prepare('SELECT * FROM loyalty_transactions WHERE idempotency_key = ?')
-        .bind(body.idempotencyKey ?? null).first();
-    } catch {
-      existing = null;
-    }
-    if (existing) {
-      return c.json({ success: false, error: 'Duplicate adjustment request' }, 409);
-    }
-
     const { account } = await getLoyaltyAccountWithFallback(db, body.customerId, now, tenantId);
 
     if (!account || !(await accountBelongsToTenant(db, account as Record<string, unknown>, tenantId))) {
       return c.json({ success: false, error: 'Loyalty account not found for customer' }, 404);
+    }
+
+    const accountId = String(account.id);
+    const customerId = String(account.customer_id ?? body.customerId);
+    const effectiveAdjustTenant =
+      tenantId === '*'
+        ? (typeof account.tenant_id === 'string' && account.tenant_id.trim()) || 'default'
+        : tenantId;
+
+    // Check idempotency isolated by tenant and customer ownership
+    const existing = await findExistingLoyaltyIdempotencyTx(db, body.idempotencyKey, {
+      tenantId: effectiveAdjustTenant,
+      customerId,
+      accountId,
+    });
+    if (existing) {
+      return c.json({ success: false, error: 'Duplicate adjustment request' }, 409);
     }
 
     const currentPoints = Number(account.current_points ?? account.loyalty_points ?? 0);
@@ -136,8 +164,6 @@ export function registerAdminHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
     }
 
     const transactionId = crypto.randomUUID();
-    const accountId = String(account.id);
-    const customerId = String(account.customer_id ?? body.customerId);
 
     const resolvedBalance = await syncLoyaltyAccountAndCustomerBalance(db, {
       accountId,
@@ -145,9 +171,12 @@ export function registerAdminHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
       newBalance: expectedBalance,
       pointsDelta: body.points,
       lifetimeDelta: Math.max(0, body.points),
-      tenantId,
+      tenantId: effectiveAdjustTenant,
       now,
     });
+    if (body.points < 0 && resolvedBalance === null) {
+      return c.json({ success: false, error: 'Insufficient points for adjustment' }, 409);
+    }
     const newBalance = typeof resolvedBalance === 'number' && Number.isFinite(resolvedBalance) ? resolvedBalance : expectedBalance;
 
     await recordLoyaltyTransactionDualWrite(db, {
@@ -161,7 +190,7 @@ export function registerAdminHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
       reason: body.reason,
       idempotencyKey: body.idempotencyKey ?? null,
       createdBy: user.id,
-      tenantId,
+      tenantId: effectiveAdjustTenant,
       now,
     });
 
@@ -172,7 +201,8 @@ export function registerAdminHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
       'loyalty_account',
       accountId,
       JSON.stringify({ points: body.points, reason: body.reason }),
-      now
+      now,
+      effectiveAdjustTenant
     );
 
     const transaction = (await db.prepare('SELECT * FROM loyalty_transactions WHERE id = ?').bind(transactionId).first()) as any;
@@ -200,6 +230,9 @@ export function registerAdminHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
     // Verify admin role
     if (!user || !LOYALTY_ADMIN_ROLES.includes(user.role)) {
       return c.json({ success: false, error: 'Admin access required' }, 403);
+    }
+    if (hasOpenApiLoyaltyTenantMismatch(c, tenantId)) {
+      return c.json({ success: false, error: 'Forbidden: cross-tenant access denied' }, 403);
     }
 
     const page = query.page || 1;
@@ -243,23 +276,25 @@ export function registerAdminHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
           WHERE (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?)`
         ).bind(tenantId, tenantId).run();
       } catch {
-        await db.prepare(
-          `INSERT OR IGNORE INTO loyalty_accounts (
-            id, customer_id, current_points, lifetime_points, tier, order_count, total_spent, last_activity_at, created_at, updated_at
-          )
-          SELECT
-            'la_' || id,
-            id,
-            COALESCE(loyalty_points, 0),
-            COALESCE(lifetime_points, loyalty_points, 0),
-            COALESCE(NULLIF(loyalty_tier, ''), 'bronze'),
-            COALESCE(visit_count, 0),
-            COALESCE(total_spent, 0),
-            COALESCE(updated_at, created_at, datetime('now')),
-            COALESCE(created_at, datetime('now')),
-            COALESCE(updated_at, datetime('now'))
-          FROM customers`
-        ).run();
+        if (tenantId === 'default') {
+          await db.prepare(
+            `INSERT OR IGNORE INTO loyalty_accounts (
+              id, customer_id, current_points, lifetime_points, tier, order_count, total_spent, last_activity_at, created_at, updated_at
+            )
+            SELECT
+              'la_' || id,
+              id,
+              COALESCE(loyalty_points, 0),
+              COALESCE(lifetime_points, loyalty_points, 0),
+              COALESCE(NULLIF(loyalty_tier, ''), 'bronze'),
+              COALESCE(visit_count, 0),
+              COALESCE(total_spent, 0),
+              COALESCE(updated_at, created_at, datetime('now')),
+              COALESCE(created_at, datetime('now')),
+              COALESCE(updated_at, datetime('now'))
+            FROM customers`
+          ).run();
+        }
       }
       if (tenantId === '*') {
         const accounts = (await db.prepare(
@@ -267,10 +302,22 @@ export function registerAdminHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
         ).bind(...params, limit, offset).all()) as { results: any[] };
         accountResults = accounts.results || [];
       } else {
-        const accounts = (await db.prepare(
-          `SELECT * FROM loyalty_accounts ${whereClause} ORDER BY created_at DESC LIMIT 1000`
-        ).bind(...params).all()) as { results: any[] };
-        accountResults = accounts.results || [];
+        let scopedQueryFailed = false;
+        try {
+          const scopedAccounts = (await db.prepare(
+            `SELECT * FROM loyalty_accounts ${whereClause} AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ? ORDER BY created_at DESC LIMIT 1000`
+          ).bind(...params, tenantId).all()) as { results: any[] };
+          accountResults = scopedAccounts.results || [];
+        } catch {
+          scopedQueryFailed = true;
+          accountResults = [];
+        }
+        if (scopedQueryFailed && tenantId === 'default') {
+          const accounts = (await db.prepare(
+            `SELECT * FROM loyalty_accounts ${whereClause} ORDER BY created_at DESC LIMIT 1000`
+          ).bind(...params).all()) as { results: any[] };
+          accountResults = accounts.results || [];
+        }
       }
     } catch {
       let canonicalWhere = 'WHERE 1=1';
@@ -290,15 +337,27 @@ export function registerAdminHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
         ).bind(...canonicalParams, limit, offset).all().catch(() => ({ results: [] }))) as { results: any[] };
         accountResults = accounts.results || [];
       } else {
-        const accounts = (await db.prepare(
-          `SELECT *, id as customer_id, loyalty_points as current_points, loyalty_points as lifetime_points, loyalty_tier as tier, visit_count as order_count FROM customers ${canonicalWhere} ORDER BY created_at DESC LIMIT 1000`
-        ).bind(...canonicalParams).all().catch(() => ({ results: [] }))) as { results: any[] };
-        accountResults = accounts.results || [];
+        let scopedCustFailed = false;
+        try {
+          const scopedAccounts = (await db.prepare(
+            `SELECT *, id as customer_id, loyalty_points as current_points, loyalty_points as lifetime_points, loyalty_tier as tier, visit_count as order_count FROM customers ${canonicalWhere} AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ? ORDER BY created_at DESC LIMIT 1000`
+          ).bind(...canonicalParams, tenantId).all()) as { results: any[] };
+          accountResults = scopedAccounts.results || [];
+        } catch {
+          scopedCustFailed = true;
+          accountResults = [];
+        }
+        if (scopedCustFailed && tenantId === 'default') {
+          const accounts = (await db.prepare(
+            `SELECT *, id as customer_id, loyalty_points as current_points, loyalty_points as lifetime_points, loyalty_tier as tier, visit_count as order_count FROM customers ${canonicalWhere} ORDER BY created_at DESC LIMIT 1000`
+          ).bind(...canonicalParams).all().catch(() => ({ results: [] }))) as { results: any[] };
+          accountResults = accounts.results || [];
+        }
       }
     }
 
     if (tenantId !== '*') {
-      const customerMap = await loadCustomerTenantMap(db);
+      const customerMap = await loadCustomerTenantMap(db, tenantId);
       const filtered: any[] = [];
       for (const a of accountResults) {
         if (await accountBelongsToTenant(db, a as Record<string, unknown>, tenantId, customerMap)) {
@@ -339,6 +398,9 @@ export function registerAdminHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
     if (!user || !LOYALTY_ADMIN_ROLES.includes(user.role)) {
       return c.json({ success: false, error: 'Admin access required' }, 403);
     }
+    if (hasOpenApiLoyaltyTenantMismatch(c, tenantId)) {
+      return c.json({ success: false, error: 'Forbidden: cross-tenant access denied' }, 403);
+    }
 
     if (tenantId !== '*') {
       let allAccounts: any[] = [];
@@ -365,34 +427,62 @@ export function registerAdminHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
             WHERE (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?)`
           ).bind(tenantId, tenantId).run();
         } catch {
-          await db.prepare(
-            `INSERT OR IGNORE INTO loyalty_accounts (
-              id, customer_id, current_points, lifetime_points, tier, order_count, total_spent, last_activity_at, created_at, updated_at
-            )
-            SELECT
-              'la_' || id,
-              id,
-              COALESCE(loyalty_points, 0),
-              COALESCE(lifetime_points, loyalty_points, 0),
-              COALESCE(NULLIF(loyalty_tier, ''), 'bronze'),
-              COALESCE(visit_count, 0),
-              COALESCE(total_spent, 0),
-              COALESCE(updated_at, created_at, datetime('now')),
-              COALESCE(created_at, datetime('now')),
-              COALESCE(updated_at, datetime('now'))
-            FROM customers`
-          ).run().catch(() => {});
+          if (tenantId === 'default') {
+            await db.prepare(
+              `INSERT OR IGNORE INTO loyalty_accounts (
+                id, customer_id, current_points, lifetime_points, tier, order_count, total_spent, last_activity_at, created_at, updated_at
+              )
+              SELECT
+                'la_' || id,
+                id,
+                COALESCE(loyalty_points, 0),
+                COALESCE(lifetime_points, loyalty_points, 0),
+                COALESCE(NULLIF(loyalty_tier, ''), 'bronze'),
+                COALESCE(visit_count, 0),
+                COALESCE(total_spent, 0),
+                COALESCE(updated_at, created_at, datetime('now')),
+                COALESCE(created_at, datetime('now')),
+                COALESCE(updated_at, datetime('now'))
+              FROM customers`
+            ).run().catch(() => {});
+          }
         }
-        const res = (await db.prepare('SELECT * FROM loyalty_accounts LIMIT 1000').all()) as { results?: any[] };
-        allAccounts = res?.results || [];
+        let scopedAcctFailed = false;
+        try {
+          const scopedRes = (await db
+            .prepare("SELECT * FROM loyalty_accounts WHERE COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ? LIMIT 1000")
+            .bind(tenantId)
+            .all()) as { results?: any[] };
+          allAccounts = scopedRes?.results || [];
+        } catch {
+          scopedAcctFailed = true;
+          allAccounts = [];
+        }
+        if (scopedAcctFailed && tenantId === 'default') {
+          const res = (await db.prepare('SELECT * FROM loyalty_accounts LIMIT 1000').all()) as { results?: any[] };
+          allAccounts = res?.results || [];
+        }
         scopedQuerySucceeded = true;
       } catch {
-        const res = (await db
-          .prepare(
-            'SELECT *, id as customer_id, loyalty_points as current_points, loyalty_tier as tier, updated_at as last_activity_at FROM customers LIMIT 1000'
-          )
-          .all()
-          .catch(() => null)) as { results?: any[] } | null;
+        let res: { results?: any[] } | null = null;
+        try {
+          res = (await db
+            .prepare(
+              "SELECT *, id as customer_id, loyalty_points as current_points, loyalty_tier as tier, updated_at as last_activity_at FROM customers WHERE COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ? LIMIT 1000"
+            )
+            .bind(tenantId)
+            .all()) as { results?: any[] } | null;
+        } catch {
+          res = null;
+        }
+        if (!res && tenantId === 'default') {
+          res = (await db
+            .prepare(
+              'SELECT *, id as customer_id, loyalty_points as current_points, loyalty_tier as tier, updated_at as last_activity_at FROM customers LIMIT 1000'
+            )
+            .all()
+            .catch(() => null)) as { results?: any[] } | null;
+        }
         if (res) {
           allAccounts = res.results || [];
           scopedQuerySucceeded = true;
@@ -400,7 +490,7 @@ export function registerAdminHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
       }
 
       if (scopedQuerySucceeded || tenantId !== 'default') {
-        const customerMap = await loadCustomerTenantMap(db);
+        const customerMap = await loadCustomerTenantMap(db, tenantId);
         const scopedAccounts: any[] = [];
         const scopedAccountIds = new Set<string>();
         const scopedCustomerIds = new Set<string>();
@@ -435,10 +525,17 @@ export function registerAdminHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
           };
         }
 
-        const allTxsRes = (await db
-          .prepare('SELECT * FROM loyalty_transactions ORDER BY created_at DESC LIMIT 1000')
+        let allTxsRes = (await db
+          .prepare("SELECT * FROM loyalty_transactions WHERE COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ? ORDER BY created_at DESC LIMIT 1000")
+          .bind(tenantId)
           .all()
-          .catch(() => ({ results: [] }))) as { results?: any[] };
+          .catch(() => null)) as { results?: any[] } | null;
+        if (!allTxsRes && tenantId === 'default') {
+          allTxsRes = (await db
+            .prepare('SELECT * FROM loyalty_transactions ORDER BY created_at DESC LIMIT 1000')
+            .all()
+            .catch(() => ({ results: [] }))) as { results?: any[] };
+        }
         let totalIssued = 0;
         let totalRedeemed = 0;
         let totalExpired = 0;
@@ -455,9 +552,10 @@ export function registerAdminHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
           }
           if (!belongs) continue;
           const pts = Number(tx.points || 0);
+          const txType = String(tx.type || '').trim().toLowerCase();
           if (pts > 0) totalIssued += pts;
-          if (pts < 0) totalRedeemed += -pts;
-          if (tx.type === 'expire') totalExpired += -pts;
+          if (txType === 'redeem' || (pts < 0 && !txType)) totalRedeemed += Math.abs(pts);
+          if (txType === 'expire') totalExpired += Math.abs(pts);
         }
 
         const redemptionRate = totalIssued > 0 ? (totalRedeemed / totalIssued) * 100 : 0;
@@ -492,8 +590,8 @@ export function registerAdminHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
       pointsStats = await db.prepare(
         `SELECT
           SUM(CASE WHEN points > 0 THEN points ELSE 0 END) as total_issued,
-          SUM(CASE WHEN points < 0 THEN -points ELSE 0 END) as total_redeemed,
-          SUM(CASE WHEN type = 'expire' THEN -points ELSE 0 END) as total_expired
+          SUM(CASE WHEN LOWER(COALESCE(type, '')) = 'redeem' OR (points < 0 AND (type IS NULL OR TRIM(type) = '')) THEN ABS(points) ELSE 0 END) as total_redeemed,
+          SUM(CASE WHEN type = 'expire' THEN ABS(points) ELSE 0 END) as total_expired
          FROM loyalty_transactions`
       ).first();
       byTier = await db.prepare(
@@ -507,8 +605,8 @@ export function registerAdminHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
       pointsStats = await db.prepare(
         `SELECT
           SUM(CASE WHEN points > 0 THEN points ELSE 0 END) as total_issued,
-          SUM(CASE WHEN points < 0 THEN -points ELSE 0 END) as total_redeemed,
-          SUM(CASE WHEN type = 'expire' THEN -points ELSE 0 END) as total_expired
+          SUM(CASE WHEN LOWER(COALESCE(type, '')) = 'redeem' OR (points < 0 AND (type IS NULL OR TRIM(type) = '')) THEN ABS(points) ELSE 0 END) as total_redeemed,
+          SUM(CASE WHEN type = 'expire' THEN ABS(points) ELSE 0 END) as total_expired
          FROM loyalty_transactions`
       ).first().catch(() => ({ total_issued: 0, total_redeemed: 0, total_expired: 0 }));
       byTier = await db.prepare(

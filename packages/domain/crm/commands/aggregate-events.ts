@@ -36,13 +36,13 @@ export async function aggregateEvents(
 ): Promise<AggregateResult> {
   const rawLimit = Number(options.limit ?? 100);
   const limit = Number.isFinite(rawLimit) ? Math.min(Math.max(1, Math.floor(rawLimit)), 500) : 100;
-  const effectiveTenant =
-    options.tenantId && options.tenantId !== '*'
+  let effectiveTenant =
+    options.tenantId && options.tenantId !== '*' && options.tenantId !== 'hq'
       ? options.tenantId.trim() || 'default'
       : null;
 
   try {
-    if (effectiveTenant) {
+    if (effectiveTenant || options.tenantId === '*' || options.tenantId === 'hq') {
       try {
         const custStmt = db.prepare('SELECT id, tenant_id FROM customers WHERE id = ? LIMIT 1');
         const boundCust = typeof custStmt.bind === 'function' ? custStmt.bind(customerId) : custStmt;
@@ -50,8 +50,11 @@ export async function aggregateEvents(
           const custRow = await boundCust.first<{ id: string; tenant_id?: string | null }>();
           if (custRow && 'tenant_id' in custRow && custRow.tenant_id !== undefined) {
             const custTenant = (custRow.tenant_id && String(custRow.tenant_id).trim()) || 'default';
-            if (custTenant !== effectiveTenant) {
+            if (effectiveTenant && custTenant !== effectiveTenant) {
               return { ...EMPTY, customerId };
+            }
+            if (!effectiveTenant && custTenant !== '*' && custTenant !== 'hq') {
+              effectiveTenant = custTenant;
             }
           }
         }
@@ -72,12 +75,14 @@ export async function aggregateEvents(
           ).bind(customerId, effectiveTenant, limit).all<{ id: string; type: string; source: string; timestamp: string; payload: string }>()
         : Promise.reject(new Error('unscoped'))
       )
-        .catch(() =>
-          db.prepare(
-            `SELECT id, 'CustomerIdentified' as type, 'identity' as source, created_at as timestamp,
-                    json_object('identifier_type', identifier_type, 'identifier_value', identifier_value, 'is_primary', is_primary) as payload
-             FROM customer_identities WHERE customer_id = ? ORDER BY created_at DESC LIMIT ?`,
-          ).bind(customerId, limit).all<{ id: string; type: string; source: string; timestamp: string; payload: string }>()
+        .catch((err) =>
+          !effectiveTenant || effectiveTenant === 'default'
+            ? db.prepare(
+                `SELECT id, 'CustomerIdentified' as type, 'identity' as source, created_at as timestamp,
+                        json_object('identifier_type', identifier_type, 'identifier_value', identifier_value, 'is_primary', is_primary) as payload
+                 FROM customer_identities WHERE customer_id = ? ORDER BY created_at DESC LIMIT ?`,
+              ).bind(customerId, limit).all<{ id: string; type: string; source: string; timestamp: string; payload: string }>()
+            : Promise.reject(err),
         )
         .catch(() => ({ results: [] })),
 
@@ -104,22 +109,26 @@ export async function aggregateEvents(
             )
         : Promise.reject(new Error('unscoped'))
       )
-        .catch(() =>
-          db.prepare(
-            `SELECT id, CASE WHEN granted = 1 THEN 'ConsentGiven' ELSE 'ConsentRevoked' END as type,
-                    'consent' as source, COALESCE(revoked_at, granted_at) as timestamp,
-                    json_object('purpose', purpose, 'granted', granted, 'source', source) as payload
-             FROM consents WHERE customer_id = ? ORDER BY COALESCE(revoked_at, granted_at) DESC LIMIT ?`,
-          ).bind(customerId, limit).all<{ id: string; type: string; source: string; timestamp: string; payload: string }>()
+        .catch((err) =>
+          !effectiveTenant || effectiveTenant === 'default'
+            ? db.prepare(
+                `SELECT id, CASE WHEN granted = 1 THEN 'ConsentGiven' ELSE 'ConsentRevoked' END as type,
+                        'consent' as source, COALESCE(revoked_at, granted_at) as timestamp,
+                        json_object('purpose', purpose, 'granted', granted, 'source', source) as payload
+                 FROM consents WHERE customer_id = ? ORDER BY COALESCE(revoked_at, granted_at) DESC LIMIT ?`,
+              ).bind(customerId, limit).all<{ id: string; type: string; source: string; timestamp: string; payload: string }>()
+            : Promise.reject(err),
         )
         .catch(() =>
-          db.prepare(
-            `SELECT id, CASE WHEN granted = 1 THEN 'ConsentGiven' ELSE 'ConsentRevoked' END as type,
-                    'consent' as source, COALESCE(revoked_at, granted_at) as timestamp,
-                    json_object('purpose', purpose, 'granted', granted, 'source', source) as payload
-             FROM consents WHERE customer_id = ? ORDER BY created_at DESC LIMIT ?`,
-          ).bind(customerId, limit).all<{ id: string; type: string; source: string; timestamp: string; payload: string }>()
-            .catch(() => ({ results: [] })),
+          !effectiveTenant || effectiveTenant === 'default'
+            ? db.prepare(
+                `SELECT id, CASE WHEN granted = 1 THEN 'ConsentGiven' ELSE 'ConsentRevoked' END as type,
+                        'consent' as source, COALESCE(revoked_at, granted_at) as timestamp,
+                        json_object('purpose', purpose, 'granted', granted, 'source', source) as payload
+                 FROM consents WHERE customer_id = ? ORDER BY created_at DESC LIMIT ?`,
+              ).bind(customerId, limit).all<{ id: string; type: string; source: string; timestamp: string; payload: string }>()
+                .catch(() => ({ results: [] }))
+            : ({ results: [] }),
         ),
 
       (effectiveTenant
@@ -132,12 +141,14 @@ export async function aggregateEvents(
           ).bind(customerId, effectiveTenant, limit).all<{ id: string; type: string; source: string; timestamp: string; payload: string }>()
         : Promise.reject(new Error('unscoped'))
       )
-        .catch(() =>
-          db.prepare(
-            `SELECT id, 'VisitRecorded' as type, 'visit' as source, visited_at as timestamp,
-                    json_object('channel', channel, 'order_id', order_id, 'spent', spent) as payload
-             FROM visits WHERE customer_id = ? ORDER BY visited_at DESC LIMIT ?`,
-          ).bind(customerId, limit).all<{ id: string; type: string; source: string; timestamp: string; payload: string }>()
+        .catch((err) =>
+          !effectiveTenant || effectiveTenant === 'default'
+            ? db.prepare(
+                `SELECT id, 'VisitRecorded' as type, 'visit' as source, visited_at as timestamp,
+                        json_object('channel', channel, 'order_id', order_id, 'spent', spent) as payload
+                 FROM visits WHERE customer_id = ? ORDER BY visited_at DESC LIMIT ?`,
+              ).bind(customerId, limit).all<{ id: string; type: string; source: string; timestamp: string; payload: string }>()
+            : Promise.reject(err),
         )
         .catch(() => ({ results: [] })),
 
@@ -178,22 +189,26 @@ export async function aggregateEvents(
                  ORDER BY created_at DESC LIMIT ?`,
               ).bind(customerId, customerId, effectiveTenant, effectiveTenant, limit).all<{ id: string; type: string; source: string; timestamp: string; payload: string }>()
             : Promise.reject(new Error('skip_scoped_fallback'))
-          ).catch(() =>
-            db.prepare(
-              `SELECT id, 'OrderLinked' as type, 'order' as source, created_at as timestamp,
-                      json_object('total', total, 'status', status, 'payment_method', payment_method) as payload
-               FROM orders
-               WHERE customer_id = ? OR customer_phone = (SELECT NULLIF(TRIM(phone), '') FROM customers WHERE id = ?)
-               ORDER BY created_at DESC LIMIT ?`,
-            ).bind(customerId, customerId, limit).all<{ id: string; type: string; source: string; timestamp: string; payload: string }>()
+          ).catch((err) =>
+            !effectiveTenant || effectiveTenant === 'default'
+              ? db.prepare(
+                  `SELECT id, 'OrderLinked' as type, 'order' as source, created_at as timestamp,
+                          json_object('total', total, 'status', status, 'payment_method', payment_method) as payload
+                   FROM orders
+                   WHERE customer_id = ? OR customer_phone = (SELECT NULLIF(TRIM(phone), '') FROM customers WHERE id = ?)
+                   ORDER BY created_at DESC LIMIT ?`,
+                ).bind(customerId, customerId, limit).all<{ id: string; type: string; source: string; timestamp: string; payload: string }>()
+              : Promise.reject(err),
           )
             .catch(() =>
-              db.prepare(
-                `SELECT id, 'OrderLinked' as type, 'order' as source, created_at as timestamp,
-                        json_object('total', total, 'status', status, 'payment_method', payment_method) as payload
-                 FROM orders WHERE customer_phone = (SELECT NULLIF(TRIM(phone), '') FROM customers WHERE id = ?) ORDER BY created_at DESC LIMIT ?`,
-              ).bind(customerId, limit).all<{ id: string; type: string; source: string; timestamp: string; payload: string }>()
-                .catch(() => ({ results: [] })),
+              !effectiveTenant || effectiveTenant === 'default'
+                ? db.prepare(
+                    `SELECT id, 'OrderLinked' as type, 'order' as source, created_at as timestamp,
+                            json_object('total', total, 'status', status, 'payment_method', payment_method) as payload
+                     FROM orders WHERE customer_phone = (SELECT NULLIF(TRIM(phone), '') FROM customers WHERE id = ?) ORDER BY created_at DESC LIMIT ?`,
+                  ).bind(customerId, limit).all<{ id: string; type: string; source: string; timestamp: string; payload: string }>()
+                    .catch(() => ({ results: [] }))
+                : ({ results: [] }),
             ),
         ),
 
@@ -220,22 +235,26 @@ export async function aggregateEvents(
             )
         : Promise.reject(new Error('unscoped'))
       )
-        .catch(() =>
-          db.prepare(
-            `SELECT id, CASE WHEN points_change > 0 THEN 'PointsEarned' ELSE 'PointsRedeemed' END as type,
-                    'loyalty' as source, created_at as timestamp,
-                    json_object('points', points_change, 'reason', COALESCE(reason, 'unknown')) as payload
-             FROM loyalty_point_logs WHERE customer_id = ? ORDER BY created_at DESC LIMIT ?`,
-          ).bind(customerId, limit).all<{ id: string; type: string; source: string; timestamp: string; payload: string }>()
+        .catch((err) =>
+          !effectiveTenant || effectiveTenant === 'default'
+            ? db.prepare(
+                `SELECT id, CASE WHEN points_change > 0 THEN 'PointsEarned' ELSE 'PointsRedeemed' END as type,
+                        'loyalty' as source, created_at as timestamp,
+                        json_object('points', points_change, 'reason', COALESCE(reason, 'unknown')) as payload
+                 FROM loyalty_point_logs WHERE customer_id = ? ORDER BY created_at DESC LIMIT ?`,
+              ).bind(customerId, limit).all<{ id: string; type: string; source: string; timestamp: string; payload: string }>()
+            : Promise.reject(err),
         )
         .catch(() =>
-          db.prepare(
-            `SELECT id, CASE WHEN points > 0 THEN 'PointsEarned' ELSE 'PointsRedeemed' END as type,
-                    'loyalty' as source, created_at as timestamp,
-                    json_object('points', points, 'reason', COALESCE(reason, 'unknown')) as payload
-             FROM loyalty_point_logs WHERE customer_id = ? ORDER BY created_at DESC LIMIT ?`,
-          ).bind(customerId, limit).all<{ id: string; type: string; source: string; timestamp: string; payload: string }>()
-            .catch(() => ({ results: [] })),
+          !effectiveTenant || effectiveTenant === 'default'
+            ? db.prepare(
+                `SELECT id, CASE WHEN points > 0 THEN 'PointsEarned' ELSE 'PointsRedeemed' END as type,
+                        'loyalty' as source, created_at as timestamp,
+                        json_object('points', points, 'reason', COALESCE(reason, 'unknown')) as payload
+                 FROM loyalty_point_logs WHERE customer_id = ? ORDER BY created_at DESC LIMIT ?`,
+              ).bind(customerId, limit).all<{ id: string; type: string; source: string; timestamp: string; payload: string }>()
+                .catch(() => ({ results: [] }))
+            : ({ results: [] }),
         ),
     ]);
 

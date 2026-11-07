@@ -1,19 +1,30 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useClientSessionScope } from '@/lib/client-session';
 import { apiFetch } from './subscription-api';
 import { EMPTY_PLAN_FORM } from './subscription-types';
 import type { PlanRecord, PlanFormData } from './subscription-types';
 
 export function useSubscriptionPlans(t: (key: string, options?: Record<string, unknown>) => string) {
   const queryClient = useQueryClient();
+  const session = useClientSessionScope();
+  const adminPlansKey = ['admin-subscription-plans', session.tenantId, session.userScope] as const;
   const [modalOpen, setModalOpen] = useState(false);
   const [editingPlan, setEditingPlan] = useState<PlanRecord | null>(null);
   const [form, setForm] = useState<PlanFormData>(EMPTY_PLAN_FORM);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [deletePlanId, setDeletePlanId] = useState<string | null>(null);
 
+  useEffect(() => {
+    setModalOpen(false);
+    setEditingPlan(null);
+    setForm(EMPTY_PLAN_FORM);
+    setErrors({});
+    setDeletePlanId(null);
+  }, [session.tenantId, session.userScope]);
+
   const query = useQuery<{ success: boolean; data: PlanRecord[] }>({
-    queryKey: ['admin-subscription-plans'],
+    queryKey: adminPlansKey,
     queryFn: () => apiFetch('/api/subscriptions/plans?all=1'),
   });
 
@@ -52,8 +63,8 @@ export function useSubscriptionPlans(t: (key: string, options?: Record<string, u
       });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['admin-subscription-plans'] });
-      queryClient.invalidateQueries({ queryKey: ['subscription-plans'] });
+      queryClient.invalidateQueries({ queryKey: adminPlansKey });
+      queryClient.invalidateQueries({ queryKey: ['subscription-plans', session.tenantId] });
       closeModal();
     },
     onError: (err: Error) => {
@@ -65,8 +76,8 @@ export function useSubscriptionPlans(t: (key: string, options?: Record<string, u
     mutationFn: (id: string) =>
       apiFetch(`/api/subscriptions/plans/${encodeURIComponent(id)}`, { method: 'DELETE' }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['admin-subscription-plans'] });
-      queryClient.invalidateQueries({ queryKey: ['subscription-plans'] });
+      queryClient.invalidateQueries({ queryKey: adminPlansKey });
+      queryClient.invalidateQueries({ queryKey: ['subscription-plans', session.tenantId] });
       setDeletePlanId(null);
     },
     onError: (err: Error) => {

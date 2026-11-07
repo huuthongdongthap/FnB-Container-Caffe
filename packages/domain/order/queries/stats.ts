@@ -11,43 +11,62 @@ const log = createLogger({ route: 'orders' });
 export async function getStats(request: Request, env: Record<string, unknown>, tenantId?: string) {
   try {
     const db = (env.AURA_DB ?? (env as Record<string, unknown>).DB) as import('@cloudflare/workers-types').D1Database;
-    const cleanTenant = tenantId ? tenantId.trim() : '';
-    const hasTenant = Boolean(cleanTenant && cleanTenant !== '*');
+    const url = new URL(request.url);
+    const queryTenant = (url.searchParams.get('tenant_id') || url.searchParams.get('tenantId') || '').trim();
+    const rawTenantId = typeof tenantId === 'string' && tenantId.trim() ? tenantId.trim() : 'default';
+    const effectiveTenantId =
+      rawTenantId === '*' || rawTenantId === 'hq'
+        ? (queryTenant && queryTenant !== 'hq' ? queryTenant : '*')
+        : rawTenantId;
+    const hasTenant = effectiveTenantId !== '*';
     const tenantWhere = !hasTenant
       ? ''
-      : cleanTenant === 'default'
+      : effectiveTenantId === 'default'
         ? " WHERE (tenant_id = ? OR tenant_id IS NULL OR tenant_id = '' OR TRIM(tenant_id) = '')"
         : ' WHERE (tenant_id = ? OR TRIM(tenant_id) = ?1)';
     const tenantAnd1 = !hasTenant
       ? ''
-      : cleanTenant === 'default'
+      : effectiveTenantId === 'default'
         ? " AND (tenant_id = ? OR tenant_id IS NULL OR tenant_id = '' OR TRIM(tenant_id) = '')"
         : ' AND (tenant_id = ? OR TRIM(tenant_id) = ?1)';
     const tenantAnd2 = !hasTenant
       ? ''
-      : cleanTenant === 'default'
+      : effectiveTenantId === 'default'
         ? " AND (tenant_id = ? OR tenant_id IS NULL OR tenant_id = '' OR TRIM(tenant_id) = '')"
         : ' AND (tenant_id = ? OR TRIM(tenant_id) = ?2)';
-    const tenantBinds = hasTenant && cleanTenant ? [cleanTenant] : [];
-    const todayStart = new Date();
-    todayStart.setHours(0, 0, 0, 0);
-    const todayStartParam = todayStart.toISOString().slice(0, 10) + ' 00:00:00';
+    const tenantBinds = hasTenant ? [effectiveTenantId] : [];
+    const ictNowMs = Date.now() + 7 * 3600_000;
+    const today = new Date(ictNowMs).toISOString().slice(0, 10);
+    const todayStartParam = `${today} 00:00:00`;
+    const revenueExclusionClause =
+      "status != 'cancelled' AND COALESCE(LOWER(TRIM(status)), '') NOT IN ('cancelled', 'refunded', 'failed', 'expired') AND COALESCE(LOWER(TRIM(payment_status)), '') NOT IN ('refunded', 'failed')";
+    const statusOnlyExclusionClause =
+      "status != 'cancelled' AND COALESCE(LOWER(TRIM(status)), '') NOT IN ('cancelled', 'refunded', 'failed', 'expired')";
 
     let ordersTodayResult: { total: number; revenue: number }[] = [];
     try {
       const res = await db.prepare(`
         SELECT COUNT(*) as total, COALESCE(SUM(total), 0) as revenue
         FROM orders
-        WHERE created_at >= ? AND status != 'cancelled'${tenantAnd2}
+        WHERE created_at >= ? AND ${revenueExclusionClause}${tenantAnd2}
       `).bind(todayStartParam, ...tenantBinds).all<{ total: number; revenue: number }>();
       ordersTodayResult = res.results || [];
     } catch {
-      const res = await db.prepare(`
-        SELECT COUNT(*) as total, COALESCE(SUM(COALESCE(total, total_amount, 0)), 0) as revenue
-        FROM orders
-        WHERE created_at >= ? AND status != 'cancelled'${tenantAnd2}
-      `).bind(todayStartParam, ...tenantBinds).all<{ total: number; revenue: number }>();
-      ordersTodayResult = res.results || [];
+      try {
+        const res = await db.prepare(`
+          SELECT COUNT(*) as total, COALESCE(SUM(COALESCE(total, total_amount, 0)), 0) as revenue
+          FROM orders
+          WHERE created_at >= ? AND ${revenueExclusionClause}${tenantAnd2}
+        `).bind(todayStartParam, ...tenantBinds).all<{ total: number; revenue: number }>();
+        ordersTodayResult = res.results || [];
+      } catch {
+        const res = await db.prepare(`
+          SELECT COUNT(*) as total, COALESCE(SUM(COALESCE(total, total_amount, 0)), 0) as revenue
+          FROM orders
+          WHERE created_at >= ? AND ${statusOnlyExclusionClause}${tenantAnd2}
+        `).bind(todayStartParam, ...tenantBinds).all<{ total: number; revenue: number }>();
+        ordersTodayResult = res.results || [];
+      }
     }
 
     const statusStmt = db.prepare(`
@@ -59,17 +78,34 @@ export async function getStats(request: Request, env: Record<string, unknown>, t
       ? await statusStmt.bind(...tenantBinds).all<{ status: string; count: number }>()
       : await statusStmt.all<{ status: string; count: number }>();
 
-    const topProductsStmt = db.prepare(`
-      SELECT items, COUNT(*) as order_count
-      FROM orders
-      WHERE status != 'cancelled'${tenantAnd1}
-      GROUP BY items
-      ORDER BY order_count DESC
-      LIMIT 10
-    `);
-    const { results: topProducts } = tenantBinds.length > 0
-      ? await topProductsStmt.bind(...tenantBinds).all<{ items: string; order_count: number }>()
-      : await topProductsStmt.all<{ items: string; order_count: number }>();
+    let topProducts: { items: string; order_count: number }[] = [];
+    try {
+      const topProductsStmt = db.prepare(`
+        SELECT items, COUNT(*) as order_count
+        FROM orders
+        WHERE ${revenueExclusionClause}${tenantAnd1}
+        GROUP BY items
+        ORDER BY order_count DESC
+        LIMIT 10
+      `);
+      const res = tenantBinds.length > 0
+        ? await topProductsStmt.bind(...tenantBinds).all<{ items: string; order_count: number }>()
+        : await topProductsStmt.all<{ items: string; order_count: number }>();
+      topProducts = res.results || [];
+    } catch {
+      const topProductsStmt = db.prepare(`
+        SELECT items, COUNT(*) as order_count
+        FROM orders
+        WHERE ${statusOnlyExclusionClause}${tenantAnd1}
+        GROUP BY items
+        ORDER BY order_count DESC
+        LIMIT 10
+      `);
+      const res = tenantBinds.length > 0
+        ? await topProductsStmt.bind(...tenantBinds).all<{ items: string; order_count: number }>()
+        : await topProductsStmt.all<{ items: string; order_count: number }>();
+      topProducts = res.results || [];
+    }
 
     const productStats: Record<string, number> = {};
     topProducts.forEach(row => {
@@ -89,30 +125,39 @@ export async function getStats(request: Request, env: Record<string, unknown>, t
       .sort((a, b) => b.quantity - a.quantity)
       .slice(0, 6);
 
-    const sevenDaysAgo = new Date();
-    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-    sevenDaysAgo.setHours(0, 0, 0, 0);
-    const sevenDaysAgoParam = sevenDaysAgo.toISOString().slice(0, 10) + ' 00:00:00';
+    const weekAgo = new Date(ictNowMs - 7 * 86_400_000).toISOString().slice(0, 10);
+    const sevenDaysAgoParam = `${weekAgo} 00:00:00`;
 
     let revenueResult: { date: string; revenue: number }[] = [];
     try {
       const res = await db.prepare(`
         SELECT DATE(created_at) as date, COALESCE(SUM(total), 0) as revenue
         FROM orders
-        WHERE created_at >= ? AND status != 'cancelled'${tenantAnd2}
+        WHERE created_at >= ? AND ${revenueExclusionClause}${tenantAnd2}
         GROUP BY DATE(created_at)
         ORDER BY date DESC
       `).bind(sevenDaysAgoParam, ...tenantBinds).all<{ date: string; revenue: number }>();
       revenueResult = res.results || [];
     } catch {
-      const res = await db.prepare(`
-        SELECT DATE(created_at) as date, COALESCE(SUM(COALESCE(total, total_amount, 0)), 0) as revenue
-        FROM orders
-        WHERE created_at >= ? AND status != 'cancelled'${tenantAnd2}
-        GROUP BY DATE(created_at)
-        ORDER BY date DESC
-      `).bind(sevenDaysAgoParam, ...tenantBinds).all<{ date: string; revenue: number }>();
-      revenueResult = res.results || [];
+      try {
+        const res = await db.prepare(`
+          SELECT DATE(created_at) as date, COALESCE(SUM(COALESCE(total, total_amount, 0)), 0) as revenue
+          FROM orders
+          WHERE created_at >= ? AND ${revenueExclusionClause}${tenantAnd2}
+          GROUP BY DATE(created_at)
+          ORDER BY date DESC
+        `).bind(sevenDaysAgoParam, ...tenantBinds).all<{ date: string; revenue: number }>();
+        revenueResult = res.results || [];
+      } catch {
+        const res = await db.prepare(`
+          SELECT DATE(created_at) as date, COALESCE(SUM(COALESCE(total, total_amount, 0)), 0) as revenue
+          FROM orders
+          WHERE created_at >= ? AND ${statusOnlyExclusionClause}${tenantAnd2}
+          GROUP BY DATE(created_at)
+          ORDER BY date DESC
+        `).bind(sevenDaysAgoParam, ...tenantBinds).all<{ date: string; revenue: number }>();
+        revenueResult = res.results || [];
+      }
     }
 
     return jsonResponse({

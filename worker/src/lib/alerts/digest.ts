@@ -5,6 +5,7 @@
 import type { D1Database } from '@cloudflare/workers-types';
 import type { Env } from '../../types/env';
 import { createLogger } from '../../middleware/logger';
+import { resolvePilotStore } from '../pilot-store';
 import { sendTelegramMessage } from './telegram';
 import {
   formatBilingualDigestMessage,
@@ -17,8 +18,48 @@ const log = createLogger({ route: 'alert-dispatcher' });
 /**
  * Lấy thống kê 24 giờ qua / Fetch 24h rolling statistics.
  */
-async function fetchDigestStats(db: D1Database): Promise<DigestStats> {
+async function fetchDigestStats(db: D1Database, tenantId?: string): Promise<DigestStats> {
   const since = 'datetime(\'now\', \'-24 hours\')';
+  const scopedTenant = typeof tenantId === 'string' && tenantId.trim() && tenantId.trim() !== '*'
+    ? tenantId.trim()
+    : null;
+
+  if (scopedTenant) {
+    const tenantClause = 'AND COALESCE(NULLIF(TRIM(json_extract(tags, \'$.tenant_id\')), \'\'), \'default\') = ?';
+    const [orders, revenue, errors, totalReqs] = await Promise.all([
+      db
+        .prepare(
+          `SELECT COUNT(*) as c FROM _metrics WHERE name = 'order_created' AND created_at >= ${since} ${tenantClause}`
+        )
+        .bind(scopedTenant)
+        .first<{ c: number }>(),
+      db
+        .prepare(
+          `SELECT COALESCE(SUM(value), 0) as s FROM _metrics WHERE name = 'revenue' AND created_at >= ${since} ${tenantClause}`
+        )
+        .bind(scopedTenant)
+        .first<{ s: number }>(),
+      db
+        .prepare(
+          `SELECT COUNT(*) as c FROM _metrics WHERE name = 'request' AND CAST(json_extract(tags, '$.status') AS INTEGER) >= 400 AND created_at >= ${since} ${tenantClause}`
+        )
+        .bind(scopedTenant)
+        .first<{ c: number }>(),
+      db
+        .prepare(
+          `SELECT COUNT(*) as c FROM _metrics WHERE name = 'request' AND created_at >= ${since} ${tenantClause}`
+        )
+        .bind(scopedTenant)
+        .first<{ c: number }>()
+    ]);
+
+    return {
+      orderCount: orders?.c ?? 0,
+      revenueTotal: revenue?.s ?? 0,
+      errorCount: errors?.c ?? 0,
+      totalCount: totalReqs?.c ?? 1,
+    };
+  }
 
   const [orders, revenue, errors, totalReqs] = await Promise.all([
     db
@@ -60,7 +101,11 @@ async function fetchDigestStats(db: D1Database): Promise<DigestStats> {
  *
  * @param env - Cloudflare Worker environment bindings
  */
-export async function dispatchDigest(env: Env, _locale: 'vi' | 'en' = 'vi'): Promise<void> {
+export async function dispatchDigest(
+  env: Env,
+  _locale: 'vi' | 'en' | string = 'vi',
+  tenantId?: string
+): Promise<void> {
   const db = env.AURA_DB;
   const token = env.TELEGRAM_BOT_TOKEN;
   const chatId = env.TELEGRAM_CHAT_ID;
@@ -69,8 +114,31 @@ export async function dispatchDigest(env: Env, _locale: 'vi' | 'en' = 'vi'): Pro
     return;
   }
 
+  const rawTenant =
+    _locale !== 'vi' && _locale !== 'en' ? _locale : tenantId;
+  let effectiveTenant =
+    typeof rawTenant === 'string' && rawTenant.trim() && rawTenant.trim() !== '*'
+      ? rawTenant.trim()
+      : null;
+  if (!effectiveTenant) {
+    const envRec = env as unknown as Record<string, unknown>;
+    if (envRec.PILOT_TENANT_ID || envRec.PILOT_STORE || envRec.PILOT_STORE_ID) {
+      try {
+        const resolved = resolvePilotStore({
+          ...envRec,
+          PILOT_TENANT_ID: envRec.PILOT_TENANT_ID ?? envRec.PILOT_STORE ?? envRec.PILOT_STORE_ID,
+        });
+        if (resolved && resolved !== '*') {
+          effectiveTenant = resolved;
+        }
+      } catch {
+        // Ignore invalid pilot store config
+      }
+    }
+  }
+
   try {
-    const stats = await fetchDigestStats(db);
+    const stats = await fetchDigestStats(db, effectiveTenant ?? undefined);
     const successRate = ((1 - stats.errorCount / stats.totalCount) * 100).toFixed(1);
 
     const dateStr = new Date().toLocaleDateString('vi-VN', {
@@ -100,12 +168,13 @@ export async function dispatchDigest(env: Env, _locale: 'vi' | 'en' = 'vi'): Pro
 export async function dispatchDigestViaCallback(
   db: D1Database | null,
   sendTelegram: (msg: string) => Promise<void>,
-  locale: 'vi' | 'en' = 'vi'
+  locale: 'vi' | 'en' = 'vi',
+  tenantId?: string
 ): Promise<void> {
   if (!db) {
     return;
   }
 
-  const stats = await fetchDigestStats(db);
+  const stats = await fetchDigestStats(db, tenantId);
   await sendTelegram(formatLegacyDigestMessage(stats, locale));
 }

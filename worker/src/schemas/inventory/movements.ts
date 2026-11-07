@@ -37,13 +37,20 @@ export const StockMovementSchema = z.object({
 }).openapi('StockMovement');
 
 export const StockMovementCreateSchema = z.object({
-  ingredientId: z.string().min(1),
-  type: z.enum(['in', 'out', 'adjustment', 'waste', 'transfer']),
+  ingredientId: z.string().min(1).optional(),
+  ingredient_id: z.string().min(1).optional(),
+  type: z.enum(['in', 'out', 'adjustment', 'adjust', 'waste', 'transfer', 'purchase_receipt']),
   quantity: z.number(),
   unitCost: MoneySchema.optional(),
+  unit_cost: MoneySchema.optional(),
   referenceId: z.string().min(1).optional(),
+  reference_id: z.string().min(1).optional(),
   referenceType: StockMovementRefTypeEnum.optional(),
+  reference_type: StockMovementRefTypeEnum.optional(),
   notes: z.string().max(500).optional(),
+}).refine((d) => Boolean((d.ingredientId && d.ingredientId.trim()) || (d.ingredient_id && d.ingredient_id.trim())), {
+  message: 'ingredientId is required',
+  path: ['ingredientId'],
 }).openapi('StockMovementCreate');
 
 export const StockMovementListResponseSchema = z.object({

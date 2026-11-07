@@ -70,7 +70,9 @@ export function validateAccessControl(
   }
 
   // 3. Multi-Tenant Scoping (Tenant Isolation)
-  if (target.tenantId && auth.userTenantId && target.tenantId !== auth.userTenantId) {
+  const actorTenant = (auth.userTenantId || '').trim() || 'default';
+  const targetTenant = (target.tenantId || '').trim() || 'default';
+  if (actorTenant !== '*' && targetTenant !== actorTenant) {
     return {
       allowed: false,
       code: 'FORBIDDEN_TENANT',

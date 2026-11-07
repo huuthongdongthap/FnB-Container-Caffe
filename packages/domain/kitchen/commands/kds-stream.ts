@@ -50,6 +50,53 @@ interface OrderRecord {
 
 export const kdsStreamRouter = new Hono<{ Bindings: Env }>();
 
+export function hasCrossTenantOverride(
+  c: { req: { query: (k: string) => string | undefined; header: (k: string) => string | undefined }; get?: (k: string) => unknown },
+  user?: { role?: string; tenantId?: string; tenant_id?: string }
+): boolean {
+  const resolvedTenant = getTenantId(c as any).trim() || 'default';
+  const effectiveUser =
+    user ?? (c.get?.('user') as { role?: string; tenantId?: string; tenant_id?: string } | undefined);
+  const candidateOverrides = [
+    c.req.query('tenant_id'),
+    c.req.query('tenantId'),
+    c.req.query('store_id'),
+    c.req.query('storeId'),
+    c.req.header('X-Tenant-ID'),
+    c.req.header('x-tenant-id'),
+    c.req.header('X-Store-ID'),
+    c.req.header('x-store-id'),
+  ]
+    .map((v) => (typeof v === 'string' ? v.trim() : ''))
+    .filter(Boolean);
+  if (new Set(candidateOverrides).size > 1) return true;
+  const requestedTenant = candidateOverrides[0] || '';
+  if (effectiveUser) {
+    const rawUserTenant = effectiveUser.tenantId ?? effectiveUser.tenant_id;
+    const userTenant = (rawUserTenant && String(rawUserTenant).trim()) || 'default';
+    const isHqAdmin =
+      (effectiveUser.role === 'owner' || effectiveUser.role === 'admin') &&
+      (userTenant.toLowerCase() === 'hq' || userTenant === '*');
+    if (isHqAdmin) return false;
+    return (
+      userTenant === '*' ||
+      userTenant.toLowerCase() === 'hq' ||
+      requestedTenant === '*' ||
+      requestedTenant.toLowerCase() === 'hq' ||
+      resolvedTenant === '*' ||
+      resolvedTenant.toLowerCase() === 'hq' ||
+      resolvedTenant !== userTenant ||
+      Boolean(requestedTenant && requestedTenant !== userTenant)
+    );
+  }
+  return (
+    requestedTenant === '*' ||
+    requestedTenant.toLowerCase() === 'hq' ||
+    resolvedTenant === '*' ||
+    resolvedTenant.toLowerCase() === 'hq'
+  );
+}
+
 function mapKdsOrder(order: OrderRecord): KdsStreamOrder {
   let items: unknown[] = [];
   if (Array.isArray(order.items)) {
@@ -83,7 +130,69 @@ function mapKdsOrder(order: OrderRecord): KdsStreamOrder {
  */
 kdsStreamRouter.get('/stream', async(c) => {
   const db = c.env.AURA_DB;
-  const tenantId = getTenantId(c).trim() || 'default';
+  const resolvedTenant = getTenantId(c).trim() || 'default';
+  const user = c.get('user' as never) as
+    | { id?: string; role?: string; tenantId?: string; tenant_id?: string }
+    | undefined;
+  const candidateOverrides = [
+    c.req.query('tenant_id'),
+    c.req.query('tenantId'),
+    c.req.query('store_id'),
+    c.req.query('storeId'),
+    c.req.header('X-Tenant-ID'),
+    c.req.header('x-tenant-id'),
+    c.req.header('X-Store-ID'),
+    c.req.header('x-store-id'),
+  ]
+    .map((v) => (typeof v === 'string' ? v.trim() : ''))
+    .filter(Boolean);
+  if (new Set(candidateOverrides).size > 1) {
+    return c.json({ success: false, error: 'Cross-tenant KDS stream access denied' }, 403);
+  }
+  const requestedTenant = candidateOverrides[0] || '';
+  let tenantId = resolvedTenant;
+  if (user) {
+    const rawUserTenant = user.tenantId ?? user.tenant_id;
+    const userTenant = (rawUserTenant && String(rawUserTenant).trim()) || 'default';
+    const isHqAdmin =
+      (user.role === 'owner' || user.role === 'admin') &&
+      (userTenant.toLowerCase() === 'hq' || userTenant === '*');
+    if (!isHqAdmin) {
+      if (
+        userTenant === '*' ||
+        userTenant.toLowerCase() === 'hq' ||
+        requestedTenant === '*' ||
+        requestedTenant.toLowerCase() === 'hq' ||
+        resolvedTenant === '*' ||
+        resolvedTenant.toLowerCase() === 'hq' ||
+        resolvedTenant !== userTenant ||
+        (requestedTenant && requestedTenant !== userTenant)
+      ) {
+        return c.json({ success: false, error: 'Cross-tenant KDS stream access denied' }, 403);
+      }
+      tenantId = userTenant;
+    } else {
+      const cleanRequested =
+        requestedTenant && requestedTenant !== '*' && requestedTenant.toLowerCase() !== 'hq'
+          ? requestedTenant
+          : '';
+      const cleanResolved =
+        resolvedTenant && resolvedTenant !== '*' && resolvedTenant.toLowerCase() !== 'hq'
+          ? resolvedTenant
+          : '';
+      tenantId =
+        requestedTenant === '*' || requestedTenant.toLowerCase() === 'hq'
+          ? '*'
+          : cleanRequested || cleanResolved || '*';
+    }
+  } else if (
+    requestedTenant === '*' ||
+    requestedTenant.toLowerCase() === 'hq' ||
+    resolvedTenant === '*' ||
+    resolvedTenant.toLowerCase() === 'hq'
+  ) {
+    return c.json({ success: false, error: 'Cross-tenant KDS stream access denied' }, 403);
+  }
   if (!db) {
     return c.json({ error: 'DB not available' }, 500);
   }
@@ -108,6 +217,16 @@ kdsStreamRouter.get('/stream', async(c) => {
         try {
           const session = await authenticateRequest(c.req.raw, c.env);
           if (!session || 'blocked' in session || !session.account) throw new StaffSessionError('SESSION_REVOKED');
+          const accountRecord = session.account as unknown as { role?: string; tenant_id?: string | null; tenantId?: string | null };
+          const rawAccountTenant = accountRecord.tenant_id ?? accountRecord.tenantId;
+          if (rawAccountTenant !== undefined && rawAccountTenant !== null && String(rawAccountTenant).trim() !== '') {
+            const accountTenant = String(rawAccountTenant).trim();
+            const accountRole = String(accountRecord.role || '').trim().toLowerCase();
+            const isAccountHq = (accountRole === 'owner' || accountRole === 'admin') && (accountTenant.toLowerCase() === 'hq' || accountTenant === '*');
+            if (!isAccountHq && tenantId !== '*' && accountTenant !== tenantId) {
+              throw new StaffSessionError('SESSION_REVOKED');
+            }
+          }
         } catch (error) {
           const code = error instanceof StaffSessionError ? error.code : 'AUTH_STATE_UNAVAILABLE';
           send('auth_error', { code, message: 'Phiên Staff không còn khả dụng' });

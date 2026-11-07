@@ -5,12 +5,21 @@
 import type { D1Database } from '@cloudflare/workers-types';
 import type { CampaignCustomer } from './types';
 
+function normalizeCampaignTenant(tenantId?: string): string | undefined {
+  if (!tenantId || !tenantId.trim()) return undefined;
+  const trimmed = tenantId.trim();
+  return trimmed === '*' || trimmed.toLowerCase() === 'hq' ? '*' : trimmed;
+}
+
 function rowMatchesTenant(row: unknown, tenantId?: string): boolean {
-  if (!tenantId || tenantId === '*') return true;
-  if (!row || typeof row !== 'object' || !('tenant_id' in row)) return true;
+  const normTenant = normalizeCampaignTenant(tenantId);
+  if (!normTenant || normTenant === '*') return true;
+  if (!row || typeof row !== 'object' || !('tenant_id' in row) || (row as { tenant_id?: unknown }).tenant_id === undefined) {
+    return normTenant === 'default';
+  }
   const raw = (row as { tenant_id?: unknown }).tenant_id;
   const normalized = typeof raw === 'string' && raw.trim() ? raw.trim() : 'default';
-  return normalized === tenantId;
+  return normalized === normTenant;
 }
 
 /**
@@ -18,8 +27,10 @@ function rowMatchesTenant(row: unknown, tenantId?: string): boolean {
  */
 export async function detectWelcomeCandidates(db: D1Database, tenantId?: string): Promise<CampaignCustomer[]> {
   const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
-  const scoped = Boolean(tenantId && tenantId !== '*');
-  if (scoped && tenantId) {
+  const normTenant = normalizeCampaignTenant(tenantId);
+  const scoped = Boolean(normTenant && normTenant !== '*');
+  if (scoped && normTenant) {
+    tenantId = normTenant;
     try {
       const { results } = await db.prepare(`
         SELECT c.id, c.name, c.phone, c.email, c.loyalty_tier, c.created_at, c.tenant_id
@@ -35,19 +46,52 @@ export async function detectWelcomeCandidates(db: D1Database, tenantId?: string)
       `).bind(cutoff, tenantId, tenantId).all<CampaignCustomer>();
       return (results || []).filter((r) => rowMatchesTenant(r, tenantId));
     } catch {
-      // Fallback if tenant_id column is absent
+      try {
+        const { results } = await db.prepare(`
+          SELECT c.id, c.name, c.phone, c.email, c.loyalty_tier, c.created_at, c.tenant_id
+          FROM customers c
+          WHERE c.created_at > ?
+            AND COALESCE(NULLIF(TRIM(c.tenant_id), ''), 'default') = ?
+            AND (c.phone IS NOT NULL OR c.email IS NOT NULL)
+            AND NOT EXISTS (
+              SELECT 1 FROM campaign_logs cl
+              WHERE cl.customer_id = c.id AND cl.trigger = 'welcome'
+            )
+        `).bind(cutoff, tenantId).all<CampaignCustomer>();
+        return (results || []).filter((r) => rowMatchesTenant(r, tenantId));
+      } catch {
+        if (tenantId !== 'default') {
+          return [];
+        }
+      }
     }
   }
-  const { results } = await db.prepare(`
-    SELECT c.id, c.name, c.phone, c.email, c.loyalty_tier, c.created_at
-    FROM customers c
-    WHERE c.created_at > ?
-      AND (c.phone IS NOT NULL OR c.email IS NOT NULL)
-      AND NOT EXISTS (
-        SELECT 1 FROM campaign_logs cl
-        WHERE cl.customer_id = c.id AND cl.trigger = 'welcome'
-      )
-  `).bind(cutoff).all<CampaignCustomer>();
+  let results: CampaignCustomer[] | undefined;
+  try {
+    const res = await db.prepare(`
+      SELECT c.id, c.name, c.phone, c.email, c.loyalty_tier, c.created_at, c.tenant_id
+      FROM customers c
+      WHERE c.created_at > ?
+        AND (c.phone IS NOT NULL OR c.email IS NOT NULL)
+        AND NOT EXISTS (
+          SELECT 1 FROM campaign_logs cl
+          WHERE cl.customer_id = c.id AND cl.trigger = 'welcome'
+        )
+    `).bind(cutoff).all<CampaignCustomer>();
+    results = res.results;
+  } catch {
+    const res = await db.prepare(`
+      SELECT c.id, c.name, c.phone, c.email, c.loyalty_tier, c.created_at
+      FROM customers c
+      WHERE c.created_at > ?
+        AND (c.phone IS NOT NULL OR c.email IS NOT NULL)
+        AND NOT EXISTS (
+          SELECT 1 FROM campaign_logs cl
+          WHERE cl.customer_id = c.id AND cl.trigger = 'welcome'
+        )
+    `).bind(cutoff).all<CampaignCustomer>();
+    results = res.results;
+  }
   return (results || []).filter((r) => rowMatchesTenant(r, tenantId));
 }
 
@@ -58,9 +102,11 @@ export async function detectBirthdayCandidates(db: D1Database, tenantId?: string
   const now = new Date();
   const month = String(now.getMonth() + 1).padStart(2, '0');
   const yearStart = `${now.getFullYear()}-01-01`;
-  const scoped = Boolean(tenantId && tenantId !== '*');
+  const normTenant = normalizeCampaignTenant(tenantId);
+  const scoped = Boolean(normTenant && normTenant !== '*');
 
-  if (scoped && tenantId) {
+  if (scoped && normTenant) {
+    tenantId = normTenant;
     try {
       const { results } = await db.prepare(`
         SELECT c.id, c.name, c.phone, c.email, c.loyalty_tier, c.date_of_birth, c.tenant_id
@@ -79,44 +125,92 @@ export async function detectBirthdayCandidates(db: D1Database, tenantId?: string
       `).bind(month, tenantId, yearStart, tenantId).all<CampaignCustomer>();
       return (results || []).filter((r) => rowMatchesTenant(r, tenantId));
     } catch {
-      // Fallback if tenant_id column is absent
+      try {
+        const { results } = await db.prepare(`
+          SELECT c.id, c.name, c.phone, c.email, c.loyalty_tier, c.date_of_birth, c.tenant_id
+          FROM customers c
+          WHERE c.date_of_birth IS NOT NULL
+            AND substr(c.date_of_birth, 6, 2) = ?
+            AND COALESCE(NULLIF(TRIM(c.tenant_id), ''), 'default') = ?
+            AND (c.phone IS NOT NULL OR c.email IS NOT NULL)
+            AND NOT EXISTS (
+              SELECT 1 FROM campaign_logs cl
+              WHERE cl.customer_id = c.id
+                AND cl.trigger = 'birthday'
+                AND cl.sent_at >= ?
+            )
+        `).bind(month, tenantId, yearStart).all<CampaignCustomer>();
+        return (results || []).filter((r) => rowMatchesTenant(r, tenantId));
+      } catch {
+        if (tenantId !== 'default') {
+          return [];
+        }
+      }
     }
   }
 
-  const { results } = await db.prepare(`
-    SELECT c.id, c.name, c.phone, c.email, c.loyalty_tier, c.date_of_birth
-    FROM customers c
-    WHERE c.date_of_birth IS NOT NULL
-      AND substr(c.date_of_birth, 6, 2) = ?
-      AND (c.phone IS NOT NULL OR c.email IS NOT NULL)
-      AND NOT EXISTS (
-        SELECT 1 FROM campaign_logs cl
-        WHERE cl.customer_id = c.id
-          AND cl.trigger = 'birthday'
-          AND cl.sent_at >= ?
-      )
-  `).bind(month, yearStart).all<CampaignCustomer>();
+  let results: CampaignCustomer[] | undefined;
+  try {
+    const res = await db.prepare(`
+      SELECT c.id, c.name, c.phone, c.email, c.loyalty_tier, c.date_of_birth, c.tenant_id
+      FROM customers c
+      WHERE c.date_of_birth IS NOT NULL
+        AND substr(c.date_of_birth, 6, 2) = ?
+        AND (c.phone IS NOT NULL OR c.email IS NOT NULL)
+        AND NOT EXISTS (
+          SELECT 1 FROM campaign_logs cl
+          WHERE cl.customer_id = c.id
+            AND cl.trigger = 'birthday'
+            AND cl.sent_at >= ?
+        )
+    `).bind(month, yearStart).all<CampaignCustomer>();
+    results = res.results;
+  } catch {
+    const res = await db.prepare(`
+      SELECT c.id, c.name, c.phone, c.email, c.loyalty_tier, c.date_of_birth
+      FROM customers c
+      WHERE c.date_of_birth IS NOT NULL
+        AND substr(c.date_of_birth, 6, 2) = ?
+        AND (c.phone IS NOT NULL OR c.email IS NOT NULL)
+        AND NOT EXISTS (
+          SELECT 1 FROM campaign_logs cl
+          WHERE cl.customer_id = c.id
+            AND cl.trigger = 'birthday'
+            AND cl.sent_at >= ?
+        )
+    `).bind(month, yearStart).all<CampaignCustomer>();
+    results = res.results;
+  }
   return (results || []).filter((r) => rowMatchesTenant(r, tenantId));
 }
 
 /**
  * Winback — customers inactive for 30+ days.
  */
-export async function detectWinbackCandidates(db: D1Database, tenantId?: string): Promise<CampaignCustomer[]> {
-  const cutoff = new Date(Date.now() - 30 * 86400000).toISOString();
+export async function detectWinbackCandidates(
+  db: D1Database,
+  tenantIdOrDays?: string | number,
+  maybeTenantId?: string,
+): Promise<CampaignCustomer[]> {
+  const inactiveDays = typeof tenantIdOrDays === 'number' ? tenantIdOrDays : 30;
+  const rawTenantId = typeof tenantIdOrDays === 'string' ? tenantIdOrDays : maybeTenantId;
+  let tenantId = normalizeCampaignTenant(rawTenantId);
+  const cutoff = new Date(Date.now() - inactiveDays * 86400000).toISOString();
   const sixtyDaysAgo = new Date(Date.now() - 60 * 86400000).toISOString();
   const scoped = Boolean(tenantId && tenantId !== '*');
 
+  const validOrderClause =
+    "AND LOWER(COALESCE(o.status, '')) NOT IN ('cancelled', 'canceled', 'rejected', 'failed', 'expired', 'refunded') AND LOWER(COALESCE(o.payment_status, '')) NOT IN ('failed', 'expired', 'cancelled', 'canceled', 'refunded')";
   if (scoped && tenantId) {
     try {
       const { results } = await db.prepare(`
         SELECT c.id, c.name, c.phone, c.email, c.loyalty_tier, c.tenant_id,
-          (SELECT MAX(o.created_at) FROM orders o WHERE o.customer_id = c.id AND COALESCE(NULLIF(TRIM(o.tenant_id), ''), 'default') = ?) as last_order_date
+          (SELECT MAX(o.created_at) FROM orders o WHERE o.customer_id = c.id ${validOrderClause} AND COALESCE(NULLIF(TRIM(o.tenant_id), ''), 'default') = ?) as last_order_date
         FROM customers c
         WHERE c.phone IS NOT NULL
           AND COALESCE(NULLIF(TRIM(c.tenant_id), ''), 'default') = ?
           AND (
-            SELECT MAX(o.created_at) FROM orders o WHERE o.customer_id = c.id AND COALESCE(NULLIF(TRIM(o.tenant_id), ''), 'default') = ?
+            SELECT MAX(o.created_at) FROM orders o WHERE o.customer_id = c.id ${validOrderClause} AND COALESCE(NULLIF(TRIM(o.tenant_id), ''), 'default') = ?
           ) < ?
           AND NOT EXISTS (
             SELECT 1 FROM campaign_logs cl
@@ -128,25 +222,107 @@ export async function detectWinbackCandidates(db: D1Database, tenantId?: string)
       `).bind(tenantId, tenantId, tenantId, cutoff, sixtyDaysAgo, tenantId).all<CampaignCustomer>();
       return (results || []).filter((r) => rowMatchesTenant(r, tenantId));
     } catch {
-      // Fallback if tenant_id column is absent
+      try {
+        const { results } = await db.prepare(`
+          SELECT c.id, c.name, c.phone, c.email, c.loyalty_tier, c.tenant_id,
+            (SELECT MAX(o.created_at) FROM orders o WHERE o.customer_id = c.id AND COALESCE(NULLIF(TRIM(o.tenant_id), ''), 'default') = ?) as last_order_date
+          FROM customers c
+          WHERE c.phone IS NOT NULL
+            AND COALESCE(NULLIF(TRIM(c.tenant_id), ''), 'default') = ?
+            AND (
+              SELECT MAX(o.created_at) FROM orders o WHERE o.customer_id = c.id AND COALESCE(NULLIF(TRIM(o.tenant_id), ''), 'default') = ?
+            ) < ?
+            AND NOT EXISTS (
+              SELECT 1 FROM campaign_logs cl
+              WHERE cl.customer_id = c.id
+                AND cl.trigger = 'winback'
+                AND cl.sent_at > ?
+            )
+        `).bind(tenantId, tenantId, tenantId, cutoff, sixtyDaysAgo).all<CampaignCustomer>();
+        return (results || []).filter((r) => rowMatchesTenant(r, tenantId));
+      } catch {
+        try {
+          const { results } = await db.prepare(`
+            SELECT c.id, c.name, c.phone, c.email, c.loyalty_tier, c.tenant_id,
+              (SELECT MAX(o.created_at) FROM orders o WHERE o.customer_id = c.id) as last_order_date
+            FROM customers c
+            WHERE c.phone IS NOT NULL
+              AND COALESCE(NULLIF(TRIM(c.tenant_id), ''), 'default') = ?
+              AND (
+                SELECT MAX(o.created_at) FROM orders o WHERE o.customer_id = c.id
+              ) < ?
+              AND NOT EXISTS (
+                SELECT 1 FROM campaign_logs cl
+                WHERE cl.customer_id = c.id
+                  AND cl.trigger = 'winback'
+                  AND cl.sent_at > ?
+              )
+          `).bind(tenantId, cutoff, sixtyDaysAgo).all<CampaignCustomer>();
+          return (results || []).filter((r) => rowMatchesTenant(r, tenantId));
+        } catch {
+          if (tenantId !== 'default') {
+            return [];
+          }
+        }
+      }
     }
   }
 
-  const { results } = await db.prepare(`
-    SELECT c.id, c.name, c.phone, c.email, c.loyalty_tier,
-      (SELECT MAX(o.created_at) FROM orders o WHERE o.customer_id = c.id) as last_order_date
-    FROM customers c
-    WHERE c.phone IS NOT NULL
-      AND (
-        SELECT MAX(o.created_at) FROM orders o WHERE o.customer_id = c.id
-      ) < ?
-      AND NOT EXISTS (
-        SELECT 1 FROM campaign_logs cl
-        WHERE cl.customer_id = c.id
-          AND cl.trigger = 'winback'
-          AND cl.sent_at > ?
-      )
-  `).bind(cutoff, sixtyDaysAgo).all<CampaignCustomer>();
+  let results: CampaignCustomer[] | undefined;
+  try {
+    const res = await db.prepare(`
+      SELECT c.id, c.name, c.phone, c.email, c.loyalty_tier, c.tenant_id,
+        (SELECT MAX(o.created_at) FROM orders o WHERE o.customer_id = c.id ${validOrderClause}) as last_order_date
+      FROM customers c
+      WHERE c.phone IS NOT NULL
+        AND (
+          SELECT MAX(o.created_at) FROM orders o WHERE o.customer_id = c.id ${validOrderClause}
+        ) < ?
+        AND NOT EXISTS (
+          SELECT 1 FROM campaign_logs cl
+          WHERE cl.customer_id = c.id
+            AND cl.trigger = 'winback'
+            AND cl.sent_at > ?
+        )
+    `).bind(cutoff, sixtyDaysAgo).all<CampaignCustomer>();
+    results = res.results;
+  } catch {
+    try {
+      const res = await db.prepare(`
+        SELECT c.id, c.name, c.phone, c.email, c.loyalty_tier,
+          (SELECT MAX(o.created_at) FROM orders o WHERE o.customer_id = c.id ${validOrderClause}) as last_order_date
+        FROM customers c
+        WHERE c.phone IS NOT NULL
+          AND (
+            SELECT MAX(o.created_at) FROM orders o WHERE o.customer_id = c.id ${validOrderClause}
+          ) < ?
+          AND NOT EXISTS (
+            SELECT 1 FROM campaign_logs cl
+            WHERE cl.customer_id = c.id
+              AND cl.trigger = 'winback'
+              AND cl.sent_at > ?
+          )
+      `).bind(cutoff, sixtyDaysAgo).all<CampaignCustomer>();
+      results = res.results;
+    } catch {
+      const res = await db.prepare(`
+        SELECT c.id, c.name, c.phone, c.email, c.loyalty_tier,
+          (SELECT MAX(o.created_at) FROM orders o WHERE o.customer_id = c.id) as last_order_date
+        FROM customers c
+        WHERE c.phone IS NOT NULL
+          AND (
+            SELECT MAX(o.created_at) FROM orders o WHERE o.customer_id = c.id
+          ) < ?
+          AND NOT EXISTS (
+            SELECT 1 FROM campaign_logs cl
+            WHERE cl.customer_id = c.id
+              AND cl.trigger = 'winback'
+              AND cl.sent_at > ?
+          )
+      `).bind(cutoff, sixtyDaysAgo).all<CampaignCustomer>();
+      results = res.results;
+    }
+  }
   return (results || []).filter((r) => rowMatchesTenant(r, tenantId));
 }
 
@@ -157,9 +333,11 @@ export async function detectPostVisitCandidates(db: D1Database, tenantId?: strin
   const now = Date.now();
   const since = new Date(now - 48 * 60 * 60 * 1000).toISOString();
   const until = new Date(now - 24 * 60 * 60 * 1000).toISOString();
-  const scoped = Boolean(tenantId && tenantId !== '*');
+  const normTenant = normalizeCampaignTenant(tenantId);
+  const scoped = Boolean(normTenant && normTenant !== '*');
 
-  if (scoped && tenantId) {
+  if (scoped && normTenant) {
+    tenantId = normTenant;
     try {
       const { results } = await db.prepare(`
         SELECT c.id, c.name, c.phone, c.email, c.tenant_id,
@@ -181,25 +359,89 @@ export async function detectPostVisitCandidates(db: D1Database, tenantId?: strin
       `).bind(since, until, tenantId, tenantId, since, tenantId).all<CampaignCustomer>();
       return (results || []).filter((r) => rowMatchesTenant(r, tenantId));
     } catch {
-      // Fallback if tenant_id column is absent
+      try {
+        const { results } = await db.prepare(`
+          SELECT c.id, c.name, c.phone, c.email, c.tenant_id,
+            o.id as order_id, o.created_at as last_order_date
+          FROM orders o
+          JOIN customers c ON o.customer_id = c.id
+          WHERE o.status = 'completed'
+            AND o.created_at BETWEEN ? AND ?
+            AND COALESCE(NULLIF(TRIM(o.tenant_id), ''), 'default') = ?
+            AND COALESCE(NULLIF(TRIM(c.tenant_id), ''), 'default') = ?
+            AND (c.phone IS NOT NULL OR c.email IS NOT NULL)
+            AND NOT EXISTS (
+              SELECT 1 FROM campaign_logs cl
+              WHERE cl.customer_id = c.id
+                AND cl.trigger = 'post_visit'
+                AND cl.sent_at > ?
+            )
+        `).bind(since, until, tenantId, tenantId, since).all<CampaignCustomer>();
+        return (results || []).filter((r) => rowMatchesTenant(r, tenantId));
+      } catch {
+        try {
+          const { results } = await db.prepare(`
+            SELECT c.id, c.name, c.phone, c.email, c.tenant_id,
+              o.id as order_id, o.created_at as last_order_date
+            FROM orders o
+            JOIN customers c ON o.customer_id = c.id
+            WHERE o.status = 'completed'
+              AND o.created_at BETWEEN ? AND ?
+              AND COALESCE(NULLIF(TRIM(c.tenant_id), ''), 'default') = ?
+              AND (c.phone IS NOT NULL OR c.email IS NOT NULL)
+              AND NOT EXISTS (
+                SELECT 1 FROM campaign_logs cl
+                WHERE cl.customer_id = c.id
+                  AND cl.trigger = 'post_visit'
+                  AND cl.sent_at > ?
+              )
+          `).bind(since, until, tenantId, since).all<CampaignCustomer>();
+          return (results || []).filter((r) => rowMatchesTenant(r, tenantId));
+        } catch {
+          if (tenantId !== 'default') {
+            return [];
+          }
+        }
+      }
     }
   }
 
-  const { results } = await db.prepare(`
-    SELECT c.id, c.name, c.phone, c.email,
-      o.id as order_id, o.created_at as last_order_date
-    FROM orders o
-    JOIN customers c ON o.customer_id = c.id
-    WHERE o.status = 'completed'
-      AND o.created_at BETWEEN ? AND ?
-      AND (c.phone IS NOT NULL OR c.email IS NOT NULL)
-      AND NOT EXISTS (
-        SELECT 1 FROM campaign_logs cl
-        WHERE cl.customer_id = c.id
-          AND cl.trigger = 'post_visit'
-          AND cl.sent_at > ?
-      )
-  `).bind(since, until, since).all<CampaignCustomer>();
+  let results: CampaignCustomer[] | undefined;
+  try {
+    const res = await db.prepare(`
+      SELECT c.id, c.name, c.phone, c.email, c.tenant_id,
+        o.id as order_id, o.created_at as last_order_date
+      FROM orders o
+      JOIN customers c ON o.customer_id = c.id
+      WHERE o.status = 'completed'
+        AND o.created_at BETWEEN ? AND ?
+        AND (c.phone IS NOT NULL OR c.email IS NOT NULL)
+        AND NOT EXISTS (
+          SELECT 1 FROM campaign_logs cl
+          WHERE cl.customer_id = c.id
+            AND cl.trigger = 'post_visit'
+            AND cl.sent_at > ?
+        )
+    `).bind(since, until, since).all<CampaignCustomer>();
+    results = res.results;
+  } catch {
+    const res = await db.prepare(`
+      SELECT c.id, c.name, c.phone, c.email,
+        o.id as order_id, o.created_at as last_order_date
+      FROM orders o
+      JOIN customers c ON o.customer_id = c.id
+      WHERE o.status = 'completed'
+        AND o.created_at BETWEEN ? AND ?
+        AND (c.phone IS NOT NULL OR c.email IS NOT NULL)
+        AND NOT EXISTS (
+          SELECT 1 FROM campaign_logs cl
+          WHERE cl.customer_id = c.id
+            AND cl.trigger = 'post_visit'
+            AND cl.sent_at > ?
+        )
+    `).bind(since, until, since).all<CampaignCustomer>();
+    results = res.results;
+  }
   return (results || []).filter((r) => rowMatchesTenant(r, tenantId));
 }
 
@@ -218,10 +460,12 @@ interface ExpiringRow {
 export async function detectCashbackExpiry(db: D1Database, tenantId?: string): Promise<CampaignCustomer[]> {
   const sevenDaysFromNow = new Date(Date.now() + 7 * 86400000).toISOString();
   const sevenDaysAgo = new Date(Date.now() - 7 * 86400000).toISOString();
-  const scoped = Boolean(tenantId && tenantId !== '*');
+  const normTenant = normalizeCampaignTenant(tenantId);
+  const scoped = Boolean(normTenant && normTenant !== '*');
 
   let results: ExpiringRow[] = [];
-  if (scoped && tenantId) {
+  if (scoped && normTenant) {
+    tenantId = normTenant;
     try {
       const scopedRes = await db.prepare(`
         SELECT cw.customer_id, c.phone, c.name, SUM(ct.amount) as total_expiring, cw.balance as wallet_balance, c.tenant_id as tenant_id
@@ -243,6 +487,7 @@ export async function detectCashbackExpiry(db: D1Database, tenantId?: string): P
           const cappedAmount = row.wallet_balance != null
             ? Math.max(0, Math.min(Number(row.total_expiring || 0), Number(row.wallet_balance)))
             : row.total_expiring;
+          const resolvedTenant = (row.tenant_id && String(row.tenant_id).trim()) || tenantId;
           return {
             id: row.customer_id,
             name: row.name || '',
@@ -250,7 +495,7 @@ export async function detectCashbackExpiry(db: D1Database, tenantId?: string): P
             email: undefined,
             loyalty_tier: undefined,
             total_spent: cappedAmount,
-            tenant_id: tenantId,
+            tenant_id: resolvedTenant,
           };
         })
         .filter((c) => (c.total_spent ?? 0) > 0);
@@ -277,16 +522,18 @@ export async function detectCashbackExpiry(db: D1Database, tenantId?: string): P
           email: undefined,
           loyalty_tier: undefined,
           total_spent: row.total_expiring,
-          tenant_id: tenantId,
+          tenant_id: (row.tenant_id && String(row.tenant_id).trim()) || tenantId,
         }));
       } catch {
-        // Fall through to default queries
+        if (tenantId !== 'default') {
+          return [];
+        }
       }
     }
   }
   try {
     const primary = await db.prepare(`
-      SELECT ct.customer_id, c.phone, c.name, SUM(ct.amount) as total_expiring
+      SELECT ct.customer_id, c.phone, c.name, SUM(ct.amount) as total_expiring, c.tenant_id as tenant_id
       FROM cashback_transactions ct
       JOIN customers c ON ct.customer_id = c.id
       WHERE ct.type IN ('earn', 'bonus')
@@ -299,25 +546,55 @@ export async function detectCashbackExpiry(db: D1Database, tenantId?: string): P
     results = primary.results || [];
   } catch {
     try {
-      const fallback = await db.prepare(`
-        SELECT cw.customer_id, c.phone, c.name, SUM(ct.amount) as total_expiring
+      const primaryLegacy = await db.prepare(`
+        SELECT ct.customer_id, c.phone, c.name, SUM(ct.amount) as total_expiring
         FROM cashback_transactions ct
-        JOIN cashback_wallets cw ON ct.wallet_id = cw.id
-        JOIN customers c ON cw.customer_id = c.id
+        JOIN customers c ON ct.customer_id = c.id
         WHERE ct.type IN ('earn', 'bonus')
           AND ct.expires_at IS NOT NULL
           AND ct.expires_at <= ?
           AND ct.expires_at > datetime('now')
-        GROUP BY cw.customer_id
-      `).bind(sevenDaysFromNow).all<ExpiringRow>();
-      results = fallback.results || [];
+          AND (c.last_expiry_warning_at IS NULL OR c.last_expiry_warning_at < ?)
+        GROUP BY ct.customer_id
+      `).bind(sevenDaysFromNow, sevenDaysAgo).all<ExpiringRow>();
+      results = primaryLegacy.results || [];
     } catch {
-      results = [];
+      try {
+        const fallback = await db.prepare(`
+          SELECT cw.customer_id, c.phone, c.name, SUM(ct.amount) as total_expiring, c.tenant_id as tenant_id
+          FROM cashback_transactions ct
+          JOIN cashback_wallets cw ON ct.wallet_id = cw.id
+          JOIN customers c ON cw.customer_id = c.id
+          WHERE ct.type IN ('earn', 'bonus')
+            AND ct.expires_at IS NOT NULL
+            AND ct.expires_at <= ?
+            AND ct.expires_at > datetime('now')
+          GROUP BY cw.customer_id
+        `).bind(sevenDaysFromNow).all<ExpiringRow>();
+        results = fallback.results || [];
+      } catch {
+        try {
+          const fallbackLegacy = await db.prepare(`
+            SELECT cw.customer_id, c.phone, c.name, SUM(ct.amount) as total_expiring
+            FROM cashback_transactions ct
+            JOIN cashback_wallets cw ON ct.wallet_id = cw.id
+            JOIN customers c ON cw.customer_id = c.id
+            WHERE ct.type IN ('earn', 'bonus')
+              AND ct.expires_at IS NOT NULL
+              AND ct.expires_at <= ?
+              AND ct.expires_at > datetime('now')
+            GROUP BY cw.customer_id
+          `).bind(sevenDaysFromNow).all<ExpiringRow>();
+          results = fallbackLegacy.results || [];
+        } catch {
+          results = [];
+        }
+      }
     }
   }
 
   return results
-    .filter((r) => rowMatchesTenant(r, tenantId))
+    .filter((r) => rowMatchesTenant(r, normTenant))
     .map((row) => ({
       id: row.customer_id,
       name: row.name || '',
@@ -325,6 +602,7 @@ export async function detectCashbackExpiry(db: D1Database, tenantId?: string): P
       email: undefined,
       loyalty_tier: undefined,
       total_spent: row.total_expiring,
+      tenant_id: (row.tenant_id && String(row.tenant_id).trim()) || (normTenant && normTenant !== '*' ? normTenant : 'default'),
     }));
 }
 
@@ -340,16 +618,19 @@ export async function markExpiryNotified(
   if (customerIds.length === 0) return 0;
 
   const now = new Date().toISOString();
-  if (tenantId && tenantId !== '*') {
+  const normTenant = normalizeCampaignTenant(tenantId);
+  if (normTenant && normTenant !== '*') {
     try {
       const scopedStmts = customerIds.map((id) =>
         db.prepare("UPDATE customers SET last_expiry_warning_at = ? WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?")
-          .bind(now, id, tenantId)
+          .bind(now, id, normTenant)
       );
       await db.batch(scopedStmts);
       return customerIds.length;
     } catch {
-      // Fallback if tenant_id or last_expiry_warning_at column is absent
+      if (normTenant !== 'default') {
+        return 0;
+      }
     }
   }
   const stmts = customerIds.map((id) =>

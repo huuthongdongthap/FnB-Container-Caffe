@@ -111,6 +111,8 @@ export interface OrderState {
   eventSource: EventSource | null;
   /** Cancels the in-flight poll fetch so its late response is discarded. */
   abortController: AbortController | null;
+  /** Active order ID currently being observed by fetch/SSE/polling. */
+  observedOrderId?: string | null;
   queuedOffline: boolean;
   /** Guards against a second flush stacking on the first; the queue is IndexedDB, so overlap would sync a record twice. */
   flushInProgress: boolean;

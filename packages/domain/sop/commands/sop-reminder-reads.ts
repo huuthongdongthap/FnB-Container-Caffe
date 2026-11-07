@@ -43,7 +43,7 @@ export async function listReminders(
 ): Promise<SopReminder[]> {
   assertReminderRole(scope);
 
-  const conditions = ['r.tenant_id = ?'];
+  const conditions = ["COALESCE(NULLIF(TRIM(r.tenant_id), ''), 'default') = ?"];
   const params: (string | number)[] = [scope.tenantId];
   if (filters.kind) {
     conditions.push('r.kind = ?');
@@ -72,7 +72,18 @@ export async function listReminders(
     .bind(...params, limit)
     .all<SopReminderRow>();
 
-  return (rows.results ?? []).map(toReminder);
+  const seenNullRunKeys = new Set<string>();
+  const uniqueRows: SopReminderRow[] = [];
+  for (const row of rows.results ?? []) {
+    if (row.run_id === null || row.run_id === undefined) {
+      const dedupKey = `${row.template_id}:${row.kind}:${row.day_key}`;
+      if (seenNullRunKeys.has(dedupKey)) continue;
+      seenNullRunKeys.add(dedupKey);
+    }
+    uniqueRows.push(row);
+  }
+
+  return uniqueRows.map(toReminder);
 }
 
 /**
@@ -87,8 +98,9 @@ export async function countOpenReminders(
 
   const rows = await sopDatabase(scope)
     .prepare(
-      `SELECT kind, COUNT(*) AS total FROM sop_reminders
-       WHERE tenant_id = ? AND acknowledged_at IS NULL
+      `SELECT kind, COUNT(DISTINCT template_id || ':' || day_key || ':' || COALESCE(run_id, '')) AS total
+       FROM sop_reminders
+       WHERE COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ? AND acknowledged_at IS NULL
        GROUP BY kind`
     )
     .bind(scope.tenantId)
@@ -120,7 +132,7 @@ export async function acknowledgeReminder(scope: SopScope, reminderId: string): 
   const result = await sopDatabase(scope)
     .prepare(
       `UPDATE sop_reminders SET acknowledged_at = ?, updated_at = ?
-       WHERE id = ? AND tenant_id = ? AND acknowledged_at IS NULL`
+       WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ? AND acknowledged_at IS NULL`
     )
     .bind(now, now, reminderId, scope.tenantId)
     .run();

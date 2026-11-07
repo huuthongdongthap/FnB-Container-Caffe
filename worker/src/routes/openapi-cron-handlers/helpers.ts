@@ -115,6 +115,68 @@ export async function checkCronJobTenant(
   return normTenant === 'default';
 }
 
+export function hasExplicitCronTenantId(row: Record<string, any> | null | undefined): boolean {
+  return Boolean(row && row.tenant_id !== undefined && row.tenant_id !== null && String(row.tenant_id).trim() !== '');
+}
+
+export function resolveCronEntityTenant(
+  row: Record<string, any> | null | undefined,
+  fallbackJob?: Record<string, any> | null | undefined
+): string | null {
+  for (const candidate of [row, fallbackJob]) {
+    if (!candidate) continue;
+    if (hasExplicitCronTenantId(candidate)) {
+      const t = String(candidate.tenant_id).trim();
+      if (t && t !== '*') return t;
+    }
+    if (candidate.payload) {
+      try {
+        const parsed = typeof candidate.payload === 'string' ? JSON.parse(candidate.payload) : candidate.payload;
+        const payloadTenant = parsed?.tenant_id ?? parsed?.tenantId;
+        if (payloadTenant !== undefined && payloadTenant !== null) {
+          const t = String(payloadTenant).trim();
+          if (t && t !== '*') return t;
+        }
+      } catch {
+        // Ignore non-JSON payload
+      }
+    }
+    if (candidate.location_id !== undefined && candidate.location_id !== null) {
+      const loc = String(candidate.location_id).trim();
+      if (loc && loc !== '*') return loc;
+    }
+  }
+  return null;
+}
+
+export function matchesCronRunTenant(
+  run: Record<string, any> | null | undefined,
+  tenantId: string,
+  expectedJobId?: string
+): boolean {
+  if (!run) return false;
+  if (expectedJobId !== undefined && run.job_id !== undefined && run.job_id !== null && String(run.job_id) !== String(expectedJobId)) {
+    return false;
+  }
+  const normTenant = (tenantId || '').trim() || 'default';
+  if (normTenant === '*') return true;
+  if (hasExplicitCronTenantId(run)) {
+    return String(run.tenant_id).trim() === normTenant;
+  }
+  if (run.payload) {
+    try {
+      const parsed = typeof run.payload === 'string' ? JSON.parse(run.payload) : run.payload;
+      const payloadTenant = parsed?.tenant_id ?? parsed?.tenantId;
+      if (payloadTenant !== undefined && payloadTenant !== null && String(payloadTenant).trim() !== '') {
+        return String(payloadTenant).trim() === normTenant;
+      }
+    } catch {
+      // Ignore non-JSON payload
+    }
+  }
+  return true;
+}
+
 export function ensureCronPayloadTenant(rawPayload: unknown, tenantId: string): string | null {
   const normTenant = (tenantId || '').trim() || 'default';
   if (normTenant === '*') {

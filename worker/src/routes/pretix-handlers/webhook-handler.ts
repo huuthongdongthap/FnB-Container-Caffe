@@ -36,8 +36,26 @@ export function registerWebhookHandler(router: Hono): void {
     }
     const body = parsed.data;
 
-    const rawHeaderTenant = (c.req.header('X-Tenant-ID') || c.req.header('x-tenant-id') || '').trim();
-    let activeTenant = rawHeaderTenant && rawHeaderTenant !== '*' ? rawHeaderTenant : '';
+    const rawHeaderTenant = (
+      c.req.header('X-Tenant-ID') ||
+      c.req.header('x-tenant-id') ||
+      c.req.header('X-Store-ID') ||
+      c.req.header('x-store-id') ||
+      ''
+    ).trim();
+    if (
+      rawHeaderTenant &&
+      (rawHeaderTenant === '*' || rawHeaderTenant.toLowerCase() === 'hq' || !/^[a-zA-Z0-9_-]{1,64}$/.test(rawHeaderTenant))
+    ) {
+      return c.json({ success: false, error: 'Invalid X-Tenant-ID header' }, 400);
+    }
+    const configuredWebhookTenant = typeof (env as unknown as Record<string, unknown>).PRETIX_WEBHOOK_TENANT === 'string'
+      ? String((env as unknown as Record<string, unknown>).PRETIX_WEBHOOK_TENANT).trim()
+      : '';
+    if (configuredWebhookTenant && rawHeaderTenant && rawHeaderTenant !== configuredWebhookTenant) {
+      return c.json({ success: false, error: 'Cross-tenant webhook rejected' }, 403);
+    }
+    let activeTenant = configuredWebhookTenant || (rawHeaderTenant ? rawHeaderTenant : '');
     if (!activeTenant) {
       try {
         activeTenant = resolvePilotStore(c.env as unknown as Parameters<typeof resolvePilotStore>[0]);
@@ -49,27 +67,60 @@ export function registerWebhookHandler(router: Hono): void {
     if (db) {
       const now = new Date().toISOString();
       const effectiveTenant = !activeTenant || activeTenant === '*' ? 'default' : activeTenant;
+      const fallbackOrganizer = effectiveTenant === 'default' ? (body.organizer || '') : `${effectiveTenant}:${body.organizer || ''}`;
       if (body.notification_id != null) {
         try {
-          let existingLog: { notification_id?: number | null } | null = null;
+          let existingLog: { notification_id?: number | null; organizer?: string | null; action?: string | null } | null = null;
           try {
             existingLog = await db
               .prepare(
                 "SELECT notification_id FROM pretix_webhook_log WHERE notification_id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ? LIMIT 1"
               )
               .bind(body.notification_id, effectiveTenant)
-              .first<{ notification_id?: number | null }>();
+              .first<{ notification_id?: number | null; organizer?: string | null; action?: string | null }>();
+            if (
+              existingLog &&
+              typeof existingLog.organizer === 'string' &&
+              existingLog.organizer.trim() !== '' &&
+              existingLog.organizer !== (body.organizer || '')
+            ) {
+              existingLog = null;
+            }
           } catch {
             existingLog = await db
-              .prepare('SELECT notification_id FROM pretix_webhook_log WHERE notification_id = ? LIMIT 1')
-              .bind(body.notification_id)
-              .first<{ notification_id?: number | null }>();
+              .prepare('SELECT notification_id FROM pretix_webhook_log WHERE notification_id = ? AND organizer = ? LIMIT 1')
+              .bind(body.notification_id, fallbackOrganizer)
+              .first<{ notification_id?: number | null; organizer?: string | null }>();
           }
           if (existingLog) {
             return c.json({ success: true, message: 'Webhook received', duplicate: true });
           }
         } catch {
           // Proceed with insert when deduplication lookup is unavailable
+        }
+      } else if (body.code && body.action) {
+        try {
+          let existingActionLog: { code?: string | null } | null = null;
+          try {
+            existingActionLog = await db
+              .prepare(
+                "SELECT code FROM pretix_webhook_log WHERE code = ? AND action = ? AND organizer = ? AND event = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ? LIMIT 1"
+              )
+              .bind(body.code, body.action, body.organizer || '', body.event || '', effectiveTenant)
+              .first<{ code?: string | null }>();
+          } catch {
+            existingActionLog = await db
+              .prepare(
+                'SELECT code FROM pretix_webhook_log WHERE code = ? AND action = ? AND organizer = ? AND event = ? LIMIT 1'
+              )
+              .bind(body.code, body.action, fallbackOrganizer, body.event || '')
+              .first<{ code?: string | null }>();
+          }
+          if (existingActionLog) {
+            return c.json({ success: true, message: 'Webhook received', duplicate: true });
+          }
+        } catch {
+          // Proceed with insert when action-level deduplication lookup is unavailable
         }
       }
       try {
@@ -84,7 +135,7 @@ export function registerWebhookHandler(router: Hono): void {
           await db.prepare(
             'INSERT INTO pretix_webhook_log (notification_id, organizer, event, code, action, payload, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)'
           ).bind(
-            body.notification_id || null, body.organizer || '', body.event || '',
+            body.notification_id || null, fallbackOrganizer, body.event || '',
             body.code, body.action, bodyText, now
           ).run();
         }

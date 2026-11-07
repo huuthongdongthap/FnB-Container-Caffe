@@ -81,9 +81,12 @@ export async function handleErpnextRequest(request: Request, env: Env, resolvedT
 
 	try {
 		if (method === 'GET' && path === '/configure') {
-			const keys = erpnextKvKeys(activeTenant);
-			let cfgUrl = activeTenant === 'default' ? env.ERPNEXT_URL : undefined;
-			let apiKey = activeTenant === 'default' ? env.ERPNEXT_API_KEY : undefined;
+			const authCheck = await verifyErpnextAdminRole(request, env, resolvedTenantId);
+			if (!authCheck.ok) return authCheck.response;
+			const cfgTenant = authCheck.tenantId;
+			const keys = erpnextKvKeys(cfgTenant);
+			let cfgUrl = cfgTenant === 'default' ? env.ERPNEXT_URL : undefined;
+			let apiKey = cfgTenant === 'default' ? env.ERPNEXT_API_KEY : undefined;
 			if (env.AUTH_KV) {
 				const kvUrl = await env.AUTH_KV.get(keys.url);
 				const kvKey = await env.AUTH_KV.get(keys.key);
@@ -135,8 +138,38 @@ export async function handleErpnextRequest(request: Request, env: Env, resolvedT
 			return jsonResp({ success: true, message: 'ERPNext credentials cleared' });
 		}
 
-		const client = await createErpnextCrmClientWithKv(env, activeTenant);
+		const isNonDefaultTenant = Boolean(activeTenant && activeTenant !== 'default' && activeTenant !== '*');
+		const envForKv = isNonDefaultTenant
+			? { ...env, ERPNEXT_URL: undefined, ERPNEXT_API_KEY: undefined, ERPNEXT_API_SECRET: undefined }
+			: env;
+		const client = await createErpnextCrmClientWithKv(envForKv, activeTenant);
 		if (!client) return jsonResp({ success: false, error: 'ERPNext not configured' }, 503);
+
+		const checkLocalCustomerOwnership = async (customerId: string): Promise<boolean> => {
+			const db = env.AURA_DB ?? (env as { DB?: D1Database }).DB;
+			if (!db || activeTenant === '*') return true;
+			const scopedTenant = activeTenant.trim() || 'default';
+			try {
+				let row: Record<string, unknown> | null = null;
+				try {
+					row = await db.prepare(
+						"SELECT id, tenant_id FROM customers WHERE (id = ? OR erpnext_id = ? OR email = ? OR phone = ?) AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ? LIMIT 1"
+					).bind(customerId, customerId, customerId, customerId, scopedTenant).first<Record<string, unknown>>();
+				} catch {
+					row = await db.prepare(
+						"SELECT id, tenant_id FROM customers WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ? LIMIT 1"
+					).bind(customerId, scopedTenant).first<Record<string, unknown>>();
+				}
+				if (!row) return false;
+				if ('tenant_id' in row && row.tenant_id !== undefined) {
+					const rowTenant = typeof row.tenant_id === 'string' && row.tenant_id.trim() ? row.tenant_id.trim() : 'default';
+					return rowTenant === scopedTenant;
+				}
+				return scopedTenant === 'default';
+			} catch {
+				return false;
+			}
+		};
 
 		if (method === 'POST' && path === '/lead') {
 			const leadParsed = erpnextLeadSchema.safeParse(await request.json());
@@ -146,12 +179,19 @@ export async function handleErpnextRequest(request: Request, env: Env, resolvedT
 		}
 
 		if (method === 'GET' && path.startsWith('/customer/')) {
-			const info = await client.getCustomerInfo(path.replace('/customer/', ''));
+			const customerId = path.replace('/customer/', '');
+			if (!(await checkLocalCustomerOwnership(customerId))) {
+				return jsonResp({ success: false, error: 'Customer not found' }, 404);
+			}
+			const info = await client.getCustomerInfo(customerId);
 			return jsonResp({ success: true, data: info });
 		}
 
 		if (method === 'POST' && path.endsWith('/tag')) {
 			const customerId = path.replace('/customer/', '').replace('/tag', '');
+			if (!(await checkLocalCustomerOwnership(customerId))) {
+				return jsonResp({ success: false, error: 'Customer not found' }, 404);
+			}
 			const tagParsed = erpnextTagSchema.safeParse(await request.json());
 			if (!tagParsed.success) return zodErrorResponseRaw(tagParsed.error);
 			await client.addTag(customerId, tagParsed.data.tag);
@@ -160,6 +200,9 @@ export async function handleErpnextRequest(request: Request, env: Env, resolvedT
 
 		if (method === 'DELETE' && path.endsWith('/tag')) {
 			const customerId = path.replace('/customer/', '').replace('/tag', '');
+			if (!(await checkLocalCustomerOwnership(customerId))) {
+				return jsonResp({ success: false, error: 'Customer not found' }, 404);
+			}
 			const tagParsed = erpnextTagSchema.safeParse(await request.json());
 			if (!tagParsed.success) return zodErrorResponseRaw(tagParsed.error);
 			await client.removeTag(customerId, tagParsed.data.tag);
@@ -168,6 +211,9 @@ export async function handleErpnextRequest(request: Request, env: Env, resolvedT
 
 		if (method === 'PUT' && path.startsWith('/customer/')) {
 			const customerId = path.replace('/customer/', '');
+			if (!(await checkLocalCustomerOwnership(customerId))) {
+				return jsonResp({ success: false, error: 'Customer not found' }, 404);
+			}
 			const putParsed = customerUpdateSchema.safeParse(await request.json());
 			if (!putParsed.success) return zodErrorResponseRaw(putParsed.error);
 			await client.updateCustomer(customerId, putParsed.data as CrmUpdateData);

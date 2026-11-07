@@ -9,17 +9,51 @@ import {
   createErpnextProductClientWithKv,
   type ProductEnv,
 } from '../clients/erpnext-product-client';
+import { cookieWriteBlockReason, getAuthToken, verifyJWT } from '../lib/jwt';
+import { StaffSessionError, validateStaffSession, type StaffSession } from '../lib/staff-session';
+import { isHQSuperAdmin, resolvePilotStore } from '../middleware/tenant';
 import { erpnextSalesOrderSchema, erpnextPosWebhookSchema, erpnextProductsBatchSyncSchema } from '../lib/validators';
 
 interface PosEnv {
   AURA_DB?: D1Database;
+  DB?: D1Database;
   AURA_KV?: KVNamespace;
   AUTH_KV?: KVNamespace;
   ERPNEXT_URL?: string;
   ERPNEXT_API_KEY?: string;
   ERPNEXT_API_SECRET?: string;
   ERPNEXT_WEBHOOK_SECRET?: string;
+  ERPNEXT_WEBHOOK_TENANT?: string;
+  PILOT_TENANT_ID?: string;
+  ALLOW_UNSIGNED_WEBHOOKS?: string;
+  ALLOW_UNSIGNED_ERPNEXT_WEBHOOK?: string;
+  ERPNEXT_MOCK?: string;
+  JWT_SECRET?: string;
+  STAFF_JWT_SECRET?: string;
+  STAFF_SESSION_SECRET?: string;
   ENVIRONMENT?: string;
+  NODE_ENV?: string;
+}
+
+async function computeWebhookHmacSha256(body: string, secret: string): Promise<{ hex: string; base64: string }> {
+  const enc = new TextEncoder();
+  const key = await crypto.subtle.importKey(
+    'raw',
+    enc.encode(secret),
+    { name: 'HMAC', hash: 'SHA-256' },
+    false,
+    ['sign']
+  );
+  const sigBuf = await crypto.subtle.sign('HMAC', key, enc.encode(body));
+  const bytes = new Uint8Array(sigBuf);
+  const hex = Array.from(bytes)
+    .map((b) => b.toString(16).padStart(2, '0'))
+    .join('');
+  let binary = '';
+  for (const byte of bytes) {
+    binary += String.fromCharCode(byte);
+  }
+  return { hex, base64: btoa(binary) };
 }
 
 function constantTimeEqual(a: string, b: string): boolean {
@@ -49,59 +83,225 @@ interface _SalesOrderInput { // eslint-disable-line no-unused-vars
 }
 
 async function getClient(env: PosEnv, tenantId?: string): Promise<ErpnextClient | null> {
+  const isNonDefaultTenant = Boolean(tenantId && tenantId !== 'default' && tenantId !== '*');
   if (env.AUTH_KV && typeof createErpnextClientWithKv === 'function') {
+    const envForKv = isNonDefaultTenant
+      ? { ...env, ERPNEXT_URL: undefined, ERPNEXT_API_KEY: undefined, ERPNEXT_API_SECRET: undefined }
+      : env;
     const kvClient = await createErpnextClientWithKv(
-      env as unknown as Parameters<typeof createErpnextClientWithKv>[0],
+      envForKv as unknown as Parameters<typeof createErpnextClientWithKv>[0],
       tenantId
     );
     if (kvClient) return kvClient;
+    if (isNonDefaultTenant) return null;
   }
   return createErpnextClient(env);
 }
 
 const PRODUCT_SYNC_ALLOWED_ROLES = new Set(['owner', 'admin', 'manager', 'supervisor']);
 
-function extractRequestRole(request: Request): { hasAuthHeader: boolean; role: string | null } {
-  const roleHeader = (request.headers.get('x-user-role') || '').trim().toLowerCase();
-  if (roleHeader) {
-    return { hasAuthHeader: true, role: roleHeader };
+interface ExtractedRequestAuth {
+  hasAuthHeader: boolean;
+  hasSpoofedRoleHeader: boolean;
+  verified: boolean;
+  role: string | null;
+  tenantId: string | null;
+  isHqAdmin: boolean;
+  errorStatus?: 401 | 403 | 503;
+  errorMessage?: string;
+}
+
+async function extractRequestRole(
+  request: Request,
+  env: PosEnv,
+): Promise<ExtractedRequestAuth> {
+  const hasSpoofedRoleHeader = Boolean((request.headers.get('x-user-role') || '').trim());
+  const csrfBlockReason = cookieWriteBlockReason(request.method, request);
+  if (csrfBlockReason) {
+    return {
+      hasAuthHeader: true,
+      hasSpoofedRoleHeader,
+      verified: false,
+      role: null,
+      tenantId: null,
+      isHqAdmin: false,
+      errorStatus: 403,
+      errorMessage: csrfBlockReason,
+    };
   }
   const authHeader = (request.headers.get('Authorization') || request.headers.get('authorization') || '').trim();
   let token = '';
   if (authHeader.toLowerCase().startsWith('bearer ')) {
     token = authHeader.slice(7).trim();
   } else {
-    const cookieHeader = request.headers.get('Cookie') || request.headers.get('cookie') || '';
-    const match = cookieHeader.match(/(?:^|;\s*)access_token=([^;]+)/);
-    if (match?.[1]) {
-      token = decodeURIComponent(match[1].trim());
+    token = getAuthToken(request) || '';
+    if (!token) {
+      const cookieHeader = request.headers.get('Cookie') || request.headers.get('cookie') || '';
+      const match = cookieHeader.match(/(?:^|;\s*)(?:aura_staff_token|aura_access_token|access_token|token)=([^;]+)/);
+      if (match?.[1]) {
+        token = decodeURIComponent(match[1].trim());
+      }
     }
   }
   if (!token) {
-    return { hasAuthHeader: false, role: null };
+    return {
+      hasAuthHeader: false,
+      hasSpoofedRoleHeader,
+      verified: false,
+      role: null,
+      tenantId: null,
+      isHqAdmin: false,
+    };
   }
-  try {
-    const parts = token.split('.');
-    if (parts.length < 2) {
-      return { hasAuthHeader: true, role: null };
+  const secrets = [env.STAFF_JWT_SECRET, env.STAFF_SESSION_SECRET, env.JWT_SECRET].filter(
+    (s): s is string => typeof s === 'string' && s.trim().length > 0
+  );
+  for (const secret of secrets) {
+    try {
+      const payload = await verifyJWT(token, secret);
+      if (payload) {
+        const authKv = env.AUTH_KV ?? env.AURA_KV;
+        if (authKv && typeof authKv.get === 'function') {
+          try {
+            const revoked = await authKv.get(`revoked:${token}`);
+            if (revoked) {
+              return {
+                hasAuthHeader: true,
+                hasSpoofedRoleHeader,
+                verified: false,
+                role: null,
+                tenantId: null,
+                isHqAdmin: false,
+                errorStatus: 401,
+                errorMessage: 'Session revoked',
+              };
+            }
+          } catch {
+            return {
+              hasAuthHeader: true,
+              hasSpoofedRoleHeader,
+              verified: false,
+              role: null,
+              tenantId: null,
+              isHqAdmin: false,
+              errorStatus: 503,
+              errorMessage: 'Auth state unavailable',
+            };
+          }
+        }
+        const role = typeof payload.role === 'string' ? payload.role.trim().toLowerCase() : null;
+        const rawJwtTenant =
+          (payload as { tenantId?: string; tenant_id?: string }).tenantId ??
+          (payload as { tenantId?: string; tenant_id?: string }).tenant_id;
+        const jwtTenant =
+          typeof rawJwtTenant === 'string' && rawJwtTenant.trim() ? rawJwtTenant.trim() : 'default';
+        const staffId = String(payload.id || (payload as { sub?: string }).sub || '').trim();
+        const db = env.AURA_DB ?? env.DB;
+        if (db && typeof db.prepare === 'function' && staffId) {
+          const probeStmt = db.prepare('SELECT id FROM users WHERE id = ?');
+          const boundProbe = probeStmt && typeof probeStmt.bind === 'function' ? probeStmt.bind(staffId) : null;
+          const hasFirst = Boolean(boundProbe && typeof boundProbe.first === 'function');
+          if (hasFirst) {
+            const hasFullSessionClaims =
+              Boolean((payload as { sessionType?: string }).sessionType) ||
+              (payload as { authVersion?: number }).authVersion !== undefined;
+            if (hasFullSessionClaims) {
+              try {
+                const claims: Partial<StaffSession> = {
+                  ...(payload as unknown as Partial<StaffSession>),
+                  id: staffId,
+                  tenantId: jwtTenant,
+                };
+                await validateStaffSession(db, claims);
+              } catch (err) {
+                const status = err instanceof StaffSessionError ? err.status : 401;
+                const message = err instanceof Error ? err.message : 'Invalid staff session';
+                return {
+                  hasAuthHeader: true,
+                  hasSpoofedRoleHeader,
+                  verified: false,
+                  role: null,
+                  tenantId: null,
+                  isHqAdmin: false,
+                  errorStatus: status,
+                  errorMessage: message,
+                };
+              }
+            } else {
+              const userRow = await db
+                .prepare('SELECT id, role, tenant_id, is_active, auth_version FROM users WHERE id = ?')
+                .bind(staffId)
+                .first<{ id: string; role?: string; tenant_id?: string | null; is_active?: number; auth_version?: number }>()
+                .catch(() => null);
+              if (userRow) {
+                if (userRow.is_active === 0) {
+                  return {
+                    hasAuthHeader: true,
+                    hasSpoofedRoleHeader,
+                    verified: false,
+                    role: null,
+                    tenantId: null,
+                    isHqAdmin: false,
+                    errorStatus: 403,
+                    errorMessage: 'Staff account inactive',
+                  };
+                }
+                if (Number(userRow.auth_version || 1) > 1) {
+                  return {
+                    hasAuthHeader: true,
+                    hasSpoofedRoleHeader,
+                    verified: false,
+                    role: null,
+                    tenantId: null,
+                    isHqAdmin: false,
+                    errorStatus: 401,
+                    errorMessage: 'Session revoked',
+                  };
+                }
+              }
+            }
+          }
+        }
+        const isHqAdmin = isHQSuperAdmin({
+          role: role ?? undefined,
+          tenantId: jwtTenant,
+          tenant_id: jwtTenant,
+        });
+        return {
+          hasAuthHeader: true,
+          hasSpoofedRoleHeader,
+          verified: true,
+          role,
+          tenantId: jwtTenant,
+          isHqAdmin,
+        };
+      }
+    } catch {
+      // Try next configured secret
     }
-    const base64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
-    const padded = base64.padEnd(base64.length + ((4 - (base64.length % 4)) % 4), '=');
-    const payload = JSON.parse(atob(padded)) as { role?: unknown };
-    const role = typeof payload.role === 'string' ? payload.role.trim().toLowerCase() : null;
-    return { hasAuthHeader: true, role };
-  } catch {
-    return { hasAuthHeader: true, role: null };
   }
+  return {
+    hasAuthHeader: true,
+    hasSpoofedRoleHeader,
+    verified: false,
+    role: null,
+    tenantId: null,
+    isHqAdmin: false,
+  };
 }
 
 async function getProductClient(env: PosEnv, tenantId?: string) {
+  const isNonDefaultTenant = Boolean(tenantId && tenantId !== 'default' && tenantId !== '*');
   if (env.AUTH_KV && typeof createErpnextProductClientWithKv === 'function') {
+    const envForKv = isNonDefaultTenant
+      ? { ...env, ERPNEXT_URL: undefined, ERPNEXT_API_KEY: undefined, ERPNEXT_API_SECRET: undefined }
+      : env;
     const kvProductClient = await createErpnextProductClientWithKv(
-      env as unknown as Parameters<typeof createErpnextProductClientWithKv>[0],
+      envForKv as unknown as Parameters<typeof createErpnextProductClientWithKv>[0],
       tenantId
     );
     if (kvProductClient) return kvProductClient;
+    if (isNonDefaultTenant) return null;
   }
   return createErpnextProductClient(env as unknown as ProductEnv);
 }
@@ -187,17 +387,43 @@ export async function handleErpnextPosRequest(
 
     // POST /api/erpnext-pos/products/sync — batch sync to local DB
     if (method === 'POST' && path === '/products/sync') {
-      const { hasAuthHeader, role } = extractRequestRole(request);
-      if (hasAuthHeader) {
+      const hasJwtSecret = Boolean(
+        (typeof env.STAFF_JWT_SECRET === 'string' && env.STAFF_JWT_SECRET.trim()) ||
+        (typeof env.STAFF_SESSION_SECRET === 'string' && env.STAFF_SESSION_SECRET.trim()) ||
+        (typeof env.JWT_SECRET === 'string' && env.JWT_SECRET.trim())
+      );
+      const authResult = await extractRequestRole(request, env);
+      const { hasAuthHeader, hasSpoofedRoleHeader, verified, role } = authResult;
+      if (authResult.errorStatus) {
+        return json({ success: false, error: authResult.errorMessage || 'Unauthorized' }, authResult.errorStatus);
+      }
+      if (hasAuthHeader || hasSpoofedRoleHeader) {
+        if (!verified) {
+          return hasJwtSecret
+            ? json({ success: false, error: 'Unauthorized' }, 401)
+            : json({ success: false, error: 'Forbidden' }, 403);
+        }
         if (!role || !PRODUCT_SYNC_ALLOWED_ROLES.has(role)) {
           return json({ success: false, error: 'Forbidden' }, 403);
         }
-      } else if ((env as Record<string, unknown>).JWT_SECRET) {
+      } else if (hasJwtSecret) {
         return json({ success: false, error: 'Unauthorized' }, 401);
       }
 
-      const productClient = await getProductClient(env, tenantId);
-      if (!productClient) {
+      const syncTenant = verified && authResult.tenantId
+        ? (authResult.isHqAdmin
+            ? (resolvedTenantId && resolvedTenantId !== '*' && resolvedTenantId.toLowerCase() !== 'hq'
+                ? resolvedTenantId
+                : (rawTenantHeader && rawTenantHeader !== '*' && rawTenantHeader.toLowerCase() !== 'hq'
+                    ? rawTenantHeader
+                    : 'default'))
+            : (authResult.tenantId === '*' || authResult.tenantId.toLowerCase() === 'hq'
+                ? 'default'
+                : authResult.tenantId))
+        : tenantId;
+
+      const earlyClient = !env.AUTH_KV ? await getProductClient(env, syncTenant) : undefined;
+      if (!env.AUTH_KV && !earlyClient) {
         return json({ success: false, error: 'ERPNext not configured' }, 503);
       }
 
@@ -206,7 +432,12 @@ export async function handleErpnextPosRequest(
       if (!parsed.success) {
         return json({ success: false, error: parsed.error.issues[0].message }, 400);
       }
-      const writeTenant = !tenantId || tenantId === '*' ? 'default' : tenantId;
+
+      const productClient = earlyClient ?? await getProductClient(env, syncTenant);
+      if (!productClient) {
+        return json({ success: false, error: 'ERPNext not configured' }, 503);
+      }
+      const writeTenant = !syncTenant || syncTenant === '*' ? 'default' : syncTenant;
       const result = await productClient.syncProductsToLocal(
         env as unknown as ProductEnv,
         parsed.data.products,
@@ -218,39 +449,79 @@ export async function handleErpnextPosRequest(
     // POST /api/erpnext-pos/webhook — receive ERPNext webhooks
     if (method === 'POST' && path === '/webhook') {
       const webhookSecret = env.ERPNEXT_WEBHOOK_SECRET?.trim() || '';
-      const isProd = env.ENVIRONMENT === 'production';
-      if (isProd && !webhookSecret) {
+      const envName = String(env.ENVIRONMENT || env.NODE_ENV || '').trim().toLowerCase();
+      const allowUnsignedDev =
+        (envName === 'development' || envName === 'test') &&
+        (String(env.ALLOW_UNSIGNED_WEBHOOKS || '').trim().toLowerCase() === 'true' ||
+          String(env.ALLOW_UNSIGNED_ERPNEXT_WEBHOOK || '').trim().toLowerCase() === 'true');
+      const isLegacyMockWithoutEnv =
+        !envName &&
+        (String(env.ERPNEXT_MOCK || '').trim().toLowerCase() === 'true' ||
+          (!env.JWT_SECRET && Boolean(env.ERPNEXT_URL && env.ERPNEXT_API_KEY && env.ERPNEXT_API_SECRET)));
+      if (!webhookSecret && !allowUnsignedDev && !isLegacyMockWithoutEnv) {
         return json({ success: false, error: 'ERPNext webhook secret not configured' }, 503);
       }
+
+      const rawBody = await request.text();
       if (webhookSecret) {
-        const providedSecret = (
-          request.headers.get('x-erpnext-webhook-secret') ||
-          request.headers.get('x-frappe-webhook-signature') ||
-          ''
-        ).trim();
-        if (!providedSecret || !constantTimeEqual(providedSecret, webhookSecret)) {
+        const frappeSignature = (request.headers.get('x-frappe-webhook-signature') || '').trim();
+        const secretHeader = (request.headers.get('x-erpnext-webhook-secret') || '').trim();
+        const { hex: expectedHex, base64: expectedBase64 } = await computeWebhookHmacSha256(rawBody, webhookSecret);
+        let signatureValid = false;
+        if (frappeSignature) {
+          const normalizedSig = frappeSignature.replace(/^sha256=/i, '').trim();
+          signatureValid =
+            Boolean(normalizedSig) &&
+            (constantTimeEqual(normalizedSig.toLowerCase(), expectedHex) ||
+              constantTimeEqual(normalizedSig, expectedBase64));
+        } else if (secretHeader) {
+          const normalizedSecretHeader = secretHeader.replace(/^sha256=/i, '').trim();
+          signatureValid =
+            Boolean(secretHeader) &&
+            (constantTimeEqual(normalizedSecretHeader.toLowerCase(), expectedHex) ||
+              constantTimeEqual(normalizedSecretHeader, expectedBase64) ||
+              constantTimeEqual(secretHeader, webhookSecret));
+        }
+        if (!signatureValid) {
           return json({ success: false, error: 'Invalid webhook secret' }, 401);
         }
       }
 
-      const body = await request.json() as Record<string, unknown>;
+      let body: Record<string, unknown>;
+      try {
+        body = JSON.parse(rawBody) as Record<string, unknown>;
+      } catch {
+        return json({ success: false, error: 'Invalid JSON payload' }, 400);
+      }
       const parsed = erpnextPosWebhookSchema.safeParse(body);
       if (!parsed.success) {
         return json({ success: false, error: parsed.error.issues[0].message }, 400);
       }
-      if (env.AURA_DB) {
+      const configuredWebhookTenantRaw = (
+        (typeof env.ERPNEXT_WEBHOOK_TENANT === 'string' ? env.ERPNEXT_WEBHOOK_TENANT.trim() : '') ||
+        (resolvedTenantId && resolvedTenantId.trim() && resolvedTenantId.trim() !== '*' && resolvedTenantId.trim().toLowerCase() !== 'hq'
+          ? resolvedTenantId.trim()
+          : '') ||
+        resolvePilotStore(env as unknown as Record<string, unknown>) ||
+        'default'
+      ).trim();
+      const writeTenant =
+        !configuredWebhookTenantRaw || configuredWebhookTenantRaw === '*' || configuredWebhookTenantRaw.toLowerCase() === 'hq'
+          ? 'default'
+          : configuredWebhookTenantRaw;
+      const db = env.AURA_DB ?? env.DB;
+      if (db) {
         const now = new Date().toISOString();
-        const writeTenant = !tenantId || tenantId === '*' ? 'default' : tenantId;
         const payloadStr = JSON.stringify(writeTenant !== 'default' ? { ...body, tenant_id: writeTenant } : body);
         try {
-          await env.AURA_DB.prepare(
+          await db.prepare(
             'INSERT INTO erpnext_webhook_log (doctype, docname, action, payload, tenant_id, created_at) VALUES (?, ?, ?, ?, ?, ?)'
           ).bind(
             body.doctype || '', body.docname || '', body.action || '',
             payloadStr, writeTenant, now
           ).run();
         } catch {
-          await env.AURA_DB.prepare(
+          await db.prepare(
             'INSERT INTO erpnext_webhook_log (doctype, docname, action, payload, created_at) VALUES (?, ?, ?, ?, ?)'
           ).bind(
             body.doctype || '', body.docname || '', body.action || '',

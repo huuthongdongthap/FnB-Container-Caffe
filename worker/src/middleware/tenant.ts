@@ -21,15 +21,21 @@ const log = createLogger({ route: 'tenant' });
 
 /**
  * Check if the authenticated user is an HQ Super-Admin.
- * HQ super-admins have role 'owner' and are bound to 'default', 'hq', or unbound.
+ * HQ super-admins have role 'owner' or 'admin' and are explicitly bound to 'hq' or '*'.
  */
-export function isHQSuperAdmin(user?: { role?: string; tenantId?: string; get?: (_k: string) => unknown } | null): boolean {
+export function isHQSuperAdmin(user?: { role?: string; tenantId?: string; tenant_id?: string; get?: (_k: string) => unknown } | null): boolean {
   const resolved = typeof user?.get === 'function'
-    ? (user.get('user') as { role?: string; tenantId?: string } | null | undefined)
+    ? (user.get('user') as { role?: string; tenantId?: string; tenant_id?: string } | null | undefined)
     : user;
   if (!resolved) return false;
-  const userTenant = resolved.tenantId?.trim();
-  return (resolved.role === 'owner' || resolved.role === 'admin') && (!userTenant || userTenant === 'default' || userTenant === 'hq');
+  const role = (resolved.role || '').trim().toLowerCase();
+  if (role !== 'owner' && role !== 'admin') return false;
+  const rawTenant =
+    (typeof resolved.tenantId === 'string' && resolved.tenantId.trim())
+      ? resolved.tenantId
+      : resolved.tenant_id;
+  const userTenant = typeof rawTenant === 'string' ? rawTenant.trim().toLowerCase() : '';
+  return userTenant === 'hq' || userTenant === '*';
 }
 
 /**
@@ -55,18 +61,32 @@ export const tenantMiddleware: MiddlewareHandler<{ Bindings: Env }> = async (c, 
     return next();
   }
 
-  const userTenant = user.tenantId?.trim() || 'default';
+  const rawUserTenant = (user as { tenantId?: string; tenant_id?: string }).tenantId ?? (user as { tenantId?: string; tenant_id?: string }).tenant_id;
+  const userTenant = (typeof rawUserTenant === 'string' ? rawUserTenant.trim() : '') || 'default';
   if (isHQSuperAdmin(user)) {
-    const requestedTenant = (c.req.query('tenant_id') || c.req.header('x-tenant-id') || c.req.header('X-Tenant-ID') || '').trim() || undefined;
-    if (requestedTenant && requestedTenant !== userTenant) {
+    const requestedTenant = (
+      c.req.query('tenant_id') ||
+      c.req.query('tenantId') ||
+      c.req.query('store_id') ||
+      c.req.query('storeId') ||
+      c.req.header('x-tenant-id') ||
+      c.req.header('X-Tenant-ID') ||
+      c.req.header('x-store-id') ||
+      c.req.header('X-Store-ID') ||
+      ''
+    ).trim() || undefined;
+    if (requestedTenant && requestedTenant.toLowerCase() !== userTenant.toLowerCase()) {
       // Privileged cross-tenant read — leave a durable trail before scoping.
-      writeTenantOverrideAudit(c, user, user.tenantId, requestedTenant);
-      c.set('tenantId', requestedTenant);
+      const normalizedTarget = requestedTenant.toLowerCase() === 'hq' ? '*' : requestedTenant;
+      writeTenantOverrideAudit(c, user, rawUserTenant, normalizedTarget);
+      c.set('tenantId', normalizedTarget);
       return next();
     }
+    c.set('tenantId', userTenant.toLowerCase() === 'hq' ? '*' : userTenant);
+    return next();
   }
 
-  if (!user.tenantId?.trim()) {
+  if (!rawUserTenant?.trim()) {
     log.warn(`User ${user.id} has no tenant binding — falling back to 'default'`);
   }
 
@@ -90,18 +110,51 @@ export function getTenantId(c: {
   }
   const explicitTenant = (c.get('tenantId') as string | undefined)?.trim();
   if (explicitTenant) {
+    if (
+      (explicitTenant === '*' || explicitTenant.toLowerCase() === 'hq') &&
+      isHQSuperAdmin(c as unknown as Parameters<typeof isHQSuperAdmin>[0])
+    ) {
+      const requestedOverride = (
+        c.req?.query?.('tenant_id') ||
+        c.req?.query?.('tenantId') ||
+        c.req?.query?.('store_id') ||
+        c.req?.query?.('storeId') ||
+        c.req?.header?.('x-tenant-id') ||
+        c.req?.header?.('X-Tenant-ID') ||
+        c.req?.header?.('x-store-id') ||
+        c.req?.header?.('X-Store-ID') ||
+        ''
+      ).trim();
+      if (requestedOverride && requestedOverride !== '*' && requestedOverride.toLowerCase() !== 'hq') {
+        return requestedOverride;
+      }
+      return '*';
+    }
     return explicitTenant;
   }
 
-  const user = c.get('user') as { id?: string; name?: string; email?: string; role?: string; tenantId?: string } | undefined;
+  const user = c.get('user') as { id?: string; name?: string; email?: string; role?: string; tenantId?: string; tenant_id?: string } | undefined;
   if (user) {
-    const userTenant = user.tenantId?.trim() || 'default';
+    const rawUserTenant = user.tenantId ?? user.tenant_id;
+    const userTenant = (typeof rawUserTenant === 'string' ? rawUserTenant.trim() : '') || 'default';
     if (isHQSuperAdmin(user)) {
-      const requestedTenant = (c.req?.query?.('tenant_id') || c.req?.header?.('x-tenant-id') || c.req?.header?.('X-Tenant-ID') || '').trim() || undefined;
-      if (requestedTenant && requestedTenant !== userTenant) {
-        writeTenantOverrideAudit(c as Parameters<typeof writeTenantOverrideAudit>[0], user, user.tenantId, requestedTenant);
-        return requestedTenant;
+      const requestedTenant = (
+        c.req?.query?.('tenant_id') ||
+        c.req?.query?.('tenantId') ||
+        c.req?.query?.('store_id') ||
+        c.req?.query?.('storeId') ||
+        c.req?.header?.('x-tenant-id') ||
+        c.req?.header?.('X-Tenant-ID') ||
+        c.req?.header?.('x-store-id') ||
+        c.req?.header?.('X-Store-ID') ||
+        ''
+      ).trim() || undefined;
+      if (requestedTenant && requestedTenant.toLowerCase() !== userTenant.toLowerCase()) {
+        const normalizedTarget = requestedTenant.toLowerCase() === 'hq' ? '*' : requestedTenant;
+        writeTenantOverrideAudit(c as Parameters<typeof writeTenantOverrideAudit>[0], user, rawUserTenant, normalizedTarget);
+        return normalizedTarget;
       }
+      return userTenant.toLowerCase() === 'hq' ? '*' : userTenant;
     }
     return userTenant;
   }
@@ -119,11 +172,21 @@ export function resolvePublicTenantId(c: Parameters<typeof getTenantId>[0]): str
     return getTenantId(c);
   }
   const explicitCtx = c.get?.('tenantId') as string | undefined;
-  if (explicitCtx && explicitCtx.trim() && explicitCtx.trim() !== '*') {
+  if (explicitCtx && explicitCtx.trim() && explicitCtx.trim() !== '*' && explicitCtx.trim().toLowerCase() !== 'hq') {
     return explicitCtx.trim();
   }
-  const raw = (c.req?.query?.('tenant_id') || c.req?.header?.('X-Tenant-ID') || c.req?.header?.('x-tenant-id') || '').trim();
-  if (!raw || raw === '*') {
+  const raw = (
+    c.req?.query?.('tenant_id') ||
+    c.req?.query?.('tenantId') ||
+    c.req?.query?.('store_id') ||
+    c.req?.query?.('storeId') ||
+    c.req?.header?.('X-Tenant-ID') ||
+    c.req?.header?.('x-tenant-id') ||
+    c.req?.header?.('X-Store-ID') ||
+    c.req?.header?.('x-store-id') ||
+    ''
+  ).trim();
+  if (!raw || raw === '*' || raw.toLowerCase() === 'hq') {
     return resolvePilotStore(((c as unknown as { env?: Env }).env ?? {}) as Env);
   }
   return raw;

@@ -23,17 +23,53 @@ export async function getPeakHours(
 ): Promise<PeakHourRow[]> {
   const { clause: tenantClause, binds: tenantBinds } = buildTenantFilter(tenantId, 'o');
   const binds: Array<number | string> = [days, ...tenantBinds];
-  const { results } = await db.prepare(`
-    SELECT
-      CAST(strftime('%H', o.created_at) AS INTEGER) AS hour,
-      COUNT(*) AS order_count,
-      COALESCE(SUM(o.total), 0) AS revenue
-    FROM orders o
-    WHERE o.created_at >= datetime('now', '-' || ? || ' days')
-      AND o.status != 'cancelled'${tenantClause}
-    GROUP BY hour
-    ORDER BY hour
-  `).bind(...binds).all<PeakHourRow>();
+  let results: PeakHourRow[] | undefined;
+  try {
+    const res = await db.prepare(`
+      SELECT
+        CAST(strftime('%H', datetime(created_at, '+7 hours')) AS INTEGER) AS hour,
+        COUNT(*) AS order_count,
+        COALESCE(SUM(o.total), 0) AS revenue
+      FROM orders o
+      WHERE o.created_at >= datetime('now', '-' || ? || ' days')
+        AND o.status != 'cancelled'
+        AND o.status NOT IN ('cancelled', 'refunded', 'failed', 'rejected', 'expired')
+        AND COALESCE(o.payment_status, '') != 'refunded'${tenantClause}
+      GROUP BY hour
+      ORDER BY hour
+    `).bind(...binds).all<PeakHourRow>();
+    results = res.results;
+  } catch {
+    try {
+      const res = await db.prepare(`
+        SELECT
+          CAST(strftime('%H', datetime(created_at, '+7 hours')) AS INTEGER) AS hour,
+          COUNT(*) AS order_count,
+          COALESCE(SUM(o.total), 0) AS revenue
+        FROM orders o
+        WHERE o.created_at >= datetime('now', '-' || ? || ' days')
+          AND o.status != 'cancelled'
+          AND o.status NOT IN ('cancelled', 'refunded', 'failed', 'rejected', 'expired')${tenantClause}
+        GROUP BY hour
+        ORDER BY hour
+      `).bind(...binds).all<PeakHourRow>();
+      results = res.results;
+    } catch {
+      const res = await db.prepare(`
+        SELECT
+          CAST(strftime('%H', created_at) AS INTEGER) AS hour,
+          COUNT(*) AS order_count,
+          COALESCE(SUM(o.total), 0) AS revenue
+        FROM orders o
+        WHERE o.created_at >= datetime('now', '-' || ? || ' days')
+          AND o.status != 'cancelled'
+          AND o.status NOT IN ('cancelled', 'refunded', 'failed', 'rejected', 'expired')${tenantClause}
+        GROUP BY hour
+        ORDER BY hour
+      `).bind(...binds).all<PeakHourRow>();
+      results = res.results;
+    }
+  }
 
   const rows = results || [];
 

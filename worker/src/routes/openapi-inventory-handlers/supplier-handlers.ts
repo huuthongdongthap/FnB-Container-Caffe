@@ -2,7 +2,102 @@ import type { OpenAPIHono } from '@hono/zod-openapi';
 import type { Env } from '../../types/env';
 import { InventoryRoutes } from '../../schemas/inventory';
 import { getDatabase } from '../../lib/db';
-import { getTenantId, matchesTenantRow } from '../../middleware/tenant';
+import { authenticateRequest } from '../../middleware/auth';
+import { getTenantId, isHQSuperAdmin, matchesTenantRow } from '../../middleware/tenant';
+
+const SUPPLIER_READ_ROLES = ['owner', 'manager', 'supervisor', 'admin', 'staff', 'kitchen', 'barista', 'chef', 'cashier', 'waiter'];
+const SUPPLIER_MUTATION_ROLES = ['owner', 'manager', 'admin'];
+
+async function verifySupplierAccess(
+  c: any,
+  allowedRoles: string[],
+): Promise<{ user: { id: string; role: string; tenantId?: string }; errorResponse: null } | { user: null; errorResponse: Response }> {
+  let user = c.get?.('user') as { id?: string; role?: string; tenantId?: string; tenant_id?: string } | undefined;
+  if (!user && c.req?.raw && c.env?.JWT_SECRET && (c.req?.header?.('Authorization') || c.req?.header?.('authorization'))) {
+    const session = await authenticateRequest(c.req.raw, c.env, { optional: true }).catch(() => null);
+    if (session && 'payload' in session) {
+      user = {
+        id: session.payload.id,
+        role: session.payload.role,
+        tenantId: session.payload.tenantId,
+      };
+      c.set?.('user', user);
+    }
+  }
+  const role = user?.role ? String(user.role).toLowerCase() : '';
+  if (!user || !role) {
+    return {
+      user: null,
+      errorResponse: c.json({ success: false, error: 'Authentication required', code: 'UNAUTHORIZED' }, 401),
+    };
+  }
+  if (!allowedRoles.includes(role)) {
+    return {
+      user: null,
+      errorResponse: c.json({ success: false, error: 'Insufficient permissions', code: 'FORBIDDEN' }, 403),
+    };
+  }
+  const userTenant = String(user.tenantId ?? user.tenant_id ?? '').trim();
+  const isWildcardHQ = (role === 'owner' || role === 'admin') && (userTenant === '*' || userTenant.toLowerCase() === 'hq');
+  const hqAdmin = isHQSuperAdmin(c) || isWildcardHQ;
+  const boundTenant = userTenant || 'default';
+  const reqTenant = (
+    c.req?.query?.('tenant_id') ||
+    c.req?.query?.('tenantId') ||
+    c.req?.query?.('store_id') ||
+    c.req?.query?.('storeId') ||
+    c.req?.header?.('X-Tenant-ID') ||
+    c.req?.header?.('x-tenant-id') ||
+    c.req?.header?.('X-Store-ID') ||
+    c.req?.header?.('x-store-id') ||
+    ''
+  ).trim();
+  const ctxTenant = (c.get?.('tenantId') as string | undefined)?.trim() || '';
+  const resolvedTenant = getTenantId(c).trim() || 'default';
+
+  if (!hqAdmin) {
+    if (
+      boundTenant === '*' ||
+      boundTenant.toLowerCase() === 'hq' ||
+      (reqTenant && (reqTenant === '*' || reqTenant.toLowerCase() === 'hq' || reqTenant !== boundTenant)) ||
+      (ctxTenant && (ctxTenant === '*' || ctxTenant.toLowerCase() === 'hq' || ctxTenant !== boundTenant)) ||
+      resolvedTenant !== boundTenant
+    ) {
+      return {
+        user: null,
+        errorResponse: c.json({ success: false, error: 'Cross-tenant access denied', code: 'FORBIDDEN' }, 403),
+      };
+    }
+  } else if (!isWildcardHQ && ctxTenant && ctxTenant !== '*' && ctxTenant.toLowerCase() !== 'hq' && ctxTenant !== boundTenant && !reqTenant) {
+    return {
+      user: null,
+      errorResponse: c.json({ success: false, error: 'Cross-tenant access denied', code: 'FORBIDDEN' }, 403),
+    };
+  }
+  return {
+    user: { id: user.id || 'system', role, tenantId: userTenant || user.tenantId },
+    errorResponse: null,
+  };
+}
+
+function resolveOpenApiSupplierTenant(c: any): string {
+  const reqTenant = (
+    c.req?.query?.('tenant_id') ||
+    c.req?.query?.('tenantId') ||
+    c.req?.query?.('store_id') ||
+    c.req?.query?.('storeId') ||
+    c.req?.header?.('X-Tenant-ID') ||
+    c.req?.header?.('x-tenant-id') ||
+    c.req?.header?.('X-Store-ID') ||
+    c.req?.header?.('x-store-id') ||
+    ''
+  ).trim();
+  if (reqTenant) {
+    return reqTenant.toLowerCase() === 'hq' ? '*' : reqTenant;
+  }
+  const resolved = getTenantId(c).trim() || 'default';
+  return resolved.toLowerCase() === 'hq' ? '*' : resolved;
+}
 
 export async function checkSupplierTenant(
   db: any,
@@ -70,24 +165,42 @@ async function writeSupplierAuditLog(
   now: string,
   tenantId = 'default'
 ): Promise<void> {
+  const normTenant = !tenantId || !tenantId.trim() || tenantId.trim() === '*' ? 'default' : tenantId.trim();
   try {
     await db.prepare(
       `INSERT INTO audit_logs (actor_id, actor_name, user_id, action, resource_type, resource_id, entity_type, entity_id, tenant_id, details, metadata, created_at)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-    ).bind(userId, userId, userId, action, 'supplier', entityId, 'supplier', entityId, tenantId, metadata, metadata, now).run();
+    ).bind(userId, userId, userId, action, 'supplier', entityId, 'supplier', entityId, normTenant, metadata, metadata, now).run();
   } catch {
     try {
       await db.prepare(
-        `INSERT INTO audit_logs (id, user_id, action, entity_type, entity_id, metadata, created_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?)`
-      ).bind(`audit_${crypto.randomUUID()}`, userId, action, 'supplier', entityId, metadata, now).run();
+        `INSERT INTO audit_logs (id, user_id, action, entity_type, entity_id, tenant_id, details, metadata, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      ).bind(`audit_${crypto.randomUUID()}`, userId, action, 'supplier', entityId, normTenant, metadata, metadata, now).run();
     } catch {
       try {
         await db.prepare(
-          `INSERT INTO audit_logs (actor_id, actor_name, action, resource_type, resource_id, details, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)`
-        ).bind(userId, userId, action, 'supplier', entityId, metadata, now).run().catch(() => {});
+          `INSERT INTO audit_logs (id, user_id, action, entity_type, entity_id, tenant_id, metadata, created_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+        ).bind(`audit_${crypto.randomUUID()}`, userId, action, 'supplier', entityId, normTenant, metadata, now).run();
       } catch {
-        // Ignore audit log error
+        try {
+          await db.prepare(
+            `INSERT INTO audit_logs (id, user_id, action, entity_type, entity_id, metadata, created_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?)`
+          ).bind(`audit_${crypto.randomUUID()}`, userId, action, 'supplier', entityId, metadata, now).run();
+        } catch {
+          try {
+            await db.prepare(
+              `INSERT INTO audit_logs (actor_id, actor_name, action, resource_type, resource_id, details, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)`
+            ).bind(userId, userId, action, 'supplier', entityId, metadata, now).run().catch(() => {});
+          } catch {
+            // Ignore audit log error
+          }
+        }
+        await db.prepare(
+          'UPDATE audit_logs SET tenant_id = ? WHERE (entity_id = ? OR resource_id = ?) AND action = ? AND created_at = ?'
+        ).bind(normTenant, entityId, entityId, action, now).run().catch(() => {});
       }
     }
   }
@@ -96,8 +209,11 @@ async function writeSupplierAuditLog(
 export function registerSupplierHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
   // GET /api/inventory/suppliers - List suppliers
   app.openapi(InventoryRoutes.suppliers.list as any, async (c: any) => {
+    const auth = await verifySupplierAccess(c, SUPPLIER_READ_ROLES);
+    if (auth.errorResponse) return auth.errorResponse;
+
     const db = getDatabase(c);
-    const tenantId = getTenantId(c).trim() || 'default';
+    const tenantId = resolveOpenApiSupplierTenant(c);
     const query = c.req.valid('query');
 
     const page = query.page || 1;
@@ -143,15 +259,20 @@ export function registerSupplierHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
         }
       }
 
-      if (!sqlTenantScoped || (rawItems.length === 0 && tenantId !== 'default' && offset === 0)) {
-        const countResult = (await db.prepare(`SELECT COUNT(*) as total FROM suppliers ${whereClause}`).bind(...params).first()) as { total: number } | null;
-        total = countResult?.total || 0;
+      if (!sqlTenantScoped) {
+        if (tenantId !== '*' && tenantId !== 'default') {
+          rawItems = [];
+          total = 0;
+        } else {
+          const countResult = (await db.prepare(`SELECT COUNT(*) as total FROM suppliers ${whereClause}`).bind(...params).first()) as { total: number } | null;
+          total = countResult?.total || 0;
 
-        const items = (await db.prepare(
-          `SELECT * FROM suppliers ${whereClause} ORDER BY name ASC LIMIT ? OFFSET ?`
-        ).bind(...params, fetchLimit, fetchOffset).all()) as { results: any[] };
-        rawItems = items.results || [];
-        sqlTenantScoped = false;
+          const items = (await db.prepare(
+            `SELECT * FROM suppliers ${whereClause} ORDER BY name ASC LIMIT ? OFFSET ?`
+          ).bind(...params, fetchLimit, fetchOffset).all()) as { results: any[] };
+          rawItems = items.results || [];
+          sqlTenantScoped = false;
+        }
       }
 
       if (tenantId === '*') {
@@ -212,8 +333,11 @@ export function registerSupplierHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
 
   // GET /api/inventory/suppliers/{id} - Get supplier by ID
   app.openapi(InventoryRoutes.suppliers.get as any, async (c: any) => {
+    const auth = await verifySupplierAccess(c, SUPPLIER_READ_ROLES);
+    if (auth.errorResponse) return auth.errorResponse;
+
     const db = getDatabase(c);
-    const tenantId = getTenantId(c).trim() || 'default';
+    const tenantId = resolveOpenApiSupplierTenant(c);
     const { id } = c.req.valid('param');
 
     let supplier: any = null;
@@ -239,14 +363,23 @@ export function registerSupplierHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
 
   // POST /api/inventory/suppliers - Create supplier
   app.openapi(InventoryRoutes.suppliers.create as any, async (c: any) => {
+    const auth = await verifySupplierAccess(c, SUPPLIER_MUTATION_ROLES);
+    if (auth.errorResponse) return auth.errorResponse;
+    const user = auth.user;
+
     const db = getDatabase(c);
-    const rawTenantId = getTenantId(c).trim() || 'default';
-    const tenantId = rawTenantId === '*' ? 'default' : rawTenantId;
-    const user = c.get('user');
-    if (user?.role && !['owner', 'manager', 'supervisor', 'admin'].includes(user.role)) {
-      return c.json({ success: false, error: 'Insufficient permissions' }, 403);
-    }
+    const rawTenantId = resolveOpenApiSupplierTenant(c);
     const body = c.req.valid('json');
+    const rawBody = (await c.req?.json?.().catch(() => null)) as Record<string, unknown> | null;
+    const bodyTenant =
+      typeof (body?.tenant_id ?? body?.tenantId ?? body?.store_id ?? body?.storeId ?? rawBody?.tenant_id ?? rawBody?.tenantId ?? rawBody?.store_id ?? rawBody?.storeId) === 'string'
+        ? String(body?.tenant_id ?? body?.tenantId ?? body?.store_id ?? body?.storeId ?? rawBody?.tenant_id ?? rawBody?.tenantId ?? rawBody?.store_id ?? rawBody?.storeId).trim()
+        : '';
+    const resolvedBodyTenant = bodyTenant && bodyTenant !== '*' && bodyTenant.toLowerCase() !== 'hq' ? bodyTenant : '';
+    const tenantId =
+      rawTenantId === '*' || rawTenantId.toLowerCase() === 'hq'
+        ? resolvedBodyTenant || 'default'
+        : rawTenantId;
     const now = new Date().toISOString();
 
     const supRand = new Uint8Array(4);
@@ -272,7 +405,8 @@ export function registerSupplierHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
           now,
           now
         ).run();
-      } catch {
+      } catch (err) {
+        if (tenantId !== 'default') throw err;
         await db.prepare(
           `INSERT INTO suppliers (id, name, contact_person, phone, email, address, payment_terms, is_active, created_at, updated_at)
            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
@@ -289,7 +423,8 @@ export function registerSupplierHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
           now
         ).run();
       }
-    } catch {
+    } catch (err) {
+      if (tenantId !== 'default') throw err;
       usingFallback = true;
     }
 
@@ -317,13 +452,13 @@ export function registerSupplierHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
 
   // PATCH /api/inventory/suppliers/{id} - Update supplier
   app.openapi(InventoryRoutes.suppliers.update as any, async (c: any) => {
+    const auth = await verifySupplierAccess(c, SUPPLIER_MUTATION_ROLES);
+    if (auth.errorResponse) return auth.errorResponse;
+    const user = auth.user;
+
     const db = getDatabase(c);
-    const tenantId = getTenantId(c).trim() || 'default';
+    const tenantId = resolveOpenApiSupplierTenant(c);
     const writeTenant = tenantId === '*' ? 'default' : tenantId;
-    const user = c.get('user');
-    if (user?.role && !['owner', 'manager', 'supervisor', 'admin'].includes(user.role)) {
-      return c.json({ success: false, error: 'Insufficient permissions' }, 403);
-    }
     const { id } = c.req.valid('param');
     const body = c.req.valid('json');
     const now = new Date().toISOString();
@@ -352,7 +487,55 @@ export function registerSupplierHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
       return c.json({ success: false, error: 'Supplier not found' }, 404);
     }
     const isLegacyUnscopedRow =
-      existing.tenant_id === undefined || existing.tenant_id === null;
+      existing.tenant_id === undefined || existing.tenant_id === null || String(existing.tenant_id).trim() === '';
+    let rawExistingTenant = existing?.tenant_id && String(existing.tenant_id).trim() && String(existing.tenant_id).trim() !== '*'
+      ? String(existing.tenant_id).trim()
+      : undefined;
+    if (!rawExistingTenant && tenantId === '*') {
+      const auditRow = (await db
+        .prepare(
+          `SELECT user_id, actor_id, tenant_id, metadata, details FROM audit_logs
+           WHERE (entity_id = ? OR resource_id = ?) AND action = 'supplier_create'
+           ORDER BY created_at DESC LIMIT 1`
+        )
+        .bind(id, id)
+        .first()
+        .catch(() => null)) as Record<string, unknown> | null;
+      if (auditRow) {
+        const auditTenant = String(auditRow.tenant_id || '').trim();
+        if (auditTenant && auditTenant !== '*' && auditTenant.toLowerCase() !== 'hq') {
+          rawExistingTenant = auditTenant;
+        } else {
+          const rawMeta = String(auditRow.metadata || auditRow.details || '');
+          if (rawMeta) {
+            try {
+              const parsed = JSON.parse(rawMeta);
+              const metaTenant = typeof parsed?.tenant_id === 'string' ? parsed.tenant_id.trim() : '';
+              if (metaTenant && metaTenant !== '*' && metaTenant.toLowerCase() !== 'hq') {
+                rawExistingTenant = metaTenant;
+              }
+            } catch {
+              // Ignore JSON parse error
+            }
+          }
+          if (!rawExistingTenant) {
+            const creatorId = String(auditRow.user_id || auditRow.actor_id || '').trim();
+            if (creatorId) {
+              const userRow = (await db
+                .prepare('SELECT tenant_id FROM users WHERE id = ?')
+                .bind(creatorId)
+                .first()
+                .catch(() => null)) as Record<string, unknown> | null;
+              const userTenant = String(userRow?.tenant_id || '').trim();
+              if (userTenant && userTenant !== '*' && userTenant.toLowerCase() !== 'hq') {
+                rawExistingTenant = userTenant;
+              }
+            }
+          }
+        }
+      }
+    }
+    const effectiveWriteTenant = tenantId === '*' ? (rawExistingTenant || 'default') : writeTenant;
 
     const updates: string[] = [];
     const params: (string | number | boolean)[] = [];
@@ -374,31 +557,29 @@ export function registerSupplierHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
     params.push(id);
 
     if (!usingFallback) {
-      if (tenantId !== '*') {
-        try {
-          const upd = await db.prepare(
-            `UPDATE suppliers SET ${updates.join(', ')} WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?`
-          ).bind(...params, tenantId).run();
-          if (upd?.meta && typeof upd.meta.changes === 'number' && upd.meta.changes === 0) {
-            if (isLegacyUnscopedRow && hasVerifiedTenantOwnership) {
-              await db.prepare(`UPDATE suppliers SET ${updates.join(', ')} WHERE id = ?`).bind(...params).run();
-            } else {
-              return c.json({ success: false, error: 'Supplier not found' }, 404);
-            }
-          }
-        } catch {
+      try {
+        const upd = await db.prepare(
+          `UPDATE suppliers SET ${updates.join(', ')} WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?`
+        ).bind(...params, effectiveWriteTenant).run();
+        if (upd?.meta && typeof upd.meta.changes === 'number' && upd.meta.changes === 0) {
           if (isLegacyUnscopedRow && hasVerifiedTenantOwnership) {
             await db.prepare(`UPDATE suppliers SET ${updates.join(', ')} WHERE id = ?`).bind(...params).run();
+            await db.prepare("UPDATE suppliers SET tenant_id = ? WHERE id = ? AND (tenant_id IS NULL OR TRIM(tenant_id) = '')")
+              .bind(effectiveWriteTenant, id).run().catch(() => null);
           } else {
             return c.json({ success: false, error: 'Supplier not found' }, 404);
           }
         }
-      } else {
-        await db.prepare(`UPDATE suppliers SET ${updates.join(', ')} WHERE id = ?`).bind(...params).run();
+      } catch {
+        if (isLegacyUnscopedRow && hasVerifiedTenantOwnership) {
+          await db.prepare(`UPDATE suppliers SET ${updates.join(', ')} WHERE id = ?`).bind(...params).run();
+        } else {
+          return c.json({ success: false, error: 'Supplier not found' }, 404);
+        }
       }
     }
 
-    await writeSupplierAuditLog(db, user.id, 'supplier_update', id, JSON.stringify(body), now, writeTenant);
+    await writeSupplierAuditLog(db, user.id, 'supplier_update', id, JSON.stringify({ ...body, tenant_id: effectiveWriteTenant }), now, effectiveWriteTenant);
 
     let supplier: any = null;
     if (!usingFallback) {

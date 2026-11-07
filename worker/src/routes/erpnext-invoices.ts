@@ -39,14 +39,27 @@ async function loadOrderForInvoice(
     return { allowed: true, orderRow: null };
   }
   const selectQueries = [
+    'SELECT id, items, total, discount_amount, customer_name, customer_phone, customer_id, status, payment_status, tenant_id FROM orders WHERE id = ? LIMIT 1',
+    'SELECT id, items, total, discount_amount, customer_name, customer_phone, customer_id, status, payment_status FROM orders WHERE id = ? LIMIT 1',
     'SELECT id, items, total, discount_amount, customer_name, customer_phone, customer_id, tenant_id FROM orders WHERE id = ? LIMIT 1',
     'SELECT * FROM orders WHERE id = ? LIMIT 1',
+    'SELECT id, status, payment_status, tenant_id FROM orders WHERE id = ? LIMIT 1',
     'SELECT id, tenant_id FROM orders WHERE id = ? LIMIT 1',
+    'SELECT id FROM orders WHERE id = ? LIMIT 1',
   ];
+  let hasFirstMethod = false;
   for (const sql of selectQueries) {
     try {
-      const orderRow = await db.prepare(sql).bind(orderId).first<Record<string, unknown>>();
+      const stmt = db.prepare(sql).bind(orderId);
+      if (typeof stmt?.first !== 'function') {
+        continue;
+      }
+      hasFirstMethod = true;
+      const orderRow = await stmt.first<Record<string, unknown>>();
       if (!orderRow) return { allowed: false, orderRow: null };
+      if (!('tenant_id' in orderRow)) {
+        return { allowed: tenantId === 'default' || tenantId === '*', orderRow };
+      }
       return {
         allowed: tenantId === '*' ? true : matchesOrderTenant(orderRow, tenantId),
         orderRow,
@@ -55,13 +68,10 @@ async function loadOrderForInvoice(
       // Try next schema variant
     }
   }
-  try {
-    const orderRow = await db.prepare('SELECT id FROM orders WHERE id = ? LIMIT 1').bind(orderId).first<Record<string, unknown>>();
-    if (!orderRow) return { allowed: false, orderRow: null };
-    return { allowed: tenantId === 'default' || tenantId === '*', orderRow };
-  } catch {
+  if (!hasFirstMethod) {
     return { allowed: tenantId === 'default' || tenantId === '*', orderRow: null };
   }
+  return { allowed: false, orderRow: null };
 }
 
 async function verifyOrderTenantOwnership(
@@ -104,12 +114,16 @@ function mergeAuthoritativeOrder(
   if (parsedItems.length > 0) {
     merged.items = parsedItems.map((item) => {
       const rec = (item && typeof item === 'object' ? item : {}) as Record<string, unknown>;
+      const qty = Number(rec.quantity ?? rec.qty ?? 1);
+      const unitPrice = Number(rec.price ?? rec.price_unit ?? rec.unit_price ?? rec.rate ?? 0);
       return {
         id: String(rec.id ?? rec.item_code ?? 'ITEM'),
+        product_id: String(rec.product_id ?? rec.item_code ?? rec.id ?? 'ITEM'),
         item_code: typeof rec.item_code === 'string' ? rec.item_code : undefined,
         name: String(rec.name ?? rec.item_name ?? rec.item_code ?? 'Order Item'),
-        quantity: Number(rec.quantity ?? rec.qty ?? 1),
-        price: Number(rec.price ?? rec.rate ?? 0),
+        quantity: qty,
+        price: unitPrice,
+        price_unit: unitPrice,
       };
     });
   } else if (dbTotal !== undefined && dbTotal > 0) {
@@ -119,26 +133,46 @@ function mergeAuthoritativeOrder(
       0
     );
     if (clientItems.length > 0 && clientSum !== dbTotal) {
-      merged.items = [{ ...clientItems[0], quantity: 1, price: dbTotal }];
+      merged.items = [{ ...clientItems[0], quantity: 1, price: dbTotal, price_unit: dbTotal }];
     } else if (clientItems.length === 0) {
       merged.items = [
         {
           id: String(orderRow.id ?? body.id),
+          product_id: 'ORDER-ITEM',
           item_code: 'ORDER-ITEM',
           name: 'Order Item',
           quantity: 1,
           price: dbTotal,
+          price_unit: dbTotal,
         },
       ];
     }
   }
 
+  const mergedRec = merged as unknown as Record<string, unknown>;
   if (dbTotal !== undefined) {
     merged.total = dbTotal;
+    mergedRec.total_amount = dbTotal;
+  }
+  const dbSubtotal = orderRow.subtotal;
+  if (typeof dbSubtotal === 'number' && !Number.isNaN(dbSubtotal)) {
+    mergedRec.subtotal = dbSubtotal;
+  } else if (dbTotal !== undefined || parsedItems.length > 0) {
+    delete mergedRec.subtotal;
+  }
+  const dbTax = orderRow.tax ?? orderRow.tax_amount;
+  if (typeof dbTax === 'number' && !Number.isNaN(dbTax)) {
+    mergedRec.tax = dbTax;
+  } else if (dbTotal !== undefined || parsedItems.length > 0) {
+    delete mergedRec.tax;
   }
   const dbDiscount = orderRow.discount_amount ?? orderRow.discount;
   if (typeof dbDiscount === 'number' && !Number.isNaN(dbDiscount)) {
-    (merged as unknown as Record<string, unknown>).discount_amount = dbDiscount;
+    mergedRec.discount_amount = dbDiscount;
+    mergedRec.discount = dbDiscount;
+  } else if (dbTotal !== undefined || parsedItems.length > 0) {
+    delete mergedRec.discount_amount;
+    delete mergedRec.discount;
   }
   if (typeof orderRow.customer_name === 'string' && orderRow.customer_name.trim()) {
     merged.customer_name = orderRow.customer_name;
@@ -162,62 +196,62 @@ async function verifyInvoiceTenantOwnership(
   tenantId: string,
 ): Promise<boolean> {
   if (!db || tenantId === '*') return true;
+  const scopedTenant = tenantId.trim() || 'default';
   const queries: Array<{ sql: string; binds: unknown[] }> = [
     {
-      sql: "SELECT COALESCE(NULLIF(TRIM(m.tenant_id), ''), o.tenant_id) AS tenant_id FROM erpnext_mappings m LEFT JOIN orders o ON o.id = m.local_id WHERE m.erpnext_id = ? OR m.local_id = ? LIMIT 1",
-      binds: [invoiceId, invoiceId],
+      sql: "SELECT COALESCE(NULLIF(TRIM(m.tenant_id), ''), o.tenant_id) AS tenant_id FROM erpnext_mappings m LEFT JOIN orders o ON o.id = m.local_id WHERE (m.erpnext_id = ? OR m.local_id = ?) AND COALESCE(NULLIF(TRIM(COALESCE(m.tenant_id, o.tenant_id)), ''), 'default') = ? LIMIT 1",
+      binds: [invoiceId, invoiceId, scopedTenant],
     },
     {
-      sql: "SELECT COALESCE(NULLIF(TRIM(m.tenant_id), ''), o.tenant_id) AS tenant_id FROM erpnext_mappings m LEFT JOIN orders o ON o.id = m.local_id WHERE m.erpnext_name = ? OR m.local_id = ? LIMIT 1",
-      binds: [invoiceId, invoiceId],
+      sql: "SELECT COALESCE(NULLIF(TRIM(m.tenant_id), ''), o.tenant_id) AS tenant_id FROM erpnext_mappings m LEFT JOIN orders o ON o.id = m.local_id WHERE m.erpnext_name = ? AND COALESCE(NULLIF(TRIM(COALESCE(m.tenant_id, o.tenant_id)), ''), 'default') = ? LIMIT 1",
+      binds: [invoiceId, scopedTenant],
     },
     {
-      sql: 'SELECT o.tenant_id AS tenant_id FROM erpnext_mappings m LEFT JOIN orders o ON o.id = m.local_id WHERE m.erpnext_id = ? OR m.local_id = ? LIMIT 1',
-      binds: [invoiceId, invoiceId],
+      sql: "SELECT o.tenant_id AS tenant_id FROM erpnext_mappings m LEFT JOIN orders o ON o.id = m.local_id WHERE (m.erpnext_id = ? OR m.local_id = ?) AND COALESCE(NULLIF(TRIM(o.tenant_id), ''), 'default') = ? LIMIT 1",
+      binds: [invoiceId, invoiceId, scopedTenant],
     },
     {
-      sql: 'SELECT o.tenant_id AS tenant_id FROM erpnext_mappings m LEFT JOIN orders o ON o.id = m.local_id WHERE m.erpnext_name = ? OR m.local_id = ? LIMIT 1',
-      binds: [invoiceId, invoiceId],
+      sql: "SELECT o.tenant_id AS tenant_id FROM erpnext_mappings m LEFT JOIN orders o ON o.id = m.local_id WHERE m.erpnext_name = ? AND COALESCE(NULLIF(TRIM(o.tenant_id), ''), 'default') = ? LIMIT 1",
+      binds: [invoiceId, scopedTenant],
     },
     {
-      sql: 'SELECT tenant_id FROM erpnext_mappings WHERE erpnext_name = ? LIMIT 1',
-      binds: [invoiceId],
+      sql: "SELECT tenant_id FROM erpnext_mappings WHERE erpnext_name = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ? LIMIT 1",
+      binds: [invoiceId, scopedTenant],
     },
     {
-      sql: 'SELECT tenant_id FROM erpnext_mappings WHERE erpnext_id = ? LIMIT 1',
-      binds: [invoiceId],
+      sql: "SELECT tenant_id FROM erpnext_mappings WHERE erpnext_id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ? LIMIT 1",
+      binds: [invoiceId, scopedTenant],
     },
     {
-      sql: 'SELECT tenant_id FROM erpnext_mappings WHERE erpnext_invoice_id = ? LIMIT 1',
-      binds: [invoiceId],
+      sql: "SELECT tenant_id FROM erpnext_mappings WHERE erpnext_invoice_id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ? LIMIT 1",
+      binds: [invoiceId, scopedTenant],
     },
     {
-      sql: 'SELECT tenant_id FROM orders WHERE id = ? LIMIT 1',
-      binds: [invoiceId],
+      sql: "SELECT tenant_id FROM orders WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ? LIMIT 1",
+      binds: [invoiceId, scopedTenant],
     },
   ];
 
-  for (const q of queries) {
+  let hasMappingTenantCol = false;
+  for (let idx = 0; idx < queries.length; idx++) {
+    const q = queries[idx];
+    if ((idx === 2 || idx === 3) && hasMappingTenantCol) {
+      continue;
+    }
     try {
       const row = await db.prepare(q.sql).bind(...q.binds).first<Record<string, unknown>>();
+      if (idx === 0 || idx === 1) {
+        hasMappingTenantCol = true;
+      }
       if (row) {
-        return matchesOrderTenant(row, tenantId);
+        return matchesOrderTenant(row, scopedTenant);
       }
     } catch {
       // Try next schema variant
     }
   }
 
-  try {
-    const anyMapping = await db.prepare('SELECT 1 AS present FROM erpnext_mappings LIMIT 1').first<Record<string, unknown>>();
-    if (anyMapping && Object.keys(anyMapping).length > 0) {
-      return false;
-    }
-  } catch {
-    // Table may not exist in minimal unit test mocks
-  }
-
-  return tenantId === 'default';
+  return false;
 }
 
 export async function handleErpnextInvoicesRequest(
@@ -238,10 +272,15 @@ export async function handleErpnextInvoicesRequest(
     });
 
   try {
+    const isNonDefaultTenant = Boolean(tenantId && tenantId !== 'default' && tenantId !== '*');
+    const envForKv = isNonDefaultTenant
+      ? { ...env, ERPNEXT_URL: undefined, ERPNEXT_API_KEY: undefined, ERPNEXT_API_SECRET: undefined }
+      : env;
     const accountingClient =
-      (env.AUTH_KV && typeof createErpnextAccountingClientWithKv === 'function'
-        ? await createErpnextAccountingClientWithKv(env, tenantId)
-        : null) ?? createErpnextAccountingClient(env);
+      env.AUTH_KV && typeof createErpnextAccountingClientWithKv === 'function'
+        ? (await createErpnextAccountingClientWithKv(envForKv, tenantId)) ??
+          (isNonDefaultTenant ? null : createErpnextAccountingClient(env))
+        : (isNonDefaultTenant ? null : createErpnextAccountingClient(env));
 
     // POST /api/erpnext-invoices/create — create invoice from order
     if (method === 'POST' && path === '/create') {
@@ -255,13 +294,30 @@ export async function handleErpnextInvoicesRequest(
       if (!allowed) {
         return json({ success: false, error: 'Order not found' }, 404);
       }
+      const rawOrderStatus = typeof (orderRow?.status ?? (body as unknown as Record<string, unknown>).status) === 'string'
+        ? String(orderRow?.status ?? (body as unknown as Record<string, unknown>).status).trim().toLowerCase()
+        : '';
+      const rawPaymentStatus = typeof (orderRow?.payment_status ?? (body as unknown as Record<string, unknown>).payment_status) === 'string'
+        ? String(orderRow?.payment_status ?? (body as unknown as Record<string, unknown>).payment_status).trim().toLowerCase()
+        : '';
+      if (
+        ['cancelled', 'canceled', 'failed', 'rejected', 'expired', 'refunded'].includes(rawOrderStatus) ||
+        ['refunded', 'failed', 'cancelled', 'canceled'].includes(rawPaymentStatus)
+      ) {
+        return json({ success: false, error: 'Cannot invoice a cancelled, failed, or refunded order' }, 409);
+      }
 
       if (!accountingClient) {
         return json({ success: false, error: 'ERPNext accounting not configured' }, 503);
       }
 
       const authoritativeOrder = mergeAuthoritativeOrder(body, orderRow);
-      const effectiveTenant = tenantId && tenantId !== '*' ? tenantId : 'default';
+      const rawOrderTenant = typeof orderRow?.tenant_id === 'string' && orderRow.tenant_id.trim()
+        ? orderRow.tenant_id.trim()
+        : '';
+      const effectiveTenant = tenantId && tenantId !== '*'
+        ? tenantId
+        : (rawOrderTenant && rawOrderTenant !== '*' ? rawOrderTenant : 'default');
       const result = await accountingClient.processOrderToInvoice(authoritativeOrder, env, effectiveTenant);
       return json({ success: true, data: result }, 201);
     }
@@ -366,16 +422,31 @@ export async function handleErpnextInvoicesRequest(
 
       const retried: string[] = [];
       const failed: Array<{ orderId: string; error: string }> = [];
-      const body = await request.json().catch(() => ({}));
-      const effectiveTenant = tenantId && tenantId !== '*' ? tenantId : 'default';
 
       for (const row of rows) {
         try {
-          const baseOrder: OrderInput = { id: row.local_id, ...(body as Record<string, unknown>) } as OrderInput;
           const loaded = await loadOrderForInvoice(db, row.local_id, tenantId).catch(() => ({
-            allowed: true,
+            allowed: false,
             orderRow: null,
           }));
+          if (!loaded.allowed) {
+            continue;
+          }
+          const retryStatus = typeof loaded.orderRow?.status === 'string' ? loaded.orderRow.status.trim().toLowerCase() : '';
+          const retryPayStatus = typeof loaded.orderRow?.payment_status === 'string' ? loaded.orderRow.payment_status.trim().toLowerCase() : '';
+          if (
+            ['cancelled', 'canceled', 'failed', 'rejected', 'expired', 'refunded'].includes(retryStatus) ||
+            ['refunded', 'failed', 'cancelled', 'canceled'].includes(retryPayStatus)
+          ) {
+            continue;
+          }
+          const rawRowTenant = (typeof row.tenant_id === 'string' && row.tenant_id.trim() && row.tenant_id.trim() !== '*')
+            ? row.tenant_id.trim()
+            : (typeof loaded.orderRow?.tenant_id === 'string' && (loaded.orderRow.tenant_id as string).trim() && (loaded.orderRow.tenant_id as string).trim() !== '*')
+              ? (loaded.orderRow.tenant_id as string).trim()
+              : 'default';
+          const effectiveTenant = tenantId && tenantId !== '*' ? tenantId : rawRowTenant;
+          const baseOrder: OrderInput = { id: row.local_id, items: [] };
           const order = mergeAuthoritativeOrder(baseOrder, loaded.orderRow);
           await accountingClient.processOrderToInvoice(order, env, effectiveTenant);
           retried.push(row.local_id);
@@ -396,7 +467,7 @@ export async function handleErpnextInvoicesRequest(
       if (!accountingClient) return json({ success: false, error: 'ERPNext accounting not configured' }, 503);
       const explicitTenant = resolvedTenantId ?? (rawTenantHeader && rawTenantHeader !== '*' ? rawTenantHeader : undefined);
       const invoice = explicitTenant
-        ? await accountingClient.getInvoiceByOrderId(orderId, env, explicitTenant === '*' ? 'default' : explicitTenant)
+        ? await accountingClient.getInvoiceByOrderId(orderId, env, explicitTenant)
         : await accountingClient.getInvoiceByOrderId(orderId, env);
       if (!invoice) return json({ success: false, error: 'No invoice found for this order' }, 404);
       return json({ success: true, data: invoice });

@@ -69,8 +69,13 @@ export function evaluateStaffSession(
   claims: Partial<StaffSession>, account: StaffAccount, now = Math.floor(Date.now() / 1000),
 ): { valid: true; remainingSeconds: number } | { valid: false; code: StaffSessionCode } {
   if (!isAccountActive(account)) return { valid: false, code: 'STAFF_ACCOUNT_INACTIVE' };
+  const claimTenantRaw = (claims.tenantId ? String(claims.tenantId).trim() : '') || 'default';
+  const accountTenantRaw = staffTenant(account);
+  const isHqRole = account.role === 'owner' || account.role === 'admin';
+  const claimTenant = isHqRole && (claimTenantRaw.toLowerCase() === 'hq' || claimTenantRaw === '*') ? '*' : claimTenantRaw;
+  const accountTenant = isHqRole && (accountTenantRaw.toLowerCase() === 'hq' || accountTenantRaw === '*') ? '*' : accountTenantRaw;
   if (!isStaffRole(account.role) || claims.id !== account.id || claims.role !== account.role
-    || ((claims.tenantId ? String(claims.tenantId).trim() : '') || 'default') !== staffTenant(account) || !Number.isSafeInteger(claims.authVersion)
+    || claimTenant !== accountTenant || !Number.isSafeInteger(claims.authVersion)
     || claims.authVersion !== account.auth_version || !Number.isSafeInteger(claims.authTime)
     || claims.authTime! > now || claims.authTime! < 0
     || !['staff-web', 'staff-mobile'].includes(claims.sessionType || '')

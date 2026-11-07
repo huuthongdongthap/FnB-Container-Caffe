@@ -19,6 +19,7 @@ export async function settlePayOS(db: D1Database, payment: SettlementPayment, su
       .bind(now, payment.id, payment.order_id, payment.id),
     db.prepare(`UPDATE orders SET payment_status = 'paid', updated_at = ?
       WHERE id = ? AND payment_method = 'payos' AND payment_status NOT IN ('paid', 'refunded')
+      AND LOWER(COALESCE(status, 'pending')) NOT IN ('cancelled', 'canceled', 'rejected', 'failed', 'expired', 'refunded')
       AND EXISTS (SELECT 1 FROM payments WHERE id = ? AND status = 'completed')`)
       .bind(now, payment.order_id, payment.id),
   ]);

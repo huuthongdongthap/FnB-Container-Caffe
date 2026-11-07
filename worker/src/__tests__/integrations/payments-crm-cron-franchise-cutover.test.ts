@@ -846,6 +846,7 @@ describe('Payments, CRM, Reviews, Franchise & Cron Cutover (20261029_03..07)', (
           rating: 5,
           comment: 'Trà sữa nướng rất thơm!',
           customer_name: 'Nguyen Van A',
+          customer_phone: '0901112222',
         }),
       },
       env,

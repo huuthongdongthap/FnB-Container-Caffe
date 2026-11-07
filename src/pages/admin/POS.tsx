@@ -10,12 +10,14 @@
  */
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
+import QRCode from 'qrcode';
 import type { POSCustomer } from '@/hooks/use-pos-customer';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { useMenu } from '@/hooks/use-menu';
 import { useCheckout, useProcessPayOS } from '@/hooks/use-checkout';
+import { useAuthStore } from '@/hooks/stores/use-auth-store';
 import { CheckCircle2, AlertCircle, X, ExternalLink } from 'lucide-react';
 import type { PaymentMethod } from '@/lib/validators';
 import { brandConfig } from '@/config/brand-types';
@@ -27,6 +29,20 @@ const VND_POS_ADDONS: POSNewAddOn[] = [
   { id: 'a2', name: 'Double Shot', price: 15000 },
   { id: 'a3', name: 'Vanilla Bean', price: 10000 },
 ];
+
+function sanitizePaymentUrl(rawUrl: string | undefined | null): string | null {
+  if (!rawUrl || typeof rawUrl !== 'string') return null;
+  try {
+    const base = typeof window !== 'undefined' ? window.location.origin : 'https://auracafe.vn';
+    const parsed = new URL(rawUrl.trim(), base);
+    if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') {
+      return null;
+    }
+    return parsed.toString();
+  } catch {
+    return null;
+  }
+}
 
 /* ─── Main Page Component ────────────────────────────────────────────────── */
 export default function AdminPOSPage() {
@@ -40,6 +56,8 @@ export default function AdminPOSPage() {
 
   const checkoutMutation = useCheckout();
   const payOSMutation = useProcessPayOS();
+  const activeTenant = useAuthStore((s) => s.user?.tenantId) || 'default';
+  const sessionVersion = useAuthStore((s) => s.sessionVersion);
   const { t } = useTranslation();
   const navigate = useNavigate();
 
@@ -50,7 +68,45 @@ export default function AdminPOSPage() {
   const [checkoutSuccess, setCheckoutSuccess] = useState(false);
   const [checkoutError, setCheckoutError] = useState<string | null>(null);
   const [paymentUrl, setPaymentUrl] = useState<string | null>(null);
-  const [isCompleting, setIsCompleting] = useState(false);
+  const [paymentQrDataUrl, setPaymentQrDataUrl] = useState<string | null>(null);
+  const [, setIsCompleting] = useState(false);
+  const isCompletingRef = useRef(false);
+  const successTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    setCustomer(null);
+    _setSelectedTableId(undefined);
+    setPaymentUrl(null);
+    setPaymentQrDataUrl(null);
+    setCheckoutError(null);
+    setCheckoutSuccess(false);
+  }, [activeTenant, sessionVersion]);
+
+  useEffect(() => {
+    if (!paymentUrl) {
+      setPaymentQrDataUrl(null);
+      return;
+    }
+    let cancelled = false;
+    void QRCode.toDataURL(paymentUrl, { width: 180, margin: 1 })
+      .then((dataUrl) => {
+        if (!cancelled) setPaymentQrDataUrl(dataUrl);
+      })
+      .catch(() => {
+        if (!cancelled) setPaymentQrDataUrl(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [paymentUrl]);
+
+  useEffect(() => {
+    return () => {
+      if (successTimerRef.current) {
+        clearTimeout(successTimerRef.current);
+      }
+    };
+  }, []);
 
   /* ── Derived Menu Data for StitchPOSNew ───────────────────────────── */
   const stitchMenuItems: POSNewMenuItem[] | undefined = menuData?.items?.map(
@@ -71,7 +127,8 @@ export default function AdminPOSPage() {
   /* ── Checkout Handler ─────────────────────────────────────────────── */
   const handleCompleteOrder = useCallback(
     async (cart: POSNewCartItem[], total: number, tableId?: string) => {
-      if (isCompleting) return;
+      if (isCompletingRef.current) return false;
+      isCompletingRef.current = true;
 
       setIsCompleting(true);
       setCheckoutError(null);
@@ -122,27 +179,29 @@ export default function AdminPOSPage() {
               // Non-fatal: order created, staff can retry payment link
             }
           }
-          if (paymentMethod === 'payos' && resolvedUrl) {
-            const url = resolvedUrl;
-            // Use React Router navigate instead of window.open (blocked on tablets)
-            // Store URL for in-app iframe / link fallback
-            setPaymentUrl(url ?? null);
-            // Attempt soft redirect — if same-origin, navigate; else show link banner
+          const safeUrl = sanitizePaymentUrl(resolvedUrl);
+          if (paymentMethod === 'payos' && safeUrl) {
+            setPaymentUrl(safeUrl);
             try {
-              const parsed = new URL(url ?? '');
+              const parsed = new URL(safeUrl);
               if (parsed.origin === window.location.origin) {
                 navigate(parsed.pathname + parsed.search);
-              } else {
-                // Cross-origin PayOS — show clickable banner instead of window.open
-                setPaymentUrl(url ?? null);
               }
             } catch {
-              setPaymentUrl(url ?? null);
+              // Keep safeUrl modal banner
             }
           }
 
+          setCustomer(null);
+          _setSelectedTableId(undefined);
           setCheckoutSuccess(true);
-          setTimeout(() => setCheckoutSuccess(false), 5000);
+          if (successTimerRef.current) {
+            clearTimeout(successTimerRef.current);
+          }
+          successTimerRef.current = setTimeout(() => {
+            setCheckoutSuccess(false);
+            successTimerRef.current = null;
+          }, 5000);
           return true;
         } else {
           setCheckoutError(
@@ -156,16 +215,18 @@ export default function AdminPOSPage() {
         );
         return false;
       } finally {
+        isCompletingRef.current = false;
         setIsCompleting(false);
       }
     },
-    [paymentMethod, checkoutMutation.mutateAsync, payOSMutation.mutateAsync, isCompleting, customer, selectedTableId, t, navigate],
+    [paymentMethod, checkoutMutation.mutateAsync, payOSMutation.mutateAsync, customer, selectedTableId, t, navigate],
   );
 
   /* ── Render ───────────────────────────────────────────────────────── */
   return (
     <div className="relative min-h-screen">
       <StitchPOSNew
+        key={`${activeTenant}:${sessionVersion}`}
         menuItems={stitchMenuItems}
         addOns={VND_POS_ADDONS}
         paymentMethod={paymentMethod === 'cod' ? 'cod' : 'payos'}
@@ -236,11 +297,13 @@ export default function AdminPOSPage() {
           >
             <span className="text-xs font-semibold text-[#C9D6DF] uppercase tracking-wider">Thanh toán PayOS</span>
             <div className="rounded-lg bg-white p-3">
-              <img
-                src={`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(paymentUrl)}`}
-                alt="PayOS QR Code"
-                className="h-44 w-44 object-contain"
-              />
+              {paymentQrDataUrl && (
+                <img
+                  src={paymentQrDataUrl}
+                  alt="PayOS QR Code"
+                  className="h-44 w-44 object-contain"
+                />
+              )}
             </div>
             <p className="text-xs text-[#C9D6DF] break-all">{paymentUrl}</p>
             <a
@@ -253,7 +316,11 @@ export default function AdminPOSPage() {
             </a>
             <button
               type="button"
-              onClick={() => setPaymentUrl(null)}
+              onClick={() => {
+                setPaymentUrl(null);
+                setCustomer(null);
+                _setSelectedTableId(undefined);
+              }}
               className="text-xs text-[#8898A4] hover:text-white mt-1 cursor-pointer transition-colors"
             >
               Đóng

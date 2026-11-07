@@ -16,6 +16,7 @@ import {
   type D1Like,
   fetchModifierChoice,
   fetchModifierGroup,
+  fetchRequiredModifierGroupsForProduct,
   isGroupLinkedToProduct,
 } from './modifier-validation-queries';
 
@@ -42,7 +43,8 @@ function parseModifierInput(mod: unknown): { modId: string | null; modName: stri
     const m = mod as Record<string, unknown>;
     const modId = ((m.id || m.choiceId || m.choice_id || m.modifierId || m.modifier_id) as string)?.trim() || null;
     const modName = ((m.name || m.optionName || m.option_name) as string)?.trim() || null;
-    const clientDelta = 'price_delta' in m ? Number(m.price_delta) : null;
+    const rawDelta = m.price_delta ?? m.priceDelta ?? m.price;
+    const clientDelta = rawDelta !== undefined && rawDelta !== null ? Number(rawDelta) : null;
     return { modId, modName, clientDelta };
   }
   return { modId: null, modName: null, clientDelta: null };
@@ -55,16 +57,19 @@ export async function validateProductModifiers(
   candidateProductIds?: string[],
   tenantId?: string,
 ): Promise<ModifierValidationResult> {
-  if (!Array.isArray(modifiers) || modifiers.length === 0) {
+  const safeModifiers = Array.isArray(modifiers) ? modifiers : [];
+  if (safeModifiers.length === 0 && !db) {
     return { valid: true, validatedModifiers: [], modifierDelta: 0 };
   }
 
   const seenChoiceKeys = new Set<string>();
+  const seenResolvedChoiceIds = new Set<string>();
   const seenSingleGroupIds = new Set<string>();
+  const selectedCountByGroupId = new Map<string, number>();
   const validatedModifiers: ModifierChoice[] = [];
   let modifierDelta = 0;
 
-  for (const mod of modifiers) {
+  for (const mod of safeModifiers) {
     const { modId, modName, clientDelta } = parseModifierInput(mod);
     if (!modId && !modName) {
       return {
@@ -76,7 +81,11 @@ export async function validateProductModifiers(
     }
 
     const dedupeKey = modId || modName!;
-    if (seenChoiceKeys.has(dedupeKey)) {
+    if (
+      seenChoiceKeys.has(dedupeKey) ||
+      (modId && seenChoiceKeys.has(modId)) ||
+      (modName && seenChoiceKeys.has(modName.toLowerCase()))
+    ) {
       return {
         valid: false,
         validatedModifiers: [],
@@ -85,8 +94,18 @@ export async function validateProductModifiers(
       };
     }
     seenChoiceKeys.add(dedupeKey);
+    if (modId) seenChoiceKeys.add(modId);
+    if (modName) seenChoiceKeys.add(modName.toLowerCase());
 
     if (!db) {
+      if (clientDelta !== null && (!Number.isFinite(clientDelta) || clientDelta < 0)) {
+        return {
+          valid: false,
+          validatedModifiers: [],
+          modifierDelta: 0,
+          rejection: { code: 'invalid_modifier', message: `Invalid modifier price delta: ${String(clientDelta)}` },
+        };
+      }
       const delta = clientDelta !== null ? Math.round(clientDelta) : 0;
       modifierDelta += delta;
       validatedModifiers.push({ id: modId || '', group_id: '', name: modName || modId || '', price_delta: delta, is_default: 0, sort_order: 0 });
@@ -108,6 +127,7 @@ export async function validateProductModifiers(
           };
         }
         seenSingleGroupIds.add('mg_bottled_choice');
+        selectedCountByGroupId.set('mg_bottled_choice', (selectedCountByGroupId.get('mg_bottled_choice') ?? 0) + 1);
         validatedModifiers.push({
           id: `mc_drink_${normalizedChoice.toLowerCase().replace(/\s+/g, '')}`,
           group_id: 'mg_bottled_choice',
@@ -124,6 +144,24 @@ export async function validateProductModifiers(
         modifierDelta: 0,
         rejection: { code: 'invalid_modifier', message: `Modifier choice not found: ${modId || modName}` },
       };
+    }
+
+    const canonicalChoiceId = String(choiceRow.id || '').trim();
+    const canonicalChoiceName = String(choiceRow.name || '').trim().toLowerCase();
+    if (canonicalChoiceId && seenResolvedChoiceIds.has(canonicalChoiceId)) {
+      return {
+        valid: false,
+        validatedModifiers: [],
+        modifierDelta: 0,
+        rejection: { code: 'duplicate_modifier', message: `Duplicate modifier selection: ${canonicalChoiceId}` },
+      };
+    }
+    if (canonicalChoiceId) {
+      seenResolvedChoiceIds.add(canonicalChoiceId);
+      seenChoiceKeys.add(canonicalChoiceId);
+    }
+    if (canonicalChoiceName) {
+      seenChoiceKeys.add(canonicalChoiceName);
     }
 
     const isAvail = choiceRow.is_available ?? choiceRow.available ?? choiceRow.is_active ?? choiceRow.active;
@@ -179,9 +217,35 @@ export async function validateProductModifiers(
       };
     }
 
+    selectedCountByGroupId.set(groupRow.id, (selectedCountByGroupId.get(groupRow.id) ?? 0) + 1);
     const delta = Math.round(Number(choiceRow.price_delta) || 0);
     modifierDelta += delta;
     validatedModifiers.push({ id: choiceRow.id, group_id: choiceRow.group_id, name: choiceRow.name, price_delta: delta, is_default: 0, sort_order: 0 });
+  }
+
+  if (db) {
+    const prodIds = candidateProductIds && candidateProductIds.length > 0 ? candidateProductIds : [productId];
+    const requiredGroups = await fetchRequiredModifierGroupsForProduct(db, prodIds, tenantId);
+    for (const reqGroup of requiredGroups) {
+      const minRequired =
+        reqGroup.min_selections !== undefined &&
+        reqGroup.min_selections !== null &&
+        Number(reqGroup.min_selections) > 0
+          ? Number(reqGroup.min_selections)
+          : 1;
+      const count = selectedCountByGroupId.get(reqGroup.id) ?? 0;
+      if (count < minRequired) {
+        return {
+          valid: false,
+          validatedModifiers: [],
+          modifierDelta: 0,
+          rejection: {
+            code: 'invalid_modifier',
+            message: `Required modifier group "${reqGroup.name || reqGroup.id}" requires at least ${minRequired} selection(s)`,
+          },
+        };
+      }
+    }
   }
 
   return { valid: true, validatedModifiers, modifierDelta };

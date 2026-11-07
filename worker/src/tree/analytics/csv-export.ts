@@ -31,16 +31,27 @@ export async function getOrdersInRange(
       ? " AND (tenant_id = ? OR tenant_id IS NULL OR tenant_id = '' OR TRIM(tenant_id) = '')"
       : ' AND TRIM(tenant_id) = ?';
   const binds = hasTenant && tenantId ? [start, end, tenantId] : [start, end];
-  const { results } = await db.prepare(`
+  const baseSql = `
     SELECT id, customer_name, customer_phone, total, status, payment_method, items, created_at
     FROM orders
-    WHERE status != 'cancelled'
-      AND created_at >= ? || ' 00:00:00'
-      AND created_at <= ? || ' 23:59:59'${tenantClause}
+    WHERE LOWER(COALESCE(status, '')) NOT IN ('cancelled', 'canceled', 'refunded', 'failed', 'rejected', 'expired')
+      AND LOWER(COALESCE(payment_status, '')) NOT IN ('refunded', 'failed')
+      AND substr(created_at, 1, 10) >= ?
+      AND substr(created_at, 1, 10) <= ?${tenantClause}
     ORDER BY created_at ASC
-  `).bind(...binds).all<OrderExportRow>();
-
-  return results || [];
+    LIMIT 10000
+  `;
+  try {
+    const { results } = await db.prepare(baseSql).bind(...binds).all<OrderExportRow>();
+    return results || [];
+  } catch {
+    const fallbackSql = baseSql.replace(
+      /\s*AND LOWER\(COALESCE\(payment_status, ''\)\) NOT IN \('refunded', 'failed'\)/,
+      ''
+    );
+    const { results } = await db.prepare(fallbackSql).bind(...binds).all<OrderExportRow>();
+    return results || [];
+  }
 }
 
 /**
@@ -96,9 +107,18 @@ export function formatCsvRows(rows: OrderExportRow[]): string {
  * Escape a CSV field: neutralize spreadsheet formula prefixes and wrap in quotes
  * if it contains comma, newline, semicolon, or double-quote.
  */
-function escapeCsvField(value: string): string {
-  const sanitized = /^[\t\r\n ]*[=+\-@]/.test(value) ? `'${value}` : value;
-  if (sanitized.includes(',') || sanitized.includes('\n') || sanitized.includes('"') || sanitized.includes(';')) {
+export function escapeCsvField(value: string): string {
+  const multilineSanitized = value.replace(/([\r\n]+)(\s*[=+\-@|])/g, "$1'$2");
+  const sanitized = /^(?:[\t\r\n ]*[=+\-@]|[\t\r\n ]*\|)/.test(multilineSanitized)
+    ? `'${multilineSanitized}`
+    : multilineSanitized;
+  if (
+    sanitized.includes(',') ||
+    sanitized.includes('\n') ||
+    sanitized.includes('\r') ||
+    sanitized.includes('"') ||
+    sanitized.includes(';')
+  ) {
     return `"${sanitized.replace(/"/g, '""')}"`;
   }
   return sanitized;

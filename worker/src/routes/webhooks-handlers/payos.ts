@@ -40,8 +40,14 @@ export async function handlePayosWebhook(c: Context<{ Bindings: Env }>, openApi 
       return c.json({ error: 1, message: 'Invalid signature' }, 401);
     }
     const orderCode = String(data.orderCode);
-    const payment = await db.prepare('SELECT id, order_id, status, amount, method FROM payments WHERE transaction_id = ?')
-      .bind(orderCode).first<SettlementPayment>();
+    let payment: (SettlementPayment & { tenant_id?: string | null }) | null = null;
+    try {
+      payment = await db.prepare('SELECT id, order_id, status, amount, method, tenant_id FROM payments WHERE transaction_id = ?')
+        .bind(orderCode).first<SettlementPayment & { tenant_id?: string | null }>();
+    } catch {
+      payment = await db.prepare('SELECT id, order_id, status, amount, method FROM payments WHERE transaction_id = ?')
+        .bind(orderCode).first<SettlementPayment & { tenant_id?: string | null }>();
+    }
     if (!payment) {
       await writePaymentReviewMarker(c.env.AUTH_KV, {
         orderCode,
@@ -53,8 +59,25 @@ export async function handlePayosWebhook(c: Context<{ Bindings: Env }>, openApi 
     }
     if (payment.method !== 'payos') return c.json({ error: 1, message: 'Payment method mismatch' }, 409);
     const order = await db.prepare('SELECT * FROM orders WHERE id = ?')
-      .bind(payment.order_id).first<{ id: string; payment_status: string; payment_method: string; total?: number | null; total_amount?: number | null }>();
+      .bind(payment.order_id).first<{ id: string; payment_status: string; payment_method: string; total?: number | null; total_amount?: number | null; tenant_id?: string | null }>();
     if (!order || order.payment_method !== 'payos') return c.json({ error: 1, message: 'Payment method mismatch' }, 409);
+    const rawPaymentTenant = typeof payment.tenant_id === 'string' ? payment.tenant_id.trim() : '';
+    const rawOrderTenant =
+      typeof (order as Record<string, unknown>).tenant_id === 'string' && String((order as Record<string, unknown>).tenant_id).trim()
+        ? String((order as Record<string, unknown>).tenant_id).trim()
+        : '';
+    if (rawPaymentTenant && rawOrderTenant && rawPaymentTenant !== rawOrderTenant) {
+      await writePaymentReviewMarker(c.env.AUTH_KV, {
+        paymentId: payment.id,
+        orderId: payment.order_id,
+        orderCode,
+        source: 'webhook',
+        stage: 'tenant_check',
+        errorCode: 'TENANT_MISMATCH',
+      });
+      return c.json({ error: 1, message: 'Payment tenant mismatch' }, 409);
+    }
+    const settledOrderTenant = rawOrderTenant || rawPaymentTenant || 'default';
     const rawStatus = String(data.status || '').toUpperCase();
     // The documented transaction result code is authoritative; a status label
     // cannot override a failed transfer code in a contradictory payload.
@@ -64,8 +87,9 @@ export async function handlePayosWebhook(c: Context<{ Bindings: Env }>, openApi 
     const orderAmount = Number(order.total ?? order.total_amount);
     if (success && (!Number.isSafeInteger(amount) || amount <= 0 || amount !== Number(payment.amount)
       || !Number.isSafeInteger(orderAmount) || orderAmount <= 0 || amount !== orderAmount)) {
-      if (c.env.AUTH_KV) await c.env.AUTH_KV.put(`payment:stuck:${payment.order_id}`, JSON.stringify({
-        orderId: payment.order_id, orderCode, dbAmount: payment.amount, webhookAmount: amount, detectedAt: now,
+      const stuckKey = settledOrderTenant === 'default' ? `payment:stuck:${payment.order_id}` : `payment:stuck:${settledOrderTenant}:${payment.order_id}`;
+      if (c.env.AUTH_KV) await c.env.AUTH_KV.put(stuckKey, JSON.stringify({
+        orderId: payment.order_id, orderCode, dbAmount: payment.amount, webhookAmount: amount, tenantId: settledOrderTenant, detectedAt: now,
       }), { expirationTtl: 86400 * 7 }).catch(() => {});
       await writePaymentReviewMarker(c.env.AUTH_KV, {
         paymentId: payment.id,
@@ -77,41 +101,72 @@ export async function handlePayosWebhook(c: Context<{ Bindings: Env }>, openApi 
       });
       return c.json({ error: 1, message: 'Amount mismatch' }, 400);
     }
+    const initialOrderStatus = String((order as Record<string, unknown>).status || '').trim().toLowerCase();
+    const isInitialTerminalOrder = ['cancelled', 'canceled', 'rejected', 'failed', 'expired', 'refunded'].includes(initialOrderStatus);
     if (payment.status === 'refunded' || order.payment_status === 'refunded') return ack('Already processed');
-    if (payment.status === 'completed' && (!success || order.payment_status === 'paid')) return ack('Already processed');
+    if (payment.status === 'completed' && (!success || order.payment_status === 'paid' || isInitialTerminalOrder)) return ack('Already processed');
     const status = success ? 'completed' : rawStatus === 'EXPIRED' ? 'expired' : rawStatus === 'CANCELLED' ? 'cancelled' : 'failed';
     const settled = await settlePayOS(db, payment, success, status, now);
     if (success && !settled.paymentChanged && payment.status !== 'completed') {
       const current = await db.prepare('SELECT status FROM payments WHERE id = ?').bind(payment.id).first<{ status: string }>();
       if (current?.status !== 'completed') return c.json({ error: 1, message: 'Payment requires reconciliation' }, 409);
     }
-    const settledOrderTenant =
-      typeof (order as Record<string, unknown>).tenant_id === 'string' && String((order as Record<string, unknown>).tenant_id).trim()
-        ? String((order as Record<string, unknown>).tenant_id).trim()
-        : 'default';
     if (settled.paymentChanged) {
       const metrics = createMetricsCollector(db);
       safeWaitUntil(c, metrics.recordMetric(success ? 'payment_success' : 'payment_failed', Number(payment.amount), { provider: 'payos', order_id: payment.order_id, tenant_id: settledOrderTenant }));
       if (success) safeWaitUntil(c, metrics.recordMetric('revenue', Number(payment.amount), { provider: 'payos', tenant_id: settledOrderTenant }));
     }
     if (success && (settled.orderChanged || settled.paymentChanged)) {
-      const kv = c.env.AUTH_KV;
-      if (kv) {
-        await kv.put('latest_order_ts', now).catch(() => {});
-        await kv.put('orders:latest_updated_at', now).catch(() => {});
-        await publishOrderEvent(kv, payment.order_id, 'paid').catch(() => {});
-      }
-      // One notification per successful payment transition; repair/replay cannot double-send.
-      if (settled.paymentChanged) {
-        try {
-          const details = await db.prepare('SELECT * FROM orders WHERE id = ?').bind(payment.order_id).first<Record<string, unknown>>();
-          if (details) await sendOrderPaidNotifications(c, { ...details, total: details.total ?? details.total_amount }, now);
-        } catch (err) { log.error('Order notifications failed', { message: (err as Error).message }); }
-      }
       const orderRecord = order as Record<string, unknown>;
-      const orderStatus = String(orderRecord.status || '');
-      const isCancelledOrFailedOrder = ['cancelled', 'failed', 'expired'].includes(orderStatus);
+      let details: Record<string, unknown> | null = null;
+      try {
+        details = await db.prepare("SELECT * FROM orders WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?")
+          .bind(payment.order_id, settledOrderTenant)
+          .first<Record<string, unknown>>();
+      } catch {
+        if (settledOrderTenant === 'default') {
+          details = await db.prepare('SELECT * FROM orders WHERE id = ?').bind(payment.order_id).first<Record<string, unknown>>().catch(() => null);
+        } else {
+          details = null;
+        }
+      }
+      const effectiveOrderRecord = details ?? orderRecord;
+      const orderStatus = String(effectiveOrderRecord.status ?? orderRecord.status ?? '').trim().toLowerCase();
+      const isCancelledOrFailedOrder = ['cancelled', 'canceled', 'rejected', 'failed', 'expired', 'refunded'].includes(orderStatus);
       if (isCancelledOrFailedOrder) {
+        const reviewTag = '[PAID_ON_CANCELLED_ORDER_REQUIRES_REVIEW]';
+        try {
+          await db
+            .prepare(
+              `UPDATE orders
+               SET notes = CASE
+                 WHEN notes IS NULL OR TRIM(notes) = '' THEN ?
+                 WHEN INSTR(notes, ?) > 0 THEN notes
+                 ELSE notes || ' ' || ?
+               END,
+               updated_at = ?
+               WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?`
+            )
+            .bind(reviewTag, reviewTag, reviewTag, now, payment.order_id, settledOrderTenant)
+            .run();
+        } catch {
+          if (settledOrderTenant === 'default') {
+            await db
+              .prepare(
+                `UPDATE orders
+                 SET notes = CASE
+                   WHEN notes IS NULL OR TRIM(notes) = '' THEN ?
+                   WHEN INSTR(notes, ?) > 0 THEN notes
+                   ELSE notes || ' ' || ?
+                 END,
+                 updated_at = ?
+                 WHERE id = ?`
+              )
+              .bind(reviewTag, reviewTag, reviewTag, now, payment.order_id)
+              .run()
+              .catch(() => {});
+          }
+        }
         await writePaymentReviewMarker(c.env.AUTH_KV, {
           paymentId: payment.id,
           orderId: payment.order_id,
@@ -120,6 +175,21 @@ export async function handlePayosWebhook(c: Context<{ Bindings: Env }>, openApi 
           stage: 'cancelled_order_paid',
           errorCode: 'PAID_ON_CANCELLED_ORDER',
         });
+      } else {
+        const kv = c.env.AUTH_KV;
+        if (kv) {
+          const latestOrderKey = settledOrderTenant === 'default' ? 'latest_order_ts' : `latest_order_ts:${settledOrderTenant}`;
+          const latestUpdatedKey = settledOrderTenant === 'default' ? 'orders:latest_updated_at' : `orders:latest_updated_at:${settledOrderTenant}`;
+          await kv.put(latestOrderKey, now).catch(() => {});
+          await kv.put(latestUpdatedKey, now).catch(() => {});
+          await publishOrderEvent(kv, payment.order_id, 'paid').catch(() => {});
+        }
+        // One notification per successful payment transition; repair/replay cannot double-send.
+        if (settled.paymentChanged && details) {
+          try {
+            await sendOrderPaidNotifications(c, { ...details, total: details.total ?? details.total_amount }, now);
+          } catch (err) { log.error('Order notifications failed', { message: (err as Error).message }); }
+        }
       }
       if (!isCancelledOrFailedOrder && (orderRecord.customer_id || orderRecord.customer_phone || orderRecord.customer_email)) {
         try {
@@ -133,25 +203,28 @@ export async function handlePayosWebhook(c: Context<{ Bindings: Env }>, openApi 
           const sanitizedEmail = trimmedEmail.length > 0 && trimmedEmail.includes('@') ? trimmedEmail : null;
           let refCustomerId = orderRecord.customer_id ? String(orderRecord.customer_id).trim() || null : null;
           if (!refCustomerId && (normalizedPhone || sanitizedEmail)) {
-            const orderTenant = (orderRecord.tenant_id && String(orderRecord.tenant_id).trim()) || 'default';
+            const orderTenant = settledOrderTenant;
             let cust: { id: string } | null = null;
             try {
               cust = await db.prepare(
                 "SELECT id FROM customers WHERE ((email = ? AND email IS NOT NULL) OR (phone = ? AND phone IS NOT NULL)) AND (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?) LIMIT 1"
               ).bind(sanitizedEmail, normalizedPhone, orderTenant, orderTenant).first<{ id: string }>();
             } catch {
-              cust = await db.prepare(
-                'SELECT id FROM customers WHERE (email = ? AND email IS NOT NULL) OR (phone = ? AND phone IS NOT NULL) LIMIT 1'
-              ).bind(sanitizedEmail, normalizedPhone).first<{ id: string }>().catch(() => null);
+              // Only fall back to unscoped customer lookup on legacy single-tenant ('default') schema;
+              // non-default tenants fail closed to prevent cross-tenant referral attribution.
+              if (!orderTenant || orderTenant === 'default') {
+                cust = await db.prepare(
+                  'SELECT id FROM customers WHERE (email = ? AND email IS NOT NULL) OR (phone = ? AND phone IS NOT NULL) LIMIT 1'
+                ).bind(sanitizedEmail, normalizedPhone).first<{ id: string }>().catch(() => null);
+              } else {
+                cust = null;
+              }
             }
             refCustomerId = cust?.id ?? null;
           }
           if (refCustomerId && orderAmount >= 20000) {
             const { rewardReferralOnFirstOrder, resolveReferralPolicy, DEFAULT_REFERRAL_POLICY } = await import('@aura/domain-crm');
-            const orderTenantForRef =
-              typeof orderRecord.tenant_id === 'string' && String(orderRecord.tenant_id).trim()
-                ? String(orderRecord.tenant_id).trim()
-                : undefined;
+            const orderTenantForRef = settledOrderTenant;
             const refPolicy = await resolveReferralPolicy(c.env.AUTH_KV, orderTenantForRef).catch(() => DEFAULT_REFERRAL_POLICY);
             await rewardReferralOnFirstOrder(db, refCustomerId, payment.order_id, orderAmount, refPolicy, orderTenantForRef);
           }

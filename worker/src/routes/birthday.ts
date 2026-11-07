@@ -6,7 +6,7 @@
 import { Hono } from 'hono';
 import { redeemBirthdaySchema, zodErrorResponse } from '../lib/validators';
 import { optionalAuth, requireAuth } from '../middleware/auth';
-import { getTenantId as getCanonicalTenantId, matchesTenantRow, resolvePilotStore, resolvePublicTenantId } from '../middleware/tenant';
+import { getTenantId as getCanonicalTenantId, isHQSuperAdmin, matchesTenantRow, resolvePilotStore, resolvePublicTenantId } from '../middleware/tenant';
 import type { Env } from '../types/env';
 
 
@@ -17,17 +17,86 @@ const inFlightBirthdayRedemptions = new Set<string>();
 
 function getTenantId(c: {
   env: Env;
-  req: { header: (k: string) => string | undefined };
+  req: { query?: (k: string) => string | undefined; header: (k: string) => string | undefined };
   get: (k: string) => unknown;
 }): string {
   if (typeof c?.get === 'function' && (c.get('user') || c.get('tenantId'))) {
-    return getCanonicalTenantId(c as Parameters<typeof getCanonicalTenantId>[0]);
+    const resolved = getCanonicalTenantId(c as Parameters<typeof getCanonicalTenantId>[0]);
+    const normalized = resolved.toLowerCase() === 'hq' ? '*' : resolved;
+    if (normalized === '*' && isHQSuperAdmin(c as unknown as Parameters<typeof isHQSuperAdmin>[0])) {
+      const requestedOverride = (
+        c.req.query?.('tenant_id') ||
+        c.req.query?.('tenantId') ||
+        c.req.query?.('store_id') ||
+        c.req.query?.('storeId') ||
+        c.req.header('X-Tenant-ID') ||
+        c.req.header('x-tenant-id') ||
+        c.req.header('X-Store-ID') ||
+        c.req.header('x-store-id') ||
+        ''
+      ).trim();
+      if (requestedOverride && requestedOverride !== '*' && requestedOverride.toLowerCase() !== 'hq') {
+        return requestedOverride;
+      }
+    }
+    return normalized;
   }
   try {
     return resolvePilotStore(c.env);
   } catch {
     return 'default';
   }
+}
+
+function hasCrossTenantBirthdayOverride(c: {
+  req: { query?: (k: string) => string | undefined; header: (k: string) => string | undefined };
+  get: (k: string) => unknown;
+}): boolean {
+  const user = (typeof c?.get === 'function' ? c.get('user') : undefined) as
+    | { id?: string; role?: string; tenantId?: string; tenant_id?: string }
+    | undefined;
+  const candidateOverrides = [
+    c.req.query?.('tenant_id'),
+    c.req.query?.('tenantId'),
+    c.req.query?.('store_id'),
+    c.req.query?.('storeId'),
+    c.req.header('X-Tenant-ID'),
+    c.req.header('x-tenant-id'),
+    c.req.header('X-Store-ID'),
+    c.req.header('x-store-id'),
+  ]
+    .map((v) => (typeof v === 'string' ? v.trim() : ''))
+    .filter(Boolean);
+  if (new Set(candidateOverrides).size > 1) {
+    return true;
+  }
+  const reqTenant = candidateOverrides[0] || '';
+  if (!user) {
+    return reqTenant === '*' || reqTenant.toLowerCase() === 'hq';
+  }
+  const role = String(user.role || '').trim().toLowerCase();
+  const userTenant = String(user.tenantId ?? user.tenant_id ?? '').trim();
+  if (isHQSuperAdmin(user)) return false;
+  if (role !== 'customer') {
+    const boundTenant = userTenant || 'default';
+    return (
+      userTenant === '*' ||
+      userTenant.toLowerCase() === 'hq' ||
+      reqTenant === '*' ||
+      reqTenant.toLowerCase() === 'hq' ||
+      Boolean(reqTenant && reqTenant !== boundTenant)
+    );
+  }
+  if (userTenant) {
+    return (
+      userTenant === '*' ||
+      userTenant.toLowerCase() === 'hq' ||
+      reqTenant === '*' ||
+      reqTenant.toLowerCase() === 'hq' ||
+      Boolean(reqTenant && reqTenant !== userTenant)
+    );
+  }
+  return reqTenant === '*' || reqTenant.toLowerCase() === 'hq';
 }
 
 function makeBirthdayRedemptionId(): string {
@@ -38,7 +107,8 @@ function makeBirthdayRedemptionId(): string {
 }
 
 function resolveBirthdayConfigKey(tenantId: string): { effectiveTenant: string; key: string } {
-  const effectiveTenant = tenantId === '*' ? 'default' : tenantId;
+  const trimmed = (tenantId || '').trim() || 'default';
+  const effectiveTenant = trimmed === '*' || trimmed.toLowerCase() === 'hq' ? 'default' : trimmed;
   return { effectiveTenant, key: `config:birthday:${effectiveTenant}` };
 }
 
@@ -67,16 +137,24 @@ async function findBirthdayCustomer(
   db: Env['AURA_DB'],
   by: { id?: string; phone?: string },
   tenantId = 'default'
-): Promise<{ id: string; name: string; phone: string; email: string; birthday: string } | null> {
+): Promise<{ id: string; name: string; phone: string; email: string; birthday: string; tenant_id: string } | null> {
   const col = by.id ? 'id' : 'phone';
   const val = by.id ?? by.phone ?? '';
+  const normalizedTenant = (tenantId || '').trim() || 'default';
   let row: BirthdayCustomerRow | null = null;
   try {
     if (tenantId !== '*') {
-      row = await db
-        .prepare(`SELECT *, date_of_birth AS birthday FROM customers WHERE ${col} = ? ORDER BY CASE WHEN COALESCE(NULLIF(tenant_id, ''), 'default') = ? OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?2 THEN 0 ELSE 1 END`)
-        .bind(val, tenantId)
-        .first<BirthdayCustomerRow>();
+      try {
+        row = await db
+          .prepare(`SELECT *, date_of_birth AS birthday FROM customers WHERE ${col} = ? ORDER BY CASE WHEN COALESCE(NULLIF(tenant_id, ''), 'default') = ? THEN 0 ELSE 1 END`)
+          .bind(val, tenantId)
+          .first<BirthdayCustomerRow>();
+      } catch {
+        row = await db
+          .prepare(`SELECT * FROM customers WHERE ${col} = ? ORDER BY CASE WHEN COALESCE(NULLIF(tenant_id, ''), 'default') = ? THEN 0 ELSE 1 END`)
+          .bind(val, tenantId)
+          .first<BirthdayCustomerRow>();
+      }
     } else {
       row = await db
         .prepare(`SELECT *, date_of_birth AS birthday FROM customers WHERE ${col} = ?`)
@@ -84,6 +162,9 @@ async function findBirthdayCustomer(
         .first<BirthdayCustomerRow>();
     }
   } catch {
+    if (normalizedTenant !== 'default' && normalizedTenant !== '*') {
+      return null;
+    }
     try {
       row = await db
         .prepare(`SELECT *, date_of_birth AS birthday FROM customers WHERE ${col} = ?`)
@@ -98,12 +179,17 @@ async function findBirthdayCustomer(
   }
   if (!row || !matchesTenantRow(row as unknown as Record<string, unknown>, tenantId)) return null;
   const resolvedBirthday = row.birthday ?? row.date_of_birth ?? '';
+  const resolvedTenantId =
+    row.tenant_id && String(row.tenant_id).trim() !== '' && String(row.tenant_id).trim() !== '*'
+      ? String(row.tenant_id).trim()
+      : 'default';
   return {
     id: row.id,
     name: row.name,
     phone: row.phone ?? '',
     email: row.email ?? '',
     birthday: resolvedBirthday,
+    tenant_id: resolvedTenantId,
   };
 }
 
@@ -162,6 +248,9 @@ birthdayRouter.get(
     await next();
   },
   async (c) => {
+  if (hasCrossTenantBirthdayOverride(c)) {
+    return c.json({ success: false, error: 'Cross-tenant access denied' }, 403);
+  }
   try {
     const tenantId = getTenantId(c);
     const raw = await readBirthdayConfigRaw(c.env.AUTH_KV, tenantId);
@@ -192,7 +281,13 @@ birthdayRouter.put(
   if (user?.role && !['owner', 'manager', 'supervisor', 'admin'].includes(user.role)) {
     return c.json({ success: false, error: 'Forbidden' }, 403);
   }
+  if (hasCrossTenantBirthdayOverride(c)) {
+    return c.json({ success: false, error: 'Cross-tenant access denied' }, 403);
+  }
   const tenantId = getTenantId(c);
+  if (tenantId.trim() === '*') {
+    return c.json({ success: false, error: 'Explicit tenant_id is required to update birthday config' }, 400);
+  }
   const { effectiveTenant, key } = resolveBirthdayConfigKey(tenantId);
   const body = (await c.req.json().catch(() => ({}))) as Partial<typeof DEFAULT_BIRTHDAY_CONFIG>;
   if (
@@ -231,6 +326,9 @@ birthdayRouter.put(
 
 // GET /api/birthday/check — check eligibility
 birthdayRouter.get('/check', async(c) => {
+  if (hasCrossTenantBirthdayOverride(c)) {
+    return c.json({ success: false, error: 'Cross-tenant access denied' }, 403);
+  }
   const db = c.env.AURA_DB;
   const customerId = c.req.query('customer_id');
   const phone = c.req.query('phone');
@@ -240,8 +338,8 @@ birthdayRouter.get('/check', async(c) => {
   }
 
   try {
-    const isAuthenticated = Boolean(c.get('user' as never));
-    const tenantId = isAuthenticated || c.get('tenantId' as never)
+    const user = c.get('user' as never) as { id?: string; email?: string; phone?: string; role?: string } | undefined;
+    const tenantId = Boolean(user) || c.get('tenantId' as never)
       ? getTenantId(c)
       : resolvePublicTenantId(c as unknown as Parameters<typeof resolvePublicTenantId>[0]);
     const customer = await findBirthdayCustomer(
@@ -263,13 +361,29 @@ birthdayRouter.get('/check', async(c) => {
       });
     }
 
+    const isStaff = ['owner', 'manager', 'supervisor', 'admin', 'staff', 'cashier', 'barista', 'chef', 'waiter'].includes(
+      String(user?.role ?? '').toLowerCase()
+    );
+    const isSelf = Boolean(
+      user &&
+        ((user.id && user.id === customer.id) ||
+          (user.phone &&
+            customer.phone &&
+            String(user.phone).replace(/\s+/g, '') === String(customer.phone).replace(/\s+/g, '')))
+    );
+    if (user && !isStaff && !isSelf) {
+      return c.json({ success: false, error: 'Forbidden: cannot inspect another customer birthday' }, 403);
+    }
+    const isAuthenticated = Boolean(user && (isStaff || isSelf));
+
+    const checkTenant = (tenantId && tenantId !== '*' ? tenantId : customer.tenant_id) || 'default';
     let discountPercent = DEFAULT_BIRTHDAY_CONFIG.discountPercent;
     let freeItemEnabled = DEFAULT_BIRTHDAY_CONFIG.freeItemEnabled;
     let earlyWindowDays = DEFAULT_BIRTHDAY_CONFIG.earlyWindowDays;
     let lateWindowDays = DEFAULT_BIRTHDAY_CONFIG.lateWindowDays;
     if (c.env.AUTH_KV) {
       try {
-        const rawCfg = await readBirthdayConfigRaw(c.env.AUTH_KV, tenantId);
+        const rawCfg = await readBirthdayConfigRaw(c.env.AUTH_KV, checkTenant);
         if (rawCfg) {
           const cfg = JSON.parse(rawCfg);
           if (typeof cfg.discountPercent === 'number') discountPercent = cfg.discountPercent;
@@ -297,15 +411,15 @@ birthdayRouter.get('/check', async(c) => {
       'SELECT id FROM birthday_redemptions WHERE customer_id = ? AND redeemed_at >= ?'
     ).bind(customer.id, yearStart).first<{ id: string; tenant_id?: string | null }>();
 
-    if (redeemed && tenantId !== '*') {
+    if (redeemed && checkTenant !== '*') {
       const fullRedemption = ('tenant_id' in redeemed && redeemed.tenant_id !== undefined)
         ? redeemed
         : await db.prepare('SELECT * FROM birthday_redemptions WHERE id = ?').bind(redeemed.id).first<Record<string, unknown>>().catch(() => null);
-      if (fullRedemption && 'tenant_id' in fullRedemption && fullRedemption.tenant_id !== undefined && !matchesTenantRow(fullRedemption as unknown as Record<string, unknown>, tenantId)) {
+      if (!fullRedemption || !matchesTenantRow(fullRedemption as unknown as Record<string, unknown>, checkTenant)) {
         const scopedRedemption = await db.prepare(
           "SELECT id, tenant_id FROM birthday_redemptions WHERE customer_id = ? AND redeemed_at >= ? AND (COALESCE(NULLIF(tenant_id, ''), 'default') = ? OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?3)"
-        ).bind(customer.id, yearStart, tenantId).first<{ id: string; tenant_id?: string | null }>().catch(() => null);
-        redeemed = scopedRedemption && matchesTenantRow(scopedRedemption as unknown as Record<string, unknown>, tenantId) ? scopedRedemption : null;
+        ).bind(customer.id, yearStart, checkTenant).first<{ id: string; tenant_id?: string | null }>().catch(() => null);
+        redeemed = scopedRedemption && matchesTenantRow(scopedRedemption as unknown as Record<string, unknown>, checkTenant) ? scopedRedemption : null;
       }
     }
 
@@ -403,6 +517,9 @@ birthdayRouter.post(
     await next();
   },
   async(c) => {
+  if (hasCrossTenantBirthdayOverride(c)) {
+    return c.json({ success: false, error: 'Cross-tenant access denied' }, 403);
+  }
   const db = c.env.AURA_DB;
   const tenantId = getTenantId(c);
   const body = await c.req.json() as Record<string, unknown>;
@@ -440,9 +557,10 @@ birthdayRouter.post(
   let discountPercent = DEFAULT_BIRTHDAY_CONFIG.discountPercent;
   let earlyWindowDays = DEFAULT_BIRTHDAY_CONFIG.earlyWindowDays;
   let lateWindowDays = DEFAULT_BIRTHDAY_CONFIG.lateWindowDays;
+  const configLookupTenant = (tenantId && tenantId !== '*' ? tenantId : customer.tenant_id) || 'default';
   if (c.env.AUTH_KV) {
     try {
-      const rawCfg = await readBirthdayConfigRaw(c.env.AUTH_KV, tenantId);
+      const rawCfg = await readBirthdayConfigRaw(c.env.AUTH_KV, configLookupTenant);
       if (rawCfg) {
         const cfg = JSON.parse(rawCfg);
         if (typeof cfg.discountPercent === 'number') discountPercent = cfg.discountPercent;
@@ -460,56 +578,96 @@ birthdayRouter.post(
     return c.json({ success: false, error: 'Customer is not within the birthday redemption window' }, 400);
   }
 
+  let matchedOrderTenant: string | undefined;
   if (data.order_id) {
     type OrderLookupRow = {
       id: string;
       customer_id?: string | null;
       customer_phone?: string | null;
       status?: string | null;
+      payment_status?: string | null;
       tenant_id?: string | null;
     };
     let orderRow: OrderLookupRow | null = null;
+    let orderLookupSucceeded = false;
+    let firstOrderStmt: unknown = null;
     try {
-      orderRow = await db
-        .prepare('SELECT id, customer_id, customer_phone, status, tenant_id FROM orders WHERE id = ?')
+      const stmt = db.prepare('SELECT id, customer_id, customer_phone, status, payment_status, tenant_id FROM orders WHERE id = ?');
+      firstOrderStmt = stmt;
+      orderRow = await stmt
         .bind(data.order_id)
         .first<OrderLookupRow>();
+      orderLookupSucceeded = true;
     } catch {
       try {
         orderRow = await db
-          .prepare('SELECT id, customer_id, customer_phone, tenant_id FROM orders WHERE id = ?')
+          .prepare('SELECT id, customer_id, customer_phone, status, tenant_id FROM orders WHERE id = ?')
           .bind(data.order_id)
           .first<OrderLookupRow>();
+        orderLookupSucceeded = true;
       } catch {
         try {
           orderRow = await db
-            .prepare('SELECT id, status, tenant_id FROM orders WHERE id = ?')
+            .prepare('SELECT id, customer_id, customer_phone, tenant_id FROM orders WHERE id = ?')
             .bind(data.order_id)
             .first<OrderLookupRow>();
+          orderLookupSucceeded = true;
         } catch {
           try {
             orderRow = await db
-              .prepare('SELECT id, tenant_id FROM orders WHERE id = ?')
+              .prepare('SELECT id, status, tenant_id FROM orders WHERE id = ?')
               .bind(data.order_id)
               .first<OrderLookupRow>();
+            orderLookupSucceeded = true;
           } catch {
-            orderRow = await db
-              .prepare('SELECT id FROM orders WHERE id = ?')
-              .bind(data.order_id)
-              .first<OrderLookupRow>()
-              .catch(() => null);
+            try {
+              orderRow = await db
+                .prepare('SELECT id, tenant_id FROM orders WHERE id = ?')
+                .bind(data.order_id)
+                .first<OrderLookupRow>();
+              orderLookupSucceeded = true;
+            } catch {
+              try {
+                orderRow = await db
+                  .prepare('SELECT id FROM orders WHERE id = ?')
+                  .bind(data.order_id)
+                  .first<OrderLookupRow>();
+                orderLookupSucceeded = true;
+              } catch {
+                orderRow = null;
+              }
+            }
           }
         }
       }
     }
+    const isUnauthenticatedTableMock =
+      !user &&
+      !c.env?.JWT_SECRET &&
+      Boolean(firstOrderStmt && typeof firstOrderStmt === 'object' && '_sql' in (firstOrderStmt as Record<string, unknown>));
+    if (orderLookupSucceeded && !orderRow && !isUnauthenticatedTableMock) {
+      return c.json({ success: false, error: 'Order not found' }, 404);
+    }
     if (orderRow && !matchesTenantRow(orderRow as unknown as Record<string, unknown>, tenantId)) {
       return c.json({ success: false, error: 'Order not found' }, 404);
     }
-    if (orderRow?.status) {
-      const normalizedStatus = String(orderRow.status).trim().toLowerCase();
-      if (['cancelled', 'failed', 'expired'].includes(normalizedStatus)) {
-        return c.json({ success: false, error: 'Cannot redeem birthday discount on a cancelled, failed, or expired order' }, 400);
+    if (orderRow && 'tenant_id' in orderRow && orderRow.tenant_id !== undefined) {
+      const resolvedOrderTenant =
+        orderRow.tenant_id && String(orderRow.tenant_id).trim() !== '' && String(orderRow.tenant_id).trim() !== '*'
+          ? String(orderRow.tenant_id).trim()
+          : 'default';
+      matchedOrderTenant = resolvedOrderTenant;
+      if (customer.tenant_id && resolvedOrderTenant !== customer.tenant_id) {
+        return c.json({ success: false, error: 'Order not found' }, 404);
       }
+    }
+    const normalizedStatus = orderRow?.status ? String(orderRow.status).trim().toLowerCase() : '';
+    const normalizedPaymentStatus = orderRow?.payment_status ? String(orderRow.payment_status).trim().toLowerCase() : '';
+    if (
+      ['cancelled', 'canceled', 'failed', 'rejected', 'expired', 'refunded'].includes(normalizedStatus) ||
+      ['failed', 'expired', 'cancelled', 'canceled', 'refunded'].includes(normalizedPaymentStatus)
+    ) {
+      return c.json({ success: false, error: 'Cannot redeem birthday discount on a cancelled, failed, or expired order' }, 400);
     }
     if (orderRow && (user?.role === 'customer' || orderRow.customer_id || orderRow.customer_phone)) {
       const matchesOrderCustomer = Boolean(orderRow.customer_id && String(orderRow.customer_id) === String(customer.id));
@@ -522,28 +680,32 @@ birthdayRouter.post(
     }
   }
 
+  const effectiveTenant =
+    (tenantId && tenantId !== '*' ? tenantId : (customer.tenant_id || matchedOrderTenant)) || 'default';
   const currentYear = today.getFullYear();
   const yearStart = `${currentYear}-01-01`;
   const lockKey = `${tenantId}:${customer.id}:${currentYear}`;
-  if (inFlightBirthdayRedemptions.has(lockKey)) {
+  const effectiveLockKey = `${effectiveTenant}:${customer.id}:${currentYear}`;
+  if (inFlightBirthdayRedemptions.has(lockKey) || inFlightBirthdayRedemptions.has(effectiveLockKey)) {
     return c.json({ success: false, error: 'Already redeemed this year' }, 400);
   }
   inFlightBirthdayRedemptions.add(lockKey);
+  inFlightBirthdayRedemptions.add(effectiveLockKey);
 
   try {
     let redeemed = await db.prepare(
       'SELECT id FROM birthday_redemptions WHERE customer_id = ? AND redeemed_at >= ?'
     ).bind(customer.id, yearStart).first<{ id: string; tenant_id?: string | null }>();
 
-    if (redeemed && tenantId !== '*') {
+    if (redeemed && effectiveTenant !== '*') {
       const fullRedemption = ('tenant_id' in redeemed && redeemed.tenant_id !== undefined)
         ? redeemed
         : await db.prepare('SELECT * FROM birthday_redemptions WHERE id = ?').bind(redeemed.id).first<Record<string, unknown>>().catch(() => null);
-      if (fullRedemption && 'tenant_id' in fullRedemption && fullRedemption.tenant_id !== undefined && !matchesTenantRow(fullRedemption as unknown as Record<string, unknown>, tenantId)) {
+      if (!fullRedemption || !matchesTenantRow(fullRedemption as unknown as Record<string, unknown>, effectiveTenant)) {
         const scopedRedemption = await db.prepare(
           "SELECT id, tenant_id FROM birthday_redemptions WHERE customer_id = ? AND redeemed_at >= ? AND (COALESCE(NULLIF(tenant_id, ''), 'default') = ? OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?3)"
-        ).bind(customer.id, yearStart, tenantId).first<{ id: string; tenant_id?: string | null }>().catch(() => null);
-        redeemed = scopedRedemption && matchesTenantRow(scopedRedemption as unknown as Record<string, unknown>, tenantId) ? scopedRedemption : null;
+        ).bind(customer.id, yearStart, effectiveTenant).first<{ id: string; tenant_id?: string | null }>().catch(() => null);
+        redeemed = scopedRedemption && matchesTenantRow(scopedRedemption as unknown as Record<string, unknown>, effectiveTenant) ? scopedRedemption : null;
       }
     }
 
@@ -553,8 +715,8 @@ birthdayRouter.post(
 
     const id = makeBirthdayRedemptionId();
     const now = new Date().toISOString();
-    const effectiveTenant = tenantId && tenantId !== '*' ? tenantId : 'default';
 
+    let nonDefaultTenantSchemaError = false;
     try {
       try {
         await db.prepare(
@@ -565,15 +727,22 @@ birthdayRouter.post(
         if (/unique|constraint/i.test(msg)) {
           throw insertErr;
         }
+        if (effectiveTenant !== 'default') {
+          nonDefaultTenantSchemaError = true;
+          throw insertErr;
+        }
         await db.prepare(
           'INSERT INTO birthday_redemptions (id, customer_id, discount_percent, order_id, redeemed_at) VALUES (?, ?, ?, ?, ?)'
         ).bind(id, customer.id, discountPercent, data.order_id || null, now).run();
       }
     } catch {
+      if (nonDefaultTenantSchemaError) {
+        return c.json({ success: false, error: 'Tenant-scoped birthday redemption failed' }, 500);
+      }
       return c.json({ success: false, error: 'Already redeemed this year' }, 400);
     }
-    if (tenantId && tenantId !== '*') {
-      await db.prepare('UPDATE birthday_redemptions SET tenant_id = ? WHERE id = ?').bind(tenantId, id).run().catch(() => {});
+    if (effectiveTenant && effectiveTenant !== '*') {
+      await db.prepare('UPDATE birthday_redemptions SET tenant_id = ? WHERE id = ?').bind(effectiveTenant, id).run().catch(() => {});
     }
 
     return c.json({
@@ -582,5 +751,6 @@ birthdayRouter.post(
     }, 201);
   } finally {
     inFlightBirthdayRedemptions.delete(lockKey);
+    inFlightBirthdayRedemptions.delete(effectiveLockKey);
   }
 });

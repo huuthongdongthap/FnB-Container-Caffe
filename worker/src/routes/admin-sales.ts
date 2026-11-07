@@ -10,7 +10,7 @@ import { Hono } from 'hono';
 import { z } from 'zod';
 import type { Env } from '../types/env';
 import { optionalAuth } from '../middleware/auth';
-import { getTenantId } from '../middleware/tenant';
+import { getTenantId, isHQSuperAdmin, matchesTenantRow } from '../middleware/tenant';
 
 const VALID_RANGES = ['24h', '7d', '30d'] as const;
 type Range = typeof VALID_RANGES[number];
@@ -54,7 +54,9 @@ function formatDate(d: Date): string {
  * Escape a CSV field per RFC 4180 and neutralize spreadsheet formula triggers.
  */
 function escapeCsv(value: string): string {
-  const safe = /^[\t\r\n ]*[=+\-@]/.test(value) ? `'${value}` : value;
+  const str = String(value ?? '');
+  const prefixed = (/^[\t\r\n ]*[=+\-@]/.test(str) || /^[=+\-@|]/.test(str.trimStart())) ? `'${str}` : str;
+  const safe = prefixed.replace(/([\r\n]+)(\s*[=+\-@|])/g, "$1'$2");
   if (safe.includes(',') || safe.includes('"') || safe.includes('\n') || safe.includes('\r')) {
     return `"${safe.replace(/"/g, '""')}"`;
   }
@@ -69,16 +71,57 @@ adminSalesRouter.use('*', async(c, next) => {
   await next();
 });
 
-const SALES_EXPORT_ALLOWED_ROLES = ['owner', 'manager', 'supervisor', 'admin'];
+const SALES_EXPORT_ALLOWED_ROLES = ['owner', 'manager', 'admin'];
 
 adminSalesRouter.get('/csv', async(c) => {
-  const user = c.get('user' as never) as { role?: string } | undefined;
-  if (user?.role && !SALES_EXPORT_ALLOWED_ROLES.includes(String(user.role).toLowerCase())) {
-    return c.json({ success: false, error: 'Insufficient permissions' }, 403);
-  }
-  if (!user?.role && (c.req.header('Authorization') || c.env?.ENVIRONMENT === 'production')) {
+  const user = c.get('user' as never) as { role?: string; tenantId?: string; tenant_id?: string } | undefined;
+  if (!user?.role) {
     return c.json({ success: false, error: 'Authentication required' }, 401);
   }
+  const roleLower = String(user.role).toLowerCase();
+  const isAuthBearerSupervisor = roleLower === 'supervisor' && Boolean(c.req.header('Authorization') || c.req.header('authorization'));
+  if (!SALES_EXPORT_ALLOWED_ROLES.includes(roleLower) && !isAuthBearerSupervisor) {
+    return c.json({ success: false, error: 'Insufficient permissions' }, 403);
+  }
+
+  const rawUserTenant = user.tenantId ?? user.tenant_id;
+  const userTenant = typeof rawUserTenant === 'string' && rawUserTenant.trim() ? rawUserTenant.trim() : 'default';
+  const normalizedUser = { ...user, role: roleLower, tenantId: userTenant };
+  (c as unknown as { set?: (k: string, v: unknown) => void }).set?.('user', normalizedUser);
+  const candidateOverrides = [
+    c.req.query('tenant_id'),
+    c.req.query('tenantId'),
+    c.req.query('store_id'),
+    c.req.query('storeId'),
+    c.req.header('x-tenant-id'),
+    c.req.header('X-Tenant-ID'),
+    c.req.header('x-store-id'),
+    c.req.header('X-Store-ID'),
+  ]
+    .map((v) => (typeof v === 'string' ? v.trim() : ''))
+    .filter(Boolean);
+  if (new Set(candidateOverrides).size > 1) {
+    return c.json({ success: false, error: 'Forbidden: tenant mismatch' }, 403);
+  }
+  const rawTenantId = getTenantId(c);
+  const requestedTenant = candidateOverrides[0] || '';
+  const isHq = isHQSuperAdmin(normalizedUser as any);
+  if (!isHq) {
+    if (
+      userTenant === '*' ||
+      userTenant.toLowerCase() === 'hq' ||
+      rawTenantId === '*' ||
+      rawTenantId.toLowerCase() === 'hq' ||
+      requestedTenant === '*' ||
+      requestedTenant.toLowerCase() === 'hq' ||
+      userTenant !== rawTenantId ||
+      (requestedTenant && requestedTenant !== userTenant)
+    ) {
+      return c.json({ success: false, error: 'Forbidden: tenant mismatch' }, 403);
+    }
+  }
+  const hqTarget = requestedTenant || rawTenantId || '*';
+  const effectiveTenant = isHq ? (hqTarget.toLowerCase() === 'hq' ? '*' : hqTarget) : userTenant;
 
   const parsed = salesCsvSchema.safeParse(c.req.query());
   if (!parsed.success) {
@@ -115,7 +158,7 @@ adminSalesRouter.get('/csv', async(c) => {
   }
 
   const db = (c.env.AURA_DB ?? (c.env as Record<string, unknown>).DB) as D1Database;
-  const tenantId = getTenantId(c);
+  const normalizedEndDate = /^\d{4}-\d{2}-\d{2}$/.test(endDate) ? `${endDate}T23:59:59.999Z` : endDate;
 
   let results: SalesCsvRow[] | undefined;
   try {
@@ -123,30 +166,60 @@ adminSalesRouter.get('/csv', async(c) => {
       SELECT id, customer_name, items, total, payment_method, status, created_at
       FROM orders
       WHERE (? = '*' OR tenant_id = ? OR TRIM(tenant_id) = ?2 OR (? = 'default' AND (tenant_id IS NULL OR tenant_id = '' OR TRIM(tenant_id) = '')))
-        AND status != 'cancelled'
-        AND created_at >= ? || ' 00:00:00'
-        AND created_at <= ? || ' 23:59:59'
+        AND LOWER(TRIM(COALESCE(status, ''))) NOT IN ('cancelled', 'refunded', 'failed', 'expired')
+        AND LOWER(TRIM(COALESCE(status, ''))) NOT IN ('canceled', 'rejected')
+        AND LOWER(TRIM(COALESCE(payment_status, ''))) NOT IN ('refunded', 'failed', 'cancelled', 'canceled')
+        AND created_at >= ?
+        AND created_at <= ?
       ORDER BY created_at ASC
       LIMIT 5000
-    `).bind(tenantId, tenantId, tenantId, startDate, endDate).all<SalesCsvRow>();
+    `).bind(effectiveTenant, effectiveTenant, effectiveTenant, startDate, normalizedEndDate).all<SalesCsvRow>();
     results = res.results;
   } catch (err) {
-    if (!/no such column:\s*tenant_id/i.test(err instanceof Error ? err.message : String(err))) {
+    const errMsg = err instanceof Error ? err.message : String(err);
+    if (/no such column:\s*payment_status/i.test(errMsg)) {
+      const res = await db.prepare(`
+        SELECT id, customer_name, items, total, payment_method, status, created_at
+        FROM orders
+        WHERE (? = '*' OR tenant_id = ? OR TRIM(tenant_id) = ?2 OR (? = 'default' AND (tenant_id IS NULL OR tenant_id = '' OR TRIM(tenant_id) = '')))
+          AND LOWER(TRIM(COALESCE(status, ''))) NOT IN ('cancelled', 'refunded', 'failed', 'expired')
+          AND LOWER(TRIM(COALESCE(status, ''))) NOT IN ('canceled', 'rejected')
+          AND created_at >= ?
+          AND created_at <= ?
+        ORDER BY created_at ASC
+        LIMIT 5000
+      `).bind(effectiveTenant, effectiveTenant, effectiveTenant, startDate, normalizedEndDate).all<SalesCsvRow>();
+      results = res.results;
+    } else if (/no such column:\s*tenant_id/i.test(errMsg)) {
+      if (effectiveTenant === 'default' || effectiveTenant === '*') {
+        const res = await db.prepare(`
+          SELECT id, customer_name, items, total, payment_method, status, created_at
+          FROM orders
+          WHERE LOWER(TRIM(COALESCE(status, ''))) NOT IN ('cancelled', 'refunded', 'failed', 'expired', 'canceled', 'rejected')
+            AND created_at >= ?
+            AND created_at <= ?
+          ORDER BY created_at ASC
+          LIMIT 5000
+        `).bind(startDate, normalizedEndDate).all<SalesCsvRow>();
+        results = res.results;
+      } else {
+        results = [];
+      }
+    } else {
       throw err;
     }
-    const res = await db.prepare(`
-      SELECT id, customer_name, items, total, payment_method, status, created_at
-      FROM orders
-      WHERE status != 'cancelled'
-        AND created_at >= ? || ' 00:00:00'
-        AND created_at <= ? || ' 23:59:59'
-      ORDER BY created_at ASC
-      LIMIT 5000
-    `).bind(startDate, endDate).all<SalesCsvRow>();
-    results = res.results;
   }
 
-  const rows = results || [];
+  const nonRevenueStatuses = new Set(['cancelled', 'canceled', 'refunded', 'failed', 'expired', 'rejected']);
+  const nonRevenuePaymentStatuses = new Set(['refunded', 'failed', 'cancelled', 'canceled']);
+  const rows = (results || []).filter((r: SalesCsvRow & { payment_status?: string | null; tenant_id?: string | null }) => {
+    if ('tenant_id' in r && r.tenant_id !== undefined && !matchesTenantRow(r as unknown as Record<string, unknown>, effectiveTenant)) {
+      return false;
+    }
+    const st = String(r.status ?? '').trim().toLowerCase();
+    const pst = String(r.payment_status ?? '').trim().toLowerCase();
+    return !nonRevenueStatuses.has(st) && !nonRevenuePaymentStatuses.has(pst);
+  });
 
   // Bilingual VN+EN headers
   const headers = [

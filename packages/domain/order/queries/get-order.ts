@@ -16,7 +16,8 @@ export async function getOrder(
 ) {
   try {
     const db = env.AURA_DB as import('@cloudflare/workers-types').D1Database;
-    const cleanTenant = tenantId ? tenantId.trim() : '';
+    const rawTenant = tenantId ? tenantId.trim() : '';
+    const cleanTenant = rawTenant.toLowerCase() === 'hq' ? '*' : rawTenant;
     const hasTenantScope = Boolean(cleanTenant && cleanTenant !== '*');
     const tenantClause = hasTenantScope
       ? cleanTenant === 'default'
@@ -24,10 +25,13 @@ export async function getOrder(
         : ' AND (tenant_id = ? OR TRIM(tenant_id) = ?2)'
       : '';
     const binds = hasTenantScope ? [id, cleanTenant] : [id];
+    const selectCols = cleanTenant
+      ? 'id, status, total, shipping_fee, discount, payment_status, customer_name, customer_phone, customer_address, items, tenant_id, created_at, updated_at, points_earned, cashback_earned'
+      : 'id, status, total, shipping_fee, discount, payment_status, customer_name, customer_phone, customer_address, items, created_at, updated_at, points_earned, cashback_earned';
     let results: Record<string, unknown>[] = [];
     try {
       const res = await db.prepare(
-        `SELECT id, status, total, shipping_fee, discount, payment_status, customer_name, customer_phone, customer_address, items, created_at, updated_at, points_earned, cashback_earned FROM orders WHERE id = ?${tenantClause}`
+        `SELECT ${selectCols} FROM orders WHERE id = ?${tenantClause}`
       ).bind(...binds).all<Record<string, unknown>>();
       results = res.results ?? [];
     } catch {
@@ -83,11 +87,59 @@ export async function getOrder(
       cashback_earned: Number(results[0].cashback_earned ?? 0)
     };
 
-    const { results: paymentResults } = await db.prepare(
-      'SELECT * FROM payments WHERE order_id = ?'
-    ).bind(id).all<Record<string, unknown>>();
+    const rawOrderTenant =
+      typeof order.tenant_id === 'string' && order.tenant_id.trim() ? order.tenant_id.trim() : '';
+    const effectivePaymentTenant =
+      rawOrderTenant && rawOrderTenant !== '*' && rawOrderTenant.toLowerCase() !== 'hq'
+        ? rawOrderTenant
+        : hasTenantScope
+          ? cleanTenant
+          : cleanTenant === '*'
+            ? 'default'
+            : '';
+
+    let paymentResults: Record<string, unknown>[] = [];
+    if (effectivePaymentTenant) {
+      const payTenantClause =
+        effectivePaymentTenant === 'default'
+          ? " AND (tenant_id = ? OR tenant_id IS NULL OR tenant_id = '' OR TRIM(tenant_id) = '')"
+          : ' AND (tenant_id = ? OR TRIM(tenant_id) = ?2)';
+      try {
+        const res = await db
+          .prepare(`SELECT * FROM payments WHERE order_id = ?${payTenantClause}`)
+          .bind(id, effectivePaymentTenant)
+          .all<Record<string, unknown>>();
+        paymentResults = res.results ?? [];
+      } catch {
+        const res = await db
+          .prepare('SELECT * FROM payments WHERE order_id = ?')
+          .bind(id)
+          .all<Record<string, unknown>>()
+          .catch(() => ({ results: [] }));
+        const rawList = res.results ?? [];
+        paymentResults =
+          effectivePaymentTenant === 'default'
+            ? rawList.filter((p) => {
+                if (!p || !('tenant_id' in p) || p.tenant_id === undefined) return true;
+                const pt = typeof p.tenant_id === 'string' && p.tenant_id.trim() ? p.tenant_id.trim() : 'default';
+                return pt === 'default';
+              })
+            : rawList.filter((p) => {
+                if (!p || !('tenant_id' in p) || p.tenant_id === undefined) return false;
+                const pt = typeof p.tenant_id === 'string' && p.tenant_id.trim() ? p.tenant_id.trim() : 'default';
+                return pt === effectivePaymentTenant;
+              });
+      }
+    } else {
+      const res = await db
+        .prepare('SELECT * FROM payments WHERE order_id = ?')
+        .bind(id)
+        .all<Record<string, unknown>>();
+      paymentResults = res.results ?? [];
+    }
 
     order.payment = paymentResults[0] || null;
+    order.payments = paymentResults;
 
     return jsonResponse({ success: true, order });
   } catch (error) {

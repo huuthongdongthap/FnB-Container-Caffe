@@ -1,10 +1,12 @@
 import type { Hono } from 'hono';
 import type { Env } from '../../types/env';
-import { getTenantId, matchesTenantRow } from '../../lib/db';
+import { matchesTenantRow } from '../../lib/db';
 import {
   DINDIN_SESSION_ID_RE,
   err,
   errorResponse,
+  hasForbiddenTenantOverride,
+  resolveDinDinTenant,
   readCartRD,
   readConfigRaw,
   writeCart,
@@ -15,7 +17,10 @@ import {
 export function registerCartHandlers(router: Hono<{ Bindings: Env }>): void {
   // ── GET /carts ───────────────────────────────────────────────────────────────
   router.get('/carts', async (c) => {
-    const tenantId = getTenantId(c as unknown as Parameters<typeof getTenantId>[0]);
+    if (hasForbiddenTenantOverride(c as unknown as Parameters<typeof hasForbiddenTenantOverride>[0])) {
+      return c.json({ success: false, error: 'Cross-tenant access denied' }, 403);
+    }
+    const tenantId = resolveDinDinTenant(c as unknown as Parameters<typeof resolveDinDinTenant>[0]);
     let carts: Array<Record<string, unknown>> = [];
     try {
       let results: Array<{ session_id: string; cart: string; raw?: string; updated_at?: string; tenant_id?: string | null }> | undefined;
@@ -26,22 +31,26 @@ export function registerCartHandlers(router: Hono<{ Bindings: Env }>): void {
         ).bind(effectiveTenant, effectiveTenant).all<{ session_id: string; cart: string; raw?: string; updated_at?: string; tenant_id?: string | null }>();
         results = res.results;
       } catch {
-        try {
-          const res = await c.env.AURA_DB.prepare(
-            'SELECT *, COALESCE(raw, cart) as cart FROM dindin_cart ORDER BY updated_at DESC LIMIT 50'
-          ).all<{ session_id: string; cart: string; raw?: string; updated_at?: string; tenant_id?: string | null }>();
-          results = res.results;
-        } catch {
+        if (effectiveTenant !== 'default' && effectiveTenant !== '*') {
+          results = [];
+        } else {
           try {
             const res = await c.env.AURA_DB.prepare(
-              'SELECT session_id, COALESCE(raw, cart) as cart, raw, updated_at FROM dindin_cart ORDER BY updated_at DESC LIMIT 50'
-            ).all<{ session_id: string; cart: string; raw?: string; updated_at?: string }>();
+              'SELECT *, COALESCE(raw, cart) as cart FROM dindin_cart ORDER BY updated_at DESC LIMIT 50'
+            ).all<{ session_id: string; cart: string; raw?: string; updated_at?: string; tenant_id?: string | null }>();
             results = res.results;
           } catch {
-            const res = await c.env.AURA_DB.prepare(
-              'SELECT session_id, cart, updated_at FROM dindin_carts ORDER BY updated_at DESC LIMIT 50'
-            ).all<{ session_id: string; cart: string; updated_at?: string }>();
-            results = res.results;
+            try {
+              const res = await c.env.AURA_DB.prepare(
+                'SELECT session_id, COALESCE(raw, cart) as cart, raw, updated_at FROM dindin_cart ORDER BY updated_at DESC LIMIT 50'
+              ).all<{ session_id: string; cart: string; raw?: string; updated_at?: string }>();
+              results = res.results;
+            } catch {
+              const res = await c.env.AURA_DB.prepare(
+                'SELECT session_id, cart, updated_at FROM dindin_carts ORDER BY updated_at DESC LIMIT 50'
+              ).all<{ session_id: string; cart: string; updated_at?: string }>();
+              results = res.results;
+            }
           }
         }
       }
@@ -56,12 +65,14 @@ export function registerCartHandlers(router: Hono<{ Bindings: Env }>): void {
           if (!rawSessionId.startsWith(prefix)) {
             continue;
           }
-        } else if (rawSessionId.includes('::')) {
+        } else if (rawSessionId.includes('::') && !rawSessionId.startsWith('default::')) {
           continue;
         }
         const displaySessionId = prefix && rawSessionId.startsWith(prefix)
           ? rawSessionId.slice(prefix.length)
-          : rawSessionId;
+          : rawSessionId.startsWith('default::')
+            ? rawSessionId.slice('default::'.length)
+            : rawSessionId;
         try {
           const parsed = JSON.parse(row.cart || (row as { raw?: string }).raw || '{}') as {
             items?: Array<Record<string, unknown>>;
@@ -102,23 +113,31 @@ export function registerCartHandlers(router: Hono<{ Bindings: Env }>): void {
 
   // ── GET /cart/:sessionId ─────────────────────────────────────────────────────
   router.get('/cart/:sessionId', async (c) => {
+    if (hasForbiddenTenantOverride(c as unknown as Parameters<typeof hasForbiddenTenantOverride>[0])) {
+      return c.json({ success: false, error: 'Cross-tenant access denied' }, 403);
+    }
     const { sessionId } = c.req.param();
     if (!DINDIN_SESSION_ID_RE.test(sessionId)) {
       return errorResponse(c as DindinContext, err('D07', 400, 'sessionId không hợp lệ'));
     }
-    const tenantId = getTenantId(c as unknown as Parameters<typeof getTenantId>[0]);
+    const tenantId = resolveDinDinTenant(c as unknown as Parameters<typeof resolveDinDinTenant>[0]);
     const cart = (await readCartRD(c.env, sessionId, tenantId)) ?? emptyCart();
     return c.json({ success: true, data: { sessionId, ...cart }, cart: { sessionId, ...cart } });
   });
 
-  // ── PATCH /cart/:sessionId ───────────────────────────────────────────────────
-  router.patch('/cart/:sessionId', async (c) => {
-    const { sessionId } = c.req.param();
-    if (!DINDIN_SESSION_ID_RE.test(sessionId)) {
+  // ── PATCH /cart/:sessionId & POST /cart ──────────────────────────────────────
+  const handleUpsertCart = async (c: DindinContext) => {
+    if (hasForbiddenTenantOverride(c as unknown as Parameters<typeof hasForbiddenTenantOverride>[0])) {
+      return c.json({ success: false, error: 'Cross-tenant access denied' }, 403);
+    }
+    const paramSessionId = c.req.param('sessionId');
+    if (paramSessionId && !DINDIN_SESSION_ID_RE.test(paramSessionId)) {
       return errorResponse(c as DindinContext, err('D07', 400, 'sessionId không hợp lệ'));
     }
-    const tenantId = getTenantId(c as unknown as Parameters<typeof getTenantId>[0]);
+    const tenantId = resolveDinDinTenant(c as unknown as Parameters<typeof resolveDinDinTenant>[0]);
     const body = await c.req.json<{
+      sessionId?: string;
+      session_id?: string;
       action?: 'add' | 'remove' | 'update';
       op?: 'add' | 'remove' | 'update';
       itemId?: string;
@@ -140,6 +159,10 @@ export function registerCartHandlers(router: Hono<{ Bindings: Env }>): void {
         quantity?: number;
       };
     }>();
+    const sessionId = String(paramSessionId || body.sessionId || body.session_id || '').trim();
+    if (!DINDIN_SESSION_ID_RE.test(sessionId)) {
+      return errorResponse(c as DindinContext, err('D07', 400, 'sessionId không hợp lệ'));
+    }
     const action = body.action ?? body.op;
     const cart = (await readCartRD(c.env, sessionId, tenantId)) ?? emptyCart();
 
@@ -273,5 +296,9 @@ export function registerCartHandlers(router: Hono<{ Bindings: Env }>): void {
 
     await writeCart(c.env, sessionId, cart, tenantId);
     return c.json({ success: true, data: { sessionId, ...cart }, cart: { sessionId, ...cart } });
-  });
+  };
+
+  router.patch('/cart/:sessionId', handleUpsertCart);
+  router.post('/cart/:sessionId', handleUpsertCart);
+  router.post('/cart', handleUpsertCart);
 }

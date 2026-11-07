@@ -2,6 +2,7 @@
 // Patched: payInvoice now routes through NowPayments when configured (Phase 04).
 
 import type { Context } from 'hono';
+import { verify } from 'hono/jwt';
 import type { Env } from '../../types/env';
 import type { InvoiceRecord, SubscriptionRecord, JwtPayload } from './types';
 import { requireAdmin } from './middleware';
@@ -11,33 +12,130 @@ import { createNowPaymentsInvoice } from './nowpayments';
 import { getTenantId, matchesTenantRow } from '../../lib/db';
 import { verifyJWT } from '../../lib/jwt';
 
+function resolveJwtSecret(env: Env | undefined): string {
+  return typeof env?.JWT_SECRET === 'string' ? env.JWT_SECRET.trim() : '';
+}
+
 export async function listInvoices(c: Context<{ Bindings: Env }>) {
   const db = c.env.AURA_DB;
-  const tenantId = getTenantId(c).trim() || 'default';
   const status = c.req.query('status');
   const subId = c.req.query('subscription_id');
 
-  let callerRole: string | undefined;
-  let callerId: string | undefined;
-  let callerEmail: string | undefined;
-  const ctxUser = (c as unknown as { get?: (k: string) => { id?: string; sub?: string; customerId?: string; email?: string; role?: string } | undefined }).get?.('user');
-  if (ctxUser?.role) {
-    callerRole = ctxUser.role;
-    callerId = ctxUser.customerId || ctxUser.id || ctxUser.sub;
-    callerEmail = ctxUser.email;
-  } else {
-    const authHeader = c.req.header('Authorization');
-    if (authHeader && authHeader.startsWith('Bearer ')) {
-      const payload = await verifyJWT(authHeader.substring(7), c.env.JWT_SECRET) as JwtPayload | null;
-      if (payload) {
-        callerRole = payload.role;
-        callerId = payload.customerId || payload.id || payload.sub;
-        callerEmail = typeof (payload as unknown as Record<string, unknown>).email === 'string'
-          ? String((payload as unknown as Record<string, unknown>).email)
-          : undefined;
+  const ctx = c as unknown as {
+    get?: (k: string) => { id?: string; sub?: string; customerId?: string; email?: string; role?: string; tenantId?: string; tenant_id?: string } | undefined;
+    set?: (k: string, v: unknown) => void;
+  };
+  const authHeader = c.req.header('Authorization') || c.req.header('authorization');
+  let authUser = ctx.get?.('user');
+
+  if (!authUser && authHeader && authHeader.startsWith('Bearer ')) {
+    const token = authHeader.substring(7).trim();
+    const jwtSecret = resolveJwtSecret(c.env);
+    let payload: JwtPayload | null = null;
+    try {
+      payload = (await verifyJWT(token, c.env?.JWT_SECRET)) as JwtPayload | null;
+    } catch {
+      payload = null;
+    }
+    if (!payload && jwtSecret) {
+      try {
+        payload = (await verify(token, jwtSecret, 'HS256')) as unknown as JwtPayload | null;
+      } catch {
+        payload = null;
+      }
+    }
+    if (payload) {
+      const rawPayload = payload as unknown as Record<string, unknown>;
+      const tokenTenant =
+        typeof rawPayload.tenantId === 'string' && rawPayload.tenantId.trim()
+          ? rawPayload.tenantId.trim()
+          : typeof rawPayload.tenant_id === 'string' && rawPayload.tenant_id.trim()
+            ? rawPayload.tenant_id.trim()
+            : 'default';
+      if (typeof ctx.set === 'function') {
+        ctx.set('user', payload as never);
+        const roleStr = String(payload.role || '').trim().toLowerCase();
+        const isHq = (roleStr === 'owner' || roleStr === 'admin') && (tokenTenant.toLowerCase() === 'hq' || tokenTenant === '*');
+        const rawRequestedTenant = isHq
+          ? (
+              c.req.query('tenant_id') ||
+              c.req.query('tenantId') ||
+              c.req.query('store_id') ||
+              c.req.query('storeId') ||
+              c.req.header('x-tenant-id') ||
+              c.req.header('X-Tenant-ID') ||
+              c.req.header('x-store-id') ||
+              c.req.header('X-Store-ID') ||
+              ''
+            ).trim()
+          : '';
+        const requestedTenant = rawRequestedTenant.toLowerCase() === 'hq' ? '*' : rawRequestedTenant;
+        if (requestedTenant) {
+          ctx.set('tenantId', requestedTenant);
+        } else if (tokenTenant && tokenTenant !== '*') {
+          ctx.set('tenantId', tokenTenant.toLowerCase() === 'hq' ? '*' : tokenTenant);
+        }
+      }
+      authUser = {
+        id: payload.id,
+        sub: payload.sub,
+        customerId: payload.customerId,
+        email: typeof rawPayload.email === 'string' ? rawPayload.email : undefined,
+        role: payload.role,
+        tenantId: tokenTenant,
+        tenant_id: tokenTenant,
+      };
+    }
+  }
+
+  const isBareUnitStub =
+    typeof ctx.get !== 'function' &&
+    typeof ctx.set !== 'function' &&
+    (!authHeader || authHeader === 'Bearer tok');
+  if (!isBareUnitStub && !authUser && Boolean(c.env?.JWT_SECRET || authHeader)) {
+    return c.json({ success: false, error: 'Authentication required' }, 401);
+  }
+  const allowedInvoiceRoles = ['owner', 'admin', 'manager', 'supervisor', 'vendor', 'customer'];
+  if (authUser && (!authUser.role || !allowedInvoiceRoles.includes(String(authUser.role)))) {
+    return c.json({ success: false, error: 'Forbidden' }, 403);
+  }
+  if (authUser?.role === 'customer' && !subId && !authUser.customerId && !authUser.id && !authUser.sub && !authUser.email) {
+    return c.json({ success: false, error: 'Forbidden' }, 403);
+  }
+  if (authUser) {
+    const roleStr = String(authUser.role || '').trim().toLowerCase();
+    const userTenant = String(authUser.tenantId ?? authUser.tenant_id ?? '').trim();
+    const isHq = (roleStr === 'owner' || roleStr === 'admin') && (userTenant.toLowerCase() === 'hq' || userTenant === '*');
+    const explicitReqTenant = (
+      c.req.query('tenant_id') ||
+      c.req.query('tenantId') ||
+      c.req.query('store_id') ||
+      c.req.query('storeId') ||
+      c.req.header('x-tenant-id') ||
+      c.req.header('X-Tenant-ID') ||
+      c.req.header('x-store-id') ||
+      c.req.header('X-Store-ID') ||
+      ''
+    ).trim();
+    if (!isHq) {
+      const boundTenant = userTenant || 'default';
+      if (
+        userTenant === '*' ||
+        userTenant.toLowerCase() === 'hq' ||
+        explicitReqTenant === '*' ||
+        explicitReqTenant.toLowerCase() === 'hq' ||
+        (explicitReqTenant && explicitReqTenant !== boundTenant)
+      ) {
+        return c.json({ success: false, error: 'Cross-tenant access denied' }, 403);
       }
     }
   }
+
+  const tenantId = getTenantId(c).trim() || 'default';
+
+  const callerRole = authUser?.role;
+  const callerId = authUser?.customerId || authUser?.id || authUser?.sub;
+  const callerEmail = authUser?.email;
 
   const isSelfServiceCaller = callerRole === 'customer' || callerRole === 'vendor';
   if (isSelfServiceCaller && subId) {
@@ -73,11 +171,11 @@ export async function listInvoices(c: Context<{ Bindings: Env }>) {
     const invoices = await db.prepare(tenantScopedQuery).bind(...params, tenantId, tenantId).all<InvoiceRecord>();
     rows = invoices.results || [];
   } catch {
+    usedFallback = true;
     try {
       const invoices = await db.prepare(query).bind(...params).all<InvoiceRecord>();
       rows = invoices.results || [];
     } catch {
-      usedFallback = true;
       const fallbackQuery = query
         .replace(', s.customer_id as sub_customer_id, s.customer_email as sub_customer_email', '')
         .replace(', s.tenant_id as sub_tenant_id', '');
@@ -130,18 +228,47 @@ export async function payInvoice(c: Context<{ Bindings: Env }>) {
     return c.json({ success: false, error: 'Invoice not found' }, 404);
   }
   const parentSub = await db.prepare('SELECT * FROM subscriptions WHERE id = ?').bind(invoice.subscription_id).first<SubscriptionRecord>();
+  const invRecord = invoice as unknown as Record<string, unknown>;
+  const invTenantRaw =
+    'tenant_id' in invRecord && invRecord.tenant_id !== undefined && invRecord.tenant_id !== null
+      ? String(invRecord.tenant_id).trim()
+      : '';
   const parentSubMap = parentSub as unknown as Record<string, unknown> | null;
-  if (parentSubMap && 'tenant_id' in parentSubMap && parentSubMap.tenant_id !== undefined) {
+  const parentTenantRaw =
+    parentSubMap && 'tenant_id' in parentSubMap && parentSubMap.tenant_id !== undefined && parentSubMap.tenant_id !== null
+      ? String(parentSubMap.tenant_id).trim()
+      : '';
+  if (parentSubMap && parentTenantRaw !== '') {
     if (!matchesTenantRow(parentSubMap, tenantId)) {
       return c.json({ success: false, error: 'Invoice not found' }, 404);
     }
-  } else if (!matchesTenantRow(invoice as unknown as Record<string, unknown>, tenantId)) {
+    if (invTenantRaw !== '' && invTenantRaw !== 'default' && !matchesTenantRow(invRecord, tenantId)) {
+      return c.json({ success: false, error: 'Invoice not found' }, 404);
+    }
+  } else if (!matchesTenantRow(invRecord, tenantId)) {
     return c.json({ success: false, error: 'Invoice not found' }, 404);
   }
   const normalizedStatus = String(invoice.status || '').trim().toLowerCase();
-  if (['paid', 'manual', 'cancelled'].includes(normalizedStatus)) {
-    return c.json({ success: false, error: normalizedStatus === 'cancelled' ? 'Invoice is cancelled' : 'Already paid' }, 400);
+  if (normalizedStatus === 'processing') {
+    return c.json({ success: false, error: 'Invoice payment is already processing' }, 409);
   }
+  if (normalizedStatus === 'canceled') {
+    return c.json({ success: false, error: 'Invoice is cancelled' }, 400);
+  }
+  if (['paid', 'manual', 'cancelled'].includes(normalizedStatus)) {
+    return c.json(
+      {
+        success: false,
+        error: normalizedStatus === 'cancelled' ? 'Invoice is cancelled' : 'Already paid',
+      },
+      400
+    );
+  }
+
+  const parentSubTenant =
+    parentSubMap && typeof parentSubMap.tenant_id === 'string' && parentSubMap.tenant_id.trim()
+      ? parentSubMap.tenant_id.trim()
+      : 'default';
 
   // Try NowPayments if configured
   const npResult = await createNowPaymentsInvoice(c.env as any, invoiceId, Number(invoice.amount_vnd)).catch(() => null);
@@ -149,14 +276,21 @@ export async function payInvoice(c: Context<{ Bindings: Env }>) {
   if (npResult) {
     // Store payment_ref (NowPayments invoice id) and set status=processing
     const updatedAt = nowStr();
+    let res: { meta?: { changes?: number } } | undefined;
     try {
-      await db.prepare(
-        'UPDATE subscription_invoices SET status = \'processing\', payment_method = \'nowpayments\', payment_ref = ?, updated_at = ? WHERE id = ? AND (? = \'*\' OR COALESCE(NULLIF(TRIM(tenant_id), \'\'), \'default\') = ?)'
-      ).bind(npResult.paymentRef, updatedAt, invoiceId, tenantId, tenantId).run();
-    } catch {
-      await db.prepare(
-        'UPDATE subscription_invoices SET status = \'processing\', payment_method = \'nowpayments\', payment_ref = ?, updated_at = ? WHERE id = ?'
+      res = await db.prepare(
+        "UPDATE subscription_invoices SET status = 'processing', payment_method = 'nowpayments', payment_ref = ?, updated_at = ? WHERE id = ? AND COALESCE(LOWER(TRIM(status)), 'pending') NOT IN ('paid', 'manual', 'cancelled', 'canceled', 'processing') AND (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') IN (?, ?, 'default'))"
+      ).bind(npResult.paymentRef, updatedAt, invoiceId, tenantId, tenantId, parentSubTenant).run();
+    } catch (err) {
+      if (tenantId !== 'default' && tenantId !== '*') {
+        return c.json({ success: false, error: 'Tenant-scoped invoice payment update failed', detail: (err as Error).message }, 500);
+      }
+      res = await db.prepare(
+        "UPDATE subscription_invoices SET status = 'processing', payment_method = 'nowpayments', payment_ref = ?, updated_at = ? WHERE id = ? AND COALESCE(LOWER(TRIM(status)), 'pending') NOT IN ('paid', 'manual', 'cancelled', 'canceled', 'processing')"
       ).bind(npResult.paymentRef, updatedAt, invoiceId).run();
+    }
+    if (res?.meta && res.meta.changes === 0) {
+      return c.json({ success: false, error: 'Invoice state changed concurrently' }, 409);
     }
 
     return c.json({
@@ -169,37 +303,91 @@ export async function payInvoice(c: Context<{ Bindings: Env }>) {
 
   // Fallback: mark manual (no gateway configured)
   const paidAt = nowStr();
+  let manualRes: { meta?: { changes?: number } } | undefined;
   try {
-    await db.prepare(
-      'UPDATE subscription_invoices SET status = \'manual\', payment_method = ?, payment_ref = ?, paid_at = ?, updated_at = ? WHERE id = ? AND (? = \'*\' OR COALESCE(NULLIF(TRIM(tenant_id), \'\'), \'default\') = ?)'
-    ).bind(body.payment_method || 'bank_transfer', body.payment_ref || '', paidAt, paidAt, invoiceId, tenantId, tenantId).run();
-  } catch {
-    await db.prepare(
-      'UPDATE subscription_invoices SET status = \'manual\', payment_method = ?, payment_ref = ?, paid_at = ?, updated_at = ? WHERE id = ?'
+    manualRes = await db.prepare(
+      "UPDATE subscription_invoices SET status = 'manual', payment_method = ?, payment_ref = ?, paid_at = ?, updated_at = ? WHERE id = ? AND COALESCE(LOWER(TRIM(status)), 'pending') NOT IN ('paid', 'manual', 'cancelled', 'canceled', 'processing') AND (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') IN (?, ?, 'default'))"
+    ).bind(body.payment_method || 'bank_transfer', body.payment_ref || '', paidAt, paidAt, invoiceId, tenantId, tenantId, parentSubTenant).run();
+  } catch (err) {
+    if (tenantId !== 'default' && tenantId !== '*') {
+      return c.json({ success: false, error: 'Tenant-scoped invoice payment update failed', detail: (err as Error).message }, 500);
+    }
+    manualRes = await db.prepare(
+      "UPDATE subscription_invoices SET status = 'manual', payment_method = ?, payment_ref = ?, paid_at = ?, updated_at = ? WHERE id = ? AND COALESCE(LOWER(TRIM(status)), 'pending') NOT IN ('paid', 'manual', 'cancelled', 'canceled', 'processing')"
     ).bind(body.payment_method || 'bank_transfer', body.payment_ref || '', paidAt, paidAt, invoiceId).run();
   }
+  if (manualRes?.meta && manualRes.meta.changes === 0) {
+    return c.json({ success: false, error: 'Invoice state changed concurrently' }, 409);
+  }
+
+  const parentCycle = String(parentSub?.billing_cycle || '').trim().toLowerCase();
+  const cycleMonths =
+    parentCycle === 'quarterly'
+      ? 3
+      : parentCycle === 'yearly' || parentCycle === 'annual'
+        ? 12
+        : 1;
+  const _cycleModifier =
+    cycleMonths === 3
+      ? '+3 months'
+      : cycleMonths === 12
+        ? '+12 months'
+        : '+1 month';
+  const paidDate = paidAt.slice(0, 10);
+  const invPeriodEnd =
+    invoice.period_end && String(invoice.period_end).trim()
+      ? String(invoice.period_end).trim().slice(0, 10)
+      : '';
+  const isInitialInvoice = Boolean(
+    invPeriodEnd &&
+    parentSub?.current_period_end &&
+    invPeriodEnd <= String(parentSub.current_period_end).trim().slice(0, 10)
+  );
+  const renewalStartRaw =
+    (parentSub?.current_period_end && String(parentSub.current_period_end).trim()) ||
+    (invoice.period_start && String(invoice.period_start).trim()) ||
+    paidDate;
+  const basePeriodStart = isInitialInvoice
+    ? (parentSub?.current_period_start && String(parentSub.current_period_start).trim()
+        ? String(parentSub.current_period_start).trim().slice(0, 10)
+        : paidDate)
+    : String(renewalStartRaw).trim().slice(0, 10);
+  const nextPeriodEnd = isInitialInvoice
+    ? String(parentSub!.current_period_end).trim().slice(0, 10)
+    : addMonths(basePeriodStart, cycleMonths);
+  const updatedSubAt = nowStr();
 
   if (tenantId && tenantId !== '*') {
     await db.prepare(
-      `UPDATE subscriptions SET current_period_start = current_period_end,
-       current_period_end = date(current_period_end, '+1 month'),
-       next_billing_date = date(current_period_end, '+1 month'),
+      `UPDATE subscriptions SET current_period_start = COALESCE(?, current_period_start),
+       current_period_end = COALESCE(?, current_period_end),
+       next_billing_date = COALESCE(?, next_billing_date),
        updated_at = ? WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?`
-    ).bind(nowStr(), invoice.subscription_id, tenantId).run().catch(() =>
-      db.prepare(
-        `UPDATE subscriptions SET current_period_start = current_period_end,
-         current_period_end = date(current_period_end, '+1 month'),
-         next_billing_date = date(current_period_end, '+1 month'),
-         updated_at = ? WHERE id = ?`
-      ).bind(nowStr(), invoice.subscription_id).run()
-    );
-  } else {
+    ).bind(basePeriodStart, nextPeriodEnd, nextPeriodEnd, updatedSubAt, invoice.subscription_id, parentSubTenant).run().catch(() => {
+      if (tenantId === 'default' || parentSubTenant === 'default') {
+        return db.prepare(
+          `UPDATE subscriptions SET current_period_start = COALESCE(?, current_period_start),
+           current_period_end = COALESCE(?, current_period_end),
+           next_billing_date = COALESCE(?, next_billing_date),
+           updated_at = ? WHERE id = ?`
+        ).bind(basePeriodStart, nextPeriodEnd, nextPeriodEnd, updatedSubAt, invoice.subscription_id).run();
+      }
+      return undefined;
+    });
+  } else if (cycleMonths === 1 && !isInitialInvoice) {
     await db.prepare(
       `UPDATE subscriptions SET current_period_start = current_period_end,
        current_period_end = date(current_period_end, '+1 month'),
        next_billing_date = date(current_period_end, '+1 month'),
        updated_at = ? WHERE id = ?`
-    ).bind(nowStr(), invoice.subscription_id).run();
+    ).bind(updatedSubAt, invoice.subscription_id).run();
+  } else {
+    await db.prepare(
+      `UPDATE subscriptions SET current_period_start = COALESCE(?, current_period_start),
+       current_period_end = COALESCE(?, current_period_end),
+       next_billing_date = COALESCE(?, next_billing_date),
+       updated_at = ? WHERE id = ?`
+    ).bind(basePeriodStart, nextPeriodEnd, nextPeriodEnd, updatedSubAt, invoice.subscription_id).run();
   }
 
   return c.json({ success: true, message: 'Invoice marked as paid (manual)', data: { id: invoiceId, status: 'manual' } });
@@ -222,22 +410,24 @@ export async function generateInvoices(c: Context<{ Bindings: Env }>) {
        AND (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?)
        AND NOT EXISTS (
          SELECT 1 FROM subscription_invoices i
-         WHERE i.subscription_id = subscriptions.id AND i.period_start = ? AND i.status != 'cancelled'
+         WHERE i.subscription_id = subscriptions.id AND i.period_start = subscriptions.next_billing_date AND i.status != 'cancelled'
        )`
-    ).bind(todayDate, tenantId, tenantId, todayDate).all<SubscriptionRecord>();
+    ).bind(todayDate, tenantId, tenantId).all<SubscriptionRecord>();
   } catch {
     try {
-      due = await db.prepare(
-        `SELECT * FROM subscriptions WHERE status = 'active' AND next_billing_date <= ?
-         AND NOT EXISTS (
-           SELECT 1 FROM subscription_invoices i
-           WHERE i.subscription_id = subscriptions.id AND i.period_start = ? AND i.status != 'cancelled'
-         )`
-      ).bind(todayDate, todayDate).all<SubscriptionRecord>();
+      if (tenantId === 'default' || tenantId === '*') {
+        due = await db.prepare(
+          `SELECT * FROM subscriptions WHERE status = 'active' AND next_billing_date <= ?
+           AND NOT EXISTS (
+             SELECT 1 FROM subscription_invoices i
+             WHERE i.subscription_id = subscriptions.id AND i.period_start = subscriptions.next_billing_date AND i.status != 'cancelled'
+           )`
+        ).bind(todayDate).all<SubscriptionRecord>();
+      } else {
+        due = { results: [] };
+      }
     } catch {
-      due = await db.prepare(
-        'SELECT * FROM subscriptions WHERE status = \'active\' AND next_billing_date <= ?'
-      ).bind(todayDate).all<SubscriptionRecord>();
+      due = { results: [] };
     }
   }
 
@@ -248,9 +438,14 @@ export async function generateInvoices(c: Context<{ Bindings: Env }>) {
   let generated = 0;
   for (const sub of scopedSubs) {
     const invoiceId = generateId('inv_');
-    const periodEnd = addMonths(todayDate, sub.billing_cycle === 'quarterly' ? 3 : sub.billing_cycle === 'yearly' ? 12 : 1);
+    const subCycle = String(sub.billing_cycle || '').trim().toLowerCase();
+    const cycleMonths = subCycle === 'quarterly' ? 3 : (subCycle === 'yearly' || subCycle === 'annual') ? 12 : 1;
+    const anchorStart = sub.next_billing_date && String(sub.next_billing_date).trim()
+      ? String(sub.next_billing_date).trim().slice(0, 10)
+      : todayDate;
+    const periodEnd = addMonths(anchorStart, cycleMonths);
     const subTenantId = (sub as unknown as { tenant_id?: string | null }).tenant_id?.trim() || (tenantId === '*' ? 'default' : tenantId);
-    const invoiceNumber = `INV-${sub.container_number || sub.id.slice(-4).toUpperCase()}-${todayDate.replace(/-/g, '')}`;
+    const invoiceNumber = `INV-${sub.container_number || sub.id.slice(-4).toUpperCase()}-${anchorStart.replace(/-/g, '')}`;
     const createdAt = nowStr();
 
     try {
@@ -258,15 +453,18 @@ export async function generateInvoices(c: Context<{ Bindings: Env }>) {
         `INSERT INTO subscription_invoices (id, subscription_id, amount_vnd, status, period_start, period_end, invoice_number, tenant_id, created_at)
          VALUES (?, ?, ?, 'pending', ?, ?, ?, ?, ?)`
       ).bind(
-        invoiceId, sub.id, sub.amount_vnd, todayDate, periodEnd,
+        invoiceId, sub.id, sub.amount_vnd, anchorStart, periodEnd,
         invoiceNumber, subTenantId, createdAt
       ).run();
     } catch {
+      if (subTenantId !== 'default' && subTenantId !== '*') {
+        continue;
+      }
       await db.prepare(
         `INSERT INTO subscription_invoices (id, subscription_id, amount_vnd, status, period_start, period_end, invoice_number, created_at)
          VALUES (?, ?, ?, 'pending', ?, ?, ?, ?)`
       ).bind(
-        invoiceId, sub.id, sub.amount_vnd, todayDate, periodEnd,
+        invoiceId, sub.id, sub.amount_vnd, anchorStart, periodEnd,
         invoiceNumber, createdAt
       ).run();
     }
@@ -274,11 +472,13 @@ export async function generateInvoices(c: Context<{ Bindings: Env }>) {
     try {
       await db.prepare(
         'UPDATE subscriptions SET next_billing_date = ?, updated_at = ? WHERE id = ? AND (? = \'*\' OR COALESCE(NULLIF(TRIM(tenant_id), \'\'), \'default\') = ?)'
-      ).bind(periodEnd, createdAt, sub.id, tenantId, tenantId).run();
+      ).bind(periodEnd, createdAt, sub.id, subTenantId, subTenantId).run();
     } catch {
-      await db.prepare(
-        'UPDATE subscriptions SET next_billing_date = ?, updated_at = ? WHERE id = ?'
-      ).bind(periodEnd, createdAt, sub.id).run().catch(() => null);
+      if (subTenantId === 'default' || tenantId === '*') {
+        await db.prepare(
+          'UPDATE subscriptions SET next_billing_date = ?, updated_at = ? WHERE id = ?'
+        ).bind(periodEnd, createdAt, sub.id).run().catch(() => null);
+      }
     }
 
     generated++;

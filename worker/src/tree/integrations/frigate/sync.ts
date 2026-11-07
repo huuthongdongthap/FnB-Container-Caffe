@@ -39,7 +39,8 @@ export function matchesFrigateTenant(
   tenantId?: string
 ): boolean {
   if (!row) return false;
-  const clean = tenantId ? tenantId.trim() : '';
+  const raw = tenantId ? tenantId.trim() : '';
+  const clean = raw.toLowerCase() === 'hq' ? '*' : raw;
   if (!clean || clean === '*') return true;
   return matchesTenantRow(row, clean);
 }
@@ -71,7 +72,7 @@ export async function syncFrigateEvents(
 
       let persisted = 0;
       const rawTenant = opts?.tenantId ? opts.tenantId.trim() : '';
-      const effectiveTenant = rawTenant && rawTenant !== '*' ? rawTenant : 'default';
+      const effectiveTenant = rawTenant && rawTenant !== '*' && rawTenant.toLowerCase() !== 'hq' ? rawTenant : 'default';
       for (const evt of events) {
         try {
           await db
@@ -176,7 +177,8 @@ export async function getFrigateEvents(
   binds.push(limit);
 
   let rows: { results?: FrigateEventRow[] };
-  const cleanTenant = opts?.tenantId ? opts.tenantId.trim() : '';
+  const rawCleanTenant = opts?.tenantId ? opts.tenantId.trim() : '';
+  const cleanTenant = rawCleanTenant.toLowerCase() === 'hq' ? '*' : rawCleanTenant;
   try {
     let tenantSql = sql.replace(
       'SELECT id, camera, label, start_time, end_time, score, payload, received_at FROM frigate_events',

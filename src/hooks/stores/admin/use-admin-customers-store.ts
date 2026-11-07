@@ -43,9 +43,10 @@ function normalizeCustomer(raw: Record<string, unknown>): AdminCustomer {
   };
 }
 
+let latestFetchCustomersSeq = 0;
+
 export const useAdminCustomersStore = create<AdminCustomersState>((set, get) => {
   const createKey = createSubmissionKey();
-  let readVersion = 0;
   let mutationVersion = 0;
   const mutate = async (entity: string, request: () => Promise<unknown>, apply: (body: unknown) => void) => {
     if (get().pending[entity]) return false;
@@ -70,7 +71,7 @@ export const useAdminCustomersStore = create<AdminCustomersState>((set, get) => 
   return {
     customers: [], totalCount: 0, pagination: null, loading: false, pending: {}, error: null,
     fetchCustomers: async (page = 1, search, tier) => {
-      const read = ++readVersion;
+      const seq = ++latestFetchCustomersSeq;
       const mutation = mutationVersion;
       const session = submissionSession();
       set({ loading: true, error: null });
@@ -79,7 +80,7 @@ export const useAdminCustomersStore = create<AdminCustomersState>((set, get) => 
         if (search) params.set('search', search);
         if (tier) params.set('tier', tier);
         const body = await apiFetch<any>(`/api/admin/customers?${params}`);
-        if (session !== submissionSession() || read !== readVersion || mutation !== mutationVersion || Object.values(get().pending).some(Boolean)) return;
+        if (session !== submissionSession() || seq !== latestFetchCustomersSeq || mutation !== mutationVersion || Object.values(get().pending).some(Boolean)) return;
         const rawList = body?.data ?? body?.customers;
         if (body?.success === false || !Array.isArray(rawList)) throw new Error('Không thể tải danh sách khách hàng. Vui lòng thử lại.');
         const pagination = body.pagination ? {
@@ -90,9 +91,9 @@ export const useAdminCustomersStore = create<AdminCustomersState>((set, get) => 
         set({ customers: rawList.map(normalizeCustomer), totalCount: pagination?.total ?? body.totalCount ?? rawList.length,
           pagination, loading: false, error: null });
       } catch (error) {
-        if (session === submissionSession() && read === readVersion && mutation === mutationVersion) set({ loading: false, error: submissionError(error) });
+        if (session === submissionSession() && seq === latestFetchCustomersSeq && mutation === mutationVersion) set({ loading: false, error: submissionError(error) });
       } finally {
-        if (session === submissionSession() && read === readVersion) set({ loading: false });
+        if (session === submissionSession() && seq === latestFetchCustomersSeq) set({ loading: false });
       }
     },
     addCustomer: async (data, requestKey) => mutate('create', () => apiFetch('/api/admin/customers', {

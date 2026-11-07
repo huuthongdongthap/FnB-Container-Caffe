@@ -38,27 +38,31 @@ export function segmentSQL(segment: string, tenantId?: string): { sql: string; p
       sql: `SELECT DISTINCT c.id, c.name, c.phone, c.email, c.tenant_id
               FROM customers c
               INNER JOIN orders o ON o.customer_phone = c.phone
+                AND COALESCE(NULLIF(TRIM(o.tenant_id), ''), 'default') = COALESCE(NULLIF(TRIM(c.tenant_id), ''), 'default')
               WHERE o.created_at >= datetime('now', '-30 days')`
     };
   case 'inactive_90d':
     if (scopedTenant) {
       return {
-        sql: `SELECT id, name, phone, email, tenant_id FROM customers
+        sql: `SELECT id, name, phone, email, tenant_id FROM customers c
               WHERE phone NOT IN (
-                SELECT DISTINCT customer_phone FROM orders
+                SELECT DISTINCT customer_phone FROM orders o
                 WHERE customer_phone IS NOT NULL
                   AND created_at >= datetime('now', '-90 days')
-                  AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?
-              ) AND phone IS NOT NULL`,
+                  AND COALESCE(NULLIF(TRIM(o.tenant_id), ''), 'default') = COALESCE(NULLIF(TRIM(c.tenant_id), ''), 'default')
+              ) AND phone IS NOT NULL
+                AND COALESCE(NULLIF(TRIM(c.tenant_id), ''), 'default') = ?
+                AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?1`,
         params: [scopedTenant]
       };
     }
     return {
-      sql: `SELECT id, name, phone, email, tenant_id FROM customers
+      sql: `SELECT id, name, phone, email, tenant_id FROM customers c
               WHERE phone NOT IN (
-                SELECT DISTINCT customer_phone FROM orders
+                SELECT DISTINCT customer_phone FROM orders o
                 WHERE customer_phone IS NOT NULL
                   AND created_at >= datetime('now', '-90 days')
+                  AND COALESCE(NULLIF(TRIM(o.tenant_id), ''), 'default') = COALESCE(NULLIF(TRIM(c.tenant_id), ''), 'default')
               ) AND phone IS NOT NULL`
     };
   case 'birthday_this_month': {

@@ -1,12 +1,40 @@
 import type { OpenAPIHono } from '@hono/zod-openapi';
 import { CategoryRoutes } from '@aura/domain-catalog';
 import type { Env } from '../../types/env';
-import { formatCategory, matchesCatalogTenant, resolveCatalogTenantId, type CategoryRow } from './helpers';
+import {
+  FORBIDDEN_TENANT_SENTINEL,
+  formatCategory,
+  matchesCatalogTenant,
+  resolveCatalogTenantId,
+  type CategoryRow,
+} from './helpers';
 import { getDatabase } from '../../lib/db';
+import { getTenantId, isHQSuperAdmin } from '../../middleware/tenant';
+
+function verifyCategoryReadTenant(c: any): { ok: true; tenantId: string } | { ok: false; status: 403; error: string } {
+  const resolved = resolveCatalogTenantId(c);
+  if (resolved === FORBIDDEN_TENANT_SENTINEL) {
+    return { ok: false, status: 403, error: 'Cross-tenant category read denied' };
+  }
+  const user = c.get('user') as { id?: string; role?: string; tenant_id?: string; tenantId?: string } | undefined;
+  if (user && !isHQSuperAdmin(c)) {
+    const userTenant = (user.tenant_id || user.tenantId || '').trim() || 'default';
+    const ctxTenant = getTenantId(c).trim() || 'default';
+    if (ctxTenant === '*' || ctxTenant.toLowerCase() === 'hq' || ctxTenant !== userTenant) {
+      return { ok: false, status: 403, error: 'Cross-tenant category read denied' };
+    }
+    return { ok: true, tenantId: userTenant };
+  }
+  return { ok: true, tenantId: resolved };
+}
 
 export function registerCategoryReadHandlers(router: OpenAPIHono<{ Bindings: Env }>): void {
   // GET /api/categories - List categories with pagination
   router.openapi(CategoryRoutes.list as any, async (c: any) => {
+    const tenantCheck = verifyCategoryReadTenant(c);
+    if (!tenantCheck.ok) {
+      return c.json({ success: false, error: tenantCheck.error }, tenantCheck.status);
+    }
     const db = getDatabase(c);
     const query = c.req.valid('query' as never) as {
       page?: number;
@@ -36,7 +64,7 @@ export function registerCategoryReadHandlers(router: OpenAPIHono<{ Bindings: Env
       params.push(`%${search}%`, `%${search}%`);
     }
 
-    const tenantId = resolveCatalogTenantId(c);
+    const tenantId = tenantCheck.tenantId;
     const safePage = Number.isFinite(Number(page)) && Number(page) >= 1 ? Math.floor(Number(page)) : 1;
     const safeLimit = Number.isFinite(Number(limit)) && Number(limit) >= 1 ? Math.min(Math.floor(Number(limit)), 100) : 20;
 
@@ -71,8 +99,12 @@ export function registerCategoryReadHandlers(router: OpenAPIHono<{ Bindings: Env
 
   // GET /api/categories/tree - Get category tree
   router.openapi(CategoryRoutes.tree as any, async (c: any) => {
+    const tenantCheck = verifyCategoryReadTenant(c);
+    if (!tenantCheck.ok) {
+      return c.json({ success: false, error: tenantCheck.error }, tenantCheck.status);
+    }
     const db = getDatabase(c);
-    const tenantId = resolveCatalogTenantId(c);
+    const tenantId = tenantCheck.tenantId;
     const query = c.req.valid('query' as never) as {
       locale?: string;
       locationId?: string;
@@ -100,8 +132,12 @@ export function registerCategoryReadHandlers(router: OpenAPIHono<{ Bindings: Env
 
   // GET /api/categories/:id - Get category by ID
   router.openapi(CategoryRoutes.get as any, async (c: any) => {
+    const tenantCheck = verifyCategoryReadTenant(c);
+    if (!tenantCheck.ok) {
+      return c.json({ success: false, error: tenantCheck.error }, tenantCheck.status);
+    }
     const db = getDatabase(c);
-    const tenantId = resolveCatalogTenantId(c);
+    const tenantId = tenantCheck.tenantId;
     const { id } = c.req.valid('param' as never) as { id: string };
     const locale = c.req.query('locale') || 'vi';
 

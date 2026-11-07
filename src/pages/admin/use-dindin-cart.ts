@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { DinDinCart } from './dindin-cart-types';
 import { apiFetch } from '@/lib/api-client';
+import { isSameSessionSnapshot, readSessionSnapshot, subscribeSessionChange } from '@/lib/client-session';
 
 export function useDinDinCart() {
   const { t } = useTranslation('admin');
@@ -17,25 +18,32 @@ export function useDinDinCart() {
   const [itemQty, setItemQty] = useState(1);
 
   const loadAll = useCallback(async () => {
+    const snap = readSessionSnapshot();
     setLoading(true);
     setError(null);
     try {
       const raw = await apiFetch<DinDinCart[] | { data?: DinDinCart[]; carts?: DinDinCart[] }>('/api/admin/dindin/carts');
+      if (!isSameSessionSnapshot(snap, readSessionSnapshot())) return;
       const list = Array.isArray(raw) ? raw : raw?.data ?? raw?.carts ?? [];
       setCarts(Array.isArray(list) ? list : []);
     } catch (err) {
+      if (!isSameSessionSnapshot(snap, readSessionSnapshot())) return;
       setError(err instanceof Error ? err.message : 'Lỗi');
     } finally {
-      setLoading(false);
+      if (isSameSessionSnapshot(snap, readSessionSnapshot())) {
+        setLoading(false);
+      }
     }
   }, [t]);
 
   const loadOne = useCallback(async (sessionId: string) => {
+    const snap = readSessionSnapshot();
     setLoading(true);
     setError(null);
     setD02Alert(null);
     try {
       const raw = await apiFetch<DinDinCart & { data?: DinDinCart; cart?: DinDinCart }>(`/api/admin/dindin/cart/${encodeURIComponent(sessionId)}`);
+      if (!isSameSessionSnapshot(snap, readSessionSnapshot())) return;
       const unwrapped = raw?.data ?? raw?.cart ?? raw;
       setActiveCart({
         sessionId: unwrapped?.sessionId || sessionId,
@@ -45,17 +53,34 @@ export function useDinDinCart() {
       });
       setSessionInput(sessionId);
     } catch (err) {
+      if (!isSameSessionSnapshot(snap, readSessionSnapshot())) return;
       setError(err instanceof Error ? err.message : 'Lỗi');
       setActiveCart(null);
     } finally {
-      setLoading(false);
+      if (isSameSessionSnapshot(snap, readSessionSnapshot())) {
+        setLoading(false);
+      }
     }
   }, [t]);
 
-  useEffect(() => { void loadAll(); }, [loadAll]);
+  useEffect(() => {
+    void loadAll();
+    return subscribeSessionChange(() => {
+      setCarts([]);
+      setActiveCart(null);
+      setError(null);
+      setMessage(null);
+      setSessionInput('');
+      setD02Alert(null);
+      setItemId('');
+      setItemQty(1);
+      void loadAll();
+    });
+  }, [loadAll]);
 
   const patchCart = async (op: 'add' | 'remove' | 'update', overrideItemId?: string) => {
     if (!activeCart) return;
+    const snap = readSessionSnapshot();
     const targetItemId = overrideItemId ?? itemId;
     setSaving(true);
     setError(null);
@@ -74,6 +99,7 @@ export function useDinDinCart() {
         method: 'PATCH',
         body: JSON.stringify(body),
       })) ?? {};
+      if (!isSameSessionSnapshot(snap, readSessionSnapshot())) return;
       if ((result as { code?: string }).code === 'D01') throw new Error((result as { message?: string }).message ?? 'Giỏ hàng rỗng (D01)');
       if ((result as { code?: string }).code === 'D02') setD02Alert((result as { message?: string }).message ?? 'Sai giá / món không thuộc menu (D02)');
       if ((result as { code?: string }).code === 'D07') throw new Error((result as { message?: string }).message ?? 'Lỗi cấu trúc giỏ (D07)');
@@ -88,9 +114,12 @@ export function useDinDinCart() {
       });
       setMessage(t('dindin.cartUpdated', { defaultValue: 'Đã cập nhật giỏ hàng' }));
     } catch (err) {
+      if (!isSameSessionSnapshot(snap, readSessionSnapshot())) return;
       setError(err instanceof Error ? err.message : 'Lỗi');
     } finally {
-      setSaving(false);
+      if (isSameSessionSnapshot(snap, readSessionSnapshot())) {
+        setSaving(false);
+      }
     }
   };
 

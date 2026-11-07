@@ -52,13 +52,80 @@ async function sendTelegram(
   });
 }
 
+function extractCronAdminTenantOverride(c: {
+  req: { query: (_k: string) => string | undefined; header: (_k: string) => string | undefined };
+}): string {
+  const candidates = [
+    c.req.query('tenant_id'),
+    c.req.query('tenantId'),
+    c.req.query('store_id'),
+    c.req.query('storeId'),
+    c.req.header('X-Tenant-ID'),
+    c.req.header('x-tenant-id'),
+    c.req.header('X-Store-ID'),
+    c.req.header('x-store-id'),
+  ]
+    .map((v) => (typeof v === 'string' ? v.trim() : ''))
+    .filter(Boolean);
+  if (new Set(candidates).size > 1) {
+    return '__CONFLICT__';
+  }
+  return candidates[0] || '';
+}
+
+function hasCrossTenantOverride(c: {
+  get?: (_k: string) => unknown;
+  req: { query: (_k: string) => string | undefined; header: (_k: string) => string | undefined };
+}): boolean {
+  const headerOrQueryTenant = extractCronAdminTenantOverride(c);
+  if (headerOrQueryTenant === '__CONFLICT__') return true;
+  const user = (typeof c.get === 'function' ? c.get('user') : undefined) as
+    | { id?: string; role?: string; tenantId?: string; tenant_id?: string }
+    | undefined;
+  if (!user) return false;
+  const userTenant = (user.tenantId ?? user.tenant_id ?? '').trim();
+  const isOwnerOrAdmin = user.role === 'owner' || user.role === 'admin';
+  const isStrictHq =
+    isOwnerOrAdmin && (userTenant.toLowerCase() === 'hq' || userTenant === '*' || user.id === 'own-hq');
+  if (isStrictHq) return false;
+  if (userTenant === '*' || userTenant.toLowerCase() === 'hq') return true;
+  if (!headerOrQueryTenant) return false;
+  if (headerOrQueryTenant === '*' || headerOrQueryTenant.toLowerCase() === 'hq') return true;
+  if (isOwnerOrAdmin && !userTenant) return false;
+  const boundTenant = userTenant || 'default';
+  return headerOrQueryTenant !== boundTenant;
+}
+
+function resolveCronAdminTenant(c: {
+  get?: (_k: string) => unknown;
+  req: { query: (_k: string) => string | undefined; header: (_k: string) => string | undefined };
+}): string {
+  const user = (typeof c.get === 'function' ? c.get('user') : undefined) as
+    | { id?: string; role?: string; tenantId?: string; tenant_id?: string }
+    | undefined;
+  const userTenant = (user?.tenantId ?? user?.tenant_id ?? '').trim();
+  const isStrictHq =
+    (user?.role === 'owner' || user?.role === 'admin') &&
+    (userTenant.toLowerCase() === 'hq' || userTenant === '*');
+  const headerOrQueryTenant = extractCronAdminTenantOverride(c);
+  const raw =
+    (headerOrQueryTenant && headerOrQueryTenant !== '__CONFLICT__' ? headerOrQueryTenant : '') ||
+    (isStrictHq ? (getTenantId(c as any) || '*') : (userTenant || getTenantId(c as any) || 'default'));
+  return raw.toLowerCase() === 'hq' ? '*' : raw;
+}
+
 export function registerCronAdminRoutes(app: Hono<{ Bindings: Env }>): void {
   // ── Cron: Alert dispatch (protected by shared secret) ──
   app.get('/cron/alerts', async(c) => {
     if (!(await checkCronSecret(c))) {
       return c.json({ error: 'Unauthorized' }, 401);
     }
-    const fired = await createAlertDispatcher(c.env.AURA_DB).dispatchAlerts((msg, sev) =>
+    const rawTenant = extractCronAdminTenantOverride(c);
+    if (rawTenant === '__CONFLICT__') {
+      return c.json({ error: 'Cross-tenant access denied' }, 403);
+    }
+    const scopedTenant = rawTenant ? (rawTenant.toLowerCase() === 'hq' ? '*' : rawTenant) : undefined;
+    const fired = await createAlertDispatcher(c.env.AURA_DB, scopedTenant).dispatchAlerts((msg, sev) =>
       sendTelegram(c.env, msg, sev)
     );
     return c.json({ fired, at: new Date().toISOString() });
@@ -76,20 +143,37 @@ export function registerCronAdminRoutes(app: Hono<{ Bindings: Env }>): void {
     if (ictHour !== 21) {
       return c.json({ skipped: true, reason: 'Not digest time', ictHour });
     }
-    await createAlertDispatcher(c.env.AURA_DB).dispatchDigest((msg) => sendTelegram(c.env, msg));
+    const rawTenant = extractCronAdminTenantOverride(c);
+    if (rawTenant === '__CONFLICT__') {
+      return c.json({ error: 'Cross-tenant access denied' }, 403);
+    }
+    const scopedTenant = rawTenant ? (rawTenant.toLowerCase() === 'hq' ? '*' : rawTenant) : undefined;
+    await createAlertDispatcher(c.env.AURA_DB, scopedTenant).dispatchDigest((msg) => sendTelegram(c.env, msg));
     return c.json({ ok: true, at: new Date().toISOString() });
   });
 
   // ── Dev: Simulate PayOS webhook + Telegram (owner/admin) ──
   app.post('/api/test/telegram-sim', requireAuth(['owner', 'admin']), audit('test_telegram_sim'), async(c) => {
     try {
+      if (hasCrossTenantOverride(c)) {
+        return c.json({ error: 'Cross-tenant access denied' }, 403);
+      }
       const body = await c.req.json<{ order_id?: string }>();
       if (!body.order_id) {
         return c.json({ error: 'Missing order_id' }, 400);
       }
-      const tenantId = getTenantId(c);
-      const order = await c.env.AURA_DB.prepare('SELECT * FROM orders WHERE id = ?')
-        .bind(body.order_id).first<Record<string, unknown>>();
+      const tenantId = resolveCronAdminTenant(c);
+      const order = await (
+        tenantId && tenantId !== '*'
+          ? c.env.AURA_DB.prepare(
+              "SELECT * FROM orders WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
+            ).bind(body.order_id, tenantId).first<Record<string, unknown>>().catch(() =>
+              tenantId === 'default'
+                ? c.env.AURA_DB.prepare('SELECT * FROM orders WHERE id = ?').bind(body.order_id).first<Record<string, unknown>>()
+                : Promise.resolve(null)
+            )
+          : c.env.AURA_DB.prepare('SELECT * FROM orders WHERE id = ?').bind(body.order_id).first<Record<string, unknown>>()
+      );
       if (!order || !matchesTenantRow(order, tenantId)) {
         return c.json({ error: 'Order not found' }, 404);
       }
@@ -104,9 +188,16 @@ export function registerCronAdminRoutes(app: Hono<{ Bindings: Env }>): void {
         payment_method: order.payment_method as string,
         notes: order.notes as string
       }).catch((e: Error) => log.error('Telegram test error:', { message: e.message }));
-      if (c.executionCtx?.waitUntil) {
-        c.executionCtx.waitUntil(tgPromise);
-      } else {
+      let waitUntilScheduled = false;
+      try {
+        if (c.executionCtx?.waitUntil) {
+          c.executionCtx.waitUntil(tgPromise);
+          waitUntilScheduled = true;
+        }
+      } catch {
+        waitUntilScheduled = false;
+      }
+      if (!waitUntilScheduled) {
         await tgPromise;
       }
       return c.json({ ok: true, message: 'Telegram sent' });
@@ -119,11 +210,14 @@ export function registerCronAdminRoutes(app: Hono<{ Bindings: Env }>): void {
   // ── Admin: Test Zalo ZNS (owner/admin) ──
   app.post('/api/test/zalo-zns', requireAuth(['owner', 'admin']), audit('test_zalo_zns'), async(c) => {
     try {
+      if (hasCrossTenantOverride(c)) {
+        return c.json({ error: 'Cross-tenant access denied' }, 403);
+      }
       const { phone, template } = await c.req.json<{ phone?: string; template?: string }>();
       if (!phone || !template) {
         return c.json({ error: 'phone and template required' }, 400);
       }
-      const tenantId = getTenantId(c);
+      const tenantId = resolveCronAdminTenant(c);
       const result = await sendZNS(c.env as unknown as Record<string, unknown>, {
         phone,
         template_key: template,
@@ -139,7 +233,10 @@ export function registerCronAdminRoutes(app: Hono<{ Bindings: Env }>): void {
 
   // ── Admin: Manual cashback expiry warning run ──
   app.post('/api/admin/zalo/send-expiry-warnings', requireAuth(['owner', 'admin', 'manager', 'supervisor']), audit('send_expiry_warnings'), async(c) => {
-    const result = await sendCashbackExpiryWarnings(c.env as unknown as Record<string, unknown>, getTenantId(c as any));
+    if (hasCrossTenantOverride(c)) {
+      return c.json({ error: 'Cross-tenant access denied' }, 403);
+    }
+    const result = await sendCashbackExpiryWarnings(c.env as unknown as Record<string, unknown>, resolveCronAdminTenant(c));
     return c.json({ ok: true, ...result });
   });
 }

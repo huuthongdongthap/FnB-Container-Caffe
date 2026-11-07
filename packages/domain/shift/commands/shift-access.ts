@@ -7,25 +7,64 @@ export class ShiftContractError extends Error {
   constructor(message: string, readonly status: 400 | 403 | 404 | 409 | 503) { super(message); }
 }
 export interface ShiftScope { env: Env; tenantId: string; actor: StaffAccount; canManage: boolean }
-export async function shiftScope(env: Env, user: AuthUser | undefined): Promise<ShiftScope> {
+
+export function extractRequestedShiftTenant(c: any): string {
+  const candidates = [
+    c?.req?.query?.('tenant_id'),
+    c?.req?.query?.('tenantId'),
+    c?.req?.query?.('store_id'),
+    c?.req?.query?.('storeId'),
+    c?.req?.header?.('X-Tenant-ID'),
+    c?.req?.header?.('x-tenant-id'),
+    c?.req?.header?.('X-Store-ID'),
+    c?.req?.header?.('x-store-id'),
+  ]
+    .map((v) => (typeof v === 'string' ? v.trim() : ''))
+    .filter(Boolean);
+  if (new Set(candidates).size > 1) {
+    return '__CONFLICT__';
+  }
+  return candidates[0] || '';
+}
+
+export const SHIFT_MANAGERS = ['owner', 'manager', 'supervisor', 'admin'];
+export const MANAGER_ROLES = SHIFT_MANAGERS;
+
+export async function shiftScope(env: Env, user: AuthUser | undefined, requestedTenant?: string): Promise<ShiftScope> {
   if (!user) throw new ShiftContractError('Staff authentication required', 403);
+  const cleanRequested = typeof requestedTenant === 'string' ? requestedTenant.trim() : '';
+  if (cleanRequested === '__CONFLICT__') {
+    throw new ShiftContractError('Cross-tenant shift access denied', 403);
+  }
   const hasExplicitPilot = env.PILOT_TENANT_ID !== undefined || env.ENVIRONMENT === 'production' || env.NODE_ENV === 'production';
   const pilotTenant = hasExplicitPilot ? resolvePilotStore(env) : undefined;
   const actor = await requireStaffAccount(env.AURA_DB, user.id);
-  const actorTenant = typeof actor.tenant_id === 'string' ? actor.tenant_id.trim() : '';
+  const rawActorTenant = typeof actor.tenant_id === 'string' ? actor.tenant_id.trim() : '';
+  const isHqAdmin = (actor.role === 'owner' || actor.role === 'admin') && (rawActorTenant.toLowerCase() === 'hq' || rawActorTenant === '*');
+  if (!isHqAdmin && cleanRequested && (cleanRequested === '*' || cleanRequested.toLowerCase() === 'hq' || cleanRequested !== rawActorTenant)) {
+    throw new ShiftContractError('Cross-tenant shift access denied', 403);
+  }
+  if (isHqAdmin) {
+    if (cleanRequested && cleanRequested !== '*' && cleanRequested.toLowerCase() !== 'hq') {
+      if (!/^[a-zA-Z0-9][a-zA-Z0-9_-]{0,99}$/.test(cleanRequested)) {
+        throw new ShiftContractError('Attendance is unavailable for this store', 403);
+      }
+      return { env, tenantId: cleanRequested, actor, canManage: true };
+    }
+    return { env, tenantId: '*', actor, canManage: true };
+  }
+  const actorTenant = rawActorTenant;
   if (
     !actorTenant ||
     actorTenant === '*' ||
-    actorTenant === 'hq' ||
+    actorTenant.toLowerCase() === 'hq' ||
     !/^[a-zA-Z0-9][a-zA-Z0-9_-]{0,99}$/.test(actorTenant) ||
     (pilotTenant !== undefined && actorTenant !== pilotTenant)
   ) {
     throw new ShiftContractError('Attendance is unavailable for this store', 403);
   }
   const tenantId = pilotTenant ?? actorTenant;
-  const allowedRoles = hasExplicitPilot
-    ? ['owner', 'manager', 'supervisor']
-    : ['owner', 'manager', 'supervisor', 'admin'];
+  const allowedRoles = hasExplicitPilot ? ['owner', 'manager', 'supervisor'] : SHIFT_MANAGERS;
   return { env, tenantId, actor, canManage: allowedRoles.includes(actor.role) };
 }
 export function managerScope(scope: ShiftScope) {
@@ -37,9 +76,10 @@ export async function shiftTarget(scope: ShiftScope, requested?: string): Promis
     throw new ShiftContractError('Only your own attendance is allowed', 403);
   }
   const account = await requireStaffAccount(scope.env.AURA_DB, id);
-  const accountTenant = (typeof account.tenant_id === 'string' ? account.tenant_id.trim() : '') || 'default';
-  if (accountTenant !== scope.tenantId) throw new ShiftContractError('Staff not found', 404);
-  return account;
+  const rawAccountTenant = typeof account.tenant_id === 'string' ? account.tenant_id.trim() : '';
+  const accountTenant = !rawAccountTenant || rawAccountTenant === '*' || rawAccountTenant.toLowerCase() === 'hq' ? 'default' : rawAccountTenant;
+  if (scope.tenantId !== '*' && accountTenant !== scope.tenantId) throw new ShiftContractError('Staff not found', 404);
+  return { ...account, tenant_id: accountTenant };
 }
 export function shiftStaffFilter(scope: ShiftScope, requested?: string): string | undefined {
   if (requested === '*' || (!scope.canManage && requested && requested !== scope.actor.id)) {

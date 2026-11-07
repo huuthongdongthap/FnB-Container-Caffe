@@ -48,15 +48,19 @@ function normalizeReservation(raw: Record<string, unknown>): AdminReservation {
   };
 }
 
+let latestFetchReservationsSeq = 0;
+
 export const useAdminReservationsStore = create<AdminReservationsState>((set, get) => ({
   reservations: [],
   loading: false,
   error: null,
 
   fetchReservations: async () => {
+    const seq = ++latestFetchReservationsSeq;
     set({ loading: true, error: null });
     try {
       const body = await apiFetch<any>('/api/reservations');
+      if (seq !== latestFetchReservationsSeq) return;
       const rawList: Array<Record<string, unknown>> = body?.reservations || body?.data || [];
       set({
         reservations: rawList.map(normalizeReservation),
@@ -64,6 +68,7 @@ export const useAdminReservationsStore = create<AdminReservationsState>((set, ge
         error: null,
       });
     } catch (err) {
+      if (seq !== latestFetchReservationsSeq) return;
       const message = err instanceof Error ? err.message : 'Lỗi kết nối';
       set({ loading: false, error: message });
     }

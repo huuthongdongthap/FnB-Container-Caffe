@@ -6,8 +6,16 @@
  */
 
 import { describe, test, expect, vi, beforeEach } from 'vitest';
+import { Hono } from 'hono';
 
-import adminMetrics from '../worker/src/routes/admin-metrics.ts';
+import rawAdminMetrics from '../worker/src/routes/admin-metrics.ts';
+
+const adminMetrics = new Hono();
+adminMetrics.use('*', async (c, next) => {
+  c.set('user' as never, { id: 'owner-1', role: 'owner', tenantId: 'default' } as never);
+  await next();
+});
+adminMetrics.route('/', rawAdminMetrics);
 
 // ── Mock D1 with programmable _metrics table ────────────────────
 function createMockD1(config: {
@@ -270,6 +278,11 @@ describe('Admin Metrics Routes', () => {
         { date: '2026-10-14', count: 42 },
         { date: '2026-10-13', count: 31 },
       ]);
+    });
+
+    test('returns 401 when requested without staff identity', async () => {
+      const res = await rawAdminMetrics.request('/', { method: 'GET' }, env);
+      expect(res.status).toBe(401);
     });
   });
 });

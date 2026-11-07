@@ -1,15 +1,99 @@
 import type { OpenAPIHono } from '@hono/zod-openapi';
 import type { Env } from '../../types/env';
 import { TableRoutes } from '../../schemas/tables';
-import { formatTable, isAllowedLocationForTenant, writeTableAuditLog } from './helpers';
+import { formatTable, isAllowedLocationForTenant, resolveOpenApiTablesTenant, writeTableAuditLog } from './helpers';
 import { getDatabase } from '../../lib/db';
-import { getTenantId, matchesTenantRow } from '../../middleware/tenant';
+import { matchesTenantRow, resolvePilotStore } from '../../middleware/tenant';
+
+async function hasUnpaidActiveOrdersOnTable(db: any, tableId: string, effectiveTableTenant: string): Promise<boolean> {
+  const isOrderRowUnpaid = (row: Record<string, unknown> | null | undefined): boolean => {
+    if (!row || typeof row !== 'object') return false;
+    const status = String(row.status ?? 'pending').trim().toLowerCase();
+    if (['completed', 'cancelled', 'canceled', 'rejected', 'failed', 'expired', 'refunded'].includes(status)) {
+      return false;
+    }
+    const payStatus = String(row.payment_status ?? 'unpaid').trim().toLowerCase();
+    if (['paid', 'completed', 'refunded', 'cancelled', 'canceled', 'failed', 'expired'].includes(payStatus)) {
+      return false;
+    }
+    return true;
+  };
+  try {
+    const res = effectiveTableTenant && effectiveTableTenant !== '*'
+      ? await db
+          .prepare(
+            "SELECT id, status, payment_status, tenant_id FROM orders WHERE table_id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ? LIMIT 10"
+          )
+          .bind(tableId, effectiveTableTenant)
+          .all()
+          .catch(() =>
+            effectiveTableTenant === 'default'
+              ? db.prepare('SELECT id, status, payment_status FROM orders WHERE table_id = ? LIMIT 10').bind(tableId).all()
+              : { results: [] }
+          )
+      : await db.prepare('SELECT id, status, payment_status, tenant_id FROM orders WHERE table_id = ? LIMIT 10').bind(tableId).all();
+    return (res?.results || []).some((r: Record<string, unknown>) => isOrderRowUnpaid(r));
+  } catch {
+    return false;
+  }
+}
+
+async function releaseTableSessionsAndOrder(db: any, tableId: string, effectiveTableTenant: string, now: string): Promise<void> {
+  try {
+    if (effectiveTableTenant && effectiveTableTenant !== '*') {
+      await db
+        .prepare("UPDATE cafe_tables SET current_order_id = NULL WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?")
+        .bind(tableId, effectiveTableTenant)
+        .run()
+        .catch(() =>
+          effectiveTableTenant === 'default'
+            ? db.prepare('UPDATE cafe_tables SET current_order_id = NULL WHERE id = ?').bind(tableId).run()
+            : undefined
+        );
+    } else {
+      await db.prepare('UPDATE cafe_tables SET current_order_id = NULL WHERE id = ?').bind(tableId).run();
+    }
+  } catch {
+    // current_order_id may be absent
+  }
+  try {
+    if (effectiveTableTenant && effectiveTableTenant !== '*') {
+      await db
+        .prepare(
+          "UPDATE table_sessions SET status = 'closed', closed_at = ?, updated_at = ? WHERE table_id = ? AND status IN ('active', 'occupied', 'seated', 'ordering', 'paying', 'paid') AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
+        )
+        .bind(now, now, tableId, effectiveTableTenant)
+        .run()
+        .catch(() =>
+          effectiveTableTenant === 'default'
+            ? db
+                .prepare(
+                  "UPDATE table_sessions SET status = 'closed', closed_at = ?, updated_at = ? WHERE table_id = ? AND status IN ('active', 'occupied', 'seated', 'ordering', 'paying', 'paid')"
+                )
+                .bind(now, now, tableId)
+                .run()
+            : undefined
+        );
+    } else {
+      await db
+        .prepare(
+          "UPDATE table_sessions SET status = 'closed', closed_at = ?, updated_at = ? WHERE table_id = ? AND status IN ('active', 'occupied', 'seated', 'ordering', 'paying', 'paid')"
+        )
+        .bind(now, now, tableId)
+        .run();
+    }
+  } catch {
+    // table_sessions table or columns may be absent
+  }
+}
 
 export function registerTableCrudHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
   // GET /api/tables - List tables with pagination and filtering
   app.openapi(TableRoutes.list as any, async (c: any) => {
+    const tenantCheck = resolveOpenApiTablesTenant(c, 'read');
+    if (!tenantCheck.ok) return tenantCheck.response;
     const db = getDatabase(c);
-    const tenantId = getTenantId(c);
+    const tenantId = tenantCheck.tenantId;
     const query = c.req.valid('query');
     const { page: rawPage = 1, limit: rawLimit = 20, sort = 'name', order = 'asc', zoneId, status, capacity, locationId, search } = query;
     const page = Math.max(1, Number(rawPage) || 1);
@@ -259,8 +343,10 @@ export function registerTableCrudHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
 
   // GET /api/tables/:id - Get table by ID
   app.openapi(TableRoutes.get as any, async (c: any) => {
+    const tenantCheck = resolveOpenApiTablesTenant(c, 'read');
+    if (!tenantCheck.ok) return tenantCheck.response;
     const db = getDatabase(c);
-    const tenantId = getTenantId(c);
+    const tenantId = tenantCheck.tenantId;
     const { id } = c.req.valid('param');
 
     let row: any = null;
@@ -308,11 +394,35 @@ export function registerTableCrudHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
   });
 
   // POST /api/tables - Create table
+  // POST /api/tables - Create table
   app.openapi(TableRoutes.create as any, async (c: any) => {
+    const tenantCheck = resolveOpenApiTablesTenant(c, 'write');
+    if (!tenantCheck.ok) return tenantCheck.response;
     const db = getDatabase(c);
-    const tenantId = getTenantId(c);
-    const writeTenant = tenantId === '*' ? 'default' : tenantId;
+    const tenantId = tenantCheck.tenantId;
     const body = c.req.valid('json');
+    let writeTenant = tenantId === '*' ? 'default' : tenantId;
+    if (tenantId === '*') {
+      if (body.zoneId) {
+        const zoneRow = await db.prepare('SELECT tenant_id FROM table_zones WHERE id = ?').bind(body.zoneId).first<{ tenant_id?: string | null }>().catch(() => null);
+        const zt = String(zoneRow?.tenant_id ?? '').trim();
+        if (zt && zt !== '*' && zt.toLowerCase() !== 'hq') {
+          writeTenant = zt;
+        }
+      }
+      if (writeTenant === 'default' && body.locationId) {
+        const locRow = await db.prepare('SELECT tenant_id FROM locations WHERE id = ?').bind(body.locationId).first<{ tenant_id?: string | null }>().catch(() => null);
+        const lt = String(locRow?.tenant_id ?? '').trim();
+        if (lt && lt !== '*' && lt.toLowerCase() !== 'hq') {
+          writeTenant = lt;
+        } else if (String(body.locationId).trim() && String(body.locationId).trim() !== '*' && String(body.locationId).trim().toLowerCase() !== 'hq') {
+          writeTenant = String(body.locationId).trim();
+        }
+      }
+      if (writeTenant === 'default') {
+        writeTenant = resolvePilotStore(c.env) || 'default';
+      }
+    }
     const user = c.get('user');
     if (user?.role && !['owner', 'admin', 'manager', 'supervisor'].includes(user.role)) {
       return c.json({ success: false, error: 'Insufficient permissions' }, 403);
@@ -519,8 +629,10 @@ export function registerTableCrudHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
 
   // PATCH /api/tables/:id - Update table
   app.openapi(TableRoutes.update as any, async (c: any) => {
+    const tenantCheck = resolveOpenApiTablesTenant(c, 'write');
+    if (!tenantCheck.ok) return tenantCheck.response;
     const db = getDatabase(c);
-    const tenantId = getTenantId(c);
+    const tenantId = tenantCheck.tenantId;
     const { id } = c.req.valid('param');
     const body = c.req.valid('json');
     const user = c.get('user');
@@ -596,7 +708,10 @@ export function registerTableCrudHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
       const tableNum = parseInt(String(body.code).replace(/\D/g, ''), 10);
       if (!Number.isNaN(tableNum)) {
         const effectiveTenant =
-          existing.tenant_id && String(existing.tenant_id).trim()
+          existing.tenant_id &&
+          String(existing.tenant_id).trim() &&
+          String(existing.tenant_id).trim() !== '*' &&
+          String(existing.tenant_id).trim().toLowerCase() !== 'hq'
             ? String(existing.tenant_id).trim()
             : tenantId === '*'
               ? 'default'
@@ -662,6 +777,15 @@ export function registerTableCrudHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
     params.push(now);
     params.push(id);
 
+    const effectiveTableTenant = tenantId === '*'
+      ? ((typeof existing.tenant_id === 'string' && existing.tenant_id.trim() && existing.tenant_id.trim() !== '*' && existing.tenant_id.trim().toLowerCase() !== 'hq') ? existing.tenant_id.trim() : 'default')
+      : tenantId;
+
+    const isReleasingToAvailable = body.status !== undefined && String(body.status).trim().toLowerCase() === 'available';
+    if (isReleasingToAvailable && (await hasUnpaidActiveOrdersOnTable(db, id, effectiveTableTenant))) {
+      return c.json({ success: false, error: 'Cannot release table with unpaid active orders' }, 409);
+    }
+
     if (updates.length > 1) {
       const fullCafeUpdates = [...updates];
       const fullCafeParams = [...params];
@@ -674,11 +798,11 @@ export function registerTableCrudHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
         fullCafeParams.unshift(canUpdateTableNum);
       }
       try {
-        if (tenantId !== '*') {
+        if (effectiveTableTenant !== '*') {
           try {
             await db.prepare(
               `UPDATE cafe_tables SET ${fullCafeUpdates.join(', ')} WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?`
-            ).bind(...fullCafeParams, tenantId).run();
+            ).bind(...fullCafeParams, effectiveTableTenant).run();
           } catch {
             await db.prepare(`UPDATE cafe_tables SET ${fullCafeUpdates.join(', ')} WHERE id = ?`).bind(...fullCafeParams).run();
           }
@@ -687,11 +811,11 @@ export function registerTableCrudHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
         }
       } catch {
         try {
-          if (tenantId !== '*') {
+          if (effectiveTableTenant !== '*') {
             try {
               await db.prepare(
                 `UPDATE tables SET ${updates.join(', ')} WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?`
-              ).bind(...params, tenantId).run();
+              ).bind(...params, effectiveTableTenant).run();
             } catch {
               await db.prepare(`UPDATE tables SET ${updates.join(', ')} WHERE id = ?`).bind(...params).run();
             }
@@ -700,11 +824,11 @@ export function registerTableCrudHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
           }
         } catch {
           if (cafeUpdates.length > 0) {
-            if (tenantId !== '*') {
+            if (effectiveTableTenant !== '*') {
               try {
                 await db.prepare(
                   `UPDATE cafe_tables SET ${cafeUpdates.join(', ')} WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?`
-                ).bind(...cafeParams, id, tenantId).run();
+                ).bind(...cafeParams, id, effectiveTableTenant).run();
               } catch {
                 await db.prepare(`UPDATE cafe_tables SET ${cafeUpdates.join(', ')} WHERE id = ?`).bind(...cafeParams, id).run();
               }
@@ -716,8 +840,12 @@ export function registerTableCrudHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
       }
     }
 
+    if (isReleasingToAvailable) {
+      await releaseTableSessionsAndOrder(db, id, effectiveTableTenant, now);
+    }
+
     // Audit log
-    await writeTableAuditLog(db, user.id, 'table_update', 'table', id, JSON.stringify(body), now, tenantId);
+    await writeTableAuditLog(db, user.id, 'table_update', 'table', id, JSON.stringify(body), now, effectiveTableTenant);
 
     let updated: any = null;
     try {
@@ -761,8 +889,10 @@ export function registerTableCrudHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
 
   // DELETE /api/tables/:id - Delete table
   app.openapi(TableRoutes.delete as any, async (c: any) => {
+    const tenantCheck = resolveOpenApiTablesTenant(c, 'write');
+    if (!tenantCheck.ok) return tenantCheck.response;
     const db = getDatabase(c);
-    const tenantId = getTenantId(c);
+    const tenantId = tenantCheck.tenantId;
     const { id } = c.req.valid('param');
     const user = c.get('user');
     if (user?.role && !['owner', 'admin', 'manager', 'supervisor'].includes(user.role)) {
@@ -784,16 +914,18 @@ export function registerTableCrudHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
       return c.json({ success: false, error: 'Table not found' }, 404);
     }
 
-    // Check for active sessions
+    if (existing.status && String(existing.status).toLowerCase() === 'occupied') {
+      return c.json({ success: false, error: 'Cannot delete occupied table' }, 409);
+    }
     let sessions: { count: number } | null = null;
     try {
       sessions = (await db.prepare(
-        "SELECT COUNT(*) as count FROM table_sessions WHERE table_id = ? AND status IN ('active', 'occupied', 'ordering', 'paid') AND (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?)"
+        "SELECT COUNT(*) as count FROM table_sessions WHERE table_id = ? AND status IN ('active', 'occupied', 'seated', 'ordering', 'paying', 'paid') AND (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?)"
       ).bind(id, tenantId, tenantId).first()) as { count: number } | null;
     } catch {
       try {
         sessions = (await db.prepare(
-          "SELECT COUNT(*) as count FROM table_sessions WHERE table_id = ? AND status IN ('active', 'occupied', 'ordering', 'paid')"
+          "SELECT COUNT(*) as count FROM table_sessions WHERE table_id = ? AND status IN ('active', 'occupied', 'seated', 'ordering', 'paying', 'paid')"
         ).bind(id).first()) as { count: number } | null;
       } catch {
         sessions = null;
@@ -822,12 +954,16 @@ export function registerTableCrudHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
       return c.json({ success: false, error: 'Cannot delete table with active orders' }, 409);
     }
 
+    const effectiveTableTenant = tenantId === '*'
+      ? ((typeof existing.tenant_id === 'string' && existing.tenant_id.trim() && existing.tenant_id.trim() !== '*' && existing.tenant_id.trim().toLowerCase() !== 'hq') ? existing.tenant_id.trim() : 'default')
+      : tenantId;
+
     try {
-      if (tenantId !== '*') {
+      if (effectiveTableTenant !== '*') {
         try {
           await db.prepare(
             "DELETE FROM cafe_tables WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
-          ).bind(id, tenantId).run();
+          ).bind(id, effectiveTableTenant).run();
         } catch {
           await db.prepare('DELETE FROM cafe_tables WHERE id = ?').bind(id).run();
         }
@@ -835,11 +971,11 @@ export function registerTableCrudHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
         await db.prepare('DELETE FROM cafe_tables WHERE id = ?').bind(id).run();
       }
     } catch {
-      if (tenantId !== '*') {
+      if (effectiveTableTenant !== '*') {
         try {
           await db.prepare(
             "DELETE FROM tables WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
-          ).bind(id, tenantId).run();
+          ).bind(id, effectiveTableTenant).run();
         } catch {
           await db.prepare('DELETE FROM tables WHERE id = ?').bind(id).run();
         }
@@ -849,15 +985,17 @@ export function registerTableCrudHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
     }
 
     // Audit log
-    await writeTableAuditLog(db, user.id, 'table_delete', 'table', id, JSON.stringify({ name: existing.name, code: existing.code }), now, tenantId);
+    await writeTableAuditLog(db, user.id, 'table_delete', 'table', id, JSON.stringify({ name: existing.name, code: existing.code }), now, effectiveTableTenant);
 
     return c.json({ success: true, data: { success: true } });
   });
 
   // POST /api/tables/bulk-status - Bulk update table status
   app.openapi(TableRoutes.bulkStatus as any, async (c: any) => {
+    const tenantCheck = resolveOpenApiTablesTenant(c, 'write');
+    if (!tenantCheck.ok) return tenantCheck.response;
     const db = getDatabase(c);
-    const tenantId = getTenantId(c);
+    const tenantId = tenantCheck.tenantId;
     const body = c.req.valid('json');
     const user = c.get('user');
     if (user?.role && !['owner', 'admin', 'manager', 'supervisor'].includes(user.role)) {
@@ -871,6 +1009,9 @@ export function registerTableCrudHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
       return c.json({ success: false, error: 'No table IDs provided' }, 400);
     }
 
+    const matchedTenants = new Set<string>();
+    const tableRowTenants = new Map<string, string>();
+    const isBulkReleasingToAvailable = String(status ?? '').trim().toLowerCase() === 'available';
     for (const tableId of tableIds) {
       let existingRow: Record<string, unknown> | null = null;
       try {
@@ -883,6 +1024,18 @@ export function registerTableCrudHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
       }
       if (tenantId !== '*' && (!existingRow || !matchesTenantRow(existingRow, tenantId))) {
         return c.json({ success: false, error: 'Table not found' }, 404);
+      }
+      let rowTenant = tenantId === '*' ? 'default' : tenantId;
+      if (existingRow && 'tenant_id' in existingRow && existingRow.tenant_id !== undefined && existingRow.tenant_id !== null) {
+        const rawT = String(existingRow.tenant_id).trim();
+        if (rawT && rawT !== '*' && rawT.toLowerCase() !== 'hq') {
+          matchedTenants.add(rawT);
+          rowTenant = rawT;
+        }
+      }
+      tableRowTenants.set(tableId, rowTenant);
+      if (isBulkReleasingToAvailable && (await hasUnpaidActiveOrdersOnTable(db, tableId, rowTenant))) {
+        return c.json({ success: false, error: 'Cannot release table with unpaid active orders' }, 409);
       }
     }
 
@@ -938,10 +1091,16 @@ export function registerTableCrudHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
           }
         }
       }
+      if (isBulkReleasingToAvailable) {
+        await releaseTableSessionsAndOrder(db, tableId, tableRowTenants.get(tableId) || (tenantId === '*' ? 'default' : tenantId), now);
+      }
     }
 
     // Audit log
-    await writeTableAuditLog(db, user.id, 'table_bulk_status', 'table', 'multiple', JSON.stringify({ tableIds, status }), now, tenantId);
+    const effectiveBulkTenant = tenantId === '*'
+      ? (matchedTenants.size === 1 ? Array.from(matchedTenants)[0] : 'default')
+      : tenantId;
+    await writeTableAuditLog(db, user.id, 'table_bulk_status', 'table', 'multiple', JSON.stringify({ tableIds, status }), now, effectiveBulkTenant);
 
     return c.json({ success: true, data: { success: true, updated: tableIds.length } });
   });

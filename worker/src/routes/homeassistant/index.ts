@@ -23,20 +23,40 @@ import {
   type DiningPresenceEvent
 } from '../../tree/homeassistant/presence';
 import { requireAuth as jwtRequireAuth } from '../../middleware/auth';
-import { getTenantId } from '../../middleware/tenant';
+import { getTenantId, isHQSuperAdmin, resolvePilotStore } from '../../middleware/tenant';
 import { createLogger } from '../../middleware/logger';
 import { z } from 'zod';
 
-// ── Auth middleware resolution ─────────────────────────────────────────────────
-const requireAuth = (function() {
-  try {
-    const g = globalThis as unknown as { requireAuth?: (...a: unknown[]) => MiddlewareHandler };
-    if (typeof g.requireAuth === 'function') {
-      return g.requireAuth;
-    }
-  } catch { /* fallback */ }
-  return (roles: string[]) => jwtRequireAuth(roles as Parameters<typeof jwtRequireAuth>[0]);
-})();
+const requireAuth = (roles: string[]): MiddlewareHandler =>
+  jwtRequireAuth(roles as Parameters<typeof jwtRequireAuth>[0]);
+
+function hasCrossTenantOverride(c: {
+  get: (_k: string) => unknown;
+  req: { query: (_k: string) => string | undefined; header: (_k: string) => string | undefined };
+}): boolean {
+  const user = c.get('user') as { role?: string; tenant_id?: string; tenantId?: string } | undefined;
+  if (!user || isHQSuperAdmin(user)) return false;
+  const userTenant = (user.tenant_id || user.tenantId || '').trim() || 'default';
+  if (userTenant === '*' || userTenant.toLowerCase() === 'hq') return true;
+  const candidates = [
+    c.req.query('tenant_id'),
+    c.req.query('tenantId'),
+    c.req.query('store_id'),
+    c.req.query('storeId'),
+    c.req.header('X-Tenant-ID'),
+    c.req.header('x-tenant-id'),
+    c.req.header('X-Store-ID'),
+    c.req.header('x-store-id'),
+  ]
+    .map((v) => (typeof v === 'string' ? v.trim() : ''))
+    .filter(Boolean);
+  return candidates.some((t) => t === '*' || t.toLowerCase() === 'hq' || t !== userTenant);
+}
+
+function resolveHaTenant(c: Parameters<typeof getTenantId>[0]): string {
+  const raw = (getTenantId(c) || 'default').trim() || 'default';
+  return raw.toLowerCase() === 'hq' ? '*' : raw;
+}
 
 const log = createLogger({ route: 'ha' });
 
@@ -56,7 +76,21 @@ const DispatchPresenceSchema = z.object({
 });
 
 export function createHARouter() {
-  const auth = requireAuth(['owner', 'admin', 'manager', 'supervisor', 'staff']);
+  const baseAuth = requireAuth(['owner', 'admin', 'manager', 'supervisor', 'staff']);
+  const auth: MiddlewareHandler<{ Bindings: Env }> = async (c, next) => {
+    let crossTenant = false;
+    const authRes = await baseAuth(c, async () => {
+      if (hasCrossTenantOverride(c as unknown as Parameters<typeof hasCrossTenantOverride>[0])) {
+        crossTenant = true;
+        return;
+      }
+      await next();
+    });
+    if (crossTenant) {
+      return c.json({ error: 'Cross-tenant access denied' }, 403);
+    }
+    return authRes;
+  };
   const app = new Hono<{ Bindings: Env }>();
 
   // ── Devices ──
@@ -67,7 +101,7 @@ export function createHARouter() {
       const db = (c.env.AURA_DB ?? c.env.DB) as import('@cloudflare/workers-types').D1Database;
       const mockMode = c.env.HA_MOCK === 'true';
 
-      const tenantId = getTenantId(c);
+      const tenantId = resolveHaTenant(c);
       let results: Array<{ entity_id: string; state: string; attributes: string | null; last_changed: string; last_updated: string; tenant_id?: string | null }> = [];
       try {
         const res = await db
@@ -104,7 +138,7 @@ export function createHARouter() {
   // GET /api/ha/devices/:entityId — single device state
   app.get('/devices/:entityId', auth, async(c) => {
     const entityId = c.req.param('entityId');
-    return getDeviceState(c.env, entityId, getTenantId(c));
+    return getDeviceState(c.env, entityId, resolveHaTenant(c));
   });
 
   // POST /api/ha/devices/:entityId/toggle — toggle device
@@ -118,7 +152,7 @@ export function createHARouter() {
       }
       const on = parsed.data.action === 'on';
       const entityId = c.req.param('entityId');
-      return toggleDevice(c.env, entityId, on, getTenantId(c));
+      return toggleDevice(c.env, entityId, on, resolveHaTenant(c));
     } catch {
       return c.json({ error: 'Invalid JSON body' }, 400);
     }
@@ -127,7 +161,7 @@ export function createHARouter() {
   // GET /api/ha/devices/zone/:zone — devices by zone
   app.get('/devices/zone/:zone', auth, async(c) => {
     const zone = c.req.param('zone');
-    return getZoneDevices(c.env, zone, getTenantId(c));
+    return getZoneDevices(c.env, zone, resolveHaTenant(c));
   });
 
   // ── Automations ──
@@ -145,7 +179,7 @@ export function createHARouter() {
         c.env,
         parsed.data.automation_id,
         parsed.data.payload ?? { trigger_entity: parsed.data.trigger_entity },
-        getTenantId(c)
+        resolveHaTenant(c)
       );
     } catch {
       return c.json({ error: 'Invalid JSON body' }, 400);
@@ -156,7 +190,7 @@ export function createHARouter() {
   app.get('/automations/log', auth, async(c) => {
     const rawLimit = parseInt(c.req.query('limit') || '50', 10);
     const limit = Number.isFinite(rawLimit) && rawLimit > 0 ? Math.min(rawLimit, 200) : 50;
-    return getAutomationLog(c.env, limit, getTenantId(c));
+    return getAutomationLog(c.env, limit, resolveHaTenant(c));
   });
 
   // ── Dining Presence ──
@@ -174,7 +208,7 @@ export function createHARouter() {
         c.env as Record<string, unknown>,
         parsed.data.event as DiningPresenceEvent,
         parsed.data.payload ?? {},
-        getTenantId(c)
+        resolveHaTenant(c)
       );
       return c.json({ ...result, success: true });
     } catch (err) {
@@ -199,10 +233,12 @@ export function createHARouter() {
         return c.json({ error: 'HA webhook secret not configured' }, 503);
       }
       if (secret) {
+        if (c.req.query('token')) {
+          return c.json({ error: 'Query token is not supported; pass X-HA-Token or Authorization header' }, 401);
+        }
         const token =
           c.req.header('x-ha-token') ??
-          c.req.header('authorization')?.replace(/^Bearer\s+/i, '') ??
-          (!isProd ? c.req.query('token') : undefined);
+          c.req.header('authorization')?.replace(/^Bearer\s+/i, '');
         const enc = new TextEncoder();
         const aBytes = enc.encode(token ?? '');
         const bBytes = enc.encode(secret);
@@ -220,8 +256,19 @@ export function createHARouter() {
         return c.json({ error: 'Invalid JSON payload' }, 400);
       }
 
-      const rawWebhookTenant = (c.req.header('x-tenant-id') ?? c.req.header('X-Tenant-ID') ?? '').trim();
-      const webhookTenant = rawWebhookTenant && rawWebhookTenant !== '*' ? rawWebhookTenant : undefined;
+      const rawHeaderTenant = (c.req.header('x-tenant-id') ?? c.req.header('X-Tenant-ID') ?? '').trim();
+      const rawWebhookTenant = rawHeaderTenant === '*' ? '' : rawHeaderTenant;
+      if (rawWebhookTenant && !/^[a-zA-Z0-9_-]{1,64}$/.test(rawWebhookTenant)) {
+        return c.json({ error: 'Invalid tenant identifier' }, 400);
+      }
+      const configuredWebhookTenant = typeof (c.env as Record<string, unknown>)?.HA_WEBHOOK_TENANT === 'string'
+        ? String((c.env as Record<string, unknown>).HA_WEBHOOK_TENANT).trim()
+        : '';
+      if (configuredWebhookTenant && rawWebhookTenant && rawWebhookTenant !== configuredWebhookTenant) {
+        return c.json({ error: 'Cross-tenant webhook target denied' }, 403);
+      }
+      const webhookTenant = configuredWebhookTenant
+        || (secret ? (rawWebhookTenant || undefined) : resolvePilotStore(c.env));
       const result = await handleHAWebhook(c.env as Record<string, unknown>, body, webhookTenant);
       return c.json({ ...result, success: true });
     } catch (err) {

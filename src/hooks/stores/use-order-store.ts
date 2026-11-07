@@ -4,7 +4,12 @@ import { apiFetch, API_BASE } from '@/lib/api-client';
 import type { ApiFetchOptions } from '@/lib/api-client';
 import { useOnlineStatus } from '@/hooks/use-online-status';
 import { offlineDb } from '@/lib/offline-db';
-import { readClientSession } from '@/lib/client-session';
+import {
+  readClientSession,
+  readSessionSnapshot,
+  isSameSessionSnapshot,
+  subscribeSessionChange,
+} from '@/lib/client-session';
 import { TERMINAL_STATUSES, POLL_INTERVAL } from './order-store-constants';
 import { mapSseEventToOrder } from './order-store-utils';
 import type { CustomerOrder, CreateOrderPayload as _CreateOrderPayload, OrderState } from './order-store-types';
@@ -32,9 +37,10 @@ export type {
 
 export const useOrderStore = create<OrderState>((set, get) => ({
   currentOrder: null, orderHistory: [], loading: false, error: null,
-  pollingId: null, isPolling: false, eventSource: null, abortController: null, queuedOffline: false, flushInProgress: false,
+  pollingId: null, isPolling: false, eventSource: null, abortController: null, observedOrderId: null, queuedOffline: false, flushInProgress: false,
 
   createOrder: async (payload, idempotencyKey) => {
+    const sessionSnap = readSessionSnapshot();
     set({ loading: true, error: null });
     if (!navigator.onLine) {
       // Checkout cannot confirm a payment offline. Keep its existing intent key
@@ -49,6 +55,10 @@ export const useOrderStore = create<OrderState>((set, get) => ({
           tenantId: sessionUser?.tenantId ?? null,
           userId: sessionUser?.id ?? null,
         });
+        if (!isSameSessionSnapshot(sessionSnap, readSessionSnapshot())) {
+          set({ loading: false });
+          return null;
+        }
         set({ loading: false, error: null, queuedOffline: true });
         return null;
       }
@@ -57,33 +67,51 @@ export const useOrderStore = create<OrderState>((set, get) => ({
     try {
       const body = await apiFetch<any>('/api/orders', { method: 'POST', body: JSON.stringify(payload),
         ...(idempotencyKey ? { headers: { 'Idempotency-Key': idempotencyKey } } : {}) });
+      if (!isSameSessionSnapshot(sessionSnap, readSessionSnapshot())) {
+        set({ loading: false });
+        return null;
+      }
       const order: CustomerOrder = body.data ?? body;
       set({ currentOrder: order, loading: false, error: null, queuedOffline: false });
       return order;
-    } catch (err) { set({ loading: false, error: err instanceof Error ? err.message : 'Lỗi kết nối' }); return null; }
+    } catch (err) {
+      if (!isSameSessionSnapshot(sessionSnap, readSessionSnapshot())) {
+        set({ loading: false });
+        return null;
+      }
+      set({ loading: false, error: err instanceof Error ? err.message : 'Lỗi kết nối' });
+      return null;
+    }
   },
 
   fetchOrder: async (id) => {
-    // Pin the poll this read belongs to. A response that arrives after the
-    // subscription was torn down (or replaced) is stale and must be discarded —
-    // writing it back would resurrect state the UI already left. Aborting the
-    // signal is the first line of defence; this identity check covers the race
-    // where the response lands before the abort is observed.
-    const owner = get().abortController;
-    const opts: ApiFetchOptions = owner && !owner.signal.aborted
-      ? { signal: owner.signal }
-      : {};
+    const sessionSnap = readSessionSnapshot();
+    const previousObservedId = get().observedOrderId;
+    if (previousObservedId && previousObservedId !== id) {
+      get().abortController?.abort();
+    }
+    let owner = get().abortController;
+    if (!owner || owner.signal.aborted || (previousObservedId && previousObservedId !== id)) {
+      owner = new AbortController();
+      set({ abortController: owner, observedOrderId: id });
+    } else if (get().observedOrderId !== id) {
+      set({ observedOrderId: id });
+    }
+    const opts: ApiFetchOptions = { signal: owner.signal };
     set({ loading: true, error: null });
     try {
       let body: { data?: CustomerOrder } & Partial<CustomerOrder>;
       try {
         body = await apiFetch<{ data?: CustomerOrder } & Partial<CustomerOrder>>(`/api/orders/${encodeURIComponent(id)}`, opts);
-      } catch {
+      } catch (primaryErr) {
+        if (owner.signal.aborted || (primaryErr instanceof Error && primaryErr.name === 'AbortError')) {
+          return;
+        }
         body = await apiFetch<{ data?: CustomerOrder } & Partial<CustomerOrder>>(`/api/orders/${encodeURIComponent(id)}/track`, opts);
       }
-      // The abort lands on the signal before the store clears the reference, so
-      // this one check covers both the abort and the resubscribe race.
-      if (owner && owner.signal.aborted) { return; }
+      if (owner.signal.aborted || !isSameSessionSnapshot(sessionSnap, readSessionSnapshot())) { return; }
+      const activeObservedId = get().observedOrderId;
+      if (activeObservedId && activeObservedId !== id) { return; }
       const resolvedOrder = (body?.data ?? body) as CustomerOrder;
       if (resolvedOrder) {
         set({ currentOrder: resolvedOrder, loading: false, error: null });
@@ -92,26 +120,32 @@ export const useOrderStore = create<OrderState>((set, get) => ({
         set({ loading: false, error: null });
       }
     } catch (err) {
-      if (err instanceof Error && err.name === 'AbortError') { return; }
+      if (owner.signal.aborted || (err instanceof Error && err.name === 'AbortError')) { return; }
+      if (!isSameSessionSnapshot(sessionSnap, readSessionSnapshot())) { return; }
+      const activeObservedId = get().observedOrderId;
+      if (activeObservedId && activeObservedId !== id) { return; }
       const message = err instanceof Error ? err.message : 'Lỗi kết nối';
       set({ loading: false, error: message });
     }
   },
 
   startPolling: (id: string) => {
-    const { isPolling, abortController, currentOrder } = get();
+    const { isPolling, abortController, currentOrder, observedOrderId } = get();
     if (isPolling) return;
     if (abortController?.signal.aborted) return;
     if (currentOrder && TERMINAL_STATUSES.includes(currentOrder.status)) return;
 
-    set({ isPolling: true });
-    const controller = new AbortController();
-    set({ abortController: controller });
+    const controller =
+      abortController && !abortController.signal.aborted && (!observedOrderId || observedOrderId === id)
+        ? abortController
+        : new AbortController();
+    set({ isPolling: true, abortController: controller, observedOrderId: id });
 
     const intervalId = window.setInterval(async () => {
       if (controller.signal.aborted) { get().stopPolling(); return; }
-      const { currentOrder } = get();
-      if (currentOrder && TERMINAL_STATUSES.includes(currentOrder.status)) { get().stopPolling(); return; }
+      const { currentOrder: latestOrder, observedOrderId: latestObservedId } = get();
+      if (latestObservedId && latestObservedId !== id) { get().stopPolling(); return; }
+      if (latestOrder && TERMINAL_STATUSES.includes(latestOrder.status)) { get().stopPolling(); return; }
       try { await get().fetchOrder(id); } catch { /* next interval */ }
     }, POLL_INTERVAL);
 
@@ -126,12 +160,47 @@ export const useOrderStore = create<OrderState>((set, get) => ({
   },
 
   subscribeToOrder: (id: string) => {
-    get().unsubscribeFromOrder();
+    const sessionSnap = readSessionSnapshot();
+    const { eventSource: prevEs, pollingId: prevPollingId, abortController: prevController, observedOrderId: prevObservedId, currentOrder: prevOrder } = get();
+    if (prevEs) { prevEs.close(); }
+    if (prevPollingId !== null) { window.clearInterval(prevPollingId); }
+    const isSameOrderInFlight = prevObservedId === id && prevController && !prevController.signal.aborted;
+    if (!isSameOrderInFlight) {
+      prevController?.abort();
+    }
+    const controller = isSameOrderInFlight ? prevController : new AbortController();
+    const shouldClearStaleOrder = Boolean(
+      prevOrder && prevOrder.id !== id && prevOrder.orderNumber !== id,
+    );
+    set({
+      eventSource: null,
+      pollingId: null,
+      isPolling: false,
+      abortController: controller,
+      observedOrderId: id,
+      ...(shouldClearStaleOrder ? { currentOrder: null } : {}),
+    });
+
     const url = `${API_BASE}/api/orders/${encodeURIComponent(id)}/events`;
     const es = new EventSource(url, { withCredentials: true });
     es.addEventListener('update_order', (event: MessageEvent) => {
+      if (controller.signal.aborted || get().observedOrderId !== id) return;
+      if (!isSameSessionSnapshot(sessionSnap, readSessionSnapshot())) {
+        get().unsubscribeFromOrder();
+        return;
+      }
       try {
         const incoming = JSON.parse(event.data);
+        if (
+          incoming &&
+          typeof incoming === 'object' &&
+          'id' in incoming &&
+          incoming.id &&
+          String(incoming.id) !== String(id) &&
+          String((incoming as { orderNumber?: unknown }).orderNumber ?? '') !== String(id)
+        ) {
+          return;
+        }
         const mapped = mapSseEventToOrder(incoming);
         set((state) => ({
           currentOrder: state.currentOrder
@@ -144,6 +213,8 @@ export const useOrderStore = create<OrderState>((set, get) => ({
       } catch { /* ignore */ }
     });
     const startPollingOnce = () => {
+      if (controller.signal.aborted || get().observedOrderId !== id) return;
+      if (!isSameSessionSnapshot(sessionSnap, readSessionSnapshot())) return;
       const { isPolling, currentOrder } = get();
       // An order that already reached a terminal state has nothing left to poll
       // for — reconnecting the poller here would restart a fetch loop forever.
@@ -160,6 +231,7 @@ export const useOrderStore = create<OrderState>((set, get) => ({
     const { eventSource } = get();
     if (eventSource) { eventSource.close(); set({ eventSource: null }); }
     get().stopPolling();
+    set({ observedOrderId: null });
   },
 
   flushQueuedOrders: async () => {
@@ -167,6 +239,7 @@ export const useOrderStore = create<OrderState>((set, get) => ({
     // IndexedDB records and sync each one twice. The second caller sees the
     // flag and returns; the in-flight run owns the queue until it settles.
     if (get().flushInProgress) return null;
+    const sessionSnap = readSessionSnapshot();
     set({ flushInProgress: true });
     try {
       const sessionUser = readClientSession().user;
@@ -178,8 +251,14 @@ export const useOrderStore = create<OrderState>((set, get) => ({
       let lastOrder: CustomerOrder | null = null;
       let allSucceeded = true;
       for (const record of pending) {
+        if (!isSameSessionSnapshot(sessionSnap, readSessionSnapshot())) {
+          return null;
+        }
         try {
           const body = await apiFetch<any>('/api/orders/sync', { method: 'POST', body: JSON.stringify(record) });
+          if (!isSameSessionSnapshot(sessionSnap, readSessionSnapshot())) {
+            return null;
+          }
           lastOrder = body.data as CustomerOrder;
           set({ currentOrder: lastOrder, error: null });
           if (record.localId && typeof offlineDb.removeOrder === 'function') {
@@ -187,9 +266,14 @@ export const useOrderStore = create<OrderState>((set, get) => ({
           }
         } catch {
           allSucceeded = false;
-          set({ error: 'Lỗi kết nối khi gửi đơn hàng', loading: false });
+          if (isSameSessionSnapshot(sessionSnap, readSessionSnapshot())) {
+            set({ error: 'Lỗi kết nối khi gửi đơn hàng', loading: false });
+          }
           break;
         }
+      }
+      if (!isSameSessionSnapshot(sessionSnap, readSessionSnapshot())) {
+        return null;
       }
       try {
         if (allSucceeded && lastOrder) {
@@ -205,6 +289,21 @@ export const useOrderStore = create<OrderState>((set, get) => ({
     }
   },
 }));
+
+// Tear down active order streams/polling and clear order state whenever the
+// authenticated user or tenant scope changes.
+if (typeof window !== 'undefined') {
+  subscribeSessionChange(() => {
+    useOrderStore.getState().unsubscribeFromOrder();
+    useOrderStore.setState({
+      currentOrder: null,
+      orderHistory: [],
+      loading: false,
+      error: null,
+      queuedOffline: false,
+    });
+  });
+}
 
 /* ── Auto-flush queued orders when connection restores ───────────────── */
 export function useOrderStoreWithOfflineFlush<T>(selector: (state: OrderState) => T): T;

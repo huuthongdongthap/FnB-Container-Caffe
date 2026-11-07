@@ -1,6 +1,7 @@
 import { Outlet } from 'react-router-dom';
 import { ErrorBoundary } from '@/components/shared/ErrorBoundary';
-import { useState, useEffect, type ReactNode } from 'react';
+import type { ReactNode } from 'react';
+import { useOnlineStatus } from '@/hooks/use-online-status';
 
 export interface OpsShellProps {
   children?: ReactNode;
@@ -8,20 +9,7 @@ export interface OpsShellProps {
 }
 
 export default function OpsShell({ children, header }: OpsShellProps) {
-  const [isOnline, setIsOnline] = useState(true);
-
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    setIsOnline(navigator.onLine);
-    const handleOnline = () => setIsOnline(true);
-    const handleOffline = () => setIsOnline(false);
-    window.addEventListener('online', handleOnline);
-    window.addEventListener('offline', handleOffline);
-    return () => {
-      window.removeEventListener('online', handleOnline);
-      window.removeEventListener('offline', handleOffline);
-    };
-  }, []);
+  const { isOnline } = useOnlineStatus();
 
   return (
     <div

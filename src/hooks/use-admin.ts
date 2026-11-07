@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { apiFetch } from '@/lib/api-client';
+import { useClientSessionScope } from '@/lib/client-session';
 
 export interface AdminStats {
   todayRevenue: number;
@@ -63,13 +64,14 @@ export function useAdmin(options: UseAdminOptions = {}): AdminResult {
     enableCustomers = true,
     enableSyncStatus = true,
   } = options;
+  const session = useClientSessionScope();
 
   const {
     data: stats,
     isLoading: isLoadingStats,
     error: statsError,
   } = useQuery<AdminStats>({
-    queryKey: ['admin-stats'],
+    queryKey: ['admin-stats', session.tenantId, session.userScope],
     enabled: enableStats,
     queryFn: () =>
       apiFetch<AdminStats & { stats?: Record<string, unknown> }>('/api/stats').then((raw) => {
@@ -97,7 +99,7 @@ export function useAdmin(options: UseAdminOptions = {}): AdminResult {
     isLoading: isLoadingOrders,
     error: ordersError,
   } = useQuery<AdminOrder[]>({
-    queryKey: ['admin-orders'],
+    queryKey: ['admin-orders', session.tenantId, session.userScope],
     enabled: enableOrders,
     queryFn: () =>
       apiFetch<{ orders?: Array<Record<string, unknown>>; data?: Array<Record<string, unknown>> }>('/api/admin/orders').then(
@@ -147,7 +149,7 @@ export function useAdmin(options: UseAdminOptions = {}): AdminResult {
     data: customers = [],
     isLoading: isLoadingCustomers,
   } = useQuery<AdminCustomer[]>({
-    queryKey: ['admin-customers'],
+    queryKey: ['admin-customers', session.tenantId, session.userScope],
     enabled: enableCustomers,
     queryFn: () =>
       apiFetch<{ customers?: Array<Record<string, unknown>>; data?: Array<Record<string, unknown>> }>('/api/admin/customers').then(
@@ -174,7 +176,7 @@ export function useAdmin(options: UseAdminOptions = {}): AdminResult {
     data: syncStatus,
     isLoading: isLoadingSyncStatus,
   } = useQuery<SyncStatusInfo>({
-    queryKey: ['admin-sync-status'],
+    queryKey: ['admin-sync-status', session.tenantId, session.userScope],
     enabled: enableSyncStatus,
     queryFn: () => apiFetch<SyncStatusInfo>('/api/admin/erpnext-sync/status'),
     staleTime: 30_000,

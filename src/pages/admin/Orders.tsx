@@ -92,25 +92,34 @@ function computeStats(orders: AdminOrder[]): StatCardData[] {
 
 /* ─── Page component ───────────────────────────────────────────────────── */
 
+const ADMIN_ORDERS_PAGE_SIZE = 12;
+
 export default function AdminOrdersPage() {
-  const { orders, loading, error, fetchOrders, updateOrderStatus } =
+  const { orders, totalCount, loading, error, fetchOrders, updateOrderStatus } =
     useAdminOrdersStore();
 
   const [activeFilter, setActiveFilter] = useState<OrderStatus | 'all'>('all');
   const [searchQuery, setSearchQuery] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
 
-  /* Fetch orders from the store whenever filter or search changes */
+  const resolveBackendStatus = useCallback((filter: OrderStatus | 'all') => {
+    if (filter === 'all') return undefined;
+    if (filter === 'served') return 'delivered';
+    return filter;
+  }, []);
+
+  /* Fetch orders from the store whenever page, filter, or search changes */
   useEffect(() => {
-    const backendStatus = activeFilter === 'all'
-      ? undefined
-      : activeFilter === 'served'
-        ? 'delivered'
-        : activeFilter;
-    fetchOrders(1, {
-      status: backendStatus,
-      search: searchQuery || undefined,
-    });
-  }, [activeFilter, searchQuery, fetchOrders]);
+    const backendStatus = resolveBackendStatus(activeFilter);
+    fetchOrders(
+      currentPage,
+      {
+        status: backendStatus,
+        search: searchQuery || undefined,
+      },
+      ADMIN_ORDERS_PAGE_SIZE,
+    );
+  }, [activeFilter, searchQuery, currentPage, fetchOrders, resolveBackendStatus]);
 
   /* ─── Derived data ──────────────────────────────────────────────────── */
   const stitchOrders: OrderData[] = orders.map(mapAdminOrder);
@@ -118,11 +127,17 @@ export default function AdminOrdersPage() {
 
   /* ─── Callbacks ──────────────────────────────────────────────────────── */
   const handleFilterChange = useCallback((filter: OrderStatus | 'all') => {
+    setCurrentPage(1);
     setActiveFilter(filter);
   }, []);
 
   const handleSearch = useCallback((query: string) => {
+    setCurrentPage(1);
     setSearchQuery(query);
+  }, []);
+
+  const handlePageChange = useCallback((nextPage: number) => {
+    setCurrentPage(Math.max(1, nextPage));
   }, []);
 
   const handleOrderAction = useCallback(
@@ -136,16 +151,16 @@ export default function AdminOrdersPage() {
   );
 
   const handleRefresh = useCallback(() => {
-    const backendStatus = activeFilter === 'all'
-      ? undefined
-      : activeFilter === 'served'
-        ? 'delivered'
-        : activeFilter;
-    fetchOrders(1, {
-      status: backendStatus,
-      search: searchQuery || undefined,
-    });
-  }, [fetchOrders, activeFilter, searchQuery]);
+    const backendStatus = resolveBackendStatus(activeFilter);
+    fetchOrders(
+      currentPage,
+      {
+        status: backendStatus,
+        search: searchQuery || undefined,
+      },
+      ADMIN_ORDERS_PAGE_SIZE,
+    );
+  }, [fetchOrders, activeFilter, searchQuery, currentPage, resolveBackendStatus]);
 
   /* ─── Render ────────────────────────────────────────────────────────── */
   return (
@@ -161,6 +176,11 @@ export default function AdminOrdersPage() {
       onSearch={handleSearch}
       onOrderAction={handleOrderAction}
       onRefresh={handleRefresh}
+      currentPage={currentPage}
+      pageSize={ADMIN_ORDERS_PAGE_SIZE}
+      totalCount={totalCount || stitchOrders.length}
+      onPageChange={handlePageChange}
+      showDashboardPanels={false}
     />
   );
 }

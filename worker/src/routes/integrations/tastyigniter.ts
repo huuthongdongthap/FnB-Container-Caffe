@@ -11,6 +11,7 @@
  */
 
 import { Hono } from 'hono';
+import type { MiddlewareHandler } from 'hono';
 import { z } from 'zod';
 import type { Env } from '../../types/env';
 import { createTastyIgniterClient } from '../../clients/tastyigniter-client';
@@ -22,10 +23,56 @@ import {
 import { processTIWebhook, type TIWebhookPayload } from '../../tree/integrations/tastyigniter/webhook';
 import { computeHmacSha256, timingSafeEqual } from '@aura/domain-security';
 import { requireAuth } from '../../middleware/auth';
-import { getTenantId } from '../../middleware/tenant';
+import { getTenantId, isHQSuperAdmin, resolvePilotStore } from '../../middleware/tenant';
 import { createLogger } from '../../middleware/logger';
 
 const log = createLogger({ route: 'ti-gateway' });
+
+export function hasCrossTenantOverride(c: {
+  get: (_k: string) => unknown;
+  req: { query: (_k: string) => string | undefined; header: (_k: string) => string | undefined };
+}): boolean {
+  const candidates = [
+    c.req.query('tenant_id'),
+    c.req.query('tenantId'),
+    c.req.query('store_id'),
+    c.req.query('storeId'),
+    c.req.header('X-Tenant-ID'),
+    c.req.header('x-tenant-id'),
+    c.req.header('X-Store-ID'),
+    c.req.header('x-store-id'),
+  ]
+    .map((v) => (typeof v === 'string' ? v.trim() : ''))
+    .filter(Boolean);
+  if (new Set(candidates).size > 1) {
+    return true;
+  }
+  const user = c.get('user') as { role?: string; tenant_id?: string; tenantId?: string } | undefined;
+  if (!user || isHQSuperAdmin(user)) return false;
+  const rawUserTenant = (user.tenant_id || user.tenantId || '').trim();
+  if (rawUserTenant === '*' || rawUserTenant.toLowerCase() === 'hq') {
+    return true;
+  }
+  const userTenant = rawUserTenant || 'default';
+  const requestedTenant = candidates[0] || '';
+  const ctxTenant = (typeof c.get === 'function' ? (c.get('tenantId') as string | undefined) : undefined)?.trim() || '';
+  if (
+    (requestedTenant && (requestedTenant === '*' || requestedTenant.toLowerCase() === 'hq' || requestedTenant !== userTenant)) ||
+    (ctxTenant && (ctxTenant === '*' || ctxTenant.toLowerCase() === 'hq' || ctxTenant !== userTenant))
+  ) {
+    return true;
+  }
+  return false;
+}
+
+export function resolveTiTenant(c: import('hono').Context<{ Bindings: Env }>): string {
+  const raw = getTenantId(c).trim() || 'default';
+  const user = c.get('user' as never) as { role?: string; tenant_id?: string; tenantId?: string } | undefined;
+  if (user && isHQSuperAdmin(user)) {
+    return raw.toLowerCase() === 'hq' ? '*' : raw;
+  }
+  return raw;
+}
 
 function matchesTiOrderTenant(row: Record<string, unknown> | null | undefined, tenantId: string): boolean {
   if (tenantId === '*') return true;
@@ -41,25 +88,59 @@ async function verifyLocalOrderTenant(
   env: Env,
   localOrderId: string,
   tenantId: string
-): Promise<boolean> {
-  if (tenantId === '*') return true;
+): Promise<{ allowed: boolean; orderTenantId: string }> {
+  const fallbackTenant = !tenantId || tenantId === '*' || tenantId.toLowerCase() === 'hq' ? 'default' : tenantId;
   const db = (env.AURA_DB ?? (env as unknown as Record<string, unknown>).DB) as D1Database | undefined;
-  if (!db) return tenantId === 'default';
+  if (!db) {
+    return {
+      allowed: tenantId === '*' || tenantId === 'default',
+      orderTenantId: fallbackTenant,
+    };
+  }
   try {
     const row = await db
       .prepare('SELECT id, tenant_id FROM orders WHERE id = ? LIMIT 1')
       .bind(localOrderId)
       .first<Record<string, unknown>>();
-    return matchesTiOrderTenant(row, tenantId);
+    if (!row) {
+      return {
+        allowed: tenantId === '*',
+        orderTenantId: fallbackTenant,
+      };
+    }
+    const rowTenantRaw =
+      'tenant_id' in row && row.tenant_id !== undefined && row.tenant_id !== null
+        ? String(row.tenant_id).trim()
+        : '';
+    const resolvedOrderTenant =
+      rowTenantRaw && rowTenantRaw !== '*' && rowTenantRaw.toLowerCase() !== 'hq'
+        ? rowTenantRaw
+        : 'default';
+    return {
+      allowed: matchesTiOrderTenant(row, tenantId),
+      orderTenantId: tenantId === '*' ? resolvedOrderTenant : fallbackTenant,
+    };
   } catch {
     try {
       const row = await db
         .prepare('SELECT id FROM orders WHERE id = ? LIMIT 1')
         .bind(localOrderId)
         .first<Record<string, unknown>>();
-      return matchesTiOrderTenant(row, tenantId);
+      if (!row) {
+        return {
+          allowed: tenantId === '*',
+          orderTenantId: fallbackTenant,
+        };
+      }
+      return {
+        allowed: matchesTiOrderTenant(row, tenantId),
+        orderTenantId: fallbackTenant,
+      };
     } catch {
-      return tenantId === 'default';
+      return {
+        allowed: tenantId === '*' || tenantId === 'default',
+        orderTenantId: fallbackTenant,
+      };
     }
   }
 }
@@ -81,13 +162,27 @@ export function createTIRoutes() {
   const app = new Hono<{ Bindings: Env }>();
 
   // Middleware: owner, admin, manager, supervisor, staff only
-  const allow = requireAuth(['owner', 'admin', 'manager', 'supervisor', 'staff']);
+  const baseAllow = requireAuth(['owner', 'admin', 'manager', 'supervisor', 'staff']);
+  const allow: MiddlewareHandler<{ Bindings: Env }> = async (c, next) => {
+    let crossTenant = false;
+    const authRes = await baseAllow(c, async () => {
+      if (hasCrossTenantOverride(c as unknown as Parameters<typeof hasCrossTenantOverride>[0])) {
+        crossTenant = true;
+        return;
+      }
+      await next();
+    });
+    if (crossTenant) {
+      return c.json({ error: 'Cross-tenant access denied', mock: false }, 403);
+    }
+    return authRes;
+  };
 
   // POST /api/integrations/tastyigniter/sync/menu
   // Pull menu from TI and cache locally (fire-and-forget).
   app.post('/sync/menu', allow, async(c) => {
     try {
-      const tenantId = getTenantId(c);
+      const tenantId = resolveTiTenant(c);
       let execCtx: ExecutionContext | undefined;
       try {
         execCtx = c.executionCtx as unknown as ExecutionContext;
@@ -114,11 +209,19 @@ export function createTIRoutes() {
       }
 
       const { localOrderId, orderData } = parsed.data;
-      const tenantId = getTenantId(c);
-      if (!(await verifyLocalOrderTenant(c.env, localOrderId, tenantId))) {
+      const tenantId = resolveTiTenant(c);
+      const verification = await verifyLocalOrderTenant(c.env, localOrderId, tenantId);
+      if (!verification.allowed) {
         return c.json({ success: false, error: 'Order not found' }, 404);
       }
-      const result = await bridgeOrderToTI(c.env, localOrderId, orderData, c.executionCtx as unknown as ExecutionContext);
+      const effectiveOrderTenant = tenantId === '*' ? verification.orderTenantId : tenantId;
+      const result = await bridgeOrderToTI(
+        c.env,
+        localOrderId,
+        { ...orderData, tenant_id: effectiveOrderTenant },
+        c.executionCtx as unknown as ExecutionContext,
+        effectiveOrderTenant
+      );
       return c.json({ success: true, result });
     } catch (err) {
       log.error('ti_bridge_order_error', { error: (err as Error).message });
@@ -130,7 +233,7 @@ export function createTIRoutes() {
   // Return cached menu from local DB.
   app.get('/menu', allow, async(c) => {
     try {
-      const tenantId = getTenantId(c);
+      const tenantId = resolveTiTenant(c);
       const { items } = await getTiMenuCache(c.env, tenantId);
       const client = createTastyIgniterClient(c.env);
       return c.json({ items, mock: client === null ? true : undefined });
@@ -147,8 +250,7 @@ export function createTIRoutes() {
       const isProd = c.env?.ENVIRONMENT === 'production' || c.env?.NODE_ENV === 'production';
       const allowUnsignedDev = !isProd && (
         c.env?.ENVIRONMENT === 'development' ||
-        c.env?.ENVIRONMENT === 'test' ||
-        (c.env as Record<string, unknown>)?.TASTYIGNITER_SYNC_ENABLED === 'false'
+        c.env?.ENVIRONMENT === 'test'
       );
       const secret = (c.env.TASTYIGNITER_WEBHOOK_SECRET ?? '') as string;
       if (!secret && !allowUnsignedDev) {
@@ -156,9 +258,12 @@ export function createTIRoutes() {
       }
       const rawBody = await c.req.text().catch(() => '');
       if (secret) {
+        if (c.req.query('secret') || c.req.query('token')) {
+          return c.json({ error: 'Query secret is not supported; pass X-TastyIgniter-Signature header' }, 401);
+        }
         const sig =
           c.req.header('x-tastyigniter-signature') ??
-          (!isProd ? (c.req.query('secret') ?? c.req.query('token')) : undefined);
+          c.req.header('X-TastyIgniter-Signature');
         if (!sig) {
           return c.json({ error: 'Unauthorized webhook signature' }, 401);
         }
@@ -184,12 +289,55 @@ export function createTIRoutes() {
         return c.json({ error: 'Invalid JSON payload' }, 400);
       }
 
-      const explicitTenant = (
-        c.req.header('X-Tenant-ID') ||
-        c.req.header('x-tenant-id') ||
-        c.req.query('tenant_id') ||
-        ''
-      ).trim() || undefined;
+      const webhookTenantCandidates = [
+        c.req.header('X-Tenant-ID'),
+        c.req.header('x-tenant-id'),
+        c.req.header('X-Store-ID'),
+        c.req.header('x-store-id'),
+        c.req.query('tenant_id'),
+        c.req.query('tenantId'),
+        c.req.query('store_id'),
+        c.req.query('storeId'),
+      ]
+        .map((v) => (typeof v === 'string' ? v.trim() : ''))
+        .filter(Boolean);
+      const bodyTenant = typeof body.tenant_id === 'string' ? body.tenant_id.trim() : '';
+      const dataTenant =
+        body.data && typeof body.data === 'object' && typeof (body.data as Record<string, unknown>).tenant_id === 'string'
+          ? String((body.data as Record<string, unknown>).tenant_id).trim()
+          : '';
+      for (const candidate of [...webhookTenantCandidates, bodyTenant, dataTenant]) {
+        if (candidate && (candidate === '*' || candidate.toLowerCase() === 'hq' || !/^[a-zA-Z0-9_-]{1,64}$/.test(candidate))) {
+          return c.json({ error: 'Invalid tenant identifier' }, 400);
+        }
+      }
+      if (new Set(webhookTenantCandidates).size > 1) {
+        return c.json({ error: 'Cross-tenant webhook target denied' }, 403);
+      }
+      const rawWebhookTenant = webhookTenantCandidates[0] || '';
+      if (bodyTenant && dataTenant && bodyTenant !== dataTenant) {
+        return c.json({ error: 'Cross-tenant webhook target denied' }, 403);
+      }
+      const payloadTenant = bodyTenant || dataTenant;
+      if (rawWebhookTenant && payloadTenant && rawWebhookTenant !== payloadTenant) {
+        return c.json({ error: 'Cross-tenant webhook target denied' }, 403);
+      }
+      const configuredWebhookTenantRaw = (
+        (typeof (c.env as Record<string, unknown>)?.TASTYIGNITER_WEBHOOK_TENANT === 'string'
+          ? String((c.env as Record<string, unknown>).TASTYIGNITER_WEBHOOK_TENANT).trim()
+          : '') ||
+        resolvePilotStore(c.env) ||
+        'default'
+      ).trim();
+      const configuredWebhookTenant =
+        !configuredWebhookTenantRaw || configuredWebhookTenantRaw === '*' || configuredWebhookTenantRaw.toLowerCase() === 'hq'
+          ? 'default'
+          : configuredWebhookTenantRaw;
+      const requestedTenant = rawWebhookTenant || payloadTenant;
+      if (requestedTenant && requestedTenant !== configuredWebhookTenant) {
+        return c.json({ error: 'Cross-tenant webhook target denied' }, 403);
+      }
+      const explicitTenant = configuredWebhookTenant;
       const result = await processTIWebhook(c.env as Record<string, unknown>, body, explicitTenant);
       return c.json({ ...result, success: true });
     } catch (err) {

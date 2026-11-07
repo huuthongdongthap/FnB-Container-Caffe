@@ -9,7 +9,10 @@ export async function checkOverdueOrders(env: Record<string, unknown>, tenantOve
   const slaMinutes = Number.isFinite(Number(env.SLA_THRESHOLD_MINUTES)) && Number(env.SLA_THRESHOLD_MINUTES) > 0
     ? Number(env.SLA_THRESHOLD_MINUTES)
     : SLA_MINUTES_DEFAULT;
-  const tenantId = tenantOverride || resolvePilotStore(env as unknown as Parameters<typeof resolvePilotStore>[0]);
+  const rawOverride = typeof tenantOverride === 'string' ? tenantOverride.trim() : '';
+  const normalizedOverride = rawOverride.toLowerCase() === 'hq' ? '*' : rawOverride;
+  const rawTenant = normalizedOverride || resolvePilotStore(env as unknown as Parameters<typeof resolvePilotStore>[0]);
+  const tenantId = rawTenant.toLowerCase() === 'hq' ? '*' : rawTenant;
 
   log.info('Checking overdue orders (SLA threshold:', { minutes: slaMinutes });
 
@@ -30,7 +33,35 @@ export async function checkOverdueOrders(env: Record<string, unknown>, tenantOve
             AND (notes IS NULL OR notes NOT LIKE '%[OVERDUE]%')
         `).bind(cutoff, tenantId).all<Record<string, unknown>>();
         overdue = (scopedRes.results || []).filter(
-          (row) => !('tenant_id' in row) || matchesTenantRow(row, tenantId)
+          (row) => matchesTenantRow(row, tenantId)
+        );
+      } catch {
+        if (tenantId === 'default') {
+          const unscoped = await db.prepare(`
+            SELECT id, customer_name, status, created_at
+            FROM orders
+            WHERE status IN ('pending', 'confirmed', 'preparing', 'Bep tiep nhan', 'Dang pha che')
+              AND created_at < ?
+              AND (notes IS NULL OR notes NOT LIKE '%[OVERDUE]%')
+          `).bind(cutoff).all<Record<string, unknown>>();
+          overdue = (unscoped.results || []).filter(
+            (row) => matchesTenantRow(row, tenantId)
+          );
+        } else {
+          overdue = [];
+        }
+      }
+    } else {
+      try {
+        const withTenant = await db.prepare(`
+          SELECT id, customer_name, status, created_at, tenant_id
+          FROM orders
+          WHERE status IN ('pending', 'confirmed', 'preparing', 'Bep tiep nhan', 'Dang pha che')
+            AND created_at < ?
+            AND (notes IS NULL OR notes NOT LIKE '%[OVERDUE]%')
+        `).bind(cutoff).all<Record<string, unknown>>();
+        overdue = (withTenant.results || []).filter(
+          (row) => matchesTenantRow(row, tenantId)
         );
       } catch {
         const unscoped = await db.prepare(`
@@ -40,21 +71,10 @@ export async function checkOverdueOrders(env: Record<string, unknown>, tenantOve
             AND created_at < ?
             AND (notes IS NULL OR notes NOT LIKE '%[OVERDUE]%')
         `).bind(cutoff).all<Record<string, unknown>>();
-        overdue = (unscoped.results || []).filter((row) =>
-          'tenant_id' in row ? matchesTenantRow(row, tenantId) : tenantId === 'default'
+        overdue = (unscoped.results || []).filter(
+          (row) => matchesTenantRow(row, tenantId)
         );
       }
-    } else {
-      const unscoped = await db.prepare(`
-        SELECT id, customer_name, status, created_at
-        FROM orders
-        WHERE status IN ('pending', 'confirmed', 'preparing', 'Bep tiep nhan', 'Dang pha che')
-          AND created_at < ?
-          AND (notes IS NULL OR notes NOT LIKE '%[OVERDUE]%')
-      `).bind(cutoff).all<Record<string, unknown>>();
-      overdue = (unscoped.results || []).filter(
-        (row) => !('tenant_id' in row) || matchesTenantRow(row, tenantId)
-      );
     }
 
     if (!overdue.length) {
@@ -64,50 +84,75 @@ export async function checkOverdueOrders(env: Record<string, unknown>, tenantOve
 
     log.info('Found overdue orders', { count: overdue.length });
 
-    // Metrics: record order_stuck count + raise a Telegram-dispatchable alert.
-    // The alert pipeline (cron-admin dispatchAlerts) delivers via Telegram when
-    // TELEGRAM_BOT_TOKEN/CHAT_ID are configured; cooldown prevents repeat noise
-    // for the same ongoing breach.
-    const effectiveAlertTenant = tenantId && tenantId !== '*' ? tenantId : 'default';
-    const alertKey =
-      effectiveAlertTenant === 'default'
-        ? 'kds_sla_breach'
-        : `kds_sla_breach:${effectiveAlertTenant}`;
+    // Metrics: record order_stuck count + raise a Telegram-dispatchable alert per concrete tenant.
+    const resolveOrderTenant = (order: Record<string, unknown>): string => {
+      const rawOrderTenant = typeof order.tenant_id === 'string' ? order.tenant_id.trim() : '';
+      if (rawOrderTenant && rawOrderTenant !== '*' && rawOrderTenant.toLowerCase() !== 'hq') {
+        return rawOrderTenant;
+      }
+      return tenantId && tenantId !== '*' ? tenantId : 'default';
+    };
+
+    const byTenant = new Map<string, Array<Record<string, unknown>>>();
+    for (const order of overdue) {
+      const orderTenant = resolveOrderTenant(order);
+      const group = byTenant.get(orderTenant) || [];
+      group.push(order);
+      byTenant.set(orderTenant, group);
+    }
+
     const mc = createMetricsCollector(db);
-    await mc.recordMetric('order_stuck', overdue.length, { tenant_id: effectiveAlertTenant }).catch(() => {});
-    await mc.recordAlert(
-      alertKey,
-      `${overdue.length} đơn vượt SLA ${slaMinutes} phút — kiểm tra KDS`,
-      { severity: 'warning', cooldownMinutes: 30 }
-    ).catch(() => {});
+    for (const [effectiveAlertTenant, tenantOrders] of byTenant.entries()) {
+      const alertKey =
+        effectiveAlertTenant === 'default'
+          ? 'kds_sla_breach'
+          : `kds_sla_breach:${effectiveAlertTenant}`;
+      await mc.recordMetric('order_stuck', tenantOrders.length, { tenant_id: effectiveAlertTenant }).catch(() => {});
+      await mc.recordAlert(
+        alertKey,
+        `${tenantOrders.length} đơn vượt SLA ${slaMinutes} phút — kiểm tra KDS`,
+        { severity: 'warning', cooldownMinutes: 30 }
+      ).catch(() => {});
+    }
 
     const now = new Date().toISOString();
-    if (tenantId && tenantId !== '*') {
-      try {
-        const scopedStmts = overdue.map(order =>
-          db.prepare("UPDATE orders SET notes = CASE WHEN notes IS NULL OR notes = '' THEN ? ELSE notes || ' | ' || ? END, updated_at = ? WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?")
-            .bind('[OVERDUE]', '[OVERDUE]', now, order.id, tenantId)
-        );
-        await db.batch(scopedStmts);
+    try {
+      const scopedStmts = overdue.map((order) => {
+        const orderTenant = resolveOrderTenant(order);
+        return db
+          .prepare(
+            "UPDATE orders SET notes = CASE WHEN notes IS NULL OR notes = '' THEN ? ELSE notes || ' | ' || ? END, updated_at = ? WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
+          )
+          .bind('[OVERDUE]', '[OVERDUE]', now, order.id, orderTenant);
+      });
+      await db.batch(scopedStmts);
+      return;
+    } catch {
+      if (tenantId && tenantId !== '*' && tenantId !== 'default') {
         return;
-      } catch {
-        if (tenantId !== 'default') {
-          return;
-        }
       }
     }
-    const stmts = overdue.map(order =>
-      db.prepare('UPDATE orders SET notes = CASE WHEN notes IS NULL OR notes = \'\' THEN ? ELSE notes || \' | \' || ? END, updated_at = ? WHERE id = ?')
-        .bind('[OVERDUE]', '[OVERDUE]', now, order.id)
-    );
-    await db.batch(stmts);
+    const defaultOrders = overdue.filter((order) => resolveOrderTenant(order) === 'default');
+    if (defaultOrders.length > 0) {
+      const stmts = defaultOrders.map((order) =>
+        db
+          .prepare(
+            "UPDATE orders SET notes = CASE WHEN notes IS NULL OR notes = '' THEN ? ELSE notes || ' | ' || ? END, updated_at = ? WHERE id = ?"
+          )
+          .bind('[OVERDUE]', '[OVERDUE]', now, order.id)
+      );
+      await db.batch(stmts);
+    }
   } catch (err) {
     log.error('checkOverdueOrders error:', { message: (err as Error).message });
   }
 }
 
 export async function checkInventoryAlerts(env: Record<string, unknown>, tenantOverride?: string): Promise<number> {
-  const tenantId = tenantOverride || resolvePilotStore(env as unknown as Parameters<typeof resolvePilotStore>[0]);
+  const rawOverride = typeof tenantOverride === 'string' ? tenantOverride.trim() : '';
+  const normalizedOverride = rawOverride.toLowerCase() === 'hq' ? '*' : rawOverride;
+  const rawTenant = normalizedOverride || resolvePilotStore(env as unknown as Parameters<typeof resolvePilotStore>[0]);
+  const tenantId = rawTenant.toLowerCase() === 'hq' ? '*' : rawTenant;
   try {
     const db = env.AURA_DB as import('@cloudflare/workers-types').D1Database;
     let items: Array<Record<string, unknown>> = [];
@@ -119,17 +164,21 @@ export async function checkInventoryAlerts(env: Record<string, unknown>, tenantO
           AND (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?)
       `).bind(tenantId, tenantId).all<Record<string, unknown>>();
       items = (res.results || []).filter(
-        (row) => !('tenant_id' in row) || matchesTenantRow(row, tenantId)
+        (row) => matchesTenantRow(row, tenantId)
       );
     } catch {
-      const res = await db.prepare(`
-        SELECT id, name, quantity, min_quantity
-        FROM inventory_items
-        WHERE quantity <= min_quantity
-      `).all<Record<string, unknown>>();
-      items = (res.results || []).filter(
-        (row) => !('tenant_id' in row) || matchesTenantRow(row, tenantId)
-      );
+      if (tenantId === 'default' || tenantId === '*') {
+        const res = await db.prepare(`
+          SELECT id, name, quantity, min_quantity
+          FROM inventory_items
+          WHERE quantity <= min_quantity
+        `).all<Record<string, unknown>>();
+        items = (res.results || []).filter(
+          (row) => matchesTenantRow(row, tenantId)
+        );
+      } else {
+        items = [];
+      }
     }
 
     const cutoffIso = new Date(Date.now() - 4 * 3600 * 1000).toISOString();
@@ -151,11 +200,15 @@ export async function checkInventoryAlerts(env: Record<string, unknown>, tenantO
           LIMIT 1
         `).bind(itemId, cutoffIso, itemTenantId, itemTenantId).first<Record<string, unknown>>();
       } catch {
-        recent = await db.prepare(`
-          SELECT id FROM inventory_alerts
-          WHERE item_id = ? AND notified_at > ?
-          LIMIT 1
-        `).bind(itemId, cutoffIso).first<Record<string, unknown>>().catch(() => null);
+        if (itemTenantId === 'default' || itemTenantId === '*') {
+          recent = await db.prepare(`
+            SELECT id FROM inventory_alerts
+            WHERE item_id = ? AND notified_at > ?
+            LIMIT 1
+          `).bind(itemId, cutoffIso).first<Record<string, unknown>>().catch(() => null);
+        } else {
+          recent = null;
+        }
       }
       if (recent) continue;
 
@@ -169,9 +222,11 @@ export async function checkInventoryAlerts(env: Record<string, unknown>, tenantO
           'INSERT INTO inventory_alerts (item_id, alert_type, current_qty, threshold, notified_at, tenant_id) VALUES (?, ?, ?, ?, ?, ?)'
         ).bind(itemId, alertType, qty, minQty, now, itemTenantId).run();
       } catch {
-        await db.prepare(
-          'INSERT INTO inventory_alerts (item_id, alert_type, current_qty, threshold, notified_at) VALUES (?, ?, ?, ?, ?)'
-        ).bind(itemId, alertType, qty, minQty, now).run().catch(() => {});
+        if (itemTenantId === 'default') {
+          await db.prepare(
+            'INSERT INTO inventory_alerts (item_id, alert_type, current_qty, threshold, notified_at) VALUES (?, ?, ?, ?, ?)'
+          ).bind(itemId, alertType, qty, minQty, now).run().catch(() => {});
+        }
       }
       notified++;
     }

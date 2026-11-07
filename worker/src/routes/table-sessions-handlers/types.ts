@@ -12,7 +12,8 @@ export async function isTableAccessibleByTenant(
   tableId: string | undefined,
   tenantId: string,
 ): Promise<boolean> {
-  const normTenant = (tenantId || '').trim() || 'default';
+  const rawTenant = (tenantId || '').trim() || 'default';
+  const normTenant = rawTenant.toLowerCase() === 'hq' ? '*' : rawTenant;
   if (normTenant === '*') return true;
   if (!tableId) return normTenant === 'default';
   try {
@@ -20,7 +21,13 @@ export async function isTableAccessibleByTenant(
     if (!table) return normTenant === 'default';
     return matchesTenantRow(table, normTenant);
   } catch {
-    return normTenant === 'default';
+    try {
+      const legacyTable = await db.prepare('SELECT * FROM tables WHERE id = ?').bind(tableId).first<Record<string, unknown>>();
+      if (!legacyTable) return normTenant === 'default';
+      return matchesTenantRow(legacyTable, normTenant);
+    } catch {
+      return normTenant === 'default';
+    }
   }
 }
 

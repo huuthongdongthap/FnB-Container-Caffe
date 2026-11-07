@@ -44,13 +44,18 @@ function nonEmptyString(value: unknown): string | undefined {
  * surfaces build the actor the same way, so this lives here rather than being
  * written twice.
  */
-export function auditActor(c: Context<{ Bindings: Env }>): AuditActor {
+export function auditActor(c: Context<{ Bindings: Env }>, scopeTenantId?: string): AuditActor {
   const user = c.get('user') as { id: string; name?: string; role?: string; tenantId?: string; tenant_id?: string } | undefined;
+  const explicitScopeTenant = nonEmptyString(scopeTenantId);
+  const userTenant = nonEmptyString(user?.tenantId) ?? nonEmptyString(user?.tenant_id);
+  const reqTenant = nonEmptyString(getTenantId(c));
+  const envTenant = nonEmptyString((c.env as unknown as Record<string, unknown> | undefined)?.SOP_TENANT_ID);
+  const isConcrete = (t?: string): t is string => Boolean(t && t !== '*' && t.toLowerCase() !== 'hq');
   const resolvedTenant =
-    nonEmptyString(user?.tenantId) ??
-    nonEmptyString(user?.tenant_id) ??
-    nonEmptyString((c.env as unknown as Record<string, unknown> | undefined)?.SOP_TENANT_ID) ??
-    nonEmptyString(getTenantId(c)) ??
+    (isConcrete(explicitScopeTenant) ? explicitScopeTenant : undefined) ??
+    (isConcrete(userTenant) ? userTenant : undefined) ??
+    (isConcrete(reqTenant) ? reqTenant : undefined) ??
+    (isConcrete(envTenant) ? envTenant : undefined) ??
     'default';
   return {
     id: String(user?.id ?? ''),

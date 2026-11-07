@@ -19,6 +19,10 @@ interface OrderTableProps {
   onFilterChange?: (filter: OrderStatus | 'all') => void;
   onSearch?: (query: string) => void;
   onOrderAction?: (orderId: string, action: string) => void;
+  currentPage?: number;
+  pageSize?: number;
+  totalCount?: number;
+  onPageChange?: (page: number) => void;
 }
 
 /* ─── Search & Filter Tabs ───────────────────────────────────────────── */
@@ -139,6 +143,10 @@ export function StitchOrderMgmtTable({
   onFilterChange,
   onSearch,
   onOrderAction,
+  currentPage,
+  pageSize,
+  totalCount,
+  onPageChange,
 }: Readonly<OrderTableProps>) {
   const filteredOrders =
     activeFilter === 'all'
@@ -153,7 +161,13 @@ export function StitchOrderMgmtTable({
         onSearch={onSearch}
       />
       <OrderGrid orders={filteredOrders} onOrderAction={onOrderAction} />
-      <PaginationFooter />
+      <PaginationFooter
+        currentPage={currentPage}
+        pageSize={pageSize}
+        totalCount={totalCount ?? filteredOrders.length}
+        currentCount={filteredOrders.length}
+        onPageChange={onPageChange}
+      />
     </>
   );
 }

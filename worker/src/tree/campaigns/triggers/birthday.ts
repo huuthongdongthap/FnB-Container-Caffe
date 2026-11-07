@@ -38,12 +38,36 @@ export async function detectBirthdayCandidates(
             )
         `).bind(month, tenantId, yearStart, tenantId).all<CampaignCustomer>();
         const filtered = (results || []).filter(
-          (row) => !('tenant_id' in row) || matchesTenantRow(row as unknown as Record<string, unknown>, tenantId)
+          (row) => matchesTenantRow(row as unknown as Record<string, unknown>, tenantId)
         );
         log.info('birthday_candidates', { count: filtered.length, month, tenantId });
         return filtered;
       } catch {
-        // Fall through to default queries if tenant_id column is absent
+        try {
+          const { results } = await db.prepare(`
+            SELECT c.id, c.name, c.phone, c.email, c.loyalty_tier, c.date_of_birth, c.tenant_id
+            FROM customers c
+            WHERE c.date_of_birth IS NOT NULL
+              AND substr(c.date_of_birth, 6, 2) = ?
+              AND COALESCE(NULLIF(TRIM(c.tenant_id), ''), 'default') = ?
+              AND (c.phone IS NOT NULL OR c.email IS NOT NULL)
+              AND NOT EXISTS (
+                SELECT 1 FROM campaign_logs cl
+                WHERE cl.customer_id = c.id
+                  AND cl.trigger = 'birthday'
+                  AND cl.sent_at >= ?
+              )
+          `).bind(month, tenantId, yearStart).all<CampaignCustomer>();
+          const filtered = (results || []).filter(
+            (row) => matchesTenantRow(row as unknown as Record<string, unknown>, tenantId)
+          );
+          log.info('birthday_candidates', { count: filtered.length, month, tenantId });
+          return filtered;
+        } catch {
+          if (tenantId !== 'default') {
+            return [];
+          }
+        }
       }
     }
 
@@ -61,9 +85,9 @@ export async function detectBirthdayCandidates(
         )
     `).bind(month, yearStart).all<CampaignCustomer>();
 
-    const filtered = scoped && tenantId
-      ? (results || []).filter((row) => !('tenant_id' in row) || matchesTenantRow(row as unknown as Record<string, unknown>, tenantId))
-      : results;
+    const filtered = (results || []).filter(
+      (r) => !scoped || !tenantId || matchesTenantRow(r as unknown as Record<string, unknown>, tenantId)
+    );
     log.info('birthday_candidates', { count: filtered.length, month });
     return filtered;
   } catch (err) {

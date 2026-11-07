@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { subscribeSessionChange } from '@/lib/client-session';
 
 /* ═══════════════════════════════════════════════════════════════════
    Cart store — Zustand with localStorage aura_cart migration.
@@ -7,6 +8,7 @@ import { create } from 'zustand';
 
 const OLD_KEY = 'aura_cart';
 const NEW_KEY = 'aura_cart_v3';
+const HYPHEN_KEY = 'aura-cart';
 
 export interface CartItem {
   id: string;
@@ -22,11 +24,13 @@ export interface CartItem {
 interface CartState {
   items: CartItem[];
   tableId: string | null;
+  appliedPromo: string | null;
   addItem: (item: Omit<CartItem, 'quantity'>) => void;
   removeItem: (id: string) => void;
   updateQuantity: (id: string, quantity: number) => void;
   clearCart: () => void;
   setTableId: (id: string | null) => void;
+  setAppliedPromo: (promo: string | null) => void;
   totalItems: () => number;
   subtotal: () => number;
 }
@@ -157,6 +161,7 @@ function persistItems(items: CartItem[]): void {
 export const useCartStore = create<CartState>((set, get) => ({
   items: loadInitialItems(),
   tableId: getInitialTableId(),
+  appliedPromo: null,
 
   addItem: (item) =>
     set((state) => {
@@ -193,13 +198,26 @@ export const useCartStore = create<CartState>((set, get) => ({
     }),
 
   clearCart: () => {
-    localStorage.removeItem(OLD_KEY);
-    localStorage.removeItem(NEW_KEY);
-    set({ items: [], tableId: null });
+    try {
+      localStorage.removeItem(OLD_KEY);
+      localStorage.removeItem(NEW_KEY);
+      localStorage.removeItem(HYPHEN_KEY);
+    } catch { /* ignore */ }
+    set({ items: [], appliedPromo: null, tableId: null });
   },
 
   setTableId: (id) => set({ tableId: id }),
 
+  setAppliedPromo: (promo) => set({ appliedPromo: promo }),
+
   totalItems: () => get().items.reduce((sum, i) => sum + i.quantity, 0),
   subtotal: () => get().items.reduce((sum, i) => sum + i.price * i.quantity, 0),
 }));
+
+// Reset cart state and storage whenever the active user or tenant session changes
+// so cart items, table context, and promo state never bleed across accounts.
+if (typeof window !== 'undefined') {
+  subscribeSessionChange(() => {
+    useCartStore.getState().clearCart();
+  });
+}

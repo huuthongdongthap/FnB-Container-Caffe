@@ -24,11 +24,41 @@ export const RATE_LIMIT_HEADERS = {
 
 /**
  * Resolves the caller's network address.
- * Cloudflare sets cf-connecting-ip at the edge; x-forwarded-for is only trusted
- * when the request did not come through the CF proxy.
+ * Cloudflare sets cf-connecting-ip at the edge; x-forwarded-for / x-real-ip are
+ * only accepted as a sanitized first hop in non-production environments when
+ * cf-connecting-ip is absent.
  */
-function resolveClientIp(c: Context<{ Bindings: Env }>): string {
-  return c.req.header('cf-connecting-ip') || c.req.header('x-forwarded-for') || 'unknown';
+export function getClientIdentifier(c: Context<{ Bindings: Env }> | Context): string {
+  const cfIp = (
+    c.req.header('CF-Connecting-IP') ||
+    c.req.header('cf-connecting-ip') ||
+    ''
+  ).trim();
+  if (cfIp) return cfIp;
+
+  const envRecord = (c.env || {}) as Record<string, unknown>;
+  const envName = String(envRecord.ENVIRONMENT || envRecord.NODE_ENV || '').toLowerCase();
+  if (envName !== 'production') {
+    const xff = (
+      c.req.header('X-Forwarded-For') ||
+      c.req.header('x-forwarded-for') ||
+      ''
+    )
+      .split(',')[0]
+      ?.trim();
+    if (xff && /^[a-fA-F0-9:.]{3,45}$/.test(xff)) return xff;
+    const realIp = (
+      c.req.header('X-Real-IP') ||
+      c.req.header('x-real-ip') ||
+      ''
+    ).trim();
+    if (realIp && /^[a-fA-F0-9:.]{3,45}$/.test(realIp)) return realIp;
+  }
+  return 'unknown';
+}
+
+export function resolveClientIp(c: Context<{ Bindings: Env }>): string {
+  return getClientIdentifier(c);
 }
 
 /**
@@ -36,10 +66,23 @@ function resolveClientIp(c: Context<{ Bindings: Env }>): string {
  * `c.get` is absent from hand-built mock contexts in unit tests, and Hono's
  * typed key map rejects dynamic keys, so read through the raw signatures.
  */
-function readContextValue(c: Context<{ Bindings: Env }>, key: string): unknown {
+function readContextValue(c: Context<{ Bindings: Env }> | Context, key: string): unknown {
   const getter = (c as unknown as { get?: (k: string) => unknown }).get;
   if (typeof getter !== 'function') return undefined;
   return getter.call(c, key);
+}
+
+export function userOrIpKeyGenerator(c: Context<{ Bindings: Env }> | Context): string {
+  const user = readContextValue(c, 'user') as
+    | { id?: string; tenantId?: string; tenant_id?: string }
+    | undefined;
+  if (user?.id) {
+    const ctxTenant = readContextValue(c, 'tenantId') as string | undefined;
+    const rawTenant = String(ctxTenant || user.tenantId || user.tenant_id || 'default').trim();
+    const tenantScope = rawTenant.toLowerCase() === 'hq' ? '*' : rawTenant || 'default';
+    return `user:${tenantScope}:${user.id}`;
+  }
+  return `ip:${getClientIdentifier(c)}`;
 }
 
 /**
@@ -49,15 +92,17 @@ function readContextValue(c: Context<{ Bindings: Env }>, key: string): unknown {
  * single counter, so a busy office locks out everyone. An authenticated user is
  * the true identity; tenant is next best; IP is the last resort for guests.
  */
-function buildRateLimitKey(
+export function buildRateLimitKey(
   c: Context<{ Bindings: Env }>,
   config: RateLimitConfig
 ): string {
-  const user = readContextValue(c, 'user') as { id?: string; tenantId?: string } | undefined;
+  const user = readContextValue(c, 'user') as
+    | { id?: string; tenantId?: string; tenant_id?: string }
+    | undefined;
   const tenantId = readContextValue(c, 'tenantId') as string | undefined;
 
   if (user?.id) {
-    return `${config.keyPrefix}:user:${user.id}`;
+    return `${config.keyPrefix}:${userOrIpKeyGenerator(c)}`;
   }
   if (tenantId && tenantId !== 'default') {
     return `${config.keyPrefix}:tenant:${tenantId}:ip:${resolveClientIp(c)}`;
@@ -166,20 +211,20 @@ export async function checkRateLimit(
   // Bypass in test environment or when KV is not configured (test benches)
   if ((c.env as Record<string, unknown>).NODE_ENV === 'test') return true;
   if (!c.env.AUTH_KV) return true;
-  const isProd = (c.env as Record<string, unknown>)?.ENVIRONMENT === 'production' || (c.env as Record<string, unknown>)?.NODE_ENV === 'production';
-  const origin = c.req.header('origin') || c.req.header('referer') || '';
-  if (!isProd && (origin.includes('localhost') || origin.includes('127.0.0.1'))) {
-    return true;
-  }
   const envRecord = c.env as Record<string, unknown>;
+  const isProd = envRecord?.ENVIRONMENT === 'production' || envRecord?.NODE_ENV === 'production';
   const allowTestHarness = !isProd && (
     envRecord?.ALLOW_PLAYWRIGHT_TEST_HEADER === 'true' ||
     envRecord?.ENVIRONMENT === 'development' ||
     envRecord?.ENVIRONMENT === 'test'
   );
+  const origin = c.req.header('origin') || c.req.header('referer') || '';
+  if (allowTestHarness && (origin.includes('localhost') || origin.includes('127.0.0.1'))) {
+    return true;
+  }
   const isTestBypass = allowTestHarness && c.req.header('x-playwright-test') === 'true';
-  const ip = c.req.header('cf-connecting-ip') || c.req.header('x-forwarded-for') || 'unknown';
-  if (!isProd && (ip === '127.0.0.1' || ip === 'localhost' || isTestBypass)) {
+  const ip = resolveClientIp(c);
+  if (allowTestHarness && (ip === '127.0.0.1' || ip === 'localhost' || isTestBypass)) {
     return true;
   }
   const key = buildRateLimitKey(c, config);

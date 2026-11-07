@@ -13,6 +13,17 @@ export interface OrderEvent {
   createdAt: number;
   updatedAt: number;
   seq?: number;
+  tenant_id?: string;
+  tenantId?: string;
+  __tenant_id?: string;
+  _cachedAt?: number;
+}
+
+function normalizeOrderTenant(raw: unknown): string {
+  const trimmed = typeof raw === 'string' ? raw.trim() : '';
+  if (!trimmed) return 'default';
+  if (trimmed.toLowerCase() === 'hq' || trimmed === '*') return '*';
+  return trimmed;
 }
 export interface ClientInfo { role: string; orderIds: string[] }
 export interface OrderBroadcasterState {
@@ -95,6 +106,8 @@ export class OrderBroadcaster {
   private snapshotStorage?: SnapshotStorage;
   private ready: Promise<void> = Promise.resolve();
   private pending: Promise<void> = Promise.resolve();
+  public recentOrders: Map<string, Record<string, unknown>> = new Map();
+  private sessions: Map<{ send: (msg: string) => void }, { tenantId: string }> = new Map();
 
   /**
    * CF hands a DO its own `state` — which owns `storage` and
@@ -115,6 +128,15 @@ export class OrderBroadcaster {
         if (saved && saved.orders && Number.isFinite(saved.seq)) {
           this.state.orders = saved.orders;
           this.state.seq = saved.seq;
+          for (const order of Object.values(saved.orders)) {
+            const orderTenant = normalizeOrderTenant(order.__tenant_id ?? order.tenant_id ?? order.tenantId);
+            const cacheKey = `${orderTenant}:${order.orderId}`;
+            this.recentOrders.set(cacheKey, {
+              ...order,
+              __tenant_id: orderTenant,
+              _cachedAt: order._cachedAt ?? order.updatedAt ?? Date.now(),
+            });
+          }
         }
       };
       this.ready = input.blockConcurrencyWhile ? input.blockConcurrencyWhile(hydrate) : hydrate();
@@ -122,16 +144,26 @@ export class OrderBroadcaster {
   }
 
   /** Serialize writes and publish memory only after storage succeeds. */
-  broadcast(event: OrderEvent): Promise<{ event: OrderEvent; seq: number }> {
+  broadcast(event: OrderEvent, tenantOverride?: string): Promise<{ event: OrderEvent; seq: number }> {
     const task = this.pending.then(async () => {
       await this.ready;
       const parsed = parseOrderBroadcast(event);
       if (!parsed) throw new Error('Invalid order event');
+      const rawEvent = event as unknown as Record<string, unknown>;
+      const rawTenant = tenantOverride ?? rawEvent.__tenant_id ?? rawEvent.tenant_id ?? rawEvent.tenantId;
+      const orderTenant = normalizeOrderTenant(rawTenant);
+      const orderId = parsed.orderId;
+      const cacheKey = `${orderTenant}:${orderId}`;
+      const stateKey = orderTenant === 'default' ? orderId : cacheKey;
       const seq = this.state.seq + 1;
-      const persisted = { ...parsed, seq };
-      const merged = { ...this.state.orders, [parsed.orderId]: persisted };
+      const persisted: OrderEvent = {
+        ...parsed,
+        ...(rawTenant !== undefined ? { tenant_id: orderTenant, __tenant_id: orderTenant } : {}),
+        seq,
+      };
+      const merged = { ...this.state.orders, [stateKey]: persisted };
       // Bounded retention: TTL for closed orders, then a hard cap by age.
-      const orders = evictStaleOrders(merged, parsed.orderId);
+      const orders = evictStaleOrders(merged, stateKey);
       if (this.snapshotStorage) {
         // `clients` is deliberately empty: a registration is a live WebSocket
         // handle, and one that outlived a DO restart would point at a socket
@@ -140,10 +172,82 @@ export class OrderBroadcaster {
       }
       this.state.orders = orders;
       this.state.seq = seq;
+
+      this.recentOrders.set(cacheKey, {
+        ...rawEvent,
+        ...persisted,
+        __tenant_id: orderTenant,
+        _cachedAt: Date.now(),
+      });
+      while (this.recentOrders.size > MAX_ORDERS) {
+        const oldestKey = this.recentOrders.keys().next().value;
+        if (!oldestKey || oldestKey === cacheKey) break;
+        this.recentOrders.delete(oldestKey);
+      }
+
+      const payloadMsg = JSON.stringify({ type: 'order_update', order: persisted, tenantId: orderTenant });
+      for (const [sock, meta] of this.sessions.entries()) {
+        if (meta.tenantId === '*' || meta.tenantId === orderTenant) {
+          try {
+            sock.send(payloadMsg);
+          } catch {
+            this.sessions.delete(sock);
+          }
+        }
+      }
+
       return { event: persisted, seq };
     });
     this.pending = task.then(() => {}, () => {});
     return task;
+  }
+
+  handleWebSocket(
+    request: Request,
+    socketOverride?: { send: (msg: string) => void; addEventListener?: (type: string, cb: () => void) => void }
+  ): Response {
+    const url = new URL(request.url);
+    const rawTenant =
+      request.headers.get('X-Tenant-ID') ||
+      request.headers.get('x-tenant-id') ||
+      request.headers.get('X-Store-ID') ||
+      request.headers.get('x-store-id') ||
+      url.searchParams.get('tenant_id') ||
+      url.searchParams.get('tenantId') ||
+      url.searchParams.get('store_id') ||
+      url.searchParams.get('storeId') ||
+      'default';
+    const socketTenant = normalizeOrderTenant(rawTenant);
+
+    const recentList = Array.from(this.recentOrders.values()).filter((item) => {
+      const itemTenant = normalizeOrderTenant(
+        item.__tenant_id || item.tenant_id || item.tenantId || 'default'
+      );
+      return socketTenant === '*' || itemTenant === socketTenant;
+    });
+
+    if (socketOverride) {
+      this.sessions.set(socketOverride, { tenantId: socketTenant });
+      socketOverride.send(JSON.stringify({ type: 'snapshot', orders: recentList }));
+      if (typeof socketOverride.addEventListener === 'function') {
+        socketOverride.addEventListener('close', () => this.sessions.delete(socketOverride));
+      }
+      return Response.json({ type: 'snapshot', orders: recentList });
+    }
+
+    const WsPairCtor = (globalThis as unknown as { WebSocketPair?: new () => { 0: WebSocket; 1: WebSocket & { accept: () => void } } }).WebSocketPair;
+    if (typeof WsPairCtor === 'function') {
+      const pair = new WsPairCtor();
+      const client = pair[0];
+      const server = pair[1];
+      server.accept();
+      this.sessions.set(server, { tenantId: socketTenant });
+      server.send(JSON.stringify({ type: 'snapshot', orders: recentList }));
+      server.addEventListener('close', () => this.sessions.delete(server));
+      return new Response(null, { status: 101, webSocket: client } as ResponseInit);
+    }
+
+    return Response.json({ type: 'snapshot', orders: recentList });
   }
 
   async fetch(request: Request): Promise<Response> {
@@ -154,26 +258,66 @@ export class OrderBroadcaster {
       let body: unknown;
       try { body = await request.json(); } catch { return new Response('Invalid JSON', { status: 400 }); }
       const fields = body && typeof body === 'object' ? body as Record<string, unknown> : {};
+      const headerTenant =
+        request.headers.get('X-Tenant-ID') ||
+        request.headers.get('x-tenant-id') ||
+        url.searchParams.get('tenant_id') ||
+        url.searchParams.get('tenantId') ||
+        undefined;
+      const rawTenant = fields.__tenant_id ?? fields.tenant_id ?? fields.tenantId ?? headerTenant;
+      const orderTenant = normalizeOrderTenant(rawTenant);
       const id = fields.orderId ?? fields.order_id;
-      const previous = typeof id === 'string' ? this.state.orders[id] : undefined;
+      const cacheKey = typeof id === 'string' ? `${orderTenant}:${id}` : '';
+      const previous =
+        typeof id === 'string'
+          ? (this.state.orders[cacheKey] ?? (orderTenant === 'default' ? this.state.orders[id] : undefined))
+          : undefined;
       const event = parseOrderBroadcast(body, previous);
       if (!event) return new Response('Invalid order event', { status: 400 });
       try {
-        const result = await this.broadcast(event);
+        const result = await this.broadcast(
+          rawTenant !== undefined ? { ...event, tenant_id: orderTenant, __tenant_id: orderTenant } : event,
+          rawTenant !== undefined ? orderTenant : undefined
+        );
         return Response.json({ success: true, seq: result.seq });
       } catch { return new Response('Order broadcast unavailable', { status: 503 }); }
     }
     if (url.pathname === '/state' && request.method === 'GET') {
       const since = Number(url.searchParams.get('since') || '0');
-      return Response.json(this.getState(Number.isFinite(since) && since >= 0 ? since : 0));
+      const rawTenant =
+        request.headers.get('X-Tenant-ID') ||
+        request.headers.get('x-tenant-id') ||
+        url.searchParams.get('tenant_id') ||
+        url.searchParams.get('tenantId') ||
+        undefined;
+      return Response.json(
+        this.getState(
+          Number.isFinite(since) && since >= 0 ? since : 0,
+          rawTenant ? normalizeOrderTenant(rawTenant) : undefined
+        )
+      );
+    }
+    if (
+      request.headers.get('Upgrade')?.toLowerCase() === 'websocket' ||
+      url.pathname === '/ws' ||
+      url.pathname.startsWith('/api/realtime')
+    ) {
+      return this.handleWebSocket(request);
     }
     return new Response('Not found', { status: 404 });
   }
 
   register(clientId: string, role: string, orderIds: string[]): void { this.state.clients[clientId] = { role, orderIds }; }
   unregister(clientId: string): void { delete this.state.clients[clientId]; }
-  getState(sinceSeq: number): OrderEvent[] {
-    return Object.values(this.state.orders).filter(order => (order.seq ?? 0) > sinceSeq)
+  getState(sinceSeq: number, tenantId?: string): OrderEvent[] {
+    const normalizedFilter = tenantId ? normalizeOrderTenant(tenantId) : undefined;
+    return Object.values(this.state.orders)
+      .filter((order) => {
+        if ((order.seq ?? 0) <= sinceSeq) return false;
+        if (!normalizedFilter || normalizedFilter === '*') return true;
+        const itemTenant = normalizeOrderTenant(order.__tenant_id ?? order.tenant_id ?? order.tenantId);
+        return itemTenant === normalizedFilter;
+      })
       .sort((a, b) => (a.seq ?? 0) - (b.seq ?? 0));
   }
   getClient(clientId: string): ClientInfo | undefined { return this.state.clients[clientId]; }

@@ -131,7 +131,7 @@ export async function publishOrderEvent(
   kv: { put: (k: string, v: string, opts?: { expirationTtl?: number }) => Promise<unknown> } | null | undefined,
   orderId: string,
   status: string,
-  options?: { previousStatus?: string; waitUntil?: (p: Promise<unknown>) => void }
+  options?: { previousStatus?: string; tenantId?: string; waitUntil?: (p: Promise<unknown>) => void }
 ): Promise<void> {
   if (!kv || !orderId) return;
   const now = new Date().toISOString();
@@ -139,6 +139,7 @@ export async function publishOrderEvent(
     orderId,
     status,
     previous_status: options?.previousStatus,
+    ...(options?.tenantId ? { tenant_id: options.tenantId, tenantId: options.tenantId } : {}),
     timestamp: now,
   });
   const promise = Promise.all([

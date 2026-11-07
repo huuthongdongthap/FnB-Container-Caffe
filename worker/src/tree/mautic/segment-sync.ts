@@ -27,8 +27,35 @@ export async function syncSegments(
   let assigned = 0;
 
   for (const customer of customers) {
-    const email = (customer.email as string) || `${customer.phone}@aura-cafe.internal`;
-    const contactId = contactIdMap[email];
+    const rawEmail = typeof customer.email === 'string' ? customer.email.trim() : '';
+    const phoneOrId = String(customer.phone || customer.id || '');
+    const rawTenant = typeof customer.tenant_id === 'string' ? customer.tenant_id.trim() : '';
+    const rowTenant = rawTenant || 'default';
+    let contactId: number | undefined;
+    if (rawEmail) {
+      contactId = contactIdMap[rawEmail];
+    } else if (rowTenant !== 'default' && rowTenant !== '*') {
+      contactId =
+        contactIdMap[`${rowTenant}+${phoneOrId}@aura-cafe.internal`] ??
+        contactIdMap[`${rowTenant}+${phoneOrId}@aura-fnb.local`];
+      if (!contactId) {
+        const hasCrossTenantPhoneCollision = customers.some((other) => {
+          if (other === customer) return false;
+          const otherPhone = String(other.phone || other.id || '');
+          const otherTenant = (typeof other.tenant_id === 'string' && other.tenant_id.trim()) || 'default';
+          return otherPhone === phoneOrId && otherTenant !== rowTenant;
+        });
+        if (!hasCrossTenantPhoneCollision) {
+          contactId =
+            contactIdMap[`${phoneOrId}@aura-cafe.internal`] ??
+            contactIdMap[`${phoneOrId}@aura-fnb.local`];
+        }
+      }
+    } else {
+      contactId =
+        contactIdMap[`${phoneOrId}@aura-cafe.internal`] ??
+        contactIdMap[`${phoneOrId}@aura-fnb.local`];
+    }
     if (!contactId) {
       continue;
     }

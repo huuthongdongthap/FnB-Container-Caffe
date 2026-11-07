@@ -31,6 +31,7 @@ export async function syncOrderToERPNext(env, orderId, orderData) {
 
   const authHeader = `token ${apiKey}:${apiSecret}`;
   const results = { salesOrder: null, lead: null };
+  let salesOrderFailed = false;
 
   // ── 1) Sales Order (when customer_name is known) ─────────────────────────
   try {
@@ -76,6 +77,7 @@ export async function syncOrderToERPNext(env, orderId, orderData) {
       results.salesOrder = soJson.data ?? soJson;
 
       if (!soRespFixed.ok) {
+        salesOrderFailed = true;
         console.error(
           '[erpnext-sync] Sales Order failed:',
           soRespFixed.status,
@@ -84,6 +86,7 @@ export async function syncOrderToERPNext(env, orderId, orderData) {
       }
     }
   } catch (err) {
+    salesOrderFailed = true;
     log.error('erpnext_sales_order_exception', { error: err?.message || err });
   }
 
@@ -123,5 +126,5 @@ export async function syncOrderToERPNext(env, orderId, orderData) {
     log.error('erpnext_lead_exception', { error: err?.message || err });
   }
 
-  return { ok: true, orderId, results };
+  return { ok: !salesOrderFailed, orderId, results };
 }

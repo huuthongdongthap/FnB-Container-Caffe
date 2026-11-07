@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useAuthStore } from '@/hooks/stores/use-auth-store';
 import { apiFetch } from '@/lib/api-client';
+import { isSameSessionSnapshot, readSessionSnapshot, useClientSessionScope } from '@/lib/client-session';
 import type { CustomerOrder } from '@/hooks/stores/order-store-types';
 
 export interface CustomerProfile {
@@ -37,6 +38,7 @@ interface ProfileUpdate {
 
 export function useAccount() {
   const user = useAuthStore((s) => s.user);
+  const session = useClientSessionScope();
   const [profile, setProfile] = useState<CustomerProfile | null>(null);
   const [orders, setOrders] = useState<OrderSummary[]>([]);
   const [loading, setLoading] = useState(true);
@@ -45,6 +47,13 @@ export function useAccount() {
   const [error, setError] = useState<string | null>(null);
   const [updateLoading, setUpdateLoading] = useState(false);
 
+  useEffect(() => {
+    setProfile(null);
+    setOrders([]);
+    setError(null);
+    setOrdersError(null);
+  }, [user?.id, session.tenantId, session.userScope]);
+
   const fetchProfile = useCallback(async () => {
     if (!user) {
       setProfile(null);
@@ -52,18 +61,21 @@ export function useAccount() {
       setLoading(false);
       return;
     }
+    const snap = readSessionSnapshot();
     try {
       const profileData = await apiFetch<{ success: boolean; data: CustomerProfile; error?: string; message?: string }>('/api/customers/me');
-      if (useAuthStore.getState().user?.id !== user.id) return;
+      if (useAuthStore.getState().user?.id !== user.id || !isSameSessionSnapshot(snap, readSessionSnapshot())) return;
       if (profileData.success) setProfile(profileData.data);
       else setError(profileData.error || profileData.message || 'Không thể tải thông tin');
     } catch {
-      if (useAuthStore.getState().user?.id !== user.id) return;
+      if (useAuthStore.getState().user?.id !== user.id || !isSameSessionSnapshot(snap, readSessionSnapshot())) return;
       setError('Lỗi kết nối');
     } finally {
-      setLoading(false);
+      if (useAuthStore.getState().user?.id === user.id && isSameSessionSnapshot(snap, readSessionSnapshot())) {
+        setLoading(false);
+      }
     }
-  }, [user]);
+  }, [user, session.tenantId, session.userScope]);
 
   const fetchOrders = useCallback(async () => {
     if (!user) {
@@ -72,10 +84,11 @@ export function useAccount() {
       setOrdersLoading(false);
       return;
     }
+    const snap = readSessionSnapshot();
     setOrdersError(null);
     try {
       const ordersData = await apiFetch<OrdersListResponse>('/api/orders?limit=50&sort=created_at&order=desc');
-      if (useAuthStore.getState().user?.id !== user.id) return;
+      if (useAuthStore.getState().user?.id !== user.id || !isSameSessionSnapshot(snap, readSessionSnapshot())) return;
       const resolvedOrders = Array.isArray(ordersData.data?.orders)
         ? ordersData.data.orders
         : Array.isArray(ordersData.orders)
@@ -87,21 +100,27 @@ export function useAccount() {
         setOrdersError(ordersData.error || ordersData.message || 'Không thể tải đơn hàng');
       }
     } catch {
-      if (useAuthStore.getState().user?.id !== user.id) return;
+      if (useAuthStore.getState().user?.id !== user.id || !isSameSessionSnapshot(snap, readSessionSnapshot())) return;
       setOrdersError('Lỗi kết nối mạng');
     } finally {
-      setOrdersLoading(false);
+      if (useAuthStore.getState().user?.id === user.id && isSameSessionSnapshot(snap, readSessionSnapshot())) {
+        setOrdersLoading(false);
+      }
     }
-  }, [user]);
+  }, [user, session.tenantId, session.userScope]);
 
   const updateProfile = useCallback(async (data: ProfileUpdate): Promise<boolean> => {
     if (!user) return false;
+    const snap = readSessionSnapshot();
     setUpdateLoading(true);
     try {
       const profileData = await apiFetch<{ success: boolean; data: CustomerProfile }>('/api/customers/me', {
         method: 'PATCH',
         body: JSON.stringify(data),
       });
+      if (useAuthStore.getState().user?.id !== user.id || !isSameSessionSnapshot(snap, readSessionSnapshot())) {
+        return false;
+      }
       if (profileData.success) {
         setProfile(profileData.data);
         return true;
@@ -112,7 +131,7 @@ export function useAccount() {
     } finally {
       setUpdateLoading(false);
     }
-  }, [user]);
+  }, [user, session.tenantId, session.userScope]);
 
   useEffect(() => { fetchProfile(); }, [fetchProfile]);
   useEffect(() => { fetchOrders(); }, [fetchOrders]);

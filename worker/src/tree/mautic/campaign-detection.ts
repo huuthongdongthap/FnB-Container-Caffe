@@ -37,13 +37,14 @@ async function detectAndEnroll(
   }
 
   let customers: Array<Record<string, unknown>> = [];
+  const allowUnscopedFallback = !tenantId || tenantId === 'default' || tenantId === '*';
   try {
     const { results } = await db.prepare(query).bind(...queryParams).all();
     customers = (results || []) as Array<Record<string, unknown>>;
   } catch (err) {
     const msg = String((err as Error)?.message || '');
-    const baseQuery = fallbackUnscopedQuery || query;
-    const baseParams = fallbackUnscopedParams || queryParams;
+    const baseQuery = (allowUnscopedFallback && fallbackUnscopedQuery) ? fallbackUnscopedQuery : query;
+    const baseParams = (allowUnscopedFallback && fallbackUnscopedParams) ? fallbackUnscopedParams : queryParams;
     if (msg.includes('no such column') && baseQuery.includes('c.loyalty_tier')) {
       try {
         const fallbackQuery = baseQuery
@@ -62,7 +63,7 @@ async function detectAndEnroll(
           return { detected: 0, enrolled: 0 };
         }
       }
-    } else if (fallbackUnscopedQuery && fallbackUnscopedParams) {
+    } else if (allowUnscopedFallback && fallbackUnscopedQuery && fallbackUnscopedParams) {
       try {
         const { results } = await db.prepare(fallbackUnscopedQuery).bind(...fallbackUnscopedParams).all();
         customers = (results || []) as Array<Record<string, unknown>>;
@@ -105,7 +106,7 @@ export async function detectWinbackCandidates(
   const thirtyOneDaysAgo = new Date(Date.now() - 31 * 86400000).toISOString();
   const tenantId = tenantOverride || resolvePilotStore(env as unknown as Parameters<typeof resolvePilotStore>[0]);
   const unscopedQuery = `SELECT c.id, c.name, c.phone, c.email, c.loyalty_tier,
-      (SELECT MAX(o.created_at) FROM orders o WHERE o.customer_id = c.id) as last_order_date
+      (SELECT MAX(o.created_at) FROM orders o WHERE o.customer_id = c.id AND COALESCE(o.status, '') NOT IN ('cancelled', 'rejected', 'failed', 'expired')) as last_order_date
      FROM customers c
      WHERE c.phone IS NOT NULL AND c.phone != ''
        AND c.id NOT IN (
@@ -113,17 +114,17 @@ export async function detectWinbackCandidates(
            AND created_at > ?
        )
        AND (
-         SELECT MAX(o2.created_at) FROM orders o2 WHERE o2.customer_id = c.id
+         SELECT MAX(o2.created_at) FROM orders o2 WHERE o2.customer_id = c.id AND COALESCE(o2.status, '') NOT IN ('cancelled', 'rejected', 'failed', 'expired')
        ) IS NOT NULL
        AND (
-         SELECT MAX(o3.created_at) FROM orders o3 WHERE o3.customer_id = c.id
+         SELECT MAX(o3.created_at) FROM orders o3 WHERE o3.customer_id = c.id AND COALESCE(o3.status, '') NOT IN ('cancelled', 'rejected', 'failed', 'expired')
        ) < ?
      LIMIT 100`;
   const unscopedParams = [thirtyOneDaysAgo, thirtyOneDaysAgo];
 
   if (tenantId && tenantId !== '*') {
     const scopedQuery = `SELECT c.id, c.name, c.phone, c.email, c.loyalty_tier, c.tenant_id,
-        (SELECT MAX(o.created_at) FROM orders o WHERE o.customer_id = c.id AND COALESCE(NULLIF(TRIM(o.tenant_id), ''), 'default') = ?) as last_order_date
+        (SELECT MAX(o.created_at) FROM orders o WHERE o.customer_id = c.id AND COALESCE(o.status, '') NOT IN ('cancelled', 'rejected', 'failed', 'expired') AND COALESCE(NULLIF(TRIM(o.tenant_id), ''), 'default') = ?) as last_order_date
        FROM customers c
        WHERE c.phone IS NOT NULL AND c.phone != ''
          AND COALESCE(NULLIF(TRIM(c.tenant_id), ''), 'default') = ?
@@ -133,10 +134,10 @@ export async function detectWinbackCandidates(
              AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?
          )
          AND (
-           SELECT MAX(o2.created_at) FROM orders o2 WHERE o2.customer_id = c.id AND COALESCE(NULLIF(TRIM(o2.tenant_id), ''), 'default') = ?
+           SELECT MAX(o2.created_at) FROM orders o2 WHERE o2.customer_id = c.id AND COALESCE(o2.status, '') NOT IN ('cancelled', 'rejected', 'failed', 'expired') AND COALESCE(NULLIF(TRIM(o2.tenant_id), ''), 'default') = ?
          ) IS NOT NULL
          AND (
-           SELECT MAX(o3.created_at) FROM orders o3 WHERE o3.customer_id = c.id AND COALESCE(NULLIF(TRIM(o3.tenant_id), ''), 'default') = ?
+           SELECT MAX(o3.created_at) FROM orders o3 WHERE o3.customer_id = c.id AND COALESCE(o3.status, '') NOT IN ('cancelled', 'rejected', 'failed', 'expired') AND COALESCE(NULLIF(TRIM(o3.tenant_id), ''), 'default') = ?
          ) < ?
        LIMIT 100`;
     return detectAndEnroll(

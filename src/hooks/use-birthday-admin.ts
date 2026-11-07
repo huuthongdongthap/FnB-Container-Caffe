@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiFetch } from '@/lib/api-client';
+import { useClientSessionScope } from '@/lib/client-session';
 import { useCallback } from 'react';
 
 /* ------------------------------------------------------------------ */
@@ -30,6 +31,8 @@ const CONFIG_QUERY_KEY = ['admin-birthday-config'] as const;
 
 export function useBirthdayAdmin() {
   const queryClient = useQueryClient();
+  const session = useClientSessionScope();
+  const configQueryKey = [...CONFIG_QUERY_KEY, session.tenantId, session.userScope] as const;
 
   const {
     data: config,
@@ -37,7 +40,7 @@ export function useBirthdayAdmin() {
     error,
     refetch,
   } = useQuery<BirthdayConfig>({
-    queryKey: CONFIG_QUERY_KEY,
+    queryKey: configQueryKey,
     queryFn: () => apiFetch<BirthdayConfig>('/api/admin/birthday/config'),
     staleTime: 30_000,
   });
@@ -49,7 +52,7 @@ export function useBirthdayAdmin() {
         body: JSON.stringify(updates),
       }),
     onSuccess: (updated) => {
-      queryClient.setQueryData(CONFIG_QUERY_KEY, updated);
+      queryClient.setQueryData(configQueryKey, updated);
     },
   });
 

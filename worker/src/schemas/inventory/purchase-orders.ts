@@ -130,8 +130,10 @@ export const purchaseOrderRoutes = {
           'application/json': {
             schema: z.object({
               items: z.array(z.object({
-                ingredientId: z.string().min(1),
-                receivedQuantity: z.number().int().positive(),
+                ingredientId: z.string().min(1).optional(),
+                ingredient_id: z.string().min(1).optional(),
+                receivedQuantity: z.number().int().nonnegative().optional(),
+                received_quantity: z.number().int().nonnegative().optional(),
               })).min(1).max(200),
             }),
           },

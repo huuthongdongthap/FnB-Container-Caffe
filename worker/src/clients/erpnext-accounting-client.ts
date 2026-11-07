@@ -127,7 +127,7 @@ export class ErpnextAccountingClient {
       };
     } catch (error: unknown) {
       const msg = error instanceof Error ? error.message : String(error);
-      await this._markMappingFailed(order.id, msg, db).catch(() => {});
+      await this._markMappingFailed(order.id, msg, db, tenantId).catch(() => {});
       throw error;
     }
   }
@@ -182,7 +182,9 @@ export class ErpnextAccountingClient {
           "SELECT id, erpnext_id, sync_status FROM erpnext_mappings WHERE local_type = ? AND local_id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ? LIMIT 1"
         ).bind('order', orderId, effectiveTenant).first<ErpnextMapping>();
       } catch {
-        // Fall through to legacy query if tenant_id column is absent
+        if (effectiveTenant !== 'default') {
+          return null;
+        }
       }
     }
     try {
@@ -206,11 +208,27 @@ export class ErpnextAccountingClient {
         INSERT INTO erpnext_mappings (local_type, local_id, erpnext_id, erpnext_model, sync_status, attempts, last_synced_at, created_at, tenant_id)
         VALUES (?, ?, ?, ?, ?, 1, ?, ?, ?)
       `).bind('order', orderId, erpnextId, 'Sales Invoice', status, now, now, effectiveTenant).run();
-    } catch {
+    } catch (err) {
+      if (effectiveTenant !== 'default') {
+        throw err;
+      }
       await db.prepare(`
         INSERT INTO erpnext_mappings (local_type, local_id, erpnext_id, erpnext_model, sync_status, attempts, last_synced_at, created_at)
         VALUES (?, ?, ?, ?, ?, 1, ?, ?)
       `).bind('order', orderId, erpnextId, 'Sales Invoice', status, now, now).run();
+    }
+
+    try {
+      const scopedResult = await db.prepare(
+        "SELECT id FROM erpnext_mappings WHERE local_id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ? ORDER BY created_at DESC LIMIT 1"
+      ).bind(orderId, effectiveTenant).first<{ id: number }>();
+      if (scopedResult?.id) {
+        return scopedResult.id;
+      }
+    } catch {
+      if (effectiveTenant !== 'default') {
+        return null;
+      }
     }
 
     const result = await db.prepare(
@@ -220,9 +238,28 @@ export class ErpnextAccountingClient {
     return result?.id || null;
   }
 
-  private async _markMappingFailed(orderId: string, error: string, db: D1Database | null): Promise<void> {
+  private async _markMappingFailed(orderId: string, error: string, db: D1Database | null, tenantId?: string): Promise<void> {
     if (!db) {
       return;
+    }
+    const effectiveTenant = tenantId && tenantId.trim() && tenantId.trim() !== '*' ? tenantId.trim() : 'default';
+    if (tenantId !== '*') {
+      try {
+        await db.prepare(`
+          UPDATE erpnext_mappings
+          SET sync_status = 'failed',
+              error_message = ?,
+              attempts = attempts + 1,
+              last_synced_at = datetime('now'),
+              updated_at = datetime('now')
+          WHERE local_type = ? AND local_id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?
+        `).bind(error, 'order', orderId, effectiveTenant).run();
+        return;
+      } catch {
+        if (effectiveTenant !== 'default') {
+          return;
+        }
+      }
     }
     await db.prepare(`
       UPDATE erpnext_mappings
@@ -312,7 +349,11 @@ export async function createErpnextAccountingClientWithKv(
   env: WorkerEnv,
   tenantId?: string,
 ): Promise<ErpnextAccountingClient | null> {
-  const client = await createErpnextClientWithKv(env, tenantId);
+  const isNonDefaultTenant = Boolean(tenantId && tenantId.trim() && tenantId.trim() !== 'default' && tenantId.trim() !== '*');
+  const envForKv = isNonDefaultTenant
+    ? { ...env, ERPNEXT_URL: undefined, ERPNEXT_API_KEY: undefined, ERPNEXT_API_SECRET: undefined }
+    : env;
+  const client = await createErpnextClientWithKv(envForKv, tenantId);
   if (!client) {
     return null;
   }

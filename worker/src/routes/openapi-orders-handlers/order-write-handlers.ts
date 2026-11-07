@@ -2,16 +2,18 @@ import type { OpenAPIHono } from '@hono/zod-openapi';
 import type { Context } from 'hono';
 import type { Env } from '../../types/env';
 import { OrderRoutes } from '../../schemas/orders';
-import { formatCustomerOrder, formatOrder, fetchOrderItemsAndPayments } from './helpers';
+import { formatCustomerOrder, formatOrder, fetchOrderItemsAndPayments, resolveOpenApiOrdersTenant } from './helpers';
 import { canTransition, isTerminal, canActorTransition, toActorRole, publishOrderEvent } from '@aura/domain-order';
 import { executeKdsStatusTransition } from '@aura/domain-kitchen';
 import { canAccessOrder } from '@aura/domain-customer';
 import { createOrderFromAlias } from '../../../../packages/domain/order/commands/create-order-alias';
 import { getDatabase, matchesTenantRow } from '../../lib/db';
-import { getTenantId } from '../../middleware/tenant';
-import { handleCancelOrder } from './order-cancel-handlers';
+import { handleCancelOrder, runOrderCancellationRollback, resolveCustomerOwnerIdsForMutation } from './order-cancel-handlers';
+import { fetchOrderForRead } from './order-read-handlers';
 
 export { handleCancelOrder };
+
+const ORDER_STAFF_ROLES = ['owner', 'manager', 'supervisor', 'admin', 'cashier', 'waiter', 'staff'];
 
 function matchesOrderTenant(row: Record<string, unknown>, tenantId: string): boolean {
   return matchesTenantRow(row, tenantId);
@@ -41,28 +43,69 @@ export async function handleOpenApiCreateOrder(c: Context<{ Bindings: Env }>) {
   let details: { items: any[]; payments: any[] } = { items: [], payments: [] };
   try {
     created = await db.prepare(`SELECT o.*, COALESCE(t.table_number, t.id) as table_name
-      FROM orders o LEFT JOIN cafe_tables t ON o.table_id = t.id WHERE o.id = ?`)
-      .bind(accepted.data.id).first() || accepted.data;
-    details = await fetchOrderItemsAndPayments(db, accepted.data.id);
+      FROM orders o LEFT JOIN cafe_tables t ON o.table_id = t.id AND COALESCE(NULLIF(TRIM(t.tenant_id), ''), 'default') = COALESCE(NULLIF(TRIM(o.tenant_id), ''), 'default') WHERE o.id = ?`)
+      .bind(accepted.data.id).first().catch(() =>
+        db.prepare(`SELECT o.*, COALESCE(t.table_number, t.id) as table_name
+          FROM orders o LEFT JOIN cafe_tables t ON o.table_id = t.id WHERE o.id = ?`)
+          .bind(accepted.data.id).first()
+      ) || accepted.data;
+    const rawCreatedTenant =
+      typeof created?.tenant_id === 'string' && created.tenant_id.trim() && created.tenant_id.trim() !== '*' && created.tenant_id.trim().toLowerCase() !== 'hq'
+        ? created.tenant_id.trim()
+        : (typeof accepted.data?.tenant_id === 'string' && accepted.data.tenant_id.trim() && accepted.data.tenant_id.trim() !== '*' && accepted.data.tenant_id.trim().toLowerCase() !== 'hq'
+            ? accepted.data.tenant_id.trim()
+            : undefined);
+    details = await fetchOrderItemsAndPayments(db, accepted.data.id, rawCreatedTenant);
   } catch { /* An optional read projection must not turn a committed order into a retryable failure. */ }
   return c.json({ success: true, data: formatOrder(created, details.items, details.payments) }, response.status as 200 | 201,
     response.headers.get('X-Cache') ? { 'X-Cache': 'HIT' } : undefined);
 }
 
 export async function handleOpenApiUpdateOrder(c: Context<{ Bindings: Env }>) {
+  const tenantCheck = resolveOpenApiOrdersTenant(c, 'write');
+  if (!tenantCheck.ok) {
+    return tenantCheck.response;
+  }
   const db = getDatabase(c);
   const id = ((c.req as any).valid ? (c.req as any).valid('param') : null)?.id || c.req.param('id');
   const body = ((c.req as any).valid ? (c.req as any).valid('json') : null) || (await c.req.json());
   const user = c.get('user');
   const now = new Date().toISOString();
 
-  const existing = (await db.prepare('SELECT * FROM orders WHERE id = ?').bind(id).first()) as { id: string; status: string; customer_id?: string | null; tenant_id?: string | null } | null;
-  if (!existing || !matchesOrderTenant(existing as unknown as Record<string, unknown>, getTenantId(c))) {
+  const rawTenantId = (tenantCheck.tenantId || 'default').trim() || 'default';
+  const tenantId = rawTenantId.toLowerCase() === 'hq' ? '*' : rawTenantId;
+  const existing = (await db.prepare('SELECT * FROM orders WHERE id = ?').bind(id).first()) as {
+    id: string; status: string; payment_status?: string | null; customer_id?: string | null; tenant_id?: string | null;
+  } | null;
+  if (!existing || !matchesOrderTenant(existing as unknown as Record<string, unknown>, tenantId)) {
     return c.json({ success: false, error: 'Order not found' }, 404);
   }
-  const access = canAccessOrder(user, existing);
+  const rawExistingTenant =
+    existing.tenant_id &&
+    String(existing.tenant_id).trim() &&
+    String(existing.tenant_id).trim() !== '*' &&
+    String(existing.tenant_id).trim().toLowerCase() !== 'hq'
+      ? String(existing.tenant_id).trim()
+      : undefined;
+  const effectiveOrderTenant = tenantId === '*' ? (rawExistingTenant || 'default') : (rawExistingTenant || tenantId || 'default');
+  let effectiveUser = user as Record<string, any> | undefined;
+  let customerOwnerIds: string[] = [];
+  if (effectiveUser?.role === 'customer') {
+    customerOwnerIds = await resolveCustomerOwnerIdsForMutation(db, effectiveUser, effectiveOrderTenant);
+    const ordCustId = existing.customer_id ? String(existing.customer_id).trim() : '';
+    if (ordCustId && customerOwnerIds.includes(ordCustId)) {
+      effectiveUser = { ...effectiveUser, id: ordCustId };
+    }
+  }
+  const access = canAccessOrder(effectiveUser as any, existing);
   if (!access.allowed) {
     return c.json({ success: false, error: access.reason || 'Forbidden' }, 403);
+  }
+  if (user?.role === 'customer') {
+    const ordCustId = existing.customer_id ? String(existing.customer_id).trim() : '';
+    if (!ordCustId || !customerOwnerIds.includes(ordCustId)) {
+      return c.json({ success: false, error: 'Unauthorized to mutate unclaimed or foreign customer order' }, 403);
+    }
   }
   if (isTerminal(existing.status)) {
     return c.json({ success: false, error: `Cannot transition terminal order (${existing.status})` }, 400);
@@ -86,14 +129,38 @@ export async function handleOpenApiUpdateOrder(c: Context<{ Bindings: Env }>) {
     ) {
       return c.json({ success: false, error: 'Customers may only cancel pending or confirmed orders' }, 403);
     }
+    if (body.status === 'cancelled' && String(existing.payment_status || '').trim().toLowerCase() === 'paid') {
+      return c.json({ success: false, error: 'Paid orders cannot be cancelled by customer' }, 409);
+    }
   }
 
   const updates: string[] = [];
   const params: (string | number | null)[] = [];
   const canonicalUpdates: string[] = [];
   const canonicalParams: (string | number | null)[] = [];
-  const tenantId = getTenantId(c).trim() || 'default';
   let statusHandledByKds = false;
+
+  const notes = body.notes;
+  const delivery_time = body.delivery_time ?? body.deliveryTime;
+  const customer_name = body.customer_name ?? body.customerName ?? body.customer?.name;
+  const customer_phone = body.customer_phone ?? body.customerPhone ?? body.customer?.phone;
+  const customer_email = body.customer_email ?? body.customerEmail ?? body.customer?.email;
+  const hasFieldMutation =
+    notes !== undefined ||
+    delivery_time !== undefined ||
+    customer_name !== undefined ||
+    customer_phone !== undefined ||
+    customer_email !== undefined ||
+    body.customer !== undefined;
+
+  if (hasFieldMutation) {
+    if (isTerminal(existing.status)) {
+      return c.json({ success: false, error: `Cannot transition terminal order (${existing.status})` }, 400);
+    }
+    if (!Boolean(user?.role && ORDER_STAFF_ROLES.includes(user.role))) {
+      return c.json({ success: false, error: 'Insufficient permissions to update order fields' }, 403);
+    }
+  }
 
   if (body.status !== undefined) {
     if (existing.status !== body.status) {
@@ -101,23 +168,52 @@ export async function handleOpenApiUpdateOrder(c: Context<{ Bindings: Env }>) {
       if (!structural.ok) return c.json({ success: false, error: structural.error }, 400);
       const authCheck = canActorTransition(toActorRole(user?.role), existing.status, body.status);
       if (!authCheck.ok) return c.json({ success: false, error: authCheck.error }, 403);
-      const rawExistingTenant = existing.tenant_id && String(existing.tenant_id).trim() ? String(existing.tenant_id).trim() : undefined;
-      const effectiveOrderTenant = tenantId === '*' ? (rawExistingTenant || 'default') : (rawExistingTenant || tenantId || 'default');
-      const transition = await executeKdsStatusTransition(db, id, body.status, user?.role, {
-        tenantId: effectiveOrderTenant,
-        kv: c.env?.AUTH_KV,
-        env: c.env as unknown as Record<string, unknown>,
-      });
-      if (!transition.success) {
-        return c.json({ success: false, error: transition.error }, (transition.statusCode || 400) as any);
+
+      if (body.status === 'cancelled') {
+        const transition = await executeKdsStatusTransition(db, id, 'cancelled', user?.role, {
+          tenantId: user?.role === 'customer' ? (rawExistingTenant || 'default') : (tenantId === '*' ? (rawExistingTenant || 'default') : tenantId),
+          kv: c.env?.AUTH_KV,
+          env: c.env as unknown as Record<string, unknown>,
+          skipCancelSideEffects: true,
+        });
+        if (!transition.success) {
+          return c.json({ success: false, error: transition.error }, (transition.statusCode || 400) as any);
+        }
+        statusHandledByKds = true;
+        await runOrderCancellationRollback({
+          db,
+          env: c.env,
+          id,
+          existing: existing as unknown as Record<string, unknown>,
+          cancelTenant: effectiveOrderTenant,
+          now,
+          reason: body.reason || body.notes || 'order_cancelled',
+        });
+      } else {
+        const transition = await executeKdsStatusTransition(db, id, body.status, user?.role, {
+          tenantId: effectiveOrderTenant,
+          kv: c.env?.AUTH_KV,
+          env: c.env as unknown as Record<string, unknown>,
+        });
+        if (!transition.success) {
+          return c.json({ success: false, error: transition.error }, (transition.statusCode || 400) as any);
+        }
+        statusHandledByKds = true;
       }
-      statusHandledByKds = true;
       if (body.status === 'cancelled') {
         try {
           await db
-            .prepare("UPDATE payments SET status = 'cancelled' WHERE order_id = ? AND status = 'pending'")
-            .bind(id)
-            .run();
+            .prepare("UPDATE payments SET status = 'cancelled' WHERE order_id = ? AND status = 'pending' AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?")
+            .bind(id, effectiveOrderTenant)
+            .run()
+            .catch(() => {
+              if (effectiveOrderTenant === 'default') {
+                return db
+                  .prepare("UPDATE payments SET status = 'cancelled' WHERE order_id = ? AND status = 'pending'")
+                  .bind(id)
+                  .run();
+              }
+            });
         } catch {
           // Optional payments table in minimal test schemas
         }
@@ -126,7 +222,7 @@ export async function handleOpenApiUpdateOrder(c: Context<{ Bindings: Env }>) {
         try {
           const { creditLoyaltyIfEligible } = await import('../../../../packages/domain/order/policies/loyalty-trigger');
           await creditLoyaltyIfEligible(db, c.env as unknown as Record<string, unknown>, id).catch(() => {});
-          const { rewardReferralOnFirstOrder } = await import('@aura/domain-crm');
+          const { rewardReferralOnFirstOrder, resolveReferralPolicy, DEFAULT_REFERRAL_POLICY } = await import('@aura/domain-crm');
           const custPhone = (existing as Record<string, unknown>).customer_phone as string | undefined;
           let resolvedCustId = existing.customer_id || null;
           if (!resolvedCustId && custPhone) {
@@ -137,7 +233,8 @@ export async function handleOpenApiUpdateOrder(c: Context<{ Bindings: Env }>) {
           }
           if (resolvedCustId) {
             const totalVnd = Number((existing as Record<string, unknown>).total ?? (existing as Record<string, unknown>).total_amount ?? 0);
-            await rewardReferralOnFirstOrder(db, resolvedCustId, id, totalVnd, undefined, effectiveOrderTenant).catch(() => {});
+            const refPolicy = await resolveReferralPolicy(c.env?.AUTH_KV, effectiveOrderTenant).catch(() => DEFAULT_REFERRAL_POLICY);
+            await rewardReferralOnFirstOrder(db, resolvedCustId, id, totalVnd, refPolicy, effectiveOrderTenant).catch(() => {});
           }
         } catch { /* Non-blocking loyalty/referral trigger on completion */ }
       }
@@ -151,21 +248,24 @@ export async function handleOpenApiUpdateOrder(c: Context<{ Bindings: Env }>) {
     else if (body.status === 'completed') { updates.push('completed_at = ?'); params.push(now); }
     else if (body.status === 'cancelled') { updates.push('cancelled_at = ?'); params.push(now); }
   }
-  if (user?.role !== 'customer') {
-    if (body.notes !== undefined) {
-      updates.push('notes = ?'); params.push(body.notes);
-      canonicalUpdates.push('notes = ?'); canonicalParams.push(body.notes);
+  if (Boolean(user?.role && ORDER_STAFF_ROLES.includes(user.role))) {
+    if (notes !== undefined) {
+      updates.push('notes = ?'); params.push(notes);
+      canonicalUpdates.push('notes = ?'); canonicalParams.push(notes);
     }
-    if (body.customer !== undefined) {
-      if (body.customer.name !== undefined) {
-        updates.push('customer_name = ?'); params.push(body.customer.name);
-        canonicalUpdates.push('customer_name = ?'); canonicalParams.push(body.customer.name);
-      }
-      if (body.customer.phone !== undefined) {
-        updates.push('customer_phone = ?'); params.push(body.customer.phone);
-        canonicalUpdates.push('customer_phone = ?'); canonicalParams.push(body.customer.phone);
-      }
-      if (body.customer.email !== undefined) { updates.push('customer_email = ?'); params.push(body.customer.email); }
+    if (delivery_time !== undefined) {
+      updates.push('delivery_time = ?'); params.push(delivery_time);
+    }
+    if (customer_name !== undefined) {
+      updates.push('customer_name = ?'); params.push(customer_name);
+      canonicalUpdates.push('customer_name = ?'); canonicalParams.push(customer_name);
+    }
+    if (customer_phone !== undefined) {
+      updates.push('customer_phone = ?'); params.push(customer_phone);
+      canonicalUpdates.push('customer_phone = ?'); canonicalParams.push(customer_phone);
+    }
+    if (customer_email !== undefined) {
+      updates.push('customer_email = ?'); params.push(customer_email);
     }
   }
 
@@ -174,36 +274,32 @@ export async function handleOpenApiUpdateOrder(c: Context<{ Bindings: Env }>) {
 
   if (updates.length > 1) {
     try {
-      if (tenantId !== '*') {
-        await db
-          .prepare(
-            `UPDATE orders SET ${updates.join(', ')} WHERE id = ? AND (tenant_id = ? OR (? = 'default' AND (tenant_id IS NULL OR TRIM(tenant_id) = '')))`
-          )
-          .bind(...params, tenantId, tenantId)
-          .run();
-      } else {
-        await db.prepare(`UPDATE orders SET ${updates.join(', ')} WHERE id = ?`).bind(...params).run();
-      }
+      await db
+        .prepare(
+          `UPDATE orders SET ${updates.join(', ')} WHERE id = ? AND (tenant_id = ? OR (? = 'default' AND (tenant_id IS NULL OR TRIM(tenant_id) = '')))`
+        )
+        .bind(...params, effectiveOrderTenant, effectiveOrderTenant)
+        .run();
     } catch (err) {
       const isMissingTenantCol = /no such column:\s*tenant_id/i.test(String(err));
-      if (tenantId !== '*' && !isMissingTenantCol) {
+      if (!isMissingTenantCol) {
         if (canonicalUpdates.length > 1) {
           try {
             await db
               .prepare(
                 `UPDATE orders SET ${canonicalUpdates.join(', ')} WHERE id = ? AND (tenant_id = ? OR (? = 'default' AND (tenant_id IS NULL OR TRIM(tenant_id) = '')))`
               )
-              .bind(...canonicalParams, tenantId, tenantId)
+              .bind(...canonicalParams, effectiveOrderTenant, effectiveOrderTenant)
               .run();
           } catch (innerErr) {
-            if (/no such column:\s*tenant_id/i.test(String(innerErr))) {
+            if (/no such column:\s*tenant_id/i.test(String(innerErr)) && effectiveOrderTenant === 'default') {
               await db.prepare(`UPDATE orders SET ${canonicalUpdates.join(', ')} WHERE id = ?`).bind(...canonicalParams).run();
             } else {
               throw innerErr;
             }
           }
         }
-      } else {
+      } else if (effectiveOrderTenant === 'default') {
         try {
           await db.prepare(`UPDATE orders SET ${updates.join(', ')} WHERE id = ?`).bind(...params).run();
         } catch {
@@ -211,6 +307,8 @@ export async function handleOpenApiUpdateOrder(c: Context<{ Bindings: Env }>) {
             await db.prepare(`UPDATE orders SET ${canonicalUpdates.join(', ')} WHERE id = ?`).bind(...canonicalParams).run();
           }
         }
+      } else {
+        throw err;
       }
     }
   }
@@ -220,36 +318,54 @@ export async function handleOpenApiUpdateOrder(c: Context<{ Bindings: Env }>) {
     await publishOrderEvent(c.env.AUTH_KV, id, body.status ?? existing.status, {
       previousStatus: existing.status,
       waitUntil: waitUntilFn,
-    });
+      tenantId: effectiveOrderTenant,
+    } as any);
   }
 
   const actorId = user?.id || 'system';
-  const metaStr = JSON.stringify(body);
+  const auditTenant = effectiveOrderTenant === '*' ? 'default' : (effectiveOrderTenant || 'default');
+  const metaStr = JSON.stringify({ ...body, tenant_id: auditTenant });
   try {
-    await db.prepare(`INSERT INTO audit_logs (id, user_id, action, entity_type, entity_id, metadata, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)`)
-      .bind(`audit_${crypto.randomUUID()}`, actorId, 'order_update', 'order', id, metaStr, now).run();
+    await db.prepare(`INSERT INTO audit_logs (id, user_id, action, entity_type, entity_id, metadata, tenant_id, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`)
+      .bind(`audit_${crypto.randomUUID()}`, actorId, 'order_update', 'order', id, metaStr, auditTenant, now).run();
   } catch {
     try {
       await db.prepare(
-        `INSERT INTO audit_logs (actor_id, actor_name, user_id, action, resource_type, resource_id, entity_type, entity_id, details, metadata, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-      ).bind(actorId, actorId, actorId, 'order_update', 'order', id, 'order', id, metaStr, metaStr, now).run();
+        `INSERT INTO audit_logs (actor_id, actor_name, user_id, action, resource_type, resource_id, entity_type, entity_id, details, metadata, tenant_id, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      ).bind(actorId, actorId, actorId, 'order_update', 'order', id, 'order', id, metaStr, metaStr, auditTenant, now).run();
     } catch {
-      await db.prepare(`INSERT INTO audit_logs (actor_id, actor_name, action, resource_type, resource_id, details, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)`)
-        .bind(actorId, actorId, 'order_update', 'order', id, metaStr, now).run().catch(() => {});
+      try {
+        await db.prepare(`INSERT INTO audit_logs (id, user_id, action, entity_type, entity_id, metadata, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)`)
+          .bind(`audit_${crypto.randomUUID()}`, actorId, 'order_update', 'order', id, metaStr, now).run();
+      } catch {
+        try {
+          await db.prepare(
+            `INSERT INTO audit_logs (actor_id, actor_name, user_id, action, resource_type, resource_id, entity_type, entity_id, details, metadata, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+          ).bind(actorId, actorId, actorId, 'order_update', 'order', id, 'order', id, metaStr, metaStr, now).run();
+        } catch {
+          await db.prepare(`INSERT INTO audit_logs (actor_id, actor_name, action, resource_type, resource_id, details, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)`)
+            .bind(actorId, actorId, 'order_update', 'order', id, metaStr, now).run().catch(() => {});
+        }
+      }
+      await db.prepare(
+        "UPDATE audit_logs SET tenant_id = ? WHERE (entity_id = ? OR resource_id = ?) AND action = 'order_update' AND created_at = ?"
+      ).bind(auditTenant, id, id, now).run().catch(() => {});
     }
   }
 
-  let updated: Record<string, any> | null = null;
-  try {
-    updated = await db.prepare(`SELECT o.*, COALESCE(t.table_number, t.id) as table_name FROM orders o LEFT JOIN cafe_tables t ON o.table_id = t.id WHERE o.id = ?`).bind(id).first();
-  } catch {
-    updated = await db.prepare('SELECT * FROM orders WHERE id = ?').bind(id).first();
+  let updated: Record<string, any> | null = await fetchOrderForRead(db, id, effectiveOrderTenant).catch(() => null);
+  if (!updated && effectiveOrderTenant === 'default') {
+    updated = (await db.prepare('SELECT * FROM orders WHERE id = ?').bind(id).first().catch(() => null)) || existing;
+  }
+  if (!updated) {
+    updated = existing;
   }
 
-  const { items, payments } = await fetchOrderItemsAndPayments(db, id);
-  const projected = user?.role === 'customer'
-    ? formatCustomerOrder(updated!, items)
-    : formatOrder(updated!, items, payments);
+  const { items, payments } = await fetchOrderItemsAndPayments(db, id, effectiveOrderTenant);
+  const isStaffActor = Boolean(user?.role && [...ORDER_STAFF_ROLES, 'kitchen'].includes(user.role));
+  const projected = isStaffActor
+    ? formatOrder(updated!, items, payments)
+    : formatCustomerOrder(updated!, items);
   return c.json({ success: true, data: projected });
 }
 

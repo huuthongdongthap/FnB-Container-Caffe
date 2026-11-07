@@ -28,7 +28,7 @@ export const SEGMENTS = [
 export const PROFILE_SQL = `
   SELECT c.id, c.name, c.phone, c.email,
          c.loyalty_tier, c.loyalty_points, c.lifetime_points,
-         c.created_at,
+         c.created_at, c.tenant_id,
          COALESCE(cw.balance, 0) AS cashback_balance,
          COALESCE(cw.total_earned, 0) AS total_earned,
          COALESCE(cw.total_spent, 0) AS total_spent,
@@ -41,7 +41,7 @@ export const PROFILE_SQL = `
 export const LEGACY_PROFILE_SQL = `
   SELECT c.id, c.name, c.phone, c.email,
          c.loyalty_tier, c.loyalty_points, c.lifetime_points,
-         c.created_at,
+         c.created_at, c.tenant_id,
          COALESCE(cw.balance, 0) AS cashback_balance,
          COALESCE(cw.total_earned, 0) AS total_earned,
          COALESCE(cw.total_spent, 0) AS total_spent,

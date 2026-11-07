@@ -53,6 +53,11 @@ export function StitchOrderMgmtNew({
   onSearch,
   onOrderAction,
   onRefresh,
+  currentPage = 1,
+  pageSize = 12,
+  totalCount,
+  onPageChange,
+  showDashboardPanels = true,
 }: Readonly<StitchOrderMgmtNewProps>) {
   const { t } = useTranslation();
   const [_sidebarOpen, _setSidebarOpen] = useState(false);
@@ -133,7 +138,7 @@ export function StitchOrderMgmtNew({
           </section>
 
           {/* Revenue, Staff, Promotions */}
-          <StitchOrderMgmtDashboard />
+          {showDashboardPanels && <StitchOrderMgmtDashboard />}
 
           {/* Search, Filters, Order Grid, Pagination */}
           <StitchOrderMgmtTable
@@ -142,6 +147,10 @@ export function StitchOrderMgmtNew({
             onFilterChange={onFilterChange}
             onSearch={onSearch}
             onOrderAction={onOrderAction}
+            currentPage={currentPage}
+            pageSize={pageSize}
+            totalCount={totalCount}
+            onPageChange={onPageChange}
           />
         </div>
       </main>

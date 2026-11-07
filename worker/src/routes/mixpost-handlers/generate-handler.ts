@@ -9,7 +9,8 @@ export function registerGenerateHandler(router: Hono<{ Bindings: MixpostEnv }>):
   router.post('/generate', async (c) => {
     const env = c.env as unknown as MixpostEnv;
     const db = env.AURA_DB;
-    const tenantId = getTenantId(c as unknown as Parameters<typeof getTenantId>[0]);
+    const rawTenant = (getTenantId(c as unknown as Parameters<typeof getTenantId>[0]) || 'default').trim() || 'default';
+    const tenantId = rawTenant.toLowerCase() === 'hq' ? '*' : rawTenant;
 
     let rawBody: Record<string, unknown>;
     try {
@@ -31,17 +32,19 @@ export function registerGenerateHandler(router: Hono<{ Bindings: MixpostEnv }>):
 
       const promoId = data.id as string;
       let promos: PromotionRow[] = [];
+      let scopedOk = false;
       if (tenantId !== '*') {
         try {
           const { results: scopedResults } = await db.prepare(
             "SELECT * FROM promotions WHERE code = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ? LIMIT 10"
           ).bind(promoId, tenantId).all<PromotionRow>();
+          scopedOk = true;
           promos = (scopedResults || []).filter((r) => matchesTenantRow(r as unknown as Record<string, unknown>, tenantId));
         } catch {
           promos = [];
         }
       }
-      if (promos.length === 0) {
+      if (promos.length === 0 && (tenantId === '*' || (!scopedOk && tenantId === 'default'))) {
         const { results } = await db.prepare(
           'SELECT * FROM promotions WHERE code = ?'
         ).bind(promoId).all<PromotionRow>();
@@ -67,6 +70,7 @@ export function registerGenerateHandler(router: Hono<{ Bindings: MixpostEnv }>):
 
       const categoryId = data.category as number | undefined;
       let products: ProductRow[] = [];
+      let scopedOk = false;
       if (tenantId !== '*') {
         try {
           let scopedQuery = 'SELECT * FROM products WHERE is_available = 1';
@@ -78,6 +82,7 @@ export function registerGenerateHandler(router: Hono<{ Bindings: MixpostEnv }>):
           scopedQuery += " AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ? LIMIT 50";
           scopedParams.push(tenantId);
           const { results: scopedResults } = await db.prepare(scopedQuery).bind(...scopedParams).all<ProductRow>();
+          scopedOk = true;
           products = (scopedResults || [])
             .filter((r) => matchesTenantRow(r as unknown as Record<string, unknown>, tenantId))
             .slice(0, 5);
@@ -85,7 +90,7 @@ export function registerGenerateHandler(router: Hono<{ Bindings: MixpostEnv }>):
           products = [];
         }
       }
-      if (products.length === 0) {
+      if (products.length === 0 && (tenantId === '*' || (!scopedOk && tenantId === 'default'))) {
         let query = 'SELECT * FROM products WHERE is_available = 1';
         const params: unknown[] = [];
         if (categoryId) {

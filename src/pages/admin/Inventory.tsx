@@ -4,6 +4,7 @@ import { useState, useMemo } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { HelmetHead } from '@/components/seo/HelmetHead';
 import { apiFetch } from '@/lib/api-client';
+import { useAuthStore } from '@/hooks/stores/use-auth-store';
 import { Package, History, Building2, Cpu } from 'lucide-react';
 import type {
   IngredientItem,
@@ -30,30 +31,32 @@ const TABS: Array<{ id: InventoryTab; label: string; icon: typeof Package }> = [
 
 export default function InventoryPage() {
   const queryClient = useQueryClient();
+  const tenantScope = useAuthStore((s) => s.user?.tenantId) || 'default';
+  const sessionVersion = useAuthStore((s) => s.sessionVersion);
   const [activeTab, setActiveTab] = useState<InventoryTab>('overview');
   const [selectedIngredient, setSelectedIngredient] = useState<IngredientItem | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
   const ingredientsQ = useQuery<{ success: boolean; data: IngredientItem[] }>({
-    queryKey: ['admin-inventory-ingredients'],
+    queryKey: ['admin-inventory-ingredients', tenantScope, sessionVersion],
     queryFn: () => apiFetch('/api/inventory/ingredients?limit=100'),
   });
   const movementsQ = useQuery<{ success: boolean; data: StockMovementItem[] }>({
-    queryKey: ['admin-inventory-movements'],
+    queryKey: ['admin-inventory-movements', tenantScope, sessionVersion],
     queryFn: () => apiFetch('/api/inventory/movements?limit=50'),
   });
   const suppliersQ = useQuery<{ success: boolean; data: SupplierItem[] }>({
-    queryKey: ['admin-inventory-suppliers'],
+    queryKey: ['admin-inventory-suppliers', tenantScope, sessionVersion],
     queryFn: () => apiFetch('/api/inventory/suppliers?limit=50'),
     enabled: activeTab === 'suppliers',
   });
   const purchaseOrdersQ = useQuery<{ success: boolean; data: PurchaseOrderItem[] }>({
-    queryKey: ['admin-inventory-pos'],
+    queryKey: ['admin-inventory-pos', tenantScope, sessionVersion],
     queryFn: () => apiFetch('/api/inventory/purchase-orders?limit=50'),
     enabled: activeTab === 'suppliers',
   });
   const forecastQ = useQuery<{ success: boolean; data: ForecastItem[] }>({
-    queryKey: ['admin-inventory-forecast'],
+    queryKey: ['admin-inventory-forecast', tenantScope, sessionVersion],
     queryFn: () => apiFetch('/api/inventory/forecasting/run-rate'),
     enabled: activeTab === 'forecasting',
   });
@@ -83,7 +86,7 @@ export default function InventoryPage() {
     notes?: string;
   }) => {
     const normalizedType = payload.type === 'adjust' ? 'adjustment' : payload.type;
-    await apiFetch('/api/inventory/movements', {
+    const res = await apiFetch<{ success?: boolean; ok?: boolean; error?: string }>('/api/inventory/movements', {
       method: 'POST',
       body: JSON.stringify({
         ...payload,
@@ -91,10 +94,13 @@ export default function InventoryPage() {
         movementType: normalizedType,
       }),
     });
+    if (res && (res.success === false || res.ok === false)) {
+      throw new Error(res.error || 'Failed to record stock movement');
+    }
     await Promise.all([
-      queryClient.invalidateQueries({ queryKey: ['admin-inventory-ingredients'] }),
-      queryClient.invalidateQueries({ queryKey: ['admin-inventory-movements'] }),
-      queryClient.invalidateQueries({ queryKey: ['admin-inventory-forecast'] }),
+      queryClient.invalidateQueries({ queryKey: ['admin-inventory-ingredients', tenantScope] }),
+      queryClient.invalidateQueries({ queryKey: ['admin-inventory-movements', tenantScope] }),
+      queryClient.invalidateQueries({ queryKey: ['admin-inventory-forecast', tenantScope] }),
     ]);
   };
 

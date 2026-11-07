@@ -13,9 +13,12 @@ export interface OrderFilters {
 interface AdminOrdersState {
   orders: AdminOrder[];
   totalCount: number;
+  page: number;
+  pageSize: number;
+  activeFilters: OrderFilters;
   loading: boolean;
   error: string | null;
-  fetchOrders: (page?: number, filters?: OrderFilters) => Promise<void>;
+  fetchOrders: (page?: number, filters?: OrderFilters, pageSize?: number) => Promise<void>;
   updateOrderStatus: (orderId: string, status: string) => Promise<void>;
 }
 
@@ -67,34 +70,60 @@ function normalizeAdminOrder(raw: Record<string, unknown>): AdminOrder {
   };
 }
 
+let latestAdminOrdersRequestId = 0;
+
 export const useAdminOrdersStore = create<AdminOrdersState>((set, get) => ({
   orders: [],
   totalCount: 0,
+  page: 1,
+  pageSize: 12,
+  activeFilters: {},
   loading: false,
   error: null,
 
-  fetchOrders: async (page = 1, filters?: OrderFilters) => {
-    set({ loading: true, error: null });
+  fetchOrders: async (page = 1, filters?: OrderFilters, pageSize?: number) => {
+    const requestId = ++latestAdminOrdersRequestId;
+    const resolvedPage = Math.max(1, Math.floor(page));
+    const resolvedPageSize = Math.max(1, Math.min(200, Math.floor(pageSize ?? get().pageSize ?? 12)));
+    const resolvedFilters: OrderFilters = filters ?? {};
+    const offset = (resolvedPage - 1) * resolvedPageSize;
+
+    set({
+      loading: true,
+      error: null,
+      page: resolvedPage,
+      pageSize: resolvedPageSize,
+      activeFilters: resolvedFilters,
+    });
     try {
-      const params = new URLSearchParams({ page: String(page) });
-      if (filters?.status) params.set('status', filters.status);
-      if (filters?.payment) params.set('payment_status', filters.payment);
-      if (filters?.search) params.set('search', filters.search);
+      const params = new URLSearchParams({
+        page: String(resolvedPage),
+        limit: String(resolvedPageSize),
+        offset: String(offset),
+      });
+      if (resolvedFilters.status) params.set('status', resolvedFilters.status);
+      if (resolvedFilters.payment) params.set('payment_status', resolvedFilters.payment);
+      if (resolvedFilters.search) params.set('search', resolvedFilters.search);
 
       const body = await apiFetch<{
         orders?: Array<Record<string, unknown>>;
         data?: Array<Record<string, unknown>>;
         totalCount?: number;
-        pagination?: { total?: number };
+        pagination?: { total?: number; limit?: number; offset?: number };
       }>(`/api/admin/orders?${params}`);
+      if (requestId !== latestAdminOrdersRequestId) return;
+
       const rawOrders: Array<Record<string, unknown>> = body?.orders || body?.data || [];
       set({
         orders: rawOrders.map(normalizeAdminOrder),
         totalCount: body?.totalCount ?? body?.pagination?.total ?? rawOrders.length ?? 0,
+        page: resolvedPage,
+        pageSize: resolvedPageSize,
         loading: false,
         error: null,
       });
     } catch (err) {
+      if (requestId !== latestAdminOrdersRequestId) return;
       const message = err instanceof Error ? err.message : 'Lỗi kết nối';
       set({ loading: false, error: message });
     }
@@ -115,7 +144,7 @@ export const useAdminOrdersStore = create<AdminOrdersState>((set, get) => ({
           body: JSON.stringify({ status }),
         });
       }
-      await get().fetchOrders();
+      await get().fetchOrders(get().page, get().activeFilters, get().pageSize);
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Lỗi kết nối';
       set({ error: message });

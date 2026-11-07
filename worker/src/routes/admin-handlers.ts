@@ -45,7 +45,7 @@ export async function getAdminCustomers(request: Request, env: Record<string, un
   }
 
   const where = clauses.length > 0 ? ` WHERE ${clauses.join(' AND ')}` : '';
-  const canonicalQuery = `SELECT c.id, c.name, c.phone, c.email, c.loyalty_tier, c.loyalty_tier AS tier, COALESCE(cw.balance, 0) AS cashback_balance, COALESCE(cw.total_spent, 0) AS total_spent, (SELECT COUNT(*) FROM orders o WHERE o.customer_phone = c.phone AND COALESCE(NULLIF(TRIM(o.tenant_id), ''), 'default') = COALESCE(NULLIF(TRIM(c.tenant_id), ''), 'default')) AS visit_count, c.created_at, c.updated_at FROM customers c LEFT JOIN cashback_wallets cw ON cw.customer_id = c.id AND COALESCE(NULLIF(TRIM(cw.tenant_id), ''), 'default') = COALESCE(NULLIF(TRIM(c.tenant_id), ''), 'default')${where} ORDER BY c.created_at DESC LIMIT ? OFFSET ?`;
+  const canonicalQuery = `SELECT c.id, c.name, c.phone, c.email, c.loyalty_tier, c.loyalty_tier AS tier, COALESCE(cw.balance, 0) AS cashback_balance, COALESCE(cw.total_spent, 0) AS total_spent, (SELECT COUNT(*) FROM orders o WHERE o.customer_phone = c.phone AND COALESCE(NULLIF(TRIM(o.tenant_id), ''), 'default') = COALESCE(NULLIF(TRIM(c.tenant_id), ''), 'default')) AS visit_count, c.tenant_id, c.created_at, c.updated_at FROM customers c LEFT JOIN cashback_wallets cw ON cw.customer_id = c.id AND COALESCE(NULLIF(TRIM(cw.tenant_id), ''), 'default') = COALESCE(NULLIF(TRIM(c.tenant_id), ''), 'default')${where} ORDER BY c.created_at DESC LIMIT ? OFFSET ?`;
   const canonicalCountQuery = `SELECT COUNT(*) as total FROM customers c${where}`;
 
   let results: unknown[] = [];
@@ -70,7 +70,8 @@ export async function getAdminCustomers(request: Request, env: Record<string, un
       legacyParams.push(tier);
     }
     const legacyWhere = legacyClauses.length > 0 ? ` WHERE ${legacyClauses.join(' AND ')}` : '';
-    const legacyQuery = `SELECT id, name, phone, email, tier, cashback_balance, total_spent, visit_count, created_at FROM customers${legacyWhere} ORDER BY created_at DESC LIMIT ? OFFSET ?`;
+    const tenantSelectCol = missingTenantCol ? '' : 'tenant_id, ';
+    const legacyQuery = `SELECT id, name, phone, email, tier, cashback_balance, total_spent, visit_count, ${tenantSelectCol}created_at FROM customers${legacyWhere} ORDER BY created_at DESC LIMIT ? OFFSET ?`;
     const legacyCountQuery = `SELECT COUNT(*) as total FROM customers${legacyWhere}`;
     const queryRes = await db.prepare(legacyQuery).bind(...legacyParams, limit, offset).all();
     results = queryRes.results || [];
@@ -257,6 +258,9 @@ export async function updateAdminCustomer(request: Request, env: Record<string, 
         canonicalParams.push(tierValue);
       }
       if (missingTenantCol) {
+        if (tenantId !== 'default' && tenantId !== '*') {
+          throw err;
+        }
         canonicalParams.push(id);
         await db.prepare(`UPDATE customers SET ${canonicalUpdates.join(', ')} WHERE id = ?`).bind(...canonicalParams).run();
       } else {
@@ -272,6 +276,9 @@ export async function updateAdminCustomer(request: Request, env: Record<string, 
         legacyParams.push(tierValue);
       }
       if (innerMissingTenant) {
+        if (tenantId !== 'default' && tenantId !== '*') {
+          throw innerErr;
+        }
         legacyParams.push(id);
         await db.prepare(`UPDATE customers SET ${legacyUpdates.join(', ')} WHERE id = ?`).bind(...legacyParams).run();
       } else {
@@ -289,7 +296,7 @@ export async function deleteAdminCustomer(env: Record<string, unknown>, id: stri
   try {
     await db.prepare("DELETE FROM customers WHERE id = ? AND (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?)").bind(id, tenantId, tenantId).run();
   } catch (err) {
-    if (!/no such column:\s*tenant_id/i.test(err instanceof Error ? err.message : String(err))) {
+    if (!/no such column:\s*tenant_id/i.test(err instanceof Error ? err.message : String(err)) || (tenantId !== 'default' && tenantId !== '*')) {
       throw err;
     }
     await db.prepare('DELETE FROM customers WHERE id = ?').bind(id).run();

@@ -1,5 +1,6 @@
 import type { Env } from '../types/env';
 import type { Context } from 'hono';
+import { optionalAuth } from '../middleware/auth';
 import { createLogger } from '../middleware/logger';
 import { matchesTenantRow } from '../lib/db';
 import { resolvePublicTenantId } from '../middleware/tenant';
@@ -66,6 +67,14 @@ function mapRow(r: Record<string, unknown>): PricingTier {
 export async function getPricing(c: Context<{ Bindings: Env }>): Promise<Response> {
  const db = c.env.AURA_DB as unknown as D1Database;
  const lang = (c.req.header('Accept-Language') || 'vi')?.startsWith('en') ? 'en' : 'vi';
+ const authHeader = c.req.header('Authorization') || c.req.header('authorization') || '';
+ if (!c.get?.('user' as never) && authHeader.toLowerCase().startsWith('bearer ')) {
+   try {
+     await optionalAuth()(c as never, async () => {});
+   } catch {
+     // Ignore optionalAuth errors on public pricing endpoint
+   }
+ }
  const tenantId = resolvePublicTenantId(c);
 
  try {
@@ -78,9 +87,9 @@ export async function getPricing(c: Context<{ Bindings: Env }>): Promise<Respons
    const allRows = results ?? [];
    const tenantRows = allRows.filter((row) => matchesTenantRow(row, tenantId));
    const effectiveRows =
-     tenantRows.length > 0 || tenantId === 'default'
+     tenantRows.length > 0 || tenantId === 'default' || tenantId === '*'
        ? tenantRows
-       : allRows.filter((row) => matchesTenantRow(row, 'default'));
+       : [];
    const tiers = effectiveRows.map(mapRow);
    return c.json({ ok: true, data: tiers, lang });
  } catch (err) {

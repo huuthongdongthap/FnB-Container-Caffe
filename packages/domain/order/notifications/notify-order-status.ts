@@ -23,6 +23,7 @@ interface OrderRow {
   customer_phone: string | null;
   total: number;
   status: string;
+  tenant_id?: string | null;
 }
 
 /**
@@ -32,7 +33,8 @@ interface OrderRow {
  */
 export async function notifyOrderStatus(
   env: Record<string, unknown>,
-  orderId: string
+  orderId: string,
+  tenantId?: string,
 ): Promise<void> {
   const db = env.AURA_DB as import('@cloudflare/workers-types').D1Database | undefined;
   if (!db) {
@@ -42,16 +44,44 @@ export async function notifyOrderStatus(
   let order: OrderRow | null = null;
   try {
     order = await db.prepare(
-      'SELECT customer_name, customer_phone, total, status FROM orders WHERE id = ?'
+      'SELECT customer_name, customer_phone, total, status, tenant_id FROM orders WHERE id = ?'
     ).bind(orderId).first<OrderRow>();
   } catch {
-    /* db fetch failure — nothing to notify */
-    return;
+    try {
+      order = await db.prepare(
+        'SELECT customer_name, customer_phone, total, status FROM orders WHERE id = ?'
+      ).bind(orderId).first<OrderRow>();
+    } catch {
+      /* db fetch failure — nothing to notify */
+      return;
+    }
   }
 
   if (!order || !order.customer_phone) {
     return;
   }
+
+  const rawCallerTenant = typeof tenantId === 'string' && tenantId.trim() ? tenantId.trim() : undefined;
+  const normCallerTenant =
+    rawCallerTenant && rawCallerTenant.toLowerCase() === 'hq' ? '*' : rawCallerTenant;
+  const rawOrderTenant = order.tenant_id;
+  const normOrderTenant =
+    typeof rawOrderTenant === 'string' &&
+    rawOrderTenant.trim() &&
+    rawOrderTenant.trim() !== '*' &&
+    rawOrderTenant.trim().toLowerCase() !== 'hq'
+      ? rawOrderTenant.trim()
+      : 'default';
+  if (
+    normCallerTenant &&
+    normCallerTenant !== '*' &&
+    rawOrderTenant !== undefined &&
+    normOrderTenant !== normCallerTenant
+  ) {
+    return;
+  }
+  const resolvedOrderTenant =
+    rawOrderTenant !== undefined ? normOrderTenant : (normCallerTenant && normCallerTenant !== '*' ? normCallerTenant : 'default');
 
   const statusLabel = STATUS_LABELS[order.status] || order.status;
   const customerName = order.customer_name || 'Khach hang';
@@ -65,6 +95,7 @@ export async function notifyOrderStatus(
       sendZNS(env as { ZALO_ACCESS_TOKEN?: string; AURA_DB?: import('@cloudflare/workers-types').D1Database }, {
         phone: order.customer_phone,
         template_key: 'order_status_update',
+        tenantId: resolvedOrderTenant,
         data: {
           name: customerName,
           order_id: orderId,

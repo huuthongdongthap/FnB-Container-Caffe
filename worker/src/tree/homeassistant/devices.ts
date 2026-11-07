@@ -140,11 +140,16 @@ export async function toggleDevice(
       return errorResponse('Device not found', 404);
     }
 
-    const cleanTenant = tenantId ? tenantId.trim() : '';
-    if ('tenant_id' in existing && existing.tenant_id !== undefined && cleanTenant && cleanTenant !== '*') {
+    const rawTenant = tenantId ? tenantId.trim() : '';
+    const cleanTenant = rawTenant.toLowerCase() === 'hq' ? '*' : rawTenant;
+    const entityTenant = typeof existing.tenant_id === 'string' && existing.tenant_id.trim()
+      ? existing.tenant_id.trim()
+      : 'default';
+    const writeTenant = cleanTenant && cleanTenant !== '*' ? cleanTenant : entityTenant;
+    if ('tenant_id' in existing && existing.tenant_id !== undefined) {
       await db
         .prepare("UPDATE ha_device_states SET state = ?, last_updated = datetime('now') WHERE entity_id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?")
-        .bind(newState, entityId, cleanTenant)
+        .bind(newState, entityId, writeTenant)
         .run();
     } else {
       await db

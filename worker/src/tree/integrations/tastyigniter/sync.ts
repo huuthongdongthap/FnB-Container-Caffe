@@ -52,7 +52,8 @@ export async function syncTIToLocalMenu(
   if (!client) {
     return { ok: true, mock: false, synced: 0, reason: 'disabled' };
   }
-  const effectiveTenant = (tenantId ?? '').trim();
+  const rawTenant = (tenantId ?? 'default').trim();
+  const effectiveTenant = rawTenant && rawTenant !== '*' && rawTenant.toLowerCase() !== 'hq' ? rawTenant : 'default';
 
   const promise = (async() => {
     try {
@@ -72,27 +73,19 @@ export async function syncTIToLocalMenu(
         const name = anyItem.name as string | undefined;
         const active = anyItem.is_active !== false ? 1 : 0;
 
-        if (effectiveTenant && effectiveTenant !== '*') {
-          try {
-            await db
-              .prepare(
-                `INSERT OR REPLACE INTO ti_menu_cache
-                 (id, name, sku, price, active, cached_at, tenant_id)
-                 VALUES (?, ?, ?, ?, ?, datetime('now'), ?)`
-              )
-              .bind(id, name ?? '', sku ?? null, price, active, effectiveTenant)
-              .run();
-          } catch {
-            await db
-              .prepare(
-                `INSERT OR REPLACE INTO ti_menu_cache
-                 (id, name, sku, price, active, cached_at)
-                 VALUES (?, ?, ?, ?, ?, datetime('now'))`
-              )
-              .bind(id, name ?? '', sku ?? null, price, active)
-              .run();
+        try {
+          await db
+            .prepare(
+              `INSERT OR REPLACE INTO ti_menu_cache
+               (id, name, sku, price, active, cached_at, tenant_id)
+               VALUES (?, ?, ?, ?, ?, datetime('now'), ?)`
+            )
+            .bind(id, name ?? '', sku ?? null, price, active, effectiveTenant)
+            .run();
+        } catch (insertErr) {
+          if (effectiveTenant !== 'default') {
+            throw insertErr;
           }
-        } else {
           await db
             .prepare(
               `INSERT OR REPLACE INTO ti_menu_cache
@@ -135,23 +128,73 @@ export async function bridgeOrderToTI(
     total: number;
     payment_method?: string;
     notes?: string;
+    tenant_id?: string;
   },
-  ctx?: ExecutionContext
+  ctxOrTenantId?: ExecutionContext | string,
+  tenantIdArg?: string
 ): Promise<{ ok: string; reason?: string; mocked?: boolean }> {
+  const ctx = typeof ctxOrTenantId === 'object' && ctxOrTenantId !== null ? ctxOrTenantId : undefined;
+  const rawTenant = (
+    (typeof ctxOrTenantId === 'string' ? ctxOrTenantId : tenantIdArg) ??
+    orderData.tenant_id ??
+    'default'
+  ).trim();
   const { AURA_DB, DB, TASTYIGNITER_SYNC_ENABLED, TASTYIGNITER_URL, TASTYIGNITER_API_KEY } = env as Record<string, unknown>;
   const enabled = (TASTYIGNITER_SYNC_ENABLED as string | undefined) === 'true';
   const db = (AURA_DB ?? DB) as import('@cloudflare/workers-types').D1Database | undefined;
+  let scopedTenant =
+    !rawTenant || rawTenant === '*' || rawTenant.toLowerCase() === 'hq'
+      ? (orderData.tenant_id &&
+        orderData.tenant_id.trim() &&
+        orderData.tenant_id.trim() !== '*' &&
+        orderData.tenant_id.trim().toLowerCase() !== 'hq'
+          ? orderData.tenant_id.trim()
+          : '')
+      : rawTenant;
+  if (!scopedTenant && db && localOrderId) {
+    try {
+      const orderRow = await db
+        .prepare('SELECT tenant_id FROM orders WHERE id = ? LIMIT 1')
+        .bind(localOrderId)
+        .first<{ tenant_id?: string | null }>();
+      const rowTenant = typeof orderRow?.tenant_id === 'string' ? orderRow.tenant_id.trim() : '';
+      if (rowTenant && rowTenant !== '*' && rowTenant.toLowerCase() !== 'hq') {
+        scopedTenant = rowTenant;
+      }
+    } catch {
+      // ignore lookup error; fall back to default
+    }
+  }
+  if (!scopedTenant) {
+    scopedTenant = 'default';
+  }
 
   if (!enabled || !TASTYIGNITER_URL || !TASTYIGNITER_API_KEY) {
     if (db) {
-      await db
-        .prepare(
-          `INSERT INTO ti_order_bridge
-           (id, local_order_id, ti_order_id, status, error, created_at)
-           VALUES (?, ?, NULL, ?, ?, datetime('now'))`
-        )
-        .bind(crypto.randomUUID(), localOrderId, 'skipped', 'disabled-or-no-credentials')
-        .run();
+      try {
+        await db
+          .prepare(
+            `INSERT INTO ti_order_bridge
+             (id, local_order_id, ti_order_id, status, error, created_at, tenant_id)
+             VALUES (?, ?, NULL, ?, ?, datetime('now'), ?)`
+          )
+          .bind(crypto.randomUUID(), localOrderId, 'skipped', 'disabled-or-no-credentials', scopedTenant)
+          .run();
+      } catch (err) {
+        const msg = String((err as Error)?.message || '');
+        if (scopedTenant === 'default' && (msg.includes('no such column') || msg.includes('has no column named'))) {
+          await db
+            .prepare(
+              `INSERT INTO ti_order_bridge
+               (id, local_order_id, ti_order_id, status, error, created_at)
+               VALUES (?, ?, NULL, ?, ?, datetime('now'))`
+            )
+            .bind(crypto.randomUUID(), localOrderId, 'skipped', 'disabled-or-no-credentials')
+            .run();
+        } else {
+          throw err;
+        }
+      }
     }
     return { ok: 'skipped', reason: 'disabled-or-no-credentials' };
   }
@@ -166,7 +209,8 @@ export async function bridgeOrderToTI(
         items: orderData.items,
         total: orderData.total,
         payment_method: orderData.payment_method,
-        notes: orderData.notes
+        notes: orderData.notes,
+        tenant_id: scopedTenant,
       };
 
       const { order, mock } = client ? await client.createOrder(payload) : { order: null, mock: true };
@@ -177,49 +221,89 @@ export async function bridgeOrderToTI(
 
       if (db) {
         if (tiOrderId) {
-          const updateRes = await db
+          let updateRes = await db
             .prepare(
               `UPDATE ti_order_bridge
-               SET ti_order_id = ?, status = 'synced', error = NULL, synced_at = datetime('now')
-               WHERE local_order_id = ?`
+               SET ti_order_id = ?, status = 'synced', error = NULL, synced_at = datetime('now'), tenant_id = ?
+               WHERE local_order_id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?`
             )
-            .bind(tiOrderId, localOrderId)
+            .bind(tiOrderId, scopedTenant, localOrderId, scopedTenant)
             .run()
             .catch(() => null);
+          if (!updateRes && scopedTenant === 'default') {
+            updateRes = await db
+              .prepare(
+                `UPDATE ti_order_bridge
+                 SET ti_order_id = ?, status = 'synced', error = NULL, synced_at = datetime('now')
+                 WHERE local_order_id = ?`
+              )
+              .bind(tiOrderId, localOrderId)
+              .run()
+              .catch(() => null);
+          }
           if (((updateRes as { meta?: { changes?: number } } | null)?.meta?.changes ?? 0) === 0) {
             try {
               await db
                 .prepare(
                   `INSERT INTO ti_order_bridge
-                   (id, local_order_id, ti_order_id, status, synced_at, created_at)
-                   VALUES (?, ?, ?, ?, datetime('now'), datetime('now'))`
+                   (id, local_order_id, ti_order_id, status, synced_at, created_at, tenant_id)
+                   VALUES (?, ?, ?, ?, datetime('now'), datetime('now'), ?)`
                 )
-                .bind(crypto.randomUUID(), localOrderId, tiOrderId, 'synced')
+                .bind(crypto.randomUUID(), localOrderId, tiOrderId, 'synced', scopedTenant)
                 .run();
             } catch {
               try {
                 await db
                   .prepare(
                     `INSERT INTO ti_order_bridge
-                     (id, local_order_id, ti_order_id, status, error, created_at)
-                     VALUES (?, ?, ?, ?, NULL, datetime('now'))`
+                     (id, local_order_id, ti_order_id, status, error, created_at, tenant_id)
+                     VALUES (?, ?, ?, ?, NULL, datetime('now'), ?)`
                   )
-                  .bind(crypto.randomUUID(), localOrderId, tiOrderId, 'synced')
+                  .bind(crypto.randomUUID(), localOrderId, tiOrderId, 'synced', scopedTenant)
                   .run();
               } catch {
-                // Non-blocking persistence fallback
+                if (scopedTenant === 'default') {
+                  try {
+                    await db
+                      .prepare(
+                        `INSERT INTO ti_order_bridge
+                         (id, local_order_id, ti_order_id, status, synced_at, created_at)
+                         VALUES (?, ?, ?, ?, datetime('now'), datetime('now'))`
+                      )
+                      .bind(crypto.randomUUID(), localOrderId, tiOrderId, 'synced')
+                      .run();
+                  } catch {
+                    // Non-blocking persistence fallback
+                  }
+                }
               }
             }
           }
         } else {
-          await db
-            .prepare(
-              `INSERT INTO ti_order_bridge
-               (id, local_order_id, ti_order_id, status, error, created_at)
-               VALUES (?, ?, NULL, ?, ?, datetime('now'))`
-            )
-            .bind(crypto.randomUUID(), localOrderId, 'failed', 'no-order-id')
-            .run();
+          try {
+            await db
+              .prepare(
+                `INSERT INTO ti_order_bridge
+                 (id, local_order_id, ti_order_id, status, error, created_at, tenant_id)
+                 VALUES (?, ?, NULL, ?, ?, datetime('now'), ?)`
+              )
+              .bind(crypto.randomUUID(), localOrderId, 'failed', 'no-order-id', scopedTenant)
+              .run();
+          } catch (err) {
+            const msg = String((err as Error)?.message || '');
+            if (scopedTenant === 'default' && (msg.includes('no such column') || msg.includes('has no column named'))) {
+              await db
+                .prepare(
+                  `INSERT INTO ti_order_bridge
+                   (id, local_order_id, ti_order_id, status, error, created_at)
+                   VALUES (?, ?, NULL, ?, ?, datetime('now'))`
+                )
+                .bind(crypto.randomUUID(), localOrderId, 'failed', 'no-order-id')
+                .run();
+            } else {
+              throw err;
+            }
+          }
         }
       }
 
@@ -228,14 +312,27 @@ export async function bridgeOrderToTI(
     } catch (err) {
       log.error('ti_bridge_order_error', { localOrderId, error: (err as Error).message });
       if (db) {
-        await db
-          .prepare(
-            `INSERT INTO ti_order_bridge
-             (id, local_order_id, ti_order_id, status, error, created_at)
-             VALUES (?, ?, NULL, ?, ?, datetime('now'))`
-          )
-          .bind(crypto.randomUUID(), localOrderId, 'error', (err as Error).message)
-          .run();
+        try {
+          await db
+            .prepare(
+              `INSERT INTO ti_order_bridge
+               (id, local_order_id, ti_order_id, status, error, created_at, tenant_id)
+               VALUES (?, ?, NULL, ?, ?, datetime('now'), ?)`
+            )
+            .bind(crypto.randomUUID(), localOrderId, 'error', (err as Error).message, scopedTenant)
+            .run();
+        } catch {
+          if (scopedTenant === 'default') {
+            await db
+              .prepare(
+                `INSERT INTO ti_order_bridge
+                 (id, local_order_id, ti_order_id, status, error, created_at)
+                 VALUES (?, ?, NULL, ?, ?, datetime('now'))`
+              )
+              .bind(crypto.randomUUID(), localOrderId, 'error', (err as Error).message)
+              .run();
+          }
+        }
       }
       return { ok: 'error', reason: (err as Error).message };
     }
@@ -252,66 +349,52 @@ export async function bridgeOrderToTI(
  */
 export async function getTiMenuCache(env: TISyncEnv, tenantId?: string): Promise<{ items: MenuCacheRow[] }> {
   const db = (env.AURA_DB ?? env.DB) as import('@cloudflare/workers-types').D1Database | undefined;
-  const effectiveTenant = (tenantId ?? '').trim();
+  const rawTenant = (tenantId ?? 'default').trim();
+  const isWildcard = rawTenant === '*' || rawTenant.toLowerCase() === 'hq';
+  const effectiveTenant = isWildcard ? '*' : (rawTenant || 'default');
 
   if (db) {
     const sixHoursAgo = new Date(Date.now() - 6 * 60 * 60 * 1000).toISOString();
     let row: { cnt: number } | null = null;
-    if (effectiveTenant && effectiveTenant !== '*') {
+    if (isWildcard) {
+      try {
+        row = await db
+          .prepare('SELECT COUNT(*) as cnt FROM ti_menu_cache WHERE cached_at > ?')
+          .bind(sixHoursAgo)
+          .first<{ cnt: number }>();
+      } catch {
+        row = null;
+      }
+    } else {
       try {
         row = await db
           .prepare("SELECT COUNT(*) as cnt FROM ti_menu_cache WHERE cached_at > ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?")
           .bind(sixHoursAgo, effectiveTenant)
           .first<{ cnt: number }>();
       } catch {
-        row = await db
-          .prepare('SELECT COUNT(*) as cnt FROM ti_menu_cache WHERE cached_at > ?')
-          .bind(sixHoursAgo)
-          .first<{ cnt: number }>();
+        if (effectiveTenant === 'default') {
+          row = await db
+            .prepare('SELECT COUNT(*) as cnt FROM ti_menu_cache WHERE cached_at > ?')
+            .bind(sixHoursAgo)
+            .first<{ cnt: number }>();
+        }
       }
-    } else {
-      row = await db
-        .prepare('SELECT COUNT(*) as cnt FROM ti_menu_cache WHERE cached_at > ?')
-        .bind(sixHoursAgo)
-        .first<{ cnt: number }>();
     }
 
     if (row && row.cnt > 0) {
-      if (effectiveTenant && effectiveTenant !== '*') {
+      if (isWildcard) {
         try {
           const rows = await db
-            .prepare("SELECT id, name, sku, price, active, cached_at, tenant_id FROM ti_menu_cache WHERE active = 1 AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?")
-            .bind(effectiveTenant)
+            .prepare('SELECT id, name, sku, price, active, cached_at, tenant_id FROM ti_menu_cache WHERE active = 1')
             .all<MenuCacheRow & { tenant_id?: string | null }>();
-          const raw = (rows as { results: Array<MenuCacheRow & { tenant_id?: string | null }> }).results ?? [];
-          return {
-            items: raw.filter(
-              (r) => !('tenant_id' in r) || r.tenant_id === undefined || matchesTenantRow(r as unknown as Record<string, unknown>, effectiveTenant)
-            ),
-          };
+          return { items: (rows as { results: Array<MenuCacheRow & { tenant_id?: string | null }> }).results ?? [] };
         } catch {
-          // Fall through to unscoped query if tenant_id column is absent
+          const rows = await db
+            .prepare('SELECT id, name, sku, price, active, cached_at FROM ti_menu_cache WHERE active = 1')
+            .all<MenuCacheRow>();
+          return { items: (rows as { results: MenuCacheRow[] }).results ?? [] };
         }
       }
-      const rows = await db
-        .prepare('SELECT id, name, sku, price, active, cached_at FROM ti_menu_cache WHERE active = 1')
-        .all<MenuCacheRow>();
-      const raw = (rows as { results: Array<MenuCacheRow & { tenant_id?: string | null }> }).results ?? [];
-      return {
-        items:
-          effectiveTenant && effectiveTenant !== '*'
-            ? raw.filter(
-                (r) => !('tenant_id' in r) || r.tenant_id === undefined || matchesTenantRow(r as unknown as Record<string, unknown>, effectiveTenant)
-              )
-            : raw,
-      };
-    }
-  }
-
-  // cache stale or missing — pull live (best-effort, non-blocking)
-  const result = await syncTIToLocalMenu(env, undefined, tenantId);
-  if (db && result.synced && result.synced > 0) {
-    if (effectiveTenant && effectiveTenant !== '*') {
       try {
         const rows = await db
           .prepare("SELECT id, name, sku, price, active, cached_at, tenant_id FROM ti_menu_cache WHERE active = 1 AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?")
@@ -324,7 +407,53 @@ export async function getTiMenuCache(env: TISyncEnv, tenantId?: string): Promise
           ),
         };
       } catch {
-        // Fall through to unscoped query if tenant_id column is absent
+        if (effectiveTenant !== 'default') {
+          return { items: [] };
+        }
+      }
+      const rows = await db
+        .prepare('SELECT id, name, sku, price, active, cached_at FROM ti_menu_cache WHERE active = 1')
+        .all<MenuCacheRow>();
+      const raw = (rows as { results: Array<MenuCacheRow & { tenant_id?: string | null }> }).results ?? [];
+      return {
+        items: raw.filter(
+          (r) => matchesTenantRow(r as unknown as Record<string, unknown>, effectiveTenant)
+        ),
+      };
+    }
+  }
+
+  // cache stale or missing — pull live (best-effort, non-blocking)
+  const syncTargetTenant = isWildcard ? 'default' : effectiveTenant;
+  const result = await syncTIToLocalMenu(env, undefined, syncTargetTenant);
+  if (db && result.synced && result.synced > 0) {
+    if (isWildcard) {
+      try {
+        const rows = await db
+          .prepare('SELECT id, name, sku, price, active, cached_at, tenant_id FROM ti_menu_cache WHERE active = 1')
+          .all<MenuCacheRow & { tenant_id?: string | null }>();
+        return { items: (rows as { results: Array<MenuCacheRow & { tenant_id?: string | null }> }).results ?? [] };
+      } catch {
+        const rows = await db
+          .prepare('SELECT id, name, sku, price, active, cached_at FROM ti_menu_cache WHERE active = 1')
+          .all<MenuCacheRow>();
+        return { items: (rows as { results: MenuCacheRow[] }).results ?? [] };
+      }
+    }
+    try {
+      const rows = await db
+        .prepare("SELECT id, name, sku, price, active, cached_at, tenant_id FROM ti_menu_cache WHERE active = 1 AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?")
+        .bind(effectiveTenant)
+        .all<MenuCacheRow & { tenant_id?: string | null }>();
+      const raw = (rows as { results: Array<MenuCacheRow & { tenant_id?: string | null }> }).results ?? [];
+      return {
+        items: raw.filter(
+          (r) => !('tenant_id' in r) || r.tenant_id === undefined || matchesTenantRow(r as unknown as Record<string, unknown>, effectiveTenant)
+        ),
+      };
+    } catch {
+      if (effectiveTenant !== 'default') {
+        return { items: [] };
       }
     }
     const rows = await db
@@ -332,12 +461,9 @@ export async function getTiMenuCache(env: TISyncEnv, tenantId?: string): Promise
       .all<MenuCacheRow>();
     const raw = (rows as { results: Array<MenuCacheRow & { tenant_id?: string | null }> }).results ?? [];
     return {
-      items:
-        effectiveTenant && effectiveTenant !== '*'
-          ? raw.filter(
-              (r) => !('tenant_id' in r) || r.tenant_id === undefined || matchesTenantRow(r as unknown as Record<string, unknown>, effectiveTenant)
-            )
-          : raw,
+      items: raw.filter(
+        (r) => matchesTenantRow(r as unknown as Record<string, unknown>, effectiveTenant)
+      ),
     };
   }
 

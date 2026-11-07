@@ -29,17 +29,30 @@ export async function getCustomerMetrics(
     return tenantBinds.length > 0 ? stmt.bind(...tenantBinds).first<T>() : stmt.first<T>();
   };
 
+  const runOrderMetric = async <T>(primarySql: string, fallbackSql: string): Promise<T | null> => {
+    try {
+      return await runFirst<T>(primarySql);
+    } catch {
+      return await runFirst<T>(fallbackSql);
+    }
+  };
+
   const [totalRow, newRow, repeatRow, avgRow] = await Promise.all([
     runFirst<{ total_customers: number }>(`SELECT COUNT(*) AS total_customers FROM customers${tenantWhere}`),
     runFirst<{ new_30d: number }>(
       `SELECT COUNT(*) AS new_30d FROM customers WHERE created_at >= datetime('now', '-30 days')${tenantAnd}`
     ),
-    runFirst<{ repeat_rate: number }>(`
+    runOrderMetric<{ repeat_rate: number }>(
+      `
       WITH customer_orders AS (
-        SELECT customer_phone, COUNT(*) AS cnt
+        SELECT TRIM(customer_phone) AS customer_phone, COUNT(*) AS cnt
         FROM orders
-        WHERE status != 'cancelled' AND customer_phone IS NOT NULL${tenantAnd}
-        GROUP BY customer_phone
+        WHERE status != 'cancelled'
+          AND status NOT IN ('cancelled', 'refunded', 'failed', 'rejected', 'expired')
+          AND COALESCE(payment_status, '') != 'refunded'
+          AND customer_phone IS NOT NULL
+          AND TRIM(COALESCE(customer_phone, '')) NOT IN ('', '0', '000000000', '0000000000', '00000000000', 'guest', 'walk-in', 'pos')${tenantAnd}
+        GROUP BY TRIM(customer_phone), COALESCE(NULLIF(TRIM(tenant_id), ''), 'default')
       )
       SELECT
         CASE WHEN COUNT(*) > 0
@@ -47,9 +60,28 @@ export async function getCustomerMetrics(
           ELSE 0
         END AS repeat_rate
       FROM customer_orders
-    `),
-    runFirst<{ avg_order_value: number }>(
-      `SELECT AVG(total) AS avg_order_value FROM orders WHERE status != 'cancelled'${tenantAnd}`
+    `,
+      `
+      WITH customer_orders AS (
+        SELECT TRIM(customer_phone) AS customer_phone, COUNT(*) AS cnt
+        FROM orders
+        WHERE status != 'cancelled'
+          AND status NOT IN ('cancelled', 'refunded', 'failed', 'rejected', 'expired')
+          AND customer_phone IS NOT NULL
+          AND TRIM(COALESCE(customer_phone, '')) NOT IN ('', '0', '000000000', '0000000000', '00000000000', 'guest', 'walk-in', 'pos')${tenantAnd}
+        GROUP BY TRIM(customer_phone)${tenantId === '*' ? ", COALESCE(NULLIF(TRIM(tenant_id), ''), 'default')" : ''}
+      )
+      SELECT
+        CASE WHEN COUNT(*) > 0
+          THEN CAST(SUM(CASE WHEN cnt > 1 THEN 1 ELSE 0 END) AS REAL) / CAST(COUNT(*) AS REAL)
+          ELSE 0
+        END AS repeat_rate
+      FROM customer_orders
+    `
+    ),
+    runOrderMetric<{ avg_order_value: number }>(
+      `SELECT AVG(total) AS avg_order_value FROM orders WHERE status != 'cancelled' AND status NOT IN ('cancelled', 'refunded', 'failed', 'rejected', 'expired') AND COALESCE(payment_status, '') != 'refunded'${tenantAnd}`,
+      `SELECT AVG(total) AS avg_order_value FROM orders WHERE status != 'cancelled' AND status NOT IN ('cancelled', 'refunded', 'failed', 'rejected', 'expired')${tenantAnd}`
     )
   ]);
 

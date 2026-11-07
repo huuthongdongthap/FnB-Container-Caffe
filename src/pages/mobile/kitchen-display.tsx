@@ -1,8 +1,8 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { useMobileAuth } from '@/hooks/use-mobile-auth';
 import { apiFetch } from '@/lib/api-client';
+import { isSameSessionSnapshot, readSessionSnapshot, subscribeSessionChange } from '@/lib/client-session';
 import { KitchenOrder, KitchenStation } from './kitchen-display-types';
 import KitchenOrderCard from './kitchen-display-order-card';
 import {
@@ -63,18 +63,29 @@ const STATION_COLORS: Record<KitchenStation, string> = {
 };
 
 export default function KitchenDisplay() {
-  const { token: _token, user: _user } = useMobileAuth();
   const [orders, setOrders] = useState<KitchenOrder[]>([]);
   const [loading, setLoading] = useState(true);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [activeStation, setActiveStation] = useState<KitchenStation>('all');
   const pollRef = useRef<ReturnType<typeof setInterval>>(null);
+  const abortRef = useRef<AbortController | null>(null);
+  const requestSeqRef = useRef(0);
 
   const fetchOrders = useCallback(async () => {
+    abortRef.current?.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
+    const seq = ++requestSeqRef.current;
+    const snap = readSessionSnapshot();
+
     try {
       setError(null);
-      const body = (await apiFetch<{ success: boolean; orders: KitchenOrder[] }>('/mobile/kds/orders'));
+      const body = await apiFetch<{ success: boolean; orders: KitchenOrder[] }>(
+        '/mobile/kds/orders',
+        { signal: controller.signal },
+      );
+      if (controller.signal.aborted || seq !== requestSeqRef.current || !isSameSessionSnapshot(snap, readSessionSnapshot())) return;
       if (body.success) {
         setError(null);
         setOrders(body.orders);
@@ -83,25 +94,49 @@ export default function KitchenDisplay() {
         setError('Không thể tải đơn hàng / Failed to load orders');
         setLoading(false);
       }
-    } catch {
+    } catch (err) {
+      if (
+        controller.signal.aborted ||
+        seq !== requestSeqRef.current ||
+        !isSameSessionSnapshot(snap, readSessionSnapshot()) ||
+        (err instanceof Error && err.name === 'AbortError')
+      ) {
+        return;
+      }
       setError('Không thể tải đơn hàng / Failed to load orders');
       setLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    fetchOrders();
-    pollRef.current = setInterval(fetchOrders, 10000);
-    return () => { if (pollRef.current) clearInterval(pollRef.current); };
+    void fetchOrders();
+    pollRef.current = setInterval(() => {
+      void fetchOrders();
+    }, 10000);
+    const unsubscribeSession = subscribeSessionChange(() => {
+      abortRef.current?.abort();
+      setOrders([]);
+      setError(null);
+      setUpdatingId(null);
+      setLoading(true);
+      void fetchOrders();
+    });
+    return () => {
+      unsubscribeSession();
+      if (pollRef.current) clearInterval(pollRef.current);
+      abortRef.current?.abort();
+    };
   }, [fetchOrders]);
 
   const updateStatus = useCallback(async (orderId: string, status: KitchenOrder['status']) => {
+    const snap = readSessionSnapshot();
     setUpdatingId(orderId);
     try {
       await apiFetch(`/mobile/kds/orders/${orderId}/status`, {
         method: 'PATCH',
         body: JSON.stringify({ status }),
       });
+      if (!isSameSessionSnapshot(snap, readSessionSnapshot())) return;
       setOrders((prev) => prev.map((o) => (o.id === orderId ? { ...o, status } : o)));
     } catch { /* silent */ } finally { setUpdatingId(null); }
   }, []);

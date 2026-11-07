@@ -1,8 +1,9 @@
 import type { Context } from 'hono';
 import { z } from 'zod';
 import type { Env } from '../../types/env';
-import { queryFirst, execute, matchesTenantRow } from '../../lib/db';
+import { queryFirst, execute, getTenantId, matchesTenantRow } from '../../lib/db';
 import { kvGet, kvSet } from '../../lib/kv';
+import { isHQSuperAdmin } from '../../middleware/tenant';
 
 export type DindinContext = Context<{ Bindings: Env }>;
 
@@ -41,12 +42,86 @@ export function errorResponse(c: DindinContext, e: DinDinError): Response {
 // ── Helpers ──
 function normalizeDinDinTenant(tenantId?: string): string {
   const trimmed = typeof tenantId === 'string' ? tenantId.trim() : '';
-  return trimmed && trimmed !== '*' ? trimmed : 'default';
+  return trimmed && trimmed !== '*' && trimmed.toLowerCase() !== 'hq' ? trimmed : 'default';
+}
+
+export function scopedCartSessionId(sessionId: string, tenantId?: string): string {
+  const effective = normalizeDinDinTenant(tenantId);
+  if (effective !== 'default') {
+    return `${effective}::${sessionId}`;
+  }
+  return sessionId.includes('::') ? `default::${sessionId}` : sessionId;
+}
+
+export function hasCrossTenantDindinOverride(c: {
+  get?: (_k: string) => unknown;
+  req: { query: (_k: string) => string | undefined; header: (_k: string) => string | undefined };
+}): boolean {
+  const candidates = [
+    c.req.query('tenant_id'),
+    c.req.query('tenantId'),
+    c.req.query('store_id'),
+    c.req.query('storeId'),
+    c.req.header('X-Tenant-ID'),
+    c.req.header('x-tenant-id'),
+    c.req.header('X-Store-ID'),
+    c.req.header('x-store-id'),
+  ]
+    .map((v) => (typeof v === 'string' ? v.trim() : ''))
+    .filter(Boolean);
+  if (new Set(candidates).size > 1) return true;
+  const user = (typeof c.get === 'function' ? c.get('user') : undefined) as
+    | { id?: string; role?: string; tenantId?: string; tenant_id?: string }
+    | undefined;
+  if (!user) return false;
+  if (isHQSuperAdmin(user)) return false;
+  const userTenant = (user.tenantId ?? user.tenant_id ?? '').trim();
+  if (userTenant === '*' || userTenant.toLowerCase() === 'hq') return true;
+  const headerOrQueryTenant = candidates[0] || '';
+  if (!headerOrQueryTenant) return false;
+  if (headerOrQueryTenant === '*' || headerOrQueryTenant.toLowerCase() === 'hq') return true;
+  const boundTenant = userTenant || 'default';
+  return headerOrQueryTenant !== boundTenant;
+}
+
+export const hasForbiddenTenantOverride = hasCrossTenantDindinOverride;
+
+export function resolveDinDinTenant(c: {
+  get?: (_k: string) => unknown;
+  env?: unknown;
+  req: { query: (_k: string) => string | undefined; header: (_k: string) => string | undefined };
+}): string {
+  const raw = getTenantId(c as unknown as Parameters<typeof getTenantId>[0]).trim();
+  const user = (typeof c.get === 'function' ? c.get('user') : undefined) as
+    | { id?: string; role?: string; tenantId?: string; tenant_id?: string }
+    | undefined;
+  const candidate = (
+    c.req.query('tenant_id') ||
+    c.req.query('tenantId') ||
+    c.req.query('store_id') ||
+    c.req.query('storeId') ||
+    c.req.header('X-Tenant-ID') ||
+    c.req.header('x-tenant-id') ||
+    c.req.header('X-Store-ID') ||
+    c.req.header('x-store-id') ||
+    ''
+  ).trim();
+  if (user) {
+    if (isHQSuperAdmin(user)) {
+      const target = candidate || raw || '*';
+      return target.toLowerCase() === 'hq' ? '*' : target;
+    }
+    const userTenant = (user.tenantId ?? user.tenant_id ?? '').trim() || raw || 'default';
+    return userTenant === '*' || userTenant.toLowerCase() === 'hq' ? 'default' : userTenant;
+  }
+  const resolved = raw && raw !== 'default' ? raw : candidate || raw || 'default';
+  return resolved.toLowerCase() === 'hq' ? '*' : resolved;
 }
 
 export function cartKVKey(sessionId: string, tenantId?: string): string {
   const effective = normalizeDinDinTenant(tenantId);
-  return effective === 'default' ? `dindin:cart:${sessionId}` : `dindin:${effective}:cart:${sessionId}`;
+  const safeSession = effective === 'default' && sessionId.includes('::') ? `default::${sessionId}` : sessionId;
+  return effective === 'default' ? `dindin:cart:${safeSession}` : `dindin:${effective}:cart:${sessionId}`;
 }
 
 export function idempotencyKVKey(key: string, tenantId?: string): string {
@@ -76,16 +151,51 @@ export async function readCartRD(env: Env, sessionId: string, tenantId?: string)
   }
 
   let row: { raw: string; tenant_id?: string | null } | null = null;
+  const scopedSessionId = scopedCartSessionId(sessionId, effective);
   if (effective !== 'default') {
-    const scopedSessionId = `${effective}::${sessionId}`;
     try {
-      row = await queryFirst<{ raw: string; tenant_id?: string | null }>(
+      const candidate = await queryFirst<{ raw: string; tenant_id?: string | null }>(
         env.AURA_DB,
-        "SELECT COALESCE(raw, cart) as raw, tenant_id FROM dindin_cart WHERE session_id IN (?, ?) AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ? LIMIT 1",
+        "SELECT COALESCE(raw, cart) as raw, tenant_id FROM dindin_cart WHERE session_id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ? LIMIT 1",
         scopedSessionId,
-        sessionId,
         effective
       );
+      if (candidate && matchesTenantRow(candidate as unknown as Record<string, unknown>, effective)) {
+        row = candidate;
+      }
+      if (!row && scopedSessionId !== sessionId) {
+        const unprefixed = await queryFirst<{ raw: string; tenant_id?: string | null }>(
+          env.AURA_DB,
+          "SELECT COALESCE(raw, cart) as raw, tenant_id FROM dindin_cart WHERE session_id IN (?, ?) AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ? LIMIT 1",
+          scopedSessionId,
+          sessionId,
+          effective
+        ).catch(() => null);
+        if (unprefixed && matchesTenantRow(unprefixed as unknown as Record<string, unknown>, effective)) {
+          row = unprefixed;
+        }
+      }
+      if (!row) {
+        const cartsCandidate = await queryFirst<{ raw?: string; cart?: string; items?: string; total?: number; tenant_id?: string | null }>(
+          env.AURA_DB,
+          "SELECT *, COALESCE(cart, items) as raw FROM dindin_carts WHERE session_id IN (?, ?) AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ? LIMIT 1",
+          scopedSessionId,
+          sessionId,
+          effective
+        ).catch(() => null);
+        if (cartsCandidate && matchesTenantRow(cartsCandidate as unknown as Record<string, unknown>, effective)) {
+          const rawStr = cartsCandidate.raw ?? cartsCandidate.cart ?? cartsCandidate.items ?? '';
+          if (rawStr) {
+            const parsed = JSON.parse(rawStr);
+            row = {
+              raw: Array.isArray(parsed)
+                ? JSON.stringify({ items: parsed, total: Number(cartsCandidate.total ?? 0) })
+                : rawStr,
+              tenant_id: cartsCandidate.tenant_id,
+            };
+          }
+        }
+      }
     } catch {
       try {
         row = await queryFirst<{ raw: string }>(
@@ -102,7 +212,7 @@ export async function readCartRD(env: Env, sessionId: string, tenantId?: string)
       const candidate = await queryFirst<{ raw: string; tenant_id?: string | null }>(
         env.AURA_DB,
         'SELECT *, COALESCE(raw, cart) as raw FROM dindin_cart WHERE session_id = ?',
-        sessionId
+        scopedSessionId
       );
       if (candidate && matchesTenantRow(candidate as unknown as Record<string, unknown>, 'default')) {
         row = candidate;
@@ -112,14 +222,14 @@ export async function readCartRD(env: Env, sessionId: string, tenantId?: string)
         row = await queryFirst<{ raw: string }>(
           env.AURA_DB,
           'SELECT COALESCE(raw, cart) as raw FROM dindin_cart WHERE session_id = ?',
-          sessionId
+          scopedSessionId
         );
       } catch {
         try {
           row = await queryFirst<{ raw: string }>(
             env.AURA_DB,
             'SELECT raw FROM dindin_cart WHERE session_id = ?',
-            sessionId
+            scopedSessionId
           );
         } catch {
           row = null;
@@ -139,27 +249,19 @@ export async function readCartRD(env: Env, sessionId: string, tenantId?: string)
 
 export async function writeCart(env: Env, sessionId: string, cart: Cart, tenantId?: string): Promise<void> {
   const effective = normalizeDinDinTenant(tenantId);
+  const scopedSessionId = scopedCartSessionId(sessionId, effective);
   const blob = JSON.stringify(cart);
   if (effective !== 'default') {
-    const scopedSessionId = `${effective}::${sessionId}`;
     await Promise.all([
       kvSet(env.AUTH_KV, cartKVKey(sessionId, effective), blob),
       execute(
         env.AURA_DB,
-        'INSERT INTO dindin_cart (session_id, raw, cart, tenant_id, updated_at) VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP) ON CONFLICT(session_id) DO UPDATE SET raw = excluded.raw, cart = excluded.cart, tenant_id = excluded.tenant_id, updated_at = excluded.updated_at',
+        "INSERT INTO dindin_cart (session_id, raw, cart, tenant_id, updated_at) VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP) ON CONFLICT(session_id) DO UPDATE SET raw = excluded.raw, cart = excluded.cart, tenant_id = excluded.tenant_id, updated_at = excluded.updated_at WHERE COALESCE(NULLIF(TRIM(dindin_cart.tenant_id), ''), 'default') = excluded.tenant_id",
         scopedSessionId,
         blob,
         blob,
         effective
-      ).catch(() =>
-        execute(
-          env.AURA_DB,
-          'INSERT INTO dindin_cart (session_id, raw, cart, updated_at) VALUES (?, ?, ?, CURRENT_TIMESTAMP) ON CONFLICT(session_id) DO UPDATE SET raw = excluded.raw, cart = excluded.cart, updated_at = excluded.updated_at',
-          scopedSessionId,
-          blob,
-          blob
-        ).catch(() => {})
-      ),
+      ).catch(() => {}),
     ]);
     return;
   }
@@ -168,8 +270,8 @@ export async function writeCart(env: Env, sessionId: string, cart: Cart, tenantI
     kvSet(env.AUTH_KV, cartKVKey(sessionId), blob),
     execute(
       env.AURA_DB,
-      'INSERT INTO dindin_cart (session_id, raw, cart, tenant_id, updated_at) VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP) ON CONFLICT(session_id) DO UPDATE SET raw = excluded.raw, cart = excluded.cart, tenant_id = excluded.tenant_id, updated_at = excluded.updated_at',
-      sessionId,
+      "INSERT INTO dindin_cart (session_id, raw, cart, tenant_id, updated_at) VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP) ON CONFLICT(session_id) DO UPDATE SET raw = excluded.raw, cart = excluded.cart, tenant_id = excluded.tenant_id, updated_at = excluded.updated_at WHERE COALESCE(NULLIF(TRIM(dindin_cart.tenant_id), ''), 'default') = excluded.tenant_id",
+      scopedSessionId,
       blob,
       blob,
       effective
@@ -177,14 +279,14 @@ export async function writeCart(env: Env, sessionId: string, cart: Cart, tenantI
       execute(
         env.AURA_DB,
         'INSERT INTO dindin_cart (session_id, raw, cart, updated_at) VALUES (?, ?, ?, CURRENT_TIMESTAMP) ON CONFLICT(session_id) DO UPDATE SET raw = excluded.raw, cart = excluded.cart, updated_at = excluded.updated_at',
-        sessionId,
+        scopedSessionId,
         blob,
         blob
       ).catch(() =>
         execute(
           env.AURA_DB,
           'INSERT INTO dindin_cart (session_id, raw, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP) ON CONFLICT(session_id) DO UPDATE SET raw = excluded.raw, updated_at = excluded.updated_at',
-          sessionId,
+          scopedSessionId,
           blob
         ).catch(() => {})
       )
@@ -276,7 +378,7 @@ export async function writeConfig(env: Env, configBlob: string, tenantId?: strin
     kvSet(env.AUTH_KV, 'dindin:config', configBlob),
     execute(
       env.AURA_DB,
-      'INSERT INTO dindin_config (id, config, tenant_id, updated_at) VALUES (1, ?, ?, CURRENT_TIMESTAMP) ON CONFLICT(id) DO UPDATE SET config = excluded.config, tenant_id = excluded.tenant_id, updated_at = excluded.updated_at',
+      "INSERT INTO dindin_config (id, config, tenant_id, updated_at) VALUES (1, ?, ?, CURRENT_TIMESTAMP) ON CONFLICT(id) DO UPDATE SET config = excluded.config, tenant_id = excluded.tenant_id, updated_at = excluded.updated_at WHERE COALESCE(NULLIF(TRIM(dindin_config.tenant_id), ''), 'default') = excluded.tenant_id",
       configBlob,
       effective
     ).catch(() =>

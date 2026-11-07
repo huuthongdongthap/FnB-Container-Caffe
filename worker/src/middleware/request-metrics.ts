@@ -24,12 +24,24 @@ export function requestMetrics(): MiddlewareHandler<{ Bindings: Env }> {
         // No execution context in testing
       }
       if (ctx) {
+        const ctxGetter = (c as unknown as { get?: (k: string) => unknown }).get;
+        const rawCtxTenant = typeof ctxGetter === 'function' ? String(ctxGetter.call(c, 'tenantId') || '').trim() : '';
+        const rawHdrTenant = String(c.req.header('X-Tenant-ID') || c.req.header('x-tenant-id') || '').trim();
+        const rawPilotTenant = typeof (c.env as unknown as Record<string, unknown> | undefined)?.PILOT_TENANT_ID === 'string'
+          ? String((c.env as unknown as Record<string, unknown>).PILOT_TENANT_ID).trim()
+          : '';
+        const resolvedTenant =
+          (rawCtxTenant && rawCtxTenant !== '*' ? rawCtxTenant : '') ||
+          (rawHdrTenant && rawHdrTenant !== '*' ? rawHdrTenant : '') ||
+          (rawPilotTenant && rawPilotTenant !== '*' ? rawPilotTenant : '') ||
+          'default';
         const mc = createMetricsCollector(c.env.AURA_DB);
         ctx.waitUntil(mc.recordMetric('request', 1, {
           method: c.req.method,
           path: c.req.path,
           status,
-          duration
+          duration,
+          tenant_id: resolvedTenant,
         }));
       }
     }

@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiFetch } from '@/lib/api-client';
+import { useAuthStore } from '@/hooks/stores/use-auth-store';
 import { z } from 'zod';
 
 /* ═══════════════════════════════════════════════════════════════════
@@ -55,8 +56,10 @@ export const reviewFormSchema = z.object({
 });
 
 export function useReviewsStats() {
+  const tenantId = useAuthStore((s) => s.user?.tenantId) || 'default';
+  const sessionVersion = useAuthStore((s) => s.sessionVersion);
   return useQuery<StatsResponse['data']>({
-    queryKey: ['reviews-stats'],
+    queryKey: sessionVersion > 0 ? ['reviews-stats', tenantId, sessionVersion] : ['reviews-stats', tenantId],
     queryFn: async () => {
       const res = await apiFetch<StatsResponse>('/api/reviews/stats');
       return res.data;
@@ -66,8 +69,10 @@ export function useReviewsStats() {
 }
 
 export function useReviews(page = 1, limit = 20) {
+  const tenantId = useAuthStore((s) => s.user?.tenantId) || 'default';
+  const sessionVersion = useAuthStore((s) => s.sessionVersion);
   return useQuery<ReviewsResponse>({
-    queryKey: ['reviews', page, limit],
+    queryKey: sessionVersion > 0 ? ['reviews', page, limit, tenantId, sessionVersion] : ['reviews', page, limit, tenantId],
     queryFn: async () => {
       return apiFetch<ReviewsResponse>(`/api/reviews?page=${page}&limit=${limit}`);
     },

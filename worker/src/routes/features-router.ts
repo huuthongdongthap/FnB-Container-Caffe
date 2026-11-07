@@ -4,7 +4,7 @@ import { handleUpdateOrderStatus } from './orders-hono-handlers/kds-handlers';
  */
 
 import { Hono } from 'hono';
-import { requireAuth } from '../middleware/auth';
+import { requireAuth, optionalAuth } from '../middleware/auth';
 import { audit } from '../middleware/audit-log';
 import { getTenantId, isHQSuperAdmin, tenantMiddleware } from '../middleware/tenant';
 import { getAdminOrders, getStats } from '@aura/domain-order';
@@ -95,7 +95,7 @@ export function registerFeatureRoutes(app: Hono<{ Bindings: Env }>): void {
   // Every alias uses the same tenant-scoped state machine and compare-and-set.
   app.patch('/api/admin/orders/:id/status', handleUpdateOrderStatus);
   app.post('/api/admin/orders/:id/complete', (c) => handleUpdateOrderStatus(c, 'completed'));
-  app.get('/api/admin/customers', (c) => getAdminCustomers(c.req.raw, c.env, getTenantId(c)));
+  app.get('/api/admin/customers', requireAuth(['owner', 'manager', 'supervisor', 'admin']), (c) => getAdminCustomers(c.req.raw, c.env, getTenantId(c)));
   app.post('/api/admin/customers', requireAuth(['owner', 'manager', 'supervisor', 'admin']), (c) => createAdminCustomer(c.req.raw, c.env, getTenantId(c)));
   app.patch('/api/admin/customers/:id', requireAuth(['owner', 'manager', 'supervisor', 'admin']), (c) => updateAdminCustomer(c.req.raw, c.env, c.req.param('id'), getTenantId(c)));
   app.delete('/api/admin/customers/:id', requireAuth(['owner', 'manager', 'supervisor', 'admin']), (c) => deleteAdminCustomer(c.env, c.req.param('id'), getTenantId(c)));
@@ -179,44 +179,131 @@ export function registerFeatureRoutes(app: Hono<{ Bindings: Env }>): void {
   app.route('/api/loyalty', loyaltyRouter);
   app.route('/api/admin/loyalty', adminLoyaltyRouter);
   app.route('/api/admin-loyalty', adminLoyaltyRouter);
+  const resolveNotificationSettingsTenant = (
+    c: any,
+    errorMessage: string
+  ): { effectiveTenant: string; user: { id?: string; role?: string; tenantId?: string; tenant_id?: string } | undefined; errorResponse: Response | null } => {
+    const user = (c as unknown as { get: (k: string) => { id?: string; role?: string; tenantId?: string; tenant_id?: string } | undefined }).get('user');
+    const rawUserTenant = String(user?.tenantId || user?.tenant_id || '').trim();
+    const userTenant = rawUserTenant || 'default';
+    const requestedTenant = (
+      c.req.query('tenant_id') ||
+      c.req.query('tenantId') ||
+      c.req.query('store_id') ||
+      c.req.query('storeId') ||
+      c.req.header('X-Tenant-ID') ||
+      c.req.header('x-tenant-id') ||
+      c.req.header('X-Store-ID') ||
+      c.req.header('x-store-id') ||
+      ''
+    ).trim();
+    const resolvedCtxTenant = getTenantId(c).trim() || 'default';
+    if (!isHQSuperAdmin(user)) {
+      if (
+        rawUserTenant === '*' ||
+        rawUserTenant.toLowerCase() === 'hq' ||
+        requestedTenant === '*' ||
+        requestedTenant.toLowerCase() === 'hq' ||
+        (requestedTenant && requestedTenant !== userTenant) ||
+        resolvedCtxTenant === '*' ||
+        resolvedCtxTenant.toLowerCase() === 'hq' ||
+        resolvedCtxTenant !== userTenant
+      ) {
+        return {
+          effectiveTenant: 'default',
+          user,
+          errorResponse: c.json({ success: false, error: errorMessage }, 403),
+        };
+      }
+    }
+    const rawTenant =
+      !isHQSuperAdmin(user) && rawUserTenant && rawUserTenant !== '*' && rawUserTenant.toLowerCase() !== 'hq'
+        ? rawUserTenant
+        : requestedTenant || resolvedCtxTenant;
+    const effectiveTenant = !rawTenant || rawTenant === '*' || rawTenant.toLowerCase() === 'hq' ? 'default' : rawTenant;
+    return { effectiveTenant, user, errorResponse: null };
+  };
+
+  const safeParseSettingsJson = (raw: string | null | undefined): Record<string, unknown> => {
+    if (!raw) return {};
+    try {
+      const parsed = JSON.parse(raw);
+      return parsed && typeof parsed === 'object' ? (parsed as Record<string, unknown>) : {};
+    } catch {
+      return {};
+    }
+  };
+
   app.get('/api/admin/notification-settings', requireAuth(['owner', 'manager', 'supervisor', 'admin']), async (c) => {
-    const rawTenant = getTenantId(c).trim();
-    const effectiveTenant = !rawTenant || rawTenant === '*' ? 'default' : rawTenant;
+    const scope = resolveNotificationSettingsTenant(c, 'Forbidden: cross-tenant notification settings access denied');
+    if (scope.errorResponse) return scope.errorResponse;
+    const { effectiveTenant } = scope;
     const tenantKey = `config:notification_settings:${effectiveTenant}`;
     const raw =
       (await c.env.AUTH_KV?.get(tenantKey)) ??
       (effectiveTenant === 'default' ? await c.env.AUTH_KV?.get('config:notification_settings') : null);
-    const parsed = raw ? (JSON.parse(raw) as Record<string, unknown>) : {};
+    const parsed = safeParseSettingsJson(raw);
     return c.json({
       autoNotifyNewOrder: Boolean(parsed.autoNotifyNewOrder),
       soundAlerts: Boolean(parsed.soundAlerts),
     });
   });
   app.patch('/api/admin/notification-settings', requireAuth(['owner', 'manager', 'supervisor', 'admin']), async (c) => {
-    const rawTenant = getTenantId(c).trim();
-    const effectiveTenant = !rawTenant || rawTenant === '*' ? 'default' : rawTenant;
-    const key = effectiveTenant === 'default' ? 'config:notification_settings' : `config:notification_settings:${effectiveTenant}`;
+    const scope = resolveNotificationSettingsTenant(c, 'Forbidden: cross-tenant notification settings update denied');
+    if (scope.errorResponse) return scope.errorResponse;
+    const { effectiveTenant } = scope;
+    const tenantKey = `config:notification_settings:${effectiveTenant}`;
     const body = await c.req.json().catch(() => ({})) as Record<string, unknown>;
-    const raw = await c.env.AUTH_KV?.get(key);
-    const prev = raw ? (JSON.parse(raw) as Record<string, unknown>) : {};
+    const raw =
+      (await c.env.AUTH_KV?.get(tenantKey)) ??
+      (effectiveTenant === 'default' ? await c.env.AUTH_KV?.get('config:notification_settings') : null);
+    const prev = safeParseSettingsJson(raw);
     const next = {
       autoNotifyNewOrder: typeof body.autoNotifyNewOrder === 'boolean' ? body.autoNotifyNewOrder : Boolean(prev.autoNotifyNewOrder),
       soundAlerts: typeof body.soundAlerts === 'boolean' ? body.soundAlerts : Boolean(prev.soundAlerts),
     };
-    await c.env.AUTH_KV?.put(key, JSON.stringify(next));
+    const serialized = JSON.stringify(next);
+    await c.env.AUTH_KV?.put(tenantKey, serialized);
+    if (effectiveTenant === 'default') {
+      await c.env.AUTH_KV?.put('config:notification_settings', serialized);
+    }
     return c.json({ success: true, ...next });
   });
+  app.get('/api/staff/notification-settings', requireAuth(['owner', 'manager', 'supervisor', 'admin', 'staff', 'waiter', 'kitchen', 'barista', 'chef', 'cashier', 'shipper']), async (c) => {
+    const scope = resolveNotificationSettingsTenant(c, 'Forbidden: cross-tenant notification settings access denied');
+    if (scope.errorResponse) return scope.errorResponse;
+    const { effectiveTenant, user } = scope;
+    const staffId = user?.id || 'default';
+    const key = `config:staff_notification_settings:${effectiveTenant}:${staffId}`;
+    const raw =
+      (await c.env.AUTH_KV?.get(key)) ??
+      (effectiveTenant === 'default' ? await c.env.AUTH_KV?.get(`config:staff_notification_settings:${staffId}`) : null);
+    const parsed = safeParseSettingsJson(raw);
+    return c.json({
+      orderAlertsEnabled: Boolean(parsed.orderAlertsEnabled ?? true),
+      shiftRemindersEnabled: Boolean(parsed.shiftRemindersEnabled ?? true),
+    });
+  });
   app.patch('/api/staff/notification-settings', requireAuth(['owner', 'manager', 'supervisor', 'admin', 'staff', 'waiter', 'kitchen', 'barista', 'chef', 'cashier', 'shipper']), async (c) => {
+    const scope = resolveNotificationSettingsTenant(c, 'Forbidden: cross-tenant notification settings update denied');
+    if (scope.errorResponse) return scope.errorResponse;
+    const { effectiveTenant, user } = scope;
     const body = await c.req.json().catch(() => ({})) as Record<string, unknown>;
-    const user = (c as unknown as { get: (k: string) => { id?: string } | undefined }).get('user');
-    const key = `config:staff_notification_settings:${user?.id || 'default'}`;
-    const raw = await c.env.AUTH_KV?.get(key);
-    const prev = raw ? (JSON.parse(raw) as Record<string, unknown>) : {};
+    const staffId = user?.id || 'default';
+    const key = `config:staff_notification_settings:${effectiveTenant}:${staffId}`;
+    const raw =
+      (await c.env.AUTH_KV?.get(key)) ??
+      (effectiveTenant === 'default' ? await c.env.AUTH_KV?.get(`config:staff_notification_settings:${staffId}`) : null);
+    const prev = safeParseSettingsJson(raw);
     const next = {
       orderAlertsEnabled: typeof body.orderAlertsEnabled === 'boolean' ? body.orderAlertsEnabled : Boolean(prev.orderAlertsEnabled ?? true),
       shiftRemindersEnabled: typeof body.shiftRemindersEnabled === 'boolean' ? body.shiftRemindersEnabled : Boolean(prev.shiftRemindersEnabled ?? true),
     };
-    await c.env.AUTH_KV?.put(key, JSON.stringify(next));
+    const serialized = JSON.stringify(next);
+    await c.env.AUTH_KV?.put(key, serialized);
+    if (effectiveTenant === 'default') {
+      await c.env.AUTH_KV?.put(`config:staff_notification_settings:${staffId}`, serialized);
+    }
     return c.json({ success: true, ...next });
   });
   app.use('/api/reports', requireAuth(['owner', 'manager', 'supervisor', 'admin']));
@@ -242,7 +329,7 @@ export function registerFeatureRoutes(app: Hono<{ Bindings: Env }>): void {
   app.get('/api/version', (c) => c.json(getVersion(c.env)));
 
   // SaaS & Franchise
-  app.get('/api/saas/pricing', getPricing);
+  app.get('/api/saas/pricing', optionalAuth(), getPricing);
   app.use('/api/saas/tenants/*', requireAuth(), tenantMiddleware);
   app.route('/api/saas/tenants', createTenantRoutes());
   app.route('/api/franchise', franchiseRouter);

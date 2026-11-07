@@ -261,7 +261,9 @@ export async function getMetricSummary(
             count: matchingValues.length
           };
         } catch {
-          // Fall back to unscoped aggregate query when tags column or .all() is unavailable
+          if (trimmedTenant !== 'default') {
+            return null;
+          }
         }
       }
     }

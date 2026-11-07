@@ -1,6 +1,12 @@
 import { create } from 'zustand';
 import { apiFetch, ApiClientError } from '@/lib/api-client';
-import { readClientSession, saveClientSession, subscribeClientSession, type ClientSessionUser } from '@/lib/client-session';
+import {
+  readSessionSnapshot,
+  isSameSessionSnapshot,
+  saveClientSession,
+  subscribeSessionChange,
+  type ClientSessionUser,
+} from '@/lib/client-session';
 import { loadInitialLoyalty, persistLoyalty, parsePointsHistory, parseRewards, parseLoyaltySummary, parseTierLadder } from './loyalty-store-helpers';
 
 import type { Reward, PointsHistoryEntry, LoyaltyTierLadderItem } from './loyalty-store-types';
@@ -43,7 +49,7 @@ export const useLoyaltyStore = create<LoyaltyState>((set, get) => ({
   error: null,
 
   fetchLoyalty: async () => {
-    const sessionToken = readClientSession().token;
+    const sessionSnap = readSessionSnapshot();
     set({ loading: true, error: null });
     try {
       const body = await apiFetch<{ success: boolean; data: Record<string, unknown> }>('/api/loyalty/summary');
@@ -73,7 +79,7 @@ export const useLoyaltyStore = create<LoyaltyState>((set, get) => ({
         tierLadder = parseTierLadder(rawTiers, parseLoyaltySummary(data).tier);
       } catch { /* tier ladder is optional */ }
 
-      if (readClientSession().token !== sessionToken) return;
+      if (!isSameSessionSnapshot(sessionSnap, readSessionSnapshot())) return;
       const { tier: tierVal, points: pointsVal, cashbackRate: cashbackRateVal } = parseLoyaltySummary(data);
       persistLoyalty(tierVal, pointsVal, cashbackRateVal);
       set({
@@ -87,6 +93,7 @@ export const useLoyaltyStore = create<LoyaltyState>((set, get) => ({
         error: null,
       });
     } catch (err) {
+      if (!isSameSessionSnapshot(sessionSnap, readSessionSnapshot())) return;
       if (err instanceof ApiClientError) {
         if (err.status === 401) {
           set({ loading: false, error: 'Session expired. Vui lòng đăng nhập lại.' });
@@ -100,18 +107,21 @@ export const useLoyaltyStore = create<LoyaltyState>((set, get) => ({
   },
 
   redeemReward: async (rewardId: string) => {
+    const sessionSnap = readSessionSnapshot();
     set({ loading: true, error: null });
     try {
       const body = await apiFetch<{ success: boolean; data: Record<string, unknown> }>('/api/loyalty/redeem', {
         method: 'POST',
         body: JSON.stringify({ reward_id: rewardId }),
       });
+      if (!isSameSessionSnapshot(sessionSnap, readSessionSnapshot())) return;
       const data = body.data || body;
       const pointsRemaining = Number(data.points_remaining ?? data.points ?? get().points);
 
       persistLoyalty(get().tier, pointsRemaining, get().cashbackRate);
       set({ points: pointsRemaining, loading: false, error: null });
     } catch (err) {
+      if (!isSameSessionSnapshot(sessionSnap, readSessionSnapshot())) return;
       if (err instanceof ApiClientError) {
         set({ loading: false, error: err.message || 'Redeem failed' });
       } else {
@@ -152,24 +162,29 @@ export const useLoyaltyStore = create<LoyaltyState>((set, get) => ({
     }
   },
 
-  reset: () => set({
-    tier: 'bronze',
-    points: 0,
-    cashbackRate: 3,
-    tierLadder: [],
-    rewards: [],
-    history: [],
-    loading: false,
-    error: null,
-  }),
+  reset: () => {
+    try {
+      localStorage.removeItem('aura_loyalty');
+    } catch { /* ignore */ }
+    set({
+      tier: 'bronze',
+      points: 0,
+      cashbackRate: 3,
+      tierLadder: [],
+      rewards: [],
+      history: [],
+      loading: false,
+      error: null,
+    });
+  },
 
   clearError: () => set({ error: null }),
 }));
 
+// Reset loyalty state whenever the active session token, user, or tenant changes
+// so points, tier ladder, and reward history never bleed across accounts.
 if (typeof window !== 'undefined') {
-  subscribeClientSession((session) => {
-    if (!session.token) {
-      useLoyaltyStore.getState().reset();
-    }
+  subscribeSessionChange(() => {
+    useLoyaltyStore.getState().reset();
   });
 }

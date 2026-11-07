@@ -54,9 +54,21 @@ export async function getCanonicalRecipe(
   productId: string,
   tenantId?: string
 ): Promise<CanonicalRecipe | null> {
-  const effectiveTenant = tenantId && tenantId.trim() ? tenantId.trim() : undefined;
+  const rawTenant = tenantId && tenantId.trim() ? tenantId.trim() : '';
+  const isWildcard = rawTenant === '*' || rawTenant.toLowerCase() === 'hq';
+  let effectiveTenant = rawTenant && !isWildcard ? rawTenant : 'default';
   let recipe: any = null;
-  if (effectiveTenant && effectiveTenant !== '*') {
+  if (isWildcard) {
+    try {
+      recipe = await db.prepare(
+        'SELECT id, product_id, name, instructions, tenant_id FROM recipes WHERE product_id = ? AND is_active = 1 LIMIT 1'
+      ).bind(productId).first<any>();
+    } catch {
+      recipe = await db.prepare(
+        'SELECT id, product_id, name, instructions FROM recipes WHERE product_id = ? AND is_active = 1 LIMIT 1'
+      ).bind(productId).first<any>().catch(() => null);
+    }
+  } else {
     try {
       recipe = await db.prepare(
         "SELECT id, product_id, name, instructions, tenant_id FROM recipes WHERE product_id = ? AND is_active = 1 AND (COALESCE(NULLIF(tenant_id, ''), 'default') = ? OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?2) LIMIT 1"
@@ -64,46 +76,93 @@ export async function getCanonicalRecipe(
     } catch {
       // Fallback when is_active or tenant_id column is absent
     }
-  }
-  if (!recipe) {
-    try {
-      recipe = await db.prepare(
-        'SELECT id, product_id, name, instructions, tenant_id FROM recipes WHERE product_id = ? AND is_active = 1 LIMIT 1'
-      ).bind(productId).first<any>();
-    } catch {
+    if (!recipe && effectiveTenant === 'default') {
       try {
         recipe = await db.prepare(
-          'SELECT id, product_id, name, instructions FROM recipes WHERE product_id = ? AND is_active = 1 LIMIT 1'
+          'SELECT id, product_id, name, instructions, tenant_id FROM recipes WHERE product_id = ? AND is_active = 1 LIMIT 1'
         ).bind(productId).first<any>();
       } catch {
-        // Fallback when is_active column is absent
+        try {
+          recipe = await db.prepare(
+            'SELECT id, product_id, name, instructions FROM recipes WHERE product_id = ? AND is_active = 1 LIMIT 1'
+          ).bind(productId).first<any>();
+        } catch {
+          // Fallback when is_active column is absent
+        }
       }
     }
   }
   if (!recipe) {
     try {
-      recipe = await db.prepare(
-        'SELECT id, product_id, name, instructions, tenant_id FROM recipes WHERE product_id = ? LIMIT 1'
-      ).bind(productId).first<any>();
+      const inactiveRecipe = await db.prepare(
+        "SELECT COUNT(*) as cnt FROM recipes WHERE product_id = ? AND is_active = 0 AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
+      ).bind(productId, effectiveTenant).first<{ cnt?: number }>();
+      if (Number(inactiveRecipe?.cnt || 0) > 0) return null;
     } catch {
+      try {
+        const inactiveProdRecipe = await db.prepare(
+          "SELECT COUNT(*) as cnt FROM product_recipes WHERE product_id = ? AND is_active = 0 AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
+        ).bind(productId, effectiveTenant).first<{ cnt?: number }>();
+        if (Number(inactiveProdRecipe?.cnt || 0) > 0) return null;
+      } catch {
+        // Ignore when is_active or table is absent
+      }
+    }
+    try {
       recipe = await db.prepare(
-        'SELECT id, product_id, name, instructions FROM recipes WHERE product_id = ? LIMIT 1'
-      ).bind(productId).first<any>();
+        "SELECT id, product_id, name, instructions, tenant_id FROM recipes WHERE product_id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ? LIMIT 1"
+      ).bind(productId, effectiveTenant).first<any>();
+    } catch {
+      if (effectiveTenant === 'default' || isWildcard) {
+        try {
+          recipe = await db.prepare(
+            'SELECT id, product_id, name, instructions, tenant_id FROM recipes WHERE product_id = ? LIMIT 1'
+          ).bind(productId).first<any>();
+        } catch {
+          recipe = await db.prepare(
+            'SELECT id, product_id, name, instructions FROM recipes WHERE product_id = ? LIMIT 1'
+          ).bind(productId).first<any>();
+        }
+      }
     }
   }
 
   if (!recipe) return null;
-  if (effectiveTenant && effectiveTenant !== '*' && 'tenant_id' in recipe && recipe.tenant_id !== undefined) {
-    const recTenant = recipe.tenant_id && String(recipe.tenant_id).trim() ? String(recipe.tenant_id).trim() : 'default';
-    if (recTenant !== effectiveTenant) return null;
+  if ('tenant_id' in recipe && recipe.tenant_id !== undefined) {
+    const rawRecTenant = recipe.tenant_id && String(recipe.tenant_id).trim() ? String(recipe.tenant_id).trim() : 'default';
+    const recTenant = rawRecTenant === '*' || rawRecTenant.toLowerCase() === 'hq' ? 'default' : rawRecTenant;
+    if (!isWildcard && recTenant !== effectiveTenant) return null;
+    effectiveTenant = recTenant;
   }
 
-  const rows = await db.prepare(
-    `SELECT ri.ingredient_id, ri.quantity, ri.unit, i.name as ing_name, COALESCE(i.cost_per_unit, 0) as cost_per_unit
-     FROM recipe_items ri
-     LEFT JOIN ingredients i ON ri.ingredient_id = i.id
-     WHERE ri.recipe_id = ?`
-  ).bind(recipe.id).all<any>();
+  let rows: { results: any[] };
+  try {
+    rows = await db.prepare(
+      `SELECT ri.ingredient_id, ri.quantity, ri.unit, i.name as ing_name, COALESCE(i.cost_per_unit, 0) as cost_per_unit
+       FROM recipe_items ri
+       LEFT JOIN ingredients i ON ri.ingredient_id = i.id AND COALESCE(NULLIF(TRIM(i.tenant_id), ''), 'default') = ?2
+       WHERE ri.recipe_id = ?1`
+    ).bind(recipe.id, effectiveTenant).all<any>();
+    if ((!rows.results || rows.results.length === 0) && effectiveTenant === 'default') {
+      rows = await db.prepare(
+        `SELECT ri.ingredient_id, ri.quantity, ri.unit, i.name as ing_name, COALESCE(i.cost_per_unit, 0) as cost_per_unit
+         FROM recipe_items ri
+         LEFT JOIN ingredients i ON ri.ingredient_id = i.id
+         WHERE ri.recipe_id = ?`
+      ).bind(recipe.id).all<any>();
+    }
+  } catch {
+    if (effectiveTenant === 'default') {
+      rows = await db.prepare(
+        `SELECT ri.ingredient_id, ri.quantity, ri.unit, i.name as ing_name, COALESCE(i.cost_per_unit, 0) as cost_per_unit
+         FROM recipe_items ri
+         LEFT JOIN ingredients i ON ri.ingredient_id = i.id
+         WHERE ri.recipe_id = ?`
+      ).bind(recipe.id).all<any>();
+    } else {
+      rows = { results: [] };
+    }
+  }
 
   const components: CanonicalRecipeComponent[] = (rows.results || []).map((r: any) => ({
     ingredientId: r.ingredient_id,
@@ -202,23 +261,38 @@ export async function deductOrderStock(
   if (!Array.isArray(orderItems) || orderItems.some(i => !i || typeof i.quantity !== 'number' || !Number.isFinite(i.quantity) || i.quantity <= 0)) {
     return { ok: false, alreadyDeducted: false, depletions: [], coveredProductIds: [], error: 'invalid_order_items' };
   }
-  const effectiveTenant = options?.tenantId && options.tenantId.trim() ? options.tenantId.trim() : undefined;
+  const rawTenant = options?.tenantId && options.tenantId.trim() ? options.tenantId.trim() : '';
+  const isWildcard = rawTenant === '*' || rawTenant.toLowerCase() === 'hq';
+  let effectiveTenant = rawTenant && !isWildcard ? rawTenant : 'default';
+  if (!rawTenant || isWildcard) {
+    try {
+      const ordRow = await db
+        .prepare('SELECT tenant_id FROM orders WHERE id = ?')
+        .bind(orderId)
+        .first<{ tenant_id?: string | null }>()
+        .catch(() => null);
+      if (ordRow && 'tenant_id' in ordRow && ordRow.tenant_id !== undefined) {
+        const ordTenant = typeof ordRow.tenant_id === 'string' && ordRow.tenant_id.trim() ? ordRow.tenant_id.trim() : '';
+        if (ordTenant && ordTenant !== '*' && ordTenant.toLowerCase() !== 'hq') {
+          effectiveTenant = ordTenant;
+        }
+      }
+    } catch {
+      // Optional orders lookup in minimal test mocks
+    }
+  }
   // 1. Idempotency Guard
   let existing: { id: string } | null = null;
-  if (effectiveTenant && effectiveTenant !== '*') {
-    try {
-      existing = await db.prepare(
-        "SELECT id FROM stock_movements WHERE reference_id = ? AND reference_type = 'order' AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ? LIMIT 1"
-      ).bind(orderId, effectiveTenant).first<{ id: string }>();
-    } catch {
+  try {
+    existing = await db.prepare(
+      "SELECT id FROM stock_movements WHERE reference_id = ? AND reference_type = 'order' AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ? LIMIT 1"
+    ).bind(orderId, effectiveTenant).first<{ id: string }>();
+  } catch {
+    if (effectiveTenant === 'default') {
       existing = await db.prepare(
         `SELECT id FROM stock_movements WHERE reference_id = ? AND reference_type = 'order' LIMIT 1`
       ).bind(orderId).first<{ id: string }>();
     }
-  } else {
-    existing = await db.prepare(
-      `SELECT id FROM stock_movements WHERE reference_id = ? AND reference_type = 'order' LIMIT 1`
-    ).bind(orderId).first<{ id: string }>();
   }
 
   if (existing) {
@@ -226,7 +300,11 @@ export async function deductOrderStock(
   }
 
   // 2. Calculate Server-Side BOM Consumption
-  const { depletions, coveredProductIds = [] } = await calculateOrderConsumption(db, orderItems, effectiveTenant);
+  const { depletions, coveredProductIds = [] } = await calculateOrderConsumption(
+    db,
+    orderItems,
+    effectiveTenant
+  );
   if (depletions.length === 0) {
     return { ok: true, alreadyDeducted: false, depletions: [], coveredProductIds };
   }
@@ -239,9 +317,11 @@ export async function deductOrderStock(
       try {
         ing = await db.prepare('SELECT id, current_stock, tenant_id FROM ingredients WHERE id = ?').bind(d.ingredientId).first<any>();
       } catch {
-        ing = await db.prepare('SELECT id, current_stock FROM ingredients WHERE id = ?').bind(d.ingredientId).first<any>();
+        if (effectiveTenant === 'default') {
+          ing = await db.prepare('SELECT id, current_stock FROM ingredients WHERE id = ?').bind(d.ingredientId).first<any>();
+        }
       }
-      if (ing && effectiveTenant && effectiveTenant !== '*' && 'tenant_id' in ing && ing.tenant_id !== undefined) {
+      if (ing && 'tenant_id' in ing && ing.tenant_id !== undefined) {
         const ingTenant = ing.tenant_id && String(ing.tenant_id).trim() ? String(ing.tenant_id).trim() : 'default';
         if (ingTenant !== effectiveTenant) {
           ing = null;
@@ -268,47 +348,36 @@ export async function deductOrderStock(
   const now = new Date().toISOString();
   for (const d of depletions) {
     const movId = `mov_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-    if (effectiveTenant && effectiveTenant !== '*') {
-      let ingRow: any = null;
-      try {
-        ingRow = await db.prepare('SELECT id, tenant_id FROM ingredients WHERE id = ?').bind(d.ingredientId).first<any>();
-      } catch {
-        // Optional tenant_id column
+    let ingRow: any = null;
+    try {
+      ingRow = await db.prepare('SELECT id, tenant_id FROM ingredients WHERE id = ?').bind(d.ingredientId).first<any>();
+    } catch {
+      // Optional tenant_id column
+    }
+    if (ingRow && 'tenant_id' in ingRow && ingRow.tenant_id !== undefined) {
+      const ingTenant = ingRow.tenant_id && String(ingRow.tenant_id).trim() ? String(ingRow.tenant_id).trim() : 'default';
+      if (ingTenant !== effectiveTenant) {
+        continue;
       }
-      if (ingRow && 'tenant_id' in ingRow && ingRow.tenant_id !== undefined) {
-        const ingTenant = ingRow.tenant_id && String(ingRow.tenant_id).trim() ? String(ingRow.tenant_id).trim() : 'default';
-        if (ingTenant !== effectiveTenant) {
-          continue;
-        }
-      }
-      try {
-        await db.prepare(
-          "UPDATE ingredients SET current_stock = current_stock - ?, updated_at = ? WHERE id = ? AND (COALESCE(NULLIF(tenant_id, ''), 'default') = ? OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?4)"
-        ).bind(d.quantity, now, d.ingredientId, effectiveTenant).run();
-      } catch {
-        await db.prepare(
-          'UPDATE ingredients SET current_stock = current_stock - ?, updated_at = ? WHERE id = ?'
-        ).bind(d.quantity, now, d.ingredientId).run();
-      }
-    } else {
+    }
+    try {
+      await db.prepare(
+        "UPDATE ingredients SET current_stock = current_stock - ?, updated_at = ? WHERE id = ? AND (COALESCE(NULLIF(tenant_id, ''), 'default') = ? OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?4)"
+      ).bind(d.quantity, now, d.ingredientId, effectiveTenant).run();
+    } catch (updErr) {
+      if (effectiveTenant !== 'default') throw updErr;
       await db.prepare(
         'UPDATE ingredients SET current_stock = current_stock - ?, updated_at = ? WHERE id = ?'
       ).bind(d.quantity, now, d.ingredientId).run();
     }
 
-    if (effectiveTenant && effectiveTenant !== '*') {
-      try {
-        await db.prepare(
-          `INSERT INTO stock_movements (id, ingredient_id, type, quantity, reference_id, reference_type, notes, created_at, tenant_id)
-           VALUES (?, ?, 'consumption', ?, ?, 'order', ?, ?, ?)`
-        ).bind(movId, d.ingredientId, -d.quantity, orderId, `BOM deduction for order ${orderId}`, now, effectiveTenant).run();
-      } catch {
-        await db.prepare(
-          `INSERT INTO stock_movements (id, ingredient_id, type, quantity, reference_id, reference_type, notes, created_at)
-           VALUES (?, ?, 'consumption', ?, ?, 'order', ?, ?)`
-        ).bind(movId, d.ingredientId, -d.quantity, orderId, `BOM deduction for order ${orderId}`, now).run();
-      }
-    } else {
+    try {
+      await db.prepare(
+        `INSERT INTO stock_movements (id, ingredient_id, type, quantity, reference_id, reference_type, notes, created_at, tenant_id)
+         VALUES (?, ?, 'consumption', ?, ?, 'order', ?, ?, ?)`
+      ).bind(movId, d.ingredientId, -d.quantity, orderId, `BOM deduction for order ${orderId}`, now, effectiveTenant).run();
+    } catch (insErr) {
+      if (effectiveTenant !== 'default') throw insErr;
       await db.prepare(
         `INSERT INTO stock_movements (id, ingredient_id, type, quantity, reference_id, reference_type, notes, created_at)
          VALUES (?, ?, 'consumption', ?, ?, 'order', ?, ?)`

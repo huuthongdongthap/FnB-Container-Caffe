@@ -39,15 +39,42 @@ export async function executeKdsStatusTransition(
 
   if (targetStatus === 'cancelled' && !options?.skipCancelSideEffects) {
     const rawDb = db as unknown as import('@cloudflare/workers-types').D1Database;
-    const ordRow = await rawDb
-      .prepare('SELECT total, total_amount, tenant_id, customer_id, cashback_used FROM orders WHERE id = ?')
-      .bind(orderId)
-      .first<{ total?: number; total_amount?: number; tenant_id?: string | null; customer_id?: string | null; cashback_used?: number | null }>()
-      .catch(() => null);
-    const ordTenantAttr = ordRow?.tenant_id && String(ordRow.tenant_id).trim() && String(ordRow.tenant_id).trim() !== '*'
-      ? String(ordRow.tenant_id).trim()
-      : undefined;
-    const resolvedTenant = ordTenantAttr || (options?.tenantId && options.tenantId !== '*' ? options.tenantId : undefined);
+    const rawRequestedCancelTenant = options?.tenantId && options.tenantId.trim() ? options.tenantId.trim() : undefined;
+    const requestedCancelTenant =
+      rawRequestedCancelTenant && (rawRequestedCancelTenant === '*' || rawRequestedCancelTenant.toLowerCase() === 'hq')
+        ? '*'
+        : rawRequestedCancelTenant;
+    const ordRow = await (requestedCancelTenant && requestedCancelTenant !== '*'
+      ? rawDb
+          .prepare(
+            "SELECT total, total_amount, tenant_id, customer_id, cashback_used FROM orders WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?",
+          )
+          .bind(orderId, requestedCancelTenant)
+          .first<{ total?: number; total_amount?: number; payment_status?: string | null; tenant_id?: string | null; customer_id?: string | null; cashback_used?: number | null }>()
+          .catch(() =>
+            requestedCancelTenant === 'default'
+              ? rawDb
+                  .prepare('SELECT total, total_amount, tenant_id, customer_id, cashback_used FROM orders WHERE id = ?')
+                  .bind(orderId)
+                  .first<{ total?: number; total_amount?: number; payment_status?: string | null; tenant_id?: string | null; customer_id?: string | null; cashback_used?: number | null }>()
+                  .catch(() => null)
+              : null,
+          )
+      : rawDb
+          .prepare('SELECT total, total_amount, tenant_id, customer_id, cashback_used FROM orders WHERE id = ?')
+          .bind(orderId)
+          .first<{ total?: number; total_amount?: number; payment_status?: string | null; tenant_id?: string | null; customer_id?: string | null; cashback_used?: number | null }>()
+          .catch(() => null));
+    const ordTenantAttr =
+      ordRow?.tenant_id &&
+      String(ordRow.tenant_id).trim() &&
+      String(ordRow.tenant_id).trim() !== '*' &&
+      String(ordRow.tenant_id).trim().toLowerCase() !== 'hq'
+        ? String(ordRow.tenant_id).trim()
+        : undefined;
+    const resolvedTenant =
+      ordTenantAttr ||
+      (requestedCancelTenant && requestedCancelTenant !== '*' ? requestedCancelTenant : undefined);
     const effectiveCancelTenant = resolvedTenant || 'default';
     try {
       const { restoreInventoryForOrder } = await import('@aura/domain-inventory');
@@ -56,11 +83,26 @@ export async function executeKdsStatusTransition(
       // Non-blocking when inventory tables are absent in minimal test schemas
     }
     try {
-      const earnRow = await rawDb
-        .prepare("SELECT customer_id FROM cashback_transactions WHERE order_id = ? AND type = 'earn' LIMIT 1")
-        .bind(orderId)
+      let earnRow = await rawDb
+        .prepare("SELECT customer_id FROM cashback_transactions WHERE order_id = ? AND type = 'earn' AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ? LIMIT 1")
+        .bind(orderId, effectiveCancelTenant)
         .first<{ customer_id?: string }>()
         .catch(() => null);
+      if (!earnRow && effectiveCancelTenant === 'default') {
+        const fallbackEarn = await rawDb
+          .prepare("SELECT customer_id FROM cashback_transactions WHERE order_id = ? AND type = 'earn' LIMIT 1")
+          .bind(orderId)
+          .first<{ customer_id?: string; tenant_id?: string | null }>()
+          .catch(() => null);
+        if (
+          fallbackEarn &&
+          (!('tenant_id' in fallbackEarn) ||
+            fallbackEarn.tenant_id === undefined ||
+            (String(fallbackEarn.tenant_id ?? '').trim() || 'default') === effectiveCancelTenant)
+        ) {
+          earnRow = fallbackEarn;
+        }
+      }
       if (earnRow?.customer_id) {
         const { loadPolicy, reverseAccrual } = await import('@aura/domain-crm');
         const totalVnd = Number(ordRow?.total ?? ordRow?.total_amount ?? 0);
@@ -76,16 +118,48 @@ export async function executeKdsStatusTransition(
           }).catch(() => {});
         }
       }
+      const cancelPaymentStatus = String(
+        ordRow?.payment_status ?? (order as Record<string, unknown>).payment_status ?? '',
+      )
+        .trim()
+        .toLowerCase();
+      const cancelCustomerId =
+        (ordRow?.customer_id ? String(ordRow.customer_id).trim() : '') ||
+        (earnRow?.customer_id ? String(earnRow.customer_id).trim() : '');
+      const cancelTotalVnd = Number(ordRow?.total ?? ordRow?.total_amount ?? 0);
+      if (
+        cancelCustomerId &&
+        cancelTotalVnd > 0 &&
+        (cancelPaymentStatus === 'paid' || cancelPaymentStatus === 'completed' || Boolean(earnRow?.customer_id))
+      ) {
+        await rawDb
+          .prepare(
+            "UPDATE customers SET total_spent = MAX(0, COALESCE(total_spent, 0) - ?) WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?",
+          )
+          .bind(cancelTotalVnd, cancelCustomerId, effectiveCancelTenant)
+          .run()
+          .catch(() => {
+            if (effectiveCancelTenant === 'default') {
+              return rawDb
+                .prepare('UPDATE customers SET total_spent = MAX(0, COALESCE(total_spent, 0) - ?) WHERE id = ?')
+                .bind(cancelTotalVnd, cancelCustomerId)
+                .run()
+                .catch(() => {});
+            }
+          });
+      }
       const existingRefund = await rawDb
         .prepare("SELECT id FROM cashback_transactions WHERE order_id = ? AND type = 'refund' AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ? LIMIT 1")
         .bind(orderId, effectiveCancelTenant)
         .first<{ id?: string }>()
         .catch(() =>
-          rawDb
-            .prepare("SELECT id FROM cashback_transactions WHERE order_id = ? AND type = 'refund' LIMIT 1")
-            .bind(orderId)
-            .first<{ id?: string }>()
-            .catch(() => null)
+          effectiveCancelTenant === 'default'
+            ? rawDb
+                .prepare("SELECT id FROM cashback_transactions WHERE order_id = ? AND type = 'refund' LIMIT 1")
+                .bind(orderId)
+                .first<{ id?: string }>()
+                .catch(() => null)
+            : null
         );
       if (!existingRefund?.id) {
         const spendRow = await rawDb
@@ -93,20 +167,30 @@ export async function executeKdsStatusTransition(
           .bind(orderId, effectiveCancelTenant)
           .first<{ id?: string; customer_id?: string; amount?: number }>()
           .catch(() =>
-            rawDb
-              .prepare("SELECT id, customer_id, amount FROM cashback_transactions WHERE order_id = ? AND type = 'spend' LIMIT 1")
-              .bind(orderId)
-              .first<{ id?: string; customer_id?: string; amount?: number }>()
-              .catch(() => null)
+            effectiveCancelTenant === 'default'
+              ? rawDb
+                  .prepare("SELECT id, customer_id, amount FROM cashback_transactions WHERE order_id = ? AND type = 'spend' LIMIT 1")
+                  .bind(orderId)
+                  .first<{ id?: string; customer_id?: string; amount?: number }>()
+                  .catch(() => null)
+              : null
           );
         let refundCustomerId = spendRow?.customer_id ? String(spendRow.customer_id).trim() : '';
         let refundAmount = Number(spendRow?.amount ?? 0);
         if (!refundCustomerId || !(refundAmount > 0)) {
           const ordSpend = ordRow ?? await rawDb
-            .prepare('SELECT customer_id, cashback_used FROM orders WHERE id = ?')
-            .bind(orderId)
+            .prepare("SELECT customer_id, cashback_used FROM orders WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?")
+            .bind(orderId, effectiveCancelTenant)
             .first<{ customer_id?: string | null; cashback_used?: number | null }>()
-            .catch(() => null);
+            .catch(() =>
+              effectiveCancelTenant === 'default'
+                ? rawDb
+                    .prepare('SELECT customer_id, cashback_used FROM orders WHERE id = ?')
+                    .bind(orderId)
+                    .first<{ customer_id?: string | null; cashback_used?: number | null }>()
+                    .catch(() => null)
+                : null
+            );
           if (!refundCustomerId && ordSpend?.customer_id) {
             refundCustomerId = String(ordSpend.customer_id).trim();
           }
@@ -116,98 +200,161 @@ export async function executeKdsStatusTransition(
         }
         if (refundCustomerId && refundAmount > 0) {
           const wRow = await rawDb
-            .prepare("SELECT id FROM cashback_wallets WHERE customer_id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ? LIMIT 1")
+            .prepare("SELECT id, balance FROM cashback_wallets WHERE customer_id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ? LIMIT 1")
             .bind(refundCustomerId, effectiveCancelTenant)
-            .first<{ id?: string }>()
+            .first<{ id?: string; balance?: number }>()
             .catch(() =>
-              rawDb
-                .prepare('SELECT id FROM cashback_wallets WHERE customer_id = ? LIMIT 1')
-                .bind(refundCustomerId)
-                .first<{ id?: string }>()
-                .catch(() => null)
+              effectiveCancelTenant === 'default'
+                ? rawDb
+                    .prepare('SELECT id, balance FROM cashback_wallets WHERE customer_id = ? LIMIT 1')
+                    .bind(refundCustomerId)
+                    .first<{ id?: string; balance?: number }>()
+                    .catch(() => null)
+                : null
             );
           const walletId = wRow?.id || `wal_${refundCustomerId}`;
+          const balanceAfter = Number(wRow?.balance ?? 0) + refundAmount;
           const refundTxId = `cb_ref_${orderId}`;
           let insertedRefund = true;
           try {
             const insRes = await rawDb
               .prepare(
-                `INSERT INTO cashback_transactions (id, wallet_id, customer_id, order_id, type, amount, tenant_id, created_at)
-                 SELECT ?, ?, ?, ?, 'refund', ?, ?, datetime('now')
-                 WHERE NOT EXISTS (SELECT 1 FROM cashback_transactions WHERE order_id = ? AND type = 'refund')`,
+                `INSERT INTO cashback_transactions (id, wallet_id, customer_id, order_id, type, amount, balance_after, tenant_id, created_at)
+                 SELECT ?, ?, ?, ?, 'refund', ?, ?, ?, datetime('now')
+                 WHERE NOT EXISTS (SELECT 1 FROM cashback_transactions WHERE order_id = ? AND type = 'refund' AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?)`,
               )
-              .bind(refundTxId, walletId, refundCustomerId, orderId, refundAmount, effectiveCancelTenant, orderId)
-              .run();
+              .bind(refundTxId, walletId, refundCustomerId, orderId, refundAmount, balanceAfter, effectiveCancelTenant, orderId, effectiveCancelTenant)
+              .run()
+              .catch(() =>
+                rawDb
+                  .prepare(
+                    `INSERT INTO cashback_transactions (id, wallet_id, customer_id, order_id, type, amount, tenant_id, created_at)
+                     SELECT ?, ?, ?, ?, 'refund', ?, ?, datetime('now')
+                     WHERE NOT EXISTS (SELECT 1 FROM cashback_transactions WHERE order_id = ? AND type = 'refund' AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?)`,
+                  )
+                  .bind(refundTxId, walletId, refundCustomerId, orderId, refundAmount, effectiveCancelTenant, orderId, effectiveCancelTenant)
+                  .run(),
+              );
             const changes = (insRes as unknown as { meta?: { changes?: number }; changes?: number })?.meta?.changes
               ?? (insRes as unknown as { changes?: number })?.changes;
             if (changes !== undefined && Number(changes) === 0) insertedRefund = false;
           } catch {
-            try {
-              const insRes = await rawDb
-                .prepare(
-                  `INSERT INTO cashback_transactions (id, wallet_id, customer_id, order_id, type, amount, created_at)
-                   SELECT ?, ?, ?, ?, 'refund', ?, datetime('now')
-                   WHERE NOT EXISTS (SELECT 1 FROM cashback_transactions WHERE order_id = ? AND type = 'refund')`,
-                )
-                .bind(refundTxId, walletId, refundCustomerId, orderId, refundAmount, orderId)
-                .run();
-              const changes = (insRes as unknown as { meta?: { changes?: number }; changes?: number })?.meta?.changes
-                ?? (insRes as unknown as { changes?: number })?.changes;
-              if (changes !== undefined && Number(changes) === 0) insertedRefund = false;
-            } catch {
+            if (effectiveCancelTenant === 'default') {
               try {
-                await rawDb
+                const insRes = await rawDb
                   .prepare(
-                    "INSERT INTO cashback_transactions (id, customer_id, order_id, type, amount, created_at) VALUES (?, ?, ?, 'refund', ?, datetime('now'))",
+                    `INSERT INTO cashback_transactions (id, wallet_id, customer_id, order_id, type, amount, balance_after, created_at)
+                     SELECT ?, ?, ?, ?, 'refund', ?, ?, datetime('now')
+                     WHERE NOT EXISTS (SELECT 1 FROM cashback_transactions WHERE order_id = ? AND type = 'refund')`,
                   )
-                  .bind(refundTxId, refundCustomerId, orderId, refundAmount)
-                  .run();
+                  .bind(refundTxId, walletId, refundCustomerId, orderId, refundAmount, balanceAfter, orderId)
+                  .run()
+                  .catch(() =>
+                    rawDb
+                      .prepare(
+                        `INSERT INTO cashback_transactions (id, wallet_id, customer_id, order_id, type, amount, created_at)
+                         SELECT ?, ?, ?, ?, 'refund', ?, datetime('now')
+                         WHERE NOT EXISTS (SELECT 1 FROM cashback_transactions WHERE order_id = ? AND type = 'refund')`,
+                      )
+                      .bind(refundTxId, walletId, refundCustomerId, orderId, refundAmount, orderId)
+                      .run(),
+                  );
+                const changes = (insRes as unknown as { meta?: { changes?: number }; changes?: number })?.meta?.changes
+                  ?? (insRes as unknown as { changes?: number })?.changes;
+                if (changes !== undefined && Number(changes) === 0) insertedRefund = false;
               } catch {
-                // Optional cashback_transactions schema differences
+                try {
+                  await rawDb
+                    .prepare(
+                      "INSERT INTO cashback_transactions (id, customer_id, order_id, type, amount, created_at) VALUES (?, ?, ?, 'refund', ?, datetime('now'))",
+                    )
+                    .bind(refundTxId, refundCustomerId, orderId, refundAmount)
+                    .run();
+                } catch {
+                  // Optional cashback_transactions schema differences
+                }
               }
+            } else {
+              insertedRefund = false;
             }
           }
           if (insertedRefund) {
             await rawDb
-              .prepare("UPDATE cashback_wallets SET balance = balance + ?, updated_at = datetime('now') WHERE customer_id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?")
-              .bind(refundAmount, refundCustomerId, effectiveCancelTenant)
+              .prepare(
+                "UPDATE cashback_wallets SET balance = balance + ?, total_spent = MAX(0, COALESCE(total_spent, 0) - ?), updated_at = datetime('now') WHERE customer_id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?",
+              )
+              .bind(refundAmount, refundAmount, refundCustomerId, effectiveCancelTenant)
               .run()
               .catch(() =>
                 rawDb
-                  .prepare("UPDATE cashback_wallets SET balance = balance + ?, updated_at = datetime('now') WHERE customer_id = ?")
-                  .bind(refundAmount, refundCustomerId)
-                  .run()
-                  .catch(() => {})
-              );
+                  .prepare("UPDATE cashback_wallets SET balance = balance + ?, updated_at = datetime('now') WHERE customer_id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?")
+                  .bind(refundAmount, refundCustomerId, effectiveCancelTenant)
+                  .run(),
+              )
+              .catch(() => {
+                if (effectiveCancelTenant === 'default') {
+                  return rawDb
+                    .prepare(
+                      "UPDATE cashback_wallets SET balance = balance + ?, total_spent = MAX(0, COALESCE(total_spent, 0) - ?), updated_at = datetime('now') WHERE customer_id = ?",
+                    )
+                    .bind(refundAmount, refundAmount, refundCustomerId)
+                    .run()
+                    .catch(() =>
+                      rawDb
+                        .prepare("UPDATE cashback_wallets SET balance = balance + ?, updated_at = datetime('now') WHERE customer_id = ?")
+                        .bind(refundAmount, refundCustomerId)
+                        .run()
+                        .catch(() => {}),
+                    );
+                }
+              });
             await rawDb
               .prepare("UPDATE orders SET cashback_used = 0 WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?")
               .bind(orderId, effectiveCancelTenant)
               .run()
-              .catch(() =>
-                rawDb
-                  .prepare('UPDATE orders SET cashback_used = 0 WHERE id = ?')
-                  .bind(orderId)
-                  .run()
-                  .catch(() => {})
-              );
+              .catch(() => {
+                if (effectiveCancelTenant === 'default') {
+                  return rawDb
+                    .prepare('UPDATE orders SET cashback_used = 0 WHERE id = ?')
+                    .bind(orderId)
+                    .run()
+                    .catch(() => {});
+                }
+              });
           }
         }
       }
       const refRow = await rawDb
-        .prepare("SELECT id FROM referrals WHERE first_order_id = ? AND status = 'completed' LIMIT 1")
-        .bind(orderId)
+        .prepare("SELECT id FROM referrals WHERE first_order_id = ? AND status = 'completed' AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ? LIMIT 1")
+        .bind(orderId, effectiveCancelTenant)
         .first<{ id?: string }>()
-        .catch(() => null);
+        .catch(() =>
+          effectiveCancelTenant === 'default'
+            ? rawDb
+                .prepare("SELECT id FROM referrals WHERE first_order_id = ? AND status = 'completed' LIMIT 1")
+                .bind(orderId)
+                .first<{ id?: string }>()
+                .catch(() => null)
+            : null
+        );
       if (refRow?.id) {
         const { reverseReferralCashback } = await import('@aura/domain-crm');
         await reverseReferralCashback(rawDb, refRow.id, effectiveCancelTenant).catch(() => {});
       }
       const decrementedPromoIds = new Set<string>();
       const redRow = await rawDb
-        .prepare('SELECT promotion_id, code FROM promotion_redemptions WHERE order_id = ? LIMIT 1')
-        .bind(orderId)
+        .prepare("SELECT promotion_id, code FROM promotion_redemptions WHERE order_id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ? LIMIT 1")
+        .bind(orderId, effectiveCancelTenant)
         .first<{ promotion_id?: string; code?: string }>()
-        .catch(() => null);
+        .catch(() =>
+          effectiveCancelTenant === 'default'
+            ? rawDb
+                .prepare('SELECT promotion_id, code FROM promotion_redemptions WHERE order_id = ? LIMIT 1')
+                .bind(orderId)
+                .first<{ promotion_id?: string; code?: string }>()
+                .catch(() => null)
+            : null
+        );
       if (redRow && (redRow.promotion_id || redRow.code)) {
         const promoTenant = effectiveCancelTenant;
         if (redRow.promotion_id) {
@@ -270,14 +417,36 @@ export async function executeKdsStatusTransition(
               }
             });
         }
-        await rawDb.prepare('DELETE FROM promotion_redemptions WHERE order_id = ?').bind(orderId).run().catch(() => {});
+        await rawDb
+          .prepare("DELETE FROM promotion_redemptions WHERE order_id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?")
+          .bind(orderId, effectiveCancelTenant)
+          .run()
+          .catch(() => {
+            if (effectiveCancelTenant === 'default') {
+              return rawDb.prepare('DELETE FROM promotion_redemptions WHERE order_id = ?').bind(orderId).run().catch(() => {});
+            }
+          });
       }
       try {
         const usageRes = await rawDb
-          .prepare('SELECT id, promotion_id FROM promotion_usages WHERE order_id = ?')
-          .bind(orderId)
+          .prepare("SELECT id, promotion_id FROM promotion_usages WHERE order_id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?")
+          .bind(orderId, effectiveCancelTenant)
           .all<{ id?: string; promotion_id?: string }>()
           .catch(async () => {
+            if (effectiveCancelTenant !== 'default') {
+              const singleTenant = await rawDb
+                .prepare("SELECT id, promotion_id FROM promotion_usages WHERE order_id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ? LIMIT 1")
+                .bind(orderId, effectiveCancelTenant)
+                .first<{ id?: string; promotion_id?: string }>()
+                .catch(() => null);
+              return { results: singleTenant ? [singleTenant] : [] };
+            }
+            const fallbackAll = await rawDb
+              .prepare('SELECT id, promotion_id FROM promotion_usages WHERE order_id = ?')
+              .bind(orderId)
+              .all<{ id?: string; promotion_id?: string }>()
+              .catch(() => null);
+            if (fallbackAll?.results) return fallbackAll;
             const single = await rawDb
               .prepare('SELECT id, promotion_id FROM promotion_usages WHERE order_id = ? LIMIT 1')
               .bind(orderId)
@@ -321,10 +490,37 @@ export async function executeKdsStatusTransition(
           }
         }
         if (usageRows.length > 0) {
-          await rawDb.prepare('DELETE FROM promotion_usages WHERE order_id = ?').bind(orderId).run().catch(() => {});
+          await rawDb
+            .prepare("DELETE FROM promotion_usages WHERE order_id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?")
+            .bind(orderId, effectiveCancelTenant)
+            .run()
+            .catch(() => {
+              if (effectiveCancelTenant === 'default') {
+                return rawDb.prepare('DELETE FROM promotion_usages WHERE order_id = ?').bind(orderId).run().catch(() => {});
+              }
+            });
         }
       } catch {
         // Optional promotion_usages table in partial schemas
+      }
+      try {
+        await rawDb
+          .prepare(
+            "UPDATE payments SET status = 'cancelled', updated_at = ? WHERE order_id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ? AND status = 'pending'",
+          )
+          .bind(now, orderId, effectiveCancelTenant)
+          .run()
+          .catch(() => {
+            if (effectiveCancelTenant === 'default') {
+              return rawDb
+                .prepare("UPDATE payments SET status = 'cancelled', updated_at = ? WHERE order_id = ? AND status = 'pending'")
+                .bind(now, orderId)
+                .run()
+                .catch(() => {});
+            }
+          });
+      } catch {
+        // Optional payments table in partial schemas
       }
     } catch {
       // Optional CRM/promotion tables in partial schemas
@@ -338,31 +534,60 @@ export async function executeKdsStatusTransition(
       const envForLoyalty = options?.env ?? (options?.kv ? { AUTH_KV: options.kv } : {});
       await creditLoyaltyIfEligible(rawDb, envForLoyalty, orderId).catch(() => {});
 
-      const ordRow = await rawDb
-        .prepare(
-          'SELECT total, total_amount, payment_status, order_type, table_id, customer_id, customer_email, customer_phone, tenant_id FROM orders WHERE id = ?',
-        )
-        .bind(orderId)
-        .first<{
-          total?: number | null;
-          total_amount?: number | null;
-          payment_status?: string | null;
-          order_type?: string | null;
-          table_id?: string | null;
-          customer_id?: string | null;
-          customer_email?: string | null;
-          customer_phone?: string | null;
-          tenant_id?: string | null;
-        }>()
-        .catch(() => null);
+      const rawRequestedCompleteTenant = options?.tenantId && options.tenantId.trim() ? options.tenantId.trim() : undefined;
+      const requestedCompleteTenant =
+        rawRequestedCompleteTenant &&
+        (rawRequestedCompleteTenant === '*' || rawRequestedCompleteTenant.toLowerCase() === 'hq')
+          ? '*'
+          : rawRequestedCompleteTenant;
+      type CompletedOrdRow = {
+        total?: number | null;
+        total_amount?: number | null;
+        payment_status?: string | null;
+        order_type?: string | null;
+        table_id?: string | null;
+        customer_id?: string | null;
+        customer_email?: string | null;
+        customer_phone?: string | null;
+        tenant_id?: string | null;
+      };
+      const ordRow = await (requestedCompleteTenant && requestedCompleteTenant !== '*'
+        ? rawDb
+            .prepare(
+              "SELECT total, total_amount, payment_status, order_type, table_id, customer_id, customer_email, customer_phone, tenant_id FROM orders WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?",
+            )
+            .bind(orderId, requestedCompleteTenant)
+            .first<CompletedOrdRow>()
+            .catch(() =>
+              requestedCompleteTenant === 'default'
+                ? rawDb
+                    .prepare(
+                      'SELECT total, total_amount, payment_status, order_type, table_id, customer_id, customer_email, customer_phone, tenant_id FROM orders WHERE id = ?',
+                    )
+                    .bind(orderId)
+                    .first<CompletedOrdRow>()
+                    .catch(() => null)
+                : null,
+            )
+        : rawDb
+            .prepare(
+              'SELECT total, total_amount, payment_status, order_type, table_id, customer_id, customer_email, customer_phone, tenant_id FROM orders WHERE id = ?',
+            )
+            .bind(orderId)
+            .first<CompletedOrdRow>()
+            .catch(() => null));
       if (ordRow) {
         const { normalizedPhone, email: sanitizedEmail } = sanitizeCustomerIdentity(
           ordRow.customer_phone,
           ordRow.customer_email,
         );
         const ordTenant =
-          (typeof ordRow.tenant_id === 'string' && ordRow.tenant_id.trim()) ||
-          (options?.tenantId && options.tenantId !== '*' ? options.tenantId : 'default');
+          (typeof ordRow.tenant_id === 'string' &&
+            ordRow.tenant_id.trim() &&
+            ordRow.tenant_id.trim() !== '*' &&
+            ordRow.tenant_id.trim().toLowerCase() !== 'hq' &&
+            ordRow.tenant_id.trim()) ||
+          (requestedCompleteTenant && requestedCompleteTenant !== '*' ? requestedCompleteTenant : 'default');
         let resolvedCustId = ordRow.customer_id ? String(ordRow.customer_id).trim() || null : null;
         if (!resolvedCustId && (normalizedPhone || sanitizedEmail)) {
           let cust: { id: string } | null = null;
@@ -374,36 +599,48 @@ export async function executeKdsStatusTransition(
               .bind(sanitizedEmail, normalizedPhone, ordTenant, ordTenant)
               .first<{ id: string }>();
           } catch {
-            cust = await rawDb
-              .prepare('SELECT id FROM customers WHERE (email = ? AND email IS NOT NULL) OR (phone = ? AND phone IS NOT NULL) LIMIT 1')
-              .bind(sanitizedEmail, normalizedPhone)
-              .first<{ id: string }>()
-              .catch(() => null);
+            if (ordTenant === 'default' || ordTenant === '*') {
+              cust = await rawDb
+                .prepare('SELECT id FROM customers WHERE (email = ? AND email IS NOT NULL) OR (phone = ? AND phone IS NOT NULL) LIMIT 1')
+                .bind(sanitizedEmail, normalizedPhone)
+                .first<{ id: string }>()
+                .catch(() => null);
+            }
           }
           resolvedCustId = cust?.id ?? null;
         }
         const totalVnd = Number(ordRow.total ?? ordRow.total_amount ?? 0);
+        const rawPaymentStatus = String(
+          ordRow.payment_status ?? (order as Record<string, unknown>).payment_status ?? '',
+        )
+          .trim()
+          .toLowerCase();
+        const isEligibleForVisit =
+          !rawPaymentStatus ||
+          !['pending', 'unpaid', 'failed', 'cancelled', 'canceled', 'refunded'].includes(rawPaymentStatus);
         if (resolvedCustId) {
-          try {
-            const { recordVisit } = await import('@aura/domain-customer');
-            const visitChannel: 'in_store' | 'qr_table' | 'online_pickup' | 'online_delivery' =
-              ordRow.order_type === 'delivery'
-                ? 'online_delivery'
-                : ordRow.order_type === 'takeaway'
-                  ? 'online_pickup'
-                  : ordRow.table_id
-                    ? 'qr_table'
-                    : 'in_store';
-            await recordVisit({
-              db: rawDb,
-              customerId: resolvedCustId,
-              orderId,
-              spent: totalVnd,
-              channel: visitChannel,
-              tenantId: ordTenant,
-            }).catch(() => {});
-          } catch {
-            // Optional customer visit table in minimal test schemas
+          if (isEligibleForVisit) {
+            try {
+              const { recordVisit } = await import('@aura/domain-customer');
+              const visitChannel: 'in_store' | 'qr_table' | 'online_pickup' | 'online_delivery' =
+                ordRow.order_type === 'delivery'
+                  ? 'online_delivery'
+                  : ordRow.order_type === 'takeaway'
+                    ? 'online_pickup'
+                    : ordRow.table_id
+                      ? 'qr_table'
+                      : 'in_store';
+              await recordVisit({
+                db: rawDb,
+                customerId: resolvedCustId,
+                orderId,
+                spent: totalVnd,
+                channel: visitChannel,
+                tenantId: ordTenant,
+              }).catch(() => {});
+            } catch {
+              // Optional customer visit table in minimal test schemas
+            }
           }
           if (totalVnd >= 20000 && (!ordRow.payment_status || ordRow.payment_status === 'paid')) {
             try {
@@ -423,16 +660,39 @@ export async function executeKdsStatusTransition(
   }
 
   if (options?.kv) {
+    let kvTenant = options?.tenantId?.trim() || 'default';
+    if (kvTenant === '*' || kvTenant.toLowerCase() === 'hq') {
+      const ordTenantFromRow =
+        typeof (order as Record<string, unknown>).tenant_id === 'string' &&
+        String((order as Record<string, unknown>).tenant_id).trim()
+          ? String((order as Record<string, unknown>).tenant_id).trim()
+          : '';
+      if (ordTenantFromRow && ordTenantFromRow !== '*' && ordTenantFromRow.toLowerCase() !== 'hq') {
+        kvTenant = ordTenantFromRow;
+      } else {
+        const ordTenantLookup = await db
+          .prepare('SELECT tenant_id FROM orders WHERE id = ?')
+          .bind(orderId)
+          .first<{ tenant_id?: string | null }>()
+          .catch(() => null);
+        const lookedUp = typeof ordTenantLookup?.tenant_id === 'string' ? ordTenantLookup.tenant_id.trim() : '';
+        kvTenant = lookedUp && lookedUp !== '*' && lookedUp.toLowerCase() !== 'hq' ? lookedUp : 'default';
+      }
+    }
     const eventPayload = JSON.stringify({
       orderId,
       status: targetStatus,
       previous_status: order.previous_status,
+      tenant_id: kvTenant,
       timestamp: now,
     });
     const putPromise = Promise.all([
       options.kv.put(`order_event:${orderId}`, eventPayload, { expirationTtl: 60 }),
+      options.kv.put(`order_event:${kvTenant}:${orderId}`, eventPayload, { expirationTtl: 60 }),
       options.kv.put('latest_order_ts', now),
+      options.kv.put(`latest_order_ts:${kvTenant}`, now),
       options.kv.put('orders:latest_updated_at', now),
+      options.kv.put(`orders:latest_updated_at:${kvTenant}`, now),
     ]);
     if (options.waitUntil) {
       options.waitUntil(putPromise);
@@ -449,7 +709,20 @@ export async function executeKdsStatusTransition(
           get?: (id: unknown) => { fetch: (req: Request) => Promise<unknown> };
         } | undefined;
         if (broadcaster?.idFromName && broadcaster?.get) {
-          const tenantId = options?.tenantId ?? 'default';
+          let tenantId = options?.tenantId ?? 'default';
+          if (tenantId === '*') {
+            const ordTenantRow = await db
+              .prepare('SELECT tenant_id FROM orders WHERE id = ?')
+              .bind(orderId)
+              .first<{ tenant_id?: string | null }>()
+              .catch(() => null);
+            if (ordTenantRow && 'tenant_id' in ordTenantRow && ordTenantRow.tenant_id !== undefined) {
+              tenantId =
+                typeof ordTenantRow.tenant_id === 'string' && ordTenantRow.tenant_id.trim() && ordTenantRow.tenant_id.trim() !== '*'
+                  ? ordTenantRow.tenant_id.trim()
+                  : 'default';
+            }
+          }
           const tenantClause = tenantId === '*'
             ? ''
             : tenantId === 'default'

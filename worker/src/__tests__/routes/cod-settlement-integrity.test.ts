@@ -10,7 +10,7 @@ function fixture(status = 'preparing', paid = 'unpaid', tenant = 'cafe-a') {
   const value = orderCreationFixture(); fixtures.push(value);
   value.sqlite.prepare(`INSERT INTO orders(id,items,total,status,payment_status,payment_method,customer_name,customer_phone,tenant_id)
     VALUES ('COD_LOCAL','[]',20000,?,?,'cod','Local','0900000010',?)`).run(status, paid, tenant);
-  value.sqlite.exec("INSERT INTO payments(id,order_id,method,amount,status) VALUES ('COD_PAYMENT','COD_LOCAL','cod',20000,'pending')");
+  value.sqlite.prepare("INSERT INTO payments(id,order_id,method,amount,status,tenant_id) VALUES ('COD_PAYMENT','COD_LOCAL','cod',20000,'pending',?)").run(tenant);
   // The request-time session gate reads the account row behind the token; with
   // no row it cannot tell a live session from a revoked one.
   // Each actor has an explicit canonical role/tenant matching its session.

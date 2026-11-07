@@ -104,6 +104,74 @@ function normalizeDeviceRole(rawRole: unknown): StaffDeviceRole {
   return 'staff';
 }
 
+function extractRequestedDeviceTenant(c: Context<{ Bindings: Env }>, body?: Record<string, unknown>): string {
+  const candidates = [
+    c.req.query('tenant_id'),
+    c.req.query('tenantId'),
+    c.req.query('store_id'),
+    c.req.query('storeId'),
+    c.req.header('X-Tenant-ID'),
+    c.req.header('x-tenant-id'),
+    c.req.header('X-Store-ID'),
+    c.req.header('x-store-id'),
+    typeof body?.tenant_id === 'string' ? body.tenant_id : undefined,
+    typeof body?.tenantId === 'string' ? body.tenantId : undefined,
+    typeof body?.store_id === 'string' ? body.store_id : undefined,
+    typeof body?.storeId === 'string' ? body.storeId : undefined,
+  ]
+    .map((v) => (typeof v === 'string' ? v.trim() : ''))
+    .filter(Boolean);
+  if (new Set(candidates).size > 1) {
+    return '__CONFLICT__';
+  }
+  return candidates[0] || '';
+}
+
+async function writeStaffDeviceAuditLog(
+  db: import('@cloudflare/workers-types').D1Database,
+  actorId: string,
+  action: 'staff_device_register' | 'staff_device_revoke',
+  entityId: string,
+  details: Record<string, unknown>,
+  now: string,
+  tenantId: string
+): Promise<void> {
+  const rawTenant = tenantId ? tenantId.trim() : '';
+  const effectiveTenant = !rawTenant || rawTenant === '*' || rawTenant.toLowerCase() === 'hq' ? 'default' : rawTenant;
+  const auditId = generateId('AUD_');
+  const metadata = JSON.stringify({ ...details, tenant_id: effectiveTenant });
+  try {
+    await db
+      .prepare(
+        `INSERT INTO audit_logs (id, user_id, action, entity_type, entity_id, metadata, tenant_id, created_at)
+         VALUES (?, ?, ?, 'staff_device', ?, ?, ?, ?)`
+      )
+      .bind(auditId, actorId, action, entityId, metadata, effectiveTenant, now)
+      .run();
+  } catch {
+    try {
+      await db
+        .prepare(
+          `INSERT INTO audit_logs (actor_id, actor_name, user_id, action, resource_type, resource_id, entity_type, entity_id, details, metadata, tenant_id, created_at)
+           VALUES (?, ?, ?, ?, 'staff_device', ?, 'staff_device', ?, ?, ?, ?, ?)`
+        )
+        .bind(actorId, actorId, actorId, action, entityId, entityId, metadata, metadata, effectiveTenant, now)
+        .run();
+    } catch {
+      if (effectiveTenant === 'default') {
+        await db
+          .prepare(
+            `INSERT INTO audit_logs (id, user_id, action, entity_type, entity_id, metadata, created_at)
+             VALUES (?, ?, ?, 'staff_device', ?, ?, ?)`
+          )
+          .bind(auditId, actorId, action, entityId, metadata, now)
+          .run()
+          .catch(() => {});
+      }
+    }
+  }
+}
+
 async function findDevice(env: { AURA_DB: import('@cloudflare/workers-types').D1Database; AUTH_KV: import('@cloudflare/workers-types').KVNamespace }, token: string) {
   try {
   const row = await env.AURA_DB
@@ -123,7 +191,19 @@ async function upsertDevice(env: { AURA_DB: import('@cloudflare/workers-types').
 }) {
   const now = new Date().toISOString();
   const account = data.account;
-  const statement = env.AURA_DB.prepare(
+  const targetTenant = staffTenant(account);
+  const devId = generateId('DEV_');
+  const statementWithTenant = env.AURA_DB.prepare(
+    `INSERT INTO staff_devices (id, staff_id, device_name, device_token, pin_hash, role, tenant_id, created_at, updated_at)
+     SELECT ?, ?, ?, ?, ?, ?, ?, ?, ? FROM users
+     WHERE id = ? AND auth_version = ? AND role = ? AND is_active = 1
+       AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?
+     ON CONFLICT(device_token) DO UPDATE SET pin_hash = excluded.pin_hash,
+       role = excluded.role, tenant_id = excluded.tenant_id, device_name = COALESCE(excluded.device_name, staff_devices.device_name), updated_at = excluded.updated_at
+     WHERE staff_devices.staff_id = excluded.staff_id`,
+  ).bind(devId, data.staff_id, data.device_name ?? null, data.device_token, data.pin_hash, data.role, targetTenant, now, now,
+    account.id, account.auth_version, account.role, targetTenant);
+  const statementFallback = env.AURA_DB.prepare(
     `INSERT INTO staff_devices (id, staff_id, device_name, device_token, pin_hash, role, created_at, updated_at)
      SELECT ?, ?, ?, ?, ?, ?, ?, ? FROM users
      WHERE id = ? AND auth_version = ? AND role = ? AND is_active = 1
@@ -131,16 +211,25 @@ async function upsertDevice(env: { AURA_DB: import('@cloudflare/workers-types').
      ON CONFLICT(device_token) DO UPDATE SET pin_hash = excluded.pin_hash,
        role = excluded.role, device_name = COALESCE(excluded.device_name, staff_devices.device_name), updated_at = excluded.updated_at
      WHERE staff_devices.staff_id = excluded.staff_id`,
-  ).bind(generateId('DEV_'), data.staff_id, data.device_name ?? null, data.device_token, data.pin_hash, data.role, now, now,
-    account.id, account.auth_version, account.role, staffTenant(account));
+  ).bind(devId, data.staff_id, data.device_name ?? null, data.device_token, data.pin_hash, data.role, now, now,
+    account.id, account.auth_version, account.role, targetTenant);
+  const updateVerStmt = env.AURA_DB.prepare(`UPDATE users SET auth_version = auth_version + 1, updated_at = ? WHERE id = ? AND auth_version = ?
+        AND EXISTS (SELECT 1 FROM staff_devices WHERE device_token = ? AND staff_id = ? AND pin_hash = ?)`)
+        .bind(now, account.id, account.auth_version, data.device_token, data.staff_id, data.pin_hash);
   let results;
   try {
-    results = await env.AURA_DB.batch([statement,
-      env.AURA_DB.prepare(`UPDATE users SET auth_version = auth_version + 1, updated_at = ? WHERE id = ? AND auth_version = ?
-        AND EXISTS (SELECT 1 FROM staff_devices WHERE device_token = ? AND staff_id = ? AND pin_hash = ?)`)
-        .bind(now, account.id, account.auth_version, data.device_token, data.staff_id, data.pin_hash),
-    ]);
-  } catch { throw new SessionUnavailableError(); }
+    results = await env.AURA_DB.batch([statementWithTenant, updateVerStmt]);
+  } catch (err) {
+    if (String((err as Error)?.message || '').toLowerCase().includes('tenant_id')) {
+      try {
+        results = await env.AURA_DB.batch([statementFallback, updateVerStmt]);
+      } catch {
+        throw new SessionUnavailableError();
+      }
+    } else {
+      throw new SessionUnavailableError();
+    }
+  }
   if (!results[0]?.meta.changes || !results[1]?.meta.changes) throw new StaffSessionError('SESSION_REVOKED');
 
 }
@@ -151,6 +240,10 @@ async function upsertDevice(env: { AURA_DB: import('@cloudflare/workers-types').
 export async function staffMobileLogin(c: Context<{ Bindings: Env }>) {
   try {
     const body = await c.req.json<Record<string, unknown>>();
+    const rawRequestedTenant = extractRequestedDeviceTenant(c, body);
+    if (rawRequestedTenant === '__CONFLICT__') {
+      return errorResponse('Không đủ quyền truy cập cửa hàng', 403);
+    }
     const deviceToken = String(body.device_token ?? '');
     const parsed = pinSchema.safeParse(body.pin);
     if (!deviceToken || !parsed.success) return errorResponse('Thiếu thiết bị hoặc PIN không hợp lệ', 400);
@@ -175,6 +268,21 @@ export async function staffMobileLogin(c: Context<{ Bindings: Env }>) {
       return failures + 1 >= 5 ? errorResponse('Tạm khóa đăng nhập do nhập sai PIN quá nhiều lần', 429) : errorResponse('PIN không đúng', 401);
     }
     const account = await requireStaffAccount(c.env.AURA_DB, device.staff_id);
+    if (rawRequestedTenant) {
+      const accountTenant = staffTenant(account);
+      const rawAccountTenant = typeof account.tenant_id === 'string' ? account.tenant_id.trim() : '';
+      const isHqAccount =
+        (account.role === 'owner' || account.role === 'admin') &&
+        (rawAccountTenant.toLowerCase() === 'hq' || rawAccountTenant === '*');
+      if (
+        !isHqAccount &&
+        (rawRequestedTenant === '*' ||
+          rawRequestedTenant.toLowerCase() === 'hq' ||
+          rawRequestedTenant !== accountTenant)
+      ) {
+        return errorResponse('Không đủ quyền truy cập cửa hàng', 403);
+      }
+    }
     const session = await issueStaffSession(c.env, account, { sessionType: 'staff-mobile', deviceId: device.id });
     await kv.delete(key).catch(() => {});
     const now = new Date().toISOString();
@@ -245,15 +353,28 @@ export async function registerStaffDevice(c: Context<{ Bindings: Env }>) {
 
     const { device_token, device_name, staff_id, pin } = parsed.data;
     if (!staff_id) return errorResponse('staff_id là bắt buộc', 400);
-    const caller = c.get('user');
+    const caller = c.get('user') as { id?: string; role: string; tenantId?: string; tenant_id?: string } | undefined;
     if (!caller) return errorResponse('Vui lòng đăng nhập', 401);
     if (!['owner', 'admin', 'manager'].includes(caller.role)) return errorResponse('Không đủ quyền đăng ký thiết bị', 403);
+    const rawCallerTenant = caller.tenantId ?? caller.tenant_id;
+    const callerTenant = typeof rawCallerTenant === 'string' && rawCallerTenant.trim() ? rawCallerTenant.trim() : 'default';
+    const isHq = (caller.role === 'owner' || caller.role === 'admin') && (callerTenant.toLowerCase() === 'hq' || callerTenant === '*');
+    const rawRequestedTenant = extractRequestedDeviceTenant(c, rawBody);
+    if (rawRequestedTenant === '__CONFLICT__') {
+      return errorResponse('Không đủ quyền truy cập cửa hàng', 403);
+    }
+    const requestedTenant = rawRequestedTenant.toLowerCase() === 'hq' ? '*' : rawRequestedTenant;
+    if (!isHq && (callerTenant === '*' || callerTenant.toLowerCase() === 'hq' || requestedTenant === '*' || (requestedTenant && requestedTenant !== callerTenant))) {
+      return errorResponse('Không đủ quyền truy cập cửa hàng', 403);
+    }
     const state = await loadStaffAccount(c.env.AURA_DB, staff_id);
     if (!state.ok || !isStaffRole(state.account.role)) return errorResponse('Tài khoản không tồn tại', 404);
     const account = state.account;
     if (!isAccountActive(account)) throw new StaffSessionError('STAFF_ACCOUNT_INACTIVE');
-    const callerTenant = caller.tenantId?.trim() || 'default';
-    if (staffTenant(account) !== callerTenant) return errorResponse('Không đủ quyền truy cập cửa hàng', 403);
+    if (!isHq && staffTenant(account) !== callerTenant) return errorResponse('Không đủ quyền truy cập cửa hàng', 403);
+    if (isHq && requestedTenant && requestedTenant !== '*' && staffTenant(account) !== requestedTenant) {
+      return errorResponse('Không đủ quyền truy cập cửa hàng', 403);
+    }
     const accountRole = normalizeDeviceRole(account.role);
     const role: StaffDeviceRole = hasExplicitRole && isExtendedValidRole
       ? normalizeDeviceRole(requestedRole)
@@ -274,6 +395,18 @@ export async function registerStaffDevice(c: Context<{ Bindings: Env }>) {
       staff_id: user.id, device_token, device_name,
       role: role as StaffDeviceRole, pin_hash: pinHash, account,
     });
+    if (c.env.AUTH_KV) {
+      await c.env.AUTH_KV.delete(`pin_lockout:${device_token}`).catch(() => {});
+    }
+    await writeStaffDeviceAuditLog(
+      c.env.AURA_DB,
+      caller.id || user.id,
+      'staff_device_register',
+      device_token,
+      { staff_id: user.id, role, device_name: device_name ?? null },
+      new Date().toISOString(),
+      staffTenant(account)
+    ).catch(() => {});
 
     return jsonResponse({
       success: true, user: { id: user.id, name: user.name, role },
@@ -293,25 +426,43 @@ export async function revokeStaffDevice(c: Context<{ Bindings: Env }>) {
     const deviceId = c.req.param('device_id');
     if (!deviceId) return errorResponse('Thiếu device_id', 400);
 
-    const callerRole = c.get('user')?.role as string | undefined;
-    const callerId = c.get('user')?.id as string | undefined;
+    const caller = c.get('user') as { id?: string; role?: string; tenantId?: string; tenant_id?: string } | undefined;
+    const callerRole = caller?.role;
+    const callerId = caller?.id;
     if (!callerRole || !callerId) return errorResponse('Vui lòng đăng nhập', 401);
 
+    const rawCallerTenant = caller?.tenantId ?? caller?.tenant_id;
+    const callerTenant = typeof rawCallerTenant === 'string' && rawCallerTenant.trim() ? rawCallerTenant.trim() : 'default';
+    const isHq = (callerRole === 'owner' || callerRole === 'admin') && (callerTenant.toLowerCase() === 'hq' || callerTenant === '*');
+    const rawRequestedTenant = extractRequestedDeviceTenant(c);
+    if (rawRequestedTenant === '__CONFLICT__') {
+      return errorResponse('Không đủ quyền truy cập cửa hàng', 403);
+    }
+    const requestedTenant = rawRequestedTenant.toLowerCase() === 'hq' ? '*' : rawRequestedTenant;
+    if (!isHq && (callerTenant === '*' || callerTenant.toLowerCase() === 'hq' || requestedTenant === '*' || (requestedTenant && requestedTenant !== callerTenant))) {
+      return errorResponse('Không đủ quyền truy cập cửa hàng', 403);
+    }
+
     const device = await c.env.AURA_DB
-      .prepare('SELECT id, staff_id, role FROM staff_devices WHERE id = ?')
+      .prepare('SELECT id, staff_id, role, device_token FROM staff_devices WHERE id = ?')
       .bind(deviceId)
-      .first<{ id: string; staff_id: string; role: string }>();
+      .first<{ id: string; staff_id: string; role: string; device_token?: string }>();
     if (!device) return errorResponse('Thiết bị không tồn tại', 404);
+
+    const state = await loadStaffAccount(c.env.AURA_DB, device.staff_id);
+    if (!state.ok) return errorResponse('Tài khoản không tồn tại', 404);
+    const account = state.account;
+    const targetTenant = staffTenant(account);
+    if (!isHq && targetTenant !== callerTenant) {
+      return errorResponse('Thiết bị không tồn tại', 404);
+    }
+    if (isHq && requestedTenant && requestedTenant !== '*' && targetTenant !== requestedTenant) {
+      return errorResponse('Thiết bị không tồn tại', 404);
+    }
 
     const canDelete = ['owner', 'admin'].includes(callerRole) || device.staff_id === callerId
       || (callerRole === 'manager' && MANAGER_MANAGED_ROLES.has(device.role));
     if (!canDelete) return errorResponse('Không đủ quyền xóa thiết bị', 403);
-    const state = await loadStaffAccount(c.env.AURA_DB, device.staff_id);
-    if (!state.ok) return errorResponse('Tài khoản không tồn tại', 404);
-    const account = state.account;
-    const caller = c.get('user');
-    const callerTenant = caller?.tenantId?.trim() || 'default';
-    if (staffTenant(account) !== callerTenant) return errorResponse('Không đủ quyền truy cập cửa hàng', 403);
     if ((account.role === 'owner' && callerRole !== 'owner')
       || ((account.role === 'admin' || device.role === 'admin') && callerRole !== 'admin')
       || (callerRole === 'manager' && !MANAGER_MANAGED_ROLES.has(account.role))) return errorResponse('Không đủ quyền xóa thiết bị', 403);
@@ -319,18 +470,15 @@ export async function revokeStaffDevice(c: Context<{ Bindings: Env }>) {
     // invalidates every already-issued session for its account in the pilot.
     const now = new Date().toISOString();
     try {
-      const updateUserStmt = callerTenant !== '*'
-        ? c.env.AURA_DB.prepare(
-            "UPDATE users SET auth_version = auth_version + 1, updated_at = ? WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
-          ).bind(now, device.staff_id, callerTenant)
-        : c.env.AURA_DB.prepare('UPDATE users SET auth_version = auth_version + 1, updated_at = ? WHERE id = ?')
-            .bind(now, device.staff_id);
+      const updateUserStmt = c.env.AURA_DB.prepare(
+        "UPDATE users SET auth_version = auth_version + 1, updated_at = ? WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
+      ).bind(now, device.staff_id, targetTenant);
       await c.env.AURA_DB.batch([
         updateUserStmt,
         c.env.AURA_DB.prepare('DELETE FROM staff_devices WHERE id = ? AND staff_id = ?').bind(deviceId, device.staff_id),
       ]);
     } catch (batchErr) {
-      if (callerTenant !== '*' && String((batchErr as Error)?.message || '').toLowerCase().includes('no such column')) {
+      if (targetTenant === 'default' && String((batchErr as Error)?.message || '').toLowerCase().includes('no such column')) {
         try {
           await c.env.AURA_DB.batch([
             c.env.AURA_DB.prepare('UPDATE users SET auth_version = auth_version + 1, updated_at = ? WHERE id = ?')
@@ -345,6 +493,19 @@ export async function revokeStaffDevice(c: Context<{ Bindings: Env }>) {
       }
     }
 
+    if (c.env.AUTH_KV && device.device_token) {
+      await c.env.AUTH_KV.delete(`pin_lockout:${device.device_token}`).catch(() => {});
+    }
+    await writeStaffDeviceAuditLog(
+      c.env.AURA_DB,
+      callerId,
+      'staff_device_revoke',
+      deviceId,
+      { staff_id: device.staff_id, role: device.role },
+      now,
+      targetTenant
+    ).catch(() => {});
+
     return jsonResponse({ success: true, message: 'Đã hủy đăng ký thiết bị' });
   } catch (err) {
     const response = staffSessionErrorResponse(err);
@@ -357,19 +518,38 @@ export async function revokeStaffDevice(c: Context<{ Bindings: Env }>) {
 // GET /mobile/devices — list devices
 export async function listStaffDevices(c: Context<{ Bindings: Env }>) {
   try {
-    const callerRole = c.get('user')?.role as string | undefined;
-    const callerId = c.get('user')?.id as string | undefined;
+    const caller = c.get('user') as { id?: string; role?: string; tenantId?: string; tenant_id?: string } | undefined;
+    const callerRole = caller?.role;
+    const callerId = caller?.id;
     if (!callerRole || !callerId) return errorResponse('Vui lòng đăng nhập', 401);
 
-    const caller = c.get('user');
-    const callerTenant = caller?.tenantId?.trim() || 'default';
+    const rawCallerTenant = caller?.tenantId ?? caller?.tenant_id;
+    const callerTenant = typeof rawCallerTenant === 'string' && rawCallerTenant.trim() ? rawCallerTenant.trim() : 'default';
+    const isHq = (callerRole === 'owner' || callerRole === 'admin') && (callerTenant.toLowerCase() === 'hq' || callerTenant === '*');
+    const rawRequestedTenant = extractRequestedDeviceTenant(c);
+    if (rawRequestedTenant === '__CONFLICT__') {
+      return errorResponse('Không tìm thấy thiết bị', 403);
+    }
+    const requestedTenant = rawRequestedTenant.toLowerCase() === 'hq' ? '*' : rawRequestedTenant;
+    if (!isHq) {
+      if (callerTenant === '*' || callerTenant.toLowerCase() === 'hq' || requestedTenant === '*' || (requestedTenant && requestedTenant !== callerTenant)) {
+        return errorResponse('Không tìm thấy thiết bị', 403);
+      }
+    }
+    const effectiveTenant = isHq ? (requestedTenant || '*') : callerTenant;
     const roleClause = callerRole === 'manager' ? " AND u.role IN ('staff','waiter','cashier','kitchen','barista','chef','supervisor','shipper')"
       : callerRole === 'owner' ? " AND u.role != 'admin'"
       : callerRole === 'admin' ? '' : ' AND d.staff_id = ?';
-    const values = [callerTenant, ...(['owner', 'admin', 'manager'].includes(callerRole) ? [] : [callerId])];
+    const tenantWhere = effectiveTenant === '*'
+      ? '1=1'
+      : "COALESCE(NULLIF(TRIM(u.tenant_id), ''), 'default') = ?";
+    const values = [
+      ...(effectiveTenant === '*' ? [] : [effectiveTenant]),
+      ...(['owner', 'admin', 'manager'].includes(callerRole) ? [] : [callerId]),
+    ];
     const rows = await c.env.AURA_DB.prepare(`SELECT d.id, d.staff_id, d.device_name, d.role, d.last_login_at, d.created_at
       FROM staff_devices d JOIN users u ON u.id = d.staff_id
-      WHERE COALESCE(NULLIF(TRIM(u.tenant_id), ''), 'default') = ?${roleClause} ORDER BY d.created_at DESC`).bind(...values).all();
+      WHERE ${tenantWhere}${roleClause} ORDER BY d.created_at DESC`).bind(...values).all();
 
     return jsonResponse({
       success: true,

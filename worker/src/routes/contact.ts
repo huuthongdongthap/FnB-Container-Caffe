@@ -14,14 +14,25 @@ import type { Env } from '../types/env';
 
 const log = createLogger({ route: 'contact' });
 
-async function throttle(request: Request, env: Record<string, unknown>, key: string, max: number, windowSec: number): Promise<boolean> {
+async function throttle(
+  request: Request,
+  env: Record<string, unknown>,
+  key: string,
+  max: number,
+  windowSec: number,
+  tenantId = 'default'
+): Promise<boolean> {
   const kv = env.AUTH_KV as import('@cloudflare/workers-types').KVNamespace | undefined;
   if (!kv) {
     return true;
   }
-  const ip = request.headers.get('CF-Connecting-IP') || request.headers.get('X-Forwarded-For') || 'unknown';
-  const fullKey = `rl:${key}:${ip}`;
-  const cur = parseInt(await kv.get(fullKey) || '0', 10);
+  const rawIp = request.headers.get('CF-Connecting-IP') || request.headers.get('X-Forwarded-For') || 'unknown';
+  const ip = rawIp.split(',')[0].trim() || 'unknown';
+  const legacyKey = `rl:${key}:${ip}`;
+  const fullKey = tenantId && tenantId !== 'default' ? `rl:${key}:${tenantId}:${ip}` : legacyKey;
+  const scopedCount = parseInt((await kv.get(fullKey)) || '0', 10) || 0;
+  const legacyCount = fullKey !== legacyKey ? parseInt((await kv.get(legacyKey)) || '0', 10) || 0 : 0;
+  const cur = Math.max(scopedCount, legacyCount);
   if (cur >= max) {
     return false;
   }
@@ -31,9 +42,7 @@ async function throttle(request: Request, env: Record<string, unknown>, key: str
 
 export async function submitContact(request: Request, env: Record<string, unknown>) {
   try {
-    if (!(await throttle(request, env, 'ct', 3, 3600))) {
-      return errorResponse('Quá nhiều tin nhắn, vui lòng thử lại sau', 429);
-    }
+    const tenantId = resolvePilotStore(env as unknown as Env);
 
     const body = await request.json() as Record<string, unknown>;
     const parsed = contactSchema.safeParse({
@@ -49,9 +58,11 @@ export async function submitContact(request: Request, env: Record<string, unknow
       return errorResponse(`${first.path.join('.')}: ${first.message}`, 400);
     }
 
-    const { name, phone, email, category, content } = parsed.data;
+    if (!(await throttle(request, env, 'ct', 3, 3600, tenantId))) {
+      return errorResponse('Quá nhiều tin nhắn, vui lòng thử lại sau', 429);
+    }
 
-    const tenantId = resolvePilotStore(env as unknown as Env);
+    const { name, phone, email, category, content } = parsed.data;
     const db = env.AURA_DB as import('@cloudflare/workers-types').D1Database;
     const messages = await contactMessageRepository(db);
     const id = await messages.insert({ tenantId, classification: 'contact',

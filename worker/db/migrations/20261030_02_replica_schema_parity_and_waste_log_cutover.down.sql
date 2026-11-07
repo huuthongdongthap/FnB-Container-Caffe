@@ -21,6 +21,8 @@ ALTER TABLE inventory_items DROP COLUMN reorder_point;
 
 DROP TABLE IF EXISTS kds_stations;
 
+ALTER TABLE ti_order_bridge DROP COLUMN tenant_id;
+ALTER TABLE payments DROP COLUMN tenant_id;
 ALTER TABLE happy_hour_windows DROP COLUMN tenant_id;
 ALTER TABLE ha_device_states DROP COLUMN tenant_id;
 

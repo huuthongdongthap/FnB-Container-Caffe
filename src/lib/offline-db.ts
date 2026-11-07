@@ -54,8 +54,14 @@ export class OfflineDB {
   ): Promise<string> {
     const db = await openDB();
     const localId = OfflineDB.generateId();
-    const tenantId = context?.tenantId ?? (orderData as { tenant_id?: string | null })?.tenant_id ?? null;
-    const userId = context?.userId ?? (orderData as { customer_id?: string | null })?.customer_id ?? null;
+    const rawOrder = orderData as {
+      tenant_id?: string | null;
+      tenantId?: string | null;
+      customer_id?: string | null;
+      userId?: string | null;
+    };
+    const tenantId = context?.tenantId ?? rawOrder?.tenantId ?? rawOrder?.tenant_id ?? null;
+    const userId = context?.userId ?? rawOrder?.userId ?? rawOrder?.customer_id ?? null;
     return new Promise<string>((resolve, reject) => {
       const tx = db.transaction(STORE_NAME, 'readwrite');
       tx.objectStore(STORE_NAME).add({
@@ -77,15 +83,34 @@ export class OfflineDB {
   ): Promise<OfflineOrderRecord[]> {
     const db = await openDB();
     const preservedKeys = new Set(['menu', '_meta_categories']);
+    const ctxTenant = context?.tenantId?.trim() || null;
+    const ctxUser = context?.userId?.trim() || null;
     return new Promise<OfflineOrderRecord[]>((resolve, reject) => {
       const tx = db.transaction(STORE_NAME, 'readonly');
       const req = tx.objectStore(STORE_NAME).getAll();
       req.onsuccess = () => {
         const records = (req.result as OfflineOrderRecord[])
           .filter(r => {
-            if (preservedKeys.has(r.localId) || r.localId?.startsWith('_') || r.synced) return false;
-            if (context?.tenantId && r.tenantId && r.tenantId !== context.tenantId) return false;
-            if (context?.userId && r.userId && r.userId !== context.userId) return false;
+            if (
+              preservedKeys.has(r.localId) ||
+              r.localId?.startsWith('_') ||
+              r.localId?.startsWith('menu:') ||
+              r.synced
+            ) {
+              return false;
+            }
+            const recTenant = typeof r.tenantId === 'string' && r.tenantId.trim() ? r.tenantId.trim() : null;
+            const recUser = typeof r.userId === 'string' && r.userId.trim() ? r.userId.trim() : null;
+            if (ctxTenant) {
+              if ((recTenant ?? 'default') !== ctxTenant) return false;
+            } else if (recTenant && recTenant !== 'default') {
+              return false;
+            }
+            if (ctxUser) {
+              if (recUser && recUser !== ctxUser) return false;
+            } else if (recUser) {
+              return false;
+            }
             return true;
           })
           .map(r => ({
@@ -133,34 +158,41 @@ export class OfflineDB {
     });
   }
 
-  /* ── Menu cache (single fixed entry keyed 'menu') ───────────────── */
-  async saveMenuItems(items: unknown[]): Promise<void> {
+  /* ── Menu cache (tenant-keyed, defaulting to 'menu') ────────────── */
+  async saveMenuItems(items: unknown[], tenantId = 'default'): Promise<void> {
     const db = await openDB();
+    const normTenant = tenantId.trim() || 'default';
+    const key = normTenant === 'default' ? 'menu' : `menu:${normTenant}`;
     return new Promise<void>((resolve, reject) => {
       const tx = db.transaction(STORE_NAME, 'readwrite');
-      tx.objectStore(STORE_NAME).put({ localId: 'menu', orderData: items });
+      tx.objectStore(STORE_NAME).put({ localId: key, orderData: items, tenantId: normTenant });
       tx.oncomplete = () => resolve();
       tx.onerror = () => reject(tx.error);
     });
   }
 
-  async getMenuItems(): Promise<unknown[]> {
+  async getMenuItems(tenantId = 'default'): Promise<unknown[]> {
     const db = await openDB();
+    const normTenant = tenantId.trim() || 'default';
+    const key = normTenant === 'default' ? 'menu' : `menu:${normTenant}`;
     return new Promise<unknown[]>((resolve, reject) => {
       const tx = db.transaction(STORE_NAME, 'readonly');
-      const req = tx.objectStore(STORE_NAME).get('menu');
+      const req = tx.objectStore(STORE_NAME).get(key);
       req.onsuccess = () => resolve((req.result?.orderData as unknown[]) ?? []);
       req.onerror = () => reject(req.error);
     });
   }
 
-  /* ── Menu categories cache (keyed '_meta_categories') ───────────── */
-  async saveMenuCategories(categories: object): Promise<void> {
+  /* ── Menu categories cache (tenant-keyed, defaulting to '_meta_categories') ── */
+  async saveMenuCategories(categories: object, tenantId = 'default'): Promise<void> {
     const db = await openDB();
+    const normTenant = tenantId.trim() || 'default';
+    const key = normTenant === 'default' ? '_meta_categories' : `_meta_categories:${normTenant}`;
     return new Promise<void>((resolve, reject) => {
       const tx = db.transaction(STORE_NAME, 'readwrite');
       tx.objectStore(STORE_NAME).put({
-        localId: '_meta_categories',
+        localId: key,
+        tenantId: normTenant,
         orderData: { items: categories, cachedAt: Date.now() },
       });
       tx.oncomplete = () => resolve();
@@ -168,11 +200,13 @@ export class OfflineDB {
     });
   }
 
-  async getMenuCategories(): Promise<{ items: unknown[]; cachedAt: number } | null> {
+  async getMenuCategories(tenantId = 'default'): Promise<{ items: unknown[]; cachedAt: number } | null> {
     const db = await openDB();
+    const normTenant = tenantId.trim() || 'default';
+    const key = normTenant === 'default' ? '_meta_categories' : `_meta_categories:${normTenant}`;
     return new Promise<{ items: unknown[]; cachedAt: number } | null>((resolve, reject) => {
       const tx = db.transaction(STORE_NAME, 'readonly');
-      const req = tx.objectStore(STORE_NAME).get('_meta_categories');
+      const req = tx.objectStore(STORE_NAME).get(key);
       req.onsuccess = () => resolve((req.result?.orderData as { items: unknown[]; cachedAt: number } | null) ?? null);
       req.onerror = () => reject(req.error);
     });
@@ -191,7 +225,7 @@ export class OfflineDB {
         if (!cursor) return;
         const key = String(cursor.primaryKey ?? '');
         const val = cursor.value as OfflineOrderRecord;
-        if (!preservedKeys.has(key) && !key.startsWith('_') && val?.synced === true) {
+        if (!preservedKeys.has(key) && !key.startsWith('_') && !key.startsWith('menu:') && val?.synced === true) {
           store.delete(cursor.primaryKey);
         }
         cursor.continue();

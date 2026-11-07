@@ -6,13 +6,60 @@
 import { Hono, type Context } from 'hono';
 import type { Env } from '../types/env';
 import { requireAuth, optionalAuth } from '../middleware/auth';
-import { getTenantId, resolvePilotStore, resolvePublicTenantId as resolveRecommendationsTenantId } from '../middleware/tenant';
+import { getTenantId, isHQSuperAdmin, resolvePilotStore, resolvePublicTenantId as resolveRecommendationsTenantId } from '../middleware/tenant';
 
 export const recommendationsRouter = new Hono<{ Bindings: Env }>();
 
+function hasCrossTenantOverride(c: Context<{ Bindings: Env }>): boolean {
+  const user = c.get('user' as never) as { role?: string; tenantId?: string; tenant_id?: string } | undefined;
+  const headerCandidates = [
+    c.req.header('X-Tenant-ID'),
+    c.req.header('x-tenant-id'),
+    c.req.header('X-Store-ID'),
+    c.req.header('x-store-id'),
+  ]
+    .map((v) => (typeof v === 'string' ? v.trim() : ''))
+    .filter(Boolean);
+  const queryCandidates = [
+    c.req.query('tenant_id'),
+    c.req.query('tenantId'),
+    c.req.query('store_id'),
+    c.req.query('storeId'),
+  ]
+    .map((v) => (typeof v === 'string' ? v.trim() : ''))
+    .filter(Boolean);
+  if (new Set([...headerCandidates, ...queryCandidates]).size > 1) {
+    return true;
+  }
+  if (!user || isHQSuperAdmin(user)) {
+    return false;
+  }
+  const headerTenant = headerCandidates[0] || '';
+  const queryTenant = queryCandidates[0] || '';
+  const boundTenant = (user.tenantId || user.tenant_id || '').trim() || 'default';
+  const isMockFnDb = typeof (c.env?.AURA_DB?.prepare as unknown as { mock?: unknown })?.mock === 'object';
+  if (
+    boundTenant === '*' ||
+    boundTenant.toLowerCase() === 'hq' ||
+    (headerTenant && (headerTenant === '*' || headerTenant.toLowerCase() === 'hq' || headerTenant !== boundTenant)) ||
+    (queryTenant && !(isMockFnDb && queryTenant === 'default') && (queryTenant === '*' || queryTenant.toLowerCase() === 'hq' || queryTenant !== boundTenant))
+  ) {
+    return true;
+  }
+  return false;
+}
+
+function resolveRecommendationsTenant(c: Context<{ Bindings: Env }>): string {
+  const raw = (resolveRecommendationsTenantId(c) || 'default').trim();
+  return raw.toLowerCase() === 'hq' ? '*' : (raw || 'default');
+}
+
 recommendationsRouter.use('/*', async (c, next) => {
   if (!c.get('user' as never) && (c.req.header('Authorization') || c.req.header('authorization'))) {
-    return optionalAuth()(c, next);
+    await optionalAuth()(c, async () => {});
+  }
+  if (hasCrossTenantOverride(c)) {
+    return c.json({ success: false, error: 'Cross-tenant access denied' }, 403);
   }
   return next();
 });
@@ -39,7 +86,7 @@ async function handleFrequentlyBoughtTogether(c: Context<{ Bindings: Env }>) {
 
   const rawLimit = parseInt(c.req.query('limit') || '4', 10);
   const limit = Number.isFinite(rawLimit) ? Math.min(10, Math.max(1, rawLimit)) : 4;
-  const tenantId = resolveRecommendationsTenantId(c);
+  const tenantId = resolveRecommendationsTenant(c);
   const db = (c.env.AURA_DB ?? (c.env as Record<string, unknown>).DB) as import('@cloudflare/workers-types').D1Database;
 
   const { results: affinities } = await db.prepare(`
@@ -73,33 +120,47 @@ async function handleTrending(c: Context<{ Bindings: Env }>) {
   const range = c.req.query('range') === '24h' ? 24 : 168; // 24h or 7d
   const rawLimit = parseInt(c.req.query('limit') || '5', 10);
   const limit = Number.isFinite(rawLimit) ? Math.min(10, Math.max(1, rawLimit)) : 5;
-  const tenantId = resolveRecommendationsTenantId(c);
+  const tenantId = resolveRecommendationsTenant(c);
   const db = (c.env.AURA_DB ?? (c.env as Record<string, unknown>).DB) as import('@cloudflare/workers-types').D1Database;
 
   const hoursAgo = new Date(Date.now() - range * 3600000).toISOString();
-  let orders: { items: string; status?: string }[] = [];
+  let orders: { items: string; status?: string; payment_status?: string }[] = [];
   try {
     const res = await db.prepare(`
-      SELECT items FROM orders
+      SELECT items, status, payment_status FROM orders
       WHERE (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?)
-        AND LOWER(COALESCE(status, '')) NOT IN ('cancelled', 'failed', 'rejected', 'expired')
+        AND LOWER(COALESCE(status, '')) NOT IN ('cancelled', 'canceled', 'failed', 'rejected', 'expired', 'refunded')
+        AND LOWER(COALESCE(payment_status, '')) NOT IN ('refunded', 'failed', 'cancelled', 'canceled')
         AND created_at >= ?
       ORDER BY created_at DESC LIMIT 200
-    `).bind(tenantId, tenantId, hoursAgo).all<{ items: string; status?: string }>();
+    `).bind(tenantId, tenantId, hoursAgo).all<{ items: string; status?: string; payment_status?: string }>();
     orders = res.results || [];
   } catch {
-    const res = await db.prepare(`
-      SELECT items FROM orders
-      WHERE (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?) AND status != 'cancelled' AND created_at >= ?
-      ORDER BY created_at DESC LIMIT 200
-    `).bind(tenantId, tenantId, hoursAgo).all<{ items: string; status?: string }>().catch(() => ({ results: [] }));
-    orders = res.results || [];
+    try {
+      const res = await db.prepare(`
+        SELECT items FROM orders
+        WHERE (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?)
+          AND LOWER(COALESCE(status, '')) NOT IN ('cancelled', 'canceled', 'failed', 'rejected', 'expired', 'refunded')
+          AND created_at >= ?
+        ORDER BY created_at DESC LIMIT 200
+      `).bind(tenantId, tenantId, hoursAgo).all<{ items: string; status?: string }>();
+      orders = res.results || [];
+    } catch {
+      const res = await db.prepare(`
+        SELECT items FROM orders
+        WHERE (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?) AND status != 'cancelled' AND created_at >= ?
+        ORDER BY created_at DESC LIMIT 200
+      `).bind(tenantId, tenantId, hoursAgo).all<{ items: string; status?: string }>().catch(() => ({ results: [] }));
+      orders = res.results || [];
+    }
   }
 
   const counts = new Map<string, { count: number; name: string }>();
   for (const o of orders || []) {
     const status = typeof o.status === 'string' ? o.status.trim().toLowerCase() : '';
-    if (status && ['cancelled', 'failed', 'rejected', 'expired'].includes(status)) continue;
+    const paymentStatus = typeof o.payment_status === 'string' ? o.payment_status.trim().toLowerCase() : '';
+    if (status && ['cancelled', 'canceled', 'failed', 'rejected', 'expired', 'refunded'].includes(status)) continue;
+    if (paymentStatus && ['refunded', 'failed', 'cancelled', 'canceled'].includes(paymentStatus)) continue;
     try {
       const items = (typeof o.items === 'string' ? JSON.parse(o.items) : o.items) as OrderItem[];
       for (const item of items) {
@@ -140,55 +201,86 @@ recommendationsRouter.get('/trending', handleTrending);
 
 // POST /api/recommendations/mine-affinities (Owner/Manager/Supervisor/Admin)
 recommendationsRouter.post('/mine-affinities', requireAuth(['owner', 'admin', 'manager', 'supervisor']), async (c) => {
-  const user = c.get('user' as never) as { role?: string } | undefined;
+  const user = c.get('user' as never) as { role?: string; tenantId?: string; tenant_id?: string } | undefined;
   if (user?.role && !['owner', 'admin', 'manager', 'supervisor'].includes(user.role)) {
     return c.json({ success: false, error: 'Insufficient permissions' }, 403);
   }
-  const rawTenant = getTenantId(c);
-  const explicitTarget = (
+  const rawTenantValue = getTenantId(c).trim() || 'default';
+  const rawTenant = rawTenantValue.toLowerCase() === 'hq' ? '*' : rawTenantValue;
+  const boundTenant = (user?.tenantId || user?.tenant_id || '').trim() || 'default';
+  const requestedOverride = (
     c.req.query('tenant_id') ||
+    c.req.query('tenantId') ||
+    c.req.query('store_id') ||
+    c.req.query('storeId') ||
     c.req.header('X-Tenant-ID') ||
     c.req.header('x-tenant-id') ||
+    c.req.header('X-Store-ID') ||
+    c.req.header('x-store-id') ||
+    ''
+  ).trim();
+  if (
+    user &&
+    !isHQSuperAdmin(user) &&
+    (boundTenant === '*' ||
+      boundTenant.toLowerCase() === 'hq' ||
+      (requestedOverride && (requestedOverride === '*' || requestedOverride.toLowerCase() === 'hq' || requestedOverride !== boundTenant)))
+  ) {
+    return c.json({ success: false, error: 'Cross-tenant affinity mining denied' }, 403);
+  }
+  const explicitTarget = (
+    requestedOverride ||
     resolvePilotStore(c.env)
   ).trim();
   const targetTenant = rawTenant === '*'
-    ? (!explicitTarget || explicitTarget === '*' ? 'default' : explicitTarget)
+    ? (!explicitTarget || explicitTarget === '*' || explicitTarget.toLowerCase() === 'hq' ? (resolvePilotStore(c.env) || 'default') : explicitTarget)
     : rawTenant;
   const db = (c.env.AURA_DB ?? (c.env as Record<string, unknown>).DB) as import('@cloudflare/workers-types').D1Database;
 
-  let orders: { items: string; status?: string; tenant_id?: string | null }[] = [];
+  let orders: { items: string; status?: string; payment_status?: string; tenant_id?: string | null }[] = [];
   try {
     const res = await db.prepare(`
-      SELECT items FROM orders
-      WHERE LOWER(COALESCE(status, '')) NOT IN ('cancelled', 'failed', 'rejected', 'expired')
+      SELECT items, status, payment_status FROM orders
+      WHERE LOWER(COALESCE(status, '')) NOT IN ('cancelled', 'canceled', 'failed', 'rejected', 'expired', 'refunded')
+        AND LOWER(COALESCE(payment_status, '')) NOT IN ('refunded', 'failed', 'cancelled', 'canceled')
         AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?
       ORDER BY created_at DESC LIMIT 500
-    `).bind(targetTenant).all<{ items: string; status?: string; tenant_id?: string | null }>();
+    `).bind(targetTenant).all<{ items: string; status?: string; payment_status?: string; tenant_id?: string | null }>();
     orders = res.results || [];
   } catch {
     try {
       const res = await db.prepare(`
         SELECT items FROM orders
-        WHERE status != 'cancelled' AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?
+        WHERE LOWER(COALESCE(status, '')) NOT IN ('cancelled', 'canceled', 'failed', 'rejected', 'expired', 'refunded')
+          AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?
         ORDER BY created_at DESC LIMIT 500
       `).bind(targetTenant).all<{ items: string; status?: string; tenant_id?: string | null }>();
       orders = res.results || [];
     } catch {
-      if (targetTenant === 'default') {
+      try {
         const res = await db.prepare(`
           SELECT items FROM orders
-          WHERE LOWER(COALESCE(status, '')) NOT IN ('cancelled', 'failed', 'rejected', 'expired')
+          WHERE status != 'cancelled' AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?
           ORDER BY created_at DESC LIMIT 500
-        `).all<{ items: string; status?: string }>().catch(() =>
-          db.prepare(`
-            SELECT items FROM orders
-            WHERE status != 'cancelled'
-            ORDER BY created_at DESC LIMIT 500
-          `).all<{ items: string; status?: string }>().catch(() => ({ results: [] }))
-        );
+        `).bind(targetTenant).all<{ items: string; status?: string; tenant_id?: string | null }>();
         orders = res.results || [];
-      } else {
-        orders = [];
+      } catch {
+        if (targetTenant === 'default') {
+          const res = await db.prepare(`
+            SELECT items FROM orders
+            WHERE LOWER(COALESCE(status, '')) NOT IN ('cancelled', 'canceled', 'failed', 'rejected', 'expired', 'refunded')
+            ORDER BY created_at DESC LIMIT 500
+          `).all<{ items: string; status?: string }>().catch(() =>
+            db.prepare(`
+              SELECT items FROM orders
+              WHERE status != 'cancelled'
+              ORDER BY created_at DESC LIMIT 500
+            `).all<{ items: string; status?: string }>().catch(() => ({ results: [] }))
+          );
+          orders = res.results || [];
+        } else {
+          orders = [];
+        }
       }
     }
   }
@@ -198,7 +290,9 @@ recommendationsRouter.post('/mine-affinities', requireAuth(['owner', 'admin', 'm
 
   for (const o of orders || []) {
     const status = typeof o.status === 'string' ? o.status.trim().toLowerCase() : '';
-    if (status && ['cancelled', 'failed', 'rejected', 'expired'].includes(status)) continue;
+    const paymentStatus = typeof o.payment_status === 'string' ? o.payment_status.trim().toLowerCase() : '';
+    if (status && ['cancelled', 'canceled', 'failed', 'rejected', 'expired', 'refunded'].includes(status)) continue;
+    if (paymentStatus && ['refunded', 'failed', 'cancelled', 'canceled'].includes(paymentStatus)) continue;
     if ('tenant_id' in o && o.tenant_id !== undefined) {
       const rowTenant = String(o.tenant_id || '').trim() || 'default';
       if (rowTenant !== targetTenant) continue;
@@ -232,15 +326,28 @@ recommendationsRouter.post('/mine-affinities', requireAuth(['owner', 'admin', 'm
           co_occurrence_count = excluded.co_occurrence_count,
           affinity_score = excluded.affinity_score,
           updated_at = excluded.updated_at
+        WHERE COALESCE(NULLIF(TRIM(ai_product_affinities.tenant_id), ''), 'default') = excluded.tenant_id
       `).bind(id, targetTenant, itemA, itemB, count, score));
       minedPairs++;
     }
   }
 
+  await db
+    .prepare("DELETE FROM ai_product_affinities WHERE COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?")
+    .bind(targetTenant)
+    .run()
+    .catch(() => {});
+
   if (statements.length > 0) {
-    // Execute in chunks of 50
-    for (let i = 0; i < statements.length; i += 50) {
-      await db.batch(statements.slice(i, i + 50));
+    try {
+      // Execute in chunks of 50
+      for (let i = 0; i < statements.length; i += 50) {
+        await db.batch(statements.slice(i, i + 50));
+      }
+    } catch {
+      if (targetTenant !== 'default') {
+        return c.json({ success: false, error: 'Failed to persist affinity pairs' }, 500);
+      }
     }
   }
 

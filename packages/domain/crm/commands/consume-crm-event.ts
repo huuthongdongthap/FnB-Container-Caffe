@@ -27,6 +27,44 @@ export interface CrmConsumeResult {
   error?: string;
 }
 
+async function resolveEventTenant(
+  db: D1Database,
+  rawTenant: string,
+  orderId?: string | null,
+  customerId?: string | null,
+): Promise<string> {
+  if (rawTenant && rawTenant !== '*' && rawTenant.toLowerCase() !== 'hq') {
+    return rawTenant;
+  }
+  if (orderId) {
+    try {
+      const row = await db
+        .prepare('SELECT tenant_id FROM orders WHERE id = ?')
+        .bind(orderId)
+        .first<{ tenant_id?: string | null }>()
+        .catch(() => null);
+      const t = typeof row?.tenant_id === 'string' ? row.tenant_id.trim() : '';
+      if (t && t !== '*' && t.toLowerCase() !== 'hq') return t;
+    } catch {
+      // Ignore if orders table lacks tenant_id
+    }
+  }
+  if (customerId) {
+    try {
+      const row = await db
+        .prepare('SELECT tenant_id FROM customers WHERE id = ?')
+        .bind(customerId)
+        .first<{ tenant_id?: string | null }>()
+        .catch(() => null);
+      const t = typeof row?.tenant_id === 'string' ? row.tenant_id.trim() : '';
+      if (t && t !== '*' && t.toLowerCase() !== 'hq') return t;
+    } catch {
+      // Ignore if customers table lacks tenant_id
+    }
+  }
+  return 'default';
+}
+
 export async function consumeCrmEvent(input: ConsumeCrmEventInput): Promise<CrmConsumeResult> {
   const { db, event } = input;
   const { eventType, customerId, orderId, payload } = event;
@@ -36,38 +74,40 @@ export async function consumeCrmEvent(input: ConsumeCrmEventInput): Promise<CrmC
     (typeof payload?.tenantId === 'string' && String(payload.tenantId).trim()) ||
     (typeof payload?.tenant_id === 'string' && String(payload.tenant_id).trim()) ||
     '';
-  const eventTenant = rawEventTenant || undefined;
+  const kv = (input.env as { AUTH_KV?: import('@cloudflare/workers-types').KVNamespace } | undefined)?.AUTH_KV;
 
   try {
     switch (eventType) {
       case 'order_created': {
         if (!customerId) return { ok: true, processed: false, actionTaken: 'guest_order_skipped' };
+        const eventTenant = await resolveEventTenant(db, rawEventTenant, orderId, customerId);
         const channel = (payload.channel as any) || 'in_store';
         const spent = typeof payload.totalAmount === 'number' ? payload.totalAmount : null;
-        const res = await recordVisit({ db, customerId, orderId, channel, spent, ...(eventTenant ? { tenantId: eventTenant } : {}) });
+        const res = await recordVisit({ db, customerId, orderId, channel, spent, tenantId: eventTenant });
         return { ok: res.ok, processed: res.ok, actionTaken: res.ok ? 'visit_recorded' : 'visit_failed' };
       }
 
       case 'order_paid':
       case 'order_completed': {
         if (!customerId || !orderId) return { ok: true, processed: false, actionTaken: 'guest_or_no_order' };
+        const eventTenant = await resolveEventTenant(db, rawEventTenant, orderId, customerId);
         const total = Number(payload.totalAmount || 0);
         let loyaltyOk = true;
         if (total > 0) {
-          const policy = await loadPolicy(db, undefined, new Date(), eventTenant);
+          const policy = await loadPolicy(db, kv, new Date(), eventTenant);
           const aRes = await applyAccrual(db, policy, {
             orderId,
             customerId,
             orderTotalVnd: total,
             cashbackUsedVnd: Number(payload.cashbackUsed || 0),
-            ...(eventTenant ? { tenantId: eventTenant } : {}),
+            tenantId: eventTenant,
           });
           loyaltyOk = aRes.ok;
         }
         let visitOk = true;
         if (eventType === 'order_completed') {
           const channel = (payload.channel as any) || 'in_store';
-          const vRes = await recordVisit({ db, customerId, orderId, channel, spent: total, ...(eventTenant ? { tenantId: eventTenant } : {}) });
+          const vRes = await recordVisit({ db, customerId, orderId, channel, spent: total, tenantId: eventTenant });
           visitOk = vRes.ok;
         }
         const ok = loyaltyOk && visitOk;
@@ -76,13 +116,14 @@ export async function consumeCrmEvent(input: ConsumeCrmEventInput): Promise<CrmC
 
       case 'order_cancelled': {
         if (!orderId || !customerId) return { ok: true, processed: false, actionTaken: 'no_order_id' };
+        const eventTenant = await resolveEventTenant(db, rawEventTenant, orderId, customerId);
         const total = Number(payload.totalAmount || 0);
-        const policy = await loadPolicy(db, undefined, new Date(), eventTenant);
+        const policy = await loadPolicy(db, kv, new Date(), eventTenant);
         const rRes = await reverseAccrual(db, policy, {
           orderId,
           customerId,
           refundAmountVnd: total,
-          ...(eventTenant ? { tenantId: eventTenant } : {}),
+          tenantId: eventTenant,
         });
         const ok = rRes ? rRes.ok !== false : true;
         return { ok, processed: ok, actionTaken: ok ? 'refund_accrual_reversed' : 'refund_reversal_failed' };
@@ -90,40 +131,65 @@ export async function consumeCrmEvent(input: ConsumeCrmEventInput): Promise<CrmC
 
       case 'customer_linked': {
         if (!orderId || !customerId) return { ok: true, processed: false, actionTaken: 'missing_params' };
+        const eventTenant = await resolveEventTenant(db, rawEventTenant, orderId, customerId);
         try {
-          if (eventTenant && eventTenant !== '*') {
-            await db.prepare(
-              "UPDATE visits SET customer_id = ? WHERE order_id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
-            ).bind(customerId, orderId, eventTenant).run().catch(() =>
-              db.prepare('UPDATE visits SET customer_id = ? WHERE order_id = ?').bind(customerId, orderId).run()
+          await db
+            .prepare(
+              "UPDATE visits SET customer_id = ? WHERE order_id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?",
+            )
+            .bind(customerId, orderId, eventTenant)
+            .run()
+            .catch(() =>
+              eventTenant === 'default'
+                ? db.prepare('UPDATE visits SET customer_id = ? WHERE order_id = ?').bind(customerId, orderId).run()
+                : undefined,
             );
-          } else {
-            await db.prepare('UPDATE visits SET customer_id = ? WHERE order_id = ?')
-              .bind(customerId, orderId).run();
-          }
         } catch {
           // Graceful fallback when visits table is absent
         }
         const total = Number(payload.totalAmount || payload.total || 0);
         let accrualOk = true;
         if (total > 0) {
-          const policy = await loadPolicy(db, undefined, new Date(), eventTenant);
-          const aRes = await applyAccrual(db, policy, {
-            orderId,
-            customerId,
-            orderTotalVnd: total,
-            ...(eventTenant ? { tenantId: eventTenant } : {}),
-          });
-          accrualOk = aRes ? aRes.ok !== false : true;
+          const orderState = await db
+            .prepare('SELECT status, payment_status FROM orders WHERE id = ?')
+            .bind(orderId)
+            .first<{ status?: string | null; payment_status?: string | null }>()
+            .catch(() => null);
+          const rawStatus = String(payload.status ?? orderState?.status ?? '').trim().toLowerCase();
+          const rawPayStatus = String(
+            payload.paymentStatus ?? payload.payment_status ?? orderState?.payment_status ?? '',
+          )
+            .trim()
+            .toLowerCase();
+          const ineligibleStatuses = new Set(['cancelled', 'rejected', 'failed', 'expired', 'refunded']);
+          const hasExplicitStatus = Boolean(rawStatus || rawPayStatus);
+          const isOrderEligible =
+            !ineligibleStatuses.has(rawStatus) &&
+            !ineligibleStatuses.has(rawPayStatus) &&
+            (!hasExplicitStatus ||
+              rawStatus === 'completed' ||
+              rawStatus === 'paid' ||
+              rawPayStatus === 'paid');
+          if (isOrderEligible) {
+            const policy = await loadPolicy(db, kv, new Date(), eventTenant);
+            const aRes = await applyAccrual(db, policy, {
+              orderId,
+              customerId,
+              orderTotalVnd: total,
+              tenantId: eventTenant,
+            });
+            accrualOk = aRes ? aRes.ok !== false : true;
+          }
         }
         return { ok: accrualOk, processed: accrualOk, actionTaken: accrualOk ? 'customer_linked_and_backfilled' : 'customer_link_accrual_failed' };
       }
 
       case 'visit_recorded': {
         if (!customerId) return { ok: true, processed: false };
+        const eventTenant = await resolveEventTenant(db, rawEventTenant, orderId, customerId);
         const channel = (payload.channel as any) || 'in_store';
         const spent = typeof payload.spent === 'number' ? payload.spent : null;
-        const vRes = await recordVisit({ db, customerId, orderId, channel, spent, ...(eventTenant ? { tenantId: eventTenant } : {}) });
+        const vRes = await recordVisit({ db, customerId, orderId, channel, spent, tenantId: eventTenant });
         const ok = vRes ? vRes.ok !== false : true;
         return { ok, processed: ok, actionTaken: ok ? 'visit_materialized' : 'visit_failed' };
       }

@@ -67,12 +67,12 @@ export const BAND_POLICY_KV_KEY = 'crm:band_policy';
 
 export function getSegmentsKvKey(tenantId?: string): string {
   const clean = tenantId && tenantId.trim() ? tenantId.trim() : 'default';
-  return clean === 'default' || clean === '*' ? CUSTOM_SEGMENTS_KV_KEY : `${CUSTOM_SEGMENTS_KV_KEY}:${clean}`;
+  return clean === 'default' || clean === '*' || clean.toLowerCase() === 'hq' ? CUSTOM_SEGMENTS_KV_KEY : `${CUSTOM_SEGMENTS_KV_KEY}:${clean}`;
 }
 
 export function getBandPolicyKvKey(tenantId?: string): string {
   const clean = tenantId && tenantId.trim() ? tenantId.trim() : 'default';
-  return clean === 'default' || clean === '*' ? BAND_POLICY_KV_KEY : `${BAND_POLICY_KV_KEY}:${clean}`;
+  return clean === 'default' || clean === '*' || clean.toLowerCase() === 'hq' ? BAND_POLICY_KV_KEY : `${BAND_POLICY_KV_KEY}:${clean}`;
 }
 
 export const DEFAULT_SEGMENTS: SegmentDefinition[] = [
@@ -152,13 +152,14 @@ async function scanCustomers(db: D1Database, tenantId?: string): Promise<
   }>
 > {
   try {
-    const hasTenantFilter = Boolean(tenantId && tenantId !== '*');
+    const normTenant = typeof tenantId === 'string' && tenantId.trim() ? tenantId.trim() : tenantId;
+    const hasTenantFilter = Boolean(normTenant && normTenant !== '*' && String(normTenant).toLowerCase() !== 'hq');
     const whereClause = hasTenantFilter
       ? "WHERE COALESCE(NULLIF(c.tenant_id, ''), 'default') = ? OR COALESCE(NULLIF(TRIM(c.tenant_id), ''), 'default') = ?1"
       : '';
     try {
       const stmt = db.prepare(
-        `SELECT c.id, c.name, c.phone, c.loyalty_tier as tier, c.lifetime_points,
+        `SELECT c.id, c.name, c.phone, c.loyalty_tier as tier, c.lifetime_points, c.tenant_id,
                 MAX(o.created_at) as last_order_at,
                 MIN(o.created_at) as first_order_at,
                 COUNT(o.id) as order_count
@@ -166,12 +167,12 @@ async function scanCustomers(db: D1Database, tenantId?: string): Promise<
          LEFT JOIN orders o
            ON (o.customer_id = c.id OR (c.phone IS NOT NULL AND c.phone != '' AND o.customer_phone = c.phone))
           AND o.status != 'cancelled'
-          AND COALESCE(NULLIF(o.tenant_id, ''), 'default') = COALESCE(NULLIF(c.tenant_id, ''), 'default')
+          AND (COALESCE(NULLIF(o.tenant_id, ''), 'default') = COALESCE(NULLIF(c.tenant_id, ''), 'default') OR COALESCE(NULLIF(TRIM(o.tenant_id), ''), 'default') = COALESCE(NULLIF(TRIM(c.tenant_id), ''), 'default'))
          ${whereClause}
          GROUP BY c.id
          LIMIT 1000`,
       );
-      const bound = hasTenantFilter && typeof stmt.bind === 'function' ? stmt.bind(tenantId!) : stmt;
+      const bound = hasTenantFilter && typeof stmt.bind === 'function' ? stmt.bind(normTenant!) : stmt;
       const { results } = await bound.all<{
         id: string;
         name: string | null;
@@ -185,13 +186,13 @@ async function scanCustomers(db: D1Database, tenantId?: string): Promise<
       }>();
       const rows = results ?? [];
       return hasTenantFilter
-        ? rows.filter((r) => !('tenant_id' in r) || r.tenant_id === undefined || ((String(r.tenant_id ?? '').trim() || 'default') === tenantId))
+        ? rows.filter((r) => !('tenant_id' in r) || r.tenant_id === undefined || ((String(r.tenant_id ?? '').trim() || 'default') === normTenant))
         : rows;
     } catch {
       if (hasTenantFilter) {
         try {
           const stmt = db.prepare(
-            `SELECT c.id, c.name, c.phone, c.loyalty_tier as tier, c.lifetime_points,
+            `SELECT c.id, c.name, c.phone, c.loyalty_tier as tier, c.lifetime_points, c.tenant_id,
                     MAX(o.created_at) as last_order_at,
                     MIN(o.created_at) as first_order_at,
                     COUNT(o.id) as order_count
@@ -199,11 +200,12 @@ async function scanCustomers(db: D1Database, tenantId?: string): Promise<
              LEFT JOIN orders o
                ON (o.customer_id = c.id OR (c.phone IS NOT NULL AND TRIM(c.phone) != '' AND o.customer_phone = c.phone))
               AND o.status != 'cancelled'
+              AND COALESCE(NULLIF(TRIM(o.tenant_id), ''), 'default') = COALESCE(NULLIF(TRIM(c.tenant_id), ''), 'default')
              WHERE COALESCE(NULLIF(TRIM(c.tenant_id), ''), 'default') = ?
              GROUP BY c.id
              LIMIT 1000`,
           );
-          const bound = typeof stmt.bind === 'function' ? stmt.bind(tenantId!) : stmt;
+          const bound = typeof stmt.bind === 'function' ? stmt.bind(normTenant!) : stmt;
           const { results } = await bound.all<{
             id: string;
             name: string | null;
@@ -213,22 +215,55 @@ async function scanCustomers(db: D1Database, tenantId?: string): Promise<
             last_order_at: string | null;
             first_order_at?: string | null;
             order_count?: number;
+            tenant_id?: string | null;
           }>();
           return results ?? [];
         } catch {
-          if (tenantId !== 'default') {
-            return [];
+          try {
+            const stmt = db.prepare(
+              `SELECT c.id, c.name, c.phone, c.loyalty_tier as tier, c.lifetime_points, c.tenant_id,
+                      MAX(o.created_at) as last_order_at,
+                      MIN(o.created_at) as first_order_at,
+                      COUNT(o.id) as order_count
+               FROM customers c
+               LEFT JOIN orders o
+                 ON (o.customer_id = c.id OR (c.phone IS NOT NULL AND TRIM(c.phone) != '' AND o.customer_phone = c.phone))
+                AND o.status != 'cancelled'
+               WHERE COALESCE(NULLIF(TRIM(c.tenant_id), ''), 'default') = ?
+               GROUP BY c.id
+               LIMIT 1000`,
+            );
+            const bound = typeof stmt.bind === 'function' ? stmt.bind(normTenant!) : stmt;
+            const { results } = await bound.all<{
+              id: string;
+              name: string | null;
+              phone: string | null;
+              tier: string;
+              lifetime_points: number;
+              last_order_at: string | null;
+              first_order_at?: string | null;
+              order_count?: number;
+              tenant_id?: string | null;
+            }>();
+            return results ?? [];
+          } catch {
+            if (normTenant !== 'default') {
+              return [];
+            }
           }
         }
       }
       const { results } = await db
         .prepare(
-          `SELECT c.id, c.name, c.phone, c.loyalty_tier as tier, c.lifetime_points,
+          `SELECT c.id, c.name, c.phone, c.loyalty_tier as tier, c.lifetime_points, c.tenant_id,
                   MAX(o.created_at) as last_order_at,
                   MIN(o.created_at) as first_order_at,
                   COUNT(o.id) as order_count
            FROM customers c
-           LEFT JOIN orders o ON (o.customer_id = c.id OR (c.phone IS NOT NULL AND TRIM(c.phone) != '' AND o.customer_phone = c.phone)) AND o.status != 'cancelled'
+           LEFT JOIN orders o
+             ON (o.customer_id = c.id OR (c.phone IS NOT NULL AND TRIM(c.phone) != '' AND o.customer_phone = c.phone))
+            AND o.status != 'cancelled'
+            AND COALESCE(NULLIF(TRIM(o.tenant_id), ''), 'default') = COALESCE(NULLIF(TRIM(c.tenant_id), ''), 'default')
            GROUP BY c.id
            LIMIT 1000`,
         )
@@ -242,10 +277,34 @@ async function scanCustomers(db: D1Database, tenantId?: string): Promise<
           first_order_at?: string | null;
           order_count?: number;
           tenant_id?: string | null;
-        }>();
+        }>()
+        .catch(() =>
+          db
+            .prepare(
+              `SELECT c.id, c.name, c.phone, c.loyalty_tier as tier, c.lifetime_points,
+                      MAX(o.created_at) as last_order_at,
+                      MIN(o.created_at) as first_order_at,
+                      COUNT(o.id) as order_count
+               FROM customers c
+               LEFT JOIN orders o ON (o.customer_id = c.id OR (c.phone IS NOT NULL AND TRIM(c.phone) != '' AND o.customer_phone = c.phone)) AND o.status != 'cancelled'
+               GROUP BY c.id
+               LIMIT 1000`,
+            )
+            .all<{
+              id: string;
+              name: string | null;
+              phone: string | null;
+              tier: string;
+              lifetime_points: number;
+              last_order_at: string | null;
+              first_order_at?: string | null;
+              order_count?: number;
+              tenant_id?: string | null;
+            }>(),
+        );
       const rows = results ?? [];
       return hasTenantFilter
-        ? rows.filter((r) => !('tenant_id' in r) || r.tenant_id === undefined || ((String(r.tenant_id ?? '').trim() || 'default') === tenantId))
+        ? rows.filter((r) => !('tenant_id' in r) || r.tenant_id === undefined || ((String(r.tenant_id ?? '').trim() || 'default') === normTenant))
         : rows;
     }
   } catch (err) {
@@ -334,7 +393,7 @@ export async function buildSegment(
     };
   }
 
-  const policy = await resolveBandPolicy(kv);
+  const policy = await resolveBandPolicy(kv, options.tenantId);
   const all = await scanCustomers(db, options.tenantId);
   const matched: SegmentRow[] = [];
 
@@ -386,7 +445,7 @@ export async function listSegments(
   options: BuildOptions = {},
 ): Promise<Array<SegmentResult>> {
   const definitions = await loadSegmentDefinitions(kv, options.tenantId);
-  const policy = await resolveBandPolicy(kv);
+  const policy = await resolveBandPolicy(kv, options.tenantId);
   const all = await scanCustomers(db, options.tenantId);
   const sampleLimit = options.limit ?? 25;
 

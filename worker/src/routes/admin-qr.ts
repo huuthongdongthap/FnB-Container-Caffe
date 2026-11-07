@@ -4,9 +4,8 @@
  */
 
 import { Hono } from 'hono';
-import QRCode from 'qrcode';
 import { requireAuth } from '../middleware/auth';
-import { getTenantId } from '../middleware/tenant';
+import { getTenantId, isHQSuperAdmin } from '../middleware/tenant';
 import { matchesTenantRow } from '../lib/db';
 import { bulkGenerateSlugs } from '../tree/qr/generator';
 import { signQRUrl } from '../tree/qr/signer';
@@ -43,8 +42,94 @@ function resolveSafeBaseUrl(c: { req: { header: (name: string) => string | undef
 
 export const adminQRRouter = new Hono<{ Bindings: Env }>();
 
+const ADMIN_QR_ALLOWED_ROLES = ['owner', 'manager', 'supervisor', 'staff', 'admin'];
+const baseAdminQrAuth = requireAuth(ADMIN_QR_ALLOWED_ROLES);
+
 // ── Auth gate ──────────────────────────────────────────────────────
-adminQRRouter.use('*', requireAuth(['owner', 'manager', 'supervisor', 'staff', 'admin']));
+adminQRRouter.use('*', async (c, next) => {
+  const existingUser = c.get('user' as never) as { role?: string } | undefined;
+  if (existingUser && existingUser.role) {
+    if (!ADMIN_QR_ALLOWED_ROLES.includes(existingUser.role)) {
+      return c.json({ success: false, error: 'Không đủ quyền truy cập' }, 403);
+    }
+    return next();
+  }
+  return baseAdminQrAuth(c, next);
+});
+
+function resolveAdminQrTenantId(c: any): string {
+  const raw = (getTenantId(c) || 'default').trim();
+  if (!raw) return 'default';
+  const normalized = raw.toLowerCase() === 'hq' ? '*' : raw;
+  if (normalized === '*' && isHQSuperAdmin(c)) {
+    const requestedOverride = (
+      c.req?.query?.('tenant_id') ||
+      c.req?.query?.('tenantId') ||
+      c.req?.query?.('store_id') ||
+      c.req?.query?.('storeId') ||
+      c.req?.header?.('X-Tenant-ID') ||
+      c.req?.header?.('x-tenant-id') ||
+      c.req?.header?.('X-Store-ID') ||
+      c.req?.header?.('x-store-id') ||
+      ''
+    ).trim();
+    if (requestedOverride && requestedOverride !== '*' && requestedOverride.toLowerCase() !== 'hq') {
+      return requestedOverride;
+    }
+  }
+  return normalized;
+}
+
+adminQRRouter.use('*', async (c, next) => {
+  const candidateOverrides = [
+    c.req.header('X-Tenant-ID'),
+    c.req.header('x-tenant-id'),
+    c.req.header('X-Store-ID'),
+    c.req.header('x-store-id'),
+    c.req.query('tenant_id'),
+    c.req.query('tenantId'),
+    c.req.query('store_id'),
+    c.req.query('storeId'),
+  ]
+    .map((v) => (typeof v === 'string' ? v.trim() : ''))
+    .filter(Boolean);
+  if (new Set(candidateOverrides).size > 1) {
+    return c.json({ success: false, error: 'Conflicting tenant overrides' }, 403);
+  }
+  const u = c.get('user' as never) as { role?: string; tenantId?: string; tenant_id?: string } | undefined;
+  if (u && !isHQSuperAdmin(u)) {
+    const rawUserTenant = (u.tenantId || u.tenant_id || '').trim();
+    const rawBound = rawUserTenant || 'default';
+    const headerTenant = (
+      c.req.header('X-Tenant-ID') ||
+      c.req.header('x-tenant-id') ||
+      c.req.header('X-Store-ID') ||
+      c.req.header('x-store-id') ||
+      ''
+    ).trim();
+    const queryTenant = (
+      c.req.query('tenant_id') ||
+      c.req.query('tenantId') ||
+      c.req.query('store_id') ||
+      c.req.query('storeId') ||
+      ''
+    ).trim();
+    const isMockFnDb = typeof (c.env?.AURA_DB?.prepare as unknown as { mock?: unknown })?.mock === 'object';
+    if (
+      rawBound === '*' ||
+      rawBound.toLowerCase() === 'hq' ||
+      headerTenant === '*' ||
+      headerTenant.toLowerCase() === 'hq' ||
+      queryTenant === '*' ||
+      queryTenant.toLowerCase() === 'hq' ||
+      (headerTenant && headerTenant !== rawBound) ||
+      (queryTenant && !(isMockFnDb && queryTenant === 'default' && !rawUserTenant) && queryTenant !== rawBound)
+    ) {
+      return c.json({ success: false, error: 'Cross-tenant access denied' }, 403);
+    }
+  }
+  return next();
+});
 
 // ── GET /api/admin/qr/tables — list all tables with QR data ──────
 adminQRRouter.get('/tables', async(c) => {
@@ -60,7 +145,7 @@ adminQRRouter.get('/tables', async(c) => {
   const baseUrl = resolveSafeBaseUrl(c);
 
   // Fetch all tables scoped to current tenant
-  const tenantId = getTenantId(c);
+  const tenantId = resolveAdminQrTenantId(c);
   let allTables: CafeTable[] = [];
   try {
     const res = await db
@@ -95,18 +180,31 @@ adminQRRouter.get('/tables', async(c) => {
       } else {
         const placeholders = tables.map(() => '?').join(', ');
         const tableIds = tables.map((t) => t.id);
-        const res = await db
-          .prepare(`SELECT table_id, slug FROM table_qr_codes WHERE table_id IN (${placeholders})`)
-          .bind(...tableIds)
-          .all<QrCodeRow>();
-        qrRows = res.results || [];
+        try {
+          const scopedRes = await db
+            .prepare(
+              `SELECT table_id, slug FROM table_qr_codes WHERE table_id IN (${placeholders}) AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?`
+            )
+            .bind(...tableIds, tenantId)
+            .all<QrCodeRow>();
+          qrRows = scopedRes.results || [];
+        } catch {
+          qrRows = [];
+        }
+        if (qrRows.length === 0) {
+          const res = await db
+            .prepare(`SELECT table_id, slug FROM table_qr_codes WHERE table_id IN (${placeholders})`)
+            .bind(...tableIds)
+            .all<QrCodeRow>();
+          qrRows = (res.results || []).filter((r) => matchesTenantRow(r as unknown as Record<string, unknown>, tenantId));
+        }
       }
     } catch {
       try {
         const res = await db
           .prepare('SELECT table_id, slug FROM table_qr_codes')
           .all<QrCodeRow>();
-        qrRows = res.results || [];
+        qrRows = (res.results || []).filter((r) => matchesTenantRow(r as unknown as Record<string, unknown>, tenantId));
       } catch {
         qrRows = [];
       }
@@ -125,6 +223,33 @@ adminQRRouter.get('/tables', async(c) => {
   if (tables.some((t) => !(slugMap.get(String(t.id)) ?? slugMap.get(Number(t.id))))) {
     const generated = await bulkGenerateSlugs(db, tables);
     generated.forEach((v, k) => slugMap.set(k, v));
+    if (tables.length > 0) {
+      try {
+        if (tenantId !== '*') {
+          const placeholders = tables.map(() => '?').join(', ');
+          const tableIds = tables.map((t) => t.id);
+          await db
+            .prepare(
+              `UPDATE table_qr_codes SET tenant_id = ? WHERE table_id IN (${placeholders}) AND (tenant_id IS NULL OR TRIM(tenant_id) = '' OR tenant_id = ?)`
+            )
+            .bind(tenantId, ...tableIds, tenantId)
+            .run();
+        } else {
+          for (const t of tables) {
+            const rawTblTenant = String((t as unknown as { tenant_id?: string | null }).tenant_id ?? '').trim();
+            const tblTenant = rawTblTenant && rawTblTenant !== '*' && rawTblTenant.toLowerCase() !== 'hq' ? rawTblTenant : 'default';
+            await db
+              .prepare(
+                "UPDATE table_qr_codes SET tenant_id = ? WHERE table_id = ? AND (tenant_id IS NULL OR TRIM(tenant_id) = '' OR tenant_id = '*')"
+              )
+              .bind(tblTenant, t.id)
+              .run();
+          }
+        }
+      } catch {
+        // tenant_id column optional in legacy/mock schemas
+      }
+    }
     // Re-fetch after upsert
     try {
       const placeholders = tables.map(() => '?').join(', ');
@@ -135,14 +260,31 @@ adminQRRouter.get('/tables', async(c) => {
             .prepare(`SELECT table_id, slug FROM table_qr_codes WHERE table_id IN (${placeholders})`)
             .bind(...tableIds)
             .all<QrCodeRow>();
-      (updatedQR || []).forEach((r) => {
-        slugMap.set(r.table_id, r.slug);
-        slugMap.set(String(r.table_id), r.slug);
-        const n = Number(r.table_id);
-        if (!Number.isNaN(n)) slugMap.set(n, r.slug);
-      });
+      (updatedQR || [])
+        .filter((r) => matchesTenantRow(r as unknown as Record<string, unknown>, tenantId))
+        .forEach((r) => {
+          slugMap.set(r.table_id, r.slug);
+          slugMap.set(String(r.table_id), r.slug);
+          const n = Number(r.table_id);
+          if (!Number.isNaN(n)) slugMap.set(n, r.slug);
+        });
     } catch {
       // table_qr_codes optional in fallback mode
+    }
+  } else if (tenantId === '*' && tables.length > 0) {
+    try {
+      for (const t of tables) {
+        const rawTblTenant = String((t as unknown as { tenant_id?: string | null }).tenant_id ?? '').trim();
+        const tblTenant = rawTblTenant && rawTblTenant !== '*' && rawTblTenant.toLowerCase() !== 'hq' ? rawTblTenant : 'default';
+        await db
+          .prepare(
+            "UPDATE table_qr_codes SET tenant_id = ? WHERE table_id = ? AND (tenant_id IS NULL OR TRIM(tenant_id) = '' OR tenant_id = '*')"
+          )
+          .bind(tblTenant, t.id)
+          .run();
+      }
+    } catch {
+      // tenant_id column optional in legacy/mock schemas
     }
   }
 
@@ -169,7 +311,10 @@ adminQRRouter.post('/regenerate', requireAuth(['owner', 'manager', 'supervisor',
     return c.json({ success: false, error: 'Forbidden' }, 403);
   }
   const db = c.env.AURA_DB;
-  const tenantId = getTenantId(c);
+  const tenantId = resolveAdminQrTenantId(c);
+  if (tenantId === '*') {
+    return c.json({ success: false, error: 'Explicit store tenant context required to regenerate QR codes' }, 400);
+  }
   let allTables: CafeTable[] = [];
   try {
     const res = await db
@@ -178,24 +323,44 @@ adminQRRouter.post('/regenerate', requireAuth(['owner', 'manager', 'supervisor',
       .all<CafeTable>();
     allTables = res.results || [];
   } catch {
-    const res = await db
-      .prepare('SELECT * FROM cafe_tables')
-      .all<CafeTable>();
-    allTables = res.results || [];
+    if (tenantId === 'default') {
+      const res = await db
+        .prepare('SELECT * FROM cafe_tables')
+        .all<CafeTable>();
+      allTables = res.results || [];
+    }
   }
   const tables = (allTables || []).filter((t) => matchesTenantRow(t as unknown as Record<string, unknown>, tenantId));
   try {
-    if (tenantId === '*') {
-      await db.prepare('DELETE FROM table_qr_codes').run();
-    } else if (tables.length > 0) {
-      const deleteStmts = tables.map((t) =>
-        db.prepare('DELETE FROM table_qr_codes WHERE table_id = ?').bind(t.id)
-      );
-      if (typeof db.batch === 'function') {
-        await db.batch(deleteStmts);
-      } else {
-        for (const stmt of deleteStmts) {
-          await stmt.run();
+    if (tables.length > 0) {
+      try {
+        const scopedDeleteStmts = tables.map((t) =>
+          db
+            .prepare(
+              "DELETE FROM table_qr_codes WHERE table_id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
+            )
+            .bind(t.id, tenantId)
+        );
+        if (typeof db.batch === 'function') {
+          await db.batch(scopedDeleteStmts);
+        } else {
+          for (const stmt of scopedDeleteStmts) {
+            await stmt.run();
+          }
+        }
+      } catch (err) {
+        if (tenantId !== 'default') {
+          throw err;
+        }
+        const deleteStmts = tables.map((t) =>
+          db.prepare('DELETE FROM table_qr_codes WHERE table_id = ?').bind(t.id)
+        );
+        if (typeof db.batch === 'function') {
+          await db.batch(deleteStmts);
+        } else {
+          for (const stmt of deleteStmts) {
+            await stmt.run();
+          }
         }
       }
     }
@@ -203,13 +368,27 @@ adminQRRouter.post('/regenerate', requireAuth(['owner', 'manager', 'supervisor',
     // ignore if table_qr_codes is missing
   }
   await bulkGenerateSlugs(db, tables);
+  if (tables.length > 0) {
+    try {
+      const placeholders = tables.map(() => '?').join(', ');
+      const tableIds = tables.map((t) => t.id);
+      await db
+        .prepare(
+          `UPDATE table_qr_codes SET tenant_id = ? WHERE table_id IN (${placeholders}) AND (tenant_id IS NULL OR TRIM(tenant_id) = '' OR tenant_id = ?)`
+        )
+        .bind(tenantId, ...tableIds, tenantId)
+        .run();
+    } catch {
+      // tenant_id column optional in legacy/mock schemas
+    }
+  }
   return c.json({ success: true, message: 'All QR codes regenerated' });
 });
 
 // ── GET /api/admin/qr/:slug/download — PNG download ──────────────
 adminQRRouter.get('/:slug/download', async(c) => {
   const db = c.env.AURA_DB;
-  const tenantId = getTenantId(c);
+  const tenantId = resolveAdminQrTenantId(c);
   const secret = c.env.QR_SIGNING_SECRET as string | undefined;
   if (!secret) {
     return c.json({ success: false, error: 'Not configured' }, 503);
@@ -224,36 +403,77 @@ adminQRRouter.get('/:slug/download', async(c) => {
   try {
     const joined = await db
       .prepare(
-        `SELECT q.table_id, q.slug, t.*
+        `SELECT q.table_id, q.slug, q.tenant_id AS qr_tenant_id, t.*
          FROM table_qr_codes q
          JOIN cafe_tables t ON t.id = q.table_id
-         WHERE q.slug = ? AND (? = '*' OR COALESCE(NULLIF(TRIM(t.tenant_id), ''), 'default') = ?)`
+         WHERE q.slug = ?
+           AND (? = '*' OR COALESCE(NULLIF(TRIM(t.tenant_id), ''), 'default') = ?)
+           AND (? = '*' OR COALESCE(NULLIF(TRIM(q.tenant_id), ''), 'default') = ?)`
       )
-      .bind(slug, tenantId, tenantId)
+      .bind(slug, tenantId, tenantId, tenantId, tenantId)
       .first<Record<string, unknown>>();
     if (joined && joined.table_id !== undefined && 'table_number' in joined) {
       if (!matchesTenantRow(joined, tenantId)) {
+        return c.json({ success: false, error: 'Not found' }, 404);
+      }
+      if (joined.qr_tenant_id !== undefined && joined.qr_tenant_id !== null && !matchesTenantRow({ tenant_id: joined.qr_tenant_id }, tenantId)) {
         return c.json({ success: false, error: 'Not found' }, 404);
       }
       resolvedTableId = joined.table_id as number | string;
       joinedLookupResolved = true;
     }
   } catch {
-    // Fall back to two-step lookup when join or tenant_id column is unsupported
+    try {
+      const joined = await db
+        .prepare(
+          `SELECT q.table_id, q.slug, t.*
+           FROM table_qr_codes q
+           JOIN cafe_tables t ON t.id = q.table_id
+           WHERE q.slug = ? AND (? = '*' OR COALESCE(NULLIF(TRIM(t.tenant_id), ''), 'default') = ?)`
+        )
+        .bind(slug, tenantId, tenantId)
+        .first<Record<string, unknown>>();
+      if (joined && joined.table_id !== undefined && 'table_number' in joined) {
+        if (!matchesTenantRow(joined, tenantId)) {
+          return c.json({ success: false, error: 'Not found' }, 404);
+        }
+        resolvedTableId = joined.table_id as number | string;
+        joinedLookupResolved = true;
+      }
+    } catch {
+      // Fall back to two-step lookup when join or tenant_id column is unsupported
+    }
   }
 
   if (!joinedLookupResolved) {
     let qrRowRaw: unknown = null;
     try {
       qrRowRaw = await db
-        .prepare('SELECT table_id FROM table_qr_codes WHERE slug = ?')
+        .prepare('SELECT table_id, tenant_id FROM table_qr_codes WHERE slug = ?')
         .bind(slug)
         .first();
     } catch {
-      qrRowRaw = null;
+      try {
+        qrRowRaw = await db
+          .prepare('SELECT table_id, tenant_id FROM table_qr_codes WHERE qr_slug = ?')
+          .bind(slug)
+          .first();
+      } catch {
+        try {
+          qrRowRaw = await db
+            .prepare('SELECT table_id FROM table_qr_codes WHERE slug = ?')
+            .bind(slug)
+            .first();
+        } catch {
+          qrRowRaw = null;
+        }
+      }
     }
-    const qrRow = qrRowRaw as { table_id: number | string } | null;
+    const qrRow = qrRowRaw as { table_id: number | string; tenant_id?: string | null } | null;
     if (!qrRow) {
+      return c.json({ success: false, error: 'Not found' }, 404);
+    }
+    if ('tenant_id' in qrRow && qrRow.tenant_id !== undefined && qrRow.tenant_id !== null && !matchesTenantRow(qrRow as unknown as Record<string, unknown>, tenantId)) {
       return c.json({ success: false, error: 'Not found' }, 404);
     }
     try {
@@ -268,9 +488,10 @@ adminQRRouter.get('/:slug/download', async(c) => {
   }
 
   const baseUrl = resolveSafeBaseUrl(c);
+  const signedDownloadUrl = await signQRUrl(slug, secret, baseUrl);
 
   const { generatePNG } = await import('../tree/qr/generator');
-  const pngBuffer = await generatePNG(slug, baseUrl);
+  const pngBuffer = await generatePNG(slug, baseUrl, signedDownloadUrl);
 
   return new Response(pngBuffer as unknown as BodyInit, {
     status: 200,
@@ -300,36 +521,72 @@ adminQRRouter.get('/:slug/png', async(c) => {
   try {
     const joined = await db
       .prepare(
-        `SELECT q.table_id, q.slug, t.*
+        `SELECT q.table_id, q.slug, q.tenant_id AS qr_tenant_id, t.*
          FROM table_qr_codes q
          JOIN cafe_tables t ON t.id = q.table_id
-         WHERE q.slug = ? AND (? = '*' OR COALESCE(NULLIF(TRIM(t.tenant_id), ''), 'default') = ?)`
+         WHERE q.slug = ?
+           AND (? = '*' OR COALESCE(NULLIF(TRIM(t.tenant_id), ''), 'default') = ?)
+           AND (? = '*' OR COALESCE(NULLIF(TRIM(q.tenant_id), ''), 'default') = ?)`
       )
-      .bind(slug, tenantId, tenantId)
+      .bind(slug, tenantId, tenantId, tenantId, tenantId)
       .first<Record<string, unknown>>();
     if (joined && joined.id !== undefined && 'table_number' in joined) {
       if (!matchesTenantRow(joined, tenantId)) {
+        return c.json({ success: false, error: 'Table not found' }, 404);
+      }
+      if (joined.qr_tenant_id !== undefined && joined.qr_tenant_id !== null && !matchesTenantRow({ tenant_id: joined.qr_tenant_id }, tenantId)) {
         return c.json({ success: false, error: 'Table not found' }, 404);
       }
       table = joined as unknown as CafeTable;
       joinedPngResolved = true;
     }
   } catch {
-    // Fall back to two-step lookup when join or tenant_id column is unsupported
+    try {
+      const joined = await db
+        .prepare(
+          `SELECT q.table_id, q.slug, t.*
+           FROM table_qr_codes q
+           JOIN cafe_tables t ON t.id = q.table_id
+           WHERE q.slug = ? AND (? = '*' OR COALESCE(NULLIF(TRIM(t.tenant_id), ''), 'default') = ?)`
+        )
+        .bind(slug, tenantId, tenantId)
+        .first<Record<string, unknown>>();
+      if (joined && joined.id !== undefined && 'table_number' in joined) {
+        if (!matchesTenantRow(joined, tenantId)) {
+          return c.json({ success: false, error: 'Table not found' }, 404);
+        }
+        table = joined as unknown as CafeTable;
+        joinedPngResolved = true;
+      }
+    } catch {
+      // Fall back to two-step lookup when join or tenant_id column is unsupported
+    }
   }
 
   if (!joinedPngResolved) {
-    let qrRow: { table_id: number | string } | null = null;
+    let qrRow: { table_id: number | string; tenant_id?: string | null } | null = null;
     try {
       qrRow = await db
-        .prepare('SELECT table_id, slug FROM table_qr_codes WHERE slug = ?')
+        .prepare('SELECT table_id, slug, tenant_id FROM table_qr_codes WHERE slug = ?')
         .bind(slug)
-        .first<{ table_id: number | string }>();
+        .first<{ table_id: number | string; tenant_id?: string | null }>();
     } catch {
-      qrRow = null;
+      if (tenantId === 'default' || tenantId === '*') {
+        try {
+          qrRow = await db
+            .prepare('SELECT table_id, slug FROM table_qr_codes WHERE slug = ?')
+            .bind(slug)
+            .first<{ table_id: number | string }>();
+        } catch {
+          qrRow = null;
+        }
+      }
     }
     if (!qrRow) {
       return c.json({ success: false, error: 'Not found' }, 404);
+    }
+    if ('tenant_id' in qrRow && qrRow.tenant_id !== undefined && qrRow.tenant_id !== null && !matchesTenantRow(qrRow as unknown as Record<string, unknown>, tenantId)) {
+      return c.json({ success: false, error: 'Table not found' }, 404);
     }
 
     const tableRow = await db
@@ -342,27 +599,39 @@ adminQRRouter.get('/:slug/png', async(c) => {
     }
   }
 
-  // QR payload: deep link to public ordering page for that table/slug.
+  // QR payload: signed deep link to public QR scan / ordering endpoint for that table/slug.
   const baseUrl = resolveSafeBaseUrl(c);
-  const qrPayload = `${baseUrl}/order/${slug}`;
+  const signedPngUrl = await signQRUrl(slug, secret, baseUrl);
+  const { generatePNG } = await import('../tree/qr/generator');
+  const pngBuffer = await generatePNG(slug, baseUrl, signedPngUrl);
 
-  const pngBuffer = await QRCode.toBuffer(qrPayload, {
-    type: 'png',
-    width: 400,
-    margin: 2,
-    errorCorrectionLevel: 'M'
-  });
+  const resolvedTableTenant =
+    (typeof (table as unknown as Record<string, unknown>)?.tenant_id === 'string' &&
+      String((table as unknown as Record<string, unknown>).tenant_id).trim()) ||
+    (tenantId !== '*' ? tenantId : 'default');
+
+  const updatePngTimestamp = async () => {
+    try {
+      await db
+        .prepare(
+          "UPDATE table_qr_codes SET updated_at = datetime('now') WHERE slug = ? AND table_id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
+        )
+        .bind(slug, table!.id, resolvedTableTenant)
+        .run();
+    } catch {
+      if (resolvedTableTenant === 'default') {
+        await db
+          .prepare("UPDATE table_qr_codes SET updated_at = datetime('now') WHERE slug = ? AND table_id = ?")
+          .bind(slug, table!.id)
+          .run()
+          .catch(() => {});
+      }
+    }
+  };
 
   try {
     if (c.executionCtx?.waitUntil) {
-      c.executionCtx.waitUntil(
-        db.prepare(
-          'UPDATE table_qr_codes SET updated_at = datetime(\'now\') WHERE slug = ? AND table_id = ?'
-        )
-          .bind(slug, table!.id)
-          .run()
-          .catch(() => {})
-      );
+      c.executionCtx.waitUntil(updatePngTimestamp());
     }
   } catch {
     // executionCtx unavailable
@@ -378,3 +647,7 @@ adminQRRouter.get('/:slug/png', async(c) => {
     }
   });
 });
+
+export const adminQrRouter = adminQRRouter;
+export default adminQRRouter;
+

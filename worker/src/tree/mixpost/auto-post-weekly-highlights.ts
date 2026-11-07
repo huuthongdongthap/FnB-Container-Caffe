@@ -22,9 +22,29 @@ export async function autoPostWeeklyHighlights(env: Record<string, unknown>, ten
   const tenantId = (tenantOverride || resolvePilotStore(env as unknown as Parameters<typeof resolvePilotStore>[0])).trim() || 'default';
   const accounts = accountsStr.split(',').map(Number).filter(n => n > 0);
 
-  const { results } = await db.prepare(
-    'SELECT * FROM products WHERE is_available = 1 LIMIT 50'
-  ).all<ProductRow>();
+  let results: ProductRow[] | undefined;
+  let scopedOk = false;
+  if (tenantId !== '*') {
+    try {
+      const stmt = db.prepare(
+        "SELECT * FROM products WHERE is_available = 1 AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ? LIMIT 50"
+      );
+      const bound = typeof (stmt as unknown as { bind?: (...args: unknown[]) => typeof stmt }).bind === 'function'
+        ? stmt.bind(tenantId)
+        : stmt;
+      const res = await bound.all<ProductRow>();
+      results = res.results;
+      scopedOk = true;
+    } catch {
+      scopedOk = false;
+    }
+  }
+  if (!scopedOk) {
+    const res = await db.prepare(
+      'SELECT * FROM products WHERE is_available = 1 LIMIT 50'
+    ).all<ProductRow>();
+    results = res.results;
+  }
   const products = (results || []).filter((p) => matchesTenantRow(p as unknown as Record<string, unknown>, tenantId)).slice(0, 5);
   if (products.length === 0) {
     return { posted: 0 };

@@ -36,12 +36,62 @@ export async function detectWinbackCandidates(
             )
         `).bind(tenantId, tenantId, tenantId, cutoff, sixtyDaysAgo, tenantId).all<CampaignCustomer>();
         const filtered = (results || []).filter(
-          (row) => !('tenant_id' in row) || matchesTenantRow(row as unknown as Record<string, unknown>, tenantId)
+          (row) => matchesTenantRow(row as unknown as Record<string, unknown>, tenantId)
         );
         log.info('winback_candidates', { count: filtered.length, tenantId });
         return filtered;
       } catch {
-        // Fall through to default queries if tenant_id column is absent
+        try {
+          const { results } = await db.prepare(`
+            SELECT c.id, c.name, c.phone, c.email, c.loyalty_tier, c.tenant_id,
+              (SELECT MAX(o.created_at) FROM orders o WHERE o.customer_id = c.id AND COALESCE(NULLIF(TRIM(o.tenant_id), ''), 'default') = ?) as last_order_date
+            FROM customers c
+            WHERE c.phone IS NOT NULL
+              AND COALESCE(NULLIF(TRIM(c.tenant_id), ''), 'default') = ?
+              AND (
+                SELECT MAX(o.created_at) FROM orders o WHERE o.customer_id = c.id AND COALESCE(NULLIF(TRIM(o.tenant_id), ''), 'default') = ?
+              ) < ?
+              AND NOT EXISTS (
+                SELECT 1 FROM campaign_logs cl
+                WHERE cl.customer_id = c.id
+                  AND cl.trigger = 'winback'
+                  AND cl.sent_at > ?
+              )
+          `).bind(tenantId, tenantId, tenantId, cutoff, sixtyDaysAgo).all<CampaignCustomer>();
+          const filtered = (results || []).filter(
+            (row) => matchesTenantRow(row as unknown as Record<string, unknown>, tenantId)
+          );
+          log.info('winback_candidates', { count: filtered.length, tenantId });
+          return filtered;
+        } catch {
+          try {
+            const { results } = await db.prepare(`
+              SELECT c.id, c.name, c.phone, c.email, c.loyalty_tier, c.tenant_id,
+                (SELECT MAX(o.created_at) FROM orders o WHERE o.customer_id = c.id) as last_order_date
+              FROM customers c
+              WHERE c.phone IS NOT NULL
+                AND COALESCE(NULLIF(TRIM(c.tenant_id), ''), 'default') = ?
+                AND (
+                  SELECT MAX(o.created_at) FROM orders o WHERE o.customer_id = c.id
+                ) < ?
+                AND NOT EXISTS (
+                  SELECT 1 FROM campaign_logs cl
+                  WHERE cl.customer_id = c.id
+                    AND cl.trigger = 'winback'
+                    AND cl.sent_at > ?
+                )
+            `).bind(tenantId, cutoff, sixtyDaysAgo).all<CampaignCustomer>();
+            const filtered = (results || []).filter(
+              (row) => matchesTenantRow(row as unknown as Record<string, unknown>, tenantId)
+            );
+            log.info('winback_candidates', { count: filtered.length, tenantId });
+            return filtered;
+          } catch {
+            if (tenantId !== 'default') {
+              return [];
+            }
+          }
+        }
       }
     }
 
@@ -61,9 +111,9 @@ export async function detectWinbackCandidates(
         )
     `).bind(cutoff, sixtyDaysAgo).all<CampaignCustomer>();
 
-    const filtered = scoped && tenantId
-      ? (results || []).filter((row) => !('tenant_id' in row) || matchesTenantRow(row as unknown as Record<string, unknown>, tenantId))
-      : results;
+    const filtered = (results || []).filter(
+      (r) => !scoped || !tenantId || matchesTenantRow(r as unknown as Record<string, unknown>, tenantId)
+    );
     log.info('winback_candidates', { count: filtered.length });
     return filtered;
   } catch (err) {

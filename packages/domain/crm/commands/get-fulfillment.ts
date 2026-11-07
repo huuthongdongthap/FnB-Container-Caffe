@@ -85,6 +85,12 @@ export async function getFulfillment(
   kv?: KVNamespace,
   tenantId?: string,
 ): Promise<GetFulfillmentResult> {
+  const rawNormTenant = tenantId !== undefined ? (String(tenantId).trim() || 'default') : undefined;
+  const normTenant =
+    rawNormTenant && (rawNormTenant === '*' || rawNormTenant.toLowerCase() === 'hq')
+      ? '*'
+      : rawNormTenant;
+
   let row: OrderRow | null;
   try {
     row = await db
@@ -92,10 +98,12 @@ export async function getFulfillment(
       .bind(orderId)
       .first<OrderRow>()
       .catch(() =>
-        db
-          .prepare('SELECT id, status, order_type AS channel, customer_id, created_at FROM orders WHERE id = ?')
-          .bind(orderId)
-          .first<OrderRow>(),
+        !normTenant || normTenant === 'default'
+          ? db
+              .prepare('SELECT id, status, order_type AS channel, customer_id, created_at FROM orders WHERE id = ?')
+              .bind(orderId)
+              .first<OrderRow>()
+          : null,
       );
   } catch (e) {
     return { ok: false, code: 'd1_error', error: `failed to read order: ${(e as Error).message}` };
@@ -105,11 +113,10 @@ export async function getFulfillment(
     return { ok: false, code: 'not_found', error: `order not found: ${orderId}` };
   }
 
-  const normTenant = tenantId !== undefined ? (String(tenantId).trim() || 'default') : undefined;
   let resolvedOrderTenant: string | undefined;
   if ('tenant_id' in row && row.tenant_id !== undefined) {
     let rowTenant = (row.tenant_id && String(row.tenant_id).trim()) || '';
-    if (!rowTenant && row.customer_id && normTenant && normTenant !== '*') {
+    if (!rowTenant && row.customer_id) {
       const custRow = await db
         .prepare('SELECT tenant_id FROM customers WHERE id = ? LIMIT 1')
         .bind(row.customer_id)
@@ -132,23 +139,26 @@ export async function getFulfillment(
 
   const channel = (row.channel === 'delivery' ? 'delivery' : 'pickup') as FulfillmentChannel;
   const isSettled = FULFILLMENT_SETTLED_STATUSES.has(row.status);
-  const effectiveQueueTenant = normTenant && normTenant !== '*'
+  const effectiveOrderTenant = (normTenant && normTenant !== '*'
     ? normTenant
-    : resolvedOrderTenant;
+    : resolvedOrderTenant) || 'default';
+  const effectiveQueueTenant = effectiveOrderTenant;
 
   let queueDepth = 0;
   if (!isSettled) {
     try {
-      const q = await (effectiveQueueTenant && effectiveQueueTenant !== '*'
+      const q = await (effectiveOrderTenant && effectiveOrderTenant !== '*'
         ? db
             .prepare("SELECT COUNT(*) AS c FROM orders WHERE status = ? AND created_at < ? AND (COALESCE(NULLIF(tenant_id, ''), 'default') = ? OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?3)")
-            .bind('pending', row.created_at, effectiveQueueTenant)
+            .bind('pending', row.created_at, effectiveOrderTenant)
             .first<{ c: number }>()
             .catch(() =>
-              db
-                .prepare('SELECT COUNT(*) AS c FROM orders WHERE status = ? AND created_at < ?')
-                .bind('pending', row.created_at)
-                .first<{ c: number }>()
+              effectiveOrderTenant === 'default'
+                ? db
+                    .prepare('SELECT COUNT(*) AS c FROM orders WHERE status = ? AND created_at < ?')
+                    .bind('pending', row.created_at)
+                    .first<{ c: number }>()
+                : { c: 0 }
             )
         : db
             .prepare('SELECT COUNT(*) AS c FROM orders WHERE status = ? AND created_at < ?')
@@ -186,7 +196,8 @@ export async function getFulfillment(
 async function resolvePickupPoint(kv?: KVNamespace, tenantId?: string): Promise<PickupPoint> {
   if (!kv) return DEFAULT_PICKUP_POINT;
   try {
-    const normTenant = tenantId && tenantId.trim() && tenantId.trim() !== '*' ? tenantId.trim() : 'default';
+    const trimmed = tenantId ? tenantId.trim() : '';
+    const normTenant = trimmed && trimmed !== '*' && trimmed.toLowerCase() !== 'hq' ? trimmed : 'default';
     let raw = normTenant !== 'default' ? await kv.get(`fulfillment:pickup_point:${normTenant}`) : null;
     if (!raw) {
       raw = await kv.get('fulfillment:pickup_point');

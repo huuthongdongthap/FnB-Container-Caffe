@@ -18,6 +18,7 @@ import {
   listAllTemplates,
   listTemplates,
   listViolations,
+  SopAccessError,
   sopScope,
   type SopRun,
   type SopScope,
@@ -117,70 +118,97 @@ async function templateIdentities(scope: SopScope, runs: SopRun[]) {
 }
 
 export function registerSopAdminReadHandlers(app: OpenAPIHono<{ Bindings: Env }>, routes: typeof SopAdminRoutes) {
+  const handleError = (c: any, err: unknown) => {
+    if (err instanceof SopAccessError) {
+      return c.json({ success: false, error: err.message }, { status: err.status });
+    }
+    return c.json({ success: false, error: (err as Error)?.message || 'SOP operation failed' }, { status: 500 });
+  };
+
   app.openapi(routes.monitor as any, async (c: any) => {
-    const scope = sopScope(c.env, c.get('user'));
-    const now = new Date();
-    const date = businessDate(now);
-    // No staff filter: this is the store's view, so every member's run for the
-    // day is in scope. The repository still binds the tenant.
-    const runs = await listRunsForStaffDay(scope, '', date);
-    const templates = await templateIdentities(scope, runs);
-    const items = runs.map((run) => toMonitorItem(run, templates, now));
-    return c.json({
-      success: true,
-      data: {
-        date,
-        runs: items,
-        completedToday: items.filter((item) => item.status === 'completed').length,
-        inProgressToday: items.filter((item) => item.status === 'in_progress').length,
-        overdueToday: items.filter((item) => item.isOverdue).length,
-      },
-    });
+    try {
+      const scope = sopScope(c.env, c.get('user'), c);
+      const now = new Date();
+      const date = businessDate(now);
+      // No staff filter: this is the store's view, so every member's run for the
+      // day is in scope. The repository still binds the tenant.
+      const runs = await listRunsForStaffDay(scope, '', date);
+      const templates = await templateIdentities(scope, runs);
+      const items = runs.map((run) => toMonitorItem(run, templates, now));
+      return c.json({
+        success: true,
+        data: {
+          date,
+          runs: items,
+          completedToday: items.filter((item) => item.status === 'completed').length,
+          inProgressToday: items.filter((item) => item.status === 'in_progress').length,
+          overdueToday: items.filter((item) => item.isOverdue).length,
+        },
+      });
+    } catch (err) {
+      return handleError(c, err);
+    }
   });
 
   app.openapi(routes.runs as any, async (c: any) => {
-    const scope = sopScope(c.env, c.get('user'));
-    const query = c.req.valid('query');
-    const date = query.date ?? businessDate();
-    const rows = await listRunsForStaffDay(scope, query.staffId ?? '', date, query.templateId);
-    const runs = rows.filter(
-      (run) =>
-        (!query.status || run.status === query.status) &&
-        (!query.templateId || run.templateId === query.templateId)
-    );
-    const templates = await templateIdentities(scope, runs);
-    return c.json({
-      success: true,
-      data: {
-        runs: runs.map((run) => toRunSummary(run, templates.get(run.templateId) ?? null)),
-        meta: { page: 1, limit: runs.length, total: runs.length },
-      },
-    });
+    try {
+      const scope = sopScope(c.env, c.get('user'), c);
+      const query = c.req.valid('query');
+      const date = query.date ?? businessDate();
+      const rows = await listRunsForStaffDay(scope, query.staffId ?? '', date, query.templateId);
+      const runs = rows.filter(
+        (run) =>
+          (!query.status || run.status === query.status) &&
+          (!query.templateId || run.templateId === query.templateId)
+      );
+      const templates = await templateIdentities(scope, runs);
+      return c.json({
+        success: true,
+        data: {
+          runs: runs.map((run) => toRunSummary(run, templates.get(run.templateId) ?? null)),
+          meta: { page: 1, limit: runs.length, total: runs.length },
+        },
+      });
+    } catch (err) {
+      return handleError(c, err);
+    }
   });
 
   app.openapi(routes.templates as any, async (c: any) => {
-    const scope = sopScope(c.env, c.get('user'));
-    const templates = await listAllTemplates(scope);
-    return c.json({ success: true, data: templates });
+    try {
+      const scope = sopScope(c.env, c.get('user'), c);
+      const templates = await listAllTemplates(scope);
+      return c.json({ success: true, data: templates });
+    } catch (err) {
+      return handleError(c, err);
+    }
   });
 
   app.openapi(routes.runDetail as any, async (c: any) => {
-    const scope = sopScope(c.env, c.get('user'));
-    const run = await findRun(scope, c.req.valid('param').id);
-    if (!run) return c.json({ success: false, error: 'Không tìm thấy checklist run' }, { status: 404 });
-    const template = await findTemplate(scope, run.templateId);
-    if (!template) return c.json({ success: false, error: 'Không tìm thấy bản mẫu' }, { status: 404 });
-    return c.json({ success: true, data: { run, detail: toRunDetail(run, template) } });
+    try {
+      const scope = sopScope(c.env, c.get('user'), c);
+      const run = await findRun(scope, c.req.valid('param').id);
+      if (!run) return c.json({ success: false, error: 'Không tìm thấy checklist run' }, { status: 404 });
+      const template = await findTemplate(scope, run.templateId);
+      if (!template) return c.json({ success: false, error: 'Không tìm thấy bản mẫu' }, { status: 404 });
+      return c.json({ success: true, data: { run, detail: toRunDetail(run, template) } });
+    } catch (err) {
+      return handleError(c, err);
+    }
   });
 
   app.openapi(routes.violations as any, async (c: any) => {
-    const scope = sopScope(c.env, c.get('user'));
-    const query = c.req.valid('query');
-    const violations: SopViolation[] = await listViolations(scope, {
-      status: query.status,
-      month: query.month,
-      staffId: query.staffId,
-    });
-    return c.json({ success: true, data: { violations } });
+    try {
+      const scope = sopScope(c.env, c.get('user'), c);
+      const query = c.req.valid('query');
+      const violations: SopViolation[] = await listViolations(scope, {
+        status: query.status,
+        month: query.month,
+        staffId: query.staffId,
+      });
+      return c.json({ success: true, data: { violations } });
+    } catch (err) {
+      return handleError(c, err);
+    }
   });
 }

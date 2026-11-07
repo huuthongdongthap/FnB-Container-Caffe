@@ -3,11 +3,17 @@
 import type { Context } from 'hono';
 import type { Env } from '../../types/env';
 import type { PlanRecord } from './types';
-import { requireAdmin } from './middleware';
+import {
+  getSubscriptionTenantCandidates,
+  hasConflictingSubscriptionTenantOverride,
+  hasForbiddenCatalogTenantOverride,
+  requireAdmin,
+  requireVendor,
+} from './auth-helpers';
 import { generateId, nowStr } from './helpers';
 import { createPlanSchema, updatePlanSchema } from '../../lib/validators';
 import { getTenantId, matchesTenantRow } from '../../lib/db';
-import { resolvePublicTenantId } from '../../middleware/tenant';
+import { isHQSuperAdmin, resolvePublicTenantId } from '../../middleware/tenant';
 
 function parsePlanFeatures(raw: unknown): unknown[] {
   if (Array.isArray(raw)) {
@@ -24,25 +30,61 @@ function parsePlanFeatures(raw: unknown): unknown[] {
   }
 }
 
+function serializePlanFeatures(raw: unknown): string {
+  if (typeof raw === 'string') {
+    return JSON.stringify(parsePlanFeatures(raw));
+  }
+  if (Array.isArray(raw)) {
+    return JSON.stringify(raw);
+  }
+  return '[]';
+}
+
 function resolveCatalogTenantId(c: Context<{ Bindings: Env }>): string {
-  const hasAuthenticatedUser = typeof c.get === 'function' && Boolean(c.get('user' as never));
-  if (hasAuthenticatedUser) {
-    return getTenantId(c).trim() || 'default';
+  const user = typeof c.get === 'function'
+    ? (c.get('user' as never) as { role?: string; tenantId?: string; tenant_id?: string } | undefined)
+    : undefined;
+  if (user) {
+    if (isHQSuperAdmin(user)) {
+      const { allCandidates } = getSubscriptionTenantCandidates(c);
+      const target = allCandidates[0] || getTenantId(c).trim() || '*';
+      return target.toLowerCase() === 'hq' ? '*' : target;
+    }
+    const rawTenant = getTenantId(c).trim() || 'default';
+    return rawTenant === '*' || rawTenant.toLowerCase() === 'hq' ? 'default' : rawTenant;
   }
   return resolvePublicTenantId(c);
 }
 
 export async function listPlans(c: Context<{ Bindings: Env }>) {
+  if (hasConflictingSubscriptionTenantOverride(c)) {
+    return c.json({ success: false, error: 'Cross-tenant access denied' }, 403);
+  }
   const db = c.env.AURA_DB;
-  const tenantId = resolveCatalogTenantId(c);
   const wantsAll = c.req.query('all') === '1';
-  const includeInactive = wantsAll ? (await requireAdmin(c)) === null : false;
+  let includeInactive = false;
+  if (wantsAll) {
+    includeInactive = (await requireAdmin(c)) === null;
+  } else if (
+    !(typeof c.get === 'function' && c.get('user' as never)) &&
+    (c.req.header?.('Authorization') || c.req.header?.('authorization'))
+  ) {
+    try {
+      await requireVendor(c);
+    } catch {
+      // Best-effort auth population
+    }
+  }
+  if (hasForbiddenCatalogTenantOverride(c)) {
+    return c.json({ success: false, error: 'Cross-tenant access denied' }, 403);
+  }
+  const tenantId = resolveCatalogTenantId(c);
 
   let query = 'SELECT * FROM subscription_plans';
   if (!includeInactive) {
     query += ' WHERE is_active = 1';
   }
-  query += ' ORDER BY sort_order ASC, monthly_price_vnd ASC';
+  query += ' ORDER BY sort_order ASC, monthly_price_vnd ASC LIMIT 200';
 
   try {
     const plans = await db.prepare(query).all<PlanRecord>();
@@ -51,11 +93,15 @@ export async function listPlans(c: Context<{ Bindings: Env }>) {
       matchesTenantRow(p as unknown as Record<string, unknown>, tenantId)
     );
     const effectiveRows =
-      tenantRows.length > 0 || tenantId === 'default' || includeInactive
+      tenantRows.length > 0 || tenantId === 'default' || tenantId === '*' || includeInactive
         ? tenantRows
-        : allRows.filter((p) =>
-            matchesTenantRow(p as unknown as Record<string, unknown>, 'default')
-          );
+        : c.req.path === '/api/subscriptions/plans'
+          ? allRows.filter(
+              (p) =>
+                matchesTenantRow(p as unknown as Record<string, unknown>, 'default') &&
+                Boolean((p as unknown as Record<string, unknown>).container_size)
+            )
+          : [];
     const results = effectiveRows.map((p) => ({
       ...p,
       features: parsePlanFeatures(p.features),
@@ -67,7 +113,23 @@ export async function listPlans(c: Context<{ Bindings: Env }>) {
 }
 
 export async function getPlan(c: Context<{ Bindings: Env }>) {
+  if (hasConflictingSubscriptionTenantOverride(c)) {
+    return c.json({ success: false, error: 'Cross-tenant access denied' }, 403);
+  }
   const db = c.env.AURA_DB;
+  if (
+    !(typeof c.get === 'function' && c.get('user' as never)) &&
+    (c.req.header('Authorization') || c.req.header('authorization'))
+  ) {
+    try {
+      await requireVendor(c);
+    } catch {
+      // Handled when plan is inactive
+    }
+  }
+  if (hasForbiddenCatalogTenantOverride(c)) {
+    return c.json({ success: false, error: 'Cross-tenant access denied' }, 403);
+  }
   const tenantId = resolveCatalogTenantId(c);
   const plan = await db.prepare(
     'SELECT * FROM subscription_plans WHERE id = ?'
@@ -80,7 +142,7 @@ export async function getPlan(c: Context<{ Bindings: Env }>) {
   const isActive = Number(plan.is_active ?? 1) !== 0;
   const matchesTenant =
     matchesTenantRow(planRow, tenantId) ||
-    (isActive && matchesTenantRow(planRow, 'default'));
+    ((tenantId === 'default' || tenantId === '*') && isActive && matchesTenantRow(planRow, 'default'));
   if (!matchesTenant) {
     return c.json({ success: false, error: 'Plan not found' }, 404);
   }
@@ -102,14 +164,28 @@ export async function createPlan(c: Context<{ Bindings: Env }>) {
   const db = c.env.AURA_DB;
   const rawTenantId = getTenantId(c).trim();
   const tenantId = !rawTenantId || rawTenantId === '*' ? 'default' : rawTenantId;
-  const body = await c.req.json();
+  const body = await c.req.json().catch(() => null);
   const parsed = createPlanSchema.safeParse(body);
   if (!parsed.success) {
     return c.json({ success: false, error: parsed.error.issues[0].message }, 400);
   }
 
+  const data = parsed.data;
   const id = generateId('plan_');
   const nowIso = nowStr();
+  const slug =
+    typeof data.slug === 'string' && data.slug.trim()
+      ? data.slug.trim()
+      : data.name.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+  const description = data.description ?? '';
+  const containerSize = data.container_size || '20ft';
+  const monthlyPriceVnd = data.monthly_price_vnd ?? data.price ?? 0;
+  const depositVnd = data.deposit_vnd ?? 0;
+  const featuresJson = serializePlanFeatures(data.features);
+  const maxOccupants = data.max_occupants ?? 1;
+  const isPopular = data.is_popular ? 1 : 0;
+  const isActive = data.is_active !== undefined ? (data.is_active ? 1 : 0) : 1;
+  const sortOrder = data.sort_order ?? 0;
 
   try {
     await db.prepare(
@@ -117,23 +193,24 @@ export async function createPlan(c: Context<{ Bindings: Env }>) {
        monthly_price_vnd, deposit_vnd, features, max_occupants, is_popular, is_active, sort_order, tenant_id, created_at, updated_at)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     ).bind(
-      id, body.name, body.slug, body.description || '', body.container_size || '20ft',
-      body.monthly_price_vnd, body.deposit_vnd || 0, JSON.stringify(body.features || []),
-      body.max_occupants || 1, body.is_popular ? 1 : 0,
-      body.is_active !== undefined ? (body.is_active ? 1 : 0) : 1,
-      body.sort_order || 0, tenantId, nowIso, nowIso
+      id, data.name, slug, description, containerSize,
+      monthlyPriceVnd, depositVnd, featuresJson,
+      maxOccupants, isPopular, isActive,
+      sortOrder, tenantId, nowIso, nowIso
     ).run();
-  } catch {
+  } catch (err) {
+    if (tenantId !== 'default') {
+      return c.json({ success: false, error: 'Tenant-scoped plan creation failed', detail: (err as Error).message }, 500);
+    }
     await db.prepare(
       `INSERT INTO subscription_plans (id, name, slug, description, container_size,
        monthly_price_vnd, deposit_vnd, features, max_occupants, is_popular, is_active, sort_order, created_at, updated_at)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     ).bind(
-      id, body.name, body.slug, body.description || '', body.container_size || '20ft',
-      body.monthly_price_vnd, body.deposit_vnd || 0, JSON.stringify(body.features || []),
-      body.max_occupants || 1, body.is_popular ? 1 : 0,
-      body.is_active !== undefined ? (body.is_active ? 1 : 0) : 1,
-      body.sort_order || 0, nowIso, nowIso
+      id, data.name, slug, description, containerSize,
+      monthlyPriceVnd, depositVnd, featuresJson,
+      maxOccupants, isPopular, isActive,
+      sortOrder, nowIso, nowIso
     ).run();
   }
 
@@ -149,7 +226,7 @@ export async function updatePlan(c: Context<{ Bindings: Env }>) {
 
   const db = c.env.AURA_DB;
   const tenantId = getTenantId(c).trim() || 'default';
-  const body = await c.req.json();
+  const body = await c.req.json().catch(() => null);
   const parsed = updatePlanSchema.safeParse(body);
   if (!parsed.success) {
     return c.json({ success: false, error: parsed.error.issues[0].message }, 400);
@@ -161,7 +238,12 @@ export async function updatePlan(c: Context<{ Bindings: Env }>) {
     return c.json({ success: false, error: 'Plan not found' }, 404);
   }
 
-  const nextFeatures = JSON.stringify(body.features ?? parsePlanFeatures(existing.features));
+  const data = parsed.data;
+  const nextFeatures =
+    data.features !== undefined
+      ? serializePlanFeatures(data.features)
+      : JSON.stringify(parsePlanFeatures(existing.features));
+  const nextMonthlyPrice = data.monthly_price_vnd ?? data.price ?? existing.monthly_price_vnd;
   const updatedAt = nowStr();
   try {
     await db.prepare(
@@ -169,29 +251,32 @@ export async function updatePlan(c: Context<{ Bindings: Env }>) {
        monthly_price_vnd=?, deposit_vnd=?, features=?, max_occupants=?, is_popular=?, is_active=?, sort_order=?, updated_at=?
        WHERE id = ? AND (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?)`
     ).bind(
-      body.name ?? existing.name, body.slug ?? existing.slug, body.description ?? existing.description,
-      body.container_size ?? existing.container_size, body.monthly_price_vnd ?? existing.monthly_price_vnd,
-      body.deposit_vnd ?? existing.deposit_vnd,
+      data.name ?? existing.name, data.slug ?? existing.slug, data.description ?? existing.description,
+      data.container_size ?? existing.container_size, nextMonthlyPrice,
+      data.deposit_vnd ?? existing.deposit_vnd,
       nextFeatures,
-      body.max_occupants ?? existing.max_occupants,
-      body.is_popular !== undefined ? (body.is_popular ? 1 : 0) : existing.is_popular,
-      body.is_active !== undefined ? (body.is_active ? 1 : 0) : existing.is_active,
-      body.sort_order ?? existing.sort_order, updatedAt, id, tenantId, tenantId
+      data.max_occupants ?? existing.max_occupants,
+      data.is_popular !== undefined ? (data.is_popular ? 1 : 0) : existing.is_popular,
+      data.is_active !== undefined ? (data.is_active ? 1 : 0) : existing.is_active,
+      data.sort_order ?? existing.sort_order, updatedAt, id, tenantId, tenantId
     ).run();
-  } catch {
+  } catch (err) {
+    if (tenantId !== 'default' && tenantId !== '*') {
+      return c.json({ success: false, error: 'Tenant-scoped plan update failed', detail: (err as Error).message }, 500);
+    }
     await db.prepare(
       `UPDATE subscription_plans SET name=?, slug=?, description=?, container_size=?,
        monthly_price_vnd=?, deposit_vnd=?, features=?, max_occupants=?, is_popular=?, is_active=?, sort_order=?, updated_at=?
        WHERE id = ?`
     ).bind(
-      body.name ?? existing.name, body.slug ?? existing.slug, body.description ?? existing.description,
-      body.container_size ?? existing.container_size, body.monthly_price_vnd ?? existing.monthly_price_vnd,
-      body.deposit_vnd ?? existing.deposit_vnd,
+      data.name ?? existing.name, data.slug ?? existing.slug, data.description ?? existing.description,
+      data.container_size ?? existing.container_size, nextMonthlyPrice,
+      data.deposit_vnd ?? existing.deposit_vnd,
       nextFeatures,
-      body.max_occupants ?? existing.max_occupants,
-      body.is_popular !== undefined ? (body.is_popular ? 1 : 0) : existing.is_popular,
-      body.is_active !== undefined ? (body.is_active ? 1 : 0) : existing.is_active,
-      body.sort_order ?? existing.sort_order, updatedAt, id
+      data.max_occupants ?? existing.max_occupants,
+      data.is_popular !== undefined ? (data.is_popular ? 1 : 0) : existing.is_popular,
+      data.is_active !== undefined ? (data.is_active ? 1 : 0) : existing.is_active,
+      data.sort_order ?? existing.sort_order, updatedAt, id
     ).run();
   }
 

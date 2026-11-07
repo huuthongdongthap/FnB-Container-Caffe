@@ -90,39 +90,99 @@ function parseTags(tags: string | string[] | null | undefined): string[] {
 async function attachProductModifiers(
   db: D1Database,
   items: CustomerMenuItem[],
+  effectiveTenant = 'default',
+  productTenantMap?: Map<string, string>,
 ): Promise<void> {
   const productIds = items.map((item) => item.id);
   if (productIds.length === 0) return;
 
+  const resolveRowTargetTenant = (productId: string): string => {
+    if (effectiveTenant === '*' && productTenantMap?.has(productId)) {
+      return productTenantMap.get(productId) || 'default';
+    }
+    return effectiveTenant;
+  };
+
   const placeholders = productIds.map(() => '?').join(',');
   try {
-    let modRes: { results?: Array<{ product_id: string } & CustomerMenuItemModifier> };
+    let modRes: { results?: Array<{ product_id: string; tenant_id?: string | null } & CustomerMenuItemModifier> };
     try {
       modRes = await db.prepare(
-        `SELECT pm.product_id, mm.id, mm.group_id, mm.option_name, mm.price_delta
+        `SELECT pm.product_id, mm.id, mm.group_id, mm.option_name, mm.price_delta, mm.tenant_id
            FROM product_modifier_groups pm
            JOIN menu_modifiers mm ON mm.group_id = pm.group_id
           WHERE pm.product_id IN (${placeholders}) AND mm.available = 1
           ORDER BY mm.option_name`
-      ).bind(...productIds).all<{ product_id: string } & CustomerMenuItemModifier>();
+      ).bind(...productIds).all<{ product_id: string; tenant_id?: string | null } & CustomerMenuItemModifier>();
     } catch {
-      modRes = await db.prepare(
-        `SELECT pm.product_id, mm.id, mm.group_id, mm.name AS option_name, mm.price_adjustment AS price_delta
-           FROM product_modifier_groups pm
-           JOIN menu_modifiers mm ON mm.group_id = pm.group_id
-          WHERE pm.product_id IN (${placeholders}) AND mm.available = 1
-          ORDER BY mm.name`
-      ).bind(...productIds).all<{ product_id: string } & CustomerMenuItemModifier>();
+      try {
+        modRes = await db.prepare(
+          `SELECT pm.product_id, mm.id, mm.group_id, mm.option_name, mm.price_delta
+             FROM product_modifier_groups pm
+             JOIN menu_modifiers mm ON mm.group_id = pm.group_id
+            WHERE pm.product_id IN (${placeholders}) AND mm.available = 1
+            ORDER BY mm.option_name`
+        ).bind(...productIds).all<{ product_id: string; tenant_id?: string | null } & CustomerMenuItemModifier>();
+      } catch {
+        modRes = await db.prepare(
+          `SELECT pm.product_id, mm.id, mm.group_id, mm.name AS option_name, mm.price_adjustment AS price_delta
+             FROM product_modifier_groups pm
+             JOIN menu_modifiers mm ON mm.group_id = pm.group_id
+            WHERE pm.product_id IN (${placeholders}) AND mm.available = 1
+            ORDER BY mm.name`
+        ).bind(...productIds).all<{ product_id: string; tenant_id?: string | null } & CustomerMenuItemModifier>();
+      }
+    }
+
+    const rawRows = (modRes.results ?? modRes ?? []) as Array<{ product_id: string; tenant_id?: string | null } & CustomerMenuItemModifier>;
+    let filteredRows = rawRows.filter((row) =>
+      matchesTenantRow(row as unknown as Record<string, unknown>, resolveRowTargetTenant(row.product_id))
+    );
+    const groupIds = Array.from(new Set(rawRows.map((r) => r.group_id).filter(Boolean)));
+    if (groupIds.length > 0) {
+      try {
+        const groupPlaceholders = groupIds.map(() => '?').join(',');
+        const groupRes = await db
+          .prepare(`SELECT * FROM modifier_groups WHERE id IN (${groupPlaceholders})`)
+          .bind(...groupIds)
+          .all<Record<string, unknown>>();
+        const groupRows = (groupRes?.results ?? groupRes ?? []) as Array<Record<string, unknown>>;
+        if (groupRows.length > 0) {
+          const groupById = new Map<string, Record<string, unknown>>();
+          for (const g of groupRows) {
+            if (g && typeof g.id === 'string') {
+              groupById.set(g.id, g);
+            }
+          }
+          filteredRows = rawRows.filter((row) => {
+            const rowTargetTenant = resolveRowTargetTenant(row.product_id);
+            if (!matchesTenantRow(row as unknown as Record<string, unknown>, rowTargetTenant)) {
+              return false;
+            }
+            const g = groupById.get(row.group_id);
+            if (!g) {
+              return rowTargetTenant === 'default' || rowTargetTenant === '*';
+            }
+            const isActive = g.is_active ?? g.active;
+            if (isActive === 0 || isActive === false) {
+              return false;
+            }
+            return matchesTenantRow(g, rowTargetTenant);
+          });
+        }
+      } catch {
+        // Fallback when modifier_groups table is absent in minimal mocks
+      }
     }
 
     const byProduct = new Map<string, CustomerMenuItemModifier[]>();
-    for (const row of (modRes.results ?? modRes ?? []) as Array<{ product_id: string } & CustomerMenuItemModifier>) {
+    for (const row of filteredRows) {
       const list = byProduct.get(row.product_id) ?? [];
       list.push({
         id: row.id,
         group_id: row.group_id,
         option_name: row.option_name,
-        price_delta: row.price_delta,
+        price_delta: Math.max(0, Math.round(Number(row.price_delta) || 0)),
       });
       byProduct.set(row.product_id, list);
     }
@@ -140,7 +200,8 @@ export async function getCustomerMenu(
   opts: CustomerMenuOptions = {},
 ): Promise<CustomerMenu> {
   const includeUnavailable = opts.includeUnavailable ?? false;
-  const effectiveTenant = (opts.tenantId && opts.tenantId.trim()) || 'default';
+  const rawTenant = (opts.tenantId && opts.tenantId.trim()) || 'default';
+  const effectiveTenant = rawTenant === '*' || rawTenant.toLowerCase() === 'hq' ? '*' : rawTenant;
 
   try {
     let query = `SELECT *, id, name, description, price, category, image_url, tags, available
@@ -160,8 +221,8 @@ export async function getCustomerMenu(
     let primaryErr: unknown = null;
     try {
       const res = await db.prepare(query).bind(...params).all<RawMenuRow>();
-      results = (res.results ?? []).filter((item) =>
-        matchesTenantRow(item as unknown as Record<string, unknown>, effectiveTenant)
+      results = (res.results ?? []).filter((row) =>
+        matchesTenantRow(row as unknown as Record<string, unknown>, effectiveTenant)
       );
     } catch (err) {
       primaryErr = err;
@@ -180,8 +241,8 @@ export async function getCustomerMenu(
         }
         prodQuery += ' ORDER BY category_id ASC, name ASC';
         const prodRes = await db.prepare(prodQuery).bind(...prodParams).all<RawMenuRow>();
-        results = (prodRes.results ?? []).filter((item) =>
-          matchesTenantRow(item as unknown as Record<string, unknown>, effectiveTenant)
+        results = (prodRes.results ?? []).filter((row) =>
+          matchesTenantRow(row as unknown as Record<string, unknown>, effectiveTenant)
         );
         primaryErr = null;
       } catch {
@@ -202,16 +263,28 @@ export async function getCustomerMenu(
       }
     }
 
+    const productTenantMap = new Map<string, string>();
     const items: CustomerMenuItem[] = (results ?? [])
       .filter((item) => matchesTenantRow(item as unknown as Record<string, unknown>, effectiveTenant))
       .map((item: RawMenuRow) => {
+      const rawItemTenant = typeof item.tenant_id === 'string' ? item.tenant_id.trim() : '';
+      const itemConcreteTenant =
+        rawItemTenant && rawItemTenant !== '*' && rawItemTenant.toLowerCase() !== 'hq'
+          ? rawItemTenant
+          : (effectiveTenant === '*' ? 'default' : effectiveTenant);
+      productTenantMap.set(item.id, itemConcreteTenant);
+
       const basePrice = typeof item.price === 'string' ? parseInt(item.price, 10) : item.price;
+      const itemHappyHourWindows =
+        effectiveTenant === '*'
+          ? happyHourWindows.filter((w) => matchesTenantRow(w as unknown as Record<string, unknown>, itemConcreteTenant))
+          : happyHourWindows;
       const priceCents = hasPricingOverrides
         ? resolveItemPrice({
             basePriceCents: basePrice,
             channel: opts.channel || 'dine_in',
             modifierChoices: [],
-            happyHourWindows,
+            happyHourWindows: itemHappyHourWindows,
             now: opts.now || new Date(),
             channelDeltas: opts.channelDeltas,
             productId: item.id,
@@ -232,7 +305,7 @@ export async function getCustomerMenu(
       };
     });
 
-    await attachProductModifiers(db, items);
+    await attachProductModifiers(db, items, effectiveTenant, productTenantMap);
 
     const categoryMap = new Map<string, CustomerMenuItem[]>();
     for (const item of items) {
@@ -258,7 +331,8 @@ export async function getCustomerMenuItem(
   opts: CustomerMenuOptions | string = {},
 ): Promise<CustomerMenuItem | null> {
   const resolvedOpts: CustomerMenuOptions = typeof opts === 'string' ? { tenantId: opts } : opts;
-  const effectiveTenant = (resolvedOpts.tenantId && resolvedOpts.tenantId.trim()) || 'default';
+  const rawTenant = (resolvedOpts.tenantId && resolvedOpts.tenantId.trim()) || 'default';
+  const effectiveTenant = rawTenant === '*' || rawTenant.toLowerCase() === 'hq' ? '*' : rawTenant;
   try {
     let results: RawMenuRow[] | undefined;
     let primaryErr: unknown = null;
@@ -296,6 +370,14 @@ export async function getCustomerMenuItem(
       return null;
     }
     const raw = matchedResults[0];
+    const rawRec = raw as unknown as Record<string, unknown>;
+    const isUnavailable =
+      raw.available === 0 ||
+      raw.available === false ||
+      (raw.available === undefined && (rawRec.is_available === 0 || rawRec.is_available === false));
+    if (!resolvedOpts.includeUnavailable && isUnavailable) {
+      return null;
+    }
     const basePrice = typeof raw.price === 'string' ? parseInt(raw.price, 10) : raw.price;
 
     const hasPricingOverrides = Boolean(resolvedOpts.channel || resolvedOpts.now || resolvedOpts.channelDeltas);
@@ -335,7 +417,13 @@ export async function getCustomerMenuItem(
       available: toAvailabilityFlag(raw.available),
       modifierChoices: [],
     };
-    await attachProductModifiers(db, [item]);
+    const rawItemTenant = typeof raw.tenant_id === 'string' ? raw.tenant_id.trim() : '';
+    const itemConcreteTenant =
+      rawItemTenant && rawItemTenant !== '*' && rawItemTenant.toLowerCase() !== 'hq'
+        ? rawItemTenant
+        : (effectiveTenant === '*' ? 'default' : effectiveTenant);
+    const singleMap = new Map<string, string>([[item.id, itemConcreteTenant]]);
+    await attachProductModifiers(db, [item], effectiveTenant, singleMap);
     return item;
   } catch (err) {
     log.error('customer_menu_item_read_failed', { id, error: String(err) });

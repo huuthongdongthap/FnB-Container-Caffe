@@ -19,7 +19,7 @@ reportsRouter.use('*', async (c, next) => {
         c.res = c.json({ success: false, error: 'Không đủ quyền truy cập' }, 403);
         return;
       }
-      if (!role && (c.req.header('Authorization') || c.env?.ENVIRONMENT === 'production')) {
+      if (!role && (c.req.header('Authorization') || c.req.header('authorization') || c.env?.ENVIRONMENT === 'production')) {
         c.res = c.json({ success: false, error: 'Authentication required' }, 401);
         return;
       }
@@ -31,7 +31,7 @@ reportsRouter.use('*', async (c, next) => {
   if (role && !REPORT_ALLOWED_ROLES.has(role)) {
     return c.json({ success: false, error: 'Không đủ quyền truy cập' }, 403);
   }
-  if (!role && (c.req.header('Authorization') || c.env?.ENVIRONMENT === 'production')) {
+  if (!role && (c.req.header('Authorization') || c.req.header('authorization') || c.env?.ENVIRONMENT === 'production')) {
     return c.json({ success: false, error: 'Authentication required' }, 401);
   }
   await next();

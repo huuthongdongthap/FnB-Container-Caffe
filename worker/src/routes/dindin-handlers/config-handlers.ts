@@ -4,6 +4,7 @@ import { getTenantId } from '../../lib/db';
 import {
   err,
   errorResponse,
+  hasCrossTenantDindinOverride as hasCrossTenantConfigOverride,
   readConfigRaw,
   writeConfig,
   type DindinContext,
@@ -12,6 +13,9 @@ import {
 export function registerConfigHandlers(router: Hono<{ Bindings: Env }>): void {
   // ── GET /config ──────────────────────────────────────────────────────────────
   router.get('/config', async (c) => {
+    if (hasCrossTenantConfigOverride(c as unknown as Parameters<typeof hasCrossTenantConfigOverride>[0])) {
+      return c.json({ success: false, error: 'Cross-tenant access denied' }, 403);
+    }
     try {
       const tenantId = getTenantId(c as unknown as Parameters<typeof getTenantId>[0]);
       const row = await readConfigRaw(c.env, tenantId);
@@ -41,9 +45,13 @@ export function registerConfigHandlers(router: Hono<{ Bindings: Env }>): void {
 
   // ── PUT /config ──────────────────────────────────────────────────────────────
   router.put('/config', async (c) => {
-    const user = c.get?.('user' as never) as { role?: string } | undefined;
-    if (user?.role && !['owner', 'admin', 'manager', 'supervisor'].includes(user.role)) {
+    const user = c.get?.('user' as never) as { id?: string; role?: string; tenantId?: string; tenant_id?: string } | undefined;
+    const hasConfiguredJwt = typeof c.env?.JWT_SECRET === 'string' && c.env.JWT_SECRET.trim().length >= 16;
+    if ((user && (!user.role || !['owner', 'admin', 'manager', 'supervisor'].includes(user.role))) || (!user && hasConfiguredJwt)) {
       return c.json({ success: false, error: 'Insufficient permissions' }, 403);
+    }
+    if (hasCrossTenantConfigOverride(c as unknown as Parameters<typeof hasCrossTenantConfigOverride>[0])) {
+      return c.json({ success: false, error: 'Cross-tenant access denied' }, 403);
     }
     try {
       const tenantId = getTenantId(c as unknown as Parameters<typeof getTenantId>[0]);

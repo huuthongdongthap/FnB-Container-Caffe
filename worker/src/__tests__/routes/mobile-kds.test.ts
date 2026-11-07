@@ -66,7 +66,7 @@ function makeCtx(
     json: async () => body ?? {},
     query: (_n: string) => '',
     param: (_n: string) => '',
-    header: (_n: string) => 'curl/7.68',
+    header: (name: string) => (name.toLowerCase() === 'user-agent' ? 'curl/7.68' : undefined),
   };
 
   const env: any = { AURA_DB: db, JWT_SECRET: TEST_JWT_SECRET };
@@ -76,7 +76,7 @@ function makeCtx(
   return {
     req,
     env,
-    get: (key: string) => (key === 'user' ? { id: userId, email: `${userId}@t.co`, name: 'T', role } : undefined),
+    get: (key: string) => (key === 'user' ? { id: userId, email: `${userId}@t.co`, name: 'T', role, tenantId: 'default' } : undefined),
     set: vi.fn(),
     json: jsonFn,
   };

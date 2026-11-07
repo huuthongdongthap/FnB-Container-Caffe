@@ -14,12 +14,24 @@ export async function getAdminOrders(request: Request, env: Record<string, unkno
     const url = new URL(request.url);
     const status = url.searchParams.get('status');
     const paymentStatus = url.searchParams.get('payment_status');
+    const search = (url.searchParams.get('search') || '').trim();
     const queryTenant = url.searchParams.get('tenant_id');
-    const cleanTenant = tenantId ? tenantId.trim() : '';
+    const effectiveTenantId = typeof tenantId === 'string' && tenantId.trim() ? tenantId.trim() : 'default';
     const cleanQueryTenant = queryTenant ? queryTenant.trim() : '';
-    const resolvedTenant = (cleanTenant === '*' ? (cleanQueryTenant || '*') : cleanTenant) || (cleanQueryTenant || undefined);
-    const limit = url.searchParams.get('limit') || '50';
-    const offset = url.searchParams.get('offset') || '0';
+    const resolvedTenant =
+      effectiveTenantId === '*' || effectiveTenantId === 'hq'
+        ? (cleanQueryTenant && cleanQueryTenant !== 'hq' ? cleanQueryTenant : '*')
+        : effectiveTenantId;
+    const rawLimit = parseInt(url.searchParams.get('limit') || url.searchParams.get('pageSize') || '50', 10);
+    const clampedLimit = Number.isFinite(rawLimit) ? Math.min(200, Math.max(1, Math.floor(rawLimit))) : 50;
+    const rawPage = parseInt(url.searchParams.get('page') || '', 10);
+    const hasExplicitOffset = url.searchParams.has('offset');
+    const computedOffset = hasExplicitOffset
+      ? parseInt(url.searchParams.get('offset') || '0', 10)
+      : Number.isFinite(rawPage) && rawPage > 1
+        ? (Math.floor(rawPage) - 1) * clampedLimit
+        : 0;
+    const clampedOffset = Number.isFinite(computedOffset) ? Math.max(0, Math.floor(computedOffset)) : 0;
     const sortParam = (url.searchParams.get('sort') || 'created_at') as OrderSortColumn;
     const order = url.searchParams.get('order') === 'asc' ? 'ASC' as const : 'DESC' as const;
 
@@ -32,13 +44,29 @@ export async function getAdminOrders(request: Request, env: Record<string, unkno
     let query = `SELECT o.id, o.table_id, o.status, o.total, o.payment_status, o.customer_name, o.customer_phone, o.created_at,
        o.items, o.shipping_fee, o.discount,
        p.id AS payment_id, p.refund_status, p.refund_amount, p.amount AS payment_amount, p.method AS payment_method
-     FROM orders o LEFT JOIN payments p ON o.id = p.order_id AND p.status IN ('paid', 'completed') WHERE 1=1`;
-    const { clause, params } = buildOrderFilterClause({ tenantId: resolvedTenant, filters });
+     FROM orders o
+     LEFT JOIN payments p ON p.id = (
+       SELECT p2.id FROM payments p2
+       WHERE p2.order_id = o.id
+         AND p2.status IN ('paid', 'completed')
+         AND COALESCE(NULLIF(TRIM(p2.tenant_id), ''), 'default') = COALESCE(NULLIF(TRIM(o.tenant_id), ''), 'default')
+       ORDER BY p2.created_at DESC, p2.rowid DESC
+       LIMIT 1
+     )
+     WHERE 1=1`;
+    const { clause: baseClause, params: baseParams } = buildOrderFilterClause({ tenantId: resolvedTenant, filters });
+    let clause = baseClause;
+    const params = [...baseParams];
+    if (search) {
+      const likeTerm = `%${search.toLowerCase()}%`;
+      clause += ' AND (LOWER(o.id) LIKE ? OR LOWER(COALESCE(o.customer_name, \'\')) LIKE ? OR LOWER(COALESCE(o.customer_phone, \'\')) LIKE ? OR LOWER(CAST(COALESCE(o.table_id, \'\') AS TEXT)) LIKE ?)';
+      params.push(likeTerm, likeTerm, likeTerm, likeTerm);
+    }
     const tail = buildOrderTail({
       sort: sortParam,
       order,
-      limit: parseInt(limit),
-      offset: parseInt(offset),
+      limit: clampedLimit,
+      offset: clampedOffset,
       prefix: 'o.',
     });
     query += clause + tail;
@@ -48,9 +76,30 @@ export async function getAdminOrders(request: Request, env: Record<string, unkno
       const res = await db.prepare(query).bind(...params).all<Record<string, unknown>>();
       results = res.results ?? [];
     } catch {
-      const fallbackQuery = `SELECT o.* FROM orders o WHERE 1=1${clause}${tail}`;
-      const res = await db.prepare(fallbackQuery).bind(...params).all<Record<string, unknown>>();
-      results = res.results ?? [];
+      try {
+        if (resolvedTenant === 'default') {
+          const legacyJoinQuery = `SELECT o.id, o.table_id, o.status, o.total, o.payment_status, o.customer_name, o.customer_phone, o.created_at,
+             o.items, o.shipping_fee, o.discount,
+             p.id AS payment_id, p.refund_status, p.refund_amount, p.amount AS payment_amount, p.method AS payment_method
+           FROM orders o
+           LEFT JOIN payments p ON p.id = (
+             SELECT p2.id FROM payments p2
+             WHERE p2.order_id = o.id AND p2.status IN ('paid', 'completed')
+             LIMIT 1
+           )
+           WHERE 1=1${clause}${tail}`;
+          const res = await db.prepare(legacyJoinQuery).bind(...params).all<Record<string, unknown>>();
+          results = res.results ?? [];
+        } else {
+          const fallbackQuery = `SELECT o.* FROM orders o WHERE 1=1${clause}${tail}`;
+          const res = await db.prepare(fallbackQuery).bind(...params).all<Record<string, unknown>>();
+          results = res.results ?? [];
+        }
+      } catch {
+        const fallbackQuery = `SELECT o.* FROM orders o WHERE 1=1${clause}${tail}`;
+        const res = await db.prepare(fallbackQuery).bind(...params).all<Record<string, unknown>>();
+        results = res.results ?? [];
+      }
     }
 
     const orders = results.map(order => {
@@ -86,9 +135,11 @@ export async function getAdminOrders(request: Request, env: Record<string, unkno
       success: true,
       orders,
       pagination: {
-        total: parseInt(total as unknown as string),
-        limit: parseInt(limit),
-        offset: parseInt(offset)
+        total: parseInt(total as unknown as string) || 0,
+        limit: clampedLimit,
+        offset: clampedOffset,
+        page: Math.floor(clampedOffset / clampedLimit) + 1,
+        pageSize: clampedLimit,
       }
     });
   } catch (error) {

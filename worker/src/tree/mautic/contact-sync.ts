@@ -30,16 +30,19 @@ export async function syncContacts(
 
   try {
     const since = state.last_sync || new Date(Date.now() - 3600000).toISOString();
-    const normalizedTenant = !tenantId || !tenantId.trim() ? 'default' : tenantId.trim();
+    const rawTenant = !tenantId || !tenantId.trim() ? 'default' : tenantId.trim();
+    const normalizedTenant = rawTenant.toLowerCase() === 'hq' ? '*' : rawTenant;
     const isWildcard = normalizedTenant === '*';
     const tenantSql = isWildcard ? '' : " AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?";
     const tenantParams = isWildcard ? [] : [normalizedTenant];
 
+    const excludedOrderStatusClause =
+      "AND COALESCE(orders.status, '') NOT IN ('cancelled', 'rejected', 'failed', 'expired') AND COALESCE(orders.status, '') NOT IN ('canceled', 'refunded')";
     let results: CustomerContact[] = [];
     try {
       const res = await db.prepare(
         `SELECT id, name, phone, email, tier, total_spent, visit_count, tenant_id,
-          (SELECT MAX(created_at) FROM orders WHERE customer_id = customers.id AND COALESCE(NULLIF(TRIM(orders.tenant_id), ''), 'default') = COALESCE(NULLIF(TRIM(customers.tenant_id), ''), 'default')) as last_visit
+          (SELECT MAX(created_at) FROM orders WHERE customer_id = customers.id ${excludedOrderStatusClause} AND COALESCE(NULLIF(TRIM(orders.tenant_id), ''), 'default') = COALESCE(NULLIF(TRIM(customers.tenant_id), ''), 'default')) as last_visit
          FROM customers WHERE updated_at >= ?${tenantSql} ORDER BY updated_at ASC LIMIT 200`
       ).bind(since, ...tenantParams).all<CustomerContact>();
       results = (res.results || []).filter((r) =>
@@ -50,8 +53,8 @@ export async function syncContacts(
       if (msg.includes('no such column')) {
         try {
           const fallbackTenant = await db.prepare(
-            `SELECT id, name, phone, email, loyalty_tier as tier, total_spent, loyalty_points as visit_count, tenant_id,
-              (SELECT MAX(created_at) FROM orders WHERE customer_id = customers.id AND COALESCE(NULLIF(TRIM(orders.tenant_id), ''), 'default') = COALESCE(NULLIF(TRIM(customers.tenant_id), ''), 'default')) as last_visit
+            `SELECT id, name, phone, email, loyalty_tier as tier, total_spent, 0 as visit_count, tenant_id,
+              (SELECT MAX(created_at) FROM orders WHERE customer_id = customers.id ${excludedOrderStatusClause} AND COALESCE(NULLIF(TRIM(orders.tenant_id), ''), 'default') = COALESCE(NULLIF(TRIM(customers.tenant_id), ''), 'default')) as last_visit
              FROM customers WHERE updated_at >= ?${tenantSql} ORDER BY updated_at ASC LIMIT 200`
           ).bind(since, ...tenantParams).all<CustomerContact>();
           results = (fallbackTenant.results || []).filter((r) =>
@@ -60,8 +63,8 @@ export async function syncContacts(
         } catch {
           if (isWildcard || normalizedTenant === 'default') {
             const fallback = await db.prepare(
-              `SELECT id, name, phone, email, loyalty_tier as tier, total_spent, loyalty_points as visit_count,
-                (SELECT MAX(created_at) FROM orders WHERE customer_id = customers.id) as last_visit
+              `SELECT id, name, phone, email, loyalty_tier as tier, total_spent, 0 as visit_count,
+                (SELECT MAX(created_at) FROM orders WHERE customer_id = customers.id ${excludedOrderStatusClause}) as last_visit
                FROM customers WHERE updated_at >= ? ORDER BY updated_at ASC LIMIT 200`
             ).bind(since).all<CustomerContact>();
             results = (fallback.results || []).filter((r) =>
@@ -85,15 +88,22 @@ export async function syncContacts(
     const batchSize = 20;
     for (let i = 0; i < results.length; i += batchSize) {
       const batch = results.slice(i, i + batchSize);
-      const contacts: MauticContactInput[] = batch.map(c => ({
-        firstname: c.name || 'Unknown',
-        email: c.email || `${c.phone || c.id}@aura-fnb.local`,
-        mobile: c.phone || '',
-        tier: c.tier || 'BASIC',
-        total_spent: String(c.total_spent || 0),
-        visit_count: String(c.visit_count || 0),
-        last_visit: c.last_visit || ''
-      }));
+      const contacts: MauticContactInput[] = batch.map(c => {
+        const rawRowTenant = (c as unknown as Record<string, unknown>).tenant_id;
+        const rowTenant = (typeof rawRowTenant === 'string' && rawRowTenant.trim()) ? rawRowTenant.trim() : normalizedTenant;
+        const fallbackLocalPart = rowTenant && rowTenant !== 'default' && rowTenant !== '*'
+          ? `${rowTenant}+${c.phone || c.id}`
+          : `${c.phone || c.id}`;
+        return {
+          firstname: c.name || 'Unknown',
+          email: c.email || `${fallbackLocalPart}@aura-cafe.internal`,
+          mobile: c.phone || '',
+          tier: c.tier || 'BASIC',
+          total_spent: String(c.total_spent || 0),
+          visit_count: String(c.visit_count || 0),
+          last_visit: c.last_visit || ''
+        };
+      });
 
       try {
         const result = await client.syncContacts(contacts) as SyncContactsResponse;

@@ -63,4 +63,31 @@ describe('All staff order read aliases enforce signed tenant confinement', () =>
     const content = JSON.stringify(await global.json());
     expect(content).toContain('order-a'); expect(content).toContain('order-b');
   });
+
+  it('paginates and searches /api/admin/orders within the signed tenant', async () => {
+    const { env, sqlite } = fixture('manager');
+    sqlite.exec(`INSERT INTO orders (id,items,total,status,customer_name,customer_phone,payment_method,table_id,tenant_id,created_at) VALUES
+      ('ord-a-1','[]',20000,'pending','Alpha One','0900000001','cod','table-a','cafe-a','2026-10-01T10:00:00Z'),
+      ('ord-a-2','[]',30000,'preparing','Beta Two','0900000002','cod','table-a','cafe-a','2026-10-01T10:05:00Z'),
+      ('ord-a-3','[]',40000,'ready','Gamma Three','0900000003','cod','table-a','cafe-a','2026-10-01T10:10:00Z'),
+      ('ord-b-1','[]',90000,'pending','Alpha Foreign','0900000099','cod','table-b','cafe-b','2026-10-01T10:15:00Z');`);
+
+    const page2Res = await get(env, '/api/admin/orders?page=2&pageSize=2', 'cafe-a', 'manager');
+    expect(page2Res.status).toBe(200);
+    const page2Body = await page2Res.json() as any;
+    expect(page2Body.pagination).toMatchObject({
+      total: 3,
+      limit: 2,
+      offset: 2,
+      page: 2,
+      pageSize: 2,
+    });
+    expect(page2Body.orders.map((o: any) => o.id)).toEqual(['ord-a-1']);
+
+    const searchRes = await get(env, '/api/admin/orders?search=Alpha', 'cafe-a', 'manager');
+    expect(searchRes.status).toBe(200);
+    const searchBody = await searchRes.json() as any;
+    expect(searchBody.pagination.total).toBe(1);
+    expect(searchBody.orders.map((o: any) => o.id)).toEqual(['ord-a-1']);
+  });
 });

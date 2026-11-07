@@ -50,6 +50,17 @@ export interface LookupOptions {
   tenantId?: string;
 }
 
+function matchesTenantRow(row: unknown, expectedTenant: string | null): boolean {
+  if (!expectedTenant || expectedTenant === '*') return true;
+  if (!row || typeof row !== 'object') return false;
+  const rec = row as Record<string, unknown>;
+  if ('tenant_id' in rec && rec.tenant_id !== undefined) {
+    const rowTenant = (rec.tenant_id && String(rec.tenant_id).trim()) || 'default';
+    return rowTenant === expectedTenant;
+  }
+  return true;
+}
+
 export async function lookupProfile(
   db: D1Database,
   phone: string,
@@ -58,7 +69,9 @@ export async function lookupProfile(
   const normalizedOpts: LookupOptions = typeof opts === 'string' ? { tenantId: opts } : (opts || {});
   const visitLimit = normalizedOpts.visitLimit ?? 5;
   const orderLimit = normalizedOpts.orderLimit ?? 5;
-  const targetTenant = normalizedOpts.tenantId && normalizedOpts.tenantId !== '*' ? normalizedOpts.tenantId : null;
+  const rawTenant = typeof normalizedOpts.tenantId === 'string' ? normalizedOpts.tenantId.trim() : '';
+  const effectiveTenant = !rawTenant ? 'default' : rawTenant.toLowerCase() === 'hq' || rawTenant === '*' ? '*' : rawTenant;
+  const targetTenant = effectiveTenant !== '*' ? effectiveTenant : null;
 
   try {
     const rawPhone = String(phone ?? '').trim();
@@ -83,11 +96,24 @@ export async function lookupProfile(
           .bind(rawPhone, normalized, targetTenant)
           .first<{ customer_id: string; value?: string; tenant_id?: string | null }>();
       } catch {
-        identity = null;
+        try {
+          identity = await db
+            .prepare(
+              `SELECT ci.customer_id, ci.identifier_value AS value FROM customer_identities ci
+               JOIN customers c ON c.id = ci.customer_id
+               WHERE ci.identifier_type = 'phone' AND (ci.identifier_value = ?1 OR ci.identifier_value = ?2)
+                 AND COALESCE(NULLIF(TRIM(c.tenant_id), ''), 'default') = ?3
+               ORDER BY ci.created_at DESC LIMIT 1`,
+            )
+            .bind(rawPhone, normalized, targetTenant)
+            .first<{ customer_id: string; value?: string; tenant_id?: string | null }>();
+        } catch {
+          identity = null;
+        }
       }
     }
 
-    if (!identity) {
+    if (!identity && (!targetTenant || targetTenant === 'default')) {
       try {
         identity = await db
           .prepare(
@@ -114,29 +140,8 @@ export async function lookupProfile(
     }
 
     if (identity?.customer_id && targetTenant) {
-      if ('tenant_id' in identity && identity.tenant_id !== undefined) {
-        const idTenant = (identity.tenant_id && String(identity.tenant_id).trim()) || 'default';
-        if (idTenant !== targetTenant) {
-          identity = null;
-        }
-      }
-      if (identity?.customer_id) {
-        try {
-          const idOwner = await db
-            .prepare('SELECT id, tenant_id FROM customers WHERE id = ?1')
-            .bind(identity.customer_id)
-            .first<{ id: string; tenant_id?: string | null }>();
-          if (!idOwner) {
-            identity = null;
-          } else if ('tenant_id' in idOwner && idOwner.tenant_id !== undefined) {
-            const ownerTenant = (idOwner.tenant_id && String(idOwner.tenant_id).trim()) || 'default';
-            if (ownerTenant !== targetTenant) {
-              identity = null;
-            }
-          }
-        } catch {
-          identity = null;
-        }
+      if (!matchesTenantRow(identity, targetTenant)) {
+        identity = null;
       }
     }
 
@@ -172,31 +177,58 @@ export async function lookupProfile(
       return EMPTY;
     }
 
-    const customer = await db
-      .prepare(
-        `SELECT * FROM customers WHERE id = ?1`,
-      )
-      .bind(resolvedCustomerId)
-      .first<{
-        id: string;
-        name: string | null;
-        phone: string | null;
-        email: string | null;
-        tier?: string | null;
-        loyalty_tier?: string | null;
-        total_visits?: number | null;
-        last_visit_at?: string | null;
-        tenant_id?: string | null;
-      }>();
+    const customer = targetTenant
+      ? await db
+          .prepare(
+            "SELECT * FROM customers WHERE id = ?1 AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?2",
+          )
+          .bind(resolvedCustomerId, targetTenant)
+          .first<{
+            id: string;
+            name: string | null;
+            phone: string | null;
+            email: string | null;
+            tier?: string | null;
+            loyalty_tier?: string | null;
+            total_visits?: number | null;
+            last_visit_at?: string | null;
+            tenant_id?: string | null;
+          }>()
+          .catch(() =>
+            targetTenant === 'default'
+              ? db
+                  .prepare('SELECT * FROM customers WHERE id = ?1')
+                  .bind(resolvedCustomerId)
+                  .first<{
+                    id: string;
+                    name: string | null;
+                    phone: string | null;
+                    email: string | null;
+                    tier?: string | null;
+                    loyalty_tier?: string | null;
+                    total_visits?: number | null;
+                    last_visit_at?: string | null;
+                    tenant_id?: string | null;
+                  }>()
+              : null,
+          )
+      : await db
+          .prepare('SELECT * FROM customers WHERE id = ?1')
+          .bind(resolvedCustomerId)
+          .first<{
+            id: string;
+            name: string | null;
+            phone: string | null;
+            email: string | null;
+            tier?: string | null;
+            loyalty_tier?: string | null;
+            total_visits?: number | null;
+            last_visit_at?: string | null;
+            tenant_id?: string | null;
+          }>();
 
-    if (!customer) {
+    if (!customer || !matchesTenantRow(customer, targetTenant)) {
       return EMPTY;
-    }
-    if (targetTenant && 'tenant_id' in customer && customer.tenant_id !== undefined) {
-      const custTenant = (customer.tenant_id && String(customer.tenant_id).trim()) || 'default';
-      if (custTenant !== targetTenant) {
-        return EMPTY;
-      }
     }
 
     const resolvedTenant =
@@ -211,13 +243,15 @@ export async function lookupProfile(
       .bind(customer.id, resolvedTenant)
       .all<{ purpose: string; granted: number | boolean }>()
       .catch(() =>
-        db
-          .prepare(
-            `SELECT purpose, granted FROM consents
-             WHERE customer_id = ?1 AND revoked_at IS NULL`,
-          )
-          .bind(customer.id)
-          .all<{ purpose: string; granted: number | boolean }>(),
+        !targetTenant || targetTenant === 'default'
+          ? db
+              .prepare(
+                `SELECT purpose, granted FROM consents
+                 WHERE customer_id = ?1 AND revoked_at IS NULL`,
+              )
+              .bind(customer.id)
+              .all<{ purpose: string; granted: number | boolean }>()
+          : { results: [] as Array<{ purpose: string; granted: number | boolean }> },
       );
 
     const consentMarketing = consents.results.some(
@@ -237,21 +271,23 @@ export async function lookupProfile(
       .bind(customer.id, resolvedTenant, visitLimit)
       .all<{ visited_at: string; channel: string }>()
       .catch(() =>
-        db
-          .prepare(
-            `SELECT visited_at, channel FROM visits
-             WHERE customer_id = ?1
-             ORDER BY visited_at DESC LIMIT ?2`,
-          )
-          .bind(customer.id, visitLimit)
-          .all<{ visited_at: string; channel: string }>(),
+        !targetTenant || targetTenant === 'default'
+          ? db
+              .prepare(
+                `SELECT visited_at, channel FROM visits
+                 WHERE customer_id = ?1
+                 ORDER BY visited_at DESC LIMIT ?2`,
+              )
+              .bind(customer.id, visitLimit)
+              .all<{ visited_at: string; channel: string }>()
+          : { results: [] as Array<{ visited_at: string; channel: string }> },
       );
     const orders = await db
       .prepare(
         `SELECT * FROM orders
-         WHERE customer_id = ?1
+         WHERE (customer_id = ?1
            AND COALESCE(NULLIF(tenant_id, ''), 'default') = ?2
-            OR customer_id = ?1 AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?2
+            OR customer_id = ?1 AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?2)
          ORDER BY created_at DESC LIMIT ?3`,
       )
       .bind(customer.id, resolvedTenant, orderLimit)

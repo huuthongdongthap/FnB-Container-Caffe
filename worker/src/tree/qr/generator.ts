@@ -161,20 +161,21 @@ export async function bulkGenerateSlugs(
  */
 export async function generatePNG(
   slug: string,
-  baseUrl: string
+  baseUrl: string,
+  signedUrl?: string
 ): Promise<ArrayBuffer> {
-  if (!baseUrl) {
+  if (!baseUrl && !signedUrl) {
     throw new Error(`generatePNG: baseUrl is required (was: ${baseUrl})`);
   }
-  const host = baseUrl.replace(/^https?:\/\//, '').replace(/\/$/, '');
-  const payload = `https://${host}?table=${encodeURIComponent(slug)}`;
+  const normalizedBase = baseUrl ? baseUrl.replace(/\/+$/, '') : '';
+  const payload = signedUrl || `${normalizedBase}/order/${encodeURIComponent(slug)}`;
   const buffer = await QRCode.toBuffer(payload, {
     type: 'png',
     width: 400,
     margin: 2,
     errorCorrectionLevel: 'M'
   });
-  return buffer.buffer as ArrayBuffer;
+  return buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength) as ArrayBuffer;
 }
 
 /**
@@ -182,9 +183,10 @@ export async function generatePNG(
  */
 export async function generateDataURL(
   slug: string,
-  baseUrl: string
+  baseUrl: string,
+  signedUrl?: string
 ): Promise<string> {
-  const pngBuffer = await generatePNG(slug, baseUrl);
+  const pngBuffer = await generatePNG(slug, baseUrl, signedUrl);
   const base64 = Buffer.from(pngBuffer).toString('base64');
   return `data:image/png;base64,${base64}`;
 }

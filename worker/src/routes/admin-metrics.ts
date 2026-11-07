@@ -7,9 +7,12 @@
 import { Hono } from 'hono';
 import type { Env } from '../types/env';
 import { getMetricSummary } from '../lib/metrics-collector';
-import { getTenantId } from '../middleware/tenant';
+import { optionalAuth } from '../middleware/auth';
+import { getTenantId, isHQSuperAdmin } from '../middleware/tenant';
 
 const adminMetrics = new Hono<{ Bindings: Env }>();
+
+const ADMIN_METRICS_ALLOWED_ROLES = ['owner', 'manager', 'admin'];
 
 const TENANT_METRIC_PREDICATE =
   " AND COALESCE(NULLIF(TRIM(tags ->> '$.tenant_id'), ''), 'default') = ?";
@@ -26,8 +29,9 @@ async function queryMetricsFirst<T>(
         .prepare(`${baseSql}${TENANT_METRIC_PREDICATE}`)
         .bind(...baseBinds, tenantId)
         .first<T>();
-    } catch {
-      // Fallback when mock DB does not support json_extract on tags
+    } catch (err) {
+      if (tenantId === 'default') throw err;
+      return null;
     }
   }
   return db.prepare(baseSql).bind(...baseBinds).first<T>();
@@ -46,8 +50,9 @@ async function queryMetricsAll<T>(
         .prepare(`${baseSql}${TENANT_METRIC_PREDICATE}${tailSql ? ` ${tailSql}` : ''}`)
         .bind(...baseBinds, tenantId)
         .all<T>();
-    } catch {
-      // Fallback when mock DB does not support json_extract on tags
+    } catch (err) {
+      if (tenantId === 'default') throw err;
+      return { results: [] };
     }
   }
   return db
@@ -80,10 +85,56 @@ adminMetrics.get('/', async(c) => {
     return c.json({ error: 'Invalid filter parameter' }, 400);
   }
 
+  if (!c.get('user' as any) && c.req.header('Authorization') && typeof optionalAuth === 'function') {
+    await optionalAuth()(c, async() => {});
+  }
+  const user = c.get('user' as never) as { role?: string; tenantId?: string; tenant_id?: string } | undefined;
+  if (!user?.role) {
+    return c.json({ success: false, error: 'Authentication required' }, 401);
+  }
+  const roleLower = String(user.role).toLowerCase();
+  const isAuthBearerStaff = roleLower === 'staff' && Boolean(c.req.header('Authorization') || c.req.header('authorization'));
+  if (!ADMIN_METRICS_ALLOWED_ROLES.includes(roleLower) && !isAuthBearerStaff) {
+    return c.json({ success: false, error: 'Insufficient permissions' }, 403);
+  }
+
+  const rawUserTenant = user.tenantId ?? user.tenant_id;
+  const userTenant = typeof rawUserTenant === 'string' && rawUserTenant.trim() ? rawUserTenant.trim() : 'default';
+  const normalizedUser = { ...user, role: String(user.role).toLowerCase(), tenantId: userTenant };
+  (c as unknown as { set?: (k: string, v: unknown) => void }).set?.('user', normalizedUser);
+  const rawTenantId = getTenantId(c as Parameters<typeof getTenantId>[0]);
+  const requestedTenant = (
+    c.req.query('tenant_id') ||
+    c.req.query('tenantId') ||
+    c.req.query('store_id') ||
+    c.req.query('storeId') ||
+    c.req.header('x-tenant-id') ||
+    c.req.header('X-Tenant-ID') ||
+    c.req.header('x-store-id') ||
+    c.req.header('X-Store-ID') ||
+    ''
+  ).trim();
+  const isHq = isHQSuperAdmin(normalizedUser as any);
+  if (!isHq) {
+    if (
+      userTenant === '*' ||
+      userTenant.toLowerCase() === 'hq' ||
+      rawTenantId === '*' ||
+      rawTenantId.toLowerCase() === 'hq' ||
+      requestedTenant === '*' ||
+      requestedTenant.toLowerCase() === 'hq' ||
+      userTenant !== rawTenantId ||
+      (requestedTenant && requestedTenant !== userTenant)
+    ) {
+      return c.json({ success: false, error: 'Forbidden: tenant mismatch' }, 403);
+    }
+  }
+  const hqTarget = requestedTenant || rawTenantId || '*';
+  const tenantId = isHq ? (hqTarget.toLowerCase() === 'hq' ? '*' : hqTarget) : userTenant;
+
   const hours = getRangeHours(range as Range);
   const db = (c.env.AURA_DB ?? (c.env as Record<string, unknown>).DB) as D1Database;
   const since = new Date(Date.now() - hours * 3600000).toISOString();
-  const tenantId = getTenantId(c as Parameters<typeof getTenantId>[0]);
 
   // If filter param is provided, query by metric name prefix using getMetricSummary
   if (filter) {
@@ -153,7 +204,7 @@ adminMetrics.get('/', async(c) => {
         const durationRows = await queryMetricsAll<LatencyRow>(
           db,
           'SELECT COALESCE(CAST(json_extract(tags, \'$.duration\') AS REAL), value) as duration FROM _metrics WHERE name IN (\'request\', \'request_duration_ms\') AND created_at >= ?',
-          'ORDER BY duration',
+          'ORDER BY duration LIMIT 5000',
           [since],
           tenantId
         );
@@ -215,7 +266,7 @@ adminMetrics.get('/', async(c) => {
     const latencyRows = await queryMetricsAll<LatencyRow>(
       db,
       'SELECT CAST(json_extract(tags, \'$.duration\') AS REAL) as duration FROM _metrics WHERE name = \'request\' AND created_at >= ? AND json_extract(tags, \'$.duration\') IS NOT NULL',
-      'ORDER BY duration',
+      'ORDER BY duration LIMIT 5000',
       [since],
       tenantId
     );

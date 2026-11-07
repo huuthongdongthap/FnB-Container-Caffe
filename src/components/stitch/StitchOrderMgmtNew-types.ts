@@ -58,6 +58,11 @@ export interface StitchOrderMgmtNewProps {
   onSearch?: (query: string) => void;
   onOrderAction?: (orderId: string, action: string) => void;
   onRefresh?: () => void;
+  currentPage?: number;
+  pageSize?: number;
+  totalCount?: number;
+  onPageChange?: (page: number) => void;
+  showDashboardPanels?: boolean;
 }
 
 /* ─── Status Config Types ────────────────────────────────────────────── */

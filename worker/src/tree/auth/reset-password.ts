@@ -3,7 +3,7 @@
 import { jsonResponse, errorResponse } from '../../middleware/cors';
 import { createLogger } from '../../middleware/logger';
 import { generateJWT, hashPassword, timingSafeEqualString } from '../../lib/jwt';
-import { requireStaffAccount, issueStaffSession, staffSessionErrorResponse } from '../../lib/staff-session';
+import { requireStaffAccount, issueStaffSession, staffSessionErrorResponse, SessionUnavailableError } from '../../lib/staff-session';
 import { changeStaffPassword } from '../../lib/staff-password';
 import { findLoginUser } from '../../lib/staff-login-identity';
 import type { Env } from '../../types/env';
@@ -56,23 +56,63 @@ export async function resetPassword(request: Request, env: Record<string, unknow
       token = session.token; responseUser = session.user;
       await authKV.put(`user:${email}`, JSON.stringify(user)).catch(() => {});
     } else {
-      user.auth_version = Number(user.auth_version || 1) + 1;
-      await authKV.put(`user:${email}`, JSON.stringify(user));
-      if (user.id) {
-        const existingById = await authKV.get(`user:${user.id}`).catch(() => null);
-        if (existingById) {
-          await authKV.put(`user:${user.id}`, JSON.stringify(user)).catch(() => {});
+      let nextVersion = Number(user.auth_version || 1) + 1;
+      try {
+        if (user.id && authKV?.get) {
+          const rawCustVer = await authKV.get(`cust_auth_ver:${user.id}`);
+          if (rawCustVer) {
+            const currentCustVer = Number(rawCustVer);
+            if (Number.isFinite(currentCustVer) && currentCustVer >= nextVersion) {
+              nextVersion = currentCustVer + 1;
+            }
+          }
         }
+        user.auth_version = nextVersion;
+        await authKV.put(`user:${email}`, JSON.stringify(user));
+        if (user.id) {
+          await authKV.put(`cust_auth_ver:${user.id}`, String(nextVersion));
+          const existingById = await authKV.get(`user:${user.id}`);
+          if (existingById) {
+            await authKV.put(`user:${user.id}`, JSON.stringify(user));
+          }
+        }
+      } catch {
+        throw new SessionUnavailableError();
+      }
+      let resolvedCustomerTenant = String(user.tenant_id || '').trim() || undefined;
+      if (user.id) {
         if (env.AURA_DB) {
-          await (env.AURA_DB as import('@cloudflare/workers-types').D1Database)
+          const db = env.AURA_DB as import('@cloudflare/workers-types').D1Database;
+          await db
+            .prepare('UPDATE users SET password_hash = ?, auth_version = ?, updated_at = ? WHERE id = ?')
+            .bind(user.password, nextVersion, user.updated_at, user.id)
+            .run()
+            .catch(() => {});
+          if (!resolvedCustomerTenant) {
+            const custRow = await db
+              .prepare('SELECT tenant_id FROM customers WHERE id = ? OR lower(email) = lower(?) LIMIT 1')
+              .bind(user.id, email)
+              .first<{ tenant_id?: string | null }>()
+              .catch(() => null);
+            if (custRow?.tenant_id && String(custRow.tenant_id).trim()) {
+              resolvedCustomerTenant = String(custRow.tenant_id).trim();
+            }
+          }
+          await db
             .prepare('UPDATE sessions SET expires_at = ? WHERE user_id = ?')
             .bind(user.updated_at, user.id)
             .run()
             .catch(() => {});
         }
       }
+      if (!resolvedCustomerTenant) {
+        const pilotTenant = typeof env.PILOT_TENANT_ID === 'string' && env.PILOT_TENANT_ID.trim() && env.PILOT_TENANT_ID.trim() !== '*'
+          ? env.PILOT_TENANT_ID.trim()
+          : 'default';
+        resolvedCustomerTenant = pilotTenant;
+      }
       token = await generateJWT(
-        { email, name: user.name, id: user.id, role: 'customer', authVersion: user.auth_version },
+        { email, name: user.name, id: user.id, role: 'customer', tenantId: resolvedCustomerTenant, authVersion: user.auth_version },
         env.JWT_SECRET as string,
         env.JWT_EXPIRY_SECONDS as string
       );

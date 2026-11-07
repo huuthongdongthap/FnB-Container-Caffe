@@ -18,7 +18,7 @@ function createAuditEnv() {
     CREATE TABLE email_verifications (id TEXT PRIMARY KEY, email TEXT, code TEXT, type TEXT, expires_at TEXT, used INTEGER DEFAULT 0, verified_at TEXT, created_at TEXT);
     CREATE TABLE sessions (id TEXT PRIMARY KEY, user_id TEXT, access_token TEXT, refresh_token TEXT, expires_at TEXT, is_trusted_device INTEGER DEFAULT 0, device_fingerprint TEXT, device_name TEXT, last_used_at TEXT, created_at TEXT, updated_at TEXT);
     CREATE TABLE orders (id TEXT PRIMARY KEY, status TEXT, order_type TEXT, payment_status TEXT, tenant_id TEXT DEFAULT 'default', updated_at TEXT);
-    CREATE TABLE ti_order_bridge (id TEXT PRIMARY KEY, local_order_id TEXT, ti_order_id TEXT, status TEXT, synced_at TEXT, created_at TEXT);
+    CREATE TABLE ti_order_bridge (id TEXT PRIMARY KEY, local_order_id TEXT, ti_order_id TEXT, status TEXT, synced_at TEXT, created_at TEXT, tenant_id TEXT DEFAULT 'default');
     CREATE TABLE ha_device_states (entity_id TEXT PRIMARY KEY, state TEXT, attributes TEXT, last_changed TEXT, last_updated TEXT, tenant_id TEXT DEFAULT 'default');
     CREATE TABLE products (id TEXT PRIMARY KEY, name TEXT, price INTEGER, category_id TEXT, is_available INTEGER DEFAULT 1, tenant_id TEXT DEFAULT 'default');
     CREATE TABLE happy_hour_windows (id TEXT PRIMARY KEY, name TEXT, day_of_week TEXT, start_time TEXT, end_time TEXT, discount_rate REAL, apply_to TEXT, apply_ids TEXT, priority INTEGER DEFAULT 1, active INTEGER DEFAULT 1, tenant_id TEXT DEFAULT 'default');

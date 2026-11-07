@@ -24,8 +24,8 @@ function collectWrites() {
   return { db: db as any, writes };
 }
 
-/** HQ owner: tenantId 'default' is what isHQSuperAdmin treats as unbound-HQ. */
-const hqOwner = { id: 'owner-1', role: 'owner', tenantId: 'default' };
+/** HQ owner: explicitly bound to 'hq' as required by isHQSuperAdmin. */
+const hqOwner = { id: 'owner-1', role: 'owner', tenantId: 'hq' };
 
 function appFor(db: any) {
   const app = new Hono<{ Bindings: Env }>();
@@ -63,7 +63,7 @@ describe('tenant override audit', () => {
     const { db, writes } = collectWrites();
     const app = appFor(db);
     await app.fetch(
-      new Request('https://test.aura/admin/orders?tenant_id=default'),
+      new Request('https://test.aura/admin/orders?tenant_id=hq'),
       { AURA_DB: db } as any,
     );
     await new Promise((r) => setTimeout(r, 0));

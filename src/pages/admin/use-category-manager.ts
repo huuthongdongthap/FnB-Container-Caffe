@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useClientSessionScope } from '@/lib/client-session';
 import { apiFetch, slugify } from './menu-api';
 import { EMPTY_CATEGORY } from './types';
 import type { Category, CategoryFormData } from './types';
@@ -8,14 +9,24 @@ import type { Category, CategoryFormData } from './types';
 export function useCategoryManager() {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
+  const session = useClientSessionScope();
+  const categoriesKey = ['admin-categories', session.tenantId, session.userScope] as const;
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<Category | null>(null);
   const [form, setForm] = useState<CategoryFormData>(EMPTY_CATEGORY);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [deleteId, setDeleteId] = useState<string | null>(null);
 
+  useEffect(() => {
+    setModalOpen(false);
+    setEditing(null);
+    setForm(EMPTY_CATEGORY);
+    setErrors({});
+    setDeleteId(null);
+  }, [session.tenantId, session.userScope]);
+
   const query = useQuery<{ success: boolean; data: Category[] }>({
-    queryKey: ['admin-categories'],
+    queryKey: categoriesKey,
     queryFn: () => apiFetch('/api/categories'),
   });
 
@@ -39,7 +50,7 @@ export function useCategoryManager() {
       });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['admin-categories'] });
+      queryClient.invalidateQueries({ queryKey: categoriesKey });
       closeModal();
     },
     onError: (err: Error) => {
@@ -51,7 +62,7 @@ export function useCategoryManager() {
     mutationFn: (id: string) =>
       apiFetch(`/api/categories/${id}`, { method: 'DELETE' }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['admin-categories'] });
+      queryClient.invalidateQueries({ queryKey: categoriesKey });
       setDeleteId(null);
     },
     onError: (err: Error) => {

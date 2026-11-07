@@ -5,6 +5,7 @@
 
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { apiFetch } from '@/lib/api-client';
+import { useClientSessionScope } from '@/lib/client-session';
 
 export interface Segment {
   id: string;
@@ -33,8 +34,9 @@ export interface BroadcastResult {
  * Fetch all customer segments with counts.
  */
 export function useSegments() {
+  const session = useClientSessionScope();
   return useQuery<Segment[]>({
-    queryKey: ['broadcast-segments'],
+    queryKey: ['broadcast-segments', session.tenantId, session.userScope],
     queryFn: () =>
       apiFetch<{ data: Segment[] }>('/api/customers/segments').then((r) => r.data),
     staleTime: 60_000,

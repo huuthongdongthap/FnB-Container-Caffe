@@ -41,8 +41,10 @@ export function buildCanonicalAuditRecord(payload: AuditPayload): CanonicalAudit
   const id = `aud_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
   const actorId = payload.actor.id || 'system';
   const actorName = payload.actor.name || payload.actor.email || 'System';
-  const tenantId = payload.tenantId || payload.actor.tenantId || null;
-  const operatingUnitId = payload.operatingUnitId || payload.actor.operatingUnitId || null;
+  const rawTenant = String(payload.tenantId ?? payload.actor.tenantId ?? '').trim();
+  const tenantId = rawTenant || null;
+  const rawOpUnit = String(payload.operatingUnitId ?? payload.actor.operatingUnitId ?? '').trim();
+  const operatingUnitId = rawOpUnit || null;
   const status = payload.outcome || 'success';
   const correlationId = payload.correlationId || `corr_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
 
@@ -137,6 +139,13 @@ export async function writeCanonicalAuditLog(
           record.actor_id, record.actor_name, record.action,
           record.resource_type, record.resource_id, record.details, record.ip_address, record.created_at
         ).run();
+        if (record.tenant_id) {
+          await db
+            .prepare('UPDATE audit_logs SET tenant_id = ? WHERE resource_id = ? AND action = ? AND created_at = ?')
+            .bind(record.tenant_id, record.resource_id, record.action, record.created_at)
+            .run()
+            .catch(() => {});
+        }
 
         return { ok: true, record };
       } catch (fallbackErr) {
@@ -147,6 +156,13 @@ export async function writeCanonicalAuditLog(
             record.id, record.action, record.actor_id, record.resource_type,
             record.resource_id, record.details, record.ip_address, record.created_at
           ).run();
+          if (record.tenant_id) {
+            await db
+              .prepare('UPDATE audit_logs SET tenant_id = ? WHERE id = ?')
+              .bind(record.tenant_id, record.id)
+              .run()
+              .catch(() => {});
+          }
 
           return { ok: true, record };
         } catch (canonicalErr) {

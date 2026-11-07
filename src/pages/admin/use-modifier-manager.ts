@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useClientSessionScope } from '@/lib/client-session';
 import { apiFetch } from './menu-api';
 import { EMPTY_MODIFIER_CHOICE, EMPTY_MODIFIER_GROUP } from './types';
 import type {
@@ -23,6 +24,8 @@ const GROUPS_KEY = ['admin-modifier-groups'];
 export function useModifierManager() {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
+  const session = useClientSessionScope();
+  const groupsKey = [...GROUPS_KEY, session.tenantId, session.userScope] as const;
 
   const [groupModalOpen, setGroupModalOpen] = useState(false);
   const [editingGroup, setEditingGroup] = useState<ModifierGroup | null>(null);
@@ -36,21 +39,33 @@ export function useModifierManager() {
   const [confirmDeleteGroup, setConfirmDeleteGroup] = useState<ModifierGroup | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
+  useEffect(() => {
+    setGroupModalOpen(false);
+    setEditingGroup(null);
+    setGroupForm(EMPTY_MODIFIER_GROUP);
+    setChoiceGroupId(null);
+    setChoiceForm(EMPTY_MODIFIER_CHOICE);
+    setEditingChoice(null);
+    setConfirmDeleteGroup(null);
+    setErrors({});
+  }, [session.tenantId, session.userScope]);
+
   const groupsQuery = useQuery<{ success: boolean; data: ModifierGroup[] }>({
-    queryKey: GROUPS_KEY,
+    queryKey: groupsKey,
     queryFn: () => apiFetch('/api/menu-modifiers/groups'),
   });
 
   /** Choices are per-group, so they key off the group id being inspected. */
   const choicesQuery = useQuery<{ success: boolean; data: ModifierChoice[] }>({
-    queryKey: ['admin-modifier-choices', choiceGroupId],
+    queryKey: ['admin-modifier-choices', session.tenantId, session.userScope, choiceGroupId],
     queryFn: () => apiFetch(`/api/menu-modifiers/groups/${choiceGroupId}/choices`),
     enabled: choiceGroupId !== null,
   });
 
-  function invalidateAll() {    queryClient.invalidateQueries({ queryKey: GROUPS_KEY });
-    queryClient.invalidateQueries({ queryKey: ['admin-modifier-choices'] });
-    queryClient.invalidateQueries({ queryKey: ['admin-product-groups'] });
+  function invalidateAll() {
+    queryClient.invalidateQueries({ queryKey: groupsKey });
+    queryClient.invalidateQueries({ queryKey: ['admin-modifier-choices', session.tenantId, session.userScope] });
+    queryClient.invalidateQueries({ queryKey: ['admin-product-groups', session.tenantId, session.userScope] });
   }
 
   const createGroupMutation = useMutation({

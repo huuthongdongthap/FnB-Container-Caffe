@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useClientSessionScope } from '@/lib/client-session';
 import { apiFetch } from './menu-api';
 import { EMPTY_PROMOTION } from './types';
 import type { Promotion, PromotionFormData } from './types';
@@ -31,6 +32,8 @@ function toDatetimeLocal(dateStr: string | null): string {
 export function usePromotionsManager() {
   const { t } = useTranslation('adminPromotions');
   const queryClient = useQueryClient();
+  const session = useClientSessionScope();
+  const promotionsKey = ['admin-promotions', session.tenantId, session.userScope] as const;
 
   const [modalOpen, setModalOpen] = useState(false);
   const [editingPromo, setEditingPromo] = useState<Promotion | null>(null);
@@ -38,10 +41,18 @@ export function usePromotionsManager() {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [deleteCode, setDeleteCode] = useState<string | null>(null);
 
+  useEffect(() => {
+    setModalOpen(false);
+    setEditingPromo(null);
+    setForm(EMPTY_PROMOTION);
+    setErrors({});
+    setDeleteCode(null);
+  }, [session.tenantId, session.userScope]);
+
   // ── Queries ──────────────────────────────────────────────────────
 
   const query = useQuery<{ success: boolean; data: Promotion[] }>({
-    queryKey: ['admin-promotions'],
+    queryKey: promotionsKey,
     queryFn: () => apiFetch('/api/promotions'),
   });
 
@@ -72,7 +83,7 @@ export function usePromotionsManager() {
       });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['admin-promotions'] });
+      queryClient.invalidateQueries({ queryKey: promotionsKey });
       closeModal();
     },
     onError: (err: Error) => {
@@ -84,7 +95,7 @@ export function usePromotionsManager() {
     mutationFn: (code: string) =>
       apiFetch(`/api/promotions/${encodeURIComponent(code)}`, { method: 'DELETE' }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['admin-promotions'] });
+      queryClient.invalidateQueries({ queryKey: promotionsKey });
       setDeleteCode(null);
     },
     onError: (err: Error) => {

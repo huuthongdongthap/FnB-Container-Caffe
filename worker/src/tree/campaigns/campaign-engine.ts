@@ -33,7 +33,7 @@ export async function deduplicate(
          ORDER BY sent_at DESC LIMIT 1`
       ).bind(customerId, trigger, cutoff, tenantId).first<Record<string, unknown>>();
       if (!row) return false;
-      return !('tenant_id' in row) || matchesTenantRow(row, tenantId);
+      return 'tenant_id' in row && row.tenant_id !== undefined ? matchesTenantRow(row, tenantId) : true;
     } catch {
       try {
         const row = await db.prepare(
@@ -43,31 +43,54 @@ export async function deduplicate(
            ORDER BY created_at DESC LIMIT 1`
         ).bind(customerId, trigger, cutoff, tenantId).first<Record<string, unknown>>();
         if (!row) return false;
-        return !('tenant_id' in row) || matchesTenantRow(row, tenantId);
+        return 'tenant_id' in row && row.tenant_id !== undefined ? matchesTenantRow(row, tenantId) : true;
       } catch {
-        // Fall through to default queries if tenant_id column is absent
+        if (tenantId !== 'default') {
+          return false;
+        }
       }
     }
   }
   try {
-    const row = await db.prepare(
-      `SELECT id, sent_at FROM campaign_logs
-       WHERE customer_id = ? AND trigger = ? AND sent_at > ?
-       ORDER BY sent_at DESC LIMIT 1`
-    ).bind(customerId, trigger, cutoff).first<Record<string, unknown>>();
-    if (!row) return false;
-    return !scoped || !tenantId || !('tenant_id' in row) || matchesTenantRow(row, tenantId);
+    let row: Record<string, unknown> | null = null;
+    try {
+      row = await db.prepare(
+        `SELECT id, sent_at, tenant_id FROM campaign_logs
+         WHERE customer_id = ? AND trigger = ? AND sent_at > ?
+         ORDER BY sent_at DESC LIMIT 1`
+      ).bind(customerId, trigger, cutoff).first<Record<string, unknown>>();
+    } catch (innerErr) {
+      const innerMsg = String((innerErr as Error)?.message || '');
+      if (innerMsg.includes('tenant_id')) {
+        row = await db.prepare(
+          `SELECT id, sent_at FROM campaign_logs
+           WHERE customer_id = ? AND trigger = ? AND sent_at > ?
+           ORDER BY sent_at DESC LIMIT 1`
+        ).bind(customerId, trigger, cutoff).first<Record<string, unknown>>();
+      } else {
+        throw innerErr;
+      }
+    }
+    return Boolean(row && (!scoped || !tenantId || matchesTenantRow(row, tenantId)));
   } catch (err) {
     const msg = String((err as Error)?.message || '');
     if (msg.includes('column')) {
       try {
-        const row = await db.prepare(
-          `SELECT id, created_at as sent_at FROM campaign_logs
-           WHERE customer_id = ? AND trigger_type = ? AND created_at > ?
-           ORDER BY created_at DESC LIMIT 1`
-        ).bind(customerId, trigger, cutoff).first<Record<string, unknown>>();
-        if (!row) return false;
-        return !scoped || !tenantId || !('tenant_id' in row) || matchesTenantRow(row, tenantId);
+        let row: Record<string, unknown> | null = null;
+        try {
+          row = await db.prepare(
+            `SELECT id, created_at as sent_at, tenant_id FROM campaign_logs
+             WHERE customer_id = ? AND trigger_type = ? AND created_at > ?
+             ORDER BY created_at DESC LIMIT 1`
+          ).bind(customerId, trigger, cutoff).first<Record<string, unknown>>();
+        } catch {
+          row = await db.prepare(
+            `SELECT id, created_at as sent_at FROM campaign_logs
+             WHERE customer_id = ? AND trigger_type = ? AND created_at > ?
+             ORDER BY created_at DESC LIMIT 1`
+          ).bind(customerId, trigger, cutoff).first<Record<string, unknown>>();
+        }
+        return Boolean(row && (!scoped || !tenantId || matchesTenantRow(row, tenantId)));
       } catch (fallbackErr) {
         log.warn('deduplicate check failed', { customerId, trigger, error: (fallbackErr as Error).message });
         return false;

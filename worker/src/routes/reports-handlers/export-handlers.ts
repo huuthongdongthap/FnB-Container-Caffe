@@ -1,7 +1,8 @@
 import type { Hono } from 'hono';
 import type { Env } from '../../types/env';
+import { authenticateRequest } from '../../middleware/auth';
 import { getTenantId } from '../../middleware/tenant';
-import { buildTenantClause } from './analytics-handlers';
+import { buildTenantClause, isStrictHQReportAdmin } from './analytics-handlers';
 import type {
   OrderExportRow,
   RevenueExportRow,
@@ -11,7 +12,15 @@ import type {
 // Helper: escape CSV cell per RFC 4180 and neutralize spreadsheet formula prefixes
 function escapeCsvCell(val: unknown): string {
   const rawStr = String(val ?? '');
-  const str = typeof val === 'string' && /^[\t\r\n ]*[=+\-@]/.test(rawStr) ? `'${rawStr}` : rawStr;
+  const sanitizedMultiline =
+    typeof val === 'string'
+      ? rawStr.replace(/([\r\n]+)(\s*[=+\-@|])/g, "$1'$2")
+      : rawStr;
+  const str =
+    typeof val === 'string' &&
+    (/^[\t\r\n ]*[=+\-@]/.test(sanitizedMultiline) || /^[\t\r\n ]*\|/.test(sanitizedMultiline))
+      ? `'${sanitizedMultiline}`
+      : sanitizedMultiline;
   if (str.includes(',') || str.includes('"') || str.includes('\n') || str.includes('\r')) {
     return `"${str.replace(/"/g, '""')}"`;
   }
@@ -37,21 +46,76 @@ function createCsvResponse(csvString: string, filename: string): Response {
 }
 
 export function registerExportHandlers(app: Hono<{ Bindings: Env }>) {
-  const EXPORT_ALLOWED_ROLES = new Set(['owner', 'manager', 'supervisor', 'admin']);
+  const EXPORT_ALLOWED_ROLES = new Set(['owner', 'manager', 'admin']);
+  const VALID_EXPORT_ORDER_SQL =
+    "LOWER(COALESCE(status, '')) NOT IN ('cancelled', 'canceled', 'refunded', 'failed', 'rejected', 'expired') AND LOWER(COALESCE(payment_status, '')) NOT IN ('refunded', 'failed')";
+  const VALID_JOINED_ORDER_SQL =
+    "LOWER(COALESCE(o.status, '')) NOT IN ('cancelled', 'canceled', 'refunded', 'failed', 'rejected', 'expired') AND LOWER(COALESCE(o.payment_status, '')) NOT IN ('refunded', 'failed')";
+  const VALID_CUSTOMER_EXPORT_PHONE_SQL =
+    "TRIM(COALESCE(c.phone, '')) NOT IN ('', '0', '000000000', '0000000000', '00000000000', 'guest', 'walk-in', 'pos')";
 
   // GET /api/reports/export — CSV export for orders, revenue, or customers
   app.get('/export', async (c) => {
-    const user = (c as unknown as { get: (k: string) => { role?: string } | undefined }).get('user');
-    const role = user?.role ? String(user.role).toLowerCase() : '';
-    if (role && !EXPORT_ALLOWED_ROLES.has(role)) {
-      return c.json({ success: false, error: 'Insufficient permissions' }, 403);
+    let user = (c as unknown as { get: (k: string) => { id?: string; role?: string; tenantId?: string; tenant_id?: string } | undefined }).get('user');
+    if (!user && c.req?.raw && c.env?.JWT_SECRET && (c.req.header('Authorization') || c.req.header('authorization'))) {
+      const session = await authenticateRequest(c.req.raw, c.env, { optional: true }).catch(() => null);
+      if (session && 'payload' in session) {
+        user = {
+          id: session.payload.id,
+          role: session.payload.role,
+          tenantId: session.payload.tenantId,
+        };
+        (c as unknown as { set?: (k: string, v: unknown) => void }).set?.('user', user);
+      }
     }
-    if (!role && (c.req.header('Authorization') || c.env?.ENVIRONMENT === 'production')) {
+    const role = user?.role ? String(user.role).toLowerCase() : '';
+    if (!user || !role) {
       return c.json({ success: false, error: 'Authentication required' }, 401);
     }
+    if (!EXPORT_ALLOWED_ROLES.has(role)) {
+      return c.json({ success: false, error: 'Insufficient permissions' }, 403);
+    }
+
+    const userTenant = String(user.tenantId ?? user.tenant_id ?? '').trim();
+    const hqAdmin = isStrictHQReportAdmin(role, userTenant);
+    const boundTenant = userTenant || 'default';
+    const reqCandidates = [
+      c.req.query('tenant_id'),
+      c.req.query('tenantId'),
+      c.req.query('store_id'),
+      c.req.query('storeId'),
+      c.req.header('X-Tenant-ID'),
+      c.req.header('x-tenant-id'),
+      c.req.header('X-Store-ID'),
+      c.req.header('x-store-id'),
+    ]
+      .map((v) => (typeof v === 'string' ? v.trim() : ''))
+      .filter(Boolean);
+    if (new Set(reqCandidates).size > 1) {
+      return c.json({ success: false, error: 'Cross-tenant export access denied' }, 403);
+    }
+    const reqTenant = reqCandidates[0] || '';
+    const ctxTenant =
+      ((c as unknown as { get: (k: string) => string | undefined }).get('tenantId') || '').trim();
+    const resolvedTenant = getTenantId(c).trim() || 'default';
+
+    if (!hqAdmin) {
+      if (
+        boundTenant === '*' ||
+        boundTenant.toLowerCase() === 'hq' ||
+        reqTenant === '*' ||
+        reqTenant.toLowerCase() === 'hq' ||
+        (reqTenant && reqTenant !== boundTenant) ||
+        (ctxTenant && (ctxTenant === '*' || ctxTenant.toLowerCase() === 'hq' || ctxTenant !== boundTenant)) ||
+        resolvedTenant !== boundTenant
+      ) {
+        return c.json({ success: false, error: 'Cross-tenant export access denied' }, 403);
+      }
+    }
+    const rawTarget = reqTenant || ctxTenant || resolvedTenant || '*';
+    const tenantId = hqAdmin ? (rawTarget.toLowerCase() === 'hq' ? '*' : rawTarget) : boundTenant;
 
     const db = c.env.AURA_DB;
-    const tenantId = getTenantId(c).trim() || 'default';
     const { and: tenantClause, binds: tenantBinds } = buildTenantClause(tenantId);
     const from = c.req.query('from') || new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10);
     const to = c.req.query('to') || new Date().toISOString().slice(0, 10);
@@ -61,7 +125,13 @@ export function registerExportHandlers(app: Hono<{ Bindings: Env }>) {
     const startMs = Date.parse(`${from}T00:00:00.000Z`);
     const endMs = Date.parse(`${to}T00:00:00.000Z`);
     const daySpan = Math.floor((endMs - startMs) / 86400000);
-    if (!Number.isFinite(startMs) || !Number.isFinite(endMs) || !(daySpan >= 0 && daySpan <= 366)) {
+    if (
+      !Number.isFinite(startMs) ||
+      !Number.isFinite(endMs) ||
+      new Date(startMs).toISOString().slice(0, 10) !== from ||
+      new Date(endMs).toISOString().slice(0, 10) !== to ||
+      !(daySpan >= 0 && daySpan <= 366)
+    ) {
       return c.json({ success: false, error: 'Invalid date range' }, 400);
     }
     const type = c.req.query('type') || 'orders';
@@ -96,7 +166,7 @@ export function registerExportHandlers(app: Hono<{ Bindings: Env }>) {
                 COALESCE(SUM(total), 0) as revenue,
                 CASE WHEN COUNT(*) > 0 THEN COALESCE(SUM(total), 0) / COUNT(*) ELSE 0 END as avg_order_value
          FROM orders
-         WHERE DATE(created_at) BETWEEN ? AND ? AND status != 'cancelled'${tenantClause}
+         WHERE DATE(created_at) BETWEEN ? AND ? AND ${VALID_EXPORT_ORDER_SQL}${tenantClause}
          GROUP BY DATE(created_at) ORDER BY date LIMIT 5000`
       ).bind(from, to, ...tenantBinds).all<RevenueExportRow>();
 
@@ -148,12 +218,13 @@ export function registerExportHandlers(app: Hono<{ Bindings: Env }>) {
     }
 
     if (type === 'customers') {
-      const { where: custWhere } = buildTenantClause(tenantId, 'c');
-      const { and: orderTenantJoin } = buildTenantClause(tenantId, 'o');
+      const { where: custWhere, binds: custBinds } = buildTenantClause(tenantId, 'c');
+      const orderTenantJoin =
+        " AND COALESCE(NULLIF(TRIM(o.tenant_id), ''), 'default') = COALESCE(NULLIF(TRIM(c.tenant_id), ''), 'default')";
       const dateFilter = custWhere
         ? ' AND (c.created_at IS NULL OR DATE(c.created_at) BETWEEN ? AND ?)'
         : ' WHERE (c.created_at IS NULL OR DATE(c.created_at) BETWEEN ? AND ?)';
-      const datedBinds = tenantId === '*' ? [from, to] : [tenantId, tenantId, from, to];
+      const datedBinds = [...custBinds, from, to];
       let results: CustomerExportRow[] = [];
       try {
         const res = await db.prepare(
@@ -161,18 +232,17 @@ export function registerExportHandlers(app: Hono<{ Bindings: Env }>) {
                   COALESCE(SUM(o.total), 0) as total_spent,
                   COUNT(o.id) as order_count
            FROM customers c
-           LEFT JOIN orders o ON (o.customer_id = c.id OR (o.customer_id IS NULL AND o.customer_phone = c.phone)) AND o.status != 'cancelled'${orderTenantJoin}${custWhere}${dateFilter}
+           LEFT JOIN orders o ON (o.customer_id = c.id OR (o.customer_id IS NULL AND ${VALID_CUSTOMER_EXPORT_PHONE_SQL} AND o.customer_phone = c.phone)) AND ${VALID_JOINED_ORDER_SQL}${orderTenantJoin}${custWhere}${dateFilter}
            GROUP BY c.id ORDER BY c.created_at LIMIT 5000`
         ).bind(...datedBinds).all<CustomerExportRow>();
         results = res.results || [];
       } catch {
-        const custBinds = tenantId === '*' ? [] : [tenantId, tenantId];
         const stmt = db.prepare(
           `SELECT c.id, c.name, c.email, c.phone, c.loyalty_tier, c.created_at,
                   COALESCE(SUM(o.total), 0) as total_spent,
                   COUNT(o.id) as order_count
            FROM customers c
-           LEFT JOIN orders o ON (o.customer_id = c.id OR (o.customer_id IS NULL AND o.customer_phone = c.phone)) AND o.status != 'cancelled'${orderTenantJoin}${custWhere}
+           LEFT JOIN orders o ON (o.customer_id = c.id OR (o.customer_id IS NULL AND ${VALID_CUSTOMER_EXPORT_PHONE_SQL} AND o.customer_phone = c.phone)) AND ${VALID_JOINED_ORDER_SQL}${orderTenantJoin}${custWhere}
            GROUP BY c.id ORDER BY c.created_at LIMIT 5000`
         );
         const res = custBinds.length > 0

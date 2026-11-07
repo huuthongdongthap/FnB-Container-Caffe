@@ -7,12 +7,19 @@ import type {
   AvailabilityQuery,
 } from '../model/table-reservation-types';
 
+const UNAVAILABLE_TABLE_STATUSES = new Set(['maintenance', 'outoforder', 'out_of_order', 'disabled']);
+
+export function isTableUnavailableForService(status: unknown): boolean {
+  if (status === undefined || status === null) return false;
+  return UNAVAILABLE_TABLE_STATUSES.has(String(status).trim().toLowerCase());
+}
+
 export function matchesOperatingUnit(
   row: Record<string, unknown> | null | undefined,
   operatingUnitId?: string
 ): boolean {
   const normUnit = operatingUnitId ? operatingUnitId.trim() : '';
-  if (!normUnit || normUnit === '*') return true;
+  if (!normUnit || normUnit === '*' || normUnit.toLowerCase() === 'hq') return true;
   if (!row) return false;
   const hasUnitColumn = 'operating_unit_id' in row || 'tenant_id' in row;
   if (!hasUnitColumn) return true;
@@ -57,6 +64,9 @@ export async function validateOrderTable(
   ).bind(normalizedTableId).first<CanonicalTable>();
 
   if (byId && matchesOperatingUnit(byId as unknown as Record<string, unknown>, operatingUnitId)) {
+    if (isTableUnavailableForService(byId.status)) {
+      return { ok: false, error: 'table_unavailable' };
+    }
     if (
       typeof partySize === 'number' &&
       typeof byId.capacity === 'number' &&
@@ -99,6 +109,9 @@ export async function validateOrderTable(
     matchesOperatingUnit(row as unknown as Record<string, unknown>, operatingUnitId)
   );
   if (matched) {
+    if (isTableUnavailableForService(matched.status)) {
+      return { ok: false, error: 'table_unavailable' };
+    }
     if (
       typeof partySize === 'number' &&
       typeof matched.capacity === 'number' &&
@@ -154,19 +167,31 @@ export async function checkTableAvailability(
     rsvs = res.results || [];
   }
 
-  const reservedMap = new Set(
-    (rsvs || [])
-      .filter((r) => matchesOperatingUnit(r as unknown as Record<string, unknown>, query.operatingUnitId))
-      .filter((r) => !query.time || r.time === query.time)
-      .map((r) => r.table_id)
-  );
+  const timeMatchedRsvs = (rsvs || [])
+    .filter((r) => matchesOperatingUnit(r as unknown as Record<string, unknown>, query.operatingUnitId))
+    .filter((r) => !query.time || r.time === query.time);
 
   const mapped = (tables || []).map((t) => {
     const isPhysicalAvailable = String(t.status).toLowerCase() === 'available';
-    const isNotReserved = !reservedMap.has(t.id) && !reservedMap.has(String(t.table_number));
+    const tableUnit =
+      (t.operating_unit_id && String(t.operating_unit_id).trim()) ||
+      (t.tenant_id && String(t.tenant_id).trim()) ||
+      (query.operatingUnitId &&
+      query.operatingUnitId.trim() !== '*' &&
+      query.operatingUnitId.trim().toLowerCase() !== 'hq'
+        ? query.operatingUnitId.trim()
+        : '');
+    const isReservedForTable = timeMatchedRsvs.some((r) => {
+      if (r.table_id !== t.id && r.table_id !== String(t.table_number)) {
+        return false;
+      }
+      return tableUnit
+        ? matchesOperatingUnit(r as unknown as Record<string, unknown>, tableUnit)
+        : true;
+    });
     return {
       ...t,
-      available: isPhysicalAvailable && isNotReserved,
+      available: isPhysicalAvailable && !isReservedForTable,
     };
   });
 

@@ -41,10 +41,14 @@ export async function createNowPaymentsInvoice(
     return null;
   }
 
+  if (!Number.isFinite(amountVnd) || amountVnd <= 0) {
+    throw new Error('NowPayments invoice amountVnd must be a positive finite number');
+  }
+
   const ipnUrl = `${env.APP_URL || 'http://localhost:3000'}/api/webhooks/nowpayments`;
 
   const payload: NowPaymentsInvoicePayload = {
-    price_amount: amountVnd / 25000, // VND approximation (NOWPayments supports VND approximate rate)
+    price_amount: amountVnd,
     price_currency: 'vnd',
     order_id: `invoice_${invoiceId}`,
     order_description: orderDescription,
@@ -66,9 +70,13 @@ export async function createNowPaymentsInvoice(
   }
 
   const data = (await res.json()) as NowPaymentsInvoiceResponse;
+  const rawInvoiceId = data.id !== undefined && data.id !== null ? String(data.id).trim() : '';
+  const paymentRef = rawInvoiceId
+    ? (rawInvoiceId.startsWith('inv:') ? rawInvoiceId : `inv:${rawInvoiceId}`)
+    : String(data.payment_id ?? '').trim();
   return {
     paymentId: data.payment_id,
     checkoutUrl: data.checkout_url,
-    paymentRef: data.id,
+    paymentRef,
   };
 }

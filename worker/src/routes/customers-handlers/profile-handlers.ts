@@ -5,32 +5,74 @@ import { resolvePilotStore } from '../../lib/pilot-store';
 import { updateCustomerProfileSchema, zodErrorResponse } from '../../lib/validators';
 import { type CustomerRecord, PROFILE_SQL } from './types';
 
-function resolveCustomerTenant(c: { get: (k: string) => unknown; env: Env }): string {
-  const user = c.get('user') as { tenantId?: string } | undefined;
-  if (user?.tenantId) {
-    return user.tenantId;
-  }
+function resolveCustomerTenantScope(c: {
+  get: (k: string) => unknown;
+  req: { query: (k: string) => string | undefined; header: (k: string) => string | undefined };
+  env: Env;
+}): { tenantId: string; forbidden: boolean } {
+  const user = c.get('user') as { tenantId?: string; tenant_id?: string } | undefined;
+  const tokenTenant = String(user?.tenantId ?? user?.tenant_id ?? '').trim();
+  const queryTenant = String(
+    c.req.query('tenant_id') ||
+    c.req.query('tenantId') ||
+    c.req.query('store_id') ||
+    c.req.query('storeId') ||
+    ''
+  ).trim();
+  const headerTenant = String(
+    c.req.header('X-Tenant-ID') ||
+    c.req.header('x-tenant-id') ||
+    c.req.header('X-Store-ID') ||
+    c.req.header('x-store-id') ||
+    ''
+  ).trim();
+  const reqTenant = queryTenant || headerTenant;
+  const ctxTenant = String((c.get('tenantId') as string | undefined) || '').trim();
+
+  let pilotTenant = 'default';
   try {
-    return resolvePilotStore(c.env);
+    pilotTenant = resolvePilotStore(c.env);
   } catch {
-    return 'default';
+    pilotTenant = 'default';
   }
+
+  const boundTenant = tokenTenant || ctxTenant || pilotTenant || 'default';
+  if (
+    boundTenant === '*' ||
+    boundTenant.toLowerCase() === 'hq' ||
+    reqTenant === '*' ||
+    reqTenant.toLowerCase() === 'hq' ||
+    ctxTenant === '*' ||
+    ctxTenant.toLowerCase() === 'hq' ||
+    (queryTenant && headerTenant && queryTenant !== headerTenant) ||
+    (tokenTenant && ctxTenant && ctxTenant !== tokenTenant) ||
+    (queryTenant && queryTenant !== boundTenant) ||
+    (headerTenant && headerTenant !== boundTenant)
+  ) {
+    return { tenantId: boundTenant === '*' || boundTenant.toLowerCase() === 'hq' ? 'default' : boundTenant, forbidden: true };
+  }
+
+  return { tenantId: boundTenant, forbidden: false };
 }
 
 export function registerProfileHandlers(router: Hono<{ Bindings: Env }>): void {
   // GET /api/customers/me — get current customer by JWT (customer role only)
   router.get('/me', requireAuth(['customer']), async (c) => {
     const db = c.env.AURA_DB;
-    const user = c.get('user' as any) as { id?: string; sub?: string; customerId?: string; role?: string } | undefined;
+    const user = c.get('user' as any) as { id?: string; sub?: string; customerId?: string; customer_id?: string; role?: string } | undefined;
     if (!user || user.role !== 'customer') {
       return c.json({ success: false, error: 'Forbidden' }, 403);
     }
 
-    const customerId = user.customerId || user.id || user.sub;
+    const customerId = user.customerId || user.customer_id || user.id || user.sub;
     if (!customerId) {
       return c.json({ success: false, error: 'No customer ID in token' }, 400);
     }
-    const tenantId = resolveCustomerTenant(c as unknown as { get: (k: string) => unknown; env: Env });
+    const scope = resolveCustomerTenantScope(c as unknown as Parameters<typeof resolveCustomerTenantScope>[0]);
+    if (scope.forbidden) {
+      return c.json({ success: false, error: 'Cross-tenant access denied' }, 403);
+    }
+    const tenantId = scope.tenantId;
 
     let customer: CustomerRecord | null = null;
     try {
@@ -38,18 +80,31 @@ export function registerProfileHandlers(router: Hono<{ Bindings: Env }>): void {
         `${PROFILE_SQL}WHERE c.id = ? AND COALESCE(NULLIF(TRIM(c.tenant_id), ''), 'default') = ?`
       ).bind(customerId, tenantId).first<CustomerRecord>();
     } catch {
-      try {
+      if (tenantId === 'default') {
+        try {
+          customer = await db.prepare(
+            `${PROFILE_SQL}WHERE c.id = ?`
+          ).bind(customerId).first<CustomerRecord>();
+        } catch {
+          customer = await db.prepare(
+            'SELECT c.* FROM customers c WHERE c.id = ?'
+          ).bind(customerId).first<CustomerRecord>();
+        }
+      } else {
         customer = await db.prepare(
-          `${PROFILE_SQL}WHERE c.id = ?`
-        ).bind(customerId).first<CustomerRecord>();
-      } catch {
-        customer = await db.prepare(
-          'SELECT c.* FROM customers c WHERE c.id = ?'
-        ).bind(customerId).first<CustomerRecord>();
+          "SELECT c.* FROM customers c WHERE c.id = ? AND COALESCE(NULLIF(TRIM(c.tenant_id), ''), 'default') = ?"
+        ).bind(customerId, tenantId).first<CustomerRecord>().catch(() => null);
       }
-      const rowTenant = (customer as Record<string, unknown> | null)?.tenant_id;
-      const resolvedRowTenant = typeof rowTenant === 'string' && rowTenant.trim() !== '' ? rowTenant.trim() : 'default';
-      if (tenantId !== '*' && resolvedRowTenant !== tenantId) {
+    }
+
+    if (customer) {
+      const rec = customer as unknown as Record<string, unknown>;
+      if ('tenant_id' in rec && rec.tenant_id !== undefined) {
+        const resolvedRowTenant = typeof rec.tenant_id === 'string' && rec.tenant_id.trim() !== '' ? rec.tenant_id.trim() : 'default';
+        if (resolvedRowTenant !== tenantId) {
+          customer = null;
+        }
+      } else if (tenantId !== 'default') {
         customer = null;
       }
     }
@@ -64,16 +119,20 @@ export function registerProfileHandlers(router: Hono<{ Bindings: Env }>): void {
   // PATCH /api/customers/me — update current customer profile (customer role only)
   router.patch('/me', requireAuth(['customer']), async (c) => {
     const db = c.env.AURA_DB;
-    const user = c.get('user' as any) as { id?: string; sub?: string; customerId?: string; role?: string } | undefined;
+    const user = c.get('user' as any) as { id?: string; sub?: string; customerId?: string; customer_id?: string; role?: string } | undefined;
     if (!user || user.role !== 'customer') {
       return c.json({ success: false, error: 'Forbidden' }, 403);
     }
 
-    const customerId = user.customerId || user.id || user.sub;
+    const customerId = user.customerId || user.customer_id || user.id || user.sub;
     if (!customerId) {
       return c.json({ success: false, error: 'No customer ID in token' }, 400);
     }
-    const tenantId = resolveCustomerTenant(c as unknown as { get: (k: string) => unknown; env: Env });
+    const scope = resolveCustomerTenantScope(c as unknown as Parameters<typeof resolveCustomerTenantScope>[0]);
+    if (scope.forbidden) {
+      return c.json({ success: false, error: 'Cross-tenant access denied' }, 403);
+    }
+    const tenantId = scope.tenantId;
 
     const body = await c.req.json() as Record<string, unknown>;
     const parsed = updateCustomerProfileSchema.safeParse(body);
@@ -106,7 +165,7 @@ export function registerProfileHandlers(router: Hono<{ Bindings: Env }>): void {
           .bind(trimmedPhone, customerId, tenantId, tenantId)
           .first<{ id?: string; phone?: string | null; tenant_id?: string | null }>();
       } catch (err) {
-        if (/no such column:\s*tenant_id/i.test(String(err))) {
+        if (tenantId === 'default' && /no such column:\s*tenant_id/i.test(String(err))) {
           existingPhone = await db
             .prepare(`SELECT id, phone FROM customers WHERE phone = ? AND id != ? LIMIT 1`)
             .bind(trimmedPhone, customerId)
@@ -148,7 +207,7 @@ export function registerProfileHandlers(router: Hono<{ Bindings: Env }>): void {
       }
       const existing = await db.prepare('SELECT id, tenant_id FROM customers WHERE id = ?').bind(customerId).first<{ id?: string; tenant_id?: string | null }>().catch(() => null);
       const existingTenant = existing?.tenant_id && existing.tenant_id.trim() !== '' ? existing.tenant_id.trim() : 'default';
-      if (tenantId !== '*' && ((!existing && tenantId !== 'default') || existingTenant !== tenantId)) {
+      if ((!existing && tenantId !== 'default') || existingTenant !== tenantId) {
         return c.json({ success: false, error: 'Customer not found' }, 404);
       }
       if (!/no such column:\s*tenant_id/i.test(msg)) {
@@ -161,14 +220,14 @@ export function registerProfileHandlers(router: Hono<{ Bindings: Env }>): void {
           if (/UNIQUE constraint failed/i.test(innerMsg)) {
             return c.json({ success: false, error: 'Phone number already in use by another customer' }, 409);
           }
-          if (!/no such column:\s*tenant_id/i.test(innerMsg)) {
+          if (tenantId !== 'default' || !/no such column:\s*tenant_id/i.test(innerMsg)) {
             throw innerErr;
           }
           await db.prepare(
             `UPDATE customers SET ${baseUpdates.join(', ')} WHERE id = ?`
           ).bind(...params, customerId).run();
         }
-      } else {
+      } else if (tenantId === 'default') {
         try {
           await db.prepare(
             `UPDATE customers SET ${updates.join(', ')} WHERE id = ?`
@@ -181,6 +240,8 @@ export function registerProfileHandlers(router: Hono<{ Bindings: Env }>): void {
             `UPDATE customers SET ${baseUpdates.join(', ')} WHERE id = ?`
           ).bind(...params, customerId).run();
         }
+      } else {
+        return c.json({ success: false, error: 'Customer not found' }, 404);
       }
     }
 
@@ -190,20 +251,37 @@ export function registerProfileHandlers(router: Hono<{ Bindings: Env }>): void {
         `${PROFILE_SQL}WHERE c.id = ? AND COALESCE(NULLIF(TRIM(c.tenant_id), ''), 'default') = ?`
       ).bind(customerId, tenantId).first<CustomerRecord>();
     } catch {
-      try {
+      if (tenantId === 'default') {
+        try {
+          customer = await db.prepare(
+            `${PROFILE_SQL}WHERE c.id = ?`
+          ).bind(customerId).first<CustomerRecord>();
+        } catch {
+          customer = await db.prepare(
+            'SELECT c.* FROM customers c WHERE c.id = ?'
+          ).bind(customerId).first<CustomerRecord>();
+        }
+      } else {
         customer = await db.prepare(
-          `${PROFILE_SQL}WHERE c.id = ?`
-        ).bind(customerId).first<CustomerRecord>();
-      } catch {
-        customer = await db.prepare(
-          'SELECT c.* FROM customers c WHERE c.id = ?'
-        ).bind(customerId).first<CustomerRecord>();
+          "SELECT c.* FROM customers c WHERE c.id = ? AND COALESCE(NULLIF(TRIM(c.tenant_id), ''), 'default') = ?"
+        ).bind(customerId, tenantId).first<CustomerRecord>().catch(() => null);
       }
-      const rowTenant = (customer as Record<string, unknown> | null)?.tenant_id;
-      const resolvedRowTenant = typeof rowTenant === 'string' && rowTenant.trim() !== '' ? rowTenant.trim() : 'default';
-      if (tenantId !== '*' && resolvedRowTenant !== tenantId) {
+    }
+
+    if (customer) {
+      const rec = customer as unknown as Record<string, unknown>;
+      if ('tenant_id' in rec && rec.tenant_id !== undefined) {
+        const resolvedRowTenant = typeof rec.tenant_id === 'string' && rec.tenant_id.trim() !== '' ? rec.tenant_id.trim() : 'default';
+        if (resolvedRowTenant !== tenantId) {
+          customer = null;
+        }
+      } else if (tenantId !== 'default') {
         customer = null;
       }
+    }
+
+    if (!customer) {
+      return c.json({ success: false, error: 'Customer not found' }, 404);
     }
 
     return c.json({ success: true, data: customer });

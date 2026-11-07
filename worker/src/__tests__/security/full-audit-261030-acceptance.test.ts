@@ -1986,7 +1986,8 @@ describe('Full Security Audit Acceptance — KDS Surfaces & Collection Guards', 
           ti_order_id TEXT,
           status TEXT,
           synced_at TEXT,
-          created_at TEXT
+          created_at TEXT,
+          tenant_id TEXT DEFAULT 'default'
         );
         CREATE TABLE IF NOT EXISTS frigate_events (
           id TEXT PRIMARY KEY,
@@ -4200,7 +4201,7 @@ describe('Full Security Audit Acceptance — KDS Surfaces & Collection Guards', 
         );
         CREATE TABLE ti_order_bridge (
           id TEXT PRIMARY KEY, local_order_id TEXT, ti_order_id TEXT,
-          status TEXT, synced_at TEXT, created_at TEXT
+          status TEXT, synced_at TEXT, created_at TEXT, tenant_id TEXT DEFAULT 'default'
         );
         CREATE TABLE frigate_events (
           id TEXT PRIMARY KEY, camera TEXT, label TEXT, start_time INTEGER,
@@ -7701,7 +7702,7 @@ describe('Phase 43 (AP1..AP4) — Loyalty, Checkin, Reviews, Subscriptions, Refe
     expect(checkinSrc).toContain('resolvePublicTenantId');
     expect(checkinSrc).toContain('Forbidden: cannot check in for another customer');
     expect(reviewsSrc).toContain('Order cannot be reviewed in its current status');
-    expect(reviewsSrc).toContain('suppliedPhone !== orderPhone');
+    expect(reviewsSrc).toContain('suppliedPhoneNorm !== orderPhoneNorm');
     expect(loyaltySrc).toContain('filterTenantReward');
     expect(loyaltySrc).toContain('Tier requirement not met for this reward');
     expect(loyaltySrc).toContain('Reward redemption limit reached');
@@ -7962,7 +7963,1767 @@ describe('Phase 44 (AQ1..AQ4) — Birthday, POS Lookup, QR, Signage, Table Sessi
   });
 });
 
+describe('Phase 45 (AR1..AR4) — Edge Telemetry, WiFi, Forecasting, Shifts, Kitchen Stations/Tickets, Promotions, Reports, Inventory & Webhooks/Push/Cron Hardening', () => {
+  it('AR1: wifi masks session phone, clamps duration, rate-limits /login & restricts staff grant overrides; container-telemetry enforces tenant-safe upsert, escapes Telegram Markdown & throttles alerts; and inventory-forecasting, demand-forecast & recommendations exclude terminal orders & scope tenants', async () => {
+    const fs = await import('fs');
+    const path = require('path');
+    const wifiRouteSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../routes/wifi.ts'),
+      'utf8'
+    );
+    const wifiSessionSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../tree/wifi/session.ts'),
+      'utf8'
+    );
+    const telemetrySrc = fs.readFileSync(
+      path.resolve(__dirname, '../../routes/container-telemetry.ts'),
+      'utf8'
+    );
+    const invForecastSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../routes/inventory-forecasting.ts'),
+      'utf8'
+    );
+    const demandForecastSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../routes/demand-forecast.ts'),
+      'utf8'
+    );
+    const recommendationsSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../routes/recommendations.ts'),
+      'utf8'
+    );
 
+    expect(wifiRouteSrc).toContain('Forbidden: Role staff is not allowed to grant WiFi overrides');
+    expect(wifiRouteSrc).toContain('rl:wifi-login:');
+    expect(wifiSessionSrc).toContain('maskWifiPhone');
+    expect(wifiSessionSrc).toContain('clampWifiDuration');
+    expect(telemetrySrc).toContain('escapeTelegramMarkdown');
+    expect(telemetrySrc).toContain('Cross-tenant telemetry log ID conflict');
+    expect(invForecastSrc).toContain('allowedItemIds');
+    expect(demandForecastSrc).toContain("NOT IN ('cancelled', 'failed', 'rejected', 'expired'");
+    expect(recommendationsSrc).toContain('resolveRecommendationsTenantId');
+  });
 
+  it('AR2: schedules enforces startTime < endTime & blocks cancelled shift revival; shifts/attendance propagates clock-out notes & validates staffId/attendanceId parity; kitchen-stations restricts mutations to manager+ roles; kitchen-station-tickets scopes active order items & upserts direct /ready; and kds-mobile removes cashier from UPDATE_ROLES', async () => {
+    const fs = await import('fs');
+    const path = require('path');
+    const schedulesSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../../../packages/domain/shift/commands/schedules.ts'),
+      'utf8'
+    );
+    const attendanceSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../../../packages/domain/shift/commands/attendance.ts'),
+      'utf8'
+    );
+    const shiftsSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../../../packages/domain/shift/commands/shifts.ts'),
+      'utf8'
+    );
+    const kitchenStationsSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../../../packages/domain/kitchen/commands/kitchen-stations.ts'),
+      'utf8'
+    );
+    const stationTicketsSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../../../packages/domain/kitchen/commands/kitchen-station-tickets.ts'),
+      'utf8'
+    );
+    const kdsMobileSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../../../packages/domain/kitchen/commands/kds-mobile.ts'),
+      'utf8'
+    );
+
+    expect(schedulesSrc).toContain('startTime must be before endTime');
+    expect(schedulesSrc).toContain('Cancelled shift cannot be modified');
+    expect(attendanceSrc).toContain('Attendance record does not match staff member');
+    expect(shiftsSrc).toContain('clockOut(scope, parsed.data.staff_id, undefined, rawNotes)');
+    expect(kitchenStationsSrc).toContain("const STATION_MANAGER_ROLES = ['owner', 'manager', 'supervisor', 'admin']");
+    expect(stationTicketsSrc).toContain('requireKdsItemStaff');
+    expect(kdsMobileSrc).toContain("const UPDATE_ROLES: string[] = ['owner', 'manager', 'supervisor', 'staff', 'kitchen', 'barista', 'chef', 'admin', 'waiter']");
+  });
+
+  it('AR3: ingredient & supplier handlers guard unscoped mutation fallbacks & record audit tenant_id; promotions usage/validation enforce min_order_value, discount caps & catalog item verification; grouped-sales & order-summary exclude terminal non-revenue orders; and guest-checkin prevents duplicate table claims', async () => {
+    const fs = await import('fs');
+    const path = require('path');
+    const ingredientHandlersSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../routes/openapi-inventory-handlers/ingredient-handlers.ts'),
+      'utf8'
+    );
+    const supplierHandlersSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../routes/openapi-inventory-handlers/supplier-handlers.ts'),
+      'utf8'
+    );
+    const promoUsageSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../routes/openapi-promotions-handlers/usage-handlers.ts'),
+      'utf8'
+    );
+    const promoValidationSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../routes/openapi-promotions-handlers/validation-handlers.ts'),
+      'utf8'
+    );
+    const groupedSalesSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../routes/reports-handlers/grouped-sales-handlers.ts'),
+      'utf8'
+    );
+    const orderSummarySrc = fs.readFileSync(
+      path.resolve(__dirname, '../../routes/openapi-orders-handlers/order-summary-handlers.ts'),
+      'utf8'
+    );
+    const orderReadSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../routes/openapi-orders-handlers/order-read-handlers.ts'),
+      'utf8'
+    );
+    const guestHandlersSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../routes/orders-hono-handlers/guest-handlers.ts'),
+      'utf8'
+    );
+
+    expect(ingredientHandlersSrc).toContain('writeIngredientAuditLog');
+    expect(supplierHandlersSrc).toContain('checkSupplierTenant');
+    expect(promoUsageSrc).toContain('Discount amount exceeds promotion allowance');
+    expect(promoValidationSrc).toContain('unverifiedCatalogItem');
+    expect(groupedSalesSrc).toContain('NON_REVENUE_STATUS_SQL');
+    expect(orderSummarySrc).toContain("NOT IN ('cancelled', 'failed', 'rejected', 'expired'");
+    expect(orderReadSrc).toContain('Math.min(Math.max(1, Math.trunc(rawLimit)), 100)');
+    expect(guestHandlersSrc).toContain('claimedTableStmt');
+  });
+
+  it('AR4: push scopes manual staff endpoints & list-subscriptions RBAC/SQL while filtering manual endpoints from customer broadcast; cal-booking filters conflicting slot reservations & handles BOOKING_RESCHEDULED; pretix deduplicates notification_id per tenant; and cron/mautic scope SLA alerts, cashback warnings & campaign enrollment', async () => {
+    const fs = await import('fs');
+    const path = require('path');
+    const pushSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../routes/push.ts'),
+      'utf8'
+    );
+    const notifierSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../tree/push/notifier.ts'),
+      'utf8'
+    );
+    const calWebhookSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../routes/cal-booking-webhook-handlers/webhook-handler.ts'),
+      'utf8'
+    );
+    const calProcessSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../tree/cal-booking/process-booking.ts'),
+      'utf8'
+    );
+    const pretixWebhookSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../routes/pretix-handlers/webhook-handler.ts'),
+      'utf8'
+    );
+    const cronOrderChecksSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../routes/cron-handlers/order-checks.ts'),
+      'utf8'
+    );
+    const cronCashbackSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../routes/cron-handlers/cashback-warnings.ts'),
+      'utf8'
+    );
+    const mauticEnrollSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../tree/mautic/campaign-enrollment.ts'),
+      'utf8'
+    );
+
+    expect(pushSrc).toContain("pushRouter.get('/list-subscriptions', requireAuth(['owner', 'manager', 'supervisor', 'admin'])");
+    expect(notifierSrc).toContain("!s.endpoint.startsWith('https://manual.auraspace.local/')");
+    expect(calWebhookSrc).toContain('BOOKING_RESCHEDULED');
+    expect(calProcessSrc).toContain('filterUnbookedTables');
+    expect(pretixWebhookSrc).toContain("SELECT notification_id FROM pretix_webhook_log WHERE notification_id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ? LIMIT 1");
+    expect(cronOrderChecksSrc).toContain('kds_sla_breach:${effectiveAlertTenant}');
+    expect(cronCashbackSrc).toContain('cw.balance as wallet_balance');
+    expect(mauticEnrollSrc).toContain('isAlreadyEnrolled');
+  });
+});
+
+describe('Phase 46 (AS1..AS4) — Subscriptions/Crypto IPN/MRR, Reservations/Table/QR/Split-Orders, Purchasing/BOM/Cash-Reconciliation & ERPNext Hardening', () => {
+  it('AS1: NowPayments validates positive finite VND amounts & inv: paymentRef, IPN verifies HMAC before JSON parsing & guards initial period double-extension/refund tenant scope, MRR normalizes quarterly/annual cycles, plan-handlers bind parsed.data, and subscription-receipt enforces RBAC & fail-closed tenant verification', async () => {
+    const fs = await import('fs');
+    const path = require('path');
+    const nowpaymentsSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../tree/subscriptions/nowpayments.ts'),
+      'utf8'
+    );
+    const nowpaymentsIpnSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../../../packages/domain/payment/commands/nowpayments-ipn.ts'),
+      'utf8'
+    );
+    const mrrSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../tree/subscriptions/mrr-calculator.ts'),
+      'utf8'
+    );
+    const planHandlersSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../tree/subscriptions/plan-handlers.ts'),
+      'utf8'
+    );
+    const receiptSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../routes/subscription-receipt.ts'),
+      'utf8'
+    );
+    const { normalizeSubscriptionMonthlyVnd } = await import('../../tree/subscriptions/mrr-calculator');
+
+    expect(nowpaymentsSrc).toContain("price_currency: 'vnd'");
+    expect(nowpaymentsSrc).toContain('NowPayments invoice amountVnd must be a positive finite number');
+    expect(nowpaymentsIpnSrc).toContain('Invalid JSON payload');
+    expect(nowpaymentsIpnSrc).toContain('inv:${explicitInvoiceId}');
+    expect(mrrSrc).toContain('normalizeSubscriptionMonthlyVnd');
+    expect(normalizeSubscriptionMonthlyVnd(3_000_000, 'quarterly')).toBe(1_000_000);
+    expect(normalizeSubscriptionMonthlyVnd(12_000_000, 'annual')).toBe(1_000_000);
+    expect(planHandlersSrc).toContain('const data = parsed.data;');
+    expect(receiptSrc).toContain('ALLOWED_RECEIPT_STAFF_ROLES');
+    expect(receiptSrc).toContain('tenantColumnVerified');
+  });
+
+  it('AS2: reservations & table policies block maintenance/inactive tables, guard multi-reservation cancellation table release & terminal approval, qr-scan enforces active QR & tenant table match, and split-orders validates table availability, discounts & tenant_id on order_items/payments', async () => {
+    const fs = await import('fs');
+    const path = require('path');
+    const reservationsSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../../../packages/domain/reservation/src/routes/reservations.ts'),
+      'utf8'
+    );
+    const tableAvailSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../../../packages/domain/table/src/policies/table-availability-policy.ts'),
+      'utf8'
+    );
+    const tableResPolicySrc = fs.readFileSync(
+      path.resolve(__dirname, '../../../../packages/domain/table/src/policies/table-reservation-policy.ts'),
+      'utf8'
+    );
+    const qrScanSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../../../packages/domain/table/commands/qr-scan.ts'),
+      'utf8'
+    );
+    const splitOrdersSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../../../packages/domain/order/commands/split-orders.ts'),
+      'utf8'
+    );
+    const { isTableUnavailableForService } = await import(
+      '../../../../packages/domain/table/src/policies/table-availability-policy'
+    );
+
+    expect(reservationsSrc).toContain('INACTIVE_TABLE_STATUSES');
+    expect(reservationsSrc).toContain('isBookableTableRow');
+    expect(tableAvailSrc).toContain('isTableUnavailableForService');
+    expect(isTableUnavailableForService('Maintenance')).toBe(true);
+    expect(isTableUnavailableForService('Available')).toBe(false);
+    expect(tableResPolicySrc).toContain('ACTIVE_RESERVATION_STATUSES');
+    expect(qrScanSrc).toContain('QR code is inactive');
+    expect(splitOrdersSrc).toContain('Table is unavailable for service');
+    expect(splitOrdersSrc).toContain('Unverified discount is not allowed on split orders');
+  });
+
+  it('AS3: purchasing enforces mutation/read RBAC, rejects duplicate PO ingredients, guards atomic conditional receiving & blocks cancelling partially_received POs; bom-policy scopes recipes by tenant & enforces order idempotency; cash-reconciliation prevents duplicate reconciliation & cross-tenant cash sums; and openapi-payments removes staff/waiter from RBAC', async () => {
+    const fs = await import('fs');
+    const path = require('path');
+    const purchasingRouteSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../../../packages/domain/inventory/src/routes/purchasing.ts'),
+      'utf8'
+    );
+    const purchasingPolicySrc = fs.readFileSync(
+      path.resolve(__dirname, '../../../../packages/domain/inventory/src/policies/purchasing-receiving-policy.ts'),
+      'utf8'
+    );
+    const bomPolicySrc = fs.readFileSync(
+      path.resolve(__dirname, '../../../../packages/domain/inventory/src/policies/bom-policy.ts'),
+      'utf8'
+    );
+    const cashReconSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../../../packages/domain/shift/src/policies/cash-reconciliation-policy.ts'),
+      'utf8'
+    );
+    const openApiPaymentsRoutesSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../routes/openapi-payments-handlers/routes.ts'),
+      'utf8'
+    );
+    const { calculateBomDepletion } = await import(
+      '../../../../packages/domain/inventory/src/policies/bom-policy'
+    );
+
+    expect(purchasingRouteSrc).toContain('PURCHASING_MUTATION_ROLES');
+    expect(purchasingRouteSrc).toContain('checkPurchasingReadAccess');
+    expect(purchasingPolicySrc).toContain('seenIngredientIds');
+    expect(purchasingPolicySrc).toContain('cannot_cancel_partially_received_order');
+    expect(bomPolicySrc).toContain("SELECT id, tenant_id FROM recipes WHERE product_id = ? AND is_active = 1 AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ? LIMIT 1");
+    const bomMap = new Map([['prod-1', [{ ingredient_id: 'ing-1', quantity: 2 }]]]);
+    expect(calculateBomDepletion([{ product_id: 'prod-1', quantity: -5 }], bomMap as any).size).toBe(0);
+    expect(cashReconSrc).toContain('allowUnscopedFallback');
+    expect(cashReconSrc).toContain('has already been reconciled');
+    expect(openApiPaymentsRoutesSrc).not.toContain("'waiter'");
+    expect(openApiPaymentsRoutesSrc).not.toContain("'staff'");
+  });
+
+  it('AS4: erpnext-pos verifies cryptographic JWTs on /products/sync & isolates non-default tenant credentials, erpnext-invoices fails closed on loadOrderForInvoice & uses authoritative D1 order items on /retry, erpnext-sync scopes inventory sync before LIMIT & deduplicates items, and cron/customers scope queue & erpnext_id updates by tenant', async () => {
+    const fs = await import('fs');
+    const path = require('path');
+    const erpPosSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../routes/erpnext-pos.ts'),
+      'utf8'
+    );
+    const erpInvoicesSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../routes/erpnext-invoices.ts'),
+      'utf8'
+    );
+    const erpSyncSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../routes/erpnext-sync.ts'),
+      'utf8'
+    );
+    const cronErpSyncSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../routes/cron-handlers/erpnext-sync.ts'),
+      'utf8'
+    );
+    const erpCustomersSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../routes/erpnext/customers.ts'),
+      'utf8'
+    );
+
+    expect(erpPosSrc).toContain('PRODUCT_SYNC_ALLOWED_ROLES');
+    expect(erpPosSrc).toContain('verifyJWT');
+    expect(erpPosSrc).toContain('isNonDefaultTenant');
+    expect(erpInvoicesSrc).toContain('hasFirstMethod');
+    expect(erpInvoicesSrc).toContain('mergeAuthoritativeOrder');
+    expect(erpSyncSrc).toContain("AND COALESCE(NULLIF(TRIM(it.tenant_id), ''), COALESCE(NULLIF(TRIM(ii.tenant_id), ''), 'default')) = ?");
+    expect(cronErpSyncSrc).toContain('matchesQueueTenant');
+    expect(erpCustomersSrc).toContain("WHERE COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ? ORDER BY created_at DESC LIMIT ? OFFSET ?");
+  });
+});
+
+describe('Phase 47 (AT1..AT4) — Payment Reconcile/Refunds, Dynamic Pricing/AI Barista/Floor Plan, Zalo/Mautic/Staff Tips & Catalog Happy-Hour/Modifiers Hardening', () => {
+  it('AT1: refunds isolates JSON parsing before settlement boundary & trims/bounds reason, manual-reconcile enforces financial RBAC & HQ wildcard guard, openapi-payments enforces PAYMENT_READ_ROLES & date(?) SQLite bounds, and payos-reconcile/webhook/cron enforce default-tenant customer fallback & CAST lease comparisons', async () => {
+    const fs = await import('fs');
+    const path = require('path');
+    const refundMutSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../routes/refunds-handlers/mutation-handlers.ts'),
+      'utf8'
+    );
+    const refundHelpersSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../routes/refunds-handlers/helpers.ts'),
+      'utf8'
+    );
+    const manualReconcileSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../routes/payment-reconcile-handlers/manual-reconcile.ts'),
+      'utf8'
+    );
+    const paymentReadSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../routes/openapi-payments-handlers/read-handlers.ts'),
+      'utf8'
+    );
+    const payosReconcileSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../../../packages/domain/payment/commands/payos-reconcile.ts'),
+      'utf8'
+    );
+    const payosLeaseSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../../../packages/domain/payment/commands/payos-reconcile-lease.ts'),
+      'utf8'
+    );
+    const cronReconcileSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../routes/cron-handlers/payment-reconcile.ts'),
+      'utf8'
+    );
+    const payosWebhookSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../routes/webhooks-handlers/payos.ts'),
+      'utf8'
+    );
+    const { refundRequestSchema } = await import('../../routes/refunds-handlers/helpers');
+    const { hasPaymentReadRole, mapPaymentRecord } = await import('../../routes/openapi-payments-handlers/read-handlers');
+
+    expect(refundMutSrc).toContain("return c.json({ success: false, error: 'Invalid JSON body' }, 400);");
+    expect(refundHelpersSrc).toContain("z.string().trim().min(1, 'reason is required').max(500)");
+    expect(refundRequestSchema.safeParse({ orderId: 'ord_1', amount: 10000, reason: '   ' }).success).toBe(false);
+    expect(manualReconcileSrc).toContain('!hasFinancialRole(c) && user.role !== \'supervisor\'');
+    expect(manualReconcileSrc).toContain('isHQSuperAdmin(user)');
+    expect(paymentReadSrc).toContain('PAYMENT_READ_ROLES');
+    expect(paymentReadSrc).toContain('date(p.created_at) >= date(?)');
+    expect(hasPaymentReadRole('waiter')).toBe(false);
+    expect(hasPaymentReadRole('cashier')).toBe(true);
+    expect(mapPaymentRecord({ id: 'p1', order_id: 'o1', status: 'paid', updated_at: '2026-10-30T10:00:00Z' }).paidAt).toBe('2026-10-30T10:00:00Z');
+    expect(payosReconcileSrc).toContain("!effectiveTenant || effectiveTenant === 'default'");
+    expect(payosWebhookSrc).toContain("if (!orderTenant || orderTenant === 'default')");
+    expect(payosLeaseSrc).toContain('CAST(lease_until AS INTEGER) < CAST(? AS INTEGER)');
+    expect(cronReconcileSrc).toContain('CAST(j.next_attempt_at AS INTEGER) <= CAST(? AS INTEGER)');
+  });
+
+  it('AT2: dynamic-pricing restricts simulation overrides to privileged roles & rejects unknown product_ids for public callers, ai-barista sanitizes control characters, rate-limits per IP+tenant & prevents customer_id spoofing, and floor-plan restricts mutations to FLOOR_PLAN_MUTATION_ROLES, bounds timeout_minutes & excludes paid sessions', async () => {
+    const fs = await import('fs');
+    const path = require('path');
+    const dynamicPricingSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../routes/dynamic-pricing.ts'),
+      'utf8'
+    );
+    const aiBaristaSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../routes/ai-barista.ts'),
+      'utf8'
+    );
+    const floorPlanSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../routes/floor-plan.ts'),
+      'utf8'
+    );
+
+    expect(dynamicPricingSrc).toContain("const PRIVILEGED_PRICING_ROLES = new Set(['owner', 'manager', 'supervisor', 'admin']);");
+    expect(dynamicPricingSrc).toContain('isPrivilegedCaller');
+    expect(dynamicPricingSrc).toContain('isHQSuperAdmin(user)');
+    expect(aiBaristaSrc).toContain('sanitizeBaristaText');
+    expect(aiBaristaSrc).toContain('BARISTA_RATE_LIMIT_MAX_REQUESTS = 30');
+    expect(aiBaristaSrc).toContain('Too many recommendation requests. Please try again later.');
+    expect(aiBaristaSrc).toContain('trustedCustomerId');
+    expect(floorPlanSrc).toContain("const FLOOR_PLAN_MUTATION_ROLES = new Set(['owner', 'manager', 'supervisor', 'admin', 'cashier']);");
+    expect(floorPlanSrc).toContain('timeout_minutes must be a finite number between 1 and 1440');
+    expect(floorPlanSrc).toContain("String(r.session_status ?? '').toLowerCase() !== 'paid'");
+    expect(floorPlanSrc).toContain('canRunUnscopedFallback');
+  });
+
+  it('AT3: zalo wraps /send JSON parsing in try/catch (400) & notifyMember fails closed on non-default tenant DB errors, zalo-webhook normalizes 10-digit Unix seconds timestamps & writes dedup keys after processCustomerQuery, mautic deduplicates promo enrollment & isolates synthetic emails/terminal orders, and staff-tips excludes terminal/refunded orders & requires integer tip_amount', async () => {
+    const fs = await import('fs');
+    const path = require('path');
+    const zaloSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../routes/zalo.ts'),
+      'utf8'
+    );
+    const notifyMemberSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../tree/zalo/notify-member.ts'),
+      'utf8'
+    );
+    const zaloWebhookSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../routes/zalo-webhook.ts'),
+      'utf8'
+    );
+    const promoCampaignSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../tree/mautic/promo-campaign.ts'),
+      'utf8'
+    );
+    const contactSyncSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../tree/mautic/contact-sync.ts'),
+      'utf8'
+    );
+    const segmentSyncSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../tree/mautic/segment-sync.ts'),
+      'utf8'
+    );
+    const staffTipsSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../../../packages/domain/staff/commands/staff-tips.ts'),
+      'utf8'
+    );
+
+    expect(zaloSrc).toContain("return json({ success: false, error: 'Invalid JSON body' }, 400);");
+    expect(notifyMemberSrc).toContain("if (effectiveTenant === 'default' || effectiveTenant === '*')");
+    expect(zaloWebhookSrc).toContain('const tsMs = tsNum > 1e9 && tsNum < 1e12 ? tsNum * 1000 : tsNum;');
+    expect(promoCampaignSrc).toContain('enrollmentTracker.isAlreadyEnrolled');
+    expect(contactSyncSrc).toContain("NOT IN ('cancelled', 'rejected', 'failed', 'expired')");
+    expect(segmentSyncSrc).toContain('hasCrossTenantPhoneCollision');
+    expect(staffTipsSrc).toContain("NOT IN ('cancelled', 'rejected', 'failed', 'expired', 'refunded')");
+    expect(staffTipsSrc).toContain('Number.isInteger(rawTipAmount)');
+  });
+
+  it('AT4: happy-hour validates apply_to/apply_ids/priority & scopes /now by tenant with resolveItemPrice parity, menu-modifiers enforces non-negative integer price_delta, adds PATCH /groups/:id with projection sync & scopes deletes by group_id, and get-customer-menu filters inactive or cross-tenant modifier groups', async () => {
+    const fs = await import('fs');
+    const path = require('path');
+    const happyHourSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../../../packages/domain/catalog/commands/happy-hour.ts'),
+      'utf8'
+    );
+    const menuModifiersSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../../../packages/domain/catalog/commands/menu-modifiers.ts'),
+      'utf8'
+    );
+    const getCustomerMenuSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../../../packages/domain/catalog/commands/get-customer-menu.ts'),
+      'utf8'
+    );
+    const menuProjectionSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../../../packages/domain/catalog/policies/menu-projection.ts'),
+      'utf8'
+    );
+
+    expect(happyHourSrc).toContain('VALID_APPLY_TO');
+    expect(happyHourSrc).toContain('parseNonEmptyApplyIds');
+    expect(happyHourSrc).toContain('itemMatchesHappyHourWindow');
+    expect(happyHourSrc).toContain('resolveItemPrice');
+    expect(menuModifiersSrc).toContain("menuModifiersRouter.patch('/groups/:id'");
+    expect(menuModifiersSrc).toContain('syncModifierGroupAvailabilityToMenuProjection');
+    expect(menuModifiersSrc).toContain('price_delta must be a non-negative integer');
+    expect(getCustomerMenuSrc).toContain('SELECT * FROM modifier_groups WHERE id IN');
+    expect(menuProjectionSrc).toContain('syncModifierGroupAvailabilityToMenuProjection');
+  });
+});
+
+describe('Phase 48 (AU1..AU4) — Loyalty Tiers/Phone Auth/Referral Reversal, Mobile Notifications/SOP Reminders, Analytics Payout/Export & Catalog Products/Modifier Validation Hardening', () => {
+  it('AU1: loyalty tier PATCH enforces owner/admin RBAC, default-tenant user.tenantId guard & finite numeric bounds, throttle ignores X-Forwarded-For loopback bypass, phone-auth/otp isolate tenants & enforce failed OTP lockout/campaign locks, and reverseReferralCashback clamps debits & adjusts total_earned', async () => {
+    const fs = await import('fs');
+    const path = require('path');
+    const tierHandlersSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../routes/openapi-loyalty-handlers/tier-handlers.ts'),
+      'utf8'
+    );
+    const phoneAuthSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../tree/loyalty/phone-auth-handler.ts'),
+      'utf8'
+    );
+    const phoneOtpSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../tree/loyalty/phone-otp-handler.ts'),
+      'utf8'
+    );
+    const loyaltyHelpersSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../tree/loyalty/helpers.ts'),
+      'utf8'
+    );
+    const authMwSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../tree/loyalty/auth-middleware.ts'),
+      'utf8'
+    );
+    const reverseCashbackSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../tree/referrals/reverse-cashback.ts'),
+      'utf8'
+    );
+    const { throttle } = await import('../../tree/loyalty/helpers');
+
+    expect(tierHandlersSrc).toContain("if (!user || !['owner', 'admin'].includes(user.role))");
+    expect(tierHandlersSrc).toContain('Global tier configuration can only be modified by default tenant admin');
+    expect(tierHandlersSrc).toContain('pointMultiplier must be a positive finite number');
+    expect(phoneAuthSrc).toContain('OTP_VERIFY_FAIL_MAX = 5');
+    expect(phoneAuthSrc).toContain('withCampaignBonusLock');
+    expect(phoneOtpSrc).toContain('expectedAudience: c.env.JWT_AUDIENCE');
+    expect(loyaltyHelpersSrc).toContain("if (c.env.ENVIRONMENT !== 'production' && cfIp && isLoopback(cfIp))");
+    expect(authMwSrc).toContain('expectedAudience: c.env.JWT_AUDIENCE');
+    expect(reverseCashbackSrc).toContain('const actualDebit = hadExistingWallet ? Math.min(walletBalance, DEBIT_VND) : DEBIT_VND;');
+    expect(reverseCashbackSrc).toContain('total_earned = MAX(0, COALESCE(total_earned, 0) - ?)');
+
+    // Runtime check: X-Forwarded-For: 127.0.0.1 does not bypass throttle when CF-Connecting-IP is absent
+    const kvMap = new Map<string, string>();
+    const mockCtx: any = {
+      env: {
+        ENVIRONMENT: 'development',
+        AUTH_KV: {
+          get: async (k: string) => kvMap.get(k) ?? null,
+          put: async (k: string, v: string) => {
+            kvMap.set(k, v);
+          },
+        },
+      },
+      req: {
+        header: (name: string) => (name === 'X-Forwarded-For' ? '127.0.0.1' : undefined),
+      },
+    };
+    expect(await throttle(mockCtx, 'au1_test', 1, 60)).toBe(true);
+    expect(await throttle(mockCtx, 'au1_test', 1, 60)).toBe(false);
+  });
+
+  it('AU2: notifications-mobile binds staff tenant & guards SSRF/409 push hijacking, sop-reminders enforces Asia/Ho_Chi_Minh 08:00 gate & NULL run_id dedup, startRunForStaff reuses in_progress runs & checks targetRole/applicableRoles, and sop-admin-write bounds appealExplanation', async () => {
+    const fs = await import('fs');
+    const path = require('path');
+    const notifMobileSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../routes/notifications-mobile.ts'),
+      'utf8'
+    );
+    const sopRemindersCronSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../routes/cron-handlers/sop-reminders.ts'),
+      'utf8'
+    );
+    const sopWriteRepoSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../../../packages/domain/sop/commands/sop-write-repository.ts'),
+      'utf8'
+    );
+    const sopOpenShiftSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../../../packages/domain/sop/commands/sop-open-shift.ts'),
+      'utf8'
+    );
+    const sopReminderReadsSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../../../packages/domain/sop/commands/sop-reminder-reads.ts'),
+      'utf8'
+    );
+    const sopAdminWriteSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../routes/openapi-sop-handlers/sop-admin-write-handlers.ts'),
+      'utf8'
+    );
+    const sopReminderHandlersSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../routes/openapi-sop-handlers/sop-reminder-handlers.ts'),
+      'utf8'
+    );
+
+    expect(notifMobileSrc).toContain('resolveMobileStaffTenant');
+    expect(notifMobileSrc).toContain('Endpoint push đã thuộc về tài khoản hoặc cửa hàng khác');
+    expect(sopRemindersCronSrc).toContain("const STORE_TZ = 'Asia/Ho_Chi_Minh'");
+    expect(sopRemindersCronSrc).toContain('if (currentHour >= 8)');
+    expect(sopWriteRepoSrc).toContain('Role is not permitted to execute this template');
+    expect(sopWriteRepoSrc).toContain("AND status = 'in_progress'");
+    expect(sopOpenShiftSrc).toContain("WHERE COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ? AND staff_id = ?");
+    expect(sopReminderReadsSrc).toContain('seenNullRunKeys');
+    expect(sopAdminWriteSrc).toContain('explanation.length < 1 || explanation.length > 2000');
+    expect(sopReminderHandlersSrc).toContain('handleSopReminderError');
+  });
+
+  it('AU3: analytics payout includes fulfilled PayOS statuses & payment_status=refunded, resolveAnalyticsTenant blocks cross-tenant overrides, analytics queries exclude refunded/failed/rejected/expired orders, and export enforces RBAC, <=366-day range, substr date bounds & CR CSV quoting', async () => {
+    const fs = await import('fs');
+    const path = require('path');
+    const metricsHandlersSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../routes/analytics-handlers/metrics-handlers.ts'),
+      'utf8'
+    );
+    const summaryHandlersSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../routes/analytics-handlers/summary-handlers.ts'),
+      'utf8'
+    );
+    const exportHandlersSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../routes/analytics-handlers/export-handlers.ts'),
+      'utf8'
+    );
+    const analyticsSummarySrc = fs.readFileSync(
+      path.resolve(__dirname, '../../tree/analytics/summary.ts'),
+      'utf8'
+    );
+    const csvExportSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../tree/analytics/csv-export.ts'),
+      'utf8'
+    );
+    const { resolveAnalyticsTenant } = await import('../../tree/analytics/summary');
+    const { escapeCsvField } = await import('../../tree/analytics/csv-export');
+
+    expect(metricsHandlersSrc).toContain("status IN ('paid', 'Confirmed', 'preparing', 'ready', 'completed')");
+    expect(metricsHandlersSrc).toContain("COALESCE(payment_status, '') = 'refunded'");
+    expect(summaryHandlersSrc).toContain('resolveAnalyticsTenant');
+    expect(exportHandlersSrc).toContain("const EXPORT_ALLOWED_ROLES = new Set(['owner', 'manager', 'admin']);");
+    expect(exportHandlersSrc).toContain('Date range cannot exceed 366 days');
+    expect(analyticsSummarySrc).toContain("AND status NOT IN ('cancelled', 'refunded', 'failed', 'rejected', 'expired')");
+    expect(analyticsSummarySrc).toContain("AND COALESCE(payment_status, '') != 'refunded'");
+    expect(csvExportSrc).toContain('AND substr(created_at, 1, 10) >= ?');
+    expect(csvExportSrc).toContain('LIMIT 10000');
+
+    // Runtime checks: resolveAnalyticsTenant & escapeCsvField carriage-return quoting
+    const spoofedCtx = {
+      get: (k: string) => (k === 'user' ? { id: 'u1', role: 'owner', tenantId: 'store-a' } : undefined),
+      req: {
+        header: (k: string) => (k.toLowerCase() === 'x-tenant-id' ? 'store-b' : undefined),
+        query: () => undefined,
+      },
+    };
+    expect(resolveAnalyticsTenant(spoofedCtx)).toEqual({ tenantId: 'store-a', forbidden: true });
+    expect(escapeCsvField('line1\rline2')).toBe('"line1\rline2"');
+  });
+
+  it('AU4: catalog products removes staff from mutation RBAC, enforces resolveVerifiedWriteTenant & tenant-scoped category JOINs, modifier-validation deduplicates canonical choiceRow IDs & enforces required groups, and pricing-resolver/compute-tier clamp non-finite/negative inputs', async () => {
+    const fs = await import('fs');
+    const path = require('path');
+    const productsSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../../../packages/domain/catalog/commands/products.ts'),
+      'utf8'
+    );
+    const pricingResolverSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../../../packages/domain/catalog/policies/pricing-resolver.ts'),
+      'utf8'
+    );
+    const modValidationSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../../../packages/domain/catalog/policies/modifier-validation.ts'),
+      'utf8'
+    );
+    const modQueriesSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../../../packages/domain/catalog/policies/modifier-validation-queries.ts'),
+      'utf8'
+    );
+    const computeTierSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../../../packages/domain/crm/commands/compute-tier.ts'),
+      'utf8'
+    );
+    const { resolveServerProductPrice } = await import('../../../../packages/domain/catalog/policies/pricing-resolver');
+    const { computeTier } = await import('../../../../packages/domain/crm/commands/compute-tier');
+
+    expect(productsSrc).toContain("const staffAuth = requireAuth(['owner', 'manager', 'supervisor', 'admin']);");
+    expect(productsSrc).toContain("const managerProductAuth = requireAuth(['owner', 'manager', 'admin']);");
+    expect(productsSrc).toContain('resolveVerifiedWriteTenant');
+    expect(productsSrc).toContain('isCrossTenantCategory');
+    expect(pricingResolverSrc).toContain('Math.max(0, Math.round(rawUnitPriceCents))');
+    expect(modValidationSrc).toContain('seenResolvedChoiceIds');
+    expect(modValidationSrc).toContain('fetchRequiredModifierGroupsForProduct');
+    expect(modQueriesSrc).toContain('fetchRequiredModifierGroupsForProduct');
+    expect(computeTierSrc).toContain('safeLifetimePoints');
+
+    // Runtime checks: resolveServerProductPrice clamps negative fallbackPrice to 0; computeTier handles negative points & unsorted tiers
+    const priceRes = await resolveServerProductPrice(null, { productId: 'p1', fallbackPrice: -5000 });
+    expect(priceRes.unitPriceCents).toBe(0);
+
+    const tierRes = computeTier(-100, 'bronze', {
+      defaultTier: { tierName: 'bronze', minPoints: 0, multiplier: 1, cashbackRate: 0.01 },
+      tiers: [
+        { tierName: 'gold', minPoints: 500, multiplier: 1.5, cashbackRate: 0.05 },
+        { tierName: 'bronze', minPoints: 0, multiplier: 1, cashbackRate: 0.01 },
+      ],
+    } as any);
+    expect(tierRes.tierName).toBe('bronze');
+    expect(tierRes.lifetimePoints).toBe(0);
+  });
+});
+
+describe('Phase 49 (AV1..AV4) — Loyalty/Referrals, Mobile POS/Checkin/Admin Metrics/Vitals, Promotions/OpenAPI Inventory/Reports & Domain Inventory/Tables/KDS/Orders Hardening', () => {
+  it('AV1: loyalty refunds loyalty_accounts on CAS failure & clamps pagination, spend-cashback removes paid-order bypass & enforces atomic order guards, admin-loyalty restricts /export RBAC & excludes non-revenue orders, referrals align bonus_type=cashback & scope completion updates, and openapi-loyalty enforces RBAC & Vietnam UTC+7 birthday bonus', async () => {
+    const fs = await import('fs');
+    const path = require('path');
+    const loyaltySrc = fs.readFileSync(
+      path.resolve(__dirname, '../../routes/loyalty.ts'),
+      'utf8'
+    );
+    const spendCashbackSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../tree/loyalty/spend-cashback-handler.ts'),
+      'utf8'
+    );
+    const adminLoyaltySrc = fs.readFileSync(
+      path.resolve(__dirname, '../../routes/admin-loyalty.ts'),
+      'utf8'
+    );
+    const applyRefSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../tree/referrals/apply-referral.ts'),
+      'utf8'
+    );
+    const processRefSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../tree/referrals/process-referral.ts'),
+      'utf8'
+    );
+    const refCashbackSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../tree/referrals/referral-cashback.ts'),
+      'utf8'
+    );
+    const oaAdminSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../routes/openapi-loyalty-handlers/admin-handlers.ts'),
+      'utf8'
+    );
+    const oaRewardSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../routes/openapi-loyalty-handlers/reward-handlers.ts'),
+      'utf8'
+    );
+    const oaDbHelpersSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../routes/openapi-loyalty-handlers/loyalty-db-helpers.ts'),
+      'utf8'
+    );
+    const { getVietnamMonthAndYear } = await import(
+      '../../routes/openapi-loyalty-handlers/loyalty-db-helpers'
+    );
+
+    expect(loyaltySrc).toContain(
+      "UPDATE loyalty_accounts SET current_points = COALESCE(current_points, 0) + ?, updated_at = ? WHERE (customer_id = ? OR id = ?) AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
+    );
+    expect(spendCashbackSrc).toContain("paymentStatus === 'paid'");
+    expect(spendCashbackSrc).toContain(
+      "SELECT id FROM cashback_transactions WHERE order_id = ? AND type = 'spend' AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ? LIMIT 1"
+    );
+    expect(adminLoyaltySrc).toContain("const CRM_EXPORT_ROLES = new Set(['owner', 'admin', 'manager']);");
+    expect(adminLoyaltySrc).toContain('hasAdminLoyaltyTenantMismatch');
+    expect(adminLoyaltySrc).toContain('LIMIT 5000');
+    expect(applyRefSrc).toContain("SET referrer_id = ?, referral_code = ?, cashback_awarded_vnd = ?, bonus_type = 'cashback'");
+    expect(processRefSrc).toContain(
+      "UPDATE referral_codes SET total_points_earned = total_points_earned + ? WHERE code = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
+    );
+    expect(refCashbackSrc).toContain('referralClaimBatchIndex');
+    expect(oaAdminSrc).toContain("const LOYALTY_POINT_ADJUST_ROLES = ['owner', 'manager', 'admin'];");
+    expect(oaRewardSrc).toContain("const LOYALTY_REWARD_WRITE_ROLES = ['owner', 'manager', 'admin'];");
+    expect(oaDbHelpersSrc).toContain('getVietnamMonthAndYear');
+
+    // Runtime check: 2026-04-30T20:00:00.000Z is 2026-05-01T03:00:00+07:00 in Vietnam (month 5, year 2026)
+    expect(getVietnamMonthAndYear(new Date('2026-04-30T20:00:00.000Z'))).toEqual({
+      currentMonth: 5,
+      currentYear: '2026',
+    });
+  });
+
+  it('AV2: tables-mobile & orders-mobile enforce tenant binding, mask PII for kitchen/barista/chef & preserve paying/paid sessions, checkin enforces tenant binding, masks waiter phones & uses UTC+7 date, admin-sales/metrics/audit-logs enforce RBAC, end-of-day bounds & pipe/multiline CSV escaping, and vitals rate-limits per IP/tenant', async () => {
+    const fs = await import('fs');
+    const path = require('path');
+    const tablesMobileSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../routes/tables-mobile.ts'),
+      'utf8'
+    );
+    const ordersMobileSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../routes/orders-mobile.ts'),
+      'utf8'
+    );
+    const checkinSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../routes/checkin.ts'),
+      'utf8'
+    );
+    const adminSalesSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../routes/admin-sales.ts'),
+      'utf8'
+    );
+    const adminMetricsSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../routes/admin-metrics.ts'),
+      'utf8'
+    );
+    const auditExportSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../routes/admin-audit-logs-handlers/export-handler.ts'),
+      'utf8'
+    );
+    const vitalsSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../routes/vitals.ts'),
+      'utf8'
+    );
+    const { escapeCsv } = await import('../../routes/admin-audit-logs-handlers/csv-helper');
+
+    expect(tablesMobileSrc).toContain('getRequestedTenantOverride');
+    expect(tablesMobileSrc).toContain("status IN ('active', 'ordering')");
+    expect(ordersMobileSrc).toContain("const PII_MASKED_ROLES: string[] = ['kitchen', 'barista', 'chef'];");
+    expect(ordersMobileSrc).toContain('maskMobileOrderPii');
+    expect(checkinSrc).toContain("const CHECKIN_UNMASKED_PHONE_ROLES = ['owner', 'manager', 'supervisor', 'admin'];");
+    expect(checkinSrc).toContain('hasStaffTenantMismatch');
+    expect(adminSalesSrc).toContain('T23:59:59.999Z');
+    expect(adminMetricsSrc).toContain("const ADMIN_METRICS_ALLOWED_ROLES = ['owner', 'manager', 'admin'];");
+    expect(adminMetricsSrc).toContain('LIMIT 5000');
+    expect(auditExportSrc).toContain("const AUDIT_EXPORT_ALLOWED_ROLES = ['owner', 'manager', 'admin'];");
+    expect(vitalsSrc).toContain('VITALS_RATE_LIMIT_MAX = 60');
+    expect(vitalsSrc).toContain('isVitalsRateLimited');
+
+    // Runtime check: escapeCsv neutralizes leading pipe and multiline formula prefixes
+    expect(escapeCsv('|/bin/sh')).toBe("\"'|/bin/sh\"");
+    expect(escapeCsv('safe line\n=CMD()')).toBe('"safe line\n\'=CMD()"');
+  });
+
+  it('AV3: promotions validation/admin/OpenAPI CRUD enforce order state/ownership, manager+ write RBAC & SQL precedence scoping, OpenAPI inventory enforces mutation RBAC, supplier validation & cumulative PO receipts, and reports enforce RBAC, refunded/failed exclusion & pipe/multiline CSV escaping', async () => {
+    const fs = await import('fs');
+    const path = require('path');
+    const promoValidationSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../routes/promotions-handlers/validation-handlers.ts'),
+      'utf8'
+    );
+    const promoAdminSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../routes/promotions-handlers/admin-handlers.ts'),
+      'utf8'
+    );
+    const oaPromosCrudSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../routes/openapi-promotions-handlers/crud-handlers.ts'),
+      'utf8'
+    );
+    const poHandlersSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../routes/openapi-inventory-handlers/purchase-order-handlers.ts'),
+      'utf8'
+    );
+    const reportsAnalyticsSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../routes/reports-handlers/analytics-handlers.ts'),
+      'utf8'
+    );
+    const reportsExportSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../routes/reports-handlers/export-handlers.ts'),
+      'utf8'
+    );
+
+    expect(promoValidationSrc).toContain('checkWelcomeNewCustomerEligibility');
+    expect(promoAdminSrc).toContain("const PROMO_ADMIN_ROLES = ['owner', 'manager', 'admin'];");
+    expect(promoAdminSrc).toContain('verifyPromoCallerTenant');
+    expect(oaPromosCrudSrc).toContain("const PROMO_WRITE_ROLES = ['owner', 'manager', 'admin'];");
+    expect(oaPromosCrudSrc).toContain('verifyOpenApiPromoTenant');
+    expect(poHandlersSrc).toContain("const PO_MUTATION_ROLES = ['owner', 'manager', 'admin'];");
+    expect(poHandlersSrc).toContain('verifyPurchaseOrderAccess');
+    expect(reportsAnalyticsSrc).toContain(
+      "COALESCE(status, '') NOT IN ('cancelled', 'refunded', 'failed', 'expired') AND COALESCE(payment_status, '') NOT IN ('refunded', 'failed')"
+    );
+    expect(reportsAnalyticsSrc).toContain('verifyReportAnalyticsAccess');
+    expect(reportsExportSrc).toContain("const EXPORT_ALLOWED_ROLES = new Set(['owner', 'manager', 'admin']);");
+    expect(reportsExportSrc).toContain('VALID_EXPORT_ORDER_SQL');
+  });
+
+  it('AV4: domain inventory CRUD/snapshots enforce fail-closed RBAC, tenant verification & ICT snapshot dates, tables scopes QR codes & preserves paying/paid sessions, kitchen KDS/COD/stations scope COD payments, cancellation rollbacks & station mutations, and admin-orders/stats deduplicate payments & exclude terminal orders', async () => {
+    const fs = await import('fs');
+    const path = require('path');
+    const invCrudSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../../../packages/domain/inventory/src/routes/inventory-crud.ts'),
+      'utf8'
+    );
+    const invSnapSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../../../packages/domain/inventory/src/routes/inventory-snapshots.ts'),
+      'utf8'
+    );
+    const tablesSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../../../packages/domain/table/commands/tables.ts'),
+      'utf8'
+    );
+    const collectCodSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../../../packages/domain/kitchen/commands/collect-cod-payment.ts'),
+      'utf8'
+    );
+    const kdsMobileSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../../../packages/domain/kitchen/commands/kds-mobile.ts'),
+      'utf8'
+    );
+    const kdsTransitionSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../../../packages/domain/kitchen/commands/kds-status-transition.ts'),
+      'utf8'
+    );
+    const kitchenStationsSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../../../packages/domain/kitchen/commands/kitchen-stations.ts'),
+      'utf8'
+    );
+    const adminOrdersSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../../../packages/domain/order/queries/admin-orders.ts'),
+      'utf8'
+    );
+    const statsSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../../../packages/domain/order/queries/stats.ts'),
+      'utf8'
+    );
+
+    expect(invCrudSrc).toContain('verifyInventoryTenant');
+    expect(invSnapSrc).toContain('verifySnapshotTenant');
+    expect(tablesSrc).toContain('verifyTableRouteTenant');
+    expect(collectCodSrc).toContain('cod:${id}');
+    expect(kdsMobileSrc).toContain('LIMIT 200');
+    expect(kdsTransitionSrc).toContain('promotion_redemptions');
+    expect(kitchenStationsSrc).toContain("const STATION_MUTATION_ROLES = new Set(['owner', 'manager', 'admin']);");
+    expect(kitchenStationsSrc).toContain('verifyStationTenant');
+    expect(adminOrdersSrc).toContain(
+      "AND COALESCE(NULLIF(TRIM(p2.tenant_id), ''), 'default') = COALESCE(NULLIF(TRIM(o.tenant_id), ''), 'default')"
+    );
+    expect(statsSrc).toContain('revenueExclusionClause');
+    expect(statsSrc).toContain('ictNowMs');
+  });
+});
+
+describe('Phase 50 (AW1..AW4) — Reservations/QR/Tables, Staff/Inventory/Forecasting, CRM/Subscriptions/Realtime & Orders/Split/Payments Hardening', () => {
+  it('AW1: reservations redact guest PII on public availability, enforce terminal state guards & Vietnam dates, QR scan/admin-qr block inactive tables & sign QR URLs, table sessions/CRUD/zones block closing/deleting active/occupied tables, and Cal.com bookings mask guest PII for non-managers', async () => {
+    const fs = await import('fs');
+    const path = require('path');
+    const reservationsSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../../../packages/domain/reservation/src/routes/reservations.ts'),
+      'utf8'
+    );
+    const qrScanSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../../../packages/domain/table/commands/qr-scan.ts'),
+      'utf8'
+    );
+    const adminQrSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../routes/admin-qr.ts'),
+      'utf8'
+    );
+    const sessionHandlersSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../routes/table-sessions-handlers/session-handlers.ts'),
+      'utf8'
+    );
+    const tableCrudSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../routes/openapi-tables-handlers/table-crud-handlers.ts'),
+      'utf8'
+    );
+    const zoneCrudSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../routes/openapi-tables-handlers/zone-crud-handlers.ts'),
+      'utf8'
+    );
+    const calBookingsSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../routes/cal-booking-webhook-handlers/bookings-handler.ts'),
+      'utf8'
+    );
+
+    expect(reservationsSrc).toContain('TERMINAL_RESERVATION_STATUSES');
+    expect(reservationsSrc).toContain('reservedSlots');
+    expect(reservationsSrc).toContain('delete safeTable.guest_phone;');
+    expect(qrScanSrc).toContain("return c.json({ success: false, error: 'QR code is inactive' }, 404);");
+    expect(adminQrSrc).toContain("const ADMIN_QR_ALLOWED_ROLES = ['owner', 'manager', 'supervisor', 'staff', 'admin'];");
+    expect(sessionHandlersSrc).toContain('unpaid');
+    expect(tableCrudSrc).toContain("return c.json({ success: false, error: 'Cannot delete occupied table' }, 409);");
+    expect(zoneCrudSrc).toContain('zoneNameCandidate');
+    expect(calBookingsSrc).toContain("const BOOKING_PII_MANAGER_ROLES = new Set(['owner', 'manager', 'supervisor', 'admin']);");
+    expect(calBookingsSrc).toContain('sanitizeBookingRecordForRole');
+  });
+
+  it('AW2: staff tips & staff handlers enforce Vietnam UTC+7 dates, exclude cancelled/refunded orders & confine tenant mutations, demand/inventory forecasting bucket in UTC+7, and inventory recipes/deduction/purchasing enforce tenant isolation & preserve positive cost_per_unit', async () => {
+    const fs = await import('fs');
+    const path = require('path');
+    const staffTipsSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../../../packages/domain/staff/commands/staff-tips.ts'),
+      'utf8'
+    );
+    const staffHandlersSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../routes/openapi-staff-handlers/staff-handlers.ts'),
+      'utf8'
+    );
+    const demandForecastSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../routes/demand-forecast.ts'),
+      'utf8'
+    );
+    const invForecastSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../routes/inventory-forecasting.ts'),
+      'utf8'
+    );
+    const purchasingPolicySrc = fs.readFileSync(
+      path.resolve(__dirname, '../../../../packages/domain/inventory/src/policies/purchasing-receiving-policy.ts'),
+      'utf8'
+    );
+    const recipePolicySrc = fs.readFileSync(
+      path.resolve(__dirname, '../../../../packages/domain/inventory/src/policies/inventory-recipe-policy.ts'),
+      'utf8'
+    );
+
+    expect(staffTipsSrc).toContain("AND COALESCE(o.status, '') NOT IN ('cancelled', 'rejected', 'failed', 'expired', 'refunded')");
+    expect(staffTipsSrc).toContain("return c.json({ success: false, error: 'tip_amount must be a non-negative integer' }, 400);");
+    expect(staffHandlersSrc).toContain('targetAccountTenant');
+    expect(demandForecastSrc).toContain("strftime('%H', datetime(created_at, '+7 hours')) as hour");
+    expect(invForecastSrc).toContain('Date.now() + 7 * 3600_000');
+    expect(purchasingPolicySrc).toContain('cost_per_unit');
+    expect(recipePolicySrc).toContain("SELECT id FROM stock_movements WHERE reference_id = ? AND reference_type = 'order'");
+  });
+
+  it('AW3: CRM accrual/events/referrals/account reject terminal/refunded orders & isolate tenants, subscription middleware/handlers verify live staff accounts, normalize quarterly/annual MRR & filter cross-tenant invoices, and realtime orders/digest scope channels & metrics per tenant', async () => {
+    const fs = await import('fs');
+    const path = require('path');
+    const accrualSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../../../packages/domain/crm/commands/accrual.ts'),
+      'utf8'
+    );
+    const consumeEventSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../../../packages/domain/crm/commands/consume-crm-event.ts'),
+      'utf8'
+    );
+    const referralSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../../../packages/domain/crm/commands/referral.ts'),
+      'utf8'
+    );
+    const getAccountSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../../../packages/domain/crm/commands/get-customer-account.ts'),
+      'utf8'
+    );
+    const subMiddlewareSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../tree/subscriptions/middleware.ts'),
+      'utf8'
+    );
+    const subHandlersSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../tree/subscriptions/sub-handlers.ts'),
+      'utf8'
+    );
+    const realtimeOrdersSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../routes/realtime-orders.ts'),
+      'utf8'
+    );
+    const digestSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../lib/alerts/digest.ts'),
+      'utf8'
+    );
+
+    expect(accrualSrc).toContain('INELIGIBLE_ORDER_STATUSES');
+    expect(accrualSrc).toContain("return { ok: false, reason: 'order_not_eligible' };");
+    expect(consumeEventSrc).toContain('resolveEventTenant');
+    expect(referralSrc).toContain("UPDATE referral_codes SET tenant_id = ? WHERE id = ?");
+    expect(getAccountSrc).toContain('effectiveTenantFilter');
+    expect(subMiddlewareSrc).toContain('syncPayloadFromLiveAccount');
+    expect(subHandlersSrc).toContain('SUBSCRIPTION_LIST_STAFF_ROLES');
+    expect(subHandlersSrc).toContain('normalized_mrr');
+    expect(realtimeOrdersSrc).toContain("return c.json({ error: 'Forbidden: cross-tenant realtime channel' }, 403);");
+    expect(digestSrc).toContain('fetchDigestStats(db, tenantId)');
+  });
+
+  it('AW4: create-order/split-orders/update-order gate unscoped fallbacks to default tenant, deduplicate split stock deduction & block terminal-order field/loyalty mutations, order summary/read handlers apply UTC+7 date boundaries & exclude refunded orders, and PayOS/NowPayments stamp and verify tenant_id', async () => {
+    const fs = await import('fs');
+    const path = require('path');
+    const createOrderSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../../../packages/domain/order/commands/create-order.ts'),
+      'utf8'
+    );
+    const createOrderSideEffectsSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../../../packages/domain/order/commands/create-order-side-effects.ts'),
+      'utf8'
+    );
+    const splitOrdersSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../../../packages/domain/order/commands/split-orders.ts'),
+      'utf8'
+    );
+    const updateOrderSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../../../packages/domain/order/commands/update-order.ts'),
+      'utf8'
+    );
+    const loyaltyTriggerSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../../../packages/domain/order/policies/loyalty-trigger.ts'),
+      'utf8'
+    );
+    const orderSummarySrc = fs.readFileSync(
+      path.resolve(__dirname, '../../routes/openapi-orders-handlers/order-summary-handlers.ts'),
+      'utf8'
+    );
+    const payosAttemptSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../../../packages/domain/payment/commands/payos-attempt.ts'),
+      'utf8'
+    );
+    const nowpaymentsIpnSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../../../packages/domain/payment/commands/nowpayments-ipn.ts'),
+      'utf8'
+    );
+
+    expect(createOrderSrc).toContain("tenantId === 'default'");
+    expect(createOrderSideEffectsSrc).toContain("effectiveTenant === 'default'");
+    expect(splitOrdersSrc).toContain("return errorResponse('Table is unavailable for service', 400);");
+    expect(splitOrdersSrc).toContain("return errorResponse('Order total mismatch with server calculation', 400);");
+    expect(updateOrderSrc).toContain("return errorResponse('Cannot modify a completed or cancelled order', 400);");
+    expect(updateOrderSrc).toContain('effectiveCancelTenant');
+    expect(loyaltyTriggerSrc).toContain('refunded');
+    expect(orderSummarySrc).toContain('refunded');
+    expect(payosAttemptSrc).toContain('orderTenant');
+    expect(nowpaymentsIpnSrc).toContain("return { ok: false, error: 'Invoice already bound to another payment reference', status: 409 };");
+    expect(nowpaymentsIpnSrc).toContain('invTenant');
+  });
+});
+
+describe('Phase 51 (AX1..AX4) — Auth/Devices/Franchise, Reports/Analytics/Shifts, Catalog/Modifiers/Pricing & Cron/SOP/DinDin Hardening', () => {
+  it('AX1: masks staff device_token in GET /api/auth/devices & omits raw token from audit_logs, enforces tenant-scoped password reset & email verification, blocks cross-tenant staff/device lookups, and excludes refunded/failed/expired orders from franchise royalty calculation', async () => {
+    const fs = await import('fs');
+    const path = require('path');
+    const deviceHandlersSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../routes/openapi-auth-handlers/device-handlers.ts'),
+      'utf8'
+    );
+    const passwordHandlersSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../routes/openapi-auth-handlers/password-handlers.ts'),
+      'utf8'
+    );
+    const authRegisterSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../routes/auth-register.ts'),
+      'utf8'
+    );
+    const authVerifySrc = fs.readFileSync(
+      path.resolve(__dirname, '../../routes/auth-verify.ts'),
+      'utf8'
+    );
+    const listStaffSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../tree/auth/list-staff.ts'),
+      'utf8'
+    );
+    const staffAuthSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../../../packages/domain/staff/commands/staff-auth.ts'),
+      'utf8'
+    );
+    const franchiseLocationsSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../routes/franchise-locations.ts'),
+      'utf8'
+    );
+
+    expect(deviceHandlersSrc).toContain('verifyDeviceCallerTenant');
+    expect(deviceHandlersSrc).toContain('substr(device_token, -4) AS device_fingerprint');
+    expect(passwordHandlersSrc).toContain('invalidatePriorPasswordResetCodes');
+    expect(authRegisterSrc).toContain('canAdoptCustomer');
+    expect(authVerifySrc).toContain('canBindCustomer');
+    expect(listStaffSrc).toContain('Cross-tenant staff access denied');
+    expect(staffAuthSrc).toContain("UPDATE users SET auth_version = auth_version + 1, updated_at = ? WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?");
+    expect(franchiseLocationsSrc).toContain(
+      "AND LOWER(COALESCE(status, '')) NOT IN ('cancelled', 'canceled', 'refunded', 'failed', 'rejected', 'expired')"
+    );
+    expect(franchiseLocationsSrc).toContain(
+      "AND LOWER(COALESCE(payment_status, '')) NOT IN ('refunded', 'failed', 'cancelled', 'canceled')"
+    );
+  });
+
+  it('AX2: reports grouped-sales & analytics exclude refunded/canceled/failed/rejected/expired orders, scope product/category/table/zone JOINs by tenant_id, escape leading pipe & multiline formula cells in CSV export, and enforce tenant isolation across staff/shift schedules', async () => {
+    const fs = await import('fs');
+    const path = require('path');
+    const groupedSalesSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../routes/reports-handlers/grouped-sales-handlers.ts'),
+      'utf8'
+    );
+    const analyticsSummarySrc = fs.readFileSync(
+      path.resolve(__dirname, '../../tree/analytics/summary.ts'),
+      'utf8'
+    );
+    const topProductsSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../tree/analytics/top-products.ts'),
+      'utf8'
+    );
+    const zoneAnalyticsSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../tree/analytics/zone-analytics.ts'),
+      'utf8'
+    );
+    const csvExportSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../tree/analytics/csv-export.ts'),
+      'utf8'
+    );
+    const shiftSchedulesSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../../../packages/domain/shift/commands/schedules.ts'),
+      'utf8'
+    );
+    const shiftAccessSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../../../packages/domain/shift/commands/shift-access.ts'),
+      'utf8'
+    );
+    const { escapeCsvField } = await import('../../tree/analytics/csv-export');
+
+    expect(groupedSalesSrc).toContain('NON_REVENUE_STATUS_SQL');
+    expect(groupedSalesSrc).toContain("AND LOWER(COALESCE(payment_status, '')) NOT IN ('refunded', 'failed', 'cancelled', 'canceled')");
+    expect(analyticsSummarySrc).toContain("COALESCE(NULLIF(TRIM(p.tenant_id), ''), 'default') = COALESCE(NULLIF(TRIM(o.tenant_id), ''), 'default')");
+    expect(topProductsSrc).toContain("COALESCE(NULLIF(TRIM(p.tenant_id), ''), 'default') = COALESCE(NULLIF(TRIM(o.tenant_id), ''), 'default')");
+    expect(zoneAnalyticsSrc).toContain("COALESCE(NULLIF(TRIM(ct.tenant_id), ''), 'default') = COALESCE(NULLIF(TRIM(o.tenant_id), ''), 'default')");
+    expect(csvExportSrc).toContain('multilineSanitized');
+    expect(shiftSchedulesSrc).toContain('assertNoScheduleOverlap');
+    expect(shiftAccessSrc).toContain('Attendance is unavailable for this store');
+
+    // Runtime check: escapeCsvField neutralizes pipe-prefixed and multiline formula payloads
+    expect(escapeCsvField('|calc.exe')).toBe("'|calc.exe");
+    expect(escapeCsvField('normal\n=1+1')).toBe('"normal\n\'=1+1"');
+  });
+
+  it('AX3: menu-modifiers, menu-projection, get-customer-menu & modifier-validation-queries enforce caller-vs-header tenant verification & fail-closed tenant probing, categories & OpenAPI category/product handlers attribute audit_logs tenant_id & scope category JOINs, and dynamic-pricing validates target_category tenant ownership', async () => {
+    const fs = await import('fs');
+    const path = require('path');
+    const menuModifiersSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../../../packages/domain/catalog/commands/menu-modifiers.ts'),
+      'utf8'
+    );
+    const menuProjectionSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../../../packages/domain/catalog/policies/menu-projection.ts'),
+      'utf8'
+    );
+    const getCustomerMenuSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../../../packages/domain/catalog/commands/get-customer-menu.ts'),
+      'utf8'
+    );
+    const modQueriesSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../../../packages/domain/catalog/policies/modifier-validation-queries.ts'),
+      'utf8'
+    );
+    const categoriesCmdSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../../../packages/domain/catalog/commands/categories.ts'),
+      'utf8'
+    );
+    const oaCatMutSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../routes/openapi-categories-handlers/mutation-handlers.ts'),
+      'utf8'
+    );
+    const oaProdMutSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../routes/openapi-products-handlers/mutation-handlers.ts'),
+      'utf8'
+    );
+    const oaProdReadSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../routes/openapi-products-handlers/read-handlers.ts'),
+      'utf8'
+    );
+    const dynamicPricingSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../routes/dynamic-pricing.ts'),
+      'utf8'
+    );
+    const { fetchModifierChoice } = await import('../../../../packages/domain/catalog/policies/modifier-validation-queries');
+
+    expect(menuModifiersSrc).toContain('verifyModifierReadTenant');
+    expect(menuModifiersSrc).toContain('verifyModifierWriteTenant');
+    expect(menuProjectionSrc).toContain(
+      "AND COALESCE(NULLIF(TRIM(c.tenant_id), ''), 'default') = COALESCE(NULLIF(TRIM(p.tenant_id), ''), 'default')"
+    );
+    expect(getCustomerMenuSrc).toContain('matchesTenantRow(row as unknown as Record<string, unknown>, effectiveTenant)');
+    expect(modQueriesSrc).toContain("return normTenant === 'default';");
+    expect(categoriesCmdSrc).toContain('verifyCategoryWriteTenant');
+    expect(oaCatMutSrc).toContain('INSERT INTO audit_logs (id, user_id, action, entity_type, entity_id, metadata, tenant_id, created_at)');
+    expect(oaProdMutSrc).toContain('INSERT INTO audit_logs (id, user_id, action, entity_type, entity_id, metadata, tenant_id, created_at)');
+    expect(oaProdReadSrc).toContain('verifyProductReadTenant');
+    expect(dynamicPricingSrc).toContain('verifyPricingTenant');
+    expect(dynamicPricingSrc).toContain('Target category does not belong to current tenant');
+
+    // Runtime check: fetchModifierChoice fails closed when tenant_id probe fails for non-default tenant
+    const probeFailDb = {
+      prepare(sql: string) {
+        return {
+          bind() {
+            return {
+              first: async () => {
+                if (sql.includes('SELECT tenant_id')) throw new Error('no such column: tenant_id');
+                return { id: 'c1', group_id: 'g1', name: 'Oat', price_delta: 5000, is_available: 1 };
+              },
+            };
+          },
+        };
+      },
+    };
+    expect(await fetchModifierChoice(probeFailDb, 'c1', null, 'store_b')).toBeNull();
+    expect((await fetchModifierChoice(probeFailDb, 'c1', null, 'default'))?.id).toBe('c1');
+  });
+
+  it('AX4: cron cashback-warnings & order-checks gate unscoped fallbacks on default tenant & scope SLA/inventory alerts, cron-admin & openapi-cron handlers enforce caller tenant & concrete tenant_id on job creation, sop-access & sop-write-repository reject cross-tenant overrides & unscoped fallbacks, and dindin handlers isolate checkout/config per tenant', async () => {
+    const fs = await import('fs');
+    const path = require('path');
+    const cashbackWarningsSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../routes/cron-handlers/cashback-warnings.ts'),
+      'utf8'
+    );
+    const orderChecksSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../routes/cron-handlers/order-checks.ts'),
+      'utf8'
+    );
+    const oaCronJobsSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../routes/openapi-cron-handlers/job-crud-handlers.ts'),
+      'utf8'
+    );
+    const sopAccessSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../../../packages/domain/sop/commands/sop-access.ts'),
+      'utf8'
+    );
+    const sopWriteRepoSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../../../packages/domain/sop/commands/sop-write-repository.ts'),
+      'utf8'
+    );
+    const dindinCheckoutSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../routes/dindin-handlers/checkout-handlers.ts'),
+      'utf8'
+    );
+    const dindinConfigSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../routes/dindin-handlers/config-handlers.ts'),
+      'utf8'
+    );
+    const { sopScope } = await import('@aura/domain-sop');
+
+    expect(cashbackWarningsSrc).toContain("if (tenantId === 'default')");
+    expect(orderChecksSrc).toContain('`kds_sla_breach:${effectiveAlertTenant}`');
+    expect(oaCronJobsSrc).toContain('hasCrossTenantCronOverride');
+    expect(sopAccessSrc).toContain("throw new SopAccessError('Cross-tenant access denied', 403);");
+    expect(sopWriteRepoSrc).toContain("WHERE COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?");
+    expect(dindinCheckoutSrc).toContain('hasCrossTenantDindinOverride');
+    expect(dindinConfigSrc).toContain('hasCrossTenantConfigOverride');
+
+    // Runtime check: sopScope throws 403 SopAccessError when non-HQ user passes cross-tenant override
+    expect(() =>
+      sopScope(
+        {} as any,
+        { id: 'u1', role: 'manager', tenantId: 'store_a' } as any,
+        'store_b'
+      )
+    ).toThrow('Cross-tenant access denied');
+  });
+});
+
+describe('Phase 52 (AY1..AY4) — Inventory/PO/BOM, Loyalty/Tiers/Cashback, CRM Reversal/KDS Stations & Reports/Customers/Order Stream Hardening', () => {
+  it('AY1: purchase-order-handlers sync total_cost/total_price, preserve unitCost=0, reject duplicate ingredientIds & guard partially_received POs, movement/supplier/ingredient handlers fail closed on non-default tenants, domain inventoryCRUD/inventorySnapshots enforce verifyInventoryTenant, and bom-policy syncs inventory_items stock', async () => {
+    const fs = await import('fs');
+    const path = require('path');
+    const poHandlersSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../routes/openapi-inventory-handlers/purchase-order-handlers.ts'),
+      'utf8'
+    );
+    const movementHandlersSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../routes/openapi-inventory-handlers/movement-handlers.ts'),
+      'utf8'
+    );
+    const supplierHandlersSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../routes/openapi-inventory-handlers/supplier-handlers.ts'),
+      'utf8'
+    );
+    const ingredientHandlersSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../routes/openapi-inventory-handlers/ingredient-handlers.ts'),
+      'utf8'
+    );
+    const inventoryCrudSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../../../packages/domain/inventory/src/routes/inventory-crud.ts'),
+      'utf8'
+    );
+    const inventorySnapshotsSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../../../packages/domain/inventory/src/routes/inventory-snapshots.ts'),
+      'utf8'
+    );
+    const bomPolicySrc = fs.readFileSync(
+      path.resolve(__dirname, '../../../../packages/domain/inventory/src/policies/bom-policy.ts'),
+      'utf8'
+    );
+    const { getRecipeForProduct } = await import('../../../../packages/domain/inventory/src/policies/bom-policy');
+
+    expect(poHandlersSrc).toContain('Duplicate or invalid ingredient');
+    expect(poHandlersSrc).toContain('item.unitCost !== undefined && item.unitCost !== null');
+    expect(poHandlersSrc).toContain('partially_received');
+    expect(movementHandlersSrc).toContain("tenantId !== 'default'");
+    expect(supplierHandlersSrc).toContain("tenantId !== 'default'");
+    expect(ingredientHandlersSrc).toContain("tenantId !== 'default'");
+    expect(inventoryCrudSrc).toContain('verifyInventoryTenant');
+    expect(inventorySnapshotsSrc).toContain('verifySnapshotTenant');
+    expect(bomPolicySrc).toContain('UPDATE inventory_items SET current_stock = MAX(0, current_stock - ?)');
+
+    // Runtime check: getRecipeForProduct fails closed ([]) when recipe_items tenant join fails on non-default tenant
+    const joinErrorDb = {
+      prepare(sql: string) {
+        return {
+          bind() {
+            return {
+              first: async () => ({ id: 'rec_1', tenant_id: 'store_b' }),
+              all: async () => {
+                if (sql.includes('FROM recipe_items') && sql.includes('LEFT JOIN ingredients')) {
+                  throw new Error('simulated join error');
+                }
+                return { results: [{ ingredient_id: 'ing_1', quantity: 2 }] };
+              },
+              run: async () => ({ meta: { changes: 0 } }),
+            };
+          },
+        };
+      },
+      batch: async () => [],
+    };
+    expect(await getRecipeForProduct(joinErrorDb as any, 'prod_1', 'store_b')).toEqual([]);
+  });
+
+  it('AY2: OpenAPI loyalty reward/tier/account/admin handlers enforce min_tier, merged minPoints < maxPoints, per-tenant tier isolation & atomic point CAS guard, admin-loyalty confines default-store owners, and legacy loyalty tree gates Pilot OTP bypass, scopes tier/reward counts & syncs total/total_amount on cashback spend', async () => {
+    const fs = await import('fs');
+    const path = require('path');
+    const rewardHandlersSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../routes/openapi-loyalty-handlers/reward-handlers.ts'),
+      'utf8'
+    );
+    const tierHandlersSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../routes/openapi-loyalty-handlers/tier-handlers.ts'),
+      'utf8'
+    );
+    const loyaltyDbHelpersSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../routes/openapi-loyalty-handlers/loyalty-db-helpers.ts'),
+      'utf8'
+    );
+    const adminLoyaltySrc = fs.readFileSync(
+      path.resolve(__dirname, '../../routes/admin-loyalty.ts'),
+      'utf8'
+    );
+    const phoneAuthSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../tree/loyalty/phone-auth-handler.ts'),
+      'utf8'
+    );
+    const spendCashbackSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../tree/loyalty/spend-cashback-handler.ts'),
+      'utf8'
+    );
+    const { syncLoyaltyAccountAndCustomerBalance } = await import(
+      '../../routes/openapi-loyalty-handlers/loyalty-db-helpers'
+    );
+
+    expect(rewardHandlersSrc).toContain('min_tier');
+    expect(tierHandlersSrc).toContain('maxPoints must be greater than minPoints');
+    expect(loyaltyDbHelpersSrc).toContain('current_points >= ?');
+    expect(adminLoyaltySrc).toContain("userTenant === '*' || userTenant === 'hq'");
+    expect(phoneAuthSrc).toContain('newCustomerVerified');
+    expect(spendCashbackSrc).toContain('total = MAX(0, COALESCE(total, total_amount, 0) - ?)');
+    expect(spendCashbackSrc).toContain('UPDATE orders SET total_amount = total WHERE id = ?');
+
+    // Runtime check: syncLoyaltyAccountAndCustomerBalance rejects negative overdraft when CAS returns 0 changes
+    const zeroChangesDb = {
+      prepare() {
+        return {
+          bind() {
+            return {
+              run: async () => ({ meta: { changes: 0 } }),
+              first: async () => ({ current_points: 50, lifetime_points: 50 }),
+            };
+          },
+        };
+      },
+    };
+    const res = await syncLoyaltyAccountAndCustomerBalance(zeroChangesDb as any, {
+      accountId: 'la_1',
+      customerId: 'cust_1',
+      newBalance: 0,
+      pointsDelta: -100,
+      lifetimeDelta: 0,
+      tenantId: 'default',
+      now: '2026-11-03T00:00:00.000Z',
+    });
+    expect(res).toBeNull();
+  });
+
+  it('AY3: reverseAccrual supports cumulative partial refunds & OpenAPI total_amount fallback, referral commands enforce ReferralPolicy.enabled & tenant-scoped referee cashback reversal, stationTicketsRouter guards GET /:id/tickets & validates itemId membership, and KDS mobile/status/handlers enforce caller-tenant confinement & cashback refund balance_after', async () => {
+    const fs = await import('fs');
+    const path = require('path');
+    const refundReversalSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../../../packages/domain/crm/commands/refund-reversal.ts'),
+      'utf8'
+    );
+    const referralSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../../../packages/domain/crm/commands/referral.ts'),
+      'utf8'
+    );
+    const stationTicketsSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../../../packages/domain/kitchen/commands/kitchen-station-tickets.ts'),
+      'utf8'
+    );
+    const kdsMobileSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../../../packages/domain/kitchen/commands/kds-mobile.ts'),
+      'utf8'
+    );
+    const kdsTransitionSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../../../packages/domain/kitchen/commands/kds-status-transition.ts'),
+      'utf8'
+    );
+    const kdsHandlersSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../routes/orders-hono-handlers/kds-handlers.ts'),
+      'utf8'
+    );
+    const { redeemReferral } = await import('../../../../packages/domain/crm/commands/referral');
+    const { DEFAULT_REFERRAL_POLICY } = await import('../../../../packages/domain/crm/commands/referral-policy');
+
+    expect(refundReversalSrc).toContain('priorPointLogs');
+    expect(refundReversalSrc).toContain('COALESCE(total, total_amount, 0)');
+    expect(referralSrc).toContain("reason: 'referral_disabled'");
+    expect(stationTicketsSrc).toContain('verifyStationTenant');
+    expect(stationTicketsSrc).toContain('verifyOrderHasItem');
+    expect(kdsMobileSrc).toContain("userTenant === 'hq' || userTenant === '*'");
+    expect(kdsTransitionSrc).toContain('balanceAfter');
+    expect(kdsHandlersSrc).toContain('verifyKdsOrderTenant');
+
+    // Runtime check: redeemReferral immediately rejects when policy.enabled is false
+    const disabledReferralRes = await redeemReferral({} as any, 'CODE123', 'cust_new', 'store_a', {
+      ...DEFAULT_REFERRAL_POLICY,
+      enabled: false,
+    });
+    expect(disabledReferralRes).toEqual({
+      success: false,
+      reason: 'referral_disabled',
+      error: 'Chương trình giới thiệu đang tạm ngưng',
+    });
+  });
+
+  it('AY4: reports handlers validate calendar dates & max 366-day ranges, enforce strict HQ checks & exclude placeholder phones from customer export joins, customers admin/profile include c.tenant_id & enforce caller-tenant confinement, and SSE order stream isolates staff tenants & Last-Event-ID replay', async () => {
+    const fs = await import('fs');
+    const path = require('path');
+    const groupedSalesSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../routes/reports-handlers/grouped-sales-handlers.ts'),
+      'utf8'
+    );
+    const analyticsHandlersSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../routes/reports-handlers/analytics-handlers.ts'),
+      'utf8'
+    );
+    const exportHandlersSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../routes/reports-handlers/export-handlers.ts'),
+      'utf8'
+    );
+    const customersAdminSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../routes/customers-handlers/admin-handlers.ts'),
+      'utf8'
+    );
+    const customersProfileSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../routes/customers-handlers/profile-handlers.ts'),
+      'utf8'
+    );
+    const orderStreamSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../routes/order-stream.ts'),
+      'utf8'
+    );
+    const orderStreamLogSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../routes/order-stream-log.ts'),
+      'utf8'
+    );
+    const { PROFILE_SQL, LEGACY_PROFILE_SQL } = await import('../../routes/customers-handlers/types');
+    const { replayEventsSince } = await import('../../routes/order-stream-log');
+
+    expect(groupedSalesSrc).toContain('isStrictHQReportAdmin');
+    expect(analyticsHandlersSrc).toContain('isStrictHQReportAdmin');
+    expect(exportHandlersSrc).toContain('VALID_CUSTOMER_EXPORT_PHONE_SQL');
+    expect(PROFILE_SQL).toContain('c.tenant_id');
+    expect(LEGACY_PROFILE_SQL).toContain('c.tenant_id');
+    expect(customersAdminSrc).toContain('Cross-tenant customer access denied');
+    expect(customersProfileSrc).toContain('Cross-tenant access denied');
+    expect(orderStreamSrc).toContain('Cross-tenant access denied');
+    expect(orderStreamLogSrc).toContain('resolveEventLogKey');
+
+    // Runtime check: replayEventsSince filters out cross-tenant events from shared fallback key
+    const kvMap = new Map<string, string>([
+      [
+        'order_events_log:ORD-99',
+        JSON.stringify([
+          { eventId: '1', orderId: 'ORD-99', type: 'update_order', data: {}, timestamp: '2026-11-03T00:00:00Z', tenantId: 'store_a' },
+          { eventId: '2', orderId: 'ORD-99', type: 'update_order', data: {}, timestamp: '2026-11-03T00:01:00Z', tenantId: 'store_b' },
+          { eventId: '3', orderId: 'ORD-99', type: 'update_order', data: {}, timestamp: '2026-11-03T00:02:00Z', tenantId: 'store_a' },
+        ]),
+      ],
+    ]);
+    const kv = { get: async (k: string) => kvMap.get(k) ?? null };
+    const replayed = await replayEventsSince(kv, 'ORD-99', '1', 'store_a');
+    expect(replayed).toHaveLength(1);
+    expect(replayed[0].eventId).toBe('3');
+  });
+});
+
+describe('Phase 53 (AZ1..AZ4) — Tenant Boundary Core, Payment Settlement Integrity, Staff/Mobile POS Confinement & Order/Table Lifecycle Hardening', () => {
+  it('AZ1: isHQSuperAdmin confines super-admin status strictly to owner/admin bound to hq/*, saas_tenants resolves by id OR slug and batches tenant/subscription creation, guest promotions select order_token and total_amount, and OpenAPI promotions handlers enforce tenant boundaries', async () => {
+    const fs = await import('fs');
+    const path = require('path');
+    const tenantMiddlewareSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../middleware/tenant.ts'),
+      'utf8'
+    );
+    const saasTenantsSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../routes/saas-tenants.ts'),
+      'utf8'
+    );
+    const promoValidationSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../routes/promotions-handlers/validation-handlers.ts'),
+      'utf8'
+    );
+    const promoCrudSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../routes/openapi-promotions-handlers/crud-handlers.ts'),
+      'utf8'
+    );
+    const { isHQSuperAdmin } = await import('../../middleware/tenant');
+
+    expect(tenantMiddlewareSrc).toContain("userTenant === 'hq' || userTenant === '*'");
+    expect(saasTenantsSrc).toContain('db.batch');
+    expect(saasTenantsSrc).toContain('WHERE id = ? OR slug = ?');
+    expect(promoValidationSrc).toContain('order_token');
+    expect(promoValidationSrc).toContain('total_amount');
+    expect(promoCrudSrc).toContain('resolveOpenApiPromoReadTenantId');
+
+    // Runtime checks
+    expect(isHQSuperAdmin({ role: 'owner', tenantId: 'default' })).toBe(false);
+    expect(isHQSuperAdmin({ role: 'admin', tenantId: 'store-1' })).toBe(false);
+    expect(isHQSuperAdmin({ role: 'owner', tenantId: 'hq' })).toBe(true);
+    expect(isHQSuperAdmin({ role: 'admin', tenantId: '*' })).toBe(true);
+    expect(isHQSuperAdmin({ role: 'manager', tenantId: 'hq' })).toBe(false);
+  });
+
+  it('AZ2: canAccessPaymentOrder rejects cross-tenant header overrides & validates X-Order-Token on guest orders, settlePayOS & reconcilePayOS mark cancelled/rejected/failed orders with [PAID_ON_CANCELLED_ORDER_REQUIRES_REVIEW] and suppress loyalty/referrals, refund lookups prioritize paid/completed, and nowpayments-ipn blocks cancelling active subscriptions on unpaid invoice refunds', async () => {
+    const fs = await import('fs');
+    const path = require('path');
+    const paymentAccessSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../../../packages/domain/payment/policies/payment-access.ts'),
+      'utf8'
+    );
+    const payosWebhookSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../routes/webhooks-handlers/payos.ts'),
+      'utf8'
+    );
+    const payosSettlementSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../routes/webhooks-handlers/payos-settlement.ts'),
+      'utf8'
+    );
+    const payosReconcileSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../../../packages/domain/payment/commands/payos-reconcile.ts'),
+      'utf8'
+    );
+    const refundsMutationSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../routes/refunds-handlers/mutation-handlers.ts'),
+      'utf8'
+    );
+    const nowpaymentsIpnSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../../../packages/domain/payment/commands/nowpayments-ipn.ts'),
+      'utf8'
+    );
+    const { canAccessPaymentOrder, hasPaymentTenantMismatch } = await import(
+      '../../../../packages/domain/payment/policies/payment-access'
+    );
+
+    expect(paymentAccessSrc).toContain('hasPaymentTenantMismatch');
+    expect(payosSettlementSrc).toContain("NOT IN ('cancelled', 'canceled', 'rejected', 'failed', 'expired', 'refunded')");
+    expect(payosWebhookSrc).toContain('PAID_ON_CANCELLED_ORDER_REQUIRES_REVIEW');
+    expect(payosReconcileSrc).toContain('PAID_ON_CANCELLED_ORDER_REQUIRES_REVIEW');
+    expect(refundsMutationSrc).toContain("CASE WHEN LOWER(COALESCE(p.status, '')) IN ('paid', 'completed')");
+    expect(refundsMutationSrc).toContain("if (!['paid', 'completed'].includes(payment.status))");
+    expect(nowpaymentsIpnSrc).toContain('IPN: ignoring refund for non-paid invoice');
+
+    // Runtime checks
+    const guestOrderWithToken = {
+      id: 'ord_sec_1',
+      customer_id: null,
+      order_token: 'secret_token_123',
+      tenant_id: 'store-a',
+    };
+
+    const mockCtxWithoutToken = {
+      get: (k: string) => (k === 'tenantId' ? 'store-a' : undefined),
+      req: {
+        header: (h: string) => (h.toLowerCase() === 'x-tenant-id' ? 'store-a' : undefined),
+        query: () => undefined,
+      },
+    };
+    const accessWithoutToken = canAccessPaymentOrder(mockCtxWithoutToken, guestOrderWithToken);
+    expect(accessWithoutToken).toBe(false);
+
+    const mockCtxWithToken = {
+      get: (k: string) => (k === 'tenantId' ? 'store-a' : undefined),
+      req: {
+        header: (h: string) => {
+          if (h.toLowerCase() === 'x-order-token') return 'secret_token_123';
+          if (h.toLowerCase() === 'x-tenant-id') return 'store-a';
+          return undefined;
+        },
+        query: () => undefined,
+      },
+    };
+    const accessWithToken = canAccessPaymentOrder(mockCtxWithToken, guestOrderWithToken);
+    expect(accessWithToken).toBe(true);
+
+    const mockCrossTenantCtx = {
+      get: (k: string) => (k === 'user' ? { id: 'mgr-1', role: 'manager', tenantId: 'store-a' } : undefined),
+      req: {
+        header: (h: string) => (h.toLowerCase() === 'x-tenant-id' ? 'store-b' : undefined),
+        query: () => undefined,
+      },
+    };
+    expect(hasPaymentTenantMismatch(mockCrossTenantCtx)).toBe(true);
+    const crossTenantAccess = canAccessPaymentOrder(mockCrossTenantCtx, guestOrderWithToken);
+    expect(crossTenantAccess).toBe(false);
+  });
+
+  it('AZ3: staff-tips uses scalar table_sessions subquery to prevent tip total fan-out & validates staff account role/tenant & blocks tip_amount mutation on settled orders with 409, openapi-staff masks PII for supervisor/staff roles, staff-auth clears pin_lockout in AUTH_KV & respects caller.tenant_id, and orders-mobile masks customer PII for supervisor/kitchen roles', async () => {
+    const fs = await import('fs');
+    const path = require('path');
+    const staffTipsSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../../../packages/domain/staff/commands/staff-tips.ts'),
+      'utf8'
+    );
+    const staffHandlersSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../routes/openapi-staff-handlers/staff-handlers.ts'),
+      'utf8'
+    );
+    const staffAuthSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../../../packages/domain/staff/commands/staff-auth.ts'),
+      'utf8'
+    );
+    const ordersMobileSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../routes/orders-mobile.ts'),
+      'utf8'
+    );
+
+    expect(staffTipsSrc).toContain('SELECT ts.waiter_id FROM table_sessions ts');
+    expect(staffTipsSrc).toContain('Cannot modify tip_amount on a paid or completed order');
+    expect(staffHandlersSrc).toContain('resolveOpenApiStaffTenant');
+    expect(staffAuthSrc).toContain('pin_lockout');
+    expect(ordersMobileSrc).toContain('maskMobileOrderPii');
+    expect(ordersMobileSrc).toContain('customer_address:');
+    expect(ordersMobileSrc).toContain("const PII_UNMASKED_ROLES: string[] = ['owner', 'manager', 'admin', 'shipper'];");
+  });
+
+  it('AZ4: handleClaimOrder parses verification body & rejects unverified claims on orders with table_id/order_token, canMutateOrder blocks customers from mutating unclaimed guest orders, PATCH /api/orders/:id runs full cancellation rollback parity, table-sessions order attachment blocks rejected/refunded orders & bounds orders to session window, and table-zones blocks deleting zones with tables', async () => {
+    const fs = await import('fs');
+    const path = require('path');
+    const claimHandlerSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../routes/openapi-orders-handlers/order-claim-handlers.ts'),
+      'utf8'
+    );
+    const orderPolicySrc = fs.readFileSync(
+      path.resolve(__dirname, '../../../../packages/domain/customer/policies/order-ownership-policy.ts'),
+      'utf8'
+    );
+    const orderWriteSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../routes/openapi-orders-handlers/order-write-handlers.ts'),
+      'utf8'
+    );
+    const sessionOrderSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../routes/table-sessions-handlers/order-handlers.ts'),
+      'utf8'
+    );
+    const zoneCrudSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../routes/openapi-tables-handlers/zone-crud-handlers.ts'),
+      'utf8'
+    );
+    const { canMutateOrder, orderHasPlaceholderPhone, evaluateOrderClaimPolicy } = await import(
+      '../../../../packages/domain/customer/policies/order-ownership-policy'
+    );
+
+    expect(claimHandlerSrc).toContain('verificationType');
+    expect(claimHandlerSrc).toContain('verificationValue');
+    expect(orderWriteSrc).toContain('runOrderCancellationRollback');
+    expect(sessionOrderSrc).toContain('effectiveOpenedAt');
+    expect(sessionOrderSrc).toContain("'rejected', 'refunded'");
+    expect(zoneCrudSrc).toContain('Cannot delete zone with tables');
+
+    // Runtime checks
+    expect(orderHasPlaceholderPhone('0000000000')).toBe(true);
+    expect(orderHasPlaceholderPhone('0901234567')).toBe(false);
+
+    const customer = { id: 'cust_1', role: 'customer' };
+    const unclaimedGuestOrder = { id: 'ord_g', customer_id: null };
+    expect(canMutateOrder(customer, unclaimedGuestOrder).allowed).toBe(false);
+
+    const guestOrderWithTable = {
+      id: 'ord_table',
+      customer_id: null,
+      customer_phone: '0000000000',
+      table_id: 'table_10',
+    };
+    const claimWithoutCreds = evaluateOrderClaimPolicy({
+      actor: customer,
+      order: guestOrderWithTable,
+    });
+    expect(claimWithoutCreds.allowed).toBe(false);
+    expect(claimWithoutCreds.statusCode).toBe(403);
+
+    const claimWithMatchingTable = evaluateOrderClaimPolicy({
+      actor: customer,
+      order: guestOrderWithTable,
+      verificationType: 'table',
+      verificationValue: 'table_10',
+    });
+    expect(claimWithMatchingTable.allowed).toBe(true);
+  });
+});
 
 

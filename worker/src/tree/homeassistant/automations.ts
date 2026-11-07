@@ -40,8 +40,23 @@ export async function triggerAutomation(
       : 'dispatched to HA webhook';
 
     const now = new Date().toISOString();
-    const cleanTenant = tenantId ? tenantId.trim() : '';
-    const effectiveTenant = cleanTenant && cleanTenant !== '*' ? cleanTenant : 'default';
+    const rawTenant = tenantId ? tenantId.trim() : '';
+    const cleanTenant = rawTenant.toLowerCase() === 'hq' ? '*' : rawTenant;
+    let effectiveTenant = cleanTenant && cleanTenant !== '*' ? cleanTenant : 'default';
+    if ((!cleanTenant || cleanTenant === '*') && triggerEntity && db) {
+      try {
+        const entityRow = await db
+          .prepare('SELECT tenant_id FROM ha_device_states WHERE entity_id = ?')
+          .bind(triggerEntity)
+          .first<{ tenant_id?: string | null }>();
+        const inherited = typeof entityRow?.tenant_id === 'string' ? entityRow.tenant_id.trim() : '';
+        if (inherited && inherited !== '*' && inherited.toLowerCase() !== 'hq') {
+          effectiveTenant = inherited;
+        }
+      } catch {
+        // Ignore when ha_device_states or tenant_id is absent in minimal schemas
+      }
+    }
 
     try {
       await db

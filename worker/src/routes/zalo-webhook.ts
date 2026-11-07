@@ -6,7 +6,7 @@
 import { Hono } from 'hono';
 import { z } from 'zod';
 import type { Env } from '../types/env';
-import { getTenantId } from '../middleware/tenant';
+import { getTenantId, isHQSuperAdmin } from '../middleware/tenant';
 import { requireAuth } from '../middleware/auth';
 import { createLogger } from '../middleware/logger';
 import { processCustomerQuery } from './customer-assistant';
@@ -39,6 +39,7 @@ const zaloSimulateSchema = z.object({
 });
 
 const ZALO_CHALLENGE_RE = /^[A-Za-z0-9._-]{1,128}$/;
+const inFlightZaloMessages = new Set<string>();
 
 function constantTimeEqual(a: string, b: string): boolean {
   const enc = new TextEncoder();
@@ -131,13 +132,22 @@ zaloWebhookRouter.post('/', async (c) => {
     if (!signatureHeader) {
       return c.json({ success: false, error: 'Missing Zalo webhook signature' }, 401);
     }
-    const appId = String(body.app_id || envRecord.ZALO_APP_ID || '');
+    const configuredAppId = typeof envRecord.ZALO_APP_ID === 'string' ? envRecord.ZALO_APP_ID.trim() : '';
+    const bodyAppId = typeof body.app_id === 'string' || typeof body.app_id === 'number' ? String(body.app_id).trim() : '';
+    if (configuredAppId && bodyAppId && bodyAppId !== configuredAppId) {
+      return c.json({ success: false, error: 'Zalo webhook app_id mismatch' }, 401);
+    }
+    const appId = configuredAppId || bodyAppId;
     const valid = await verifyZaloSignature(rawBody, signatureHeader, zaloSecret, appId, timestampRaw);
     if (!valid) {
       return c.json({ success: false, error: 'Invalid Zalo webhook signature' }, 401);
     }
+    if (timestampRaw === '') {
+      return c.json({ success: false, error: 'Missing Zalo webhook timestamp' }, 401);
+    }
     const tsNum = Number(timestampRaw);
-    if (Number.isFinite(tsNum) && tsNum > 1000000000000 && Math.abs(Date.now() - tsNum) > 10 * 60 * 1000) {
+    const tsMs = tsNum > 1e9 && tsNum < 1e12 ? tsNum * 1000 : tsNum;
+    if (!Number.isFinite(tsMs) || tsMs <= 1e12 || Math.abs(Date.now() - tsMs) > 10 * 60 * 1000) {
       return c.json({ success: false, error: 'Stale Zalo webhook timestamp' }, 401);
     }
   }
@@ -148,32 +158,65 @@ zaloWebhookRouter.post('/', async (c) => {
   }
 
   const { event_name, sender, message, user_phone } = parsed.data;
-  const rawTenant = c.get('user' as never)
+  const requestedWebhookTenant = (
+    c.req.query('tenant_id') ||
+    c.req.query('tenantId') ||
+    c.req.query('store_id') ||
+    c.req.query('storeId') ||
+    c.req.header('X-Tenant-ID') ||
+    c.req.header('x-tenant-id') ||
+    ''
+  ).trim();
+  if (requestedWebhookTenant === '*') {
+    return c.json({ success: false, error: 'Forbidden: wildcard tenant is not allowed on Zalo webhook' }, 403);
+  }
+  const webhookUser = c.get('user' as never) as { role?: string; tenantId?: string; tenant_id?: string } | undefined;
+  const configuredPilotTenant = String(envRecord.PILOT_TENANT_ID || envRecord.DEFAULT_TENANT_ID || '').trim();
+  if (webhookUser) {
+    const rawUserTenant = String(webhookUser.tenantId || webhookUser.tenant_id || '').trim();
+    const userTenant = rawUserTenant && rawUserTenant !== '*' ? rawUserTenant : 'default';
+    if (!isHQSuperAdmin(webhookUser as never)) {
+      if (rawUserTenant === '*' || (requestedWebhookTenant && requestedWebhookTenant !== userTenant)) {
+        return c.json({ success: false, error: 'Forbidden: cross-tenant Zalo webhook access denied' }, 403);
+      }
+    }
+  } else {
+    const expectedWebhookTenant = configuredPilotTenant || 'default';
+    if (requestedWebhookTenant && requestedWebhookTenant !== expectedWebhookTenant) {
+      return c.json({ success: false, error: 'Forbidden: webhook tenant mismatch' }, 403);
+    }
+  }
+  const rawTenant = webhookUser
     ? getTenantId(c)
-    : (
-        c.req.query('tenant_id') ||
-        c.req.header('X-Tenant-ID') ||
-        c.req.header('x-tenant-id') ||
-        String(envRecord.PILOT_TENANT_ID || envRecord.DEFAULT_TENANT_ID || '')
-      ).trim();
+    : (configuredPilotTenant || requestedWebhookTenant || 'default');
   const tenantId = !rawTenant || rawTenant === '*' ? 'default' : rawTenant;
+  const effectiveTenantId = tenantId;
 
   const msgId = message?.msg_id?.trim() || '';
   const authKv = c.env?.AUTH_KV as
-    | { get(_k: string): Promise<string | null>; put(_k: string, _v: string, _opts?: { expirationTtl?: number }): Promise<void> }
+    | {
+        get(_k: string): Promise<string | null>;
+        put(_k: string, _v: string, _opts?: { expirationTtl?: number }): Promise<void>;
+        delete?(_k: string): Promise<void>;
+      }
     | undefined;
-  if (msgId && authKv && typeof authKv.get === 'function') {
-    const dedupKey = tenantId === 'default' ? `zalo_msg:${msgId}` : `zalo_msg:${tenantId}:${msgId}`;
+  const userText = message?.text?.trim() || '';
+
+  // Without a msg_id, fall back to sender+text so a replayed event without an
+  // id still collapses instead of being reprocessed as a new message.
+  const replayFingerprint = msgId
+    ? msgId
+    : `fp:${sender?.id || 'anon'}:${Buffer.from(userText).toString('base64').slice(0, 64)}`;
+  const dedupKey = effectiveTenantId === 'default' ? `zalo_msg:${replayFingerprint}` : `zalo_msg:${effectiveTenantId}:${replayFingerprint}`;
+  if (dedupKey && inFlightZaloMessages.has(dedupKey)) {
+    return c.json({ success: true, deduplicated: true, message: 'Duplicate message ignored' });
+  }
+  if (dedupKey && authKv && typeof authKv.get === 'function') {
     const alreadyProcessed = await authKv.get(dedupKey).catch(() => null);
     if (alreadyProcessed) {
       return c.json({ success: true, deduplicated: true, message: 'Duplicate message ignored' });
     }
-    if (typeof authKv.put === 'function') {
-      await authKv.put(dedupKey, '1', { expirationTtl: 86400 }).catch(() => {});
-    }
   }
-
-  const userText = message?.text?.trim() || '';
 
   if (event_name !== 'user_send_text' || !userText) {
     return c.json({ success: true, message: 'Event ignored or empty text' });
@@ -182,16 +225,34 @@ zaloWebhookRouter.post('/', async (c) => {
   const db = (c.env.AURA_DB ?? (c.env as Record<string, unknown>).DB) as import('@cloudflare/workers-types').D1Database;
   const aiBinding = (c.env as Record<string, unknown>).AI;
 
+  if (dedupKey) {
+    inFlightZaloMessages.add(dedupKey);
+    if (authKv && typeof authKv.put === 'function' && typeof authKv.delete === 'function') {
+      await authKv.put(dedupKey, '1', { expirationTtl: 86400 }).catch(() => {});
+    }
+  }
+
   let result: { intent: string; reply: string; engine: string };
   try {
-    result = await processCustomerQuery(db, aiBinding, tenantId, {
+    result = await processCustomerQuery(db, aiBinding, effectiveTenantId, {
       query: userText,
       phone: user_phone,
       channel: 'zalo'
     });
   } catch (err) {
+    if (dedupKey && authKv && typeof authKv.delete === 'function') {
+      await authKv.delete(dedupKey).catch(() => {});
+    }
     log.error('Zalo webhook query processing error:', { message: (err as Error).message });
     return c.json({ success: false, error: 'Failed to process Zalo message' }, 500);
+  } finally {
+    if (dedupKey) {
+      inFlightZaloMessages.delete(dedupKey);
+    }
+  }
+
+  if (dedupKey && authKv && typeof authKv.put === 'function') {
+    await authKv.put(dedupKey, '1', { expirationTtl: 86400 }).catch(() => {});
   }
 
   // Outbound push via Zalo OA message API if token is present
@@ -237,9 +298,39 @@ zaloWebhookRouter.post(
       return c.json({ success: false, error: parsed.error.issues[0]?.message || 'Invalid simulation payload' }, 400);
     }
     const body = parsed.data;
-    const tenantId = c.get('user' as never)
+    const requestedSimTenant = (
+      c.req.query('tenant_id') ||
+      c.req.query('tenantId') ||
+      c.req.query('store_id') ||
+      c.req.query('storeId') ||
+      c.req.header('X-Tenant-ID') ||
+      c.req.header('x-tenant-id') ||
+      ''
+    ).trim();
+    if (requestedSimTenant === '*') {
+      return c.json({ success: false, error: 'Forbidden: wildcard tenant is not allowed on Zalo simulation' }, 403);
+    }
+    const simUser = c.get('user' as never) as { role?: string; tenantId?: string; tenant_id?: string } | undefined;
+    const envRecord = (c.env || {}) as unknown as Record<string, unknown>;
+    const configuredPilotTenant = String(envRecord.PILOT_TENANT_ID || envRecord.DEFAULT_TENANT_ID || '').trim();
+    if (simUser) {
+      const rawUserTenant = String(simUser.tenantId || simUser.tenant_id || '').trim();
+      const userTenant = rawUserTenant && rawUserTenant !== '*' ? rawUserTenant : 'default';
+      if (!isHQSuperAdmin(simUser as never)) {
+        if (rawUserTenant === '*' || (requestedSimTenant && requestedSimTenant !== userTenant)) {
+          return c.json({ success: false, error: 'Forbidden: cross-tenant Zalo simulation denied' }, 403);
+        }
+      }
+    } else {
+      const expectedSimTenant = configuredPilotTenant || 'default';
+      if (requestedSimTenant && requestedSimTenant !== expectedSimTenant) {
+        return c.json({ success: false, error: 'Forbidden: cross-tenant Zalo simulation requires authentication' }, 403);
+      }
+    }
+    const rawSimTenant = simUser
       ? getTenantId(c)
-      : ((c.req.query('tenant_id') || c.req.header('X-Tenant-ID') || c.req.header('x-tenant-id') || '').trim() || 'default');
+      : (configuredPilotTenant || requestedSimTenant || 'default');
+    const tenantId = !rawSimTenant || rawSimTenant === '*' ? 'default' : rawSimTenant;
     const db = (c.env.AURA_DB ?? (c.env as Record<string, unknown>).DB) as import('@cloudflare/workers-types').D1Database;
     const aiBinding = (c.env as Record<string, unknown>).AI;
 

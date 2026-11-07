@@ -1,12 +1,57 @@
 import type { Hono } from 'hono';
 import type { Env } from '../../types/env';
 import { requireAuth } from '../../middleware/auth';
-import { getTenantId } from '../../middleware/tenant';
+import { getTenantId, isHQSuperAdmin } from '../../middleware/tenant';
 import {
   getCustomerAccount,
   updateConsent,
   CONSENT_PURPOSES,
 } from '@aura/domain-crm';
+
+const CRM_MANAGEMENT_ROLES = new Set(['owner', 'admin', 'manager', 'supervisor', 'staff']);
+
+function hasCrmAccountTenantMismatch(c: any): boolean {
+  const user = c.get?.('user') as { role?: string; tenantId?: string; tenant_id?: string } | undefined;
+  const queryTenant = String(
+    c.req?.query?.('tenant_id') ||
+    c.req?.query?.('tenantId') ||
+    c.req?.query?.('store_id') ||
+    c.req?.query?.('storeId') ||
+    ''
+  ).trim();
+  const headerTenant = String(
+    c.req?.header?.('X-Tenant-ID') ||
+    c.req?.header?.('x-tenant-id') ||
+    c.req?.header?.('X-Store-ID') ||
+    c.req?.header?.('x-store-id') ||
+    ''
+  ).trim();
+  if (queryTenant && headerTenant && queryTenant !== headerTenant) return true;
+  const reqTenant = queryTenant || headerTenant;
+  if (!user) {
+    return reqTenant === '*' || reqTenant.toLowerCase() === 'hq';
+  }
+  if (isHQSuperAdmin(user)) return false;
+  const userTenant = String(user.tenantId ?? user.tenant_id ?? '').trim();
+  const boundTenant = userTenant || 'default';
+  if (
+    userTenant === '*' ||
+    userTenant.toLowerCase() === 'hq' ||
+    reqTenant === '*' ||
+    reqTenant.toLowerCase() === 'hq'
+  ) {
+    return true;
+  }
+  return Boolean(reqTenant && reqTenant !== boundTenant);
+}
+
+function resolveCrmAccountTenantId(c: any, user: { role?: string; tenantId?: string; tenant_id?: string }): string {
+  const raw = user.role === 'customer'
+    ? (user.tenantId ?? user.tenant_id ?? getTenantId(c))
+    : getTenantId(c);
+  const trimmed = String(raw || '').trim() || 'default';
+  return trimmed.toLowerCase() === 'hq' && isHQSuperAdmin(user) ? '*' : trimmed;
+}
 
 export function registerAccountHandlers(router: Hono<{ Bindings: Env }>): void {
   /**
@@ -16,15 +61,19 @@ export function registerAccountHandlers(router: Hono<{ Bindings: Env }>): void {
    */
   router.get('/account/me', requireAuth(['customer', 'staff', 'waiter', 'cashier', 'supervisor', 'manager', 'admin', 'owner']), async (c) => {
     const db = c.env.AURA_DB;
-    const user = c.get('user');
+    const user = c.get('user') as { id: string; userId?: string; customerId?: string; customer_id?: string; role?: string; tenantId?: string; tenant_id?: string } | undefined;
 
     if (!user) {
       return c.json({ success: false, error: 'Unauthorized' }, 401);
     }
+    if (hasCrmAccountTenantMismatch(c)) {
+      return c.json({ success: false, error: 'Forbidden' }, 403);
+    }
 
-    const rawTenant = user.role === 'customer' ? (user.tenantId || getTenantId(c as any)) : getTenantId(c as any);
-    const tenantId = (rawTenant || '').trim() || 'default';
-    const account = await getCustomerAccount(db, user.id, { tenantId });
+    const tenantId = resolveCrmAccountTenantId(c, user);
+    const kv = c.env.AUTH_KV as import('@cloudflare/workers-types').KVNamespace | undefined;
+    const accountOwnerId = user.customerId || user.customer_id || user.userId || user.id;
+    const account = await getCustomerAccount(db, accountOwnerId, { tenantId, kv });
     return c.json({ success: true, data: account });
   });
 
@@ -36,10 +85,13 @@ export function registerAccountHandlers(router: Hono<{ Bindings: Env }>): void {
    */
   const handleUpdateConsent = async (c: any) => {
     const db = c.env.AURA_DB;
-    const user = c.get('user');
+    const user = c.get('user') as { id: string; userId?: string; customerId?: string; customer_id?: string; sub?: string; role: string; tenantId?: string; tenant_id?: string } | undefined;
 
     if (!user) {
       return c.json({ success: false, error: 'Unauthorized' }, 401);
+    }
+    if (hasCrmAccountTenantMismatch(c)) {
+      return c.json({ success: false, error: 'Forbidden' }, 403);
     }
 
     const body = await c.req.json();
@@ -48,29 +100,41 @@ export function registerAccountHandlers(router: Hono<{ Bindings: Env }>): void {
       return c.json({ success: false, error: 'purpose and granted are required' }, 400);
     }
 
-    // Customer role can only update their own consents.
-    const targetCustomerId = user.role === 'customer' ? user.id : (body.customerId ?? user.id);
-    const rawTenant = user.role === 'customer' ? (user.tenantId || getTenantId(c as any)) : getTenantId(c as any);
-    const tenantId = (rawTenant || '').trim() || 'default';
+    // Customer role can only update their own consents; staff override requires management role.
+    if (user.role !== 'customer' && !CRM_MANAGEMENT_ROLES.has(user.role)) {
+      return c.json({ success: false, error: 'Forbidden' }, 403);
+    }
+    const selfIds = [user.id, user.userId, user.customerId, user.customer_id, user.sub]
+      .filter((v): v is string => typeof v === 'string' && v.trim() !== '');
+    if (user.role === 'customer' && body.customerId !== undefined && !selfIds.includes(String(body.customerId))) {
+      return c.json({ success: false, error: 'Forbidden' }, 403);
+    }
+    const targetCustomerId = user.role === 'customer'
+      ? (user.customerId || user.customer_id || user.id)
+      : (body.customerId ?? user.id);
+    const tenantId = resolveCrmAccountTenantId(c, user);
+    let effectiveConsentTenant = tenantId;
     if (user.role !== 'customer') {
-      if (tenantId !== '*') {
-        try {
-          const custRow = (await db.prepare('SELECT tenant_id FROM customers WHERE id = ? LIMIT 1').bind(targetCustomerId).first()) as { tenant_id?: string | null } | null;
-          if (custRow) {
-            const custTenant = (custRow.tenant_id && String(custRow.tenant_id).trim()) || 'default';
-            if (custTenant !== tenantId) {
-              return c.json({ success: false, error: 'Forbidden' }, 403);
-            }
-          } else if (tenantId !== 'default') {
+      try {
+        const custRow = (await db.prepare('SELECT tenant_id FROM customers WHERE id = ? LIMIT 1').bind(targetCustomerId).first()) as { tenant_id?: string | null } | null;
+        if (custRow) {
+          const custTenant = (custRow.tenant_id && String(custRow.tenant_id).trim()) || 'default';
+          if (tenantId !== '*' && custTenant !== tenantId) {
             return c.json({ success: false, error: 'Forbidden' }, 403);
           }
-        } catch (err) {
-          if (!/no such column:\s*tenant_id/i.test(String(err)) || tenantId !== 'default') {
-            return c.json({ success: false, error: 'Forbidden' }, 403);
+          if (tenantId === '*') {
+            effectiveConsentTenant = custTenant;
           }
+        } else if (tenantId !== 'default' && tenantId !== '*') {
+          return c.json({ success: false, error: 'Forbidden' }, 403);
+        }
+      } catch (err) {
+        if (tenantId !== '*' && (!/no such column:\s*tenant_id/i.test(String(err)) || tenantId !== 'default')) {
+          return c.json({ success: false, error: 'Forbidden' }, 403);
         }
       }
     }
+    const finalConsentTenant = effectiveConsentTenant === '*' ? 'default' : effectiveConsentTenant;
 
     const result = await updateConsent(
       db,
@@ -82,9 +146,9 @@ export function registerAccountHandlers(router: Hono<{ Bindings: Env }>): void {
         policyVersion: body.policyVersion,
         actorId: user.id,
         actorRole: (user.role === 'customer' ? 'customer' : user.role) as import('@aura/domain-crm').ConsentUpdate['actorRole'],
-        tenantId,
+        tenantId: finalConsentTenant,
       },
-      tenantId,
+      finalConsentTenant,
     );
 
     if (!result.ok) {

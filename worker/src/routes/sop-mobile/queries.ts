@@ -29,7 +29,7 @@ import type { Env } from '../../types/env';
  */
 export async function getSopTemplates(c: Context<{ Bindings: Env }>) {
   try {
-    const scope = sopScope(c.env, c.get('user'));
+    const scope = sopScope(c.env, c.get('user'), c);
     const templates = await listTemplates(scope);
     return jsonResponse({ success: true, templates, data: { items: templates } });
   } catch (err) {
@@ -44,7 +44,7 @@ export async function getSopTemplates(c: Context<{ Bindings: Env }>) {
  */
 export async function getSopRunsToday(c: Context<{ Bindings: Env }>) {
   try {
-    const scope = sopScope(c.env, c.get('user'));
+    const scope = sopScope(c.env, c.get('user'), c);
     const now = new Date();
     const templates = await listTemplates(scope);
     const runs = await listRunsForStaffDay(scope, scope.actorId, businessDate(now));
@@ -92,7 +92,7 @@ export async function getSopRunsToday(c: Context<{ Bindings: Env }>) {
  */
 export async function getSopRunDetail(c: Context<{ Bindings: Env }>) {
   try {
-    const scope = sopScope(c.env, c.get('user'));
+    const scope = sopScope(c.env, c.get('user'), c);
     const runId = c.req.param('id') ?? '';
     const run = await findRun(scope, runId);
     if (!run) return errorResponse('Checklist not found', 404);
@@ -118,7 +118,7 @@ export async function getSopRunDetail(c: Context<{ Bindings: Env }>) {
  */
 export async function getMyViolation(c: Context<{ Bindings: Env }>) {
   try {
-    const scope = sopScope(c.env, c.get('user'));
+    const scope = sopScope(c.env, c.get('user'), c);
     const violationId = c.req.param('id') ?? '';
     const violation = await findViolation(scope, violationId);
     if (!violation) return errorResponse('Violation not found', 404);

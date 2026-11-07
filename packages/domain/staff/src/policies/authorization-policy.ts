@@ -147,10 +147,12 @@ export const ROLE_PERMISSIONS: Record<RoleType, Partial<Record<ResourceType, Act
   },
 };
 
-export function isHQSuperAdmin(actor?: ActorContext | null): boolean {
+export function isHQSuperAdmin(actor?: (ActorContext & { tenant_id?: string }) | null): boolean {
   if (!actor) return false;
   const roleStr = String(actor.role);
-  return (roleStr === 'owner' || roleStr === 'admin') && (!actor.tenantId || actor.tenantId === 'default' || actor.tenantId === 'hq');
+  const rawTenant = actor.tenantId ?? actor.tenant_id;
+  const tenant = typeof rawTenant === 'string' ? rawTenant.trim().toLowerCase() : '';
+  return (roleStr === 'owner' || roleStr === 'admin') && (tenant === 'hq' || tenant === '*');
 }
 
 export function validateOperatingUnitScope(
@@ -162,11 +164,14 @@ export function validateOperatingUnitScope(
   }
 
   // 1. Tenant boundary validation
-  if (resource.tenantId && actor.tenantId && resource.tenantId !== actor.tenantId) {
+  const rawActorTenant = actor.tenantId ?? (actor as { tenant_id?: string }).tenant_id;
+  const actorTenant = (rawActorTenant || '').trim() || 'default';
+  const resourceTenant = (resource.tenantId || '').trim() || 'default';
+  if (actorTenant !== '*' && actorTenant !== resourceTenant) {
     return {
       allowed: false,
       code: 'tenant_mismatch',
-      reason: `Access denied: Resource belongs to tenant '${resource.tenantId}', but actor is bound to '${actor.tenantId}'`,
+      reason: `Access denied: Resource belongs to tenant '${resourceTenant}', but actor is bound to '${actorTenant}'`,
     };
   }
 
@@ -286,7 +291,43 @@ export function authorizeAction(
 
   // 6. Staff (Kitchen / Counter / Operations / Barista / Chef / Cashier) Boundaries
   const roleStr = String(role);
-  if (roleStr === 'staff' || roleStr === 'barista' || roleStr === 'kitchen' || roleStr === 'chef' || roleStr === 'cashier') {
+  if (roleStr === 'barista' || roleStr === 'kitchen' || roleStr === 'chef') {
+    if (resource.type === 'catalog' && action === 'read') return { allowed: true };
+    if (resource.type === 'table' && action === 'read') return { allowed: true };
+    if (resource.type === 'order' && ['read', 'update'].includes(action)) return { allowed: true };
+    if (resource.type === 'shift' && ['read', 'create', 'operate'].includes(action)) return { allowed: true };
+    if (resource.type === 'shift' && action === 'update') {
+      if (!resource.ownerId || resource.ownerId === currentActor.id) return { allowed: true };
+      return { allowed: false, code: 'unauthorized_role', reason: 'Peer staff cannot close another staff shift' };
+    }
+    if (resource.type === 'inventory' && action === 'read') return { allowed: true };
+
+    return {
+      allowed: false,
+      code: 'unauthorized_role',
+      reason: `${roleStr} role is not authorized to perform ${action} on ${resource.type}`,
+    };
+  }
+
+  if (roleStr === 'cashier') {
+    if (resource.type === 'catalog' && action === 'read') return { allowed: true };
+    if (resource.type === 'table' && ['read', 'update'].includes(action)) return { allowed: true };
+    if (resource.type === 'order' && ['read', 'create', 'update'].includes(action)) return { allowed: true };
+    if (resource.type === 'shift' && ['read', 'create', 'operate'].includes(action)) return { allowed: true };
+    if (resource.type === 'shift' && action === 'update') {
+      if (!resource.ownerId || resource.ownerId === currentActor.id) return { allowed: true };
+      return { allowed: false, code: 'unauthorized_role', reason: 'Peer staff cannot close another staff shift' };
+    }
+    if (resource.type === 'payment' && ['read', 'create'].includes(action)) return { allowed: true };
+
+    return {
+      allowed: false,
+      code: 'unauthorized_role',
+      reason: `Cashier role is not authorized to perform ${action} on ${resource.type}`,
+    };
+  }
+
+  if (roleStr === 'staff') {
     if (resource.type === 'catalog' && ['read', 'create', 'update'].includes(action)) return { allowed: true };
     if (resource.type === 'table' && ['read', 'update'].includes(action)) return { allowed: true };
     if (resource.type === 'order' && ['read', 'create', 'update'].includes(action)) return { allowed: true };

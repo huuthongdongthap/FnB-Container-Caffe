@@ -5,6 +5,9 @@ import { INITIAL_LOADING } from './admin-shifts-store-constants';
 
 export type { ShiftRecord, TodayResponse, SingleShiftResponse } from './admin-shifts-store-types';
 
+let latestFetchTodaySeq = 0;
+let latestFetchHistorySeq = 0;
+
 export const useAdminShiftsStore = create<AdminShiftsState>((set, get) => ({
   todayShifts: [],
   historyShifts: [],
@@ -16,14 +19,17 @@ export const useAdminShiftsStore = create<AdminShiftsState>((set, get) => ({
   },
 
   fetchToday: async () => {
+    const seq = ++latestFetchTodaySeq;
     set({ loading: { ...get().loading, today: true }, error: null });
     try {
       const body: TodayResponse = await apiFetch<any>('/api/shifts/today');
+      if (seq !== latestFetchTodaySeq) return;
       set({
         todayShifts: Array.isArray(body.data) ? body.data : [],
         loading: { ...get().loading, today: false },
       });
     } catch {
+      if (seq !== latestFetchTodaySeq) return;
       set({
         loading: { ...get().loading, today: false },
         error: 'Lỗi kết nối khi tải ca làm việc',
@@ -32,6 +38,7 @@ export const useAdminShiftsStore = create<AdminShiftsState>((set, get) => ({
   },
 
   fetchHistory: async (staffId?: string) => {
+    const seq = ++latestFetchHistorySeq;
     set({ loading: { ...get().loading, history: true }, error: null });
     try {
       const params = new URLSearchParams();
@@ -39,11 +46,13 @@ export const useAdminShiftsStore = create<AdminShiftsState>((set, get) => ({
       params.set('limit', '50');
 
       const body: TodayResponse = await apiFetch<any>(`/api/shifts?${params.toString()}`);
+      if (seq !== latestFetchHistorySeq) return;
       set({
         historyShifts: Array.isArray(body.data) ? body.data : [],
         loading: { ...get().loading, history: false },
       });
     } catch {
+      if (seq !== latestFetchHistorySeq) return;
       set({
         loading: { ...get().loading, history: false },
         error: 'Lỗi kết nối khi tải lịch sử ca làm việc',

@@ -38,10 +38,46 @@ export async function handleSpendCashback(c: Context<{ Bindings: Env }>) {
       // keep fallback
     }
   }
+  const queryTenant = (
+    c.req?.query?.('tenant_id') ||
+    c.req?.query?.('tenantId') ||
+    c.req?.query?.('store_id') ||
+    c.req?.query?.('storeId') ||
+    ''
+  ).trim();
+  const headerTenant = (
+    c.req?.header?.('X-Tenant-ID') ||
+    c.req?.header?.('x-tenant-id') ||
+    c.req?.header?.('X-Store-ID') ||
+    c.req?.header?.('x-store-id') ||
+    ''
+  ).trim();
+  if (queryTenant && headerTenant && queryTenant !== headerTenant) {
+    return c.json({ success: false, error: 'Forbidden' }, 403);
+  }
+  const requestedTenant = queryTenant || headerTenant;
+  if (
+    custTenant === '*' ||
+    custTenant.toLowerCase() === 'hq' ||
+    (requestedTenant && (requestedTenant === '*' || requestedTenant.toLowerCase() === 'hq' || requestedTenant !== storeTenant)) ||
+    (custTenant && custTenant !== storeTenant)
+  ) {
+    return c.json({ success: false, error: 'Forbidden' }, 403);
+  }
 
-  const existingSpend = await db.prepare(
-    'SELECT id FROM cashback_transactions WHERE order_id = ? AND type = \'spend\' LIMIT 1'
-  ).bind(order_id).first<{ id: string }>();
+  let existingSpend: { id: string } | null = null;
+  try {
+    existingSpend = await db.prepare(
+      "SELECT id FROM cashback_transactions WHERE order_id = ? AND type = 'spend' AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ? LIMIT 1"
+    ).bind(order_id, storeTenant).first<{ id: string }>();
+  } catch (spendCheckErr) {
+    if (storeTenant !== 'default') {
+      throw spendCheckErr;
+    }
+    existingSpend = await db.prepare(
+      "SELECT id FROM cashback_transactions WHERE order_id = ? AND type = 'spend' LIMIT 1"
+    ).bind(order_id).first<{ id: string }>();
+  }
   if (existingSpend) {
     return c.json({ success: false, error: 'Ví đã được dùng cho đơn này' }, 409);
   }
@@ -50,6 +86,7 @@ export async function handleSpendCashback(c: Context<{ Bindings: Env }>) {
     total_amount?: number;
     total?: number;
     cashback_used?: number | null;
+    cashback_used_vnd?: number | null;
     customer_id?: string | null;
     customer_phone?: string | null;
     tenant_id?: string | null;
@@ -61,12 +98,19 @@ export async function handleSpendCashback(c: Context<{ Bindings: Env }>) {
   }
   const orderStatus = order.status ? String(order.status).trim().toLowerCase() : '';
   const paymentStatus = order.payment_status ? String(order.payment_status).trim().toLowerCase() : '';
-  const isLegacySharedFixture = order_id === 'ord_fran_r1' && cust.id === 'cust_fran_r1';
   if (
     orderStatus === 'cancelled' ||
+    orderStatus === 'canceled' ||
+    orderStatus === 'rejected' ||
+    orderStatus === 'failed' ||
+    orderStatus === 'expired' ||
+    orderStatus === 'refunded' ||
     orderStatus === 'completed' ||
     paymentStatus === 'refunded' ||
-    (paymentStatus === 'paid' && !isLegacySharedFixture)
+    paymentStatus === 'failed' ||
+    paymentStatus === 'cancelled' ||
+    paymentStatus === 'canceled' ||
+    paymentStatus === 'paid'
   ) {
     return c.json({ success: false, error: 'Order is not eligible for cashback spend' }, 400);
   }
@@ -82,7 +126,7 @@ export async function handleSpendCashback(c: Context<{ Bindings: Env }>) {
       return c.json({ success: false, error: 'Forbidden' }, 403);
     }
   }
-  if (Number(order.cashback_used ?? 0) > 0) {
+  if (Number(order.cashback_used ?? order.cashback_used_vnd ?? 0) > 0) {
     return c.json({ success: false, error: 'Ví đã được dùng cho đơn này' }, 409);
   }
   if ('tenant_id' in order && order.tenant_id !== undefined) {
@@ -113,12 +157,21 @@ export async function handleSpendCashback(c: Context<{ Bindings: Env }>) {
     return c.json({ success: false, error: 'Toi da 50% gia tr? don hang', max_allowed: maxAllowed }, 400);
   }
 
-  let wallet: CashbackWallet | null = null;
+  let wallet: (CashbackWallet & { tenant_id?: string | null }) | null = null;
   try {
     wallet = await db.prepare("SELECT * FROM cashback_wallets WHERE customer_id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?")
-      .bind(cust.id, storeTenant).first<CashbackWallet>();
-  } catch {
-    wallet = await db.prepare('SELECT * FROM cashback_wallets WHERE customer_id = ?').bind(cust.id).first<CashbackWallet>();
+      .bind(cust.id, storeTenant).first<CashbackWallet & { tenant_id?: string | null }>();
+  } catch (walletErr) {
+    if (storeTenant !== 'default') {
+      throw walletErr;
+    }
+    wallet = await db.prepare('SELECT * FROM cashback_wallets WHERE customer_id = ?').bind(cust.id).first<CashbackWallet & { tenant_id?: string | null }>();
+  }
+  if (wallet && 'tenant_id' in wallet && wallet.tenant_id !== undefined) {
+    const walletTenant = (wallet.tenant_id && String(wallet.tenant_id).trim()) || 'default';
+    if (walletTenant !== storeTenant) {
+      wallet = null;
+    }
   }
   if (!wallet) {
     return c.json({ success: false, error: 'Vi khong ton tai', balance: 0 }, 400);
@@ -135,7 +188,10 @@ export async function handleSpendCashback(c: Context<{ Bindings: Env }>) {
     updateResult = await db.prepare(
       "UPDATE cashback_wallets SET balance = balance - ?, total_spent = total_spent + ?, updated_at = ? WHERE customer_id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ? AND balance >= ?"
     ).bind(amount, amount, now, cust.id, storeTenant, amount).run();
-  } catch {
+  } catch (walletUpdateErr) {
+    if (storeTenant !== 'default') {
+      throw walletUpdateErr;
+    }
     updateResult = await db.prepare(
       'UPDATE cashback_wallets SET balance = balance - ?, total_spent = total_spent + ?, updated_at = ? WHERE customer_id = ? AND balance >= ?'
     ).bind(amount, amount, now, cust.id, amount).run();
@@ -145,52 +201,86 @@ export async function handleSpendCashback(c: Context<{ Bindings: Env }>) {
     return c.json({ success: false, error: 'So du khong du (race condition)', balance: wallet.balance }, 400);
   }
 
+  const refundWalletOnOrderConflict = async () => {
+    await db.prepare(
+      "UPDATE cashback_wallets SET balance = balance + ?, total_spent = MAX(0, total_spent - ?), updated_at = ? WHERE customer_id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
+    ).bind(amount, amount, now, cust.id, storeTenant).run().catch(async () => {
+      if (storeTenant === 'default') {
+        await db.prepare(
+          'UPDATE cashback_wallets SET balance = balance + ?, total_spent = MAX(0, total_spent - ?), updated_at = ? WHERE customer_id = ?'
+        ).bind(amount, amount, now, cust.id).run().catch(() => {});
+      }
+    });
+  };
+
   try {
     let orderUpdateRes: { meta?: { changes?: number }; changes?: number } | undefined;
     try {
       orderUpdateRes = await db.prepare(
-        "UPDATE orders SET cashback_used = ?, discount = COALESCE(discount, 0) + ?, total = MAX(0, total - ?) WHERE id = ? AND COALESCE(cashback_used, 0) = 0 AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
+        "UPDATE orders SET cashback_used = ?, discount = COALESCE(discount, 0) + ?, total = MAX(0, COALESCE(total, total_amount, 0) - ?) WHERE id = ? AND COALESCE(cashback_used, 0) = 0 AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ? AND COALESCE(status, 'pending') NOT IN ('cancelled', 'completed') AND COALESCE(payment_status, 'unpaid') NOT IN ('paid', 'refunded')"
       ).bind(amount, amount, amount, order_id, storeTenant).run();
     } catch {
       try {
         orderUpdateRes = await db.prepare(
-          'UPDATE orders SET cashback_used = ?, discount = COALESCE(discount, 0) + ?, total = MAX(0, total - ?) WHERE id = ? AND COALESCE(cashback_used, 0) = 0'
-        ).bind(amount, amount, amount, order_id).run();
-      } catch {
+          "UPDATE orders SET cashback_used = ?, discount = COALESCE(discount, 0) + ?, total = MAX(0, total - ?) WHERE id = ? AND COALESCE(cashback_used, 0) = 0 AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ? AND COALESCE(status, 'pending') NOT IN ('cancelled', 'completed') AND COALESCE(payment_status, 'unpaid') NOT IN ('paid', 'refunded')"
+        ).bind(amount, amount, amount, order_id, storeTenant).run();
+      } catch (scopedOrdErr) {
+        if (storeTenant !== 'default') {
+          throw scopedOrdErr;
+        }
         try {
           orderUpdateRes = await db.prepare(
-            'UPDATE orders SET cashback_used = ?, total = MAX(0, total - ?) WHERE id = ? AND COALESCE(cashback_used, 0) = 0'
-          ).bind(amount, amount, order_id).run();
+            "UPDATE orders SET cashback_used = ?, discount = COALESCE(discount, 0) + ?, total = MAX(0, total - ?) WHERE id = ? AND COALESCE(cashback_used, 0) = 0 AND COALESCE(status, 'pending') NOT IN ('cancelled', 'completed') AND COALESCE(payment_status, 'unpaid') NOT IN ('paid', 'refunded')"
+          ).bind(amount, amount, amount, order_id).run();
         } catch {
-          orderUpdateRes = await db.prepare(
-            'UPDATE orders SET cashback_used = ? WHERE id = ? AND COALESCE(cashback_used, 0) = 0'
-          ).bind(amount, order_id).run();
+          try {
+            orderUpdateRes = await db.prepare(
+              "UPDATE orders SET cashback_used = ?, total = MAX(0, total - ?) WHERE id = ? AND COALESCE(cashback_used, 0) = 0 AND COALESCE(status, 'pending') NOT IN ('cancelled', 'completed') AND COALESCE(payment_status, 'unpaid') NOT IN ('paid', 'refunded')"
+            ).bind(amount, amount, order_id).run();
+          } catch {
+            orderUpdateRes = await db.prepare(
+              'UPDATE orders SET cashback_used = ? WHERE id = ? AND COALESCE(cashback_used, 0) = 0'
+            ).bind(amount, order_id).run();
+          }
         }
       }
     }
     const orderChanges = orderUpdateRes?.meta?.changes ?? (orderUpdateRes as unknown as { changes?: number })?.changes ?? 1;
     if (orderChanges === 0) {
-      await db.prepare(
-        "UPDATE cashback_wallets SET balance = balance + ?, total_spent = MAX(0, total_spent - ?), updated_at = ? WHERE customer_id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
-      ).bind(amount, amount, now, cust.id, storeTenant).run().catch(async () => {
-        await db.prepare(
-          'UPDATE cashback_wallets SET balance = balance + ?, total_spent = MAX(0, total_spent - ?), updated_at = ? WHERE customer_id = ?'
-        ).bind(amount, amount, now, cust.id).run().catch(() => {});
-      });
+      await refundWalletOnOrderConflict();
       return c.json({ success: false, error: 'Ví đã được dùng cho đơn này' }, 409);
     }
+    await db.prepare(
+      "UPDATE orders SET total_amount = total WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
+    ).bind(order_id, storeTenant).run().catch(() => {});
   } catch {
-    await db.prepare('UPDATE orders SET discount = COALESCE(discount, 0) + ?, total = MAX(0, total - ?) WHERE id = ?')
-      .bind(amount, amount, order_id).run().catch(async () => {
-        await db.prepare('UPDATE orders SET discount = COALESCE(discount, 0) + ? WHERE id = ?').bind(amount, order_id).run().catch(() => {});
-      });
+    if (storeTenant !== 'default') {
+      await refundWalletOnOrderConflict();
+      return c.json({ success: false, error: 'Ví đã được dùng cho đơn này' }, 409);
+    }
+    let fallbackOrderRes: { meta?: { changes?: number }; changes?: number } | undefined;
+    try {
+      fallbackOrderRes = await db.prepare(
+        "UPDATE orders SET discount = COALESCE(discount, 0) + ?, total = MAX(0, total - ?) WHERE id = ? AND COALESCE(status, 'pending') NOT IN ('cancelled', 'completed') AND COALESCE(payment_status, 'unpaid') NOT IN ('paid', 'refunded')"
+      ).bind(amount, amount, order_id).run();
+    } catch {
+      fallbackOrderRes = await db.prepare('UPDATE orders SET discount = COALESCE(discount, 0) + ? WHERE id = ?').bind(amount, order_id).run().catch(() => undefined);
+    }
+    const fallbackChanges = fallbackOrderRes ? (fallbackOrderRes.meta?.changes ?? (fallbackOrderRes as unknown as { changes?: number }).changes ?? 1) : 0;
+    if (fallbackChanges === 0) {
+      await refundWalletOnOrderConflict();
+      return c.json({ success: false, error: 'Ví đã được dùng cho đơn này' }, 409);
+    }
   }
   const txId = makeCashbackTxId();
   try {
     await db.prepare(
       "INSERT INTO cashback_transactions (id, wallet_id, customer_id, order_id, type, amount, balance_after, tenant_id, created_at) VALUES (?, ?, ?, ?, 'spend', ?, ?, ?, ?)"
     ).bind(txId, wallet.id ?? `wal_${cust.id}`, cust.id, order_id, amount, newBalance, storeTenant, now).run();
-  } catch {
+  } catch (txInsertErr) {
+    if (storeTenant !== 'default') {
+      throw txInsertErr;
+    }
     try {
       await db.prepare(
         'INSERT INTO cashback_transactions (id, wallet_id, customer_id, order_id, type, amount, balance_after, created_at) VALUES (?, ?, ?, ?, \'spend\', ?, ?, ?)'
@@ -206,12 +296,14 @@ export async function handleSpendCashback(c: Context<{ Bindings: Env }>) {
       'INSERT INTO loyalty_audit_log (customer_id, action, amount_vnd, order_id, metadata, tenant_id, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)'
     ).bind(cust.id, 'cashback_spend', amount, order_id, JSON.stringify({ order_total: orderTotal }), storeTenant, now).run();
   } catch {
-    try {
-      await db.prepare(
-        'INSERT INTO loyalty_audit_log (customer_id, action, amount_vnd, order_id, metadata, created_at) VALUES (?, ?, ?, ?, ?, ?)'
-      ).bind(cust.id, 'cashback_spend', amount, order_id, JSON.stringify({ order_total: orderTotal }), now).run();
-    } catch {
-      // loyalty_audit_log table is optional in canonical D1 schema
+    if (storeTenant === 'default') {
+      try {
+        await db.prepare(
+          'INSERT INTO loyalty_audit_log (customer_id, action, amount_vnd, order_id, metadata, created_at) VALUES (?, ?, ?, ?, ?, ?)'
+        ).bind(cust.id, 'cashback_spend', amount, order_id, JSON.stringify({ order_total: orderTotal }), now).run();
+      } catch {
+        // loyalty_audit_log table is optional in canonical D1 schema
+      }
     }
   }
 
@@ -220,7 +312,9 @@ export async function handleSpendCashback(c: Context<{ Bindings: Env }>) {
     updatedWallet = await db.prepare("SELECT balance FROM cashback_wallets WHERE customer_id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?")
       .bind(cust.id, storeTenant).first<{ balance: number }>();
   } catch {
-    updatedWallet = await db.prepare('SELECT balance FROM cashback_wallets WHERE customer_id = ?').bind(cust.id).first<{ balance: number }>();
+    if (storeTenant === 'default') {
+      updatedWallet = await db.prepare('SELECT balance FROM cashback_wallets WHERE customer_id = ?').bind(cust.id).first<{ balance: number }>();
+    }
   }
   const updatedOrderTotal = Math.max(0, orderTotal - amount);
   return c.json({

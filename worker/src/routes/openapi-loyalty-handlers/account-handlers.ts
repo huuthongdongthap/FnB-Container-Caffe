@@ -5,6 +5,8 @@ import { getDatabase } from '../../lib/db';
 import { getTenantId } from '../../middleware/tenant';
 import {
   getLoyaltyAccountWithFallback,
+  getVietnamMonthAndYear,
+  hasOpenApiLoyaltyTenantMismatch,
   matchesLoyaltyTenant,
   recordLoyaltyTransactionDualWrite,
   syncLoyaltyAccountAndCustomerBalance,
@@ -18,9 +20,14 @@ export function registerAccountHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
   app.openapi(LoyaltyRoutes.account.get as any, async (c: any) => {
     const db = getDatabase(c);
     const user = c.get('user');
-    const tenantId = getTenantId(c);
+    const rawTenantId = getTenantId(c);
+    if (hasOpenApiLoyaltyTenantMismatch(c, rawTenantId)) {
+      return c.json({ success: false, error: 'Forbidden: cross-tenant access denied' }, 403);
+    }
+    const tenantId = rawTenantId.trim().toLowerCase() === 'hq' ? '*' : rawTenantId.trim();
+    const customerId = String(user.customerId || user.customer_id || user.id);
 
-    const { account } = await getLoyaltyAccountWithFallback(db, user.customerId || user.id, new Date().toISOString(), tenantId);
+    const { account } = await getLoyaltyAccountWithFallback(db, customerId, new Date().toISOString(), tenantId);
 
     if (!account) {
       return c.json({ success: false, error: 'Account not found' }, 404);
@@ -44,9 +51,13 @@ export function registerAccountHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
   app.openapi(LoyaltyRoutes.account.transactions as any, async (c: any) => {
     const db = getDatabase(c);
     const user = c.get('user');
-    const tenantId = getTenantId(c);
+    const rawTenantId = getTenantId(c);
+    if (hasOpenApiLoyaltyTenantMismatch(c, rawTenantId)) {
+      return c.json({ success: false, error: 'Forbidden: cross-tenant access denied' }, 403);
+    }
+    const tenantId = rawTenantId.trim().toLowerCase() === 'hq' ? '*' : rawTenantId.trim();
     const query = c.req.valid('query');
-    const customerId = String(user.customerId || user.id);
+    const customerId = String(user.customerId || user.customer_id || user.id);
 
     const { account } = await getLoyaltyAccountWithFallback(db, customerId, new Date().toISOString(), tenantId);
 
@@ -69,6 +80,7 @@ export function registerAccountHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
 
     let total = 0;
     let transactionsResults: any[] = [];
+    const allowUnscopedFallback = !tenantId || tenantId === 'default';
     const scopedWhereClause = `${whereClause} AND (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?)`;
     const scopedParams: (string | number)[] = [...params, tenantId, tenantId];
     try {
@@ -79,7 +91,10 @@ export function registerAccountHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
         transactions = (await db.prepare(
           `SELECT * FROM loyalty_transactions ${scopedWhereClause} ORDER BY created_at DESC LIMIT ? OFFSET ?`
         ).bind(...scopedParams, limit, offset).all()) as { results: any[] };
-      } catch {
+      } catch (err) {
+        if (!allowUnscopedFallback) {
+          throw err;
+        }
         countResult = (await db.prepare(`SELECT COUNT(*) as total FROM loyalty_transactions ${whereClause}`).bind(...params).first()) as { total: number } | null;
         transactions = (await db.prepare(
           `SELECT * FROM loyalty_transactions ${whereClause} ORDER BY created_at DESC LIMIT ? OFFSET ?`
@@ -88,15 +103,17 @@ export function registerAccountHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
       total = countResult?.total || 0;
       transactionsResults = transactions.results || [];
     } catch {
-      const canonicalWhere = query.type ? 'WHERE customer_id = ? AND type = ?' : 'WHERE customer_id = ?';
-      const canonicalParams = query.type ? [accountCustomerId, query.type] : [accountCustomerId];
-      const countResult = (await db.prepare(`SELECT COUNT(*) as total FROM loyalty_transactions ${canonicalWhere}`).bind(...canonicalParams).first().catch(() => null)) as { total: number } | null;
-      total = countResult?.total || 0;
+      if (allowUnscopedFallback) {
+        const canonicalWhere = query.type ? 'WHERE customer_id = ? AND type = ?' : 'WHERE customer_id = ?';
+        const canonicalParams = query.type ? [accountCustomerId, query.type] : [accountCustomerId];
+        const countResult = (await db.prepare(`SELECT COUNT(*) as total FROM loyalty_transactions ${canonicalWhere}`).bind(...canonicalParams).first().catch(() => null)) as { total: number } | null;
+        total = countResult?.total || 0;
 
-      const transactions = (await db.prepare(
-        `SELECT *, customer_id as account_id, reason as description FROM loyalty_transactions ${canonicalWhere} ORDER BY created_at DESC LIMIT ? OFFSET ?`
-      ).bind(...canonicalParams, limit, offset).all().catch(() => ({ results: [] }))) as { results: any[] };
-      transactionsResults = transactions.results || [];
+        const transactions = (await db.prepare(
+          `SELECT *, customer_id as account_id, reason as description FROM loyalty_transactions ${canonicalWhere} ORDER BY created_at DESC LIMIT ? OFFSET ?`
+        ).bind(...canonicalParams, limit, offset).all().catch(() => ({ results: [] }))) as { results: any[] };
+        transactionsResults = transactions.results || [];
+      }
     }
 
     if (transactionsResults.length === 0 && !query.type) {
@@ -106,7 +123,10 @@ export function registerAccountHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
           logCount = (await db.prepare(
             "SELECT COUNT(*) as total FROM loyalty_point_logs WHERE customer_id = ? AND (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?)"
           ).bind(accountCustomerId, tenantId, tenantId).first()) as { total: number } | null;
-        } catch {
+        } catch (err) {
+          if (!allowUnscopedFallback) {
+            throw err;
+          }
           logCount = (await db.prepare('SELECT COUNT(*) as total FROM loyalty_point_logs WHERE customer_id = ?').bind(accountCustomerId).first()) as { total: number } | null;
         }
         total = logCount?.total || 0;
@@ -117,9 +137,12 @@ export function registerAccountHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
               `SELECT id, customer_id as account_id, customer_id, COALESCE(reason, 'earn') as type, points_change as points, balance_after, order_id, COALESCE(description, reason) as description, reason, tenant_id, created_at
                FROM loyalty_point_logs WHERE customer_id = ? AND (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?) ORDER BY created_at DESC LIMIT ? OFFSET ?`
             ).bind(accountCustomerId, tenantId, tenantId, limit, offset).all()) as { results: any[] };
-          } catch {
+          } catch (err) {
+            if (!allowUnscopedFallback) {
+              throw err;
+            }
             logs = (await db.prepare(
-              `SELECT id, customer_id as account_id, customer_id, COALESCE(reason, 'earn') as type, points_change as points, balance_after, order_id, COALESCE(description, reason) as description, reason, created_at
+              `SELECT *, id, customer_id as account_id, customer_id, COALESCE(reason, 'earn') as type, points_change as points, balance_after, order_id, COALESCE(description, reason) as description, reason, created_at
                FROM loyalty_point_logs WHERE customer_id = ? ORDER BY created_at DESC LIMIT ? OFFSET ?`
             ).bind(accountCustomerId, limit, offset).all()) as { results: any[] };
           }
@@ -132,8 +155,10 @@ export function registerAccountHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
 
     if (tenantId !== '*') {
       const beforeFilterCount = transactionsResults.length;
-      transactionsResults = transactionsResults.filter(
-        (r: any) => !('tenant_id' in r) || r.tenant_id === undefined || ((String(r.tenant_id ?? '').trim() || 'default') === tenantId)
+      transactionsResults = transactionsResults.filter((r: any) =>
+        allowUnscopedFallback
+          ? !('tenant_id' in r) || r.tenant_id === undefined || ((String(r.tenant_id ?? '').trim() || 'default') === tenantId)
+          : matchesLoyaltyTenant(r, tenantId)
       );
       if (transactionsResults.length < beforeFilterCount) {
         total = Math.max(0, total - (beforeFilterCount - transactionsResults.length));
@@ -153,13 +178,18 @@ export function registerAccountHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
   app.openapi(LoyaltyRoutes.account.claimBirthdayBonus as any, async (c: any) => {
     const db = getDatabase(c);
     const user = c.get('user');
-    const tenantId = getTenantId(c);
+    const rawTenantId = getTenantId(c);
+    if (hasOpenApiLoyaltyTenantMismatch(c, rawTenantId)) {
+      return c.json({ success: false, error: 'Forbidden: cross-tenant access denied' }, 403);
+    }
+    const tenantId = rawTenantId.trim().toLowerCase() === 'hq' ? '*' : rawTenantId.trim();
     c.req.valid('json');
     const nowDate = new Date();
     const now = nowDate.toISOString();
-    const currentMonth = nowDate.getUTCMonth() + 1;
-    const currentYear = String(nowDate.getUTCFullYear());
-    const customerId = String(user.customerId || user.id);
+    const vnNow = new Date(nowDate.getTime() + 7 * 3600_000);
+    const { currentMonth, currentYear } = getVietnamMonthAndYear(nowDate);
+    void vnNow;
+    const customerId = String(user.customerId || user.customer_id || user.id);
 
     const { account } = await getLoyaltyAccountWithFallback(db, customerId, now, tenantId);
 
@@ -171,15 +201,30 @@ export function registerAccountHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
 
     // Require a valid customer birth date and verify birth month matches current month
     let birthDateRaw = account.birthday || account.date_of_birth || null;
-    if (!birthDateRaw) {
-      const custRow = await db.prepare('SELECT * FROM customers WHERE id = ?').bind(accountCustomerId).first().catch(() => null);
+    let custRow: any = null;
+    if (!birthDateRaw || (tenantId === '*' && (!account.tenant_id || String(account.tenant_id).trim() === '' || String(account.tenant_id).trim() === '*'))) {
+      try {
+        custRow = await db
+          .prepare("SELECT * FROM customers WHERE id = ? AND (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?)")
+          .bind(accountCustomerId, tenantId, tenantId)
+          .first();
+      } catch {
+        if (!tenantId || tenantId === 'default' || tenantId === '*') {
+          custRow = await db.prepare('SELECT * FROM customers WHERE id = ?').bind(accountCustomerId).first().catch(() => null);
+        }
+      }
+      if (!custRow && (!tenantId || tenantId === 'default' || tenantId === '*')) {
+        custRow = await db.prepare('SELECT * FROM customers WHERE id = ?').bind(accountCustomerId).first().catch(() => null);
+      }
       if (custRow && tenantId !== '*' && 'tenant_id' in custRow && custRow.tenant_id !== undefined) {
         const custTenant = (custRow.tenant_id && String(custRow.tenant_id).trim()) || 'default';
         if (custTenant !== tenantId) {
           return c.json({ success: false, error: 'No loyalty account found' }, 404);
         }
       }
-      birthDateRaw = custRow?.birthday || custRow?.date_of_birth || null;
+      if (!birthDateRaw) {
+        birthDateRaw = custRow?.birthday || custRow?.date_of_birth || null;
+      }
     }
     if (!birthDateRaw || typeof birthDateRaw !== 'string' || !birthDateRaw.trim()) {
       return c.json({ success: false, error: 'Customer birthday is not configured' }, 400);
@@ -196,7 +241,15 @@ export function registerAccountHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
       return c.json({ success: false, error: 'Birthday bonus is only available during your birth month' }, 400);
     }
 
-    const effectiveTenant = tenantId && tenantId !== '*' ? tenantId.trim() || 'default' : 'default';
+    const accountTenantCandidate = account?.tenant_id && String(account.tenant_id).trim() !== '*'
+      ? String(account.tenant_id).trim()
+      : '';
+    const customerTenantCandidate = custRow?.tenant_id && String(custRow.tenant_id).trim() !== '*'
+      ? String(custRow.tenant_id).trim()
+      : '';
+    const effectiveTenant = tenantId && tenantId !== '*'
+      ? tenantId.trim() || 'default'
+      : (accountTenantCandidate || customerTenantCandidate || 'default');
     const idempotencyKey =
       effectiveTenant === 'default'
         ? `birthday_bonus:${accountCustomerId}:${currentYear}`
@@ -207,6 +260,7 @@ export function registerAccountHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
     inFlightBirthdayClaims.add(idempotencyKey);
 
     try {
+      const allowUnscopedClaimFallback = effectiveTenant === 'default';
       // Check if already claimed this year within the active tenant scope
       let existingClaim: any = null;
       try {
@@ -221,29 +275,31 @@ export function registerAccountHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
                  AND strftime('%Y', created_at) = ?
                )
              )`
-        ).bind(account.id, accountCustomerId, tenantId, effectiveTenant, idempotencyKey, currentYear).first();
+        ).bind(account.id, accountCustomerId, effectiveTenant, effectiveTenant, idempotencyKey, currentYear).first();
       } catch {
-        try {
-          existingClaim = await db.prepare(
-            `SELECT * FROM loyalty_transactions
-             WHERE (account_id = ? OR customer_id = ?)
-               AND (
-                 idempotency_key = ?
-                 OR (
-                   (type = 'birthday' OR (type = 'bonus' AND description LIKE '%Birthday%') OR reason = 'Birthday bonus')
-                   AND strftime('%Y', created_at) = ?
-                 )
-               )`
-          ).bind(account.id, accountCustomerId, idempotencyKey, currentYear).first();
-        } catch {
-          existingClaim = await db.prepare(
-            `SELECT * FROM loyalty_transactions
-             WHERE customer_id = ? AND (type = 'birthday' OR reason = 'Birthday bonus' OR description LIKE '%Birthday%') AND strftime('%Y', created_at) = ?`
-          ).bind(accountCustomerId, currentYear).first().catch(() => null);
+        if (allowUnscopedClaimFallback) {
+          try {
+            existingClaim = await db.prepare(
+              `SELECT * FROM loyalty_transactions
+               WHERE (account_id = ? OR customer_id = ?)
+                 AND (
+                   idempotency_key = ?
+                   OR (
+                     (type = 'birthday' OR (type = 'bonus' AND description LIKE '%Birthday%') OR reason = 'Birthday bonus')
+                     AND strftime('%Y', created_at) = ?
+                   )
+                 )`
+            ).bind(account.id, accountCustomerId, idempotencyKey, currentYear).first();
+          } catch {
+            existingClaim = await db.prepare(
+              `SELECT * FROM loyalty_transactions
+               WHERE customer_id = ? AND (type = 'birthday' OR reason = 'Birthday bonus' OR description LIKE '%Birthday%') AND strftime('%Y', created_at) = ?`
+            ).bind(accountCustomerId, currentYear).first().catch(() => null);
+          }
         }
       }
-      if (existingClaim && tenantId !== '*' && 'tenant_id' in existingClaim && existingClaim.tenant_id !== undefined) {
-        if (!matchesLoyaltyTenant(existingClaim, tenantId)) {
+      if (existingClaim && 'tenant_id' in existingClaim && existingClaim.tenant_id !== undefined) {
+        if (!matchesLoyaltyTenant(existingClaim, effectiveTenant)) {
           existingClaim = null;
         }
       }
@@ -252,21 +308,44 @@ export function registerAccountHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
         return c.json({ success: false, error: 'Birthday bonus already claimed this year' }, 400);
       }
 
-      // Birthday bonus: configurable via tier config without aliasing percentage discount as points
+      // Birthday bonus: configurable via tier config scoped to tenant without aliasing percentage discount as points
       let tierConfig: any = null;
       try {
-        tierConfig = await db.prepare('SELECT birthday_bonus FROM loyalty_tier_configs WHERE tier = ?')
-          .bind(account.tier).first();
+        tierConfig = await db
+          .prepare("SELECT birthday_bonus FROM loyalty_tier_configs WHERE tier = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?")
+          .bind(account.tier, effectiveTenant)
+          .first();
       } catch {
-        tierConfig = null;
+        if (allowUnscopedClaimFallback) {
+          tierConfig = await db.prepare('SELECT birthday_bonus FROM loyalty_tier_configs WHERE tier = ?')
+            .bind(account.tier).first().catch(() => null);
+        }
       }
-      if (!tierConfig) {
-        tierConfig = await db.prepare('SELECT birthday_bonus FROM loyalty_tiers WHERE tier_name = ? OR tier = ?')
-          .bind(account.tier, account.tier).first().catch(() => null);
-      }
-      if (!tierConfig) {
-        tierConfig = await db.prepare('SELECT birthday_bonus FROM tier_configs WHERE tier = ?')
+      if (!tierConfig && allowUnscopedClaimFallback) {
+        tierConfig = await db.prepare('SELECT birthday_bonus FROM loyalty_tier_configs WHERE tier = ?')
           .bind(account.tier).first().catch(() => null);
+      }
+      if (!tierConfig) {
+        tierConfig = await db
+          .prepare("SELECT birthday_bonus FROM loyalty_tiers WHERE (tier_name = ? OR tier = ?) AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?")
+          .bind(account.tier, account.tier, effectiveTenant)
+          .first()
+          .catch(() => null);
+        if (!tierConfig && allowUnscopedClaimFallback) {
+          tierConfig = await db.prepare('SELECT birthday_bonus FROM loyalty_tiers WHERE tier_name = ? OR tier = ?')
+            .bind(account.tier, account.tier).first().catch(() => null);
+        }
+      }
+      if (!tierConfig) {
+        tierConfig = await db
+          .prepare("SELECT birthday_bonus FROM tier_configs WHERE tier = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?")
+          .bind(account.tier, effectiveTenant)
+          .first()
+          .catch(() => null);
+        if (!tierConfig && allowUnscopedClaimFallback) {
+          tierConfig = await db.prepare('SELECT birthday_bonus FROM tier_configs WHERE tier = ?')
+            .bind(account.tier).first().catch(() => null);
+        }
       }
       const rawBonus = tierConfig?.birthday_bonus;
       const birthdayPoints =
@@ -287,7 +366,7 @@ export function registerAccountHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
         newBalance: expectedBalance,
         pointsDelta: birthdayPoints,
         lifetimeDelta: birthdayPoints,
-        tenantId,
+        tenantId: effectiveTenant,
         now,
       });
       const newBalance = typeof resolvedBalance === 'number' && Number.isFinite(resolvedBalance) ? resolvedBalance : expectedBalance;
@@ -302,7 +381,7 @@ export function registerAccountHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
         description: 'Birthday bonus',
         reason: 'Birthday bonus',
         idempotencyKey,
-        tenantId,
+        tenantId: effectiveTenant,
         now,
       });
 
@@ -313,7 +392,8 @@ export function registerAccountHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
         'loyalty_account',
         String(account.id),
         JSON.stringify({ points: birthdayPoints }),
-        now
+        now,
+        effectiveTenant
       );
 
       return c.json({

@@ -9,7 +9,8 @@ function genId(prefix: string): string {
 }
 
 export async function reverseReferralCashback(db: D1Database, referralId: string, tenantId?: string): Promise<Record<string, unknown>> {
-  const effectiveTenant = tenantId && tenantId !== '*' ? tenantId.trim() || 'default' : null;
+  const rawTenant = tenantId ? tenantId.trim() : '';
+  let effectiveTenant = rawTenant && rawTenant !== '*' && rawTenant.toLowerCase() !== 'hq' ? rawTenant : null;
   let referral: (Referral & { tenant_id?: string | null }) | null = null;
   if (effectiveTenant) {
     try {
@@ -28,6 +29,12 @@ export async function reverseReferralCashback(db: D1Database, referralId: string
     }
   } else {
     referral = await db.prepare('SELECT * FROM referrals WHERE id = ? AND status = ?').bind(referralId, 'completed').first<Referral & { tenant_id?: string | null }>();
+    if (referral && 'tenant_id' in referral && referral.tenant_id !== undefined) {
+      const refTenant = String(referral.tenant_id ?? '').trim();
+      if (refTenant && refTenant !== '*' && refTenant.toLowerCase() !== 'hq') {
+        effectiveTenant = refTenant;
+      }
+    }
   }
   if (!referral || !referral.cashback_awarded_vnd) {
     return { success: false, reason: 'not_applicable' };
@@ -71,20 +78,31 @@ export async function reverseReferralCashback(db: D1Database, referralId: string
     return { success: false, reason: 'not_applicable' };
   }
 
-  let wallet: CashbackWallet | null = null;
+  let wallet: (CashbackWallet & { tenant_id?: string | null }) | null = null;
   if (effectiveTenant) {
     try {
       wallet = await db
         .prepare("SELECT id, balance FROM cashback_wallets WHERE customer_id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?")
         .bind(referrerId, effectiveTenant)
-        .first<CashbackWallet>();
+        .first<CashbackWallet & { tenant_id?: string | null }>();
     } catch {
-      wallet = await db.prepare('SELECT id, balance FROM cashback_wallets WHERE customer_id = ?').bind(referrerId).first<CashbackWallet>();
+      try {
+        wallet = await db.prepare('SELECT id, balance, tenant_id FROM cashback_wallets WHERE customer_id = ?').bind(referrerId).first<CashbackWallet & { tenant_id?: string | null }>();
+      } catch {
+        wallet = await db.prepare('SELECT id, balance FROM cashback_wallets WHERE customer_id = ?').bind(referrerId).first<CashbackWallet & { tenant_id?: string | null }>();
+      }
+      if (wallet && 'tenant_id' in wallet && wallet.tenant_id !== undefined) {
+        const walletTenant = String(wallet.tenant_id ?? '').trim() || 'default';
+        if (walletTenant !== effectiveTenant) {
+          wallet = null;
+        }
+      }
     }
   } else {
-    wallet = await db.prepare('SELECT id, balance FROM cashback_wallets WHERE customer_id = ?').bind(referrerId).first<CashbackWallet>();
+    wallet = await db.prepare('SELECT id, balance FROM cashback_wallets WHERE customer_id = ?').bind(referrerId).first<CashbackWallet & { tenant_id?: string | null }>();
   }
   const batch: ReturnType<typeof db.prepare>[] = [];
+  const hadExistingWallet = Boolean(wallet);
 
   if (!wallet) {
     const walletId = genId('cbw_');
@@ -96,30 +114,32 @@ export async function reverseReferralCashback(db: D1Database, referralId: string
     wallet = { id: walletId, customer_id: referrerId, balance: 0, total_earned: 0, total_spent: 0, created_at: now, updated_at: now };
   }
 
-  const newBalance = Math.max(0, (wallet.balance || 0) - DEBIT_VND);
+  const walletBalance = Math.max(0, Number(wallet.balance) || 0);
+  const actualDebit = hadExistingWallet ? Math.min(walletBalance, DEBIT_VND) : DEBIT_VND;
+  const newBalance = Math.max(0, walletBalance - actualDebit);
   const txId = genId('cbt_');
   const resolvedTenantForAudit = effectiveTenant || 'default';
 
-  batch.push(db.prepare('UPDATE cashback_wallets SET balance = MAX(0, COALESCE(balance, 0) - ?), total_spent = COALESCE(total_spent, 0) + ?, updated_at = ? WHERE id = ?').bind(DEBIT_VND, DEBIT_VND, now, wallet.id));
+  batch.push(db.prepare('UPDATE cashback_wallets SET balance = MAX(0, COALESCE(balance, 0) - ?), total_earned = MAX(0, COALESCE(total_earned, 0) - ?), updated_at = ? WHERE id = ?').bind(actualDebit, actualDebit, now, wallet.id));
   batch.push(db.prepare(
     `INSERT INTO cashback_transactions (id, wallet_id, customer_id, type, amount, balance_after, description, expires_at, tenant_id, created_at)
      VALUES (?, ?, ?, 'debit', ?, ?, ?, NULL, ?, ?)`
-  ).bind(txId, wallet.id, referrerId, DEBIT_VND, newBalance, `Hoan ti?n referral (${referralId}): -${DEBIT_VND}d do don hang bi h?y`, resolvedTenantForAudit, now));
+  ).bind(txId, wallet.id, referrerId, actualDebit, newBalance, `Hoan ti?n referral (${referralId}): -${actualDebit}d do don hang bi h?y`, resolvedTenantForAudit, now));
   batch.push(db.prepare(
     'INSERT INTO loyalty_audit_log (customer_id, action, amount_vnd, order_id, metadata, tenant_id, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)'
-  ).bind(referrerId, 'referral_reversed', DEBIT_VND, null, JSON.stringify({ referral_id: referralId, reason: 'order_cancelled', debited: DEBIT_VND }), resolvedTenantForAudit, now));
+  ).bind(referrerId, 'referral_reversed', actualDebit, null, JSON.stringify({ referral_id: referralId, reason: 'order_cancelled', debited: actualDebit, requested_debit: DEBIT_VND }), resolvedTenantForAudit, now));
 
   try {
     await db.batch(batch);
   } catch {
     const fallbackBatch: ReturnType<typeof db.prepare>[] = [
-      db.prepare('UPDATE cashback_wallets SET balance = MAX(0, COALESCE(balance, 0) - ?), total_spent = COALESCE(total_spent, 0) + ?, updated_at = ? WHERE id = ?').bind(DEBIT_VND, DEBIT_VND, now, wallet.id),
+      db.prepare('UPDATE cashback_wallets SET balance = MAX(0, COALESCE(balance, 0) - ?), total_earned = MAX(0, COALESCE(total_earned, 0) - ?), updated_at = ? WHERE id = ?').bind(actualDebit, actualDebit, now, wallet.id),
       db.prepare(
         `INSERT INTO cashback_transactions (id, wallet_id, customer_id, type, amount, balance_after, description, expires_at, created_at)
          VALUES (?, ?, ?, 'debit', ?, ?, ?, NULL, ?)`
-      ).bind(txId, wallet.id, referrerId, DEBIT_VND, newBalance, `Hoan ti?n referral (${referralId}): -${DEBIT_VND}d do don hang bi h?y`, now),
+      ).bind(txId, wallet.id, referrerId, actualDebit, newBalance, `Hoan ti?n referral (${referralId}): -${actualDebit}d do don hang bi h?y`, now),
     ];
     await db.batch(fallbackBatch);
   }
-  return { success: true, debited_vnd: DEBIT_VND, new_balance: newBalance };
+  return { success: true, debited_vnd: actualDebit, new_balance: newBalance };
 }

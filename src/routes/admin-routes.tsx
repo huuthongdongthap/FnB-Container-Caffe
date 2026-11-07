@@ -1,13 +1,13 @@
 import React from 'react';
 import { Route, Navigate } from 'react-router-dom';
 import { ProtectedRoute, ADMIN_SHELL_ROLES } from '@/components/auth/ProtectedRoute';
-import AdminShell from '@/components/stitch/AdminShell';
 import { ErrorBoundary } from '@/components/shared/ErrorBoundary';
 
 function guarded(element: React.ReactNode): React.ReactNode {
   return <ErrorBoundary>{element}</ErrorBoundary>;
 }
 
+const AdminShell = React.lazy(() => import('@/components/stitch/AdminShell'));
 const AdminBirthdayConfigPage = React.lazy(() => import('@/pages/admin/BirthdayConfig'));
 const AdminCheckinApprovePage = React.lazy(() => import('@/pages/admin/CheckinApprove'));
 const AdminCustomersPage = React.lazy(() => import('@/pages/admin/Customers'));
@@ -41,7 +41,7 @@ const TableManagementPage = React.lazy(() => import('@/pages/admin/TableManageme
 export const adminRoutes = [
   <Route key="/admin/login" path="/admin/login" element={guarded(<AdminLoginPage />)} />,
   <Route key="/admin" element={<ProtectedRoute allowedRoles={ADMIN_SHELL_ROLES} />}>
-    <Route element={<AdminShell />}>
+    <Route element={guarded(<AdminShell />)}>
       <Route path="/admin" element={guarded(<AdminDashboardPage />)} />
       <Route path="/admin/audit-logs" element={guarded(<AuditLogViewerPage />)} />
       <Route path="/admin/birthday-config" element={guarded(<AdminBirthdayConfigPage />)} />

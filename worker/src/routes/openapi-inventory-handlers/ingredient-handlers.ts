@@ -2,7 +2,103 @@ import type { OpenAPIHono } from '@hono/zod-openapi';
 import type { Env } from '../../types/env';
 import { InventoryRoutes } from '../../schemas/inventory';
 import { getDatabase, matchesTenantRow } from '../../lib/db';
-import { getTenantId } from '../../middleware/tenant';
+import { authenticateRequest } from '../../middleware/auth';
+import { getTenantId, isHQSuperAdmin } from '../../middleware/tenant';
+
+const INGREDIENT_STAFF_ROLES = ['owner', 'manager', 'supervisor', 'admin'];
+const INGREDIENT_READ_ROLES = [...INGREDIENT_STAFF_ROLES, 'staff', 'kitchen', 'barista', 'chef', 'cashier', 'waiter'];
+const INGREDIENT_MUTATION_ROLES = ['owner', 'manager', 'admin'];
+
+async function verifyIngredientAccess(
+  c: any,
+  allowedRoles: string[],
+): Promise<{ user: { id: string; role: string; tenantId?: string }; errorResponse: null } | { user: null; errorResponse: Response }> {
+  let user = c.get?.('user') as { id?: string; role?: string; tenantId?: string; tenant_id?: string } | undefined;
+  if (!user && c.req?.raw && c.env?.JWT_SECRET && (c.req?.header?.('Authorization') || c.req?.header?.('authorization'))) {
+    const session = await authenticateRequest(c.req.raw, c.env, { optional: true }).catch(() => null);
+    if (session && 'payload' in session) {
+      user = {
+        id: session.payload.id,
+        role: session.payload.role,
+        tenantId: session.payload.tenantId,
+      };
+      c.set?.('user', user);
+    }
+  }
+  const role = user?.role ? String(user.role).toLowerCase() : '';
+  if (!user || !role) {
+    return {
+      user: null,
+      errorResponse: c.json({ success: false, error: 'Authentication required', code: 'UNAUTHORIZED' }, 401),
+    };
+  }
+  if (!allowedRoles.includes(role)) {
+    return {
+      user: null,
+      errorResponse: c.json({ success: false, error: 'Insufficient permissions', code: 'FORBIDDEN' }, 403),
+    };
+  }
+  const userTenant = String(user.tenantId ?? user.tenant_id ?? '').trim();
+  const isWildcardHQ = (role === 'owner' || role === 'admin') && (userTenant === '*' || userTenant.toLowerCase() === 'hq');
+  const hqAdmin = isHQSuperAdmin(c) || isWildcardHQ;
+  const boundTenant = userTenant || 'default';
+  const reqTenant = (
+    c.req?.query?.('tenant_id') ||
+    c.req?.query?.('tenantId') ||
+    c.req?.query?.('store_id') ||
+    c.req?.query?.('storeId') ||
+    c.req?.header?.('X-Tenant-ID') ||
+    c.req?.header?.('x-tenant-id') ||
+    c.req?.header?.('X-Store-ID') ||
+    c.req?.header?.('x-store-id') ||
+    ''
+  ).trim();
+  const ctxTenant = (c.get?.('tenantId') as string | undefined)?.trim() || '';
+  const resolvedTenant = getTenantId(c).trim() || 'default';
+
+  if (!hqAdmin) {
+    if (
+      boundTenant === '*' ||
+      boundTenant.toLowerCase() === 'hq' ||
+      (reqTenant && (reqTenant === '*' || reqTenant.toLowerCase() === 'hq' || reqTenant !== boundTenant)) ||
+      (ctxTenant && (ctxTenant === '*' || ctxTenant.toLowerCase() === 'hq' || ctxTenant !== boundTenant)) ||
+      resolvedTenant !== boundTenant
+    ) {
+      return {
+        user: null,
+        errorResponse: c.json({ success: false, error: 'Cross-tenant access denied', code: 'FORBIDDEN' }, 403),
+      };
+    }
+  } else if (!isWildcardHQ && ctxTenant && ctxTenant !== '*' && ctxTenant.toLowerCase() !== 'hq' && ctxTenant !== boundTenant && !reqTenant) {
+    return {
+      user: null,
+      errorResponse: c.json({ success: false, error: 'Cross-tenant access denied', code: 'FORBIDDEN' }, 403),
+    };
+  }
+  return {
+    user: { id: user.id || 'system', role, tenantId: userTenant || user.tenantId },
+    errorResponse: null,
+  };
+}
+
+function resolveOpenApiIngredientTenant(c: any): string {
+  const reqTenant = (
+    c.req?.query?.('tenant_id') ||
+    c.req?.query?.('tenantId') ||
+    c.req?.query?.('store_id') ||
+    c.req?.query?.('storeId') ||
+    c.req?.header?.('X-Tenant-ID') ||
+    c.req?.header?.('x-tenant-id') ||
+    c.req?.header?.('X-Store-ID') ||
+    c.req?.header?.('x-store-id') ||
+    ''
+  ).trim();
+  if (reqTenant) {
+    return reqTenant.toLowerCase() === 'hq' ? '*' : reqTenant;
+  }
+  const resolved = getTenantId(c).trim() || 'default';
+  return resolved.toLowerCase() === 'hq' ? '*' : resolved;
+}
 
 export async function checkIngredientTenant(
   db: any,
@@ -73,7 +169,7 @@ async function writeIngredientAuditLog(
   now: string,
   tenantId = 'default'
 ): Promise<void> {
-  const normTenant = (tenantId || '').trim() || 'default';
+  const normTenant = !tenantId || !tenantId.trim() || tenantId.trim() === '*' ? 'default' : tenantId.trim();
   try {
     await db.prepare(
       `INSERT INTO audit_logs (actor_id, actor_name, user_id, action, resource_type, resource_id, entity_type, entity_id, tenant_id, details, metadata, created_at)
@@ -100,6 +196,9 @@ async function writeIngredientAuditLog(
           // Ignore audit log error
         }
       }
+      await db.prepare(
+        'UPDATE audit_logs SET tenant_id = ? WHERE (entity_id = ? OR resource_id = ?) AND action = ? AND created_at = ?'
+      ).bind(normTenant, entityId, entityId, action, now).run().catch(() => {});
     }
   }
 }
@@ -107,6 +206,9 @@ async function writeIngredientAuditLog(
 export function registerIngredientHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
   // GET /api/inventory/ingredients - List ingredients
   app.openapi(InventoryRoutes.ingredients.list as any, async (c: any) => {
+    const auth = await verifyIngredientAccess(c, INGREDIENT_READ_ROLES);
+    if (auth.errorResponse) return auth.errorResponse;
+
     const db = getDatabase(c);
     const query = c.req.valid('query');
 
@@ -132,7 +234,7 @@ export function registerIngredientHandlers(app: OpenAPIHono<{ Bindings: Env }>) 
       params.push(query.isActive ? 1 : 0);
     }
 
-    const tenantId = getTenantId(c).trim() || 'default';
+    const tenantId = resolveOpenApiIngredientTenant(c);
     const fetchLimit = tenantId === '*' ? limit : Math.max(limit * 10, 500);
     const fetchOffset = tenantId === '*' ? offset : 0;
     const scopedWhere = `${whereClause ? whereClause : 'WHERE 1=1 '}AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?`;
@@ -159,13 +261,18 @@ export function registerIngredientHandlers(app: OpenAPIHono<{ Bindings: Env }>) 
       }
 
       if (!sqlTenantScoped) {
-        const countResult = (await db.prepare(`SELECT COUNT(*) as total FROM ingredients ${whereClause}`).bind(...params).first()) as { total?: number } | null;
-        total = Number(countResult?.total || 0);
+        if (tenantId !== '*' && tenantId !== 'default') {
+          itemResults = [];
+          total = 0;
+        } else {
+          const countResult = (await db.prepare(`SELECT COUNT(*) as total FROM ingredients ${whereClause}`).bind(...params).first()) as { total?: number } | null;
+          total = Number(countResult?.total || 0);
 
-        const items = await db.prepare(
-          `SELECT * FROM ingredients ${whereClause} ORDER BY name ASC LIMIT ? OFFSET ?`
-        ).bind(...params, fetchLimit, fetchOffset).all();
-        itemResults = items.results || [];
+          const items = await db.prepare(
+            `SELECT * FROM ingredients ${whereClause} ORDER BY name ASC LIMIT ? OFFSET ?`
+          ).bind(...params, fetchLimit, fetchOffset).all();
+          itemResults = items.results || [];
+        }
       }
     } catch {
       let invWhere = '';
@@ -182,13 +289,35 @@ export function registerIngredientHandlers(app: OpenAPIHono<{ Bindings: Env }>) 
         invWhere += invWhere ? 'AND is_active = ? ' : 'WHERE is_active = ? ';
         invParams.push(query.isActive ? 1 : 0);
       }
-      const countResult = (await db.prepare(`SELECT COUNT(*) as total FROM inventory_items ${invWhere}`).bind(...invParams).first()) as { total?: number } | null;
-      total = Number(countResult?.total || 0);
+      if (tenantId !== '*') {
+        try {
+          const scopedInvWhere = `${invWhere ? invWhere : 'WHERE 1=1 '}AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?`;
+          const countResult = (await db.prepare(`SELECT COUNT(*) as total FROM inventory_items ${scopedInvWhere}`).bind(...invParams, tenantId).first()) as { total?: number } | null;
+          total = Number(countResult?.total || 0);
 
-      const items = await db.prepare(
-        `SELECT *, id as sku, unit_cost as cost_per_unit FROM inventory_items ${invWhere} ORDER BY name ASC LIMIT ? OFFSET ?`
-      ).bind(...invParams, fetchLimit, fetchOffset).all();
-      itemResults = items.results || [];
+          const items = await db.prepare(
+            `SELECT *, id as sku, unit_cost as cost_per_unit FROM inventory_items ${scopedInvWhere} ORDER BY name ASC LIMIT ? OFFSET ?`
+          ).bind(...invParams, tenantId, limit, offset).all();
+          itemResults = items.results || [];
+          sqlTenantScoped = true;
+        } catch {
+          sqlTenantScoped = false;
+        }
+      }
+      if (!sqlTenantScoped) {
+        if (tenantId !== '*' && tenantId !== 'default') {
+          itemResults = [];
+          total = 0;
+        } else {
+          const countResult = (await db.prepare(`SELECT COUNT(*) as total FROM inventory_items ${invWhere}`).bind(...invParams).first()) as { total?: number } | null;
+          total = Number(countResult?.total || 0);
+
+          const items = await db.prepare(
+            `SELECT *, id as sku, unit_cost as cost_per_unit FROM inventory_items ${invWhere} ORDER BY name ASC LIMIT ? OFFSET ?`
+          ).bind(...invParams, fetchLimit, fetchOffset).all();
+          itemResults = items.results || [];
+        }
+      }
     }
 
     if (tenantId !== '*' && itemResults.length > 0) {
@@ -215,8 +344,11 @@ export function registerIngredientHandlers(app: OpenAPIHono<{ Bindings: Env }>) 
 
   // GET /api/inventory/ingredients/{id} - Get ingredient by ID
   app.openapi(InventoryRoutes.ingredients.get as any, async (c: any) => {
+    const auth = await verifyIngredientAccess(c, INGREDIENT_READ_ROLES);
+    if (auth.errorResponse) return auth.errorResponse;
+
     const db = getDatabase(c);
-    const tenantId = getTenantId(c).trim() || 'default';
+    const tenantId = resolveOpenApiIngredientTenant(c);
     const { id } = c.req.valid('param');
 
     let ingredient: any = null;
@@ -238,14 +370,23 @@ export function registerIngredientHandlers(app: OpenAPIHono<{ Bindings: Env }>) 
 
   // POST /api/inventory/ingredients - Create ingredient
   app.openapi(InventoryRoutes.ingredients.create as any, async (c: any) => {
+    const auth = await verifyIngredientAccess(c, INGREDIENT_MUTATION_ROLES);
+    if (auth.errorResponse) return auth.errorResponse;
+    const user = auth.user;
+
     const db = getDatabase(c);
-    const rawTenantId = getTenantId(c).trim() || 'default';
-    const tenantId = rawTenantId === '*' ? 'default' : rawTenantId;
-    const user = c.get('user');
-    if (user?.role && !['owner', 'manager', 'supervisor', 'admin'].includes(user.role)) {
-      return c.json({ success: false, error: 'Insufficient permissions' }, 403);
-    }
+    const rawTenantId = resolveOpenApiIngredientTenant(c);
     const body = c.req.valid('json');
+    const rawBody = (await c.req?.json?.().catch(() => null)) as Record<string, unknown> | null;
+    const bodyTenant =
+      typeof (body?.tenant_id ?? body?.tenantId ?? body?.store_id ?? body?.storeId ?? rawBody?.tenant_id ?? rawBody?.tenantId ?? rawBody?.store_id ?? rawBody?.storeId) === 'string'
+        ? String(body?.tenant_id ?? body?.tenantId ?? body?.store_id ?? body?.storeId ?? rawBody?.tenant_id ?? rawBody?.tenantId ?? rawBody?.store_id ?? rawBody?.storeId).trim()
+        : '';
+    const resolvedBodyTenant = bodyTenant && bodyTenant !== '*' && bodyTenant.toLowerCase() !== 'hq' ? bodyTenant : '';
+    const tenantId =
+      rawTenantId === '*' || rawTenantId.toLowerCase() === 'hq'
+        ? resolvedBodyTenant || 'default'
+        : rawTenantId;
     const now = new Date().toISOString();
 
     // Check SKU uniqueness within tenant scope
@@ -302,7 +443,35 @@ export function registerIngredientHandlers(app: OpenAPIHono<{ Bindings: Env }>) 
           now,
           now
         ).run();
-      } catch {
+      } catch (err) {
+        if (tenantId !== 'default') {
+          try {
+            await db.prepare(
+              `INSERT INTO inventory_items (
+                id, sku, tenant_id, name, category, unit, current_stock, min_stock, max_stock,
+                cost_per_unit, unit_cost, active, is_active, created_at, updated_at
+              ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+            ).bind(
+              id,
+              body.sku,
+              tenantId,
+              body.name,
+              body.category || 'raw_materials',
+              body.unit,
+              body.currentStock || 0,
+              body.minStock || 0,
+              body.maxStock || 0,
+              body.costPerUnit || 0,
+              body.costPerUnit || 0,
+              isActiveInt,
+              isActiveInt,
+              now,
+              now
+            ).run();
+          } catch {
+            throw err;
+          }
+        }
         await db.prepare(
           `INSERT INTO ingredients (id, name, sku, category, unit, cost_per_unit, current_stock, min_stock, max_stock, is_active, created_at, updated_at)
            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
@@ -363,7 +532,8 @@ export function registerIngredientHandlers(app: OpenAPIHono<{ Bindings: Env }>) 
           now,
           now
         ).run();
-      } catch {
+      } catch (err) {
+        if (tenantId !== 'default') throw err;
         await db.prepare(
           `INSERT INTO inventory_items (id, name, unit, category, current_stock, min_stock, max_stock, unit_cost, is_active, created_at, updated_at)
            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
@@ -407,12 +577,12 @@ export function registerIngredientHandlers(app: OpenAPIHono<{ Bindings: Env }>) 
 
   // PATCH /api/inventory/ingredients/{id} - Update ingredient
   app.openapi(InventoryRoutes.ingredients.update as any, async (c: any) => {
+    const auth = await verifyIngredientAccess(c, INGREDIENT_MUTATION_ROLES);
+    if (auth.errorResponse) return auth.errorResponse;
+    const user = auth.user;
+
     const db = getDatabase(c);
-    const tenantId = getTenantId(c).trim() || 'default';
-    const user = c.get('user');
-    if (user?.role && !['owner', 'manager', 'supervisor', 'admin'].includes(user.role)) {
-      return c.json({ success: false, error: 'Insufficient permissions' }, 403);
-    }
+    const tenantId = resolveOpenApiIngredientTenant(c);
     const { id } = c.req.valid('param');
     const body = c.req.valid('json');
     const now = new Date().toISOString();
@@ -430,6 +600,10 @@ export function registerIngredientHandlers(app: OpenAPIHono<{ Bindings: Env }>) 
         usingCanonical = true;
       }
     }
+    const hasIngredientTenant = Boolean(existing && typeof existing === 'object' && 'tenant_id' in existing);
+    if (!hasIngredientTenant && tenantId !== 'default') {
+      return c.json({ success: false, error: 'Ingredient not found' }, 404);
+    }
     const hasVerifiedTenantOwnership = existing
       ? await checkIngredientTenant(db, id, existing, tenantId)
       : false;
@@ -438,6 +612,10 @@ export function registerIngredientHandlers(app: OpenAPIHono<{ Bindings: Env }>) 
     }
     const isLegacyUnscopedRow =
       existing.tenant_id === undefined || existing.tenant_id === null;
+    const rawExistingTenant = existing?.tenant_id && String(existing.tenant_id).trim() && String(existing.tenant_id).trim() !== '*'
+      ? String(existing.tenant_id).trim()
+      : undefined;
+    const effectiveRowTenant = rawExistingTenant || (tenantId === '*' ? 'default' : tenantId);
 
     // Check SKU uniqueness within tenant scope if changing
     if (body.sku && body.sku !== existing.sku && !usingCanonical) {
@@ -446,14 +624,14 @@ export function registerIngredientHandlers(app: OpenAPIHono<{ Bindings: Env }>) 
       const candidates = (skuRes?.results as Array<Record<string, unknown>> | undefined) || [];
       if (candidates.length > 0) {
         for (const cand of candidates) {
-          if (await checkIngredientTenant(db, String(cand.id), cand, tenantId)) {
+          if (await checkIngredientTenant(db, String(cand.id), cand, effectiveRowTenant)) {
             skuExists = cand;
             break;
           }
         }
       } else {
         const firstCand = (await db.prepare('SELECT * FROM ingredients WHERE sku = ? AND id != ?').bind(body.sku, id).first().catch(() => null)) as Record<string, unknown> | null;
-        if (firstCand && (await checkIngredientTenant(db, String(firstCand.id), firstCand, tenantId))) {
+        if (firstCand && (await checkIngredientTenant(db, String(firstCand.id), firstCand, effectiveRowTenant))) {
           skuExists = firstCand;
         }
       }
@@ -513,50 +691,42 @@ export function registerIngredientHandlers(app: OpenAPIHono<{ Bindings: Env }>) 
     params.push(now, id);
 
     if (!usingCanonical) {
-      if (tenantId !== '*') {
-        try {
-          const upd = await db.prepare(
-            `UPDATE ingredients SET ${updates.join(', ')} WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?`
-          ).bind(...params, tenantId).run();
-          if (upd?.meta && typeof upd.meta.changes === 'number' && upd.meta.changes === 0) {
-            if (isLegacyUnscopedRow && hasVerifiedTenantOwnership) {
-              await db.prepare(`UPDATE ingredients SET ${updates.join(', ')} WHERE id = ?`).bind(...params).run();
-            } else {
-              return c.json({ success: false, error: 'Ingredient not found' }, 404);
-            }
-          }
-        } catch {
+      try {
+        const upd = await db.prepare(
+          `UPDATE ingredients SET ${updates.join(', ')} WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?`
+        ).bind(...params, effectiveRowTenant).run();
+        if (upd?.meta && typeof upd.meta.changes === 'number' && upd.meta.changes === 0) {
           if (isLegacyUnscopedRow && hasVerifiedTenantOwnership) {
             await db.prepare(`UPDATE ingredients SET ${updates.join(', ')} WHERE id = ?`).bind(...params).run();
           } else {
             return c.json({ success: false, error: 'Ingredient not found' }, 404);
           }
         }
-      } else {
-        await db.prepare(`UPDATE ingredients SET ${updates.join(', ')} WHERE id = ?`).bind(...params).run();
+      } catch {
+        if (isLegacyUnscopedRow && hasVerifiedTenantOwnership) {
+          await db.prepare(`UPDATE ingredients SET ${updates.join(', ')} WHERE id = ?`).bind(...params).run();
+        } else {
+          return c.json({ success: false, error: 'Ingredient not found' }, 404);
+        }
       }
     }
 
     if (canonicalUpdates.length > 0) {
       canonicalUpdates.push('updated_at = ?');
       canonicalParams.push(now, id);
-      if (tenantId !== '*') {
-        try {
-          await db.prepare(
-            `UPDATE inventory_items SET ${canonicalUpdates.join(', ')} WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?`
-          ).bind(...canonicalParams, tenantId).run();
-        } catch {
-          if (isLegacyUnscopedRow && hasVerifiedTenantOwnership) {
-            await db.prepare(`UPDATE inventory_items SET ${canonicalUpdates.join(', ')} WHERE id = ?`).bind(...canonicalParams).run().catch(() => {});
-          }
+      try {
+        await db.prepare(
+          `UPDATE inventory_items SET ${canonicalUpdates.join(', ')} WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?`
+        ).bind(...canonicalParams, effectiveRowTenant).run();
+      } catch {
+        if (isLegacyUnscopedRow && hasVerifiedTenantOwnership) {
+          await db.prepare(`UPDATE inventory_items SET ${canonicalUpdates.join(', ')} WHERE id = ?`).bind(...canonicalParams).run().catch(() => {});
         }
-      } else {
-        await db.prepare(`UPDATE inventory_items SET ${canonicalUpdates.join(', ')} WHERE id = ?`).bind(...canonicalParams).run().catch(() => {});
       }
     }
 
-    const writeTenant = tenantId === '*' ? 'default' : tenantId;
-    await writeIngredientAuditLog(db, user.id, 'ingredient_update', id, JSON.stringify(body), now, writeTenant);
+    const writeTenant = effectiveRowTenant;
+    await writeIngredientAuditLog(db, user.id, 'ingredient_update', id, JSON.stringify({ ...body, tenant_id: writeTenant }), now, writeTenant);
 
     let ingredient: any = null;
     if (!usingCanonical) {
@@ -570,12 +740,12 @@ export function registerIngredientHandlers(app: OpenAPIHono<{ Bindings: Env }>) 
 
   // DELETE /api/inventory/ingredients/{id} - Delete ingredient
   app.openapi(InventoryRoutes.ingredients.delete as any, async (c: any) => {
+    const auth = await verifyIngredientAccess(c, INGREDIENT_MUTATION_ROLES);
+    if (auth.errorResponse) return auth.errorResponse;
+    const user = auth.user;
+
     const db = getDatabase(c);
-    const tenantId = getTenantId(c).trim() || 'default';
-    const user = c.get('user');
-    if (user?.role && !['owner', 'manager', 'supervisor', 'admin'].includes(user.role)) {
-      return c.json({ success: false, error: 'Insufficient permissions' }, 403);
-    }
+    const tenantId = resolveOpenApiIngredientTenant(c);
     const { id } = c.req.valid('param');
     const now = new Date().toISOString();
 
@@ -592,6 +762,10 @@ export function registerIngredientHandlers(app: OpenAPIHono<{ Bindings: Env }>) 
         usingCanonical = true;
       }
     }
+    const hasIngredientTenant = Boolean(existing && typeof existing === 'object' && 'tenant_id' in existing);
+    if (!hasIngredientTenant && tenantId !== 'default') {
+      return c.json({ success: false, error: 'Ingredient not found' }, 404);
+    }
     const hasVerifiedTenantOwnership = existing
       ? await checkIngredientTenant(db, id, existing, tenantId)
       : false;
@@ -600,23 +774,64 @@ export function registerIngredientHandlers(app: OpenAPIHono<{ Bindings: Env }>) 
     }
     const isLegacyUnscopedRow =
       existing.tenant_id === undefined || existing.tenant_id === null;
+    const rawExistingTenant = existing?.tenant_id && String(existing.tenant_id).trim() && String(existing.tenant_id).trim() !== '*'
+      ? String(existing.tenant_id).trim()
+      : undefined;
+    const effectiveRowTenant = rawExistingTenant || (tenantId === '*' ? 'default' : tenantId);
 
-    // Check if ingredient is used in recipes across all 3 BOM tables or purchase orders
+    // Check if ingredient is used in recipes or purchase orders within the target ingredient's tenant
     let usedInRecipe = null;
     try {
-      usedInRecipe = await db.prepare('SELECT 1 FROM recipe_items WHERE ingredient_id = ? LIMIT 1').bind(id).first();
+      usedInRecipe = await db.prepare(
+        `SELECT 1 FROM recipe_items ri
+         INNER JOIN recipes r ON r.id = ri.recipe_id
+         WHERE ri.ingredient_id = ? AND COALESCE(NULLIF(TRIM(r.tenant_id), ''), 'default') = ?
+         LIMIT 1`
+      ).bind(id, effectiveRowTenant).first();
     } catch {
       usedInRecipe = null;
     }
     if (!usedInRecipe) {
       try {
-        usedInRecipe = await db.prepare('SELECT 1 FROM recipe_ingredients WHERE ingredient_id = ? LIMIT 1').bind(id).first();
+        usedInRecipe = await db.prepare(
+          "SELECT 1 FROM recipe_items WHERE ingredient_id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ? LIMIT 1"
+        ).bind(id, effectiveRowTenant).first();
       } catch {
-        usedInRecipe = null;
+        if (effectiveRowTenant === 'default') {
+          usedInRecipe = await db.prepare('SELECT 1 FROM recipe_items WHERE ingredient_id = ? LIMIT 1').bind(id).first().catch(() => null);
+        }
       }
     }
     if (!usedInRecipe) {
-      usedInRecipe = await db.prepare('SELECT 1 FROM recipes WHERE item_id = ? LIMIT 1').bind(id).first().catch(() => null);
+      try {
+        usedInRecipe = await db.prepare(
+          `SELECT 1 FROM recipe_ingredients ri
+           INNER JOIN products p ON p.id = ri.product_id
+           WHERE ri.ingredient_id = ? AND COALESCE(NULLIF(TRIM(p.tenant_id), ''), 'default') = ?
+           LIMIT 1`
+        ).bind(id, effectiveRowTenant).first();
+      } catch {
+        try {
+          usedInRecipe = await db.prepare(
+            "SELECT 1 FROM recipe_ingredients WHERE ingredient_id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ? LIMIT 1"
+          ).bind(id, effectiveRowTenant).first();
+        } catch {
+          if (effectiveRowTenant === 'default') {
+            usedInRecipe = await db.prepare('SELECT 1 FROM recipe_ingredients WHERE ingredient_id = ? LIMIT 1').bind(id).first().catch(() => null);
+          }
+        }
+      }
+    }
+    if (!usedInRecipe) {
+      try {
+        usedInRecipe = await db.prepare(
+          "SELECT 1 FROM recipes WHERE (item_id = ? OR ingredient_id = ?) AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ? LIMIT 1"
+        ).bind(id, id, effectiveRowTenant).first();
+      } catch {
+        if (effectiveRowTenant === 'default') {
+          usedInRecipe = await db.prepare('SELECT 1 FROM recipes WHERE item_id = ? LIMIT 1').bind(id).first().catch(() => null);
+        }
+      }
     }
     if (usedInRecipe) {
       return c.json({ success: false, error: 'Cannot delete ingredient used in recipes' }, 409);
@@ -624,54 +839,62 @@ export function registerIngredientHandlers(app: OpenAPIHono<{ Bindings: Env }>) 
 
     let usedInPO = null;
     try {
-      usedInPO = await db.prepare('SELECT 1 FROM purchase_order_items WHERE ingredient_id = ? LIMIT 1').bind(id).first();
+      usedInPO = await db.prepare(
+        `SELECT 1 FROM purchase_order_items poi
+         INNER JOIN purchase_orders po ON po.id = poi.purchase_order_id
+         WHERE poi.ingredient_id = ? AND COALESCE(NULLIF(TRIM(po.tenant_id), ''), 'default') = ?
+         LIMIT 1`
+      ).bind(id, effectiveRowTenant).first();
     } catch {
       usedInPO = null;
+    }
+    if (!usedInPO) {
+      try {
+        usedInPO = await db.prepare(
+          "SELECT 1 FROM purchase_order_items WHERE ingredient_id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ? LIMIT 1"
+        ).bind(id, effectiveRowTenant).first();
+      } catch {
+        if (effectiveRowTenant === 'default') {
+          usedInPO = await db.prepare('SELECT 1 FROM purchase_order_items WHERE ingredient_id = ? LIMIT 1').bind(id).first().catch(() => null);
+        }
+      }
     }
     if (usedInPO) {
       return c.json({ success: false, error: 'Cannot delete ingredient used in purchase orders' }, 409);
     }
 
     if (!usingCanonical) {
-      if (tenantId !== '*') {
-        try {
-          const del = await db.prepare(
-            "DELETE FROM ingredients WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
-          ).bind(id, tenantId).run();
-          if (del?.meta && typeof del.meta.changes === 'number' && del.meta.changes === 0) {
-            if (isLegacyUnscopedRow && hasVerifiedTenantOwnership) {
-              await db.prepare('DELETE FROM ingredients WHERE id = ?').bind(id).run();
-            } else {
-              return c.json({ success: false, error: 'Ingredient not found' }, 404);
-            }
-          }
-        } catch {
+      try {
+        const del = await db.prepare(
+          "DELETE FROM ingredients WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
+        ).bind(id, effectiveRowTenant).run();
+        if (del?.meta && typeof del.meta.changes === 'number' && del.meta.changes === 0) {
           if (isLegacyUnscopedRow && hasVerifiedTenantOwnership) {
             await db.prepare('DELETE FROM ingredients WHERE id = ?').bind(id).run();
           } else {
             return c.json({ success: false, error: 'Ingredient not found' }, 404);
           }
         }
-      } else {
-        await db.prepare('DELETE FROM ingredients WHERE id = ?').bind(id).run();
-      }
-    }
-    if (tenantId !== '*') {
-      try {
-        await db.prepare(
-          "DELETE FROM inventory_items WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
-        ).bind(id, tenantId).run();
       } catch {
         if (isLegacyUnscopedRow && hasVerifiedTenantOwnership) {
-          await db.prepare('DELETE FROM inventory_items WHERE id = ?').bind(id).run().catch(() => {});
+          await db.prepare('DELETE FROM ingredients WHERE id = ?').bind(id).run();
+        } else {
+          return c.json({ success: false, error: 'Ingredient not found' }, 404);
         }
       }
-    } else {
-      await db.prepare('DELETE FROM inventory_items WHERE id = ?').bind(id).run().catch(() => {});
+    }
+    try {
+      await db.prepare(
+        "DELETE FROM inventory_items WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
+      ).bind(id, effectiveRowTenant).run();
+    } catch {
+      if (isLegacyUnscopedRow && hasVerifiedTenantOwnership) {
+        await db.prepare('DELETE FROM inventory_items WHERE id = ?').bind(id).run().catch(() => {});
+      }
     }
 
-    const writeTenant = tenantId === '*' ? 'default' : tenantId;
-    await writeIngredientAuditLog(db, user.id, 'ingredient_delete', id, JSON.stringify({}), now, writeTenant);
+    const writeTenant = effectiveRowTenant;
+    await writeIngredientAuditLog(db, user.id, 'ingredient_delete', id, JSON.stringify({ tenant_id: writeTenant }), now, writeTenant);
 
     return c.json({ success: true, data: { id, deleted: true } });
   });

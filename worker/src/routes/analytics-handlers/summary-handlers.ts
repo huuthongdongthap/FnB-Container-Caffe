@@ -1,17 +1,23 @@
 import type { Hono } from 'hono';
 import type { Env } from '../../types/env';
-import { getTenantId } from '../../middleware/tenant';
 import {
   getSummary,
   getSummaryCompare,
   getGrouped,
+  resolveAnalyticsTenant,
   type GroupBy,
 } from '../../tree/analytics/summary';
 import { SUMMARY_CACHE_TTL, getCached, setCacheWithTtl, summarySchema } from './helpers';
 
+export { resolveAnalyticsTenant };
+
 export function registerSummaryHandlers(router: Hono<{ Bindings: Env }>): void {
   // GET /api/analytics (root — summary with optional compare & group)
   router.get('/', async (c) => {
+    const { tenantId, forbidden } = resolveAnalyticsTenant(c);
+    if (forbidden) {
+      return c.json({ success: false, error: 'Cross-tenant analytics access denied' }, 403);
+    }
     const parsed = summarySchema.safeParse(c.req.query());
     if (!parsed.success) {
       return c.json(
@@ -26,7 +32,6 @@ export function registerSummaryHandlers(router: Hono<{ Bindings: Env }>): void {
     const { days, compare, group } = parsed.data;
     const db = c.env.AURA_DB;
     const kv = c.env.AUTH_KV;
-    const tenantId = getTenantId(c);
     const cacheKey = `analytics:summary:${tenantId}:${days}:${compare ?? false}:${group ?? 'none'}`;
 
     // KV cache (30s TTL for the summary endpoint)

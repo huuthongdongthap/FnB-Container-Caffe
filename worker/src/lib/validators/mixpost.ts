@@ -4,7 +4,7 @@
 
 import { z } from 'zod';
 
-function isSafePublicMediaUrl(rawUrl: string): boolean {
+export function isSafePublicMediaUrl(rawUrl: string): boolean {
   try {
     const parsed = new URL(rawUrl);
     if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') {
@@ -30,6 +30,8 @@ function isSafePublicMediaUrl(rawUrl: string): boolean {
     return false;
   }
 }
+
+export const isSafeMixpostMediaUrl = isSafePublicMediaUrl;
 
 const safeMediaUrlArray = z
   .array(z.string().url().refine(isSafePublicMediaUrl, 'Media URL must use a public host'))

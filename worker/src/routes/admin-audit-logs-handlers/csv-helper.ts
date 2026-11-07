@@ -7,7 +7,8 @@ export function escapeCsv(value: string | null | undefined): string {
     return '""';
   }
   const str = String(value);
-  const safe = /^[\t\r\n ]*[=+\-@]/.test(str) ? `'${str}` : str;
+  const prefixed = (/^[\t\r\n ]*[=+\-@]/.test(str) || /^[=+\-@|]/.test(str.trimStart())) ? `'${str}` : str;
+  const safe = prefixed.replace(/([\r\n]+)(\s*[=+\-@|])/g, "$1'$2");
   // Luôn bọc quote để tránh lỗi parse với dấu phẩy / xuống dòng
   return `"${safe.replace(/"/g, '""')}"`;
 }

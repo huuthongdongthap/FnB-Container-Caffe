@@ -33,6 +33,23 @@ function chatError(error: unknown, message: string) {
     || errorResponse(error instanceof ContactSchemaUnavailable ? 'Chat unavailable' : message,
       error instanceof ContactSchemaUnavailable ? 503 : 500);
 }
+function hasDisallowedStoreOverride(c: Context<{ Bindings: Env }>, tenantId: string): boolean {
+  const candidates = [
+    c.req.query('tenant_id'),
+    c.req.query('tenantId'),
+    c.req.query('store_id'),
+    c.req.query('storeId'),
+    c.req.header('X-Tenant-ID'),
+    c.req.header('x-tenant-id'),
+    c.req.header('X-Store-ID'),
+    c.req.header('x-store-id'),
+  ]
+    .map((v) => (typeof v === 'string' ? v.trim() : ''))
+    .filter(Boolean);
+  if (new Set(candidates).size > 1) return true;
+  const requested = candidates[0] || '';
+  return Boolean(requested && (requested === '*' || requested.toLowerCase() === 'hq' || requested !== tenantId));
+}
 async function sendMessage(c: Context<{ Bindings: Env }>) {
   try {
     const parsed = sendMessageSchema.safeParse(await c.req.json());
@@ -53,7 +70,12 @@ async function sendMessage(c: Context<{ Bindings: Env }>) {
       if ('blocked' in session) return errorResponse(session.blocked, 403);
       // Authority comes from the verified D1 account, never an incidental JWT claim.
       const accountTenant = (session.account?.tenant_id || '').trim() || 'default';
-      if (!session.account || !roles.includes(session.account.role) || accountTenant !== tenantId)
+      if (
+        !session.account ||
+        !roles.includes(session.account.role) ||
+        accountTenant !== tenantId ||
+        hasDisallowedStoreOverride(c, tenantId)
+      )
         return errorResponse('Không đủ quyền truy cập cửa hàng', 403);
       direction = 'admin';
     }
@@ -67,6 +89,7 @@ async function getConversations(c: Context<{ Bindings: Env }>) {
   try {
     const tenantId = privacyStore(c, roles);
     if (tenantId instanceof Response) return tenantId;
+    if (hasDisallowedStoreOverride(c, tenantId)) return errorResponse('Không đủ quyền truy cập cửa hàng', 403);
     const repository = await contactMessageRepository(c.env.AURA_DB);
     return jsonResponse({ success: true, data: await repository.conversations(tenantId) });
   } catch (error) { return chatError(error, 'Failed to get conversations'); }
@@ -75,6 +98,7 @@ async function getMessageHistory(c: Context<{ Bindings: Env }>) {
   try {
     const tenantId = privacyStore(c, roles);
     if (tenantId instanceof Response) return tenantId;
+    if (hasDisallowedStoreOverride(c, tenantId)) return errorResponse('Không đủ quyền truy cập cửa hàng', 403);
     const phone = c.req.param('phone') || c.req.param('id');
     if (!phone || phone.length < 8) return errorResponse('So dien thoai khong hop le', 400);
     const repository = await contactMessageRepository(c.env.AURA_DB);

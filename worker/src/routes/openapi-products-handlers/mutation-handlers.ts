@@ -10,11 +10,56 @@ import { getDatabase } from '../../lib/db';
 import { getTenantId, isHQSuperAdmin } from '../../middleware/tenant';
 import { formatProduct, matchesCatalogTenant, type ProductRow } from './helpers';
 
-const PRODUCT_WRITE_ROLES = ['owner', 'manager', 'supervisor', 'admin'];
+export const PRODUCT_WRITE_ROLES = ['owner', 'manager', 'supervisor', 'admin'];
 
-function resolveProductWriteTenantId(c: any): string {
-  const raw = getTenantId(c).trim() || 'default';
-  return raw === '*' && !isHQSuperAdmin(c) ? 'default' : raw;
+function verifyProductWriteTenant(
+  c: any,
+  requireConcreteTenant = false
+): { ok: true; tenantId: string } | { ok: false; status: 400 | 403; error: string } {
+  const user = c.get('user') as { id?: string; role?: string; tenant_id?: string; tenantId?: string } | undefined;
+  const candidateOverrides = [
+    c.req.query('tenant_id'),
+    c.req.query('tenantId'),
+    c.req.query('store_id'),
+    c.req.query('storeId'),
+    c.req.header('X-Tenant-ID'),
+    c.req.header('x-tenant-id'),
+    c.req.header('X-Store-ID'),
+    c.req.header('x-store-id'),
+  ]
+    .map((v) => (typeof v === 'string' ? v.trim() : ''))
+    .filter(Boolean);
+  if (new Set(candidateOverrides).size > 1) {
+    return { ok: false, status: 403, error: 'Conflicting tenant overrides denied' };
+  }
+  const requestedOverride = candidateOverrides[0] || '';
+
+  if (!isHQSuperAdmin(c)) {
+    const userTenant = (user?.tenant_id || user?.tenantId || '').trim() || 'default';
+    if (userTenant === '*' || userTenant.toLowerCase() === 'hq') {
+      return { ok: false, status: 403, error: 'Cross-tenant product write denied' };
+    }
+    if (
+      requestedOverride &&
+      (requestedOverride === '*' ||
+        requestedOverride.toLowerCase() === 'hq' ||
+        requestedOverride !== userTenant)
+    ) {
+      return { ok: false, status: 403, error: 'Cross-tenant product write denied' };
+    }
+    const ctxTenant = getTenantId(c).trim() || 'default';
+    if (ctxTenant === '*' || ctxTenant.toLowerCase() === 'hq' || ctxTenant !== userTenant) {
+      return { ok: false, status: 403, error: 'Cross-tenant product write denied' };
+    }
+    return { ok: true, tenantId: userTenant };
+  }
+
+  const rawResolved = requestedOverride || getTenantId(c).trim() || (user?.tenant_id || user?.tenantId || '').trim() || 'default';
+  const resolved = rawResolved.toLowerCase() === 'hq' ? '*' : rawResolved;
+  if (requireConcreteTenant && resolved === '*') {
+    return { ok: false, status: 400, error: 'Concrete tenant_id required for product creation' };
+  }
+  return { ok: true, tenantId: resolved };
 }
 
 async function logProductAudit(
@@ -23,29 +68,53 @@ async function logProductAudit(
   action: string,
   entityId: string,
   metadata: string,
-  now: string
+  now: string,
+  tenantId: string = 'default'
 ): Promise<void> {
+  const writeTenant = tenantId && tenantId.trim() && tenantId.trim() !== '*' ? tenantId.trim() : 'default';
+  let enrichedMeta = metadata;
+  try {
+    const parsed = JSON.parse(metadata);
+    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed) && parsed.tenant_id === undefined) {
+      enrichedMeta = JSON.stringify({ ...parsed, tenant_id: writeTenant });
+    }
+  } catch { /* non-JSON metadata */ }
   try {
     await db.prepare(
-      `INSERT INTO audit_logs (id, user_id, action, entity_type, entity_id, metadata, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`
-    ).bind(`audit_${crypto.randomUUID()}`, userId, action, 'product', entityId, metadata, now).run();
+      `INSERT INTO audit_logs (id, user_id, action, entity_type, entity_id, metadata, tenant_id, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+    ).bind(`audit_${crypto.randomUUID()}`, userId, action, 'product', entityId, enrichedMeta, writeTenant, now).run();
   } catch {
     try {
       await db.prepare(
-        `INSERT INTO audit_logs (actor_id, actor_name, user_id, action, resource_type, resource_id, entity_type, entity_id, details, metadata, created_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-      ).bind(userId, userId, userId, action, 'product', entityId, 'product', entityId, metadata, metadata, now).run();
+        `INSERT INTO audit_logs (actor_id, actor_name, user_id, action, resource_type, resource_id, entity_type, entity_id, details, metadata, tenant_id, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      ).bind(userId, userId, userId, action, 'product', entityId, 'product', entityId, enrichedMeta, enrichedMeta, writeTenant, now).run();
     } catch {
       try {
         await db.prepare(
-          `INSERT INTO audit_logs (actor_id, actor_name, action, resource_type, resource_id, details, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)`
-        ).bind(userId, userId, action, 'product', entityId, metadata, now).run().catch(() => {});
+          `INSERT INTO audit_logs (id, user_id, action, entity_type, entity_id, metadata, created_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?)`
+        ).bind(`audit_${crypto.randomUUID()}`, userId, action, 'product', entityId, enrichedMeta, now).run();
       } catch {
-        // Ignore audit log failure
+        try {
+          await db.prepare(
+            `INSERT INTO audit_logs (actor_id, actor_name, user_id, action, resource_type, resource_id, entity_type, entity_id, details, metadata, created_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+          ).bind(userId, userId, userId, action, 'product', entityId, 'product', entityId, enrichedMeta, enrichedMeta, now).run();
+        } catch {
+          await db.prepare(
+            `INSERT INTO audit_logs (actor_id, actor_name, action, resource_type, resource_id, details, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)`
+          ).bind(userId, userId, action, 'product', entityId, enrichedMeta, now).run().catch(() => {});
+        }
       }
     }
   }
+  await db
+    .prepare('UPDATE audit_logs SET tenant_id = ? WHERE (entity_id = ? OR resource_id = ?) AND action = ? AND created_at = ?')
+    .bind(writeTenant, entityId, entityId, action, now)
+    .run()
+    .catch(() => {});
 }
 
 export function registerProductMutationHandlers(router: OpenAPIHono<{ Bindings: Env }>): void {
@@ -67,8 +136,12 @@ export function registerProductMutationHandlers(router: OpenAPIHono<{ Bindings: 
     if (!user?.id || (user.role && !PRODUCT_WRITE_ROLES.includes(user.role))) {
       return c.json({ success: false, error: 'Insufficient permissions' }, 403);
     }
-    const rawTenant = getTenantId(c).trim() || 'default';
-    const targetTenant = rawTenant === '*' ? 'default' : rawTenant;
+    const tenantCheck = verifyProductWriteTenant(c, false);
+    if (!tenantCheck.ok) {
+      return c.json({ success: false, error: tenantCheck.error }, tenantCheck.status);
+    }
+    const resolvedTenant = tenantCheck.tenantId;
+    let writeTenant = resolvedTenant === '*' ? '' : resolvedTenant;
     const now = new Date().toISOString();
 
     const id = crypto.randomUUID();
@@ -79,13 +152,29 @@ export function registerProductMutationHandlers(router: OpenAPIHono<{ Bindings: 
     const tags = JSON.stringify(body.tags || []);
     const isAvailable = body.status === 'inactive' ? 0 : 1;
 
-    // Verify category belongs to same tenant when present
+    // Verify category belongs to same tenant when present, and inherit concrete category tenant under wildcard scope
     if (body.categoryId) {
-      const catRow = await db.prepare('SELECT * FROM categories WHERE id = ?').bind(body.categoryId).first().catch(() => null);
-      if (catRow && !matchesCatalogTenant(catRow, targetTenant)) {
+      const catRow =
+        typeof db?.prepare === 'function'
+          ? await db.prepare('SELECT * FROM categories WHERE id = ?').bind(body.categoryId).first().catch(() => null)
+          : null;
+      if (catRow && resolvedTenant === '*') {
+        const rawCatTenant = typeof (catRow as Record<string, unknown>).tenant_id === 'string'
+          ? String((catRow as Record<string, unknown>).tenant_id).trim()
+          : '';
+        writeTenant =
+          rawCatTenant && rawCatTenant !== '*' && rawCatTenant.toLowerCase() !== 'hq'
+            ? rawCatTenant
+            : 'default';
+      }
+      if (catRow && writeTenant && !matchesCatalogTenant(catRow, writeTenant)) {
         return c.json({ success: false, error: 'Category not found' }, 404);
       }
     }
+    if (!writeTenant || writeTenant === '*') {
+      return c.json({ success: false, error: 'Concrete tenant_id required for product creation' }, 400);
+    }
+    const targetTenant = writeTenant;
 
     // Check slug uniqueness within tenant
     if (body.slug) {
@@ -108,8 +197,8 @@ export function registerProductMutationHandlers(router: OpenAPIHono<{ Bindings: 
 
     try {
       await db.prepare(
-        `INSERT INTO products (id, category_id, name, slug, price, compare_at_price, description, image_url, tags, is_available, sort_order, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        `INSERT INTO products (id, category_id, name, slug, price, compare_at_price, description, image_url, tags, is_available, sort_order, tenant_id, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       ).bind(
         id,
         body.categoryId,
@@ -122,41 +211,73 @@ export function registerProductMutationHandlers(router: OpenAPIHono<{ Bindings: 
         tags,
         isAvailable,
         0,
+        writeTenant,
         now,
         now
       ).run();
-    } catch {
-      await db.prepare(
-        `INSERT INTO products (id, name, description, price, category_id, image_url, is_available, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
-      ).bind(
-        id,
-        name,
-        description,
-        price,
-        body.categoryId,
-        imageUrl,
-        isAvailable,
-        now,
-        now
-      ).run();
-    }
-
-    if (targetTenant !== 'default') {
-      await db.prepare('UPDATE products SET tenant_id = ? WHERE id = ?').bind(targetTenant, id).run().catch(() => {});
+    } catch (err) {
+      if (writeTenant !== 'default') throw err;
+      try {
+        await db.prepare(
+          `INSERT INTO products (id, category_id, name, slug, price, compare_at_price, description, image_url, tags, is_available, sort_order, created_at, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        ).bind(
+          id,
+          body.categoryId,
+          name,
+          body.slug || id,
+          price,
+          null,
+          description,
+          imageUrl,
+          tags,
+          isAvailable,
+          0,
+          now,
+          now
+        ).run();
+      } catch {
+        await db.prepare(
+          `INSERT INTO products (id, name, description, price, category_id, image_url, is_available, created_at, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        ).bind(
+          id,
+          name,
+          description,
+          price,
+          body.categoryId,
+          imageUrl,
+          isAvailable,
+          now,
+          now
+        ).run();
+      }
+      await db.prepare('UPDATE products SET tenant_id = ? WHERE id = ?').bind(writeTenant, id).run().catch(() => {});
     }
 
     // Audit log
-    await logProductAudit(db, user.id, 'product_create', id, JSON.stringify(body), now);
+    await logProductAudit(db, user.id, 'product_create', id, JSON.stringify(body), now, writeTenant);
 
-    await syncProductToMenuProjection(db, id);
+    await syncProductToMenuProjection(db, id, writeTenant);
 
-    const created = (await db.prepare(
-      `SELECT p.*, c.name as category_name
-       FROM products p
-       LEFT JOIN categories c ON p.category_id = c.id
-       WHERE p.id = ?`
-    ).bind(id).first()) as ProductRow | null;
+    let created: ProductRow | null = null;
+    try {
+      created = (await db.prepare(
+        `SELECT p.*, c.name as category_name
+         FROM products p
+         LEFT JOIN categories c ON p.category_id = c.id
+           AND COALESCE(NULLIF(TRIM(c.tenant_id), ''), 'default') = COALESCE(NULLIF(TRIM(p.tenant_id), ''), 'default')
+         WHERE p.id = ?`
+      ).bind(id).first()) as ProductRow | null;
+    } catch (err) {
+      if (writeTenant !== 'default') throw err;
+      created = (await db.prepare(
+        `SELECT p.*, c.name as category_name
+         FROM products p
+         LEFT JOIN categories c ON p.category_id = c.id
+         WHERE p.id = ?`
+      ).bind(id).first()) as ProductRow | null;
+    }
 
     return c.json({ success: true, data: created ? formatProduct(created) : null }, 201);
   });
@@ -164,7 +285,6 @@ export function registerProductMutationHandlers(router: OpenAPIHono<{ Bindings: 
   // PATCH /api/products/:id - Update product
   router.openapi(ProductRoutes.update as any, async (c: any) => {
     const db = getDatabase(c);
-    const tenantId = resolveProductWriteTenantId(c);
     const { id } = c.req.valid('param' as never) as { id: string };
     const body = c.req.valid('json' as never) as {
       slug?: string;
@@ -180,6 +300,11 @@ export function registerProductMutationHandlers(router: OpenAPIHono<{ Bindings: 
     if (!user?.id || (user.role && !PRODUCT_WRITE_ROLES.includes(user.role))) {
       return c.json({ success: false, error: 'Insufficient permissions' }, 403);
     }
+    const tenantCheck = verifyProductWriteTenant(c, false);
+    if (!tenantCheck.ok) {
+      return c.json({ success: false, error: tenantCheck.error }, tenantCheck.status);
+    }
+    const tenantId = tenantCheck.tenantId;
     const now = new Date().toISOString();
 
     const existing = await db.prepare('SELECT * FROM products WHERE id = ?').bind(id).first() as { tenant_id?: string | null } | null;
@@ -187,8 +312,9 @@ export function registerProductMutationHandlers(router: OpenAPIHono<{ Bindings: 
       return c.json({ success: false, error: 'Product not found' }, 404);
     }
 
+    const rawExistingProdTenant = typeof existing.tenant_id === 'string' ? existing.tenant_id.trim() : '';
     const effectiveTenant = tenantId === '*'
-      ? ((typeof existing.tenant_id === 'string' && existing.tenant_id.trim()) || 'default')
+      ? ((rawExistingProdTenant && rawExistingProdTenant !== '*' && rawExistingProdTenant.toLowerCase() !== 'hq' ? rawExistingProdTenant : '') || 'default')
       : tenantId;
 
     const updates: string[] = [];
@@ -267,47 +393,49 @@ export function registerProductMutationHandlers(router: OpenAPIHono<{ Bindings: 
     canonicalParams.push(now);
 
     if (updates.length > 1) {
-      if (tenantId !== '*') {
-        try {
-          await db.prepare(
-            `UPDATE products SET ${updates.join(', ')} WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?`
-          ).bind(...params, id, tenantId).run();
-        } catch {
-          if (canonicalUpdates.length > 1) {
-            try {
-              await db.prepare(
-                `UPDATE products SET ${canonicalUpdates.join(', ')} WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?`
-              ).bind(...canonicalParams, id, tenantId).run();
-            } catch {
-              if (tenantId === 'default') {
-                await db.prepare(`UPDATE products SET ${canonicalUpdates.join(', ')} WHERE id = ?`).bind(...canonicalParams, id).run();
-              }
+      try {
+        await db.prepare(
+          `UPDATE products SET ${updates.join(', ')} WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?`
+        ).bind(...params, id, effectiveTenant).run();
+      } catch {
+        if (canonicalUpdates.length > 1) {
+          try {
+            await db.prepare(
+              `UPDATE products SET ${canonicalUpdates.join(', ')} WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?`
+            ).bind(...canonicalParams, id, effectiveTenant).run();
+          } catch {
+            if (effectiveTenant === 'default') {
+              await db.prepare(`UPDATE products SET ${canonicalUpdates.join(', ')} WHERE id = ?`).bind(...canonicalParams, id).run();
             }
-          } else if (tenantId === 'default') {
-            await db.prepare(`UPDATE products SET ${updates.join(', ')} WHERE id = ?`).bind(...params, id).run();
           }
-        }
-      } else {
-        try {
+        } else if (effectiveTenant === 'default') {
           await db.prepare(`UPDATE products SET ${updates.join(', ')} WHERE id = ?`).bind(...params, id).run();
-        } catch {
-          if (canonicalUpdates.length > 1) {
-            await db.prepare(`UPDATE products SET ${canonicalUpdates.join(', ')} WHERE id = ?`).bind(...canonicalParams, id).run();
-          }
         }
       }
-      await syncProductToMenuProjection(db, id);
+      await syncProductToMenuProjection(db, id, effectiveTenant);
     }
 
     // Audit log
-    await logProductAudit(db, user.id, 'product_update', id, JSON.stringify(body), now);
+    await logProductAudit(db, user.id, 'product_update', id, JSON.stringify(body), now, effectiveTenant);
 
-    const updated = (await db.prepare(
-      `SELECT p.*, c.name as category_name
-       FROM products p
-       LEFT JOIN categories c ON p.category_id = c.id
-       WHERE p.id = ?`
-    ).bind(id).first()) as ProductRow | null;
+    let updated: ProductRow | null = null;
+    try {
+      updated = (await db.prepare(
+        `SELECT p.*, c.name as category_name
+         FROM products p
+         LEFT JOIN categories c ON p.category_id = c.id
+           AND COALESCE(NULLIF(TRIM(c.tenant_id), ''), 'default') = COALESCE(NULLIF(TRIM(p.tenant_id), ''), 'default')
+         WHERE p.id = ?`
+      ).bind(id).first()) as ProductRow | null;
+    } catch (err) {
+      if (effectiveTenant !== 'default') throw err;
+      updated = (await db.prepare(
+        `SELECT p.*, c.name as category_name
+         FROM products p
+         LEFT JOIN categories c ON p.category_id = c.id
+         WHERE p.id = ?`
+      ).bind(id).first()) as ProductRow | null;
+    }
 
     return c.json({ success: true, data: updated ? formatProduct(updated) : null });
   });
@@ -315,57 +443,66 @@ export function registerProductMutationHandlers(router: OpenAPIHono<{ Bindings: 
   // DELETE /api/products/:id - Delete product
   router.openapi(ProductRoutes.delete as any, async (c: any) => {
     const db = getDatabase(c);
-    const tenantId = resolveProductWriteTenantId(c);
     const { id } = c.req.valid('param' as never) as { id: string };
     const user = c.get('user') as { id: string; role?: string } | undefined;
     if (!user?.id || (user.role && !PRODUCT_WRITE_ROLES.includes(user.role))) {
       return c.json({ success: false, error: 'Insufficient permissions' }, 403);
     }
+    const tenantCheck = verifyProductWriteTenant(c, false);
+    if (!tenantCheck.ok) {
+      return c.json({ success: false, error: tenantCheck.error }, tenantCheck.status);
+    }
+    const tenantId = tenantCheck.tenantId;
     const now = new Date().toISOString();
 
     const existing = (await db.prepare('SELECT * FROM products WHERE id = ?').bind(id).first()) as { name?: string; slug?: string; tenant_id?: string | null } | null;
     if (!existing || !matchesCatalogTenant(existing, tenantId)) {
       return c.json({ success: false, error: 'Product not found' }, 404);
     }
+    const rawExistingProdTenant = typeof existing.tenant_id === 'string' ? existing.tenant_id.trim() : '';
+    const effectiveTenant = tenantId === '*'
+      ? ((rawExistingProdTenant && rawExistingProdTenant !== '*' && rawExistingProdTenant.toLowerCase() !== 'hq' ? rawExistingProdTenant : '') || 'default')
+      : tenantId;
 
-    // Check for order items referencing this product
+    // Check for order items referencing this product within effectiveTenant
     let orderItems: { count: number } | null = null;
     try {
       orderItems = (await db.prepare('SELECT COUNT(*) as count FROM order_items WHERE product_id = ?').bind(id).first()) as { count: number } | null;
     } catch {
       orderItems = null;
     }
-    if (orderItems && orderItems.count > 0) {
+    let hasTenantOrderItems = Boolean(orderItems && orderItems.count > 0);
+    if (hasTenantOrderItems) {
+      const oiRowsRes = await db.prepare('SELECT * FROM order_items WHERE product_id = ?').bind(id).all<Record<string, unknown>>().catch(() => null);
+      if (oiRowsRes && Array.isArray(oiRowsRes.results) && oiRowsRes.results.length > 0) {
+        hasTenantOrderItems = oiRowsRes.results.some((oi) => matchesCatalogTenant(oi, effectiveTenant));
+      }
+    }
+    if (hasTenantOrderItems) {
       // Soft delete by setting is_available = 0
-      if (tenantId !== '*') {
-        await db.prepare(
-          "UPDATE products SET is_available = 0, updated_at = ? WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
-        ).bind(now, id, tenantId).run().catch(async () => {
-          if (tenantId === 'default') {
-            await db.prepare('UPDATE products SET is_available = 0, updated_at = ? WHERE id = ?').bind(now, id).run();
-          }
-        });
-      } else {
-        await db.prepare('UPDATE products SET is_available = 0, updated_at = ? WHERE id = ?').bind(now, id).run();
-      }
-      await syncProductAvailabilityProjection(db, id, 0);
+      const softDeleteSql = effectiveTenant === 'default'
+        ? "UPDATE products SET is_available = 0, updated_at = ? WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = 'default'"
+        : "UPDATE products SET is_available = 0, updated_at = ? WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?";
+      const softDeleteArgs = effectiveTenant === 'default' ? [now, id] : [now, id, effectiveTenant];
+      await db.prepare(softDeleteSql).bind(...softDeleteArgs).run().catch(async () => {
+        if (effectiveTenant === 'default') {
+          await db.prepare('UPDATE products SET is_available = 0, updated_at = ? WHERE id = ?').bind(now, id).run();
+        }
+      });
+      await syncProductAvailabilityProjection(db, id, 0, effectiveTenant);
     } else {
-      if (tenantId !== '*') {
-        await db.prepare(
-          "DELETE FROM products WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
-        ).bind(id, tenantId).run().catch(async () => {
-          if (tenantId === 'default') {
-            await db.prepare('DELETE FROM products WHERE id = ?').bind(id).run();
-          }
-        });
-      } else {
-        await db.prepare('DELETE FROM products WHERE id = ?').bind(id).run();
-      }
-      await deleteProductProjection(db, id);
+      await db.prepare(
+        "DELETE FROM products WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
+      ).bind(id, effectiveTenant).run().catch(async () => {
+        if (effectiveTenant === 'default') {
+          await db.prepare('DELETE FROM products WHERE id = ?').bind(id).run();
+        }
+      });
+      await deleteProductProjection(db, id, effectiveTenant);
     }
 
     // Audit log
-    await logProductAudit(db, user.id, 'product_delete', id, JSON.stringify({ name: existing.name || existing.slug }), now);
+    await logProductAudit(db, user.id, 'product_delete', id, JSON.stringify({ name: existing.name || existing.slug }), now, effectiveTenant);
 
     return c.json({ success: true, data: { success: true } });
   });

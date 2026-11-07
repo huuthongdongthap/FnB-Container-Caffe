@@ -2,6 +2,7 @@ import { useState, useCallback } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { apiFetch, API_BASE } from '@/lib/api-client';
 import { getAuthHeaders } from '@/hooks/stores/admin/admin-utils';
+import { useClientSessionScope } from '@/lib/client-session';
 import { previousPeriodDates } from './date-helpers';
 import type { GroupedSalesData } from '@/components/admin/GroupedSalesChart';
 import type { PeriodDataPoint } from './sales-report-types';
@@ -10,8 +11,9 @@ const COMPARISON_ERROR_KEY = '__COMPARISON_ERR__';
 const CSV_EXPORT_ERR_KEY = '__CSV_EXPORT_ERR__';
 
 export function useDailyReportData(from: string, to: string) {
+  const session = useClientSessionScope();
   return useQuery<{ success: boolean; data: PeriodDataPoint[] }>({
-    queryKey: ['reports', 'daily', from, to],
+    queryKey: ['reports', 'daily', session.tenantId, session.userScope, from, to],
     queryFn: () => apiFetch(`/api/reports/daily?from=${from}&to=${to}`),
     enabled: !!from && !!to,
     staleTime: 60_000,
@@ -23,6 +25,7 @@ export function useSalesGrouped(
   from: string,
   to: string,
 ) {
+  const session = useClientSessionScope();
   const endpointMap: Record<string, string> = {
     hour: '/api/reports/sales-by-hour',
     day: '/api/reports/sales-by-day',
@@ -31,7 +34,7 @@ export function useSalesGrouped(
   };
 
   return useQuery<{ success: boolean; data: GroupedSalesData }>({
-    queryKey: ['reports', 'sales-grouped', groupBy, from, to],
+    queryKey: ['reports', 'sales-grouped', session.tenantId, session.userScope, groupBy, from, to],
     queryFn: () => apiFetch(`${endpointMap[groupBy]}?from=${from}&to=${to}`),
     enabled: !!from && !!to,
     staleTime: 60_000,

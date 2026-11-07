@@ -544,13 +544,37 @@ describe('Production D1 Reconciliation & Cutover Migrations (20261029_03 & 20261
       signup_slots_left: 100,
     });
 
-    // 2. New customer signup receives 50.000 VND bonus
+    // 2a. Unverified customer signup in production is denied signup bonus
+    const unverifiedSignupRes = await loyaltyRouter.request(
+      '/phone-auth',
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phone: '0938000111', name: 'Khách Chưa OTP' }),
+      },
+      env as never
+    );
+    expect(unverifiedSignupRes.status).toBe(200);
+    const unverifiedSignupJson = (await unverifiedSignupRes.json()) as {
+      is_new: boolean;
+      bonus_granted: number;
+      customer: { id: string };
+    };
+    expect(unverifiedSignupJson.is_new).toBe(true);
+    expect(unverifiedSignupJson.bonus_granted).toBe(0);
+    const unverifiedWalletRow = sqlite
+      .prepare('SELECT balance FROM cashback_wallets WHERE customer_id = ?')
+      .get(unverifiedSignupJson.customer.id) as { balance: number };
+    expect(unverifiedWalletRow.balance).toBe(0);
+
+    // 2b. OTP-verified customer signup in production receives 50.000 VND bonus
+    kvMap.set('phone_otp:default:0912345678', '654321');
     const signupRes = await loyaltyRouter.request(
       '/phone-auth',
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phone: '0912345678', name: 'Khách Mới Pilot' }),
+        body: JSON.stringify({ phone: '0912345678', name: 'Khách Mới Pilot', otp: '654321' }),
       },
       env as never
     );

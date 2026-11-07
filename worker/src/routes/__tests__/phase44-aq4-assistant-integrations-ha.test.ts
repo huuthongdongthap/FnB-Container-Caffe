@@ -297,6 +297,7 @@ describe('AI Customer Assistant, TastyIgniter, Frigate & HomeAssistant Hardening
           local_order_id TEXT,
           ti_order_id TEXT,
           status TEXT,
+          tenant_id TEXT NOT NULL DEFAULT 'default',
           synced_at TEXT,
           created_at TEXT
         );
@@ -310,15 +311,15 @@ describe('AI Customer Assistant, TastyIgniter, Frigate & HomeAssistant Hardening
         );
       `);
       sqlite
-        .prepare("INSERT INTO ti_order_bridge (id, local_order_id, ti_order_id, status, synced_at, created_at) VALUES (?, ?, ?, ?, datetime('now'), datetime('now'))")
-        .run('br-1', 'ord-completed-1', 'ti-101', 'completed');
+        .prepare("INSERT INTO ti_order_bridge (id, local_order_id, ti_order_id, status, tenant_id, synced_at, created_at) VALUES (?, ?, ?, ?, ?, datetime('now'), datetime('now'))")
+        .run('br-1', 'ord-completed-1', 'ti-101', 'completed', 'default');
       sqlite
         .prepare("INSERT INTO orders (id, status, order_type, payment_status, tenant_id) VALUES (?, ?, ?, ?, ?)")
         .run('ord-completed-1', 'completed', 'dine_in', 'paid', 'default');
 
       sqlite
-        .prepare("INSERT INTO ti_order_bridge (id, local_order_id, ti_order_id, status, synced_at, created_at) VALUES (?, ?, ?, ?, datetime('now'), datetime('now'))")
-        .run('br-2', 'ord-sadec-2', 'ti-202', 'confirmed');
+        .prepare("INSERT INTO ti_order_bridge (id, local_order_id, ti_order_id, status, tenant_id, synced_at, created_at) VALUES (?, ?, ?, ?, ?, datetime('now'), datetime('now'))")
+        .run('br-2', 'ord-sadec-2', 'ti-202', 'confirmed', 'tenant_sadec_02');
       sqlite
         .prepare("INSERT INTO orders (id, status, order_type, payment_status, tenant_id) VALUES (?, ?, ?, ?, ?)")
         .run('ord-sadec-2', 'confirmed', 'dine_in', 'paid', 'tenant_sadec_02');

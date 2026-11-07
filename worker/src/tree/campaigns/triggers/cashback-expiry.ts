@@ -66,12 +66,46 @@ export async function detectCashbackExpiry(
           results = scopedFallback.results || [];
           scopedSucceeded = true;
         } catch {
-          // Fall through to default queries if tenant_id column is absent
+          try {
+            const scopedCustomerOnly = await db.prepare(`
+              SELECT cw.customer_id as customer_id, c.phone, c.name, NULL as zalo, SUM(ct.amount) as total_expiring, c.tenant_id as tenant_id
+              FROM cashback_transactions ct
+              JOIN cashback_wallets cw ON cw.id = ct.wallet_id
+              JOIN customers c ON cw.customer_id = c.id
+              WHERE ct.type IN ('earn', 'bonus')
+                AND ct.expires_at IS NOT NULL
+                AND ct.expires_at <= ?
+                AND ct.expires_at > datetime('now')
+                AND COALESCE(NULLIF(TRIM(c.tenant_id), ''), 'default') = ?
+              GROUP BY cw.customer_id
+            `).bind(sevenDaysFromNow, tenantId).all<ExpiringRow>();
+            results = scopedCustomerOnly.results || [];
+            scopedSucceeded = true;
+          } catch {
+            try {
+              const scopedDirect = await db.prepare(`
+                SELECT ct.customer_id, c.phone, c.name, c.zalo, SUM(ct.amount) as total_expiring, c.tenant_id as tenant_id
+                FROM cashback_transactions ct
+                JOIN customers c ON ct.customer_id = c.id
+                WHERE ct.type IN ('earn', 'bonus')
+                  AND ct.expires_at IS NOT NULL
+                  AND ct.expires_at <= ?
+                  AND ct.expires_at > datetime('now')
+                  AND COALESCE(NULLIF(TRIM(c.tenant_id), ''), 'default') = ?
+                  AND (c.last_expiry_warning_at IS NULL OR c.last_expiry_warning_at < ?)
+                GROUP BY ct.customer_id
+              `).bind(sevenDaysFromNow, tenantId, sevenDaysAgo).all<ExpiringRow>();
+              results = scopedDirect.results || [];
+              scopedSucceeded = true;
+            } catch {
+              // Fall through if tenant_id column is absent
+            }
+          }
         }
       }
       if (scopedSucceeded) {
         const filtered = results.filter(
-          (row) => !('tenant_id' in row) || matchesTenantRow(row as unknown as Record<string, unknown>, tenantId)
+          (row) => matchesTenantRow(row as unknown as Record<string, unknown>, tenantId)
         );
         const customers: CampaignCustomer[] = filtered
           .map(row => {
@@ -91,6 +125,9 @@ export async function detectCashbackExpiry(
           .filter(c => (c.total_spent ?? 0) > 0);
         log.info('cashback_expiry_candidates', { count: customers.length, tenantId });
         return customers;
+      }
+      if (tenantId !== 'default') {
+        return [];
       }
     }
 
@@ -138,9 +175,9 @@ export async function detectCashbackExpiry(
       }
     }
 
-    const filtered = scoped && tenantId
-      ? results.filter((row) => !('tenant_id' in row) || matchesTenantRow(row as unknown as Record<string, unknown>, tenantId))
-      : results;
+    const filtered = results.filter(
+      (r) => !scoped || !tenantId || matchesTenantRow(r as unknown as Record<string, unknown>, tenantId)
+    );
 
     const customers: CampaignCustomer[] = filtered.map(row => ({
       id: row.customer_id,
@@ -172,9 +209,10 @@ export async function markExpiryNotified(
     return 0;
   }
 
+  const scoped = Boolean(tenantId && tenantId !== '*');
   try {
     const now = new Date().toISOString();
-    if (tenantId && tenantId !== '*') {
+    if (scoped && tenantId) {
       try {
         const scopedStmts = customerIds.map(id =>
           db.prepare("UPDATE customers SET last_expiry_warning_at = ? WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?")
@@ -183,17 +221,22 @@ export async function markExpiryNotified(
         await db.batch(scopedStmts);
         return customerIds.length;
       } catch {
-        // Fall through if tenant_id column is absent
+        if (tenantId !== 'default') {
+          return 0;
+        }
       }
     }
-    const stmts = customerIds.map(id =>
-      db.prepare('UPDATE customers SET last_expiry_warning_at = ? WHERE id = ?').bind(now, id)
-    );
-    await db.batch(stmts);
-    return customerIds.length;
+    if (!scoped || !tenantId || tenantId === 'default') {
+      const stmts = customerIds.map(id =>
+        db.prepare('UPDATE customers SET last_expiry_warning_at = ? WHERE id = ?').bind(now, id)
+      );
+      await db.batch(stmts);
+      return customerIds.length;
+    }
+    return 0;
   } catch (err) {
     const msg = String((err as Error)?.message || '');
-    if (msg.includes('column')) {
+    if (msg.includes('column') && (!scoped || !tenantId || tenantId === 'default')) {
       return customerIds.length;
     }
     log.error('markExpiryNotified error', { error: (err as Error).message });

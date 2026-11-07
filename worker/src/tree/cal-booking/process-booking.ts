@@ -33,7 +33,11 @@ export async function createReservationFromBooking(
 ): Promise<{ table_id: string; guest_count: number; zone: string; status: string } | { error: string }> {
   const metadata = payload.metadata || {};
   const rawMetaTenant = typeof metadata.tenant_id === 'string' ? metadata.tenant_id.trim() : '';
-  const effectiveTenant = (tenantOverride || rawMetaTenant || 'default').trim() || 'default';
+  const safeMetaTenant = rawMetaTenant && rawMetaTenant !== '*' ? rawMetaTenant : '';
+  const safeOverride = tenantOverride && tenantOverride.trim() && tenantOverride.trim() !== '*'
+    ? tenantOverride.trim()
+    : '';
+  const effectiveTenant = safeOverride || safeMetaTenant || 'default';
 
   // Check for duplicate within the same tenant
   let existingRows: Array<{ id: string; tenant_id?: string | null }> = [];
@@ -55,6 +59,9 @@ export async function createReservationFromBooking(
   if (existing) {
     return { table_id: '', guest_count: 0, zone: '', status: 'idempotent' };
   }
+  if (existingRows.length > 0) {
+    return { error: 'Booking UID already belongs to another store' };
+  }
 
   const attendeeCount = payload.attendees?.length || 1;
   const guestCount = Math.max(1, Math.floor(Number(metadata.guest_count) || attendeeCount || 1));
@@ -70,17 +77,42 @@ export async function createReservationFromBooking(
         try {
           conflictRow = await db
             .prepare(
-              "SELECT id, status, tenant_id FROM reservations WHERE table_id = ? AND date = ? AND time = ? AND status = 'confirmed'"
+              "SELECT id, status, tenant_id FROM reservations WHERE table_id = ? AND date = ? AND time = ? AND status = 'confirmed' AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
             )
-            .bind(candidate.id, date, time)
+            .bind(candidate.id, date, time, effectiveTenant)
             .first<{ id: string; status?: string; tenant_id?: string | null }>();
+          if (
+            conflictRow &&
+            !matchesTenantRow(conflictRow as unknown as Record<string, unknown>, effectiveTenant)
+          ) {
+            const allRes = await db
+              .prepare(
+                "SELECT id, status, tenant_id FROM reservations WHERE table_id = ? AND date = ? AND time = ? AND status = 'confirmed'"
+              )
+              .bind(candidate.id, date, time)
+              .all<{ id: string; status?: string; tenant_id?: string | null }>()
+              .catch(() => ({ results: [] as Array<{ id: string; status?: string; tenant_id?: string | null }> }));
+            conflictRow =
+              (allRes.results || []).find((row) =>
+                matchesTenantRow(row as unknown as Record<string, unknown>, effectiveTenant)
+              ) ?? null;
+          }
         } catch {
-          conflictRow = await db
-            .prepare(
-              "SELECT id, status FROM reservations WHERE table_id = ? AND date = ? AND time = ? AND status = 'confirmed'"
-            )
-            .bind(candidate.id, date, time)
-            .first<{ id: string; status?: string }>();
+          try {
+            conflictRow = await db
+              .prepare(
+                "SELECT id, status, tenant_id FROM reservations WHERE table_id = ? AND date = ? AND time = ? AND status = 'confirmed'"
+              )
+              .bind(candidate.id, date, time)
+              .first<{ id: string; status?: string; tenant_id?: string | null }>();
+          } catch {
+            conflictRow = await db
+              .prepare(
+                "SELECT id, status FROM reservations WHERE table_id = ? AND date = ? AND time = ? AND status = 'confirmed'"
+              )
+              .bind(candidate.id, date, time)
+              .first<{ id: string; status?: string }>();
+          }
         }
         if (
           conflictRow &&
@@ -99,24 +131,32 @@ export async function createReservationFromBooking(
     return unbooked;
   };
 
+  const fetchCandidateTables = async (): Promise<CafeTableRow[]> => {
+    let rawTables: unknown[] = [];
+    try {
+      const { results } = await db.prepare(
+        "SELECT * FROM cafe_tables WHERE COALESCE(capacity, seats, 2) >= ? AND LOWER(status) = 'available' AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
+      ).bind(guestCount, effectiveTenant).all();
+      rawTables = results || [];
+    } catch {
+      const { results } = await db.prepare(
+        "SELECT * FROM cafe_tables WHERE COALESCE(capacity, seats, 2) >= ? AND LOWER(status) = 'available'"
+      ).bind(guestCount).all();
+      rawTables = results || [];
+    }
+    return (rawTables as CafeTableRow[]).filter((t) =>
+      matchesTenantRow(t as unknown as Record<string, unknown>, effectiveTenant)
+    );
+  };
+
   // Find available tables
   let table: CafeTableRow | null = null;
   if (zone) {
-    const { results: zoneResults } = await db.prepare(
-      'SELECT * FROM cafe_tables WHERE COALESCE(capacity, seats, 2) >= ? AND LOWER(status) = \'available\''
-    ).bind(guestCount).all();
-    const tenantFiltered = ((zoneResults || []) as unknown as CafeTableRow[]).filter((t) =>
-      matchesTenantRow(t as unknown as Record<string, unknown>, effectiveTenant)
-    );
+    const tenantFiltered = await fetchCandidateTables();
     const available = await filterUnbookedTables(tenantFiltered);
     table = available.find((t: CafeTableRow) => (t.zone || '').toLowerCase() === zone.toLowerCase()) || available.sort((a: CafeTableRow, b: CafeTableRow) => (a.capacity ?? a.seats ?? 2) - (b.capacity ?? b.seats ?? 2))[0] || null;
   } else {
-    const { results: tablesResults } = await db.prepare(
-      'SELECT * FROM cafe_tables WHERE COALESCE(capacity, seats, 2) >= ? AND LOWER(status) = \'available\''
-    ).bind(guestCount).all();
-    const tenantFiltered = ((tablesResults || []) as unknown as CafeTableRow[]).filter((t) =>
-      matchesTenantRow(t as unknown as Record<string, unknown>, effectiveTenant)
-    );
+    const tenantFiltered = await fetchCandidateTables();
     const available = await filterUnbookedTables(tenantFiltered);
     available.sort((a: CafeTableRow, b: CafeTableRow) => (a.capacity ?? a.seats ?? 2) - (b.capacity ?? b.seats ?? 2));
     table = available[0] || null;

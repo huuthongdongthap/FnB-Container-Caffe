@@ -82,23 +82,14 @@ export async function handleHAWebhook(
       // Optional tenant_id column in minimal test schemas
     }
 
-    if (effectiveTenant !== 'default') {
-      try {
-        await db
-          .prepare(
-            "INSERT OR REPLACE INTO ha_device_states (entity_id, state, attributes, last_changed, last_updated, tenant_id) VALUES (?, ?, ?, ?, datetime('now'), ?)"
-          )
-          .bind(entityId, state, attributes, lastChanged, effectiveTenant)
-          .run();
-      } catch {
-        await db
-          .prepare(
-            "INSERT OR REPLACE INTO ha_device_states (entity_id, state, attributes, last_changed, last_updated) VALUES (?, ?, ?, ?, datetime('now'))"
-          )
-          .bind(entityId, state, attributes, lastChanged)
-          .run();
-      }
-    } else {
+    try {
+      await db
+        .prepare(
+          "INSERT OR REPLACE INTO ha_device_states (entity_id, state, attributes, last_changed, last_updated, tenant_id) VALUES (?, ?, ?, ?, datetime('now'), ?)"
+        )
+        .bind(entityId, state, attributes, lastChanged, effectiveTenant)
+        .run();
+    } catch {
       await db
         .prepare(
           "INSERT OR REPLACE INTO ha_device_states (entity_id, state, attributes, last_changed, last_updated) VALUES (?, ?, ?, ?, datetime('now'))"

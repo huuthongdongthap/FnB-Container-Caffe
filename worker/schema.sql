@@ -229,6 +229,7 @@ CREATE TABLE payments (
     refund_amount INTEGER DEFAULT 0,
     refund_reason TEXT,
     refunded_at TEXT,
+    tenant_id TEXT NOT NULL DEFAULT 'default',
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE
@@ -236,6 +237,7 @@ CREATE TABLE payments (
 
 -- Index for order lookup
 CREATE INDEX idx_payments_order_id ON payments(order_id);
+CREATE INDEX idx_payments_tenant_order ON payments(tenant_id, order_id);
 CREATE INDEX idx_payments_status ON payments(status);
 CREATE INDEX idx_payments_created_at ON payments(created_at);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_payments_txn_unique
@@ -1839,7 +1841,7 @@ CREATE TABLE IF NOT EXISTS saas_tenants ( id TEXT PRIMARY KEY, slug TEXT UNIQUE 
 CREATE TABLE IF NOT EXISTS table_qr_codes ( id INTEGER PRIMARY KEY AUTOINCREMENT, table_id INTEGER NOT NULL UNIQUE, slug TEXT NOT NULL UNIQUE, created_at TEXT DEFAULT (datetime('now')), updated_at TEXT DEFAULT (datetime('now')) );
 CREATE TABLE IF NOT EXISTS table_sessions (id TEXT PRIMARY KEY, table_id TEXT NOT NULL, customer_id TEXT, customer_name TEXT, customer_phone TEXT, status TEXT NOT NULL DEFAULT 'active', opened_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, closed_at DATETIME, order_count INTEGER NOT NULL DEFAULT 0, total_amount INTEGER NOT NULL DEFAULT 0, notes TEXT, created_at DATETIME DEFAULT CURRENT_TIMESTAMP, updated_at DATETIME DEFAULT CURRENT_TIMESTAMP, order_id TEXT, current_order_id TEXT, started_at TEXT, ended_at TEXT);
 CREATE TABLE IF NOT EXISTS ti_menu_cache ( id TEXT PRIMARY KEY, name TEXT NOT NULL, sku TEXT, price REAL DEFAULT 0, active INTEGER DEFAULT 1, cached_at TEXT DEFAULT (datetime('now')) );
-CREATE TABLE IF NOT EXISTS ti_order_bridge ( id TEXT PRIMARY KEY, local_order_id TEXT NOT NULL, ti_order_id TEXT, status TEXT NOT NULL, error TEXT, synced_at TEXT, created_at TEXT DEFAULT (datetime('now')) );
+CREATE TABLE IF NOT EXISTS ti_order_bridge ( id TEXT PRIMARY KEY, local_order_id TEXT NOT NULL, ti_order_id TEXT, status TEXT NOT NULL, error TEXT, synced_at TEXT, tenant_id TEXT NOT NULL DEFAULT 'default', created_at TEXT DEFAULT (datetime('now')) );
 CREATE TABLE IF NOT EXISTS wifi_sessions ( id TEXT PRIMARY KEY, client_mac TEXT NOT NULL, ip_address TEXT, phone TEXT, customer_id TEXT, status TEXT NOT NULL, session_timeout INTEGER DEFAULT 3600, authorized_at TEXT DEFAULT (datetime('now')), expires_at TEXT NOT NULL, created_at TEXT DEFAULT (datetime('now')) );
 ALTER TABLE _alerts ADD COLUMN value REAL;
 ALTER TABLE _alerts ADD COLUMN threshold REAL;

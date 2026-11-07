@@ -34,21 +34,6 @@ export async function creditLoyaltyIfEligible(
   env: Record<string, unknown>,
   orderId: string,
 ): Promise<void> {
-  const existingEarn = await db.prepare(
-    'SELECT id FROM cashback_transactions WHERE order_id = ? AND type = \'earn\' LIMIT 1'
-  ).bind(orderId).first<{ id: string }>();
-
-  if (existingEarn) {
-    log.info('Loyalty credit skipped (already earned)', { orderId, existingId: existingEarn.id });
-    return;
-  }
-
-  const policy = await loadPolicy(db).catch(() => null);
-  if (!policy) {
-    log.warn('Loyalty credit skipped (no policy)', { orderId });
-    return;
-  }
-
   const orderRow = await db.prepare(
     'SELECT * FROM orders WHERE id = ?'
   ).bind(orderId).first<{
@@ -60,10 +45,70 @@ export async function creditLoyaltyIfEligible(
     customer_email?: string | null;
     status?: string;
     payment_status?: string;
-  }>();
+    tenant_id?: string | null;
+  }>().catch(() => null);
 
-  if (!orderRow || orderRow.status === 'cancelled' || orderRow.status === 'failed' || orderRow.status === 'expired') {
+  const rawOrderTenant = (orderRow as Record<string, unknown> | null)?.tenant_id;
+  const orderTenantForAccrual =
+    typeof rawOrderTenant === 'string' && rawOrderTenant.trim()
+      ? rawOrderTenant.trim()
+      : 'default';
+
+  const existingEarn = await db.prepare(
+    "SELECT id FROM cashback_transactions WHERE order_id = ? AND type = 'earn' AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ? LIMIT 1"
+  ).bind(orderId, orderTenantForAccrual).first<{ id: string; tenant_id?: string | null }>().catch(() =>
+    orderTenantForAccrual === 'default'
+      ? db.prepare(
+          "SELECT id FROM cashback_transactions WHERE order_id = ? AND type = 'earn' LIMIT 1"
+        ).bind(orderId).first<{ id: string; tenant_id?: string | null }>().catch(() => null)
+      : null
+  );
+
+  if (
+    existingEarn &&
+    (!('tenant_id' in existingEarn) ||
+      existingEarn.tenant_id === undefined ||
+      ((String(existingEarn.tenant_id ?? '').trim()) || 'default') === orderTenantForAccrual)
+  ) {
+    log.info('Loyalty credit skipped (already earned)', { orderId, existingId: existingEarn.id });
+    return;
+  }
+
+  if (orderTenantForAccrual !== 'default') {
+    await loadPolicy(
+      db,
+      env?.AUTH_KV as import('@cloudflare/workers-types').KVNamespace | undefined,
+    ).catch(() => null);
+  }
+  const policy = await loadPolicy(
+    db,
+    env?.AUTH_KV as import('@cloudflare/workers-types').KVNamespace | undefined,
+    new Date(),
+    orderTenantForAccrual,
+  ).catch(() => null);
+
+  const normalizedStatus = String(orderRow?.status ?? '').trim().toLowerCase();
+  const normalizedPaymentStatus = String(orderRow?.payment_status ?? '').trim().toLowerCase();
+  const hasPaymentStatusColumn =
+    Boolean(orderRow) &&
+    (orderRow as Record<string, unknown>).payment_status !== undefined;
+  if (
+    !orderRow ||
+    ['cancelled', 'rejected', 'failed', 'expired', 'refunded'].includes(normalizedStatus) ||
+    normalizedPaymentStatus === 'refunded'
+  ) {
     log.info('Loyalty credit skipped (no order or cancelled)', { orderId });
+    return;
+  }
+  // An unpaid order must not mint loyalty points, cashback, or referral rewards.
+  // A null/empty payment_status is treated as unpaid unless the schema has no
+  // such column at all (legacy unit-test fixtures).
+  if (hasPaymentStatusColumn && normalizedPaymentStatus !== 'paid') {
+    log.info('Loyalty credit skipped (order payment not settled)', {
+      orderId,
+      status: orderRow.status,
+      payment_status: orderRow.payment_status,
+    });
     return;
   }
 
@@ -73,17 +118,18 @@ export async function creditLoyaltyIfEligible(
   );
   let customerId = orderRow.customer_id ? String(orderRow.customer_id).trim() || null : null;
   if (!customerId && (normalizedPhone || sanitizedEmail)) {
-    const rawTenant = (orderRow as Record<string, unknown>).tenant_id;
-    const orderTenant = typeof rawTenant === 'string' && rawTenant.trim() ? rawTenant.trim() : 'default';
+    const orderTenant = orderTenantForAccrual;
     let cust: { id: string } | null = null;
     try {
       cust = await db.prepare(
         "SELECT id FROM customers WHERE ((email = ? AND email IS NOT NULL) OR (phone = ? AND phone IS NOT NULL)) AND (? = '*' OR COALESCE(NULLIF(tenant_id, ''), 'default') = ? OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?) LIMIT 1"
       ).bind(sanitizedEmail, normalizedPhone, orderTenant, orderTenant, orderTenant).first<{ id: string }>();
     } catch {
-      cust = await db.prepare(
-        'SELECT id FROM customers WHERE (email = ? AND email IS NOT NULL) OR (phone = ? AND phone IS NOT NULL) LIMIT 1'
-      ).bind(sanitizedEmail, normalizedPhone).first<{ id: string }>().catch(() => null);
+      if (orderTenant === 'default' || orderTenant === '*') {
+        cust = await db.prepare(
+          'SELECT id FROM customers WHERE (email = ? AND email IS NOT NULL) OR (phone = ? AND phone IS NOT NULL) LIMIT 1'
+        ).bind(sanitizedEmail, normalizedPhone).first<{ id: string }>().catch(() => null);
+      }
     }
     customerId = cust?.id ?? null;
   }
@@ -93,19 +139,10 @@ export async function creditLoyaltyIfEligible(
     return;
   }
 
-  if (orderRow.payment_status && orderRow.payment_status !== 'paid') {
-    log.info('Loyalty credit skipped (order payment not yet settled)', {
-      orderId,
-      status: orderRow.status,
-      payment_status: orderRow.payment_status,
-    });
-    return;
-  }
-
   if (
     orderRow.status &&
     ['pending', 'confirmed', 'preparing', 'ready', 'failed', 'expired'].includes(orderRow.status) &&
-    orderRow.payment_status !== 'paid'
+    normalizedPaymentStatus !== 'paid'
   ) {
     log.info('Loyalty credit skipped (order not yet paid or completed)', {
       orderId,
@@ -121,21 +158,12 @@ export async function creditLoyaltyIfEligible(
     return;
   }
 
-  const rawOrderTenant = (orderRow as Record<string, unknown>).tenant_id;
-  const orderTenantForAccrual =
-    typeof rawOrderTenant === 'string' && rawOrderTenant.trim()
-      ? rawOrderTenant.trim()
-      : 'default';
+  if (!policy) {
+    log.warn('Loyalty credit skipped (no policy)', { orderId });
+    return;
+  }
 
-  const effectivePolicy =
-    (await loadPolicy(
-      db,
-      env?.AUTH_KV as import('@cloudflare/workers-types').KVNamespace | undefined,
-      new Date(),
-      orderTenantForAccrual
-    ).catch(() => null)) || policy;
-
-  await applyAccrual(db, effectivePolicy, {
+  await applyAccrual(db, policy, {
     orderId,
     customerId,
     orderTotalVnd: total,

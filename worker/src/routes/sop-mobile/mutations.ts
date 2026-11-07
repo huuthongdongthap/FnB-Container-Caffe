@@ -32,7 +32,7 @@ import type { Env } from '../../types/env';
  */
 export async function postStartSopRun(c: Context<{ Bindings: Env }>) {
   try {
-    const scope = sopScope(c.env, c.get('user'));
+    const scope = sopScope(c.env, c.get('user'), c);
     const body = await c.req.json().catch(() => ({}));
     const templateId = readString(body, 'templateId');
     if (!templateId) return errorResponse('templateId is required', 400);
@@ -45,7 +45,7 @@ export async function postStartSopRun(c: Context<{ Bindings: Env }>) {
     const shiftId = await linkRunToOpenShift(scope, run.id) ?? run.shiftId;
     await auditSopAction({
       db: c.env.AURA_DB,
-      actor: auditActor(c),
+      actor: auditActor(c, scope.tenantId),
       action: 'sop_run.started',
       resourceId: run.id,
       metadata: {
@@ -72,7 +72,7 @@ export async function postStartSopRun(c: Context<{ Bindings: Env }>) {
  */
 export async function postCheckSopItem(c: Context<{ Bindings: Env }>) {
   try {
-    const scope = sopScope(c.env, c.get('user'));
+    const scope = sopScope(c.env, c.get('user'), c);
     const runId = c.req.param('id') ?? '';
     const itemId = c.req.param('itemId') ?? '';
     if (!runId) return errorResponse('run id is required', 400);
@@ -91,7 +91,7 @@ export async function postCheckSopItem(c: Context<{ Bindings: Env }>) {
     });
     await auditSopAction({
       db: c.env.AURA_DB,
-      actor: auditActor(c),
+      actor: auditActor(c, scope.tenantId),
       action: 'sop_run.item_checked',
       resourceId: runId,
       metadata: { templateItemId: itemId, isChecked },
@@ -105,13 +105,13 @@ export async function postCheckSopItem(c: Context<{ Bindings: Env }>) {
 /** POST /api/sop/runs/:id/complete — blocked while a critical item is unticked. */
 export async function postCompleteSopRun(c: Context<{ Bindings: Env }>) {
   try {
-    const scope = sopScope(c.env, c.get('user'));
+    const scope = sopScope(c.env, c.get('user'), c);
     const runId = c.req.param('id') ?? '';
     if (!runId) return errorResponse('run id is required', 400);
     const run = await completeRunForStaff(scope, runId);
     await auditSopAction({
       db: c.env.AURA_DB,
-      actor: auditActor(c),
+      actor: auditActor(c, scope.tenantId),
       action: 'sop_run.completed',
       resourceId: run.id,
       metadata: { templateId: run.templateId, templateVersion: run.templateVersion },
@@ -125,7 +125,7 @@ export async function postCompleteSopRun(c: Context<{ Bindings: Env }>) {
 /** POST /api/sop/runs/:id/abandon — a reason is required, for the audit trail. */
 export async function postAbandonSopRun(c: Context<{ Bindings: Env }>) {
   try {
-    const scope = sopScope(c.env, c.get('user'));
+    const scope = sopScope(c.env, c.get('user'), c);
     const body = await c.req.json().catch(() => ({}));
     const reason = readString(body, 'reason');
     if (!reason) return errorResponse('A reason is required to abandon a checklist', 400);
@@ -136,7 +136,7 @@ export async function postAbandonSopRun(c: Context<{ Bindings: Env }>) {
     const run = await abandonRunForStaff(scope, runId, { reason });
     await auditSopAction({
       db: c.env.AURA_DB,
-      actor: auditActor(c),
+      actor: auditActor(c, scope.tenantId),
       action: 'sop_run.abandoned',
       resourceId: run.id,
       metadata: { reason },
@@ -159,7 +159,7 @@ export async function postAbandonSopRun(c: Context<{ Bindings: Env }>) {
  */
 export async function postAppealMyViolation(c: Context<{ Bindings: Env }>) {
   try {
-    const scope = sopScope(c.env, c.get('user'));
+    const scope = sopScope(c.env, c.get('user'), c);
     const violationId = c.req.param('id') ?? '';
     if (!violationId) return errorResponse('violation id is required', 400);
     const body = await c.req.json().catch(() => ({}));
@@ -174,7 +174,7 @@ export async function postAppealMyViolation(c: Context<{ Bindings: Env }>) {
     const violation = await appealOwnViolation(scope, violationId, explanation.trim());
     await auditSopAction({
       db: c.env.AURA_DB,
-      actor: auditActor(c),
+      actor: auditActor(c, scope.tenantId),
       action: 'sop_violation.appealed',
       resourceId: violation.id,
       // Only the fact of the appeal, never its text: the explanation is the

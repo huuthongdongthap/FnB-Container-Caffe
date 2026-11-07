@@ -24,29 +24,117 @@ export async function handleLookup(c: Context<{ Bindings: Env }>) {
     throw err;
   }
 
+  const queryTenant = (
+    c.req?.query?.('tenant_id') ||
+    c.req?.query?.('tenantId') ||
+    c.req?.query?.('store_id') ||
+    c.req?.query?.('storeId') ||
+    ''
+  ).trim();
+  const headerTenant = (
+    c.req?.header?.('X-Tenant-ID') ||
+    c.req?.header?.('x-tenant-id') ||
+    c.req?.header?.('X-Store-ID') ||
+    c.req?.header?.('x-store-id') ||
+    ''
+  ).trim();
+  if (queryTenant && headerTenant && queryTenant !== headerTenant) {
+    return c.json({ ok: false, error: 'Không đủ quyền truy cập cửa hàng này' }, 403);
+  }
+  const requestedTenant = queryTenant || headerTenant;
+  const hasExplicitPilotTenant = c.env?.PILOT_TENANT_ID !== undefined;
+
   let callerCustomerId: string | null = null;
+  const contextUser = c.get?.('user' as never) as {
+    id?: string;
+    userId?: string;
+    customerId?: string;
+    customer_id?: string;
+    sub?: string;
+    role?: string;
+    tenantId?: string;
+    tenant_id?: string;
+  } | undefined;
+
   if (c.req.raw) {
     try {
       const session = await authenticateRequest(c.req.raw, c.env);
-      if (!session) {
+      if (!session && !contextUser) {
         return c.json({ ok: false, error: 'Chưa đăng nhập' }, 401);
       }
-      if ('blocked' in session) {
+      if (session && 'blocked' in session) {
         return c.json({ ok: false, error: session.blocked }, 403);
       }
-      if (session.account) {
+      if (session?.account) {
         const acctRole = String(session.account.role || '');
+        const rawAcctTenant = String(session.account.tenant_id ?? '').trim();
         const acctTenant = staffTenant(session.account);
         if (!isStaffRole(acctRole) || !POS_LOOKUP_ROLES.has(acctRole)) {
           return c.json({ ok: false, error: 'Không đủ quyền truy cập' }, 403);
         }
-        if (acctTenant !== tenantId) {
-          return c.json({ ok: false, error: 'Không đủ quyền truy cập cửa hàng này' }, 403);
+        const isHqAdmin = (acctRole === 'owner' || acctRole === 'admin') && (rawAcctTenant === '*' || rawAcctTenant.toLowerCase() === 'hq');
+        if (!isHqAdmin) {
+          if (rawAcctTenant === '*' || rawAcctTenant.toLowerCase() === 'hq') {
+            return c.json({ ok: false, error: 'Không đủ quyền truy cập cửa hàng này' }, 403);
+          }
+          if (hasExplicitPilotTenant && acctTenant !== tenantId) {
+            return c.json({ ok: false, error: 'Không đủ quyền truy cập cửa hàng này' }, 403);
+          }
+          if (!hasExplicitPilotTenant && acctTenant) {
+            tenantId = acctTenant;
+          }
+          if (requestedTenant && (requestedTenant === '*' || requestedTenant.toLowerCase() === 'hq' || requestedTenant !== tenantId)) {
+            return c.json({ ok: false, error: 'Không đủ quyền truy cập cửa hàng này' }, 403);
+          }
+        } else if (requestedTenant) {
+          tenantId = requestedTenant.toLowerCase() === 'hq' ? '*' : requestedTenant;
+        } else if (!hasExplicitPilotTenant) {
+          tenantId = '*';
         }
-      } else if (session.payload.role === 'customer') {
-        callerCustomerId = String(session.payload.id || (session.payload as unknown as Record<string, unknown>).sub || '');
+      } else if (session?.payload?.role === 'customer' || (!session && contextUser?.role === 'customer')) {
+        const custClaims = (session?.payload ?? contextUser) as Record<string, unknown>;
+        callerCustomerId = String(custClaims.customerId || custClaims.customer_id || custClaims.id || custClaims.sub || '');
         if (!callerCustomerId) {
           return c.json({ ok: false, error: 'Không đủ quyền truy cập' }, 403);
+        }
+        const custTenant = String(custClaims.tenantId ?? custClaims.tenant_id ?? '').trim();
+        if (custTenant === '*' || custTenant.toLowerCase() === 'hq') {
+          return c.json({ ok: false, error: 'Không đủ quyền truy cập cửa hàng này' }, 403);
+        }
+        if (hasExplicitPilotTenant && custTenant && custTenant !== tenantId) {
+          return c.json({ ok: false, error: 'Không đủ quyền truy cập cửa hàng này' }, 403);
+        }
+        if (!hasExplicitPilotTenant && custTenant) {
+          tenantId = custTenant;
+        }
+        if (requestedTenant && (requestedTenant === '*' || requestedTenant.toLowerCase() === 'hq' || requestedTenant !== tenantId)) {
+          return c.json({ ok: false, error: 'Không đủ quyền truy cập cửa hàng này' }, 403);
+        }
+      } else if (!session && contextUser) {
+        const ctxRole = String(contextUser.role || '');
+        const ctxTenant = String(contextUser.tenantId ?? contextUser.tenant_id ?? '').trim();
+        if (!isStaffRole(ctxRole) || !POS_LOOKUP_ROLES.has(ctxRole)) {
+          return c.json({ ok: false, error: 'Không đủ quyền truy cập' }, 403);
+        }
+        const isHqAdmin = (ctxRole === 'owner' || ctxRole === 'admin') && (ctxTenant === '*' || ctxTenant.toLowerCase() === 'hq');
+        if (!isHqAdmin) {
+          const boundTenant = ctxTenant || 'default';
+          if (ctxTenant === '*' || ctxTenant.toLowerCase() === 'hq') {
+            return c.json({ ok: false, error: 'Không đủ quyền truy cập cửa hàng này' }, 403);
+          }
+          if (hasExplicitPilotTenant && boundTenant !== tenantId) {
+            return c.json({ ok: false, error: 'Không đủ quyền truy cập cửa hàng này' }, 403);
+          }
+          if (!hasExplicitPilotTenant) {
+            tenantId = boundTenant;
+          }
+          if (requestedTenant && (requestedTenant === '*' || requestedTenant.toLowerCase() === 'hq' || requestedTenant !== tenantId)) {
+            return c.json({ ok: false, error: 'Không đủ quyền truy cập cửa hàng này' }, 403);
+          }
+        } else if (requestedTenant) {
+          tenantId = requestedTenant.toLowerCase() === 'hq' ? '*' : requestedTenant;
+        } else if (!hasExplicitPilotTenant) {
+          tenantId = '*';
         }
       } else {
         return c.json({ ok: false, error: 'Không đủ quyền truy cập' }, 403);
@@ -56,6 +144,13 @@ export async function handleLookup(c: Context<{ Bindings: Env }>) {
         return c.json({ ok: false, code: err.code, error: err.message }, err.status);
       }
       return c.json({ ok: false, code: 'AUTH_STATE_UNAVAILABLE', error: 'Dịch vụ xác thực tạm thời gián đoạn' }, 503);
+    }
+  } else if (requestedTenant) {
+    if (requestedTenant === '*' || requestedTenant.toLowerCase() === 'hq' || (hasExplicitPilotTenant && requestedTenant !== tenantId)) {
+      return c.json({ ok: false, error: 'Không đủ quyền truy cập cửa hàng này' }, 403);
+    }
+    if (!hasExplicitPilotTenant) {
+      tenantId = requestedTenant;
     }
   }
 
@@ -68,31 +163,39 @@ export async function handleLookup(c: Context<{ Bindings: Env }>) {
   const db = c.env.AURA_DB;
   let customer: Customer | null = null;
   try {
-    customer = await db.prepare(
-      "SELECT id, email, name, phone, loyalty_points, lifetime_points, loyalty_tier, created_at FROM customers WHERE phone = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
-    ).bind(phone, tenantId).first<Customer>();
-  } catch {
-    try {
+    if (tenantId === '*') {
       customer = await db.prepare(
         'SELECT id, email, name, phone, loyalty_points, lifetime_points, loyalty_tier, created_at, tenant_id FROM customers WHERE phone = ?'
       ).bind(phone).first<Customer>();
-    } catch {
+    } else {
+      customer = await db.prepare(
+        "SELECT id, email, name, phone, loyalty_points, lifetime_points, loyalty_tier, created_at FROM customers WHERE phone = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
+      ).bind(phone, tenantId).first<Customer>();
+    }
+  } catch {
+    if (tenantId === 'default' || tenantId === '*') {
       try {
         customer = await db.prepare(
-          'SELECT id, email, name, phone, loyalty_points, loyalty_points AS lifetime_points, loyalty_tier, created_at, tenant_id FROM customers WHERE phone = ?'
+          'SELECT id, email, name, phone, loyalty_points, lifetime_points, loyalty_tier, created_at, tenant_id FROM customers WHERE phone = ?'
         ).bind(phone).first<Customer>();
       } catch {
-        customer = await db.prepare(
-          'SELECT id, email, name, phone, loyalty_points, loyalty_points AS lifetime_points, loyalty_tier, created_at FROM customers WHERE phone = ?'
-        ).bind(phone).first<Customer>();
+        try {
+          customer = await db.prepare(
+            'SELECT id, email, name, phone, loyalty_points, loyalty_points AS lifetime_points, loyalty_tier, created_at, tenant_id FROM customers WHERE phone = ?'
+          ).bind(phone).first<Customer>();
+        } catch {
+          customer = await db.prepare(
+            'SELECT id, email, name, phone, loyalty_points, loyalty_points AS lifetime_points, loyalty_tier, created_at FROM customers WHERE phone = ?'
+          ).bind(phone).first<Customer>();
+        }
       }
-    }
-    if (customer && 'tenant_id' in (customer as unknown as Record<string, unknown>)) {
-      const rowTenantRaw = (customer as unknown as Record<string, unknown>).tenant_id;
-      if (rowTenantRaw !== undefined) {
-        const rowTenant = typeof rowTenantRaw === 'string' && rowTenantRaw.trim() ? rowTenantRaw.trim() : 'default';
-        if (rowTenant !== tenantId) {
-          customer = null;
+      if (customer && tenantId !== '*' && 'tenant_id' in (customer as unknown as Record<string, unknown>)) {
+        const rowTenantRaw = (customer as unknown as Record<string, unknown>).tenant_id;
+        if (rowTenantRaw !== undefined) {
+          const rowTenant = typeof rowTenantRaw === 'string' && rowTenantRaw.trim() ? rowTenantRaw.trim() : 'default';
+          if (rowTenant !== tenantId) {
+            customer = null;
+          }
         }
       }
     }
@@ -100,17 +203,31 @@ export async function handleLookup(c: Context<{ Bindings: Env }>) {
   if (!customer) {
     return c.json({ ok: false, error: 'Không tìm thấy thành viên' }, 200);
   }
+  if (tenantId === '*') {
+    const custTenantRaw = (customer as unknown as Record<string, unknown>).tenant_id;
+    tenantId = typeof custTenantRaw === 'string' && custTenantRaw.trim() && custTenantRaw.trim() !== '*'
+      ? custTenantRaw.trim()
+      : 'default';
+  }
   if (callerCustomerId && String(customer.id) !== callerCustomerId) {
     return c.json({ ok: false, error: 'Không đủ quyền truy cập hồ sơ khách hàng khác' }, 403);
   }
 
-  let wallet: CashbackWallet | null = null;
+  let wallet: (CashbackWallet & { tenant_id?: string | null }) | null = null;
   try {
     wallet = await db.prepare(
       "SELECT * FROM cashback_wallets WHERE customer_id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
-    ).bind(customer.id, tenantId).first<CashbackWallet>();
+    ).bind(customer.id, tenantId).first<CashbackWallet & { tenant_id?: string | null }>();
   } catch {
-    wallet = await db.prepare('SELECT * FROM cashback_wallets WHERE customer_id = ?').bind(customer.id).first<CashbackWallet>();
+    if (tenantId === 'default') {
+      wallet = await db.prepare('SELECT * FROM cashback_wallets WHERE customer_id = ?').bind(customer.id).first<CashbackWallet & { tenant_id?: string | null }>();
+      if (wallet && 'tenant_id' in wallet && wallet.tenant_id !== undefined) {
+        const walletTenant = (wallet.tenant_id && String(wallet.tenant_id).trim()) || 'default';
+        if (walletTenant !== tenantId) {
+          wallet = null;
+        }
+      }
+    }
   }
   const balance = wallet?.balance || 0;
 
@@ -120,14 +237,16 @@ export async function handleLookup(c: Context<{ Bindings: Env }>) {
       "SELECT COALESCE(SUM(ct.amount), 0) as total FROM cashback_transactions ct JOIN cashback_wallets cw ON cw.id = ct.wallet_id WHERE cw.customer_id = ? AND COALESCE(NULLIF(TRIM(cw.tenant_id), ''), 'default') = ? AND ct.type IN ('earn', 'bonus')"
     ).bind(customer.id, tenantId).first<{ total: number }>();
   } catch {
-    try {
-      lifetimeRow = await db.prepare(
-        'SELECT COALESCE(SUM(ct.amount), 0) as total FROM cashback_transactions ct JOIN cashback_wallets cw ON cw.id = ct.wallet_id WHERE cw.customer_id = ? AND ct.type IN (\'earn\', \'bonus\')'
-      ).bind(customer.id).first<{ total: number }>();
-    } catch {
-      lifetimeRow = await db.prepare(
-        'SELECT COALESCE(SUM(amount), 0) as total FROM cashback_transactions WHERE customer_id = ? AND type IN (\'earn\', \'bonus\')'
-      ).bind(customer.id).first<{ total: number }>();
+    if (tenantId === 'default') {
+      try {
+        lifetimeRow = await db.prepare(
+          'SELECT COALESCE(SUM(ct.amount), 0) as total FROM cashback_transactions ct JOIN cashback_wallets cw ON cw.id = ct.wallet_id WHERE cw.customer_id = ? AND ct.type IN (\'earn\', \'bonus\')'
+        ).bind(customer.id).first<{ total: number }>();
+      } catch {
+        lifetimeRow = await db.prepare(
+          'SELECT COALESCE(SUM(amount), 0) as total FROM cashback_transactions WHERE customer_id = ? AND type IN (\'earn\', \'bonus\')'
+        ).bind(customer.id).first<{ total: number }>();
+      }
     }
   }
 
@@ -138,29 +257,55 @@ export async function handleLookup(c: Context<{ Bindings: Env }>) {
       "SELECT COALESCE(SUM(ct.amount), 0) as total, COUNT(*) as cnt FROM cashback_transactions ct JOIN cashback_wallets cw ON cw.id = ct.wallet_id WHERE cw.customer_id = ? AND COALESCE(NULLIF(TRIM(cw.tenant_id), ''), 'default') = ? AND ct.type IN ('earn', 'bonus') AND ct.expires_at IS NOT NULL AND ct.expires_at <= ? AND ct.expires_at > datetime('now')"
     ).bind(customer.id, tenantId, sevenDays).first<{ total: number; cnt: number }>();
   } catch {
-    try {
-      expiringRow = await db.prepare(
-        'SELECT COALESCE(SUM(ct.amount), 0) as total, COUNT(*) as cnt FROM cashback_transactions ct JOIN cashback_wallets cw ON cw.id = ct.wallet_id WHERE cw.customer_id = ? AND ct.type IN (\'earn\', \'bonus\') AND ct.expires_at IS NOT NULL AND ct.expires_at <= ? AND ct.expires_at > datetime(\'now\')'
-      ).bind(customer.id, sevenDays).first<{ total: number; cnt: number }>();
-    } catch {
-      expiringRow = await db.prepare(
-        'SELECT COALESCE(SUM(amount), 0) as total, COUNT(*) as cnt FROM cashback_transactions WHERE customer_id = ? AND type IN (\'earn\', \'bonus\') AND expires_at IS NOT NULL AND expires_at <= ? AND expires_at > datetime(\'now\')'
-      ).bind(customer.id, sevenDays).first<{ total: number; cnt: number }>();
+    if (tenantId === 'default') {
+      try {
+        expiringRow = await db.prepare(
+          'SELECT COALESCE(SUM(ct.amount), 0) as total, COUNT(*) as cnt FROM cashback_transactions ct JOIN cashback_wallets cw ON cw.id = ct.wallet_id WHERE cw.customer_id = ? AND ct.type IN (\'earn\', \'bonus\') AND ct.expires_at IS NOT NULL AND ct.expires_at <= ? AND ct.expires_at > datetime(\'now\')'
+        ).bind(customer.id, sevenDays).first<{ total: number; cnt: number }>();
+      } catch {
+        expiringRow = await db.prepare(
+          'SELECT COALESCE(SUM(amount), 0) as total, COUNT(*) as cnt FROM cashback_transactions WHERE customer_id = ? AND type IN (\'earn\', \'bonus\') AND expires_at IS NOT NULL AND expires_at <= ? AND expires_at > datetime(\'now\')'
+        ).bind(customer.id, sevenDays).first<{ total: number; cnt: number }>();
+      }
     }
   }
 
   let nextTierRow: { tier_name: string; min_points: number } | null = null;
   try {
     nextTierRow = await db.prepare(
-      'SELECT * FROM loyalty_tiers WHERE min_points > ? ORDER BY min_points ASC LIMIT 1'
-    ).bind(customer.lifetime_points || 0).first<{ tier_name: string; min_points: number }>();
+      "SELECT * FROM loyalty_tiers WHERE min_points > ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ? ORDER BY min_points ASC LIMIT 1"
+    ).bind(customer.lifetime_points || 0, tenantId).first<{ tier_name: string; min_points: number }>();
+    if (!nextTierRow && tenantId !== 'default') {
+      nextTierRow = await db.prepare(
+        "SELECT * FROM loyalty_tiers WHERE min_points > ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = 'default' ORDER BY min_points ASC LIMIT 1"
+      ).bind(customer.lifetime_points || 0).first<{ tier_name: string; min_points: number }>();
+    }
   } catch {
     try {
       nextTierRow = await db.prepare(
-        'SELECT tier AS tier_name, min_points FROM tier_configs WHERE min_points > ? ORDER BY min_points ASC LIMIT 1'
-      ).bind(customer.lifetime_points || 0).first<{ tier_name: string; min_points: number }>();
+        "SELECT tier AS tier_name, min_points FROM tier_configs WHERE min_points > ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ? ORDER BY min_points ASC LIMIT 1"
+      ).bind(customer.lifetime_points || 0, tenantId).first<{ tier_name: string; min_points: number }>();
+      if (!nextTierRow && tenantId !== 'default') {
+        nextTierRow = await db.prepare(
+          "SELECT tier AS tier_name, min_points FROM tier_configs WHERE min_points > ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = 'default' ORDER BY min_points ASC LIMIT 1"
+        ).bind(customer.lifetime_points || 0).first<{ tier_name: string; min_points: number }>();
+      }
     } catch {
-      nextTierRow = null;
+      if (tenantId === 'default') {
+        try {
+          nextTierRow = await db.prepare(
+            'SELECT * FROM loyalty_tiers WHERE min_points > ? ORDER BY min_points ASC LIMIT 1'
+          ).bind(customer.lifetime_points || 0).first<{ tier_name: string; min_points: number }>();
+        } catch {
+          try {
+            nextTierRow = await db.prepare(
+              'SELECT tier AS tier_name, min_points FROM tier_configs WHERE min_points > ? ORDER BY min_points ASC LIMIT 1'
+            ).bind(customer.lifetime_points || 0).first<{ tier_name: string; min_points: number }>();
+          } catch {
+            nextTierRow = null;
+          }
+        }
+      }
     }
   }
 
@@ -171,15 +316,34 @@ export async function handleLookup(c: Context<{ Bindings: Env }>) {
     let prevTier: { min_points: number } | null = null;
     try {
       prevTier = await db.prepare(
-        'SELECT min_points FROM loyalty_tiers WHERE min_points < ? ORDER BY min_points DESC LIMIT 1'
-      ).bind(nextTierRow.min_points).first<{ min_points: number }>();
+        "SELECT min_points FROM loyalty_tiers WHERE min_points < ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ? ORDER BY min_points DESC LIMIT 1"
+      ).bind(nextTierRow.min_points, tenantId).first<{ min_points: number }>();
+      if (!prevTier && tenantId !== 'default') {
+        prevTier = await db.prepare(
+          "SELECT min_points FROM loyalty_tiers WHERE min_points < ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = 'default' ORDER BY min_points DESC LIMIT 1"
+        ).bind(nextTierRow.min_points).first<{ min_points: number }>();
+      }
     } catch {
       try {
         prevTier = await db.prepare(
-          'SELECT min_points FROM tier_configs WHERE min_points < ? ORDER BY min_points DESC LIMIT 1'
-        ).bind(nextTierRow.min_points).first<{ min_points: number }>();
+          "SELECT min_points FROM tier_configs WHERE min_points < ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ? ORDER BY min_points DESC LIMIT 1"
+        ).bind(nextTierRow.min_points, tenantId).first<{ min_points: number }>();
       } catch {
-        prevTier = null;
+        if (tenantId === 'default') {
+          try {
+            prevTier = await db.prepare(
+              'SELECT min_points FROM loyalty_tiers WHERE min_points < ? ORDER BY min_points DESC LIMIT 1'
+            ).bind(nextTierRow.min_points).first<{ min_points: number }>();
+          } catch {
+            try {
+              prevTier = await db.prepare(
+                'SELECT min_points FROM tier_configs WHERE min_points < ? ORDER BY min_points DESC LIMIT 1'
+              ).bind(nextTierRow.min_points).first<{ min_points: number }>();
+            } catch {
+              prevTier = null;
+            }
+          }
+        }
       }
     }
     const range = nextTierRow.min_points - (prevTier?.min_points || 0);
@@ -192,26 +356,31 @@ export async function handleLookup(c: Context<{ Bindings: Env }>) {
     };
   }
 
+  const memberPayload = {
+    id: customer.id,
+    customer_id: customer.id,
+    member_id: `AC${String(customer.id).slice(-6).toUpperCase()}`,
+    name: customer.name,
+    phone: customer.phone,
+    tier: customer.loyalty_tier || DEFAULT_TIER,
+    loyalty_tier: customer.loyalty_tier || DEFAULT_TIER,
+    loyalty_points: customer.loyalty_points || 0,
+    lifetime_points: customer.lifetime_points || 0,
+    tier_vi: TIER_VI_MAP[customer.loyalty_tier] || TIER_VI_MAP.bronze,
+    balance,
+    wallet_balance: balance,
+    cashback_balance: balance,
+    cashback_balance_vnd: balance,
+    lifetime_cashback: lifetimeRow?.total || 0,
+    expiring_amount: expiringRow?.total || 0,
+    expiring_within_7d: expiringRow?.cnt || 0,
+    tier_progress: tierProgress,
+    member_since: customer.created_at
+  };
+
   return c.json({
     ok: true,
-    member: {
-      id: customer.id,
-      member_id: `AC${String(customer.id).slice(-6).toUpperCase()}`,
-      name: customer.name,
-      phone: customer.phone,
-      tier: customer.loyalty_tier || DEFAULT_TIER,
-      loyalty_tier: customer.loyalty_tier || DEFAULT_TIER,
-      loyalty_points: customer.loyalty_points || 0,
-      lifetime_points: customer.lifetime_points || 0,
-      tier_vi: TIER_VI_MAP[customer.loyalty_tier] || TIER_VI_MAP.bronze,
-      balance,
-      cashback_balance: balance,
-      cashback_balance_vnd: balance,
-      lifetime_cashback: lifetimeRow?.total || 0,
-      expiring_amount: expiringRow?.total || 0,
-      expiring_within_7d: expiringRow?.cnt || 0,
-      tier_progress: tierProgress,
-      member_since: customer.created_at
-    }
+    data: memberPayload,
+    member: memberPayload,
   });
 }

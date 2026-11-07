@@ -2,19 +2,24 @@ import type { Hono } from 'hono';
 import type { Env } from '../../types/env';
 import { requireAuth } from '../../middleware/auth';
 import { createLogger } from '../../middleware/logger';
-import { getTenantId } from '../../middleware/tenant';
 import { getTopProducts } from '../../tree/analytics/top-products';
 import { getPeakHours } from '../../tree/analytics/peak-hours';
 import { getCustomerMetrics } from '../../tree/analytics/customer-metrics';
 import { getZoneStats } from '../../tree/analytics/zone-analytics';
-import { buildTenantFilter } from '../../tree/analytics/summary';
+import { buildTenantFilter, resolveAnalyticsTenant } from '../../tree/analytics/summary';
 import { topProductsSchema, peakHoursSchema, zoneSchema, buildCacheKey, getCached, setCache } from './helpers';
+
+export { resolveAnalyticsTenant };
 
 const log = createLogger({ route: 'analytics-metrics' });
 
 export function registerMetricsHandlers(router: Hono<{ Bindings: Env }>): void {
   // GET /api/analytics/top-products
   router.get('/top-products', async (c) => {
+    const { tenantId, forbidden } = resolveAnalyticsTenant(c);
+    if (forbidden) {
+      return c.json({ success: false, error: 'Cross-tenant analytics access denied' }, 403);
+    }
     const parsed = topProductsSchema.safeParse(c.req.query());
     if (!parsed.success) {
       return c.json(
@@ -28,7 +33,6 @@ export function registerMetricsHandlers(router: Hono<{ Bindings: Env }>): void {
 
     const { limit } = parsed.data;
     const kv = c.env.AUTH_KV;
-    const tenantId = getTenantId(c);
     const cacheKey = buildCacheKey('top-products', { tenant: tenantId, limit: String(limit) });
 
     // Try cache first
@@ -57,6 +61,10 @@ export function registerMetricsHandlers(router: Hono<{ Bindings: Env }>): void {
 
   // GET /api/analytics/peak-hours
   router.get('/peak-hours', async (c) => {
+    const { tenantId, forbidden } = resolveAnalyticsTenant(c);
+    if (forbidden) {
+      return c.json({ success: false, error: 'Cross-tenant analytics access denied' }, 403);
+    }
     const parsed = peakHoursSchema.safeParse(c.req.query());
     if (!parsed.success) {
       return c.json(
@@ -70,7 +78,6 @@ export function registerMetricsHandlers(router: Hono<{ Bindings: Env }>): void {
 
     const { days } = parsed.data;
     const kv = c.env.AUTH_KV;
-    const tenantId = getTenantId(c);
     const cacheKey = buildCacheKey('peak-hours', { tenant: tenantId, days: String(days) });
 
     // Try cache first
@@ -99,13 +106,20 @@ export function registerMetricsHandlers(router: Hono<{ Bindings: Env }>): void {
 
   // GET /api/analytics/customer-metrics
   router.get('/customer-metrics', async (c) => {
-    const tenantId = getTenantId(c);
+    const { tenantId, forbidden } = resolveAnalyticsTenant(c);
+    if (forbidden) {
+      return c.json({ success: false, error: 'Cross-tenant analytics access denied' }, 403);
+    }
     const data = await getCustomerMetrics(c.env.AURA_DB, tenantId);
     return c.json({ success: true, data });
   });
 
   // GET /api/analytics/zones?days=30 — orders grouped by physical zone (Indoor/Outdoor/VIP/etc.)
   router.get('/zones', async (c) => {
+    const { tenantId, forbidden } = resolveAnalyticsTenant(c);
+    if (forbidden) {
+      return c.json({ success: false, error: 'Cross-tenant analytics access denied' }, 403);
+    }
     const parsed = zoneSchema.safeParse(c.req.query());
     if (!parsed.success) {
       return c.json(
@@ -115,7 +129,6 @@ export function registerMetricsHandlers(router: Hono<{ Bindings: Env }>): void {
     }
     const { days } = parsed.data;
     const kv = c.env.AUTH_KV;
-    const tenantId = getTenantId(c);
     const cacheKey = buildCacheKey('zones', { tenant: tenantId, days: String(days) });
     if (kv) {
       const cached = await getCached<unknown[]>(kv, cacheKey);
@@ -135,36 +148,62 @@ export function registerMetricsHandlers(router: Hono<{ Bindings: Env }>): void {
 
   // GET /api/analytics/payout - owner only: COD + PayOS net payout summary
   router.get('/payout', requireAuth(['owner']), async (c) => {
+    const { tenantId, forbidden } = resolveAnalyticsTenant(c);
+    if (forbidden) {
+      return c.json({ success: false, error: 'Cross-tenant analytics access denied' }, 403);
+    }
     const db = c.env.AURA_DB;
-    const tenantId = getTenantId(c);
     const { clause: tenantWhere, binds: tenantBinds } = buildTenantFilter(tenantId, undefined, 'WHERE');
     const runFirst = <T>(sql: string) => {
       const stmt = db.prepare(sql);
       return tenantBinds.length > 0 ? stmt.bind(...tenantBinds).first<T>() : stmt.first<T>();
     };
     try {
-      let row: { cod_total: number; payos_total: number; refunded_total: number; total_orders: number } | null = null;
+      let row: { cod_total: number; payos_total: number; refunded_total: number; net_total?: number; total_orders: number } | null = null;
       try {
-        row = await runFirst<{ cod_total: number; payos_total: number; refunded_total: number; total_orders: number }>(`SELECT
-          COALESCE(SUM(CASE WHEN is_cod = 1 AND payment_status = 'paid' AND status = 'completed' THEN total ELSE 0 END), 0) AS cod_total,
-          COALESCE(SUM(CASE WHEN payment_method = 'payos' AND payment_status = 'paid' AND status = 'paid' THEN total ELSE 0 END), 0) AS payos_total,
-          COALESCE(SUM(CASE WHEN status = 'refunded' THEN total ELSE 0 END), 0) AS refunded_total,
-          COUNT(*) AS total_orders
+        row = await runFirst<{ cod_total: number; payos_total: number; refunded_total: number; net_total?: number; total_orders: number }>(`SELECT
+          COALESCE(SUM(CASE WHEN (is_cod = 1 OR LOWER(COALESCE(payment_method, '')) IN ('cash', 'cod')) AND payment_status = 'paid' AND status = 'completed' THEN total ELSE 0 END), 0) AS cod_total,
+          COALESCE(SUM(CASE WHEN payment_method = 'payos' AND payment_status = 'paid' AND status IN ('paid', 'Confirmed', 'preparing', 'ready', 'completed') THEN total ELSE 0 END), 0) AS payos_total,
+          COALESCE(SUM(CASE WHEN status = 'refunded' OR COALESCE(payment_status, '') = 'refunded' THEN total ELSE 0 END), 0) AS refunded_total,
+          (
+            COALESCE(SUM(CASE WHEN (is_cod = 1 OR LOWER(COALESCE(payment_method, '')) IN ('cash', 'cod')) AND payment_status = 'paid' AND status = 'completed' THEN total ELSE 0 END), 0) +
+            COALESCE(SUM(CASE WHEN payment_method = 'payos' AND payment_status = 'paid' AND status IN ('paid', 'Confirmed', 'preparing', 'ready', 'completed') THEN total ELSE 0 END), 0)
+          ) AS net_total,
+          COALESCE(SUM(CASE WHEN LOWER(COALESCE(status, '')) NOT IN ('cancelled', 'canceled', 'refunded', 'failed', 'rejected', 'expired') AND LOWER(COALESCE(payment_status, '')) NOT IN ('refunded', 'failed') THEN 1 ELSE 0 END), 0) AS total_orders
           FROM orders${tenantWhere}`);
       } catch (queryErr) {
         if (String((queryErr as Error)?.message || '').includes('column')) {
-          row = await runFirst<{ cod_total: number; payos_total: number; refunded_total: number; total_orders: number }>(`SELECT
-            COALESCE(SUM(CASE WHEN payment_method IN ('cash', 'cod') AND payment_status = 'paid' AND status = 'completed' THEN total ELSE 0 END), 0) AS cod_total,
-            COALESCE(SUM(CASE WHEN payment_method = 'payos' AND payment_status = 'paid' AND status IN ('paid', 'completed') THEN total ELSE 0 END), 0) AS payos_total,
-            COALESCE(SUM(CASE WHEN status = 'refunded' OR payment_status = 'refunded' THEN total ELSE 0 END), 0) AS refunded_total,
-            COUNT(*) AS total_orders
-            FROM orders${tenantWhere}`);
+          try {
+            row = await runFirst<{ cod_total: number; payos_total: number; refunded_total: number; net_total?: number; total_orders: number }>(`SELECT
+              COALESCE(SUM(CASE WHEN LOWER(COALESCE(payment_method, '')) IN ('cash', 'cod') AND payment_status = 'paid' AND status = 'completed' THEN total ELSE 0 END), 0) AS cod_total,
+              COALESCE(SUM(CASE WHEN payment_method = 'payos' AND payment_status = 'paid' AND status IN ('paid', 'Confirmed', 'preparing', 'ready', 'completed') THEN total ELSE 0 END), 0) AS payos_total,
+              COALESCE(SUM(CASE WHEN status = 'refunded' OR COALESCE(payment_status, '') = 'refunded' THEN total ELSE 0 END), 0) AS refunded_total,
+              (
+                COALESCE(SUM(CASE WHEN LOWER(COALESCE(payment_method, '')) IN ('cash', 'cod') AND payment_status = 'paid' AND status = 'completed' THEN total ELSE 0 END), 0) +
+                COALESCE(SUM(CASE WHEN payment_method = 'payos' AND payment_status = 'paid' AND status IN ('paid', 'Confirmed', 'preparing', 'ready', 'completed') THEN total ELSE 0 END), 0)
+              ) AS net_total,
+              COALESCE(SUM(CASE WHEN LOWER(COALESCE(status, '')) NOT IN ('cancelled', 'canceled', 'refunded', 'failed', 'rejected', 'expired') AND LOWER(COALESCE(payment_status, '')) NOT IN ('refunded', 'failed') THEN 1 ELSE 0 END), 0) AS total_orders
+              FROM orders${tenantWhere}`);
+          } catch {
+            row = await runFirst<{ cod_total: number; payos_total: number; refunded_total: number; net_total?: number; total_orders: number }>(`SELECT
+              COALESCE(SUM(CASE WHEN LOWER(COALESCE(payment_method, '')) IN ('cash', 'cod') AND status = 'completed' THEN total ELSE 0 END), 0) AS cod_total,
+              COALESCE(SUM(CASE WHEN payment_method = 'payos' AND status IN ('paid', 'Confirmed', 'preparing', 'ready', 'completed') THEN total ELSE 0 END), 0) AS payos_total,
+              COALESCE(SUM(CASE WHEN status = 'refunded' THEN total ELSE 0 END), 0) AS refunded_total,
+              (
+                COALESCE(SUM(CASE WHEN LOWER(COALESCE(payment_method, '')) IN ('cash', 'cod') AND status = 'completed' THEN total ELSE 0 END), 0) +
+                COALESCE(SUM(CASE WHEN payment_method = 'payos' AND status IN ('paid', 'Confirmed', 'preparing', 'ready', 'completed') THEN total ELSE 0 END), 0)
+              ) AS net_total,
+              COALESCE(SUM(CASE WHEN LOWER(COALESCE(status, '')) NOT IN ('cancelled', 'canceled', 'refunded', 'failed', 'rejected', 'expired') THEN 1 ELSE 0 END), 0) AS total_orders
+              FROM orders${tenantWhere}`);
+          }
         } else {
           throw queryErr;
         }
       }
 
-      const net = (row?.cod_total || 0) + (row?.payos_total || 0) - (row?.refunded_total || 0);
+      const net = typeof row?.net_total === 'number'
+        ? row.net_total
+        : (row?.cod_total || 0) + (row?.payos_total || 0) - (row?.refunded_total || 0);
       return c.json({
         success: true,
         data: {

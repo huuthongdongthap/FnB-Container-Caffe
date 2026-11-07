@@ -3,7 +3,7 @@ import { Hono } from 'hono';
 import { optionalAuth } from 'worker/src/middleware/auth';
 import { createLogger } from 'worker/src/middleware/logger';
 import { payOSCreateLinkSchema } from 'worker/src/lib/validators';
-import { canAccessPaymentOrder } from '../policies/payment-access';
+import { canAccessPaymentOrder, resolvePaymentCustomerOwnerIds, resolvePaymentTenantScope } from '../policies/payment-access';
 import { getOrCreatePayOSAttempt } from './payos-attempt';
 import { PAYOS_ERROR_MESSAGES as errMsg } from './payos-helpers';
 import type { Env } from 'worker/src/types/env';
@@ -16,22 +16,110 @@ export const handleCreateLink = async (c: any, input?: unknown, openApi = false)
   const db = (c.env.AURA_DB ?? c.env.DB) as import('@cloudflare/workers-types').D1Database;
   const locale = c.req.query('locale') === 'en' ? 'en' : 'vi';
   try {
+    const scope = resolvePaymentTenantScope(c, true);
+    if (!scope) return c.json({ success: false, error: errMsg.forbidden[locale] }, 403);
     const parsed = payOSCreateLinkSchema.safeParse(input ?? await c.req.json());
     if (!parsed.success) return c.json({ success: false, error: parsed.error.issues[0].message }, 400);
     const { order_id, description, customer_name } = parsed.data;
-    type Order = { id: string; total: number; status: string; payment_status: string;
-      payment_method: string; customer_id: string | null; tenant_id?: string | null };
-    let order: Order | null;
+    type Order = {
+      id: string;
+      total: number;
+      status: string;
+      payment_status: string;
+      payment_method: string;
+      customer_id: string | null;
+      tenant_id?: string | null;
+      order_token?: string | null;
+    };
+    let order: Order | null = null;
     try {
-      order = await db.prepare('SELECT id, total, status, payment_status, payment_method, customer_id, tenant_id FROM orders WHERE id = ?')
-        .bind(order_id).first<Order>();
+      order = await db
+        .prepare(
+          'SELECT id, COALESCE(total, total_amount) AS total, status, payment_status, payment_method, customer_id, tenant_id, order_token FROM orders WHERE id = ?'
+        )
+        .bind(order_id)
+        .first<Order>();
     } catch {
-      order = await db.prepare('SELECT id, total_amount AS total, status, payment_status, payment_method, customer_id, tenant_id FROM orders WHERE id = ?')
-        .bind(order_id).first<Order>();
+      try {
+        order = await db
+          .prepare('SELECT id, total, status, payment_status, payment_method, customer_id, tenant_id, order_token FROM orders WHERE id = ?')
+          .bind(order_id)
+          .first<Order>();
+      } catch {
+        try {
+          order = await db
+            .prepare('SELECT id, total_amount AS total, status, payment_status, payment_method, customer_id, tenant_id, order_token FROM orders WHERE id = ?')
+            .bind(order_id)
+            .first<Order>();
+        } catch {
+          try {
+            order = await db
+              .prepare('SELECT id, COALESCE(total, total_amount) AS total, status, payment_status, payment_method, customer_id, tenant_id FROM orders WHERE id = ?')
+              .bind(order_id)
+              .first<Order>();
+          } catch {
+            try {
+              order = await db
+                .prepare('SELECT id, total, status, payment_status, payment_method, customer_id, tenant_id FROM orders WHERE id = ?')
+                .bind(order_id)
+                .first<Order>();
+            } catch {
+              try {
+                order = await db
+                  .prepare('SELECT id, total_amount AS total, status, payment_status, payment_method, customer_id, tenant_id FROM orders WHERE id = ?')
+                  .bind(order_id)
+                  .first<Order>();
+              } catch {
+                if (scope.tenantId === 'default' || scope.wildcard) {
+                  try {
+                    order = await db
+                      .prepare(
+                        'SELECT id, COALESCE(total, total_amount) AS total, status, payment_status, payment_method, customer_id, order_token FROM orders WHERE id = ?'
+                      )
+                      .bind(order_id)
+                      .first<Order>();
+                  } catch {
+                    try {
+                      order = await db
+                        .prepare('SELECT id, total, status, payment_status, payment_method, customer_id FROM orders WHERE id = ?')
+                        .bind(order_id)
+                        .first<Order>();
+                    } catch {
+                      order = await db
+                        .prepare('SELECT id, total_amount AS total, status, payment_status, payment_method, customer_id FROM orders WHERE id = ?')
+                        .bind(order_id)
+                        .first<Order>();
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
     }
     if (!order) return c.json({ success: false, error: errMsg.order_not_found[locale] }, 404);
-    if (!canAccessPaymentOrder(c, order, true)) return c.json({ success: false, error: errMsg.forbidden[locale] }, 403);
-    if (['cancelled', 'failed', 'expired'].includes(order.status)) {
+    const orderTenant =
+      (order.tenant_id &&
+      String(order.tenant_id).trim() &&
+      String(order.tenant_id).trim() !== '*' &&
+      String(order.tenant_id).trim().toLowerCase() !== 'hq')
+        ? String(order.tenant_id).trim()
+        : (scope.wildcard ? 'default' : scope.tenantId);
+    let effectiveOrderForAccess: Order = order;
+    const user = c?.get?.('user') as Record<string, any> | undefined;
+    if (user && String(user.role || '').trim().toLowerCase() === 'customer' && order.customer_id) {
+      const ownerIds = await resolvePaymentCustomerOwnerIds(db, user, orderTenant);
+      try { c.set?.('customerOwnerIds', ownerIds); } catch { /* optional on mock context */ }
+      const ordCustId = String(order.customer_id).trim();
+      if (ownerIds.includes(ordCustId)) {
+        const canonicalActorId = String(user.id ?? user.sub ?? ordCustId).trim() || ordCustId;
+        effectiveOrderForAccess = { ...order, customer_id: canonicalActorId };
+      }
+    }
+    if (!canAccessPaymentOrder(c, effectiveOrderForAccess, true)) return c.json({ success: false, error: errMsg.forbidden[locale] }, 403);
+    const normalizedOrderStatus = String(order.status || '').trim().toLowerCase();
+    if (['cancelled', 'canceled', 'rejected', 'refunded', 'failed', 'expired'].includes(normalizedOrderStatus)) {
       return c.json({ success: false, error: `Cannot pay for ${order.status} order` }, 409);
     }
     if (order.payment_status === 'paid' || order.payment_status === 'refunded') {
@@ -56,6 +144,7 @@ export const handleCreateLink = async (c: any, input?: unknown, openApi = false)
       description: (description || `Order #${order_id}`).slice(0, 25), buyerName: customer_name || 'Khách hàng',
       returnUrl: `${baseUrl}/order-success?order_id=${encodeURIComponent(order_id)}`,
       cancelUrl: `${baseUrl}/checkout?cancelled=true&order_id=${encodeURIComponent(order_id)}`,
+      tenantId: orderTenant,
     });
     if (result.ok === false) {
       if (result.status === 202) c.header('Retry-After', '2');

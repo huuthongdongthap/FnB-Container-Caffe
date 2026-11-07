@@ -12,7 +12,7 @@ import { phoneAuthSchema } from '../../lib/validators';
 import { resolvePilotStore, PilotStoreError } from '../../lib/pilot-store';
 import { StaffSessionError, isStaffIdentity, staffTenant, validateStaffSession, type StaffSession } from '../../lib/staff-session';
 import type { Env } from '../../types/env';
-import { resetOtpClaim, throttle } from './helpers';
+import { persistOtpChallenge, resetOtpClaim, throttle } from './helpers';
 
 const log = createLogger({ route: 'loyalty-otp' });
 const OTP_TTL_SECONDS = 300;
@@ -100,7 +100,7 @@ export async function handlePhoneOtpRequest(c: Context<{ Bindings: Env }>) {
       }
     }
 
-    const phoneRateKey = `rl:otp:phone:${phone}`;
+    const phoneRateKey = `rl:otp:phone:${tenantId}:${phone}`;
     const phoneAttempts = Number((await c.env.AUTH_KV.get(phoneRateKey)) || 0);
     if (phoneAttempts >= 3) {
       return c.json({ success: false, error: 'Số điện thoại này đã yêu cầu quá nhiều mã OTP. Vui lòng đợi 5 phút.' }, 429);
@@ -123,7 +123,13 @@ export async function handlePhoneOtpRequest(c: Context<{ Bindings: Env }>) {
       }
     }
 
-    if (!customer) {
+    const forceNewSignupOtp =
+      body.forceOtp === true ||
+      body.force_otp === true ||
+      body.purpose === 'signup_verify' ||
+      isStaffCaller;
+
+    if (!customer && !forceNewSignupOtp) {
       return c.json({
         success: true,
         requiresOtp: false,
@@ -131,7 +137,7 @@ export async function handlePhoneOtpRequest(c: Context<{ Bindings: Env }>) {
       });
     }
 
-    if ('tenant_id' in customer && customer.tenant_id !== undefined) {
+    if (customer && 'tenant_id' in customer && customer.tenant_id !== undefined) {
       const custTenant = (customer.tenant_id && String(customer.tenant_id).trim()) || 'default';
       if (custTenant !== tenantId) {
         return c.json({ success: false, error: 'Tài khoản thuộc cửa hàng khác' }, 403);
@@ -139,14 +145,26 @@ export async function handlePhoneOtpRequest(c: Context<{ Bindings: Env }>) {
     }
 
     const otp = generateSixDigitOtp();
-    const otpKey = `phone_otp:${phone}`;
+    const otpKey = `phone_otp:${tenantId}:${phone}`;
+    const legacyOtpKey = `phone_otp:${phone}`;
     resetOtpClaim(c.env.AUTH_KV, otpKey);
-    await c.env.AUTH_KV.put(otpKey, otp, { expirationTtl: OTP_TTL_SECONDS });
-    await c.env.AUTH_KV.put(phoneRateKey, String(phoneAttempts + 1), { expirationTtl: OTP_TTL_SECONDS });
+    if (tenantId === 'default') {
+      resetOtpClaim(c.env.AUTH_KV, legacyOtpKey);
+    }
+    try {
+      await c.env.AUTH_KV.put(otpKey, otp, { expirationTtl: OTP_TTL_SECONDS });
+      if (tenantId === 'default') {
+        await c.env.AUTH_KV.put(legacyOtpKey, otp, { expirationTtl: OTP_TTL_SECONDS });
+      }
+      await persistOtpChallenge(c.env.AURA_DB, otpKey, tenantId, phone, otp, OTP_TTL_SECONDS);
+      await c.env.AUTH_KV.put(phoneRateKey, String(phoneAttempts + 1), { expirationTtl: OTP_TTL_SECONDS });
+    } catch {
+      return c.json({ success: false, code: 'AUTH_STATE_UNAVAILABLE', error: 'Dịch vụ OTP tạm thời gián đoạn' }, 503);
+    }
 
     if (c.env.TELEGRAM_BOT_TOKEN && c.env.TELEGRAM_CHAT_ID) {
       const tgUrl = `https://api.telegram.org/bot${c.env.TELEGRAM_BOT_TOKEN}/sendMessage`;
-      const text = `🔐 [AURA OTP] Khách hàng: ${customer.name || 'Thành viên'} (${phone})\nMã xác thực: ${otp} (hiệu lực 5 phút)`;
+      const text = `🔐 [AURA OTP] Khách hàng: ${customer?.name || 'Thành viên mới'} (${phone})\nMã xác thực: ${otp} (hiệu lực 5 phút)`;
       safeWaitUntil(
         c,
         fetch(tgUrl, {

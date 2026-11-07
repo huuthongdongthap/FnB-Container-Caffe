@@ -74,8 +74,8 @@ export async function claimReconcileJob(
     `UPDATE payment_reconciliation_jobs
      SET lease_owner = ?, lease_until = ?, attempts = attempts + 1, updated_at = ?
      WHERE payment_id = ?
-       AND (lease_until IS NULL OR lease_until < ?)
-       AND (? = 1 OR next_attempt_at <= ?)`
+       AND (lease_until IS NULL OR CAST(lease_until AS INTEGER) < CAST(? AS INTEGER))
+       AND (? = 1 OR CAST(next_attempt_at AS INTEGER) <= CAST(? AS INTEGER))`
   ).bind(leaseOwner, leaseUntilStr, nowStr, paymentId, nowStr, ignoreCooldown ? 1 : 0, nowStr).run();
 
   return (res.meta?.changes ?? 0) > 0;
