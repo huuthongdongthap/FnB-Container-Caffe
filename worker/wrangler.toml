@@ -27,6 +27,8 @@ JWT_EXPIRY_SECONDS = "604800"
 # override the flag and freeze /api/version at a stale SHA.
 # SLA threshold (minutes). Orders stuck in kitchen past this get flagged.
 SLA_THRESHOLD_MINUTES = "15"
+# Enable POS cash drawer denomination counting & end-of-shift variance reconciliation in production
+CASH_RECONCILIATION_ENABLED = "true"
 
 # Durable Object — OrderBroadcaster for realtime order fan-out
 [[durable_objects.bindings]]

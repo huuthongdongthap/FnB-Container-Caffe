@@ -124,14 +124,37 @@ export function useZoneStats(days = 30) {
   });
 }
 
+const ICT_OFFSET_MS = 7 * 3600_000;
+
+export function toStoreDateString(nowMs = Date.now()): string {
+  return new Date(nowMs + ICT_OFFSET_MS).toISOString().slice(0, 10);
+}
+
+export function resolveDailyRevenueRange(from?: string, to?: string): { start: string; end: string } {
+  const nowMs = Date.now();
+  const shorthandMatch = from && !to ? /^(\d+)d$/i.exec(from.trim()) : null;
+  if (shorthandMatch) {
+    const days = Math.max(1, Number(shorthandMatch[1]));
+    return {
+      start: toStoreDateString(nowMs - (days - 1) * 86400_000),
+      end: toStoreDateString(nowMs),
+    };
+  }
+  const end = to && /^\d{4}-\d{2}-\d{2}$/.test(to) ? to : toStoreDateString(nowMs);
+  const start =
+    from && /^\d{4}-\d{2}-\d{2}$/.test(from)
+      ? from
+      : toStoreDateString(nowMs - 30 * 86400_000);
+  return { start, end };
+}
+
 /**
  * Daily revenue report for date range
  * GET /api/reports/daily?from=YYYY-MM-DD&to=YYYY-MM-DD
  */
 export function useDailyRevenue(from?: string, to?: string) {
   const session = useClientSessionScope();
-  const end = to || new Date().toISOString().slice(0, 10);
-  const start = from || new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10);
+  const { start, end } = resolveDailyRevenueRange(from, to);
 
   return useQuery<DailyRevenueRow[]>({
     queryKey: ['reports', 'daily', session.tenantId, session.userScope, start, end],

@@ -19,15 +19,15 @@ on:
         type: string
         default: ''
       baseline_version_id:
-        description: 'Baseline Worker Version ID for 90% canary or fallback rollback target'
+        description: 'Baseline Worker Version ID for 90% canary (leave blank to auto-detect active production version)'
         required: false
         type: string
-        default: '33d9e23b-711c-4278-82d1-b8013fedc41a'
+        default: ''
       rollback_reason:
         description: 'Rollback message/reason (used when action is worker-rollback)'
         required: false
         type: string
-        default: 'Rollback to baseline version 33d9e23b-711c-4278-82d1-b8013fedc41a'
+        default: 'Emergency production rollback via GitHub Actions'
 
 env:
   BASELINE_VERSION_ID: ${{ inputs.baseline_version_id }}
@@ -118,8 +118,22 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: b69fee03bdd94234eea8e4114cfc36ab
         run: |
           set -e
-          if ! printf '%s' "$BASELINE_VERSION_ID" | grep -Eq '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$'; then
-            echo "Error: invalid baseline_version_id UUID format"
+          RESOLVED_BASELINE="$BASELINE_VERSION_ID"
+          if [ -z "$RESOLVED_BASELINE" ]; then
+            echo "Auto-detecting active production Worker baseline version..."
+            DEPLOYMENTS_JSON=$(npx --no-install wrangler deployments list --json 2>/dev/null || true)
+            RESOLVED_BASELINE=$(printf '%s' "$DEPLOYMENTS_JSON" | node -e "
+              const fs = require('fs');
+              try {
+                const list = JSON.parse(fs.readFileSync(0, 'utf8'));
+                const latest = Array.isArray(list) ? list[list.length - 1] : null;
+                const ver = latest && Array.isArray(latest.versions) ? latest.versions[0]?.version_id : '';
+                if (ver) process.stdout.write(String(ver));
+              } catch {}
+            ")
+          fi
+          if ! printf '%s' "$RESOLVED_BASELINE" | grep -Eq '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$'; then
+            echo "Error: could not determine valid active baseline_version_id UUID. Pass baseline_version_id explicitly."
             exit 1
           fi
           echo "Uploading candidate version for SHA ${{ github.sha }}..."
@@ -131,9 +145,9 @@ jobs:
             exit 1
           fi
           echo "Candidate Version ID: $VERSION_ID"
-          echo "Baseline Version ID: $BASELINE_VERSION_ID"
-          echo "Deploying traffic split: 10% -> $VERSION_ID, 90% -> $BASELINE_VERSION_ID"
-          npx --no-install wrangler versions deploy "$VERSION_ID@10" "$BASELINE_VERSION_ID@90" --yes
+          echo "Baseline Version ID: $RESOLVED_BASELINE"
+          echo "Deploying traffic split: 10% -> $VERSION_ID, 90% -> $RESOLVED_BASELINE"
+          npx --no-install wrangler versions deploy "$VERSION_ID@10" "$RESOLVED_BASELINE@90" --yes
 
   worker-promote:
     name: Worker Promote to 100%
@@ -208,9 +222,14 @@ jobs:
         run: |
           set -e
           TARGET_VERSION="${WORKER_VERSION_ID:-$BASELINE_VERSION_ID}"
-          if ! printf '%s' "$TARGET_VERSION" | grep -Eq '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$'; then
-            echo "Error: invalid rollback target version UUID format"
-            exit 1
+          if [ -n "$TARGET_VERSION" ]; then
+            if ! printf '%s' "$TARGET_VERSION" | grep -Eq '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$'; then
+              echo "Error: invalid rollback target version UUID format"
+              exit 1
+            fi
+            echo "Rolling back Worker to explicit version $TARGET_VERSION..."
+            npx --no-install wrangler rollback "$TARGET_VERSION" --message "$ROLLBACK_REASON_INPUT" --yes
+          else
+            echo "Rolling back Worker to immediately preceding active deployment..."
+            npx --no-install wrangler rollback --message "$ROLLBACK_REASON_INPUT" --yes
           fi
-          echo "Rolling back Worker to version $TARGET_VERSION..."
-          npx --no-install wrangler rollback "$TARGET_VERSION" --message "$ROLLBACK_REASON_INPUT" --yes

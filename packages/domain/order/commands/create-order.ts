@@ -198,13 +198,49 @@ export async function createOrder(
       snapshot.total = Math.max(0, snapshot.subtotal - snapshot.discount) + (snapshot.service_fee ?? 0) + snapshot.shipping_fee + snapshot.tip_amount;
       appliedPromo = { id: promo.id ?? promo.code, code: promo.code, discountAmount: snapshot.discount, reservedInPlace };
     }
+
+    // Redeem customer loyalty points atomically (1 point = 100 VND => 100 points = 10,000 VND)
+    const rawRequestedPoints = Math.max(0, Math.floor(Number(data.redeem_points ?? data.loyalty_points_redeemed ?? 0)));
+    let redeemedPoints = 0;
+    if (rawRequestedPoints > 0) {
+      if (!resolvedCustomerId) {
+        return errorResponse('Cần xác định tài khoản khách hàng thành viên để đổi điểm thưởng', 400);
+      }
+      const remainingPayable = Math.max(0, snapshot.subtotal - snapshot.discount);
+      const maxRedeemablePoints = Math.floor(remainingPayable / 100);
+      redeemedPoints = Math.min(rawRequestedPoints, maxRedeemablePoints);
+      if (redeemedPoints > 0) {
+        const loyaltyTenant = tenantId === '*' ? 'default' : (tenantId || 'default');
+        let deductRes: { meta?: { changes?: number } } | null = null;
+        try {
+          deductRes = await db.prepare(
+            "UPDATE customers SET loyalty_points = loyalty_points - ? WHERE id = ? AND COALESCE(loyalty_points, 0) >= ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
+          ).bind(redeemedPoints, resolvedCustomerId, redeemedPoints, loyaltyTenant).run();
+        } catch {
+          if (loyaltyTenant === 'default') {
+            deductRes = await db.prepare(
+              'UPDATE customers SET loyalty_points = loyalty_points - ? WHERE id = ? AND COALESCE(loyalty_points, 0) >= ?'
+            ).bind(redeemedPoints, resolvedCustomerId, redeemedPoints).run();
+          }
+        }
+        if ((deductRes?.meta?.changes ?? 0) < 1) {
+          return errorResponse('Số điểm thưởng hiện tại không đủ để quy đổi cho đơn hàng này', 400);
+        }
+        const pointsDiscountVnd = redeemedPoints * 100;
+        snapshot.discount = Math.min(snapshot.subtotal, snapshot.discount + pointsDiscountVnd);
+        snapshot.total = Math.max(0, snapshot.subtotal - snapshot.discount) + (snapshot.service_fee ?? 0) + snapshot.shipping_fee + snapshot.tip_amount;
+      }
+    }
+
     const responseBody = {
       success: true, data: {
         id: orderId, status: 'pending', payment_status: 'unpaid', items: snapshot.items, total: snapshot.total,
         customer: { full_name: data.customer_name, phone: data.customer_phone, address: data.customer_address || null },
         customer_name: data.customer_name, customer_phone: data.customer_phone,
         customer_address: data.customer_address || null, payment_method: validatedMethod,
-        shipping_fee: snapshot.shipping_fee, discount: snapshot.discount, notes: data.notes || null,
+        shipping_fee: snapshot.shipping_fee, discount: snapshot.discount,
+        ...(redeemedPoints > 0 ? { loyalty_points_redeemed: redeemedPoints } : {}),
+        notes: data.notes || null,
         delivery_time: data.delivery_time || 'now', table_id: resolvedTableId, order_type: orderType, created_at: now,
       },
       message: 'Order created successfully',
@@ -218,20 +254,51 @@ export async function createOrder(
       statements.push(db.prepare(idemSql).bind(...idemArgs));
       legacyStatements.push(db.prepare(idemSql).bind(...idemArgs));
     }
-    const orderInsertSql = `INSERT INTO orders (
+    const orderInsertSql = redeemedPoints > 0
+      ? `INSERT INTO orders (
+      id, items, total, status, customer_name, customer_phone,
+      customer_email, customer_address, payment_method, payment_status,
+      shipping_fee, discount, loyalty_points_redeemed, notes, delivery_time, table_id,
+      order_type, tip_amount, service_fee, customer_id, tenant_id, created_at, updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      : `INSERT INTO orders (
       id, items, total, status, customer_name, customer_phone,
       customer_email, customer_address, payment_method, payment_status,
       shipping_fee, discount, notes, delivery_time, table_id,
       order_type, tip_amount, service_fee, customer_id, tenant_id, created_at, updated_at
     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
-    const orderInsertArgs = [
+    const legacyOrderInsertSql = `INSERT INTO orders (
+      id, items, total, status, customer_name, customer_phone,
+      customer_email, customer_address, payment_method, payment_status,
+      shipping_fee, discount, notes, delivery_time, table_id,
+      order_type, tip_amount, service_fee, customer_id, tenant_id, created_at, updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+    const legacyOrderInsertArgs = [
       orderId, snapshot.itemsJson, snapshot.total, 'pending', data.customer_name, data.customer_phone,
       data.customer_email || null, data.customer_address || null, validatedMethod, 'unpaid',
       snapshot.shipping_fee, snapshot.discount, data.notes || null, data.delivery_time || 'now', resolvedTableId,
       orderType, snapshot.tip_amount, snapshot.service_fee, resolvedCustomerId, tenantId, now, now,
     ] as const;
+    const orderInsertArgs = redeemedPoints > 0
+      ? [
+          orderId, snapshot.itemsJson, snapshot.total, 'pending', data.customer_name, data.customer_phone,
+          data.customer_email || null, data.customer_address || null, validatedMethod, 'unpaid',
+          snapshot.shipping_fee, snapshot.discount, redeemedPoints, data.notes || null, data.delivery_time || 'now', resolvedTableId,
+          orderType, snapshot.tip_amount, snapshot.service_fee, resolvedCustomerId, tenantId, now, now,
+        ]
+      : legacyOrderInsertArgs;
     statements.push(db.prepare(orderInsertSql).bind(...orderInsertArgs));
-    legacyStatements.push(db.prepare(orderInsertSql).bind(...orderInsertArgs));
+    legacyStatements.push(db.prepare(legacyOrderInsertSql).bind(...legacyOrderInsertArgs));
+    if (redeemedPoints > 0 && resolvedCustomerId) {
+      const loyaltyTxId = generateId('LTX_');
+      const loyaltyTenant = tenantId === '*' ? 'default' : (tenantId || 'default');
+      statements.push(
+        db.prepare(
+          `INSERT INTO loyalty_transactions (id, customer_id, order_id, points, type, description, tenant_id, created_at)
+           VALUES (?, ?, ?, ?, 'redeem', ?, ?, ?)`
+        ).bind(loyaltyTxId, resolvedCustomerId, orderId, -redeemedPoints, `Đổi ${redeemedPoints} điểm giảm ${(redeemedPoints * 100).toLocaleString('vi-VN')}đ cho đơn ${orderId}`, loyaltyTenant, now)
+      );
+    }
     for (const item of snapshot.items) {
       const itemId = generateId('ITEM_');
       const modifiersJson = JSON.stringify(item.modifiers || []);
@@ -279,6 +346,17 @@ export async function createOrder(
       }
     }
     catch (error) {
+      if (redeemedPoints > 0 && resolvedCustomerId) {
+        const loyaltyTenant = tenantId === '*' ? 'default' : (tenantId || 'default');
+        await db.prepare(
+          "UPDATE customers SET loyalty_points = COALESCE(loyalty_points, 0) + ? WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
+        ).bind(redeemedPoints, resolvedCustomerId, loyaltyTenant).run().catch(async () => {
+          if (loyaltyTenant === 'default') {
+            await db.prepare('UPDATE customers SET loyalty_points = COALESCE(loyalty_points, 0) + ? WHERE id = ?')
+              .bind(redeemedPoints, resolvedCustomerId).run().catch(() => {});
+          }
+        });
+      }
       if (appliedPromo?.reservedInPlace) {
         const promoTenant = tenantId === '*' ? 'default' : (tenantId || 'default');
         await db.prepare(

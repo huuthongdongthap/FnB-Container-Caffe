@@ -5,7 +5,7 @@ import { getTenantId } from '../../middleware/tenant';
 import type { DailyReport, SummaryReport } from './types';
 
 const REPORT_ANALYTICS_ROLES = ['owner', 'manager', 'supervisor', 'admin'];
-const VALID_REVENUE_ORDER_SQL =
+export const VALID_REVENUE_ORDER_SQL =
   "COALESCE(status, '') NOT IN ('cancelled', 'refunded', 'failed', 'expired') AND COALESCE(payment_status, '') NOT IN ('refunded', 'failed') AND LOWER(COALESCE(status, '')) NOT IN ('cancelled', 'canceled', 'refunded', 'failed', 'rejected', 'expired') AND LOWER(COALESCE(payment_status, '')) NOT IN ('refunded', 'failed')";
 
 export function isStrictHQReportAdmin(role: string, userTenant: string): boolean {
@@ -151,11 +151,21 @@ export function buildCustomerJoinTenantClause(tenantId: string): { join: string;
   };
 }
 
+const ICT_OFFSET_MS = 7 * 3600_000;
+
+function defaultStoreToDate(nowMs = Date.now()): string {
+  return new Date(nowMs + ICT_OFFSET_MS).toISOString().slice(0, 10);
+}
+
+function defaultStoreFromDate(daysBack = 30, nowMs = Date.now()): string {
+  return new Date(nowMs + ICT_OFFSET_MS - daysBack * 86400_000).toISOString().slice(0, 10);
+}
+
 export function registerAnalyticsHandlers(app: Hono<{ Bindings: Env }>) {
-  // GET /api/reports/daily — daily metrics for date range
+  // GET /api/reports/daily — daily metrics for date range (Vietnam UTC+7 day boundary)
   app.get('/daily', async (c) => {
-    const from = c.req.query('from') || new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10);
-    const to = c.req.query('to') || new Date().toISOString().slice(0, 10);
+    const from = c.req.query('from') || defaultStoreFromDate(30);
+    const to = c.req.query('to') || defaultStoreToDate();
 
     if (!/^\d{4}-\d{2}-\d{2}$/.test(from) || !/^\d{4}-\d{2}-\d{2}$/.test(to)) {
       return c.json({ success: false, error: 'Invalid date format (YYYY-MM-DD required)' }, 400);
@@ -173,37 +183,37 @@ export function registerAnalyticsHandlers(app: Hono<{ Bindings: Env }>) {
     const tf = buildTenantClause(tenantId);
     const cjf = buildCustomerJoinTenantClause(tenantId);
 
-    // Signups by day
+    // Signups by day (ICT UTC+7)
     const { results: signups } = await db.prepare(
-      `SELECT DATE(created_at) as date, COUNT(*) as count
-       FROM customers WHERE DATE(created_at) BETWEEN ? AND ?${tf.and}
-       GROUP BY DATE(created_at) ORDER BY date`
+      `SELECT DATE(datetime(created_at, '+7 hours')) as date, COUNT(*) as count
+       FROM customers WHERE DATE(datetime(created_at, '+7 hours')) BETWEEN ? AND ?${tf.and}
+       GROUP BY DATE(datetime(created_at, '+7 hours')) ORDER BY date`
     ).bind(from, to, ...tf.binds).all<{ date: string; count: number }>();
 
-    // Orders by day
+    // Orders by day (ICT UTC+7)
     const { results: orders } = await db.prepare(
-      `SELECT DATE(created_at) as date, COUNT(*) as count, COALESCE(SUM(total), 0) as revenue
-       FROM orders WHERE DATE(created_at) BETWEEN ? AND ? AND ${VALID_REVENUE_ORDER_SQL}${tf.and}
-       GROUP BY DATE(created_at) ORDER BY date`
+      `SELECT DATE(datetime(created_at, '+7 hours')) as date, COUNT(*) as count, COALESCE(SUM(total), 0) as revenue
+       FROM orders WHERE DATE(datetime(created_at, '+7 hours')) BETWEEN ? AND ? AND ${VALID_REVENUE_ORDER_SQL}${tf.and}
+       GROUP BY DATE(datetime(created_at, '+7 hours')) ORDER BY date`
     ).bind(from, to, ...tf.binds).all<{ date: string; count: number; revenue: number }>();
 
-    // Cashback earned by day
+    // Cashback earned by day (ICT UTC+7)
     let cashbackEarned: { date: string; amount: number }[] = [];
     try {
       const res = await db.prepare(
-        `SELECT DATE(t.created_at) as date, COALESCE(SUM(t.reward_amount), 0) as amount
+        `SELECT DATE(datetime(t.created_at, '+7 hours')) as date, COALESCE(SUM(t.reward_amount), 0) as amount
          FROM checkins t${cjf.join}
-         WHERE DATE(t.created_at) BETWEEN ? AND ? AND t.status = 'approved'${cjf.and}
-         GROUP BY DATE(t.created_at) ORDER BY date`
+         WHERE DATE(datetime(t.created_at, '+7 hours')) BETWEEN ? AND ? AND t.status = 'approved'${cjf.and}
+         GROUP BY DATE(datetime(t.created_at, '+7 hours')) ORDER BY date`
       ).bind(from, to, ...cjf.binds).all<{ date: string; amount: number }>();
       cashbackEarned = res.results || [];
     } catch {
       try {
         const res = await db.prepare(
-          `SELECT DATE(t.created_at) as date, COALESCE(SUM(t.amount), 0) as amount
+          `SELECT DATE(datetime(t.created_at, '+7 hours')) as date, COALESCE(SUM(t.amount), 0) as amount
            FROM cashback_transactions t${cjf.join}
-           WHERE DATE(t.created_at) BETWEEN ? AND ? AND t.type = 'earn'${cjf.and}
-           GROUP BY DATE(t.created_at) ORDER BY date`
+           WHERE DATE(datetime(t.created_at, '+7 hours')) BETWEEN ? AND ? AND t.type = 'earn'${cjf.and}
+           GROUP BY DATE(datetime(t.created_at, '+7 hours')) ORDER BY date`
         ).bind(from, to, ...cjf.binds).all<{ date: string; amount: number }>();
         cashbackEarned = res.results || [];
       } catch {
@@ -225,46 +235,46 @@ export function registerAnalyticsHandlers(app: Hono<{ Bindings: Env }>) {
     const promoBinds = !tenantId || tenantId === '*' ? [] : [tenantId];
     try {
       const res = await db.prepare(
-        `SELECT DATE(COALESCE(t.redeemed_at, t.created_at)) as date, COALESCE(SUM(t.discount_amount), 0) as amount
+        `SELECT DATE(datetime(COALESCE(t.redeemed_at, t.created_at), '+7 hours')) as date, COALESCE(SUM(t.discount_amount), 0) as amount
          FROM promotion_redemptions t${promoJoin}
-         WHERE DATE(COALESCE(t.redeemed_at, t.created_at)) BETWEEN ? AND ?${promoAndWithTenantCol}
-         GROUP BY DATE(COALESCE(t.redeemed_at, t.created_at)) ORDER BY date`
+         WHERE DATE(datetime(COALESCE(t.redeemed_at, t.created_at), '+7 hours')) BETWEEN ? AND ?${promoAndWithTenantCol}
+         GROUP BY DATE(datetime(COALESCE(t.redeemed_at, t.created_at), '+7 hours')) ORDER BY date`
       ).bind(from, to, ...promoBinds).all<{ date: string; amount: number }>();
       cashbackRedeemed = res.results || [];
     } catch {
       try {
         const res = await db.prepare(
-          `SELECT DATE(t.redeemed_at) as date, COALESCE(SUM(t.discount_amount), 0) as amount
+          `SELECT DATE(datetime(t.redeemed_at, '+7 hours')) as date, COALESCE(SUM(t.discount_amount), 0) as amount
            FROM promotion_redemptions t${promoJoin}
-           WHERE DATE(t.redeemed_at) BETWEEN ? AND ?${promoAndWithTenantCol}
-           GROUP BY DATE(t.redeemed_at) ORDER BY date`
+           WHERE DATE(datetime(t.redeemed_at, '+7 hours')) BETWEEN ? AND ?${promoAndWithTenantCol}
+           GROUP BY DATE(datetime(t.redeemed_at, '+7 hours')) ORDER BY date`
         ).bind(from, to, ...promoBinds).all<{ date: string; amount: number }>();
         cashbackRedeemed = res.results || [];
       } catch {
         try {
           const res = await db.prepare(
-            `SELECT DATE(t.redeemed_at) as date, COALESCE(SUM(t.discount_amount), 0) as amount
+            `SELECT DATE(datetime(t.redeemed_at, '+7 hours')) as date, COALESCE(SUM(t.discount_amount), 0) as amount
              FROM promotion_redemptions t${promoJoin}
-             WHERE DATE(t.redeemed_at) BETWEEN ? AND ?${promoAndJoinOnly}
-             GROUP BY DATE(t.redeemed_at) ORDER BY date`
+             WHERE DATE(datetime(t.redeemed_at, '+7 hours')) BETWEEN ? AND ?${promoAndJoinOnly}
+             GROUP BY DATE(datetime(t.redeemed_at, '+7 hours')) ORDER BY date`
           ).bind(from, to, ...promoBinds).all<{ date: string; amount: number }>();
           cashbackRedeemed = res.results || [];
         } catch {
           try {
             const res = await db.prepare(
-              `SELECT DATE(t.created_at) as date, COALESCE(SUM(t.discount_amount), 0) as amount
+              `SELECT DATE(datetime(t.created_at, '+7 hours')) as date, COALESCE(SUM(t.discount_amount), 0) as amount
                FROM promotion_redemptions t${promoJoin}
-               WHERE DATE(t.created_at) BETWEEN ? AND ?${promoAndJoinOnly}
-               GROUP BY DATE(t.created_at) ORDER BY date`
+               WHERE DATE(datetime(t.created_at, '+7 hours')) BETWEEN ? AND ?${promoAndJoinOnly}
+               GROUP BY DATE(datetime(t.created_at, '+7 hours')) ORDER BY date`
             ).bind(from, to, ...promoBinds).all<{ date: string; amount: number }>();
             cashbackRedeemed = res.results || [];
           } catch {
             try {
               const res = await db.prepare(
-                `SELECT DATE(t.created_at) as date, COALESCE(SUM(ABS(t.amount)), 0) as amount
+                `SELECT DATE(datetime(t.created_at, '+7 hours')) as date, COALESCE(SUM(ABS(t.amount)), 0) as amount
                  FROM cashback_transactions t${cjf.join}
-                 WHERE DATE(t.created_at) BETWEEN ? AND ? AND t.type = 'spend'${cjf.and}
-                 GROUP BY DATE(t.created_at) ORDER BY date`
+                 WHERE DATE(datetime(t.created_at, '+7 hours')) BETWEEN ? AND ? AND t.type = 'spend'${cjf.and}
+                 GROUP BY DATE(datetime(t.created_at, '+7 hours')) ORDER BY date`
               ).bind(from, to, ...cjf.binds).all<{ date: string; amount: number }>();
               cashbackRedeemed = res.results || [];
             } catch {
@@ -379,10 +389,10 @@ export function registerAnalyticsHandlers(app: Hono<{ Bindings: Env }>) {
     return c.json({ success: true, data: summary });
   });
 
-  // GET /api/reports/orders — order metrics
+  // GET /api/reports/orders — order metrics (Vietnam UTC+7 day boundary)
   app.get('/orders', async (c) => {
-    const from = c.req.query('from') || new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10);
-    const to = c.req.query('to') || new Date().toISOString().slice(0, 10);
+    const from = c.req.query('from') || defaultStoreFromDate(30);
+    const to = c.req.query('to') || defaultStoreToDate();
     if (!/^\d{4}-\d{2}-\d{2}$/.test(from) || !/^\d{4}-\d{2}-\d{2}$/.test(to)) {
       return c.json({ success: false, error: 'Invalid date format. Expected YYYY-MM-DD' }, 400);
     }
@@ -399,17 +409,17 @@ export function registerAnalyticsHandlers(app: Hono<{ Bindings: Env }>) {
 
     const { results } = await db.prepare(
       `SELECT status, COUNT(*) as count, COALESCE(SUM(total), 0) as revenue
-       FROM orders WHERE DATE(created_at) BETWEEN ? AND ?${tf.and}
+       FROM orders WHERE DATE(datetime(created_at, '+7 hours')) BETWEEN ? AND ?${tf.and}
        GROUP BY status ORDER BY revenue DESC`
     ).bind(from, to, ...tf.binds).all<{ status: string; count: number; revenue: number }>();
 
     return c.json({ success: true, data: results || [] });
   });
 
-  // GET /api/reports/top-products — top selling products by quantity in date range
+  // GET /api/reports/top-products — top selling products by quantity in date range (Vietnam UTC+7)
   app.get('/top-products', async (c) => {
-    const from = c.req.query('from') || new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10);
-    const to = c.req.query('to') || new Date().toISOString().slice(0, 10);
+    const from = c.req.query('from') || defaultStoreFromDate(30);
+    const to = c.req.query('to') || defaultStoreToDate();
     if (!/^\d{4}-\d{2}-\d{2}$/.test(from) || !/^\d{4}-\d{2}-\d{2}$/.test(to)) {
       return c.json({ success: false, error: 'Invalid date format. Expected YYYY-MM-DD' }, 400);
     }
@@ -426,7 +436,7 @@ export function registerAnalyticsHandlers(app: Hono<{ Bindings: Env }>) {
 
     const { results } = await db.prepare(
       `SELECT items FROM orders
-       WHERE DATE(created_at) BETWEEN ? AND ? AND ${VALID_REVENUE_ORDER_SQL}${tf.and}
+       WHERE DATE(datetime(created_at, '+7 hours')) BETWEEN ? AND ? AND ${VALID_REVENUE_ORDER_SQL}${tf.and}
        ORDER BY created_at DESC`
     ).bind(from, to, ...tf.binds).all<{ items: string }>();
 
@@ -463,10 +473,10 @@ export function registerAnalyticsHandlers(app: Hono<{ Bindings: Env }>) {
     return c.json({ success: true, data: topProducts });
   });
 
-  // GET /api/reports/peak-hours — hourly order distribution, zero-filled
+  // GET /api/reports/peak-hours — hourly order distribution, zero-filled (Vietnam UTC+7)
   app.get('/peak-hours', async (c) => {
-    const from = c.req.query('from') || new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10);
-    const to = c.req.query('to') || new Date().toISOString().slice(0, 10);
+    const from = c.req.query('from') || defaultStoreFromDate(30);
+    const to = c.req.query('to') || defaultStoreToDate();
     if (!/^\d{4}-\d{2}-\d{2}$/.test(from) || !/^\d{4}-\d{2}-\d{2}$/.test(to)) {
       return c.json({ success: false, error: 'Invalid date format. Expected YYYY-MM-DD' }, 400);
     }
@@ -488,7 +498,7 @@ export function registerAnalyticsHandlers(app: Hono<{ Bindings: Env }>) {
                 COUNT(*) as order_count,
                 COALESCE(SUM(total), 0) as revenue
          FROM orders
-         WHERE DATE(created_at) BETWEEN ? AND ? AND ${VALID_REVENUE_ORDER_SQL}${tf.and}
+         WHERE DATE(datetime(created_at, '+7 hours')) BETWEEN ? AND ? AND ${VALID_REVENUE_ORDER_SQL}${tf.and}
          GROUP BY hour ORDER BY hour`
       ).bind(from, to, ...tf.binds).all<{ hour: number; order_count: number; revenue: number }>();
       results = res.results;

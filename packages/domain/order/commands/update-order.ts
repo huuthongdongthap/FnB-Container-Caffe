@@ -239,6 +239,83 @@ export async function updateOrder(
         log.warn('Loyalty accrual reversal error (non-blocking):', { message: (revAccErr as Error).message, orderId: id });
       }
 
+      // Refund redeemed loyalty points back to customer if order was cancelled
+      try {
+        let redeemedPts = Math.max(0, Math.floor(Number(results[0]?.loyalty_points_redeemed ?? 0)));
+        let redeemCustId = results[0]?.customer_id ? String(results[0].customer_id).trim() : '';
+        if (!redeemedPts || !redeemCustId) {
+          const ordLoyaltyRow = await db
+            .prepare('SELECT customer_id, loyalty_points_redeemed FROM orders WHERE id = ? LIMIT 1')
+            .bind(id)
+            .first<{ customer_id?: string | null; loyalty_points_redeemed?: number | null }>()
+            .catch(() => null);
+          if (ordLoyaltyRow?.loyalty_points_redeemed && !redeemedPts) {
+            redeemedPts = Math.max(0, Math.floor(Number(ordLoyaltyRow.loyalty_points_redeemed)));
+          }
+          if (ordLoyaltyRow?.customer_id && !redeemCustId) {
+            redeemCustId = String(ordLoyaltyRow.customer_id).trim();
+          }
+        }
+        if (!redeemedPts || !redeemCustId) {
+          const redeemTx = await db
+            .prepare(
+              "SELECT customer_id, ABS(points) AS pts FROM loyalty_transactions WHERE order_id = ? AND type = 'redeem' LIMIT 1"
+            )
+            .bind(id)
+            .first<{ customer_id?: string; pts?: number }>()
+            .catch(() => null);
+          if (redeemTx?.pts && !redeemedPts) redeemedPts = Number(redeemTx.pts);
+          if (redeemTx?.customer_id && !redeemCustId) redeemCustId = String(redeemTx.customer_id);
+        }
+        if (redeemedPts > 0 && redeemCustId) {
+          const alreadyRefunded = await db
+            .prepare(
+              "SELECT id FROM loyalty_transactions WHERE order_id = ? AND type = 'refund_redeem' LIMIT 1"
+            )
+            .bind(id)
+            .first<{ id: string }>()
+            .catch(() => null);
+          if (!alreadyRefunded) {
+            await db
+              .prepare(
+                "UPDATE customers SET loyalty_points = COALESCE(loyalty_points, 0) + ? WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
+              )
+              .bind(redeemedPts, redeemCustId, effectiveCancelTenant)
+              .run()
+              .catch(async () => {
+                if (effectiveCancelTenant === 'default') {
+                  await db
+                    .prepare('UPDATE customers SET loyalty_points = COALESCE(loyalty_points, 0) + ? WHERE id = ?')
+                    .bind(redeemedPts, redeemCustId)
+                    .run()
+                    .catch(() => {});
+                }
+              });
+            await db
+              .prepare(
+                `INSERT INTO loyalty_transactions (id, customer_id, order_id, points, type, description, tenant_id, created_at)
+                 VALUES (?, ?, ?, ?, 'refund_redeem', ?, ?, ?)`
+              )
+              .bind(
+                `LTX_REF_${id}`,
+                redeemCustId,
+                id,
+                redeemedPts,
+                `Hoàn trả ${redeemedPts} điểm do hủy đơn ${id}`,
+                effectiveCancelTenant,
+                new Date().toISOString()
+              )
+              .run()
+              .catch(() => {});
+          }
+        }
+      } catch (refundPtsErr) {
+        log.warn('Loyalty point redemption refund error (non-blocking):', {
+          message: (refundPtsErr as Error).message,
+          orderId: id,
+        });
+      }
+
       // Refund spent cashback on cancellation if not already refunded
       try {
         const existingRefund = await db.prepare(

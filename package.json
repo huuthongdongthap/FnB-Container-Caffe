@@ -1,9 +1,12 @@
 {
   "name": "aura-space-sadec",
-  "version": "2.1.1",
+  "version": "2.3.0",
   "description": "AURA CAFE — Quán cà phê container industrial-luxury tại Sa Đéc",
   "type": "module",
   "private": true,
+  "engines": {
+    "node": ">=22.0.0"
+  },
   "workspaces": [
     "packages/*",
     "packages/domain/*",
