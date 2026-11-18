@@ -8,11 +8,17 @@ on:
         required: true
         type: choice
         options:
+          - apply-d1-migration
           - deploy-pages
           - worker-canary-10
           - worker-promote-100
           - worker-rollback
         default: worker-canary-10
+      migration_file:
+        description: 'Canonical forward D1 migration file in worker/db/migrations/ (required when action is apply-d1-migration, e.g. 20261118_01_orders_loyalty_points_redeemed.sql)'
+        required: false
+        type: string
+        default: ''
       worker_version_id:
         description: 'Candidate Worker Version ID (required for worker-promote-100; optional for specific rollback target)'
         required: false
@@ -30,11 +36,65 @@ on:
         default: 'Emergency production rollback via GitHub Actions'
 
 env:
+  MIGRATION_FILE_INPUT: ${{ inputs.migration_file }}
   BASELINE_VERSION_ID: ${{ inputs.baseline_version_id }}
   WORKER_VERSION_ID: ${{ inputs.worker_version_id }}
   ROLLBACK_REASON_INPUT: ${{ inputs.rollback_reason }}
 
 jobs:
+  apply-d1-migration:
+    name: Backup & Apply Explicit D1 Migration
+    if: ${{ inputs.action == 'apply-d1-migration' }}
+    runs-on: ubuntu-latest
+    environment: production
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22.x'
+
+      - name: Install root & worker dependencies
+        run: |
+          npm ci --silent
+          cd worker && npm ci --silent
+
+      - name: Validate migration file & export pre-migration D1 backup
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: b69fee03bdd94234eea8e4114cfc36ab
+        run: |
+          set -euo pipefail
+          if ! printf '%s' "$MIGRATION_FILE_INPUT" | grep -Eq '^[0-9]{8}_[0-9]{2}_[a-z0-9_]+\.sql$'; then
+            echo "Error: invalid migration_file format (expected YYYYMMDD_NN_slug.sql)" >&2
+            exit 1
+          fi
+          bash worker/scripts/apply-migrations.sh --dry-run --file "$MIGRATION_FILE_INPUT"
+          mkdir -p d1-backups
+          BACKUP_PATH="d1-backups/fnb-caffe-db-pre-${MIGRATION_FILE_INPUT%.sql}-$(date -u +%Y%m%dT%H%M%SZ).sql"
+          echo "Exporting remote D1 backup before migration..."
+          npx --no-install wrangler d1 export fnb-caffe-db --remote --output="$BACKUP_PATH" --config worker/wrangler.toml
+
+      - name: Retain pre-migration D1 backup artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: d1-backup-pre-migration-${{ github.run_id }}
+          path: d1-backups/*.sql
+          retention-days: 30
+          if-no-files-found: error
+
+      - name: Apply explicit forward D1 migration
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: b69fee03bdd94234eea8e4114cfc36ab
+        run: |
+          set -euo pipefail
+          PATH="$PWD/node_modules/.bin:$PATH" bash worker/scripts/apply-migrations.sh --remote --file "$MIGRATION_FILE_INPUT"
+
   deploy-pages:
     name: Deploy Cloudflare Pages
     if: ${{ inputs.action == 'deploy-pages' }}
