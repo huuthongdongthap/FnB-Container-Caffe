@@ -28,9 +28,18 @@ const TENANT = 'default';
 const DEEP_CLEAN = 'tpl_deep_clean_m15';
 const AUDIT = 'tpl_inventory_audit_m30';
 
-/** The store is at UTC+7 (Vietnam); local dates are what the duties follow. */
-function localDate(year: number, monthIndex: number, day: number, hour = 12): Date {
-  return new Date(year, monthIndex, day, hour, 0, 0);
+/**
+ * The store is at UTC+7 (Vietnam); local dates are what the duties follow.
+ *
+ * These instants must be built from the store's offset, never from the runtime's
+ * local timezone. `new Date(y, m, d, h)` means "whatever hour `h` is on the
+ * machine running this suite", so on a UTC runner a 06:00 case silently becomes
+ * 13:00 store time and the 08:00 gate the test is probing is never exercised.
+ */
+const STORE_OFFSET_MS = 7 * 60 * 60 * 1000;
+
+function localDate(year: number, monthIndex: number, day: number, hour = 12, minute = 0): Date {
+  return new Date(Date.UTC(year, monthIndex, day, hour, minute) - STORE_OFFSET_MS);
 }
 
 function withMinutes(date: Date, minutes: number): Date {
