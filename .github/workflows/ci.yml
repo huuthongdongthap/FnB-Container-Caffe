@@ -8,7 +8,7 @@ on:
 
 jobs:
   lint-and-test:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     env:
       TZ: UTC
 
@@ -49,9 +49,10 @@ jobs:
 
   e2e-smoke:
     needs: lint-and-test
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     env:
       TZ: UTC
+      VITE_API_BASE: ''
 
     steps:
     - uses: actions/checkout@v4
