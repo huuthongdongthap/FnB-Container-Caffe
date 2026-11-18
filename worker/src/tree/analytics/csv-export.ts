@@ -103,6 +103,73 @@ export function formatCsvRows(rows: OrderExportRow[]): string {
   return '﻿' + lines.join('\n');
 }
 
+export interface DailyRevenueExportRow {
+  date: string;
+  orders: number;
+  revenue: number;
+  avg_order_value: number;
+}
+
+/**
+ * Aggregate daily revenue in Vietnam store timezone (UTC+7) within a date range.
+ */
+export async function getDailyRevenueInRange(
+  db: import('@cloudflare/workers-types').D1Database,
+  start: string,
+  end: string,
+  tenantId?: string
+): Promise<DailyRevenueExportRow[]> {
+  const hasTenant = Boolean(tenantId && tenantId !== '*');
+  const tenantClause = !hasTenant
+    ? ''
+    : tenantId === 'default'
+      ? " AND (tenant_id = ? OR tenant_id IS NULL OR tenant_id = '' OR TRIM(tenant_id) = '')"
+      : ' AND TRIM(tenant_id) = ?';
+  const binds = hasTenant && tenantId ? [start, end, tenantId] : [start, end];
+  const baseSql = `
+    SELECT DATE(datetime(created_at, '+7 hours')) AS date,
+           COUNT(*) AS orders,
+           COALESCE(SUM(total), 0) AS revenue,
+           CASE WHEN COUNT(*) > 0 THEN ROUND(COALESCE(SUM(total), 0) * 1.0 / COUNT(*)) ELSE 0 END AS avg_order_value
+    FROM orders
+    WHERE LOWER(COALESCE(status, '')) NOT IN ('cancelled', 'canceled', 'refunded', 'failed', 'rejected', 'expired')
+      AND LOWER(COALESCE(payment_status, '')) NOT IN ('refunded', 'failed')
+      AND DATE(datetime(created_at, '+7 hours')) BETWEEN ? AND ?${tenantClause}
+    GROUP BY DATE(datetime(created_at, '+7 hours'))
+    ORDER BY date ASC
+    LIMIT 1000
+  `;
+  try {
+    const { results } = await db.prepare(baseSql).bind(...binds).all<DailyRevenueExportRow>();
+    return results || [];
+  } catch {
+    const fallbackSql = baseSql.replace(
+      /\s*AND LOWER\(COALESCE\(payment_status, ''\)\) NOT IN \('refunded', 'failed'\)/,
+      ''
+    );
+    const { results } = await db.prepare(fallbackSql).bind(...binds).all<DailyRevenueExportRow>();
+    return results || [];
+  }
+}
+
+export function formatDailyRevenueCsvRows(rows: DailyRevenueExportRow[]): string {
+  const headers = ['Date (ICT)', 'Orders', 'Revenue (VND)', 'Avg Order Value (VND)'];
+  const lines: string[] = [headers.map(escapeCsvField).join(',')];
+  for (const row of rows) {
+    lines.push(
+      [
+        row.date || '',
+        String(row.orders ?? 0),
+        String(row.revenue ?? 0),
+        String(Math.round(Number(row.avg_order_value ?? 0))),
+      ]
+        .map(escapeCsvField)
+        .join(',')
+    );
+  }
+  return '﻿' + lines.join('\n');
+}
+
 /**
  * Escape a CSV field: neutralize spreadsheet formula prefixes and wrap in quotes
  * if it contains comma, newline, semicolon, or double-quote.

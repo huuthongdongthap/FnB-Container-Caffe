@@ -108,6 +108,7 @@ export interface Env {
 
   // General
   ENVIRONMENT?: string;
+  CASH_RECONCILIATION_ENABLED?: string;
   AURA_KV?: import('@cloudflare/workers-types').KVNamespace;
   KV_CACHE?: import('@cloudflare/workers-types').KVNamespace;
   GIT_COMMIT_SHA?: string;

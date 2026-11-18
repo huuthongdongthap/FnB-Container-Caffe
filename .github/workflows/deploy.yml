@@ -8,33 +8,93 @@ on:
         required: true
         type: choice
         options:
+          - apply-d1-migration
           - deploy-pages
           - worker-canary-10
           - worker-promote-100
           - worker-rollback
         default: worker-canary-10
+      migration_file:
+        description: 'Canonical forward D1 migration file in worker/db/migrations/ (required when action is apply-d1-migration, e.g. 20261118_01_orders_loyalty_points_redeemed.sql)'
+        required: false
+        type: string
+        default: ''
       worker_version_id:
         description: 'Candidate Worker Version ID (required for worker-promote-100; optional for specific rollback target)'
         required: false
         type: string
         default: ''
       baseline_version_id:
-        description: 'Baseline Worker Version ID for 90% canary or fallback rollback target'
+        description: 'Baseline Worker Version ID for 90% canary (leave blank to auto-detect active production version)'
         required: false
         type: string
-        default: '33d9e23b-711c-4278-82d1-b8013fedc41a'
+        default: ''
       rollback_reason:
         description: 'Rollback message/reason (used when action is worker-rollback)'
         required: false
         type: string
-        default: 'Rollback to baseline version 33d9e23b-711c-4278-82d1-b8013fedc41a'
+        default: 'Emergency production rollback via GitHub Actions'
 
 env:
+  MIGRATION_FILE_INPUT: ${{ inputs.migration_file }}
   BASELINE_VERSION_ID: ${{ inputs.baseline_version_id }}
   WORKER_VERSION_ID: ${{ inputs.worker_version_id }}
   ROLLBACK_REASON_INPUT: ${{ inputs.rollback_reason }}
 
 jobs:
+  apply-d1-migration:
+    name: Backup & Apply Explicit D1 Migration
+    if: ${{ inputs.action == 'apply-d1-migration' }}
+    runs-on: ubuntu-latest
+    environment: production
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22.x'
+
+      - name: Install root & worker dependencies
+        run: |
+          npm ci --silent
+          cd worker && npm ci --silent
+
+      - name: Validate migration file & export pre-migration D1 backup
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: b69fee03bdd94234eea8e4114cfc36ab
+        run: |
+          set -euo pipefail
+          if ! printf '%s' "$MIGRATION_FILE_INPUT" | grep -Eq '^[0-9]{8}_[0-9]{2}_[a-z0-9_]+\.sql$'; then
+            echo "Error: invalid migration_file format (expected YYYYMMDD_NN_slug.sql)" >&2
+            exit 1
+          fi
+          bash worker/scripts/apply-migrations.sh --dry-run --file "$MIGRATION_FILE_INPUT"
+          mkdir -p d1-backups
+          BACKUP_PATH="d1-backups/fnb-caffe-db-pre-${MIGRATION_FILE_INPUT%.sql}-$(date -u +%Y%m%dT%H%M%SZ).sql"
+          echo "Exporting remote D1 backup before migration..."
+          npx --no-install wrangler d1 export fnb-caffe-db --remote --output="$BACKUP_PATH" --config worker/wrangler.toml
+
+      - name: Retain pre-migration D1 backup artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: d1-backup-pre-migration-${{ github.run_id }}
+          path: d1-backups/*.sql
+          retention-days: 30
+          if-no-files-found: error
+
+      - name: Apply explicit forward D1 migration
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: b69fee03bdd94234eea8e4114cfc36ab
+        run: |
+          set -euo pipefail
+          PATH="$PWD/node_modules/.bin:$PATH" bash worker/scripts/apply-migrations.sh --remote --file "$MIGRATION_FILE_INPUT"
+
   deploy-pages:
     name: Deploy Cloudflare Pages
     if: ${{ inputs.action == 'deploy-pages' }}
@@ -118,8 +178,22 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: b69fee03bdd94234eea8e4114cfc36ab
         run: |
           set -e
-          if ! printf '%s' "$BASELINE_VERSION_ID" | grep -Eq '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$'; then
-            echo "Error: invalid baseline_version_id UUID format"
+          RESOLVED_BASELINE="$BASELINE_VERSION_ID"
+          if [ -z "$RESOLVED_BASELINE" ]; then
+            echo "Auto-detecting active production Worker baseline version..."
+            DEPLOYMENTS_JSON=$(npx --no-install wrangler deployments list --json 2>/dev/null || true)
+            RESOLVED_BASELINE=$(printf '%s' "$DEPLOYMENTS_JSON" | node -e "
+              const fs = require('fs');
+              try {
+                const list = JSON.parse(fs.readFileSync(0, 'utf8'));
+                const latest = Array.isArray(list) ? list[list.length - 1] : null;
+                const ver = latest && Array.isArray(latest.versions) ? latest.versions[0]?.version_id : '';
+                if (ver) process.stdout.write(String(ver));
+              } catch {}
+            ")
+          fi
+          if ! printf '%s' "$RESOLVED_BASELINE" | grep -Eq '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$'; then
+            echo "Error: could not determine valid active baseline_version_id UUID. Pass baseline_version_id explicitly."
             exit 1
           fi
           echo "Uploading candidate version for SHA ${{ github.sha }}..."
@@ -131,9 +205,9 @@ jobs:
             exit 1
           fi
           echo "Candidate Version ID: $VERSION_ID"
-          echo "Baseline Version ID: $BASELINE_VERSION_ID"
-          echo "Deploying traffic split: 10% -> $VERSION_ID, 90% -> $BASELINE_VERSION_ID"
-          npx --no-install wrangler versions deploy "$VERSION_ID@10" "$BASELINE_VERSION_ID@90" --yes
+          echo "Baseline Version ID: $RESOLVED_BASELINE"
+          echo "Deploying traffic split: 10% -> $VERSION_ID, 90% -> $RESOLVED_BASELINE"
+          npx --no-install wrangler versions deploy "$VERSION_ID@10" "$RESOLVED_BASELINE@90" --yes
 
   worker-promote:
     name: Worker Promote to 100%
@@ -208,9 +282,14 @@ jobs:
         run: |
           set -e
           TARGET_VERSION="${WORKER_VERSION_ID:-$BASELINE_VERSION_ID}"
-          if ! printf '%s' "$TARGET_VERSION" | grep -Eq '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$'; then
-            echo "Error: invalid rollback target version UUID format"
-            exit 1
+          if [ -n "$TARGET_VERSION" ]; then
+            if ! printf '%s' "$TARGET_VERSION" | grep -Eq '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$'; then
+              echo "Error: invalid rollback target version UUID format"
+              exit 1
+            fi
+            echo "Rolling back Worker to explicit version $TARGET_VERSION..."
+            npx --no-install wrangler rollback "$TARGET_VERSION" --message "$ROLLBACK_REASON_INPUT" --yes
+          else
+            echo "Rolling back Worker to immediately preceding active deployment..."
+            npx --no-install wrangler rollback --message "$ROLLBACK_REASON_INPUT" --yes
           fi
-          echo "Rolling back Worker to version $TARGET_VERSION..."
-          npx --no-install wrangler rollback "$TARGET_VERSION" --message "$ROLLBACK_REASON_INPUT" --yes

@@ -45,6 +45,22 @@ function createCsvResponse(csvString: string, filename: string): Response {
   });
 }
 
+const ICT_OFFSET_MS = 7 * 3600_000;
+
+function formatStoreDate(raw?: string | null): string {
+  if (!raw) return '';
+  const trimmed = raw.trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) return trimmed;
+  const isoCandidate = /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}/.test(trimmed)
+    ? `${trimmed.replace(' ', 'T')}Z`
+    : trimmed;
+  const ms = Date.parse(isoCandidate);
+  if (Number.isFinite(ms)) {
+    return new Date(ms + ICT_OFFSET_MS).toISOString().slice(0, 10);
+  }
+  return trimmed.slice(0, 10);
+}
+
 export function registerExportHandlers(app: Hono<{ Bindings: Env }>) {
   const EXPORT_ALLOWED_ROLES = new Set(['owner', 'manager', 'admin']);
   const VALID_EXPORT_ORDER_SQL =
@@ -117,8 +133,8 @@ export function registerExportHandlers(app: Hono<{ Bindings: Env }>) {
 
     const db = c.env.AURA_DB;
     const { and: tenantClause, binds: tenantBinds } = buildTenantClause(tenantId);
-    const from = c.req.query('from') || new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10);
-    const to = c.req.query('to') || new Date().toISOString().slice(0, 10);
+    const from = c.req.query('from') || new Date(Date.now() + ICT_OFFSET_MS - 30 * 86400000).toISOString().slice(0, 10);
+    const to = c.req.query('to') || new Date(Date.now() + ICT_OFFSET_MS).toISOString().slice(0, 10);
     if (!/^\d{4}-\d{2}-\d{2}$/.test(from) || !/^\d{4}-\d{2}-\d{2}$/.test(to)) {
       return c.json({ success: false, error: 'Invalid date range' }, 400);
     }
@@ -139,7 +155,7 @@ export function registerExportHandlers(app: Hono<{ Bindings: Env }>) {
     if (type === 'orders') {
       const { results } = await db.prepare(
         `SELECT id, customer_name, customer_phone, total, status, payment_method, created_at
-         FROM orders WHERE DATE(created_at) BETWEEN ? AND ?${tenantClause} ORDER BY created_at LIMIT 5000`
+         FROM orders WHERE DATE(datetime(created_at, '+7 hours')) BETWEEN ? AND ?${tenantClause} ORDER BY created_at LIMIT 5000`
       ).bind(from, to, ...tenantBinds).all<OrderExportRow>();
 
       const headers = ['id', 'customer_name', 'customer_phone', 'total', 'status', 'payment_method', 'created_at'];
@@ -150,7 +166,7 @@ export function registerExportHandlers(app: Hono<{ Bindings: Env }>) {
         r.total ?? 0,
         r.status || '',
         r.payment_method || '',
-        (r.created_at || '').slice(0, 10)
+        formatStoreDate(r.created_at)
       ]);
 
       return createCsvResponse(
@@ -161,16 +177,16 @@ export function registerExportHandlers(app: Hono<{ Bindings: Env }>) {
 
     if (type === 'revenue' || type === 'sales') {
       const { results } = await db.prepare(
-        `SELECT DATE(created_at) as date,
+        `SELECT DATE(datetime(created_at, '+7 hours')) as date,
                 COUNT(*) as orders,
                 COALESCE(SUM(total), 0) as revenue,
                 CASE WHEN COUNT(*) > 0 THEN COALESCE(SUM(total), 0) / COUNT(*) ELSE 0 END as avg_order_value
          FROM orders
-         WHERE DATE(created_at) BETWEEN ? AND ? AND ${VALID_EXPORT_ORDER_SQL}${tenantClause}
-         GROUP BY DATE(created_at) ORDER BY date LIMIT 5000`
+         WHERE DATE(datetime(created_at, '+7 hours')) BETWEEN ? AND ? AND ${VALID_EXPORT_ORDER_SQL}${tenantClause}
+         GROUP BY DATE(datetime(created_at, '+7 hours')) ORDER BY date LIMIT 5000`
       ).bind(from, to, ...tenantBinds).all<RevenueExportRow>();
 
-      // Get cashback earned per day separately
+      // Get cashback earned per day separately (Vietnam UTC+7)
       const custJoin = tenantId === '*'
         ? ''
         : tenantId === 'default'
@@ -180,19 +196,19 @@ export function registerExportHandlers(app: Hono<{ Bindings: Env }>) {
       let cashbackResults: { date: string; amount: number }[] = [];
       try {
         const res = await db.prepare(
-          `SELECT DATE(t.created_at) as date, COALESCE(SUM(t.reward_amount), 0) as amount
+          `SELECT DATE(datetime(t.created_at, '+7 hours')) as date, COALESCE(SUM(t.reward_amount), 0) as amount
            FROM checkins t${custJoin}
-           WHERE DATE(t.created_at) BETWEEN ? AND ? AND t.status = 'approved'${custClause}
-           GROUP BY DATE(t.created_at)`
+           WHERE DATE(datetime(t.created_at, '+7 hours')) BETWEEN ? AND ? AND t.status = 'approved'${custClause}
+           GROUP BY DATE(datetime(t.created_at, '+7 hours'))`
         ).bind(from, to, ...tenantBinds).all<{ date: string; amount: number }>();
         cashbackResults = res.results || [];
       } catch {
         try {
           const res = await db.prepare(
-            `SELECT DATE(t.created_at) as date, COALESCE(SUM(t.amount), 0) as amount
+            `SELECT DATE(datetime(t.created_at, '+7 hours')) as date, COALESCE(SUM(t.amount), 0) as amount
              FROM cashback_transactions t${custJoin}
-             WHERE DATE(t.created_at) BETWEEN ? AND ? AND t.type = 'earn'${custClause}
-             GROUP BY DATE(t.created_at)`
+             WHERE DATE(datetime(t.created_at, '+7 hours')) BETWEEN ? AND ? AND t.type = 'earn'${custClause}
+             GROUP BY DATE(datetime(t.created_at, '+7 hours'))`
           ).bind(from, to, ...tenantBinds).all<{ date: string; amount: number }>();
           cashbackResults = res.results || [];
         } catch {
@@ -222,8 +238,8 @@ export function registerExportHandlers(app: Hono<{ Bindings: Env }>) {
       const orderTenantJoin =
         " AND COALESCE(NULLIF(TRIM(o.tenant_id), ''), 'default') = COALESCE(NULLIF(TRIM(c.tenant_id), ''), 'default')";
       const dateFilter = custWhere
-        ? ' AND (c.created_at IS NULL OR DATE(c.created_at) BETWEEN ? AND ?)'
-        : ' WHERE (c.created_at IS NULL OR DATE(c.created_at) BETWEEN ? AND ?)';
+        ? " AND (c.created_at IS NULL OR DATE(datetime(c.created_at, '+7 hours')) BETWEEN ? AND ?)"
+        : " WHERE (c.created_at IS NULL OR DATE(datetime(c.created_at, '+7 hours')) BETWEEN ? AND ?)";
       const datedBinds = [...custBinds, from, to];
       let results: CustomerExportRow[] = [];
       try {
@@ -260,7 +276,7 @@ export function registerExportHandlers(app: Hono<{ Bindings: Env }>) {
         r.total_spent ?? 0,
         r.order_count ?? 0,
         r.loyalty_tier || '',
-        (r.created_at || '').slice(0, 10)
+        formatStoreDate(r.created_at)
       ]);
 
       return createCsvResponse(

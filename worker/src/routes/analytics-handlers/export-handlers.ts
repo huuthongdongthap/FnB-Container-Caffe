@@ -1,7 +1,12 @@
 import type { Hono } from 'hono';
 import type { Env } from '../../types/env';
 import { authenticateRequest } from '../../middleware/auth';
-import { getOrdersInRange, formatCsvRows } from '../../tree/analytics/csv-export';
+import {
+  getOrdersInRange,
+  formatCsvRows,
+  getDailyRevenueInRange,
+  formatDailyRevenueCsvRows,
+} from '../../tree/analytics/csv-export';
 import { resolveAnalyticsTenant } from '../../tree/analytics/summary';
 import { exportSchema } from './helpers';
 
@@ -47,7 +52,7 @@ export function registerExportHandlers(router: Hono<{ Bindings: Env }>): void {
       );
     }
 
-    const { start, end } = parsed.data;
+    const { start, end, type } = parsed.data;
     const startMs = Date.parse(`${start}T00:00:00.000Z`);
     const endMs = Date.parse(`${end}T00:00:00.000Z`);
     const startIso = Number.isFinite(startMs) ? new Date(startMs).toISOString().slice(0, 10) : '';
@@ -58,6 +63,15 @@ export function registerExportHandlers(router: Hono<{ Bindings: Env }>): void {
     const daySpan = Math.floor((endMs - startMs) / 86_400_000) + 1;
     if (daySpan > MAX_EXPORT_RANGE_DAYS) {
       return c.json({ success: false, error: 'Date range cannot exceed 366 days' }, 400);
+    }
+
+    if (type === 'revenue') {
+      const revenueRows = await getDailyRevenueInRange(c.env.AURA_DB, start, end, tenantId);
+      const revenueCsv = formatDailyRevenueCsvRows(revenueRows);
+      return c.newResponse(revenueCsv, 200, {
+        'Content-Type': 'text/csv; charset=utf-8',
+        'Content-Disposition': `attachment; filename="revenue-export-${start}-to-${end}.csv"`,
+      });
     }
 
     const rows = await getOrdersInRange(c.env.AURA_DB, start, end, tenantId);

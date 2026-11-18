@@ -432,6 +432,18 @@ describe('Loyalty, Referrals, Inventory PO, Customer Events & Audit Cutover (202
     sqlite.exec(migration30_02Down);
     sqlite.exec(migration30_02Up);
 
+    const migration1118_01Up = readFileSync(
+      resolve(__dirname, '../../../db/migrations/20261118_01_orders_loyalty_points_redeemed.sql'),
+      'utf8'
+    );
+    const migration1118_01Down = readFileSync(
+      resolve(__dirname, '../../../db/migrations/20261118_01_orders_loyalty_points_redeemed.down.sql'),
+      'utf8'
+    );
+    sqlite.exec(migration1118_01Up);
+    sqlite.exec(migration1118_01Down);
+    sqlite.exec(migration1118_01Up);
+
     const canonicalSqlite = new DatabaseSync(':memory:');
     canonicalSqlite.exec(readFileSync(resolve(__dirname, '../../../schema.sql'), 'utf8'));
     const getSchemaMap = (conn: DatabaseSync) => {

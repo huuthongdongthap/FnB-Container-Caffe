@@ -22,6 +22,8 @@ import {
   TabletSmartphone,
   LayoutGrid,
   Package,
+  TrendingUp,
+  DollarSign,
 } from 'lucide-react';
 import type { NavSectionData } from './StitchAdminTerminalNew-types';
 
@@ -50,6 +52,8 @@ export const SECTIONS: NavSectionData[] = [
     items: [
       { label: 'Phân tích', labelEn: 'Metrics', to: '/admin/metrics', icon: BarChart3 },
       { label: 'Báo cáo', labelEn: 'Sales Reports', to: '/admin/sales-reports', icon: FileBarChart },
+      { label: 'Lãi lỗ & Giá vốn', labelEn: 'P&L & COGS', to: '/admin/revenue-accounting', icon: TrendingUp },
+      { label: 'Nhượng quyền', labelEn: 'Franchise & Royalty', to: '/admin/franchise', icon: DollarSign },
     ],
   },
   {
