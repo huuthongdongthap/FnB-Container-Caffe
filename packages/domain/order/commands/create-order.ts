@@ -210,7 +210,8 @@ export async function createOrder(
         return errorResponse('Cần xác định tài khoản khách hàng thành viên để đổi điểm thưởng', 400);
       }
       const remainingPayable = Math.max(0, snapshot.subtotal - snapshot.discount);
-      const maxRedeemablePoints = Math.floor(remainingPayable / 100);
+      const maxSubtotalRedeemVnd = Math.floor(snapshot.subtotal * 0.5);
+      const maxRedeemablePoints = Math.floor(Math.min(remainingPayable, maxSubtotalRedeemVnd) / 100);
       redeemedPoints = Math.min(rawRequestedPoints, maxRedeemablePoints);
       if (redeemedPoints > 0) {
         const loyaltyTenant = tenantId === '*' ? 'default' : (tenantId || 'default');

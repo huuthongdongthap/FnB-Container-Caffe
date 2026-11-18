@@ -268,18 +268,14 @@ franchiseRouter.get('/locations/:id/metrics', requireAuth(['owner', 'admin', 'ma
     FROM orders
     WHERE (COALESCE(NULLIF(tenant_id, ''), 'default') = ? OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?1)
       AND LOWER(COALESCE(status, '')) NOT IN ('cancelled', 'canceled', 'refunded', 'failed', 'rejected', 'expired')
-      AND LOWER(COALESCE(payment_status, '')) NOT IN ('refunded', 'failed', 'cancelled', 'canceled')${dateClause}
+      AND LOWER(COALESCE(payment_status, '')) NOT IN ('refunded', 'failed', 'cancelled', 'canceled')
+      AND NOT (COALESCE(total, 0) = 0 AND (COALESCE(customer_name, '') = 'Khách QR - cho don mon' OR COALESCE(items, '') IN ('', '[]')))${dateClause}
   `;
   const statusOnlyScopedQuery = `
     SELECT COUNT(*) as order_count, COALESCE(SUM(total), 0) as gross_sales
     FROM orders
     WHERE (COALESCE(NULLIF(tenant_id, ''), 'default') = ? OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?1)
       AND LOWER(COALESCE(status, '')) NOT IN ('cancelled', 'canceled', 'refunded', 'failed', 'rejected', 'expired')${dateClause}
-  `;
-  const unscopedFallbackQuery = `
-    SELECT COUNT(*) as order_count, COALESCE(SUM(total), 0) as gross_sales
-    FROM orders
-    WHERE LOWER(COALESCE(status, '')) NOT IN ('cancelled', 'canceled', 'refunded', 'failed', 'rejected', 'expired')${dateClause}
   `;
 
   let stats: { order_count: number; gross_sales: number } | null = null;
@@ -289,16 +285,16 @@ franchiseRouter.get('/locations/:id/metrics', requireAuth(['owner', 'admin', 'ma
     try {
       stats = await db.prepare(statusOnlyScopedQuery).bind(locTenant, ...dateParams).first<{ order_count: number; gross_sales: number }>();
     } catch {
-      if (locTenant === 'default') {
-        stats = await db.prepare(unscopedFallbackQuery).bind(...dateParams).first<{ order_count: number; gross_sales: number }>().catch(() => null);
-      } else {
-        stats = { order_count: 0, gross_sales: 0 };
-      }
+      stats = { order_count: 0, gross_sales: 0 };
     }
   }
   const grossSales = Number(stats?.gross_sales || 0);
   const orderCount = Number(stats?.order_count || 0);
-  const royaltyPercentage = Number(location.royalty_percentage || 5.0);
+  const rawRoyalty = location.royalty_percentage;
+  const royaltyPercentage =
+    rawRoyalty !== null && rawRoyalty !== undefined && Number.isFinite(Number(rawRoyalty))
+      ? Number(rawRoyalty)
+      : 5.0;
   const royaltyAmount = Math.round((grossSales * royaltyPercentage) / 100);
   const netFranchiseePayout = grossSales - royaltyAmount;
 

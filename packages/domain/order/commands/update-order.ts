@@ -345,58 +345,72 @@ export async function updateOrder(
             .first<{ id: string }>()
             .catch(() => null);
           if (!alreadyRefunded) {
-            await db
-              .prepare(
-                "UPDATE customers SET loyalty_points = COALESCE(loyalty_points, 0) + ? WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
-              )
-              .bind(redeemedPts, redeemCustId, effectiveCancelTenant)
-              .run()
-              .catch(async () => {
-                if (effectiveCancelTenant === 'default') {
-                  await db
-                    .prepare('UPDATE customers SET loyalty_points = COALESCE(loyalty_points, 0) + ? WHERE id = ?')
-                    .bind(redeemedPts, redeemCustId)
-                    .run()
-                    .catch(() => {});
-                }
-              });
             const refundNowIso = new Date().toISOString();
             const refundDesc = `Hoàn trả ${redeemedPts} điểm do hủy đơn ${id}`;
-            await db
-              .prepare(
-                `INSERT INTO loyalty_transactions (id, customer_id, order_id, points, type, description, idempotency_key, tenant_id, created_at)
-                 VALUES (?, ?, ?, ?, 'refund_redeem', ?, ?, ?, ?)`
-              )
-              .bind(
-                `LTX_REF_${id}`,
-                redeemCustId,
-                id,
-                redeemedPts,
-                refundDesc,
-                `refund_redeem:${id}`,
-                effectiveCancelTenant,
-                refundNowIso
-              )
-              .run()
-              .catch(async () => {
-                await db
-                  .prepare(
-                    `INSERT INTO loyalty_transactions (id, customer_id, order_id, points, type, description, tenant_id, created_at)
-                     VALUES (?, ?, ?, ?, 'refund_redeem', ?, ?, ?)`
-                  )
-                  .bind(`LTX_REF_${id}`, redeemCustId, id, redeemedPts, refundDesc, effectiveCancelTenant, refundNowIso)
-                  .run()
-                  .catch(async () => {
-                    await db
+            let txClaimed = false;
+            try {
+              const txRes = await db
+                .prepare(
+                  `INSERT INTO loyalty_transactions (id, customer_id, order_id, points, type, description, idempotency_key, tenant_id, created_at)
+                   VALUES (?, ?, ?, ?, 'refund_redeem', ?, ?, ?, ?)`
+                )
+                .bind(
+                  `LTX_REF_${id}`,
+                  redeemCustId,
+                  id,
+                  redeemedPts,
+                  refundDesc,
+                  `refund_redeem:${id}`,
+                  effectiveCancelTenant,
+                  refundNowIso
+                )
+                .run();
+              txClaimed = (txRes?.meta?.changes ?? 1) > 0;
+            } catch (err1) {
+              const msg1 = String((err1 as Error)?.message || '').toLowerCase();
+              if (!msg1.includes('unique') && !msg1.includes('constraint')) {
+                try {
+                  const txRes2 = await db
+                    .prepare(
+                      `INSERT INTO loyalty_transactions (id, customer_id, order_id, points, type, description, tenant_id, created_at)
+                       VALUES (?, ?, ?, ?, 'refund_redeem', ?, ?, ?)`
+                    )
+                    .bind(`LTX_REF_${id}`, redeemCustId, id, redeemedPts, refundDesc, effectiveCancelTenant, refundNowIso)
+                    .run();
+                  txClaimed = (txRes2?.meta?.changes ?? 1) > 0;
+                } catch (err2) {
+                  const msg2 = String((err2 as Error)?.message || '').toLowerCase();
+                  if (!msg2.includes('unique') && !msg2.includes('constraint')) {
+                    const txRes3 = await db
                       .prepare(
                         `INSERT INTO loyalty_transactions (id, customer_id, order_id, points, type, description, created_at)
                          VALUES (?, ?, ?, ?, 'refund_redeem', ?, ?)`
                       )
                       .bind(`LTX_REF_${id}`, redeemCustId, id, redeemedPts, refundDesc, refundNowIso)
                       .run()
+                      .catch(() => null);
+                    txClaimed = Boolean(txRes3 && (txRes3.meta?.changes ?? 1) > 0);
+                  }
+                }
+              }
+            }
+            if (txClaimed) {
+              await db
+                .prepare(
+                  "UPDATE customers SET loyalty_points = COALESCE(loyalty_points, 0) + ? WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
+                )
+                .bind(redeemedPts, redeemCustId, effectiveCancelTenant)
+                .run()
+                .catch(async () => {
+                  if (effectiveCancelTenant === 'default') {
+                    await db
+                      .prepare('UPDATE customers SET loyalty_points = COALESCE(loyalty_points, 0) + ? WHERE id = ?')
+                      .bind(redeemedPts, redeemCustId)
+                      .run()
                       .catch(() => {});
-                  });
-              });
+                  }
+                });
+            }
           }
         }
       } catch (refundPtsErr) {

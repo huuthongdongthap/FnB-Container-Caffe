@@ -8804,7 +8804,7 @@ describe('Phase 49 (AV1..AV4) — Loyalty/Referrals, Mobile POS/Checkin/Admin Me
     expect(poHandlersSrc).toContain("const PO_MUTATION_ROLES = ['owner', 'manager', 'admin'];");
     expect(poHandlersSrc).toContain('verifyPurchaseOrderAccess');
     expect(reportsAnalyticsSrc).toContain(
-      "COALESCE(status, '') NOT IN ('cancelled', 'refunded', 'failed', 'expired') AND COALESCE(payment_status, '') NOT IN ('refunded', 'failed')"
+      "COALESCE(status, '') NOT IN ('cancelled', 'refunded', 'failed', 'expired') AND COALESCE(payment_status, '') NOT IN ('refunded', 'failed', 'cancelled', 'canceled') AND LOWER(COALESCE(status, '')) NOT IN ('cancelled', 'canceled', 'refunded', 'failed', 'rejected', 'expired') AND LOWER(COALESCE(payment_status, '')) NOT IN ('refunded', 'failed', 'cancelled', 'canceled') AND NOT (COALESCE(total, 0) = 0 AND (COALESCE(customer_name, '') = 'Khách QR - cho don mon' OR COALESCE(items, '') IN ('', '[]')))"
     );
     expect(reportsAnalyticsSrc).toContain('verifyReportAnalyticsAccess');
     expect(reportsExportSrc).toContain("const EXPORT_ALLOWED_ROLES = new Set(['owner', 'manager', 'admin']);");

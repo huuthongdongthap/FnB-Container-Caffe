@@ -6,6 +6,7 @@ import { reportsRouter } from '../../routes/reports';
 import { reconciliationRoutes } from '@aura/domain-shift';
 import { loginRateLimit, resetLoginRateLimitMemory } from '../../middleware/rate-limit-login';
 import { authEndpointsRouter } from '../../routes/auth-endpoints';
+import { VALID_REVENUE_ORDER_SQL } from '../../routes/reports-handlers/analytics-handlers';
 import { generateJWT } from '../../lib/jwt';
 
 function createStoreMockDb() {
@@ -504,5 +505,56 @@ describe('Store Operations Go-Live Readiness Suite', () => {
       brokenEnv
     );
     expect(outageRes.status).toBe(503);
+  });
+
+  it('caps loyalty point redemption at 50% of subtotal and enforces QR placeholder exclusion in VALID_REVENUE_ORDER_SQL', async () => {
+    const mockDb = createStoreMockDb();
+    mockDb.customers.set('cust_vip_600', {
+      id: 'cust_vip_600',
+      tenant_id: 'default',
+      loyalty_points: 600,
+    });
+    const customerToken = await generateJWT(
+      { sub: 'cust_vip_600', role: 'customer', tenant_id: 'default' },
+      JWT_SECRET,
+      3600
+    );
+    const env = {
+      AURA_DB: mockDb as unknown as Env['AURA_DB'],
+      JWT_SECRET,
+    } as unknown as Record<string, unknown>;
+
+    const req = new Request('https://auraspace.cafe/api/orders', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${customerToken}`,
+      },
+      body: JSON.stringify({
+        customer_id: 'cust_vip_600',
+        customer_name: 'VIP Sa Đéc',
+        customer_phone: '0909888999',
+        total: 90000,
+        items: [{ id: 'prod_cf_sua', name: 'Cà Phê Sữa Đá Sa Đéc', price: 45000, quantity: 2 }],
+        payment_method: 'cod',
+        order_type: 'takeaway',
+        redeem_points: 600,
+      }),
+    });
+    const res = await createOrder(req, env);
+    expect(res.status).toBe(201);
+    const body = (await res.json()) as {
+      data: { total: number; discount: number; loyalty_points_redeemed: number };
+    };
+    // 50% of 90,000 VND = 45,000 VND = 450 points maximum
+    expect(body.data.loyalty_points_redeemed).toBe(450);
+    expect(body.data.discount).toBe(45000);
+    expect(body.data.total).toBe(45000);
+    expect(mockDb.customers.get('cust_vip_600')?.loyalty_points).toBe(150);
+
+    // VALID_REVENUE_ORDER_SQL must exclude QR check-in placeholders and cancelled payment_status
+    expect(VALID_REVENUE_ORDER_SQL).toContain("Khách QR - cho don mon");
+    expect(VALID_REVENUE_ORDER_SQL).toContain("'cancelled'");
+    expect(VALID_REVENUE_ORDER_SQL).toContain("'canceled'");
   });
 });
