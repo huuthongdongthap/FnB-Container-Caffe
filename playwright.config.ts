@@ -5,11 +5,18 @@ export default defineConfig({
   timeout: 60000,
   use: {
     baseURL: 'http://localhost:5173',
+    serviceWorkers: 'block',
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
   },
   projects: [
-    { name: 'Desktop Chrome', use: { ...devices['Desktop Chrome'], channel: 'chrome' } },
+    {
+      name: 'Desktop Chrome',
+      use: {
+        ...devices['Desktop Chrome'],
+        ...(process.env.CI ? {} : { channel: 'chrome' }),
+      },
+    },
     { name: 'Mobile Safari', use: { ...devices['iPhone 12'] } },
   ],
   webServer: {
