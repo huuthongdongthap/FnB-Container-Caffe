@@ -6,7 +6,9 @@ import {
   FINANCIAL_ROLES,
   hasFinancialRole,
   resolvePaymentTenantScope,
+  verifyPaymentOrderToken,
 } from '../../../../packages/domain/payment/policies/payment-access';
+import { publishOrderEvent } from '../../../../packages/domain/order/policies/customer-order-payload';
 import type { Env } from '../../types/env';
 import { log, refundRequestSchema, ERRORS } from './helpers';
 
@@ -55,15 +57,18 @@ export async function handleRefund(c: Context<{ Bindings: Env }>, openApi = fals
       status: string;
       transaction_id: string;
       refund_status: string | null;
+      refund_amount?: number | null;
       tenant_id: string | null;
       customer_id: string | null;
       order_token?: string | null;
+      guest_token_hash?: string | null;
+      orderTokenVerified?: boolean;
     };
     let payment: RefundPaymentRow | null = null;
     try {
       payment = await db
         .prepare(
-          `SELECT p.*, o.tenant_id, o.customer_id, o.order_token
+          `SELECT p.*, o.tenant_id, o.customer_id, o.guest_token_hash
            FROM payments p JOIN orders o ON o.id = p.order_id
            WHERE ${lookupColumn} = ? AND (? = '*' OR COALESCE(NULLIF(TRIM(o.tenant_id), ''), 'default') = ?)${orderByClause}`
         )
@@ -73,40 +78,219 @@ export async function handleRefund(c: Context<{ Bindings: Env }>, openApi = fals
       try {
         payment = await db
           .prepare(
-            `SELECT p.*, o.tenant_id, o.customer_id
+            `SELECT p.*, o.tenant_id, o.customer_id, o.order_token
              FROM payments p JOIN orders o ON o.id = p.order_id
              WHERE ${lookupColumn} = ? AND (? = '*' OR COALESCE(NULLIF(TRIM(o.tenant_id), ''), 'default') = ?)${orderByClause}`
           )
           .bind(lookupValue, tenantId, tenantId)
           .first<RefundPaymentRow>();
       } catch {
-        if (tenantId === 'default' || tenantId === '*') {
+        try {
           payment = await db
             .prepare(
               `SELECT p.*, o.tenant_id, o.customer_id
                FROM payments p JOIN orders o ON o.id = p.order_id
-               WHERE ${lookupColumn} = ?${orderByClause}`
+               WHERE ${lookupColumn} = ? AND (? = '*' OR COALESCE(NULLIF(TRIM(o.tenant_id), ''), 'default') = ?)${orderByClause}`
             )
-            .bind(lookupValue)
-            .first<RefundPaymentRow>()
-            .catch(() => null);
+            .bind(lookupValue, tenantId, tenantId)
+            .first<RefundPaymentRow>();
+        } catch {
+          if (tenantId === 'default' || tenantId === '*') {
+            payment = await db
+              .prepare(
+                `SELECT p.*, o.tenant_id, o.customer_id
+                 FROM payments p JOIN orders o ON o.id = p.order_id
+                 WHERE ${lookupColumn} = ?${orderByClause}`
+              )
+              .bind(lookupValue)
+              .first<RefundPaymentRow>()
+              .catch(() => null);
+          }
         }
       }
+    }
+    if (payment) {
+      payment.orderTokenVerified = await verifyPaymentOrderToken(c, payment);
     }
     if (!payment || !canAccessPaymentOrder(c, payment)) return c.json(ERRORS.PAYMENT_NOT_FOUND, 404);
     if (rawPaymentId && rawOrderId && String(payment.order_id) !== rawOrderId) {
       return c.json({ success: false, error: 'paymentId does not belong to the specified orderId' }, 400);
     }
-    const parsed = refundRequestSchema.safeParse(openApi ? { ...body, amount: body.amount ?? payment.amount, reason: body.reason === undefined ? 'Staff refund' : body.reason } : body);
+    // Partial refunds accumulate; each tranche is capped at the still-unrefunded balance.
+    const priorRefunded = payment.refund_status === 'partial' ? Math.max(0, Number(payment.refund_amount) || 0) : 0;
+    const refundableBalance = Math.max(0, Number(payment.amount) - priorRefunded);
+    const parsed = refundRequestSchema.safeParse(openApi ? { ...body, amount: body.amount ?? refundableBalance, reason: body.reason === undefined ? 'Staff refund' : body.reason } : body);
     if (!parsed.success) return c.json({ success: false, error: parsed.error.issues[0].message }, 400);
-    const amount = parsed.data.amount ?? Number(payment.amount);
+    const amount = parsed.data.amount ?? refundableBalance;
     if (!['paid', 'completed'].includes(payment.status)) return c.json(ERRORS.PAYMENT_NOT_PAID, 400);
-    if (payment.refund_status) return c.json({ ...ERRORS.PAYMENT_ALREADY_REFUNDED,
+    const hasManualTransferRef = typeof (body.manual_transfer_ref ?? body.manualTransferRef) === 'string'
+      && String(body.manual_transfer_ref ?? body.manualTransferRef).trim() !== '';
+    // Only a manually settled bank transfer may add a tranche on top of an existing partial refund.
+    if (payment.refund_status && !(payment.refund_status === 'partial' && hasManualTransferRef)) return c.json({ ...ERRORS.PAYMENT_ALREADY_REFUNDED,
       error: 'Refund already submitted or pending reconciliation' }, 409);
-    if (amount > Number(payment.amount)) return c.json(ERRORS.AMOUNT_EXCEEDS_PAYMENT, 400);
+    if (amount > refundableBalance) return c.json(ERRORS.AMOUNT_EXCEEDS_PAYMENT, 400);
     if (payment.method !== 'payos' || !/^\d+$/.test(payment.transaction_id || '')) {
       return c.json({ success: false, error: 'Only verified PayOS payments support this refund operation' }, 409);
     }
+
+    const manualTransferRef = typeof body.manual_transfer_ref === 'string'
+      ? body.manual_transfer_ref.trim()
+      : (typeof body.manualTransferRef === 'string' ? body.manualTransferRef.trim() : '');
+    const user = c.get('user') as Record<string, any> | undefined;
+    const userRole = String(user?.role || '').trim().toLowerCase();
+    const canManualRefund = ['owner', 'manager', 'admin'].includes(userRole);
+
+    if (manualTransferRef) {
+      if (!canManualRefund) {
+        return c.json({ success: false, error: 'Only owner or manager can confirm manual bank-transfer refund' }, 403);
+      }
+      const now = new Date().toISOString();
+      const refundReason = parsed.data.reason || 'Manual bank-transfer refund';
+      const effectivePaymentTenant = (payment.tenant_id && String(payment.tenant_id).trim()) || 'default';
+
+      const cumulativeRefunded = priorRefunded + amount;
+      const fullRefund = cumulativeRefunded >= Number(payment.amount);
+      const refundStatus = fullRefund ? 'completed' : 'partial';
+      // CAS on refund_status + prior refund_amount: concurrent tranches settle exactly once
+      // and cannot jointly exceed the captured payment amount.
+      const settled = await db.prepare(`
+        UPDATE payments
+        SET refund_status = ?,
+            refund_amount = ?,
+            refund_reason = ?,
+            refunded_at = ?,
+            status = CASE WHEN ? = 1 THEN 'refunded' ELSE status END,
+            updated_at = ?
+        WHERE id = ? AND status IN ('paid', 'completed')
+          AND (refund_status IS NULL OR refund_status IN ('', 'partial'))
+          AND COALESCE(refund_amount, 0) = ?
+          AND ? <= amount
+      `).bind(refundStatus, cumulativeRefunded, refundReason, now, fullRefund ? 1 : 0, now, payment.id, priorRefunded, cumulativeRefunded).run();
+      const settledChanges = (settled as { meta?: { changes?: number } })?.meta?.changes ?? 0;
+      if (settledChanges < 1) {
+        return c.json({ ...ERRORS.PAYMENT_ALREADY_REFUNDED,
+          error: 'Refund already submitted or pending reconciliation' }, 409);
+      }
+
+      if (fullRefund) {
+        await db
+          .prepare(
+            "UPDATE orders SET payment_status = 'refunded', updated_at = ? WHERE id = ? AND LOWER(COALESCE(payment_status, '')) IN ('paid', 'completed') AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
+          )
+          .bind(now, payment.order_id, effectivePaymentTenant)
+          .run()
+          .catch(() =>
+            db
+              .prepare(
+                "UPDATE orders SET payment_status = 'refunded', updated_at = ? WHERE id = ? AND LOWER(COALESCE(payment_status, '')) IN ('paid', 'completed')"
+              )
+              .bind(now, payment.order_id)
+              .run()
+          );
+      }
+
+      const postRefundOrder = await db
+        .prepare('SELECT status, payment_status FROM orders WHERE id = ? LIMIT 1')
+        .bind(payment.order_id)
+        .first<{ status?: string | null; payment_status?: string | null }>()
+        .catch(() => null);
+      const effectiveOrderStatus = String(postRefundOrder?.status || 'pending');
+      const effectiveOrderPayStatus = fullRefund
+        ? 'refunded'
+        : String(postRefundOrder?.payment_status || 'paid');
+
+      if (c.env?.AUTH_KV) {
+        await Promise.all([
+          c.env.AUTH_KV.delete('orders:active:all').catch(() => {}),
+          c.env.AUTH_KV.delete(`orders:active:${effectivePaymentTenant}`).catch(() => {}),
+          publishOrderEvent(c.env.AUTH_KV, payment.order_id, effectiveOrderStatus, {
+            tenantId: effectivePaymentTenant,
+            paymentStatus: effectiveOrderPayStatus,
+          }).catch(() => {}),
+        ]);
+      }
+
+      if (c.env?.ORDER_BROADCASTER) {
+        try {
+          const ns = c.env.ORDER_BROADCASTER;
+          const doChannel =
+            effectivePaymentTenant !== 'default'
+              ? `${effectivePaymentTenant}:${payment.order_id}`
+              : payment.order_id;
+          const stub = ns.get(ns.idFromName(doChannel)) as unknown as {
+            broadcast?: (msg: unknown) => Promise<void>;
+            fetch?: (input: RequestInfo, init?: RequestInit) => Promise<Response>;
+          };
+          const eventPayload = {
+            orderId: payment.order_id,
+            status: effectiveOrderStatus,
+            payment_status: effectiveOrderPayStatus,
+            refund_status: refundStatus,
+            ...(effectivePaymentTenant !== 'default' ? { tenant_id: effectivePaymentTenant } : {}),
+            updatedAt: Date.now(),
+          };
+          if (typeof stub.broadcast === 'function') await stub.broadcast(eventPayload);
+          else if (typeof stub.fetch === 'function') {
+            await stub.fetch('https://do/broadcast', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(eventPayload),
+            });
+          }
+        } catch {
+          // Non-blocking broadcaster notification
+        }
+      }
+
+      try {
+        await db.prepare(`
+          INSERT INTO audit_logs (actor_id, actor_name, user_id, action, resource_type, resource_id, details, metadata, tenant_id, created_at)
+          VALUES (?, ?, ?, 'manual_refund_settled', 'payment', ?, ?, ?, ?, ?)
+        `).bind(
+          user?.id || 'system',
+          user?.name || user?.email || 'manager',
+          user?.id || null,
+          payment.id,
+          JSON.stringify({ manual_transfer_ref: manualTransferRef, amount, order_id: payment.order_id, reason: refundReason }),
+          JSON.stringify({ manual_transfer_ref: manualTransferRef, amount }),
+          effectivePaymentTenant,
+          now,
+        ).run();
+      } catch {
+        // Fallback for minimal audit_logs schema
+      }
+
+      const customerId = payment.customer_id;
+      if (customerId && customerId !== 'guest') {
+        try {
+          const { loadPolicy, reverseAccrual } = await import('@aura/domain-crm');
+          const policy = await loadPolicy(db, c.env?.AUTH_KV, new Date(), effectivePaymentTenant).catch(() => null);
+          if (policy) {
+            await reverseAccrual(db, policy, {
+              orderId: payment.order_id,
+              customerId,
+              refundAmountVnd: amount,
+              tenantId: effectivePaymentTenant,
+              reason: refundReason,
+            }).catch(() => {});
+          }
+        } catch {
+          // Non-blocking on reverseAccrual
+        }
+      }
+
+      return c.json({
+        success: true,
+        data: {
+          paymentId: payment.id,
+          orderId: payment.order_id,
+          amount,
+          refund_status: refundStatus,
+          manual_transfer_ref: manualTransferRef,
+        },
+      }, 200);
+    }
+
     // The published PayOS payment-link API documents create/get/cancel, not refunds.
     // Never invent a provider transfer or mark paid funds refunded without evidence.
     return c.json({ success: false, code: 'REFUND_PROVIDER_UNAVAILABLE',

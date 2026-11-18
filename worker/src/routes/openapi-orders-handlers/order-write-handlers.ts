@@ -8,7 +8,7 @@ import { executeKdsStatusTransition } from '@aura/domain-kitchen';
 import { canAccessOrder } from '@aura/domain-customer';
 import { createOrderFromAlias } from '../../../../packages/domain/order/commands/create-order-alias';
 import { getDatabase, matchesTenantRow } from '../../lib/db';
-import { handleCancelOrder, runOrderCancellationRollback, resolveCustomerOwnerIdsForMutation } from './order-cancel-handlers';
+import { handleCancelOrder, hasIssuedEInvoice, runOrderCancellationRollback, resolveCustomerOwnerIdsForMutation } from './order-cancel-handlers';
 import { fetchOrderForRead } from './order-read-handlers';
 
 export { handleCancelOrder };
@@ -129,9 +129,23 @@ export async function handleOpenApiUpdateOrder(c: Context<{ Bindings: Env }>) {
     ) {
       return c.json({ success: false, error: 'Customers may only cancel pending or confirmed orders' }, 403);
     }
-    if (body.status === 'cancelled' && String(existing.payment_status || '').trim().toLowerCase() === 'paid') {
-      return c.json({ success: false, error: 'Paid orders cannot be cancelled by customer' }, 409);
-    }
+  }
+  const normalizedActorRole = String(user?.role || '').trim().toLowerCase();
+  const canCompensatePaid = ['owner', 'admin', 'manager', 'supervisor'].includes(normalizedActorRole);
+  if (
+    body.status === 'cancelled' &&
+    existing.status !== 'cancelled' &&
+    !canCompensatePaid &&
+    String(existing.payment_status || '').trim().toLowerCase() === 'paid'
+  ) {
+    return c.json({ success: false, error: 'Paid order cannot be cancelled; initiate a refund instead' }, 409);
+  }
+  if (body.status === 'cancelled' && existing.status !== 'cancelled' && (await hasIssuedEInvoice(db, id))) {
+    return c.json({
+      success: false,
+      code: 'EINVOICE_ADJUSTMENT_REQUIRED',
+      error: 'Order already has an issued e-invoice; issue an adjustment or replacement credit note instead of cancelling',
+    }, 409);
   }
 
   const updates: string[] = [];
@@ -170,11 +184,13 @@ export async function handleOpenApiUpdateOrder(c: Context<{ Bindings: Env }>) {
       if (!authCheck.ok) return c.json({ success: false, error: authCheck.error }, 403);
 
       if (body.status === 'cancelled') {
+        const preCancelStatus = String(existing.status ?? '');
         const transition = await executeKdsStatusTransition(db, id, 'cancelled', user?.role, {
           tenantId: user?.role === 'customer' ? (rawExistingTenant || 'default') : (tenantId === '*' ? (rawExistingTenant || 'default') : tenantId),
           kv: c.env?.AUTH_KV,
           env: c.env as unknown as Record<string, unknown>,
           skipCancelSideEffects: true,
+          allowPaidCompensation: canCompensatePaid,
         });
         if (!transition.success) {
           return c.json({ success: false, error: transition.error }, (transition.statusCode || 400) as any);
@@ -188,6 +204,7 @@ export async function handleOpenApiUpdateOrder(c: Context<{ Bindings: Env }>) {
           cancelTenant: effectiveOrderTenant,
           now,
           reason: body.reason || body.notes || 'order_cancelled',
+          preCancelStatus,
         });
       } else {
         const transition = await executeKdsStatusTransition(db, id, body.status, user?.role, {

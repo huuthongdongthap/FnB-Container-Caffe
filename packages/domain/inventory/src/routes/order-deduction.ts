@@ -16,18 +16,63 @@ interface Env {
   executionCtx?: { waitUntil: (p: Promise<any>) => void };
 }
 
+/**
+ * Best-effort spoilage record keyed by (tenant, order, ingredient). It only writes when a
+ * matching ingredient row exists (waste_log references ingredients) and is skipped when the
+ * order already has an entry, so retries never double count. The authoritative append-only
+ * record stays in inventory_transactions / stock_movements.
+ */
+async function recordWasteLog(env: Env, orderId: string, tenant: string, ingredientId: string, quantity: number): Promise<void> {
+  try {
+    await env.AURA_DB.prepare(
+      `INSERT INTO waste_log (id, ingredient_id, quantity, unit, reason, notes, tenant_id, order_id, item_id)
+       SELECT ?, i.id, ?, COALESCE(NULLIF(TRIM(i.unit), ''), 'unit'), 'order_cancelled_after_prep', ?, ?, ?, ?
+         FROM ingredients i
+        WHERE i.id = ?
+          AND NOT EXISTS (SELECT 1 FROM waste_log w WHERE w.order_id = ? AND w.ingredient_id = i.id AND w.tenant_id = ?)`
+    ).bind(
+      crypto.randomUUID(), quantity, `Spoiled after preparation started, cancelled order ${orderId}`,
+      tenant, orderId, ingredientId, ingredientId, orderId, tenant
+    ).run();
+  } catch {
+    // waste_log or its tenant/order columns are absent in minimal schemas
+  }
+}
+
 const inFlightOrderRestorations = new Map<string, Promise<void>>();
 
+/** Statuses after which ingredients were already brewed or plated, so cancelling cannot return them to clean stock. */
+const POST_PREP_STATUSES = new Set(['preparing', 'ready', 'served', 'completed']);
+
+function isPostPrepStatus(status?: string): boolean {
+  return POST_PREP_STATUSES.has(String(status ?? '').trim().toLowerCase());
+}
+
 /**
- * Reverse all `reserve` transactions for an order when it is cancelled.
- * Idempotent: no-op if no `reserve` txns exist for the order.
+ * Reverse the stock held by an order when it is cancelled.
+ * Before preparation starts the stock is released back; once preparation has started the
+ * quantities are spoiled, so they are recorded as waste and never re-enter clean stock.
+ * The ledger is append-only and idempotent: a retry finds the existing release/waste row.
  */
-export async function restoreInventoryForOrder(env: Env, orderId: string, tenantId?: string): Promise<void> {
+export async function restoreInventoryForOrder(
+  env: Env,
+  orderId: string,
+  tenantId?: string,
+  preCancelStatus?: string | { preCancelStatus?: string; releaseUnconsumedReserves?: boolean },
+): Promise<void> {
+  const resolvedPreStatus =
+    typeof preCancelStatus === 'string'
+      ? preCancelStatus
+      : preCancelStatus?.preCancelStatus;
+  const releaseUnconsumedReserves =
+    typeof preCancelStatus === 'object' && preCancelStatus !== null
+      ? Boolean(preCancelStatus.releaseUnconsumedReserves)
+      : false;
   const lockKey = String(orderId || '');
   const previous = inFlightOrderRestorations.get(lockKey) ?? Promise.resolve();
   const current = previous
     .catch(() => {})
-    .then(() => restoreInventoryForOrderInternal(env, orderId, tenantId));
+    .then(() => restoreInventoryForOrderInternal(env, orderId, tenantId, resolvedPreStatus, releaseUnconsumedReserves));
   inFlightOrderRestorations.set(lockKey, current);
   try {
     await current;
@@ -38,7 +83,14 @@ export async function restoreInventoryForOrder(env: Env, orderId: string, tenant
   }
 }
 
-async function restoreInventoryForOrderInternal(env: Env, orderId: string, tenantId?: string): Promise<void> {
+async function restoreInventoryForOrderInternal(
+  env: Env,
+  orderId: string,
+  tenantId?: string,
+  preCancelStatus?: string,
+  releaseUnconsumedReserves: boolean = false,
+): Promise<void> {
+  const spoiled = isPostPrepStatus(preCancelStatus);
   const rawExplicit = tenantId && tenantId.trim() ? tenantId.trim() : '';
   const explicitTenant =
     rawExplicit && rawExplicit !== '*' && rawExplicit.toLowerCase() !== 'hq'
@@ -74,15 +126,15 @@ async function restoreInventoryForOrderInternal(env: Env, orderId: string, tenan
   };
 
   try {
-    let reservations: { results: Array<{ id: string; item_id: string; quantity: number }> };
+    let reservations: { results: Array<{ id: string; item_id: string; type?: string; quantity: number }> };
     try {
       reservations = await env.AURA_DB.prepare(
-        `SELECT id, item_id, quantity FROM inventory_transactions
+        `SELECT id, item_id, type, quantity FROM inventory_transactions
          WHERE reference_id = ? AND reference_type = 'order' AND type IN ('reserve', 'sale')
            AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?`
       )
         .bind(orderId, effectiveTenant)
-        .all<{ id: string; item_id: string; quantity: number }>();
+        .all<{ id: string; item_id: string; type?: string; quantity: number }>();
     } catch {
       reservations = { results: [] };
     }
@@ -92,14 +144,14 @@ async function restoreInventoryForOrderInternal(env: Env, orderId: string, tenan
          WHERE reference_id = ? AND reference_type = 'order' AND type = 'reserve'`
       )
         .bind(orderId)
-        .all<{ id: string; item_id: string; quantity: number; tenant_id?: string | null }>()
+        .all<{ id: string; item_id: string; type?: string; quantity: number; tenant_id?: string | null }>()
         .catch(() =>
           env.AURA_DB.prepare(
             `SELECT id, item_id, quantity FROM inventory_transactions
              WHERE reference_id = ? AND reference_type = 'order' AND type = 'reserve'`
           )
             .bind(orderId)
-            .all<{ id: string; item_id: string; quantity: number; tenant_id?: string | null }>()
+            .all<{ id: string; item_id: string; type?: string; quantity: number; tenant_id?: string | null }>()
         );
       reservations = {
         results: (fallbackRes.results || []).filter((r) => matchesItemTenant(r as unknown as Record<string, unknown>)),
@@ -109,7 +161,27 @@ async function restoreInventoryForOrderInternal(env: Env, orderId: string, tenan
     if (reservations.results && reservations.results.length > 0) {
       const ops = [];
       const fallbackOps = [];
+      const handledItemIds = new Set<string>();
+      const seenReservationIds = new Set<string>();
+      const wasteItems: Array<{ itemId: string; quantity: number }> = [];
+      try {
+        const done = await env.AURA_DB.prepare(
+          `SELECT item_id, type, quantity FROM inventory_transactions
+           WHERE reference_id = ? AND reference_type = 'order' AND type IN ('release', 'waste')`
+        ).bind(orderId).all<{ item_id: string; type?: string; quantity?: number }>();
+        for (const row of done.results || []) {
+          if (row.type && row.type !== 'release' && row.type !== 'waste') continue;
+          if (!row.type && typeof row.quantity === 'number' && row.quantity < 0) continue;
+          handledItemIds.add(row.item_id);
+        }
+      } catch {
+        // Partial mocks without the ledger table: nothing recorded yet
+      }
       for (const res of reservations.results) {
+        if (res.id) {
+          if (seenReservationIds.has(res.id)) continue;
+          seenReservationIds.add(res.id);
+        }
         let hasItemTenantCol = false;
         if (effectiveTenant && effectiveTenant !== '*') {
           try {
@@ -123,93 +195,47 @@ async function restoreInventoryForOrderInternal(env: Env, orderId: string, tenan
             // Ignore when inventory_items.tenant_id is absent in partial mocks
           }
         }
-        if (res.id) {
-          let claimDelRes: { meta?: { changes?: number } } | null = null;
-          try {
-            const delStmt = hasItemTenantCol
-              ? env.AURA_DB.prepare(
-                  "DELETE FROM inventory_transactions WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
-                ).bind(res.id, effectiveTenant)
-              : env.AURA_DB.prepare('DELETE FROM inventory_transactions WHERE id = ?').bind(res.id);
-            if (typeof (delStmt as any).run === 'function') {
-              claimDelRes = await delStmt.run();
-            }
-          } catch {
-            if (effectiveTenant === 'default') {
-              const fallbackDelStmt = env.AURA_DB.prepare('DELETE FROM inventory_transactions WHERE id = ?').bind(res.id);
-              if (typeof (fallbackDelStmt as any).run === 'function') {
-                claimDelRes = await fallbackDelStmt.run().catch(() => null);
-              }
-            }
-          }
-          if (claimDelRes?.meta && typeof claimDelRes.meta.changes === 'number' && claimDelRes.meta.changes === 0) {
-            continue;
-          }
-        }
+        if (handledItemIds.has(res.item_id)) continue;
+        const spoilThisRes = spoiled && (!releaseUnconsumedReserves || res.type === 'sale');
         const absQty = Math.abs(res.quantity);
         const relId = crypto.randomUUID();
-        ops.push(
-          hasItemTenantCol
-            ? env.AURA_DB.prepare(
-                "UPDATE inventory_items SET current_stock = current_stock + ?, updated_at = datetime('now') WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
-              ).bind(absQty, res.item_id, effectiveTenant)
-            : env.AURA_DB.prepare(
-                "UPDATE inventory_items SET current_stock = current_stock + ?, updated_at = datetime('now') WHERE id = ?"
-              ).bind(absQty, res.item_id)
-        );
+        const ledgerType = spoilThisRes ? 'waste' : 'release';
+        const ledgerNote = spoilThisRes
+          ? `Spoiled after preparation started, cancelled order ${orderId}`
+          : `Restore from cancelled order ${orderId}`;
+        if (!spoilThisRes) {
+          ops.push(
+            hasItemTenantCol
+              ? env.AURA_DB.prepare(
+                  "UPDATE inventory_items SET current_stock = current_stock + ?, updated_at = datetime('now') WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
+                ).bind(absQty, res.item_id, effectiveTenant)
+              : env.AURA_DB.prepare(
+                  "UPDATE inventory_items SET current_stock = current_stock + ?, updated_at = datetime('now') WHERE id = ?"
+                ).bind(absQty, res.item_id)
+          );
+          fallbackOps.push(
+            env.AURA_DB.prepare(
+              "UPDATE inventory_items SET current_stock = current_stock + ?, updated_at = datetime('now') WHERE id = ?"
+            ).bind(absQty, res.item_id)
+          );
+        }
         ops.push(
           hasItemTenantCol
             ? env.AURA_DB.prepare(
                 'INSERT INTO inventory_transactions (id, item_id, type, quantity, reference_id, reference_type, notes, tenant_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
-              ).bind(
-                relId,
-                res.item_id,
-                'release',
-                absQty,
-                orderId,
-                'order',
-                `Restore from cancelled order ${orderId}`,
-                effectiveTenant
-              )
+              ).bind(relId, res.item_id, ledgerType, absQty, orderId, 'order', ledgerNote, effectiveTenant)
             : env.AURA_DB.prepare(
                 'INSERT INTO inventory_transactions (id, item_id, type, quantity, reference_id, reference_type, notes) VALUES (?, ?, ?, ?, ?, ?, ?)'
-              ).bind(
-                relId,
-                res.item_id,
-                'release',
-                absQty,
-                orderId,
-                'order',
-                `Restore from cancelled order ${orderId}`
-              )
-        );
-        ops.push(
-          hasItemTenantCol
-            ? env.AURA_DB.prepare(
-                "DELETE FROM inventory_transactions WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
-              ).bind(res.id, effectiveTenant)
-            : env.AURA_DB.prepare('DELETE FROM inventory_transactions WHERE id = ?').bind(res.id)
-        );
-
-        fallbackOps.push(
-          env.AURA_DB.prepare(
-            "UPDATE inventory_items SET current_stock = current_stock + ?, updated_at = datetime('now') WHERE id = ?"
-          ).bind(absQty, res.item_id)
+              ).bind(relId, res.item_id, ledgerType, absQty, orderId, 'order', ledgerNote)
         );
         fallbackOps.push(
           env.AURA_DB.prepare(
             'INSERT INTO inventory_transactions (id, item_id, type, quantity, reference_id, reference_type, notes) VALUES (?, ?, ?, ?, ?, ?, ?)'
-          ).bind(
-            relId,
-            res.item_id,
-            'release',
-            absQty,
-            orderId,
-            'order',
-            `Restore from cancelled order ${orderId}`
-          )
+          ).bind(relId, res.item_id, ledgerType, absQty, orderId, 'order', ledgerNote)
         );
-        fallbackOps.push(env.AURA_DB.prepare('DELETE FROM inventory_transactions WHERE id = ?').bind(res.id));
+        if (spoilThisRes) {
+          wasteItems.push({ itemId: res.item_id, quantity: absQty });
+        }
       }
       if (ops.length > 0) {
         try {
@@ -217,6 +243,9 @@ async function restoreInventoryForOrderInternal(env: Env, orderId: string, tenan
         } catch (batchErr) {
           if (effectiveTenant !== 'default') throw batchErr;
           await env.AURA_DB.batch(fallbackOps);
+        }
+        for (const w of wasteItems) {
+          await recordWasteLog(env, orderId, effectiveTenant, w.itemId, w.quantity);
         }
       }
       // Do not return early: a hybrid order may have both SKU reservations
@@ -284,7 +313,28 @@ async function restoreInventoryForOrderInternal(env: Env, orderId: string, tenan
     const now = new Date().toISOString();
     const ops = [];
     const fallbackOps = [];
+    const handledIngredientIds = new Set<string>();
+    const seenMovementIds = new Set<string>();
+    const movementWasteItems: Array<{ ingredientId: string; quantity: number }> = [];
+    try {
+      const done = await env.AURA_DB.prepare(
+        `SELECT ingredient_id, type, quantity FROM stock_movements
+         WHERE reference_id = ? AND reference_type = 'order' AND type IN ('adjustment', 'waste', 'return', 'release')`
+      ).bind(orderId).all<{ ingredient_id: string; type?: string; quantity?: number }>();
+      for (const row of done.results || []) {
+        if (row.type && !['adjustment', 'waste', 'return', 'release'].includes(row.type)) continue;
+        if (!row.type && typeof row.quantity === 'number' && row.quantity < 0) continue;
+        handledIngredientIds.add(row.ingredient_id);
+      }
+    } catch {
+      // Partial schema
+    }
+
     for (const mov of movements.results) {
+      if (mov.id) {
+        if (seenMovementIds.has(mov.id)) continue;
+        seenMovementIds.add(mov.id);
+      }
       let hasIngTenantCol = false;
       if (effectiveTenant && effectiveTenant !== '*') {
         try {
@@ -298,108 +348,58 @@ async function restoreInventoryForOrderInternal(env: Env, orderId: string, tenan
           // Ignore when ingredients.tenant_id is absent in partial mocks
         }
       }
-      if (mov.id) {
-        let claimMovDelRes: { meta?: { changes?: number } } | null = null;
-        try {
-          const delMovStmt = hasIngTenantCol
-            ? env.AURA_DB.prepare(
-                "DELETE FROM stock_movements WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
-              ).bind(mov.id, effectiveTenant)
-            : env.AURA_DB.prepare('DELETE FROM stock_movements WHERE id = ?').bind(mov.id);
-          if (typeof (delMovStmt as any).run === 'function') {
-            claimMovDelRes = await delMovStmt.run();
-          }
-        } catch {
-          if (effectiveTenant === 'default') {
-            const fallbackDelMovStmt = env.AURA_DB.prepare('DELETE FROM stock_movements WHERE id = ?').bind(mov.id);
-            if (typeof (fallbackDelMovStmt as any).run === 'function') {
-              claimMovDelRes = await fallbackDelMovStmt.run().catch(() => null);
-            }
-          }
-        }
-        if (claimMovDelRes?.meta && typeof claimMovDelRes.meta.changes === 'number' && claimMovDelRes.meta.changes === 0) {
-          continue;
-        }
-      }
+      if (handledIngredientIds.has(mov.ingredient_id)) continue;
+
       const absQty = Math.abs(mov.quantity);
       const restoreMovId = crypto.randomUUID();
-      ops.push(
-        hasIngTenantCol
-          ? env.AURA_DB.prepare(
-              "UPDATE ingredients SET current_stock = current_stock + ?, updated_at = ? WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
-            ).bind(absQty, now, mov.ingredient_id, effectiveTenant)
-          : env.AURA_DB.prepare(
-              'UPDATE ingredients SET current_stock = current_stock + ?, updated_at = ? WHERE id = ?'
-            ).bind(absQty, now, mov.ingredient_id)
-      );
+      const movType = spoiled ? 'waste' : 'adjustment';
+      const movNote = spoiled
+        ? `Spoiled after preparation started, cancelled order ${orderId}`
+        : `Restore from cancelled order ${orderId}`;
+
+      if (!spoiled) {
+        ops.push(
+          hasIngTenantCol
+            ? env.AURA_DB.prepare(
+                "UPDATE ingredients SET current_stock = current_stock + ?, updated_at = ? WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
+              ).bind(absQty, now, mov.ingredient_id, effectiveTenant)
+            : env.AURA_DB.prepare(
+                'UPDATE ingredients SET current_stock = current_stock + ?, updated_at = ? WHERE id = ?'
+              ).bind(absQty, now, mov.ingredient_id)
+        );
+        fallbackOps.push(
+          env.AURA_DB.prepare(
+            'UPDATE ingredients SET current_stock = current_stock + ?, updated_at = ? WHERE id = ?'
+          ).bind(absQty, now, mov.ingredient_id)
+        );
+      }
+
       ops.push(
         hasIngTenantCol
           ? env.AURA_DB.prepare(
               'INSERT INTO stock_movements (id, ingredient_id, type, quantity, reference_id, reference_type, notes, created_at, tenant_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'
-            ).bind(
-              restoreMovId,
-              mov.ingredient_id,
-              'adjustment',
-              absQty,
-              orderId,
-              'order',
-              `Restore from cancelled order ${orderId}`,
-              now,
-              effectiveTenant
-            )
+            ).bind(restoreMovId, mov.ingredient_id, movType, absQty, orderId, 'order', movNote, now, effectiveTenant)
           : env.AURA_DB.prepare(
               'INSERT INTO stock_movements (id, ingredient_id, type, quantity, reference_id, reference_type, notes, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
-            ).bind(
-              restoreMovId,
-              mov.ingredient_id,
-              'adjustment',
-              absQty,
-              orderId,
-              'order',
-              `Restore from cancelled order ${orderId}`,
-              now
-            )
+            ).bind(restoreMovId, mov.ingredient_id, movType, absQty, orderId, 'order', movNote, now)
       );
-      if (mov.id) {
-        ops.push(
-          hasIngTenantCol
-            ? env.AURA_DB.prepare(
-                "DELETE FROM stock_movements WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
-              ).bind(mov.id, effectiveTenant)
-            : env.AURA_DB.prepare('DELETE FROM stock_movements WHERE id = ?').bind(mov.id)
-        );
-      }
 
       fallbackOps.push(
         env.AURA_DB.prepare(
-          'UPDATE ingredients SET current_stock = current_stock + ?, updated_at = ? WHERE id = ?'
-        ).bind(absQty, now, mov.ingredient_id)
-      );
-      fallbackOps.push(
-        env.AURA_DB.prepare(
           'INSERT INTO stock_movements (id, ingredient_id, type, quantity, reference_id, reference_type, notes, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
-        ).bind(
-          restoreMovId,
-          mov.ingredient_id,
-          'adjustment',
-          absQty,
-          orderId,
-          'order',
-          `Restore from cancelled order ${orderId}`,
-          now
-        )
+        ).bind(restoreMovId, mov.ingredient_id, movType, absQty, orderId, 'order', movNote, now)
       );
-      if (mov.id) {
-        fallbackOps.push(env.AURA_DB.prepare('DELETE FROM stock_movements WHERE id = ?').bind(mov.id));
-      }
-      try {
-        await env.AURA_DB.prepare(
-          "UPDATE inventory_items SET current_stock = current_stock + ?, updated_at = datetime('now') WHERE id = ? AND (COALESCE(NULLIF(tenant_id, ''), 'default') = ? OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?3)"
-        )
-          .bind(absQty, mov.ingredient_id, effectiveTenant)
-          .run();
-      } catch {
-        // Best-effort sync when inventory_items shares ingredient IDs
+
+      if (spoiled) {
+        movementWasteItems.push({ ingredientId: mov.ingredient_id, quantity: absQty });
+      } else {
+        try {
+          await env.AURA_DB.prepare(
+            "UPDATE inventory_items SET current_stock = current_stock + ?, updated_at = datetime('now') WHERE id = ? AND (COALESCE(NULLIF(tenant_id, ''), 'default') = ? OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?3)"
+          ).bind(absQty, mov.ingredient_id, effectiveTenant).run();
+        } catch {
+          // Best-effort sync when inventory_items shares ingredient IDs
+        }
       }
     }
     if (ops.length > 0) {
@@ -408,6 +408,9 @@ async function restoreInventoryForOrderInternal(env: Env, orderId: string, tenan
       } catch (batchErr) {
         if (effectiveTenant !== 'default') throw batchErr;
         await env.AURA_DB.batch(fallbackOps);
+      }
+      for (const w of movementWasteItems) {
+        await recordWasteLog(env, orderId, effectiveTenant, w.ingredientId, w.quantity);
       }
     }
   } catch {

@@ -8,6 +8,7 @@ export type { KitchenStation, CategoryStation, OrderItemStation } from './comman
 export { executeKdsStatusTransition } from './commands/kds-status-transition';
 export type { TransitionKdsResult, KdsTransitionDb, KdsTransitionOptions } from './commands/kds-status-transition';
 // policies
+export { PREPAID_ONLINE_METHODS, isHeldOutOfKds } from './policies/kds-hold-policy';
 export {
   buildCategoryStationIndex,
   buildIndexFromDbRows,

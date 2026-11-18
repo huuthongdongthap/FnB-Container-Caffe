@@ -29,6 +29,8 @@ const GenerateQRPage = React.lazy(() => import('@/pages/admin/GenerateQR'));
 const ManageMenuPage = React.lazy(() => import('@/pages/admin/ManageMenu'));
 const PromotionsManagerPage = React.lazy(() => import('@/pages/admin/PromotionsManager'));
 const SalesReportsPage = React.lazy(() => import('@/pages/admin/SalesReports'));
+const RevenueAccountingPage = React.lazy(() => import('@/pages/admin/RevenueAccounting'));
+const FranchiseReportsPage = React.lazy(() => import('@/pages/admin/FranchiseReports'));
 const SubscriptionsManagerPage = React.lazy(() => import('@/pages/admin/SubscriptionsManager'));
 const AdminDinDinMenuPage = React.lazy(() => import('@/pages/admin/DinDinMenu'));
 const AdminDinDinCartPage = React.lazy(() => import('@/pages/admin/DinDinCart'));
@@ -64,6 +66,8 @@ export const adminRoutes = [
       <Route path="/admin/promotions" element={guarded(<PromotionsManagerPage />)} />
       <Route path="/admin/reservations" element={guarded(<AdminReservationsPage />)} />
       <Route path="/admin/sales-reports" element={guarded(<SalesReportsPage />)} />
+      <Route path="/admin/revenue-accounting" element={guarded(<RevenueAccountingPage />)} />
+      <Route path="/admin/franchise" element={guarded(<FranchiseReportsPage />)} />
       <Route path="/admin/staff" element={guarded(<AdminStaffPage />)} />
       <Route path="/admin/subscriptions" element={guarded(<SubscriptionsManagerPage />)} />
       <Route path="/admin/dindin/menu" element={guarded(<AdminDinDinMenuPage />)} />

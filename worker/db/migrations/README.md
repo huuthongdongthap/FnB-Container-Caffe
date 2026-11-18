@@ -47,24 +47,20 @@ the `.down.sql` rollback. Never recreate them except via that rollback.
 
 `migrations/006_refund_columns.sql` recreates `payments` and SELECTs refund columns from the pre-migration table — only valid if those columns already exist (added by prior manual applies). On a fresh database, run `schema.sql` first, then treat 006 as a no-op.
 
-## Remote-only tables (DDL absent from this repo)
+## Remote-only tables
 
-The production D1 contains tables with no CREATE TABLE in any repo file:
-`_cf_KV`, `bonus_campaigns`, `signup_bonus_log`, `loyalty_audit_log`,
-`erpnext_product_sync`, `campaign_logs`, `campaign_configs`, `sessions`,
-`order_payments`.
-Before recreating or altering any of these, dump their schema from remote
-(`pragma_table_info`) — the repo cannot rebuild them.
+Canonical DDL for `sessions`, `bonus_campaigns`, `signup_bonus_log`, `loyalty_audit_log`, `erpnext_product_sync`, `campaign_logs`, `campaign_configs`, `otp_challenges`, and `schema_migrations` now lives in both `worker/schema.sql` and `db/schema.sql` with 100% table, column, and index parity.
+Only legacy `order_payments` and D1 internal `_cf_KV` remain outside repository DDL; inspect `pragma_table_info` on remote D1 before referencing `order_payments`.
 
 (`checkin_log`, `erpnext_invoices`, the 5 `odoo_*` tables, and `users_legacy`
-were also remote-only — they were retired 2026-09-13; DDL preserved in
-`20260913_02_retire_orphan_tables.down.sql`.)
+were retired 2026-09-13; DDL preserved in `20260913_02_retire_orphan_tables.down.sql`.)
 
-## Fresh-environment bootstrap
+## Fresh-environment bootstrap vs incremental cutover
 
-1. `npx wrangler d1 execute AURA_DB --file=schema.sql`
-2. `npx wrangler d1 execute AURA_DB --file=seed.sql`
-3. Apply `db/migrations/` files in order, **skipping**:
-   - the superseded duplicates in the table above, and
-   - `20260824_03_customers_profile_columns.sql` — its columns are already declared in schema.sql; that file is only for databases created before 2026-08-24, and
-   - `20260826_02_locality_fields.sql` — same reason; schema.sql on or after 2026-08-26 already declares these columns.
+- **Fresh D1 / SQLite environment:**
+  1. `npx wrangler d1 execute AURA_DB --file=worker/schema.sql` (`db/schema.sql` is an identical mirror verified by `tests/bootstrap-payment-schema.test.ts`).
+  2. `npx wrangler d1 execute AURA_DB --file=worker/seed.sql`
+  3. **Do NOT bulk-replay historical `worker/db/migrations/*.sql` on top of `schema.sql`** — `schema.sql` already incorporates every forward migration up to the latest cutover, and `deploy-cloudflare.sh` / `worker/scripts/apply-migrations.sh` intentionally block bulk replay fail-closed. Record the baseline version in `schema_migrations`.
+- **Existing D1 environment:**
+  1. Check `SELECT version FROM schema_migrations ORDER BY version` and verify column/index state via `pragma_table_info` / `pragma_index_list`.
+  2. Apply only new unapplied `YYYYMMDD_NN_<slug>.sql` files individually via `./worker/scripts/apply-migrations.sh <target> <migration_file>` and insert the applied version + SHA-256 checksum into `schema_migrations`.

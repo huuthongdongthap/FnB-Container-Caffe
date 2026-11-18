@@ -7,9 +7,15 @@ import { rateLimitMiddleware, ORDER_RATE_LIMIT } from '../../middleware/rate-lim
 import { createLogger } from '../../middleware/logger';
 import { makeOrderId } from './types';
 import { createOrderFromAlias } from '../../../../packages/domain/order/commands/create-order-alias';
+import { hashOrderToken } from '../../../../packages/domain/customer/policies/order-ownership-policy';
 import { resolveOrderCreationScope, resolveOrderCreationTable, OrderCreationError } from '../../../../packages/domain/order/policies/order-creation-scope';
 
 const log = createLogger({ route: 'guest-orders' });
+
+function generateOrderToken(): string {
+  const bytes = crypto.getRandomValues(new Uint8Array(24));
+  return Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('');
+}
 
 export async function handleGuestCheckin(c: Context<{ Bindings: Env }>) {
   const db = c.env.AURA_DB;
@@ -84,7 +90,20 @@ export async function handleGuestCheckin(c: Context<{ Bindings: Env }>) {
     return c.json({ success: false, error: 'Bàn đang được sử dụng, vui lòng chọn bàn khác' }, 409);
   }
 
+  // Capability token for this guest order: only its SHA-256 digest is stored, the
+  // plaintext is returned once so the guest can re-open or claim the order later.
+  const orderToken = generateOrderToken();
+  const guestTokenHash = await hashOrderToken(orderToken);
+
   const orderInsertStmt = db.prepare(
+    `INSERT INTO orders (id, customer_name, customer_phone, table_id, items, total, status, payment_method, notes, order_type, guest_token_hash, tenant_id, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, 'pending', 'cod', ?, 'dine_in', ?, ?, ?, ?)`
+  ).bind(
+    orderId, data.customer_name, data.customer_phone, tableRow.id,
+    JSON.stringify([]), 0,
+    'Khách QR - cho don mon', guestTokenHash, effectiveTableTenant, now, now
+  );
+  const legacyOrderInsertStmt = db.prepare(
     `INSERT INTO orders (id, customer_name, customer_phone, table_id, items, total, status, payment_method, notes, order_type, tenant_id, created_at, updated_at)
      VALUES (?, ?, ?, ?, ?, ?, 'pending', 'cod', ?, 'dine_in', ?, ?, ?)`
   ).bind(
@@ -93,15 +112,26 @@ export async function handleGuestCheckin(c: Context<{ Bindings: Env }>) {
     'Khách QR - cho don mon', effectiveTableTenant, now, now
   );
   try {
-    if ('idx' in (orderInsertStmt as unknown as Record<string, unknown>) && typeof db.batch === 'function') {
-      const claimedTableStmt = Object.assign(
-        Object.create(Object.getPrototypeOf(tableClaimStmt)),
-        tableClaimStmt,
-        { run: async () => tableUpdateResult }
-      );
-      await db.batch([claimedTableStmt, orderInsertStmt]);
-    } else {
-      await orderInsertStmt.run();
+    const runWithInsert = async (stmt: typeof orderInsertStmt) => {
+      if ('idx' in (stmt as unknown as Record<string, unknown>) && typeof db.batch === 'function') {
+        const claimedTableStmt = Object.assign(
+          Object.create(Object.getPrototypeOf(tableClaimStmt)),
+          tableClaimStmt,
+          { run: async () => tableUpdateResult }
+        );
+        await db.batch([claimedTableStmt, stmt]);
+      } else {
+        await stmt.run();
+      }
+    };
+    try {
+      await runWithInsert(orderInsertStmt);
+    } catch (firstInsertErr) {
+      if (/guest_token_hash/i.test(String((firstInsertErr as Error)?.message ?? firstInsertErr))) {
+        await runWithInsert(legacyOrderInsertStmt);
+      } else {
+        throw firstInsertErr;
+      }
     }
   } catch (insertError) {
     try {
@@ -172,7 +202,7 @@ export async function handleGuestCheckin(c: Context<{ Bindings: Env }>) {
     data: {
       id: orderId, table_id: tableRow.id, table_number: String(tableRow.table_number ?? data.table_id),
       customer_name: data.customer_name, customer_phone: data.customer_phone,
-      status: 'pending', total: 0, created_at: now
+      status: 'pending', total: 0, created_at: now, order_token: orderToken
     }
   }, 201);
 }
@@ -194,9 +224,19 @@ export async function handleGuestCheckout(c: Context<{ Bindings: Env }>) {
       notes: body.notes || (fulfillment === 'DINE_IN' ? 'QR guest' : 'Takeaway guest'),
     }, ctx);
     if (!response.ok) return response;
-    const result = await response.json() as { data: { id: string; total: number; payment_method: string } };
-    return c.json({ success: true, order_id: result.data.id, total: result.data.total,
-      fulfillment_type: fulfillment, payment_method: result.data.payment_method }, response.status as 200 | 201,
+    const result = await response.json() as {
+      order_token?: string;
+      data: { id: string; total: number; payment_method: string; order_token?: string };
+    };
+    const guestOrderToken = result.order_token || result.data.order_token;
+    return c.json({
+      success: true,
+      order_id: result.data.id,
+      total: result.data.total,
+      fulfillment_type: fulfillment,
+      payment_method: result.data.payment_method,
+      ...(guestOrderToken ? { order_token: guestOrderToken } : {}),
+    }, response.status as 200 | 201,
     response.headers.get('X-Cache') ? { 'X-Cache': 'HIT' } : undefined);
   } catch (err) {
     log.error('Guest checkout error:', { message: (err as Error).message });

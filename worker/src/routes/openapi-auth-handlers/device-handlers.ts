@@ -12,8 +12,38 @@ async function resolveDeviceUser(c: any): Promise<any> {
   if (existing) return existing;
   const token = getAuthToken(c.req?.raw);
   if (token && c.env?.JWT_SECRET) {
+    if (c.env?.AUTH_KV && typeof c.env.AUTH_KV.get === 'function') {
+      const isRevoked = await c.env.AUTH_KV.get(`revoked:${token}`).catch(() => '__KV_ERR__');
+      if (isRevoked) return undefined;
+    }
     const payload = await verifyJWT(token, c.env.JWT_SECRET).catch(() => null);
     if (payload) {
+      const tokenVer = Number((payload as { authVersion?: number }).authVersion || 1);
+      const db = c.env?.AURA_DB;
+      if (db && typeof db.prepare === 'function' && payload.id) {
+        const userRow = await db
+          .prepare('SELECT is_active, auth_version FROM users WHERE id = ? LIMIT 1')
+          .bind(payload.id)
+          .first()
+          .catch(() => null);
+        if (userRow) {
+          if ((userRow as { is_active?: number }).is_active === 0) return undefined;
+          if (Number((userRow as { auth_version?: number }).auth_version || 1) !== tokenVer) return undefined;
+        } else if (payload.role === 'customer') {
+          const custRow = await db
+            .prepare('SELECT auth_version FROM customers WHERE id = ? LIMIT 1')
+            .bind(payload.id)
+            .first()
+            .catch(() => null);
+          if (custRow && Number((custRow as { auth_version?: number }).auth_version || 1) !== tokenVer) {
+            return undefined;
+          }
+        }
+      }
+      if (c.env?.AUTH_KV && typeof c.env.AUTH_KV.get === 'function' && payload.id && payload.role === 'customer') {
+        const kvVer = await c.env.AUTH_KV.get(`cust_auth_ver:${payload.id}`).catch(() => null);
+        if (kvVer && Number(kvVer) !== tokenVer) return undefined;
+      }
       const resolved = toUser(payload as any);
       c.set('user', resolved);
       return resolved;
@@ -117,7 +147,7 @@ export function registerDeviceHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
       } catch {
         try {
           const res = await db.prepare(
-            `SELECT sd.id, substr(sd.device_token, -4) AS device_fingerprint, sd.device_token AS raw_device_token, sd.device_name, sd.role, sd.last_login_at, sd.created_at, sd.updated_at
+            `SELECT sd.id, substr(sd.device_token, -4) AS device_fingerprint, sd.device_name, sd.role, sd.last_login_at, sd.created_at, sd.updated_at
              FROM staff_devices sd
              JOIN users u ON u.id = sd.staff_id
              WHERE sd.staff_id = ? AND COALESCE(NULLIF(TRIM(u.tenant_id), ''), 'default') = ?
@@ -128,7 +158,7 @@ export function registerDeviceHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
           if (tenantId === 'default') {
             try {
               const res = await db.prepare(
-                `SELECT id, substr(device_token, -4) AS device_fingerprint, device_token AS raw_device_token, device_name, role, last_login_at, created_at, updated_at
+                `SELECT id, substr(device_token, -4) AS device_fingerprint, device_name, role, last_login_at, created_at, updated_at
                  FROM staff_devices WHERE staff_id = ? ORDER BY created_at DESC`
               ).bind(user.id).all();
               staffRows = res.results || [];
@@ -143,14 +173,13 @@ export function registerDeviceHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
       const seenIds = new Set(mapped.map((d: any) => String(d.id)));
       for (const sd of staffRows) {
         if (seenIds.has(String(sd.id))) continue;
-        const rawFp = sd.device_fingerprint ?? sd.device_token;
+        const rawFp = sd.device_fingerprint;
         const maskedFingerprint = rawFp
           ? (String(rawFp).startsWith('***') ? String(rawFp) : `***${String(rawFp).slice(-4)}`)
           : `***${String(sd.id).slice(-4)}`;
-        const displayFingerprint = sd.raw_device_token ? String(sd.raw_device_token) : maskedFingerprint;
         mapped.push({
           id: sd.id,
-          fingerprint: displayFingerprint,
+          fingerprint: maskedFingerprint,
           name: sd.device_name || sd.id,
           platform: 'mobile',
           browser: null,
@@ -218,10 +247,25 @@ export function registerDeviceHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
       }
       if (staffDevice) {
         const deviceTenant = tenantId || String(user?.tenantId || user?.tenant_id || resolvePublicTenantId(c) || 'default').trim() || 'default';
-        await db.batch([
-          db.prepare('DELETE FROM staff_devices WHERE id = ? AND staff_id = ?').bind(staffDevice.id, user.id),
-          db.prepare('UPDATE users SET auth_version = COALESCE(auth_version, 1) + 1, updated_at = ? WHERE id = ?').bind(now, user.id),
-        ]);
+        try {
+          await db.batch([
+            db
+              .prepare(
+                "DELETE FROM staff_devices WHERE id = ? AND staff_id = ? AND (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?)"
+              )
+              .bind(staffDevice.id, user.id, deviceTenant, deviceTenant),
+            db.prepare('UPDATE users SET auth_version = COALESCE(auth_version, 1) + 1, updated_at = ? WHERE id = ?').bind(now, user.id),
+          ]);
+        } catch {
+          if (deviceTenant === 'default' || deviceTenant === '*') {
+            await db.batch([
+              db.prepare('DELETE FROM staff_devices WHERE id = ? AND staff_id = ?').bind(staffDevice.id, user.id),
+              db.prepare('UPDATE users SET auth_version = COALESCE(auth_version, 1) + 1, updated_at = ? WHERE id = ?').bind(now, user.id),
+            ]);
+          } else {
+            return c.json({ success: false, code: 'AUTH_STATE_UNAVAILABLE', error: 'Failed to revoke staff device', retryable: true }, 503);
+          }
+        }
         await writeAuthAuditLog(
           db,
           user.id,
@@ -246,7 +290,7 @@ export function registerDeviceHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
         .run();
     } catch {
       if (tenantId === 'default') {
-        await db.prepare('DELETE FROM trusted_devices WHERE id = ?').bind(id).run().catch(() => {});
+        await db.prepare('DELETE FROM trusted_devices WHERE id = ? AND user_id = ?').bind(id, user.id).run().catch(() => {});
       }
     }
     try {
@@ -261,9 +305,14 @@ export function registerDeviceHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
         if (currentRow && Number.isFinite(Number(currentRow.auth_version))) {
           dbNextVer = Math.max(dbNextVer, Number(currentRow.auth_version) + 1);
         }
+        const currentCustRow = (await db.prepare('SELECT auth_version FROM customers WHERE id = ?').bind(user.id).first().catch(() => null)) as { auth_version?: number } | null;
+        if (currentCustRow && Number.isFinite(Number(currentCustRow.auth_version))) {
+          dbNextVer = Math.max(dbNextVer, Number(currentCustRow.auth_version) + 1);
+        }
         await db.prepare('UPDATE users SET auth_version = COALESCE(auth_version, 1) + 1, updated_at = ? WHERE id = ?').bind(now, user.id).run().catch(() => {});
+        await db.prepare('UPDATE customers SET auth_version = COALESCE(auth_version, 1) + 1, updated_at = ? WHERE id = ?').bind(now, user.id).run().catch(() => {});
       } catch {
-        // Non-blocking on minimal schemas without users.auth_version
+        // Non-blocking on minimal schemas without auth_version columns
       }
       if (c.env.AUTH_KV) {
         try {
@@ -367,7 +416,12 @@ export function registerDeviceHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
         if (currentRow && Number.isFinite(Number(currentRow.auth_version))) {
           dbNextVer = Math.max(dbNextVer, Number(currentRow.auth_version) + 1);
         }
+        const currentCustRow = (await db.prepare('SELECT auth_version FROM customers WHERE id = ?').bind(user.id).first().catch(() => null)) as { auth_version?: number } | null;
+        if (currentCustRow && Number.isFinite(Number(currentCustRow.auth_version))) {
+          dbNextVer = Math.max(dbNextVer, Number(currentCustRow.auth_version) + 1);
+        }
         await db.prepare('UPDATE users SET auth_version = COALESCE(auth_version, 1) + 1, updated_at = ? WHERE id = ?').bind(now, user.id).run().catch(() => {});
+        await db.prepare('UPDATE customers SET auth_version = COALESCE(auth_version, 1) + 1, updated_at = ? WHERE id = ?').bind(now, user.id).run().catch(() => {});
       } catch {
         return c.json({ success: false, code: 'AUTH_STATE_UNAVAILABLE', error: 'Failed to revoke customer sessions', retryable: true }, 503);
       }

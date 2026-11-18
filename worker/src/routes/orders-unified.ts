@@ -78,7 +78,20 @@ ordersUnifiedRouter.post('/:id/cancel', requireAuth(['owner', 'manager', 'superv
 ordersUnifiedRouter.post('/:id/claim', requireAuth(['owner', 'manager', 'supervisor', 'staff', 'waiter', 'cashier', 'admin', 'customer']), handleClaimOrder);
 
 // ── 3. Parameterized Base Record Handlers (/:id) ──
-ordersUnifiedRouter.get('/:id', requireAuth(['owner', 'manager', 'supervisor', 'staff', 'waiter', 'cashier', 'admin', 'kitchen', 'barista', 'chef', 'shipper', 'customer']), handleGetOrderById);
+const ORDER_DETAIL_ROLES = ['owner', 'manager', 'supervisor', 'staff', 'waiter', 'cashier', 'admin', 'kitchen', 'barista', 'chef', 'shipper', 'customer'];
+ordersUnifiedRouter.get(
+  '/:id',
+  async (c, next) => {
+    const hasOrderToken = Boolean(
+      (c.req.header('X-Order-Token') || c.req.header('x-order-token') || c.req.query('order_token') || '').trim()
+    );
+    if (hasOrderToken) {
+      return optionalAuth()(c, next);
+    }
+    return requireAuth(ORDER_DETAIL_ROLES)(c, next);
+  },
+  handleGetOrderById,
+);
 ordersUnifiedRouter.patch('/:id', requireAuth(['owner', 'manager', 'supervisor', 'staff', 'waiter', 'cashier', 'admin', 'kitchen', 'barista', 'chef', 'shipper']), handleUpdateOrder);
 
 export default ordersUnifiedRouter;

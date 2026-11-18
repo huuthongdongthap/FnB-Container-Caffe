@@ -13,9 +13,12 @@ import { createLogger } from 'worker/src/middleware/logger';
 
 const log = createLogger({ route: 'crm.consent' });
 
+export type ConsentChannel = 'all' | 'zns' | 'sms' | 'email' | 'push';
+
 export interface ConsentUpdate {
   customerId: string;
   purpose: string;
+  channel?: ConsentChannel | string;
   granted: boolean;
   source: string; // 'customer_portal' | 'checkout' | 'staff_action'
   policyVersion?: string;
@@ -41,6 +44,7 @@ export interface ConsentRow {
   id: string;
   customerId: string;
   purpose: string;
+  channel?: string;
   granted: number;
   source: string;
   policyVersion: string | null;
@@ -53,7 +57,8 @@ export type ConsentResult =
   | { ok: true; consent: ConsentRow }
   | { ok: false; error: string; code: 'forbidden' | 'invalid_purpose' | 'server_error' };
 
-const VALID_PURPOSES = ['marketing', 'order', 'analytics', 'referral', 'loyalty'];
+const VALID_PURPOSES = ['marketing', 'order', 'analytics', 'referral', 'loyalty', 'crm', 'erpnext_sync'];
+export const VALID_CONSENT_CHANNELS: readonly ConsentChannel[] = ['all', 'zns', 'sms', 'email', 'push'];
 
 export async function updateConsent(
   db: D1Database,
@@ -62,6 +67,12 @@ export async function updateConsent(
 ): Promise<ConsentResult> {
   if (!VALID_PURPOSES.includes(update.purpose)) {
     return { ok: false, error: `Invalid consent purpose: ${update.purpose}`, code: 'invalid_purpose' };
+  }
+  const normalizedChannel = update.channel !== undefined && String(update.channel).trim() !== ''
+    ? String(update.channel).trim().toLowerCase()
+    : 'all';
+  if (!(VALID_CONSENT_CHANNELS as readonly string[]).includes(normalizedChannel)) {
+    return { ok: false, error: `Invalid consent channel: ${update.channel}`, code: 'invalid_purpose' };
   }
 
   // Staff/owner acting on behalf of a customer must be explicit.
@@ -105,14 +116,38 @@ export async function updateConsent(
 
     try {
       try {
-        await db
-          .prepare(
-            "UPDATE consents SET revoked_at = ? WHERE customer_id = ? AND purpose = ? AND revoked_at IS NULL AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?",
-          )
-          .bind(now, update.customerId, update.purpose, targetTenant)
-          .run();
+        if (normalizedChannel === 'all' && !update.granted) {
+          await db
+            .prepare(
+              "UPDATE consents SET revoked_at = ? WHERE customer_id = ? AND purpose = ? AND revoked_at IS NULL AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?",
+            )
+            .bind(now, update.customerId, update.purpose, targetTenant)
+            .run();
+        } else {
+          await db
+            .prepare(
+              "UPDATE consents SET revoked_at = ? WHERE customer_id = ? AND purpose = ? AND COALESCE(NULLIF(TRIM(channel), ''), 'all') = ? AND revoked_at IS NULL AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?",
+            )
+            .bind(now, update.customerId, update.purpose, normalizedChannel, targetTenant)
+            .run();
+        }
       } catch (revokeErr) {
-        if (targetTenant === 'default' && /no such column:\s*tenant_id/i.test(String(revokeErr))) {
+        if (/no such column:\s*channel/i.test(String(revokeErr))) {
+          await db
+            .prepare(
+              "UPDATE consents SET revoked_at = ? WHERE customer_id = ? AND purpose = ? AND revoked_at IS NULL AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?",
+            )
+            .bind(now, update.customerId, update.purpose, targetTenant)
+            .run()
+            .catch(async (nestedErr) => {
+              if (targetTenant === 'default' && /no such column:\s*tenant_id/i.test(String(nestedErr))) {
+                await db
+                  .prepare('UPDATE consents SET revoked_at = ? WHERE customer_id = ? AND purpose = ? AND revoked_at IS NULL')
+                  .bind(now, update.customerId, update.purpose)
+                  .run();
+              }
+            });
+        } else if (targetTenant === 'default' && /no such column:\s*tenant_id/i.test(String(revokeErr))) {
           await db
             .prepare(
               'UPDATE consents SET revoked_at = ? WHERE customer_id = ? AND purpose = ? AND revoked_at IS NULL',
@@ -126,7 +161,62 @@ export async function updateConsent(
     }
 
     const insertTenant = targetTenant;
-    try {
+    const policyVersion =
+      typeof update.policyVersion === 'string' && update.policyVersion.trim()
+        ? update.policyVersion.trim()
+        : 'v1';
+    let insertedWithChannel = false;
+    if (normalizedChannel !== 'all') {
+      try {
+        await db
+          .prepare(
+            `INSERT INTO consents (id, customer_id, purpose, channel, granted, source, policy_version, granted_at, revoked_at, tenant_id)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          )
+          .bind(
+            id,
+            update.customerId,
+            update.purpose,
+            normalizedChannel,
+            granted,
+            update.source,
+            policyVersion,
+            grantedAt,
+            revokedAt,
+            insertTenant,
+          )
+          .run();
+        insertedWithChannel = true;
+      } catch {
+        try {
+          await db
+            .prepare(
+              `INSERT INTO consents (id, customer_id, purpose, channel, granted, source, policy_version, granted_at, revoked_at, created_by, tenant_id, created_at, updated_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            )
+            .bind(
+              id,
+              update.customerId,
+              update.purpose,
+              normalizedChannel,
+              granted,
+              update.source,
+              policyVersion,
+              grantedAt,
+              revokedAt,
+              update.actorId,
+              insertTenant,
+              now,
+              now,
+            )
+            .run();
+          insertedWithChannel = true;
+        } catch {
+          insertedWithChannel = false;
+        }
+      }
+    }
+    if (!insertedWithChannel) try {
       await db
         .prepare(
           `INSERT INTO consents (id, customer_id, purpose, granted, source, policy_version, granted_at, revoked_at, tenant_id)
@@ -138,7 +228,7 @@ export async function updateConsent(
           update.purpose,
           granted,
           update.source,
-          update.policyVersion ?? null,
+          policyVersion,
           grantedAt,
           revokedAt,
           insertTenant,
@@ -157,7 +247,7 @@ export async function updateConsent(
             update.purpose,
             granted,
             update.source,
-            update.policyVersion ?? null,
+            policyVersion,
             grantedAt,
             revokedAt,
             update.actorId,
@@ -182,7 +272,7 @@ export async function updateConsent(
               update.purpose,
               granted,
               update.source,
-              update.policyVersion ?? null,
+              policyVersion,
               grantedAt,
               revokedAt,
             )
@@ -199,7 +289,7 @@ export async function updateConsent(
               update.purpose,
               granted,
               update.source,
-              update.policyVersion ?? null,
+              policyVersion,
               grantedAt,
               revokedAt,
               update.actorId,
@@ -209,6 +299,45 @@ export async function updateConsent(
             .run();
         }
       }
+    }
+
+    if ((update.purpose === 'marketing' || update.purpose === 'analytics') && normalizedChannel === 'all') {
+      try {
+        const colSql =
+          update.purpose === 'marketing'
+            ? 'marketing_consent = ?, consent_marketing = ?, consent_timestamp = ?'
+            : 'consent_analytics = ?, consent_timestamp = ?';
+        const colBinds =
+          update.purpose === 'marketing'
+            ? [granted, granted, now, update.customerId, insertTenant]
+            : [granted, now, update.customerId, insertTenant];
+        await db
+          .prepare(
+            `UPDATE customers SET ${colSql} WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?`,
+          )
+          .bind(...colBinds)
+          .run();
+      } catch {
+        // Optional mirror columns on legacy schemas
+      }
+    }
+
+    try {
+      await db
+        .prepare(
+          'INSERT INTO customer_events (id, customer_id, event_type, payload, tenant_id, recorded_at) VALUES (?, ?, ?, ?, ?, ?)',
+        )
+        .bind(
+          genId('cev_'),
+          update.customerId,
+          update.granted ? 'ConsentGiven' : 'ConsentRevoked',
+          JSON.stringify({ purpose: update.purpose, source: update.source }),
+          insertTenant,
+          now,
+        )
+        .run();
+    } catch {
+      // Optional event log on minimal mocks
     }
 
     log.info('consent_updated', {
@@ -224,6 +353,7 @@ export async function updateConsent(
         id,
         customerId: update.customerId,
         purpose: update.purpose,
+        channel: normalizedChannel,
         granted,
         source: update.source,
         policyVersion: update.policyVersion ?? null,

@@ -11,7 +11,7 @@ import {
 } from './helpers';
 import { getDatabase } from '../../lib/db';
 import { handleGetOrderSummary } from './order-summary-handlers';
-import { canAccessOrder } from '@aura/domain-order';
+import { canAccessOrder, verifyGuestOrderToken } from '@aura/domain-order';
 
 export { handleGetOrderSummary };
 
@@ -239,7 +239,7 @@ export async function handleListOrders(c: Context<{ Bindings: Env }>) {
 }
 
 export async function handleGetOrderById(c: Context<{ Bindings: Env }>) {
-  const tenantCheck = resolveOpenApiOrdersTenant(c, 'read');
+  const tenantCheck = resolveOpenApiOrdersTenant(c, c.get('user') ? 'read' : 'public');
   if (!tenantCheck.ok) {
     return tenantCheck.response;
   }
@@ -266,9 +266,26 @@ export async function handleGetOrderById(c: Context<{ Bindings: Env }>) {
     }
   }
 
-  const access = canAccessOrder(effectiveUser as any, { id: order.id, customer_id: order.customer_id });
+  const presentedOrderToken = (
+    c.req.header('X-Order-Token') ||
+    c.req.header('x-order-token') ||
+    c.req.query('order_token') ||
+    ''
+  ).trim();
+  const orderTokenVerified = order.guest_token_hash
+    ? await verifyGuestOrderToken(order.guest_token_hash, presentedOrderToken)
+    : false;
+  const access = canAccessOrder(
+    effectiveUser as any,
+    {
+      id: order.id,
+      customer_id: order.customer_id,
+      guest_token_hash: order.guest_token_hash,
+    },
+    { orderTokenVerified },
+  );
   if (!access.allowed) {
-    const status = !user ? 401 : 403;
+    const status = !user && !presentedOrderToken ? 401 : 403;
     return c.json({ success: false, error: access.reason || (status === 401 ? 'Unauthorized' : 'Forbidden') }, status);
   }
 
@@ -308,10 +325,29 @@ export async function handleTrackOrder(c: Context<{ Bindings: Env }>) {
     }
   }
 
-  // Anonymous callers resolve guest orders only; signed-in customers resolve their own orders only.
-  const access = canAccessOrder(effectiveUser as any, { id: order.id, customer_id: order.customer_id });
+  const presentedOrderToken = (
+    c.req.header('X-Order-Token') ||
+    c.req.header('x-order-token') ||
+    c.req.query('order_token') ||
+    ''
+  ).trim();
+  const orderTokenVerified = order.guest_token_hash
+    ? await verifyGuestOrderToken(order.guest_token_hash, presentedOrderToken)
+    : false;
+
+  // Anonymous callers without a token keep shareable zero-PII tracking links working;
+  // signed-in customers and explicit token presenters must match ownership or guest_token_hash.
+  const access = canAccessOrder(
+    effectiveUser as any,
+    {
+      id: order.id,
+      customer_id: order.customer_id,
+      guest_token_hash: effectiveUser || presentedOrderToken ? order.guest_token_hash : null,
+    },
+    { orderTokenVerified },
+  );
   if (!access.allowed) {
-    const status = !user ? 401 : 403;
+    const status = !user && !presentedOrderToken ? 401 : 403;
     return c.json({ success: false, error: access.reason || (status === 401 ? 'Unauthorized' : 'Forbidden') }, status);
   }
 

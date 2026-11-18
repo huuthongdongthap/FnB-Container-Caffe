@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { apiFetch } from '@/lib/api-client';
+import { getGuestOrderToken } from '@/lib/guest-order-token';
 
 /* ═══════════════════════════════════════════════════════════════════
    Payment store — Zustand, no persistence.
@@ -26,11 +27,13 @@ export const usePaymentStore = create<PaymentState>((set, get) => ({
   createPaymentLink: async (orderId: string, amount: number) => {
     set({ loading: true, error: null });
     try {
+      const guestToken = getGuestOrderToken(orderId);
       const body = await apiFetch<{ checkoutUrl?: string; checkout_url?: string; payment?: { checkoutUrl?: string }; url?: string }>(
         '/api/payment/create-link',
         {
           method: 'POST',
           body: JSON.stringify({ order_id: orderId, amount }),
+          ...(guestToken ? { headers: { 'X-Order-Token': guestToken } } : {}),
         },
       );
 

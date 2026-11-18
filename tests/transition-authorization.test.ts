@@ -89,14 +89,15 @@ describe('canActorTransition role-based matrix', () => {
   });
 
   describe('kitchen permissions', () => {
-    it('only permits movement across the prep boundary', () => {
+    it('only permits movement across prep and counter pickup handoff', () => {
       expect(canActorTransition('kitchen', 'confirmed', 'preparing').ok).toBe(true);
       expect(canActorTransition('kitchen', 'preparing', 'ready').ok).toBe(true);
+      expect(canActorTransition('kitchen', 'ready', 'served').ok).toBe(true);
     });
 
     it('forbids intake, billing, or delivery moves', () => {
       expect(canActorTransition('kitchen', 'pending', 'confirmed').ok).toBe(false);
-      expect(canActorTransition('kitchen', 'ready', 'served').ok).toBe(false);
+      expect(canActorTransition('kitchen', 'ready', 'delivered').ok).toBe(false);
       expect(canActorTransition('kitchen', 'served', 'completed').ok).toBe(false);
       expect(canActorTransition('kitchen', 'pending', 'cancelled').ok).toBe(false);
     });

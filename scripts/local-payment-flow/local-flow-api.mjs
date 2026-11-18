@@ -12,9 +12,9 @@ export function sign(data) {
   return createHmac('sha256', CHECKSUM).update(canonical).digest('hex');
 }
 
-export async function http(runtime, pathname, { method = 'GET', body, token } = {}) {
+export async function http(runtime, pathname, { method = 'GET', body, token, headers = {} } = {}) {
   const response = await fetch(`${runtime.url}${pathname}`, {
-    method, headers: { 'content-type': 'application/json', Connection: 'close', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+    method, headers: { 'content-type': 'application/json', Connection: 'close', ...(token ? { Authorization: `Bearer ${token}` } : {}), ...headers },
     ...(body === undefined ? {} : { body: JSON.stringify(body) }), signal: AbortSignal.timeout(15000),
   });
   const text = await response.text(); let json;

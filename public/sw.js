@@ -79,9 +79,15 @@ self.addEventListener('fetch', (event) => {
 
   const url = new URL(event.request.url);
   if (url.origin !== self.location.origin) return;
-  // Mobile aliases may return private JSON outside /api. Neither authenticated
-  // responses nor these aliases belong in the navigation/static cache.
-  if (event.request.headers.has('Authorization') || url.pathname.startsWith('/mobile/')) {
+  // Mobile aliases, authenticated requests, and URLs carrying capability tokens
+  // must never be persisted in the navigation or static CacheStorage.
+  if (
+    event.request.headers.has('Authorization') ||
+    event.request.headers.has('X-Order-Token') ||
+    url.searchParams.has('order_token') ||
+    url.searchParams.has('token') ||
+    url.pathname.startsWith('/mobile/')
+  ) {
     event.respondWith(fetch(event.request));
     return;
   }
@@ -165,12 +171,15 @@ async function queueRequest(request) {
   const cache = await caches.open(API_QUEUE_CACHE);
   const key = `pending-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
-  // Clone the request body as text so we can store it
+  // Clone the request body as text so we can store it without sensitive auth headers
   const body = await request.clone().text();
+  const safeHeaders = [...request.headers.entries()].filter(
+    ([name]) => !['authorization', 'x-order-token', 'cookie'].includes(String(name).toLowerCase())
+  );
   const queued = new Response(JSON.stringify({
     url: request.url,
     method: request.method,
-    headers: [...request.headers.entries()],
+    headers: safeHeaders,
     body: body || null,
     timestamp: Date.now()
   }), { headers: { 'Content-Type': 'application/json' } });
@@ -225,7 +234,7 @@ self.addEventListener('notificationclick', (event) => {
 
 // ---- Background sync: retry queued API requests ----
 self.addEventListener('sync', (event) => {
-  if (event.tag === 'sync-orders') {
+  if (event.tag === 'sync-orders' || event.tag === 'sync-pending-orders') {
     event.waitUntil(syncOrders());
   }
   if (event.tag === 'retry-queued-api') {
@@ -234,7 +243,11 @@ self.addEventListener('sync', (event) => {
 });
 
 async function syncOrders() {
-  return retryQueuedRequests();
+  await retryQueuedRequests();
+  const windowClients = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+  for (const client of windowClients) {
+    client.postMessage({ type: 'FLUSH_OFFLINE_ORDERS' });
+  }
 }
 
 async function retryQueuedRequests() {

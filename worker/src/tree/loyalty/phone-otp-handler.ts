@@ -156,7 +156,14 @@ export async function handlePhoneOtpRequest(c: Context<{ Bindings: Env }>) {
       if (tenantId === 'default') {
         await c.env.AUTH_KV.put(legacyOtpKey, otp, { expirationTtl: OTP_TTL_SECONDS });
       }
-      await persistOtpChallenge(c.env.AURA_DB, otpKey, tenantId, phone, otp, OTP_TTL_SECONDS);
+      const persisted = await persistOtpChallenge(c.env.AURA_DB, otpKey, tenantId, phone, otp, OTP_TTL_SECONDS);
+      if (!persisted) {
+        await c.env.AUTH_KV.delete?.(otpKey).catch(() => {});
+        if (tenantId === 'default') {
+          await c.env.AUTH_KV.delete?.(legacyOtpKey).catch(() => {});
+        }
+        return c.json({ success: false, code: 'AUTH_STATE_UNAVAILABLE', error: 'Dịch vụ OTP tạm thời gián đoạn' }, 503);
+      }
       await c.env.AUTH_KV.put(phoneRateKey, String(phoneAttempts + 1), { expirationTtl: OTP_TTL_SECONDS });
     } catch {
       return c.json({ success: false, code: 'AUTH_STATE_UNAVAILABLE', error: 'Dịch vụ OTP tạm thời gián đoạn' }, 503);

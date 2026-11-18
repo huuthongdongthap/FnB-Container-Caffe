@@ -60,6 +60,16 @@ interface Env {
 export const reservationsRouter = new Hono<{ Bindings: Env }>();
 
 const INACTIVE_TABLE_STATUSES = new Set(['maintenance', 'outoforder', 'out_of_order', 'disabled', 'inactive']);
+
+/** The partial unique slot index rejects a concurrent booking of the same table, date and time. */
+function isSlotUniqueViolation(err: unknown): boolean {
+  const msg = err instanceof Error ? err.message : String(err);
+  return /UNIQUE constraint failed/i.test(msg);
+}
+
+function slotAlreadyBooked(c: { json: (body: unknown, status: 409) => Response }): Response {
+  return c.json({ success: false, code: 'TABLE_SLOT_ALREADY_BOOKED', error: 'Table already reserved for this time slot' }, 409);
+}
 const ACTIVE_RESERVATION_STATUSES = new Set(['pending', 'confirmed', 'approved', 'seated']);
 const TERMINAL_RESERVATION_STATUSES = new Set(['cancelled', 'completed', 'rejected', 'no_show']);
 const RESERVATION_STAFF_ROLES = ['staff', 'owner', 'manager', 'supervisor', 'admin', 'cashier', 'waiter'];
@@ -384,12 +394,14 @@ reservationsRouter.post('/', optionalAuth() as any, async (c) => {
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'confirmed', ?, ?, ?)`
     ).bind(id, canonicalTableId, customer_name, customer_phone, guests, date, time, (table.zone as string) || '', String(notes || '').slice(0, 500), effectiveTenant, now, now).run();
   } catch (err) {
+    if (isSlotUniqueViolation(err)) return slotAlreadyBooked(c);
     try {
       await db.prepare(
         `INSERT INTO reservations (id, table_id, guest_name, guest_phone, party_size, reservation_date, reservation_time, status, tenant_id, created_at, updated_at)
          VALUES (?, ?, ?, ?, ?, ?, ?, 'confirmed', ?, ?, ?)`
       ).bind(id, canonicalTableId, customer_name, customer_phone, guests, date, time, effectiveTenant, now, now).run();
-    } catch {
+    } catch (legacyErr) {
+      if (isSlotUniqueViolation(legacyErr)) return slotAlreadyBooked(c);
       if (effectiveTenant !== 'default') {
         throw err;
       }
@@ -398,11 +410,17 @@ reservationsRouter.post('/', optionalAuth() as any, async (c) => {
           `INSERT INTO reservations (id, table_id, customer_name, customer_phone, guest_count, date, time, zone, notes, status, created_at, updated_at)
            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'confirmed', ?, ?)`
         ).bind(id, canonicalTableId, customer_name, customer_phone, guests, date, time, (table.zone as string) || '', String(notes || '').slice(0, 500), now, now).run();
-      } catch {
-        await db.prepare(
-          `INSERT INTO reservations (id, table_id, customer_name, phone, pax, reservation_date, reservation_time, notes, status, created_at, updated_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'confirmed', ?, ?)`
-        ).bind(id, canonicalTableId, customer_name, customer_phone, guests, date, time, String(notes || '').slice(0, 500), now, now).run();
+      } catch (untenantedErr) {
+        if (isSlotUniqueViolation(untenantedErr)) return slotAlreadyBooked(c);
+        try {
+          await db.prepare(
+            `INSERT INTO reservations (id, table_id, customer_name, phone, pax, reservation_date, reservation_time, notes, status, created_at, updated_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'confirmed', ?, ?)`
+          ).bind(id, canonicalTableId, customer_name, customer_phone, guests, date, time, String(notes || '').slice(0, 500), now, now).run();
+        } catch (v1UntenantedErr) {
+          if (isSlotUniqueViolation(v1UntenantedErr)) return slotAlreadyBooked(c);
+          throw v1UntenantedErr;
+        }
       }
     }
   }

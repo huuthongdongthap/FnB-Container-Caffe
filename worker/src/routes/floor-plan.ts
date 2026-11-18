@@ -48,11 +48,11 @@ async function hasUnpaidActiveOrdersForTable(
       return false;
     }
     const status = String(row.status ?? 'pending').trim().toLowerCase();
-    if (['completed', 'cancelled', 'rejected', 'failed', 'expired', 'refunded'].includes(status)) {
+    if (['completed', 'cancelled', 'canceled', 'rejected', 'failed', 'expired', 'refunded'].includes(status)) {
       return false;
     }
     const payStatus = String(row.payment_status ?? 'unpaid').trim().toLowerCase();
-    return !['paid', 'refunded'].includes(payStatus);
+    return !['paid', 'completed', 'refunded', 'cancelled', 'canceled'].includes(payStatus);
   };
   const scopedTenant = normalizedTenant === '*' ? 'default' : normalizedTenant;
   try {
@@ -60,8 +60,8 @@ async function hasUnpaidActiveOrdersForTable(
       .prepare(
         `SELECT id, status, payment_status FROM orders
          WHERE table_id = ?
-           AND LOWER(COALESCE(status, 'pending')) NOT IN ('completed', 'cancelled', 'rejected', 'failed', 'expired', 'refunded')
-           AND LOWER(COALESCE(payment_status, 'unpaid')) NOT IN ('paid', 'refunded')
+           AND LOWER(COALESCE(status, 'pending')) NOT IN ('completed', 'cancelled', 'canceled', 'rejected', 'failed', 'expired', 'refunded')
+           AND LOWER(COALESCE(payment_status, 'unpaid')) NOT IN ('paid', 'completed', 'refunded', 'cancelled', 'canceled')
            AND (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?)
          LIMIT 5`
       )
@@ -74,8 +74,8 @@ async function hasUnpaidActiveOrdersForTable(
         .prepare(
           `SELECT id, status, payment_status FROM orders
            WHERE table_id = ?
-             AND LOWER(COALESCE(status, 'pending')) NOT IN ('completed', 'cancelled', 'rejected', 'failed', 'expired', 'refunded')
-             AND LOWER(COALESCE(payment_status, 'unpaid')) NOT IN ('paid', 'refunded')
+             AND LOWER(COALESCE(status, 'pending')) NOT IN ('completed', 'cancelled', 'canceled', 'rejected', 'failed', 'expired', 'refunded')
+             AND LOWER(COALESCE(payment_status, 'unpaid')) NOT IN ('paid', 'completed', 'refunded', 'cancelled', 'canceled')
            LIMIT 5`
         )
         .bind(tableId)

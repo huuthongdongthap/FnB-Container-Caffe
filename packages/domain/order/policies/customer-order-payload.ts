@@ -8,8 +8,18 @@
  * 4. Zero Catalog lookups: reads purely from frozen snapshot items.
  */
 
-import { canAccessOrder } from '../../customer/policies/order-ownership-policy';
-export { canAccessOrder };
+import {
+  canAccessOrder,
+  generateOrderToken,
+  hashOrderToken,
+  verifyGuestOrderToken,
+} from '../../customer/policies/order-ownership-policy';
+export {
+  canAccessOrder,
+  generateOrderToken,
+  hashOrderToken,
+  verifyGuestOrderToken,
+};
 
 export interface CustomerOrderItemPayload {
   id?: string;
@@ -131,22 +141,37 @@ export async function publishOrderEvent(
   kv: { put: (k: string, v: string, opts?: { expirationTtl?: number }) => Promise<unknown> } | null | undefined,
   orderId: string,
   status: string,
-  options?: { previousStatus?: string; tenantId?: string; waitUntil?: (p: Promise<unknown>) => void }
+  options?: {
+    previousStatus?: string;
+    paymentStatus?: string;
+    tenantId?: string;
+    waitUntil?: (p: Promise<unknown>) => void;
+  }
 ): Promise<void> {
   if (!kv || !orderId) return;
   const now = new Date().toISOString();
+  const rawTenant = typeof options?.tenantId === 'string' ? options.tenantId.trim() : '';
+  const scopedTenant =
+    rawTenant && rawTenant !== 'default' && rawTenant !== '*' && rawTenant.toLowerCase() !== 'hq'
+      ? rawTenant
+      : '';
   const payload = JSON.stringify({
     orderId,
     status,
     previous_status: options?.previousStatus,
+    ...(options?.paymentStatus ? { paymentStatus: options.paymentStatus, payment_status: options.paymentStatus } : {}),
     ...(options?.tenantId ? { tenant_id: options.tenantId, tenantId: options.tenantId } : {}),
     timestamp: now,
   });
-  const promise = Promise.all([
+  const writes: Array<Promise<unknown>> = [
     kv.put(`order_event:${orderId}`, payload, { expirationTtl: 60 }),
-    kv.put('latest_order_ts', now),
-    kv.put('orders:latest_updated_at', now),
-  ]).catch(() => {});
+    kv.put(scopedTenant ? `latest_order_ts:${scopedTenant}` : 'latest_order_ts', now),
+    kv.put(scopedTenant ? `orders:latest_updated_at:${scopedTenant}` : 'orders:latest_updated_at', now),
+  ];
+  if (scopedTenant) {
+    writes.push(kv.put(`order_event:${scopedTenant}:${orderId}`, payload, { expirationTtl: 60 }));
+  }
+  const promise = Promise.all(writes).catch(() => {});
   if (options?.waitUntil) {
     options.waitUntil(promise);
   } else {

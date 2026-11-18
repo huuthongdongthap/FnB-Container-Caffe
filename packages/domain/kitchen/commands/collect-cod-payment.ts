@@ -6,7 +6,32 @@ type CollectionResult = { success: true; status: string; idempotent?: boolean }
 type Order = { total?: number; total_amount?: number; status: string; payment_status: string; payment_method?: string; is_cod?: number; tenant_id?: string | null };
 
 /** Cash collection is one ledger transaction and never changes kitchen fulfillment. */
-export async function collectCodPayment(db: D1Database, id: string, tenantId: string): Promise<CollectionResult> {
+/**
+ * Credit a settled cash sale to the collecting staff member's open attendance shift in one
+ * statement so concurrent collections never lose an increment. Absent table/columns (minimal
+ * schemas) or no open shift leave the settlement itself untouched.
+ */
+async function attributeCashToOpenShift(db: D1Database, staffId: string | undefined, tenant: string, amount: number): Promise<void> {
+  const staff = (staffId || '').trim();
+  if (!staff || !Number.isFinite(amount) || amount <= 0) return;
+  try {
+    await db.prepare(
+      `UPDATE staff_shifts
+          SET cash_sales = COALESCE(cash_sales, 0) + ?,
+              total_sales = COALESCE(total_sales, 0) + ?,
+              order_count = COALESCE(order_count, 0) + 1
+        WHERE id = (
+          SELECT id FROM staff_shifts
+           WHERE staff_id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?
+             AND clock_in IS NOT NULL AND clock_out IS NULL
+           ORDER BY clock_in DESC LIMIT 1)`
+    ).bind(amount, amount, staff, tenant).run();
+  } catch {
+    // staff_shifts or its sales columns are optional in minimal schemas
+  }
+}
+
+export async function collectCodPayment(db: D1Database, id: string, tenantId: string, staffId?: string): Promise<CollectionResult> {
   const rawTenant = (tenantId || '').trim() || 'default';
   const normTenant = rawTenant.toLowerCase() === 'hq' ? '*' : rawTenant;
   const tenantClause = normTenant === '*'
@@ -108,6 +133,7 @@ export async function collectCodPayment(db: D1Database, id: string, tenantId: st
     if (!(res.meta?.changes > 0)) {
       return { success: false, statusCode: 409, error: 'Order changed concurrently; refresh and retry' };
     }
+    await attributeCashToOpenShift(db, staffId, effectiveOrderTenant, amount);
     return { success: true, status: order.status };
   }
   const effectivePaymentTenant = effectiveOrderTenant;
@@ -166,6 +192,7 @@ export async function collectCodPayment(db: D1Database, id: string, tenantId: st
   if (!(results[0]!.meta?.changes > 0)) {
     return { success: false, statusCode: 409, error: 'Order changed concurrently; refresh and retry' };
   }
+  await attributeCashToOpenShift(db, staffId, effectiveOrderTenant, amount);
   return { success: true, status: order.status };
 }
 

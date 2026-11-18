@@ -217,12 +217,12 @@ export async function handleSpendCashback(c: Context<{ Bindings: Env }>) {
     let orderUpdateRes: { meta?: { changes?: number }; changes?: number } | undefined;
     try {
       orderUpdateRes = await db.prepare(
-        "UPDATE orders SET cashback_used = ?, discount = COALESCE(discount, 0) + ?, total = MAX(0, COALESCE(total, total_amount, 0) - ?) WHERE id = ? AND COALESCE(cashback_used, 0) = 0 AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ? AND COALESCE(status, 'pending') NOT IN ('cancelled', 'completed') AND COALESCE(payment_status, 'unpaid') NOT IN ('paid', 'refunded')"
+        "UPDATE orders SET cashback_used = ?, discount = COALESCE(discount, 0) + ?, total = MAX(0, COALESCE(total, total_amount, 0) - ?) WHERE id = ? AND COALESCE(cashback_used, 0) = 0 AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ? AND COALESCE(status, 'pending') NOT IN ('cancelled', 'completed') AND COALESCE(payment_status, 'unpaid') NOT IN ('paid', 'completed', 'refunded')"
       ).bind(amount, amount, amount, order_id, storeTenant).run();
     } catch {
       try {
         orderUpdateRes = await db.prepare(
-          "UPDATE orders SET cashback_used = ?, discount = COALESCE(discount, 0) + ?, total = MAX(0, total - ?) WHERE id = ? AND COALESCE(cashback_used, 0) = 0 AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ? AND COALESCE(status, 'pending') NOT IN ('cancelled', 'completed') AND COALESCE(payment_status, 'unpaid') NOT IN ('paid', 'refunded')"
+          "UPDATE orders SET cashback_used = ?, discount = COALESCE(discount, 0) + ?, total = MAX(0, total - ?) WHERE id = ? AND COALESCE(cashback_used, 0) = 0 AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ? AND COALESCE(status, 'pending') NOT IN ('cancelled', 'completed') AND COALESCE(payment_status, 'unpaid') NOT IN ('paid', 'completed', 'refunded')"
         ).bind(amount, amount, amount, order_id, storeTenant).run();
       } catch (scopedOrdErr) {
         if (storeTenant !== 'default') {
@@ -230,12 +230,12 @@ export async function handleSpendCashback(c: Context<{ Bindings: Env }>) {
         }
         try {
           orderUpdateRes = await db.prepare(
-            "UPDATE orders SET cashback_used = ?, discount = COALESCE(discount, 0) + ?, total = MAX(0, total - ?) WHERE id = ? AND COALESCE(cashback_used, 0) = 0 AND COALESCE(status, 'pending') NOT IN ('cancelled', 'completed') AND COALESCE(payment_status, 'unpaid') NOT IN ('paid', 'refunded')"
+            "UPDATE orders SET cashback_used = ?, discount = COALESCE(discount, 0) + ?, total = MAX(0, total - ?) WHERE id = ? AND COALESCE(cashback_used, 0) = 0 AND COALESCE(status, 'pending') NOT IN ('cancelled', 'completed') AND COALESCE(payment_status, 'unpaid') NOT IN ('paid', 'completed', 'refunded')"
           ).bind(amount, amount, amount, order_id).run();
         } catch {
           try {
             orderUpdateRes = await db.prepare(
-              "UPDATE orders SET cashback_used = ?, total = MAX(0, total - ?) WHERE id = ? AND COALESCE(cashback_used, 0) = 0 AND COALESCE(status, 'pending') NOT IN ('cancelled', 'completed') AND COALESCE(payment_status, 'unpaid') NOT IN ('paid', 'refunded')"
+              "UPDATE orders SET cashback_used = ?, total = MAX(0, total - ?) WHERE id = ? AND COALESCE(cashback_used, 0) = 0 AND COALESCE(status, 'pending') NOT IN ('cancelled', 'completed') AND COALESCE(payment_status, 'unpaid') NOT IN ('paid', 'completed', 'refunded')"
             ).bind(amount, amount, order_id).run();
           } catch {
             orderUpdateRes = await db.prepare(
@@ -261,7 +261,7 @@ export async function handleSpendCashback(c: Context<{ Bindings: Env }>) {
     let fallbackOrderRes: { meta?: { changes?: number }; changes?: number } | undefined;
     try {
       fallbackOrderRes = await db.prepare(
-        "UPDATE orders SET discount = COALESCE(discount, 0) + ?, total = MAX(0, total - ?) WHERE id = ? AND COALESCE(status, 'pending') NOT IN ('cancelled', 'completed') AND COALESCE(payment_status, 'unpaid') NOT IN ('paid', 'refunded')"
+        "UPDATE orders SET discount = COALESCE(discount, 0) + ?, total = MAX(0, total - ?) WHERE id = ? AND COALESCE(status, 'pending') NOT IN ('cancelled', 'completed') AND COALESCE(payment_status, 'unpaid') NOT IN ('paid', 'completed', 'refunded')"
       ).bind(amount, amount, order_id).run();
     } catch {
       fallbackOrderRes = await db.prepare('UPDATE orders SET discount = COALESCE(discount, 0) + ? WHERE id = ?').bind(amount, order_id).run().catch(() => undefined);

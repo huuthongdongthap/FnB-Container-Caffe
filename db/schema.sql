@@ -630,3 +630,175 @@ ALTER TABLE users ADD COLUMN loyalty_points INTEGER DEFAULT 0;
 ALTER TABLE users ADD COLUMN email_verified INTEGER DEFAULT 0;
 ALTER TABLE users ADD COLUMN avatar_url TEXT;
 ALTER TABLE users ADD COLUMN hire_date TEXT;
+
+CREATE TABLE IF NOT EXISTS schema_migrations (
+  version TEXT PRIMARY KEY,
+  checksum TEXT NOT NULL,
+  applied_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS otp_challenges (
+  challenge_key TEXT PRIMARY KEY,
+  tenant_id TEXT NOT NULL DEFAULT 'default',
+  phone TEXT NOT NULL,
+  code TEXT NOT NULL,
+  attempts INTEGER NOT NULL DEFAULT 0,
+  expires_at TEXT NOT NULL,
+  consumed_at TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+ALTER TABLE staff_devices ADD COLUMN tenant_id TEXT NOT NULL DEFAULT 'default';
+ALTER TABLE payments ADD COLUMN provider_reference TEXT;
+ALTER TABLE loyalty_transactions ADD COLUMN tenant_id TEXT NOT NULL DEFAULT 'default';
+ALTER TABLE loyalty_point_logs ADD COLUMN tenant_id TEXT NOT NULL DEFAULT 'default';
+ALTER TABLE inventory_transactions ADD COLUMN tenant_id TEXT NOT NULL DEFAULT 'default';
+ALTER TABLE stock_movements ADD COLUMN tenant_id TEXT NOT NULL DEFAULT 'default';
+ALTER TABLE waste_log ADD COLUMN tenant_id TEXT NOT NULL DEFAULT 'default';
+ALTER TABLE waste_log ADD COLUMN order_id TEXT;
+ALTER TABLE waste_log ADD COLUMN item_id TEXT;
+ALTER TABLE erpnext_mappings ADD COLUMN tenant_id TEXT NOT NULL DEFAULT 'default';
+ALTER TABLE consents ADD COLUMN tenant_id TEXT NOT NULL DEFAULT 'default';
+ALTER TABLE consents ADD COLUMN channel TEXT NOT NULL DEFAULT 'all';
+ALTER TABLE customers ADD COLUMN auth_version INTEGER NOT NULL DEFAULT 1;
+ALTER TABLE customers ADD COLUMN anonymized_at TEXT;
+ALTER TABLE orders ADD COLUMN guest_token_hash TEXT;
+ALTER TABLE sessions ADD COLUMN tenant_id TEXT NOT NULL DEFAULT 'default';
+ALTER TABLE sessions ADD COLUMN revoked_at TEXT;
+ALTER TABLE table_sessions ADD COLUMN tenant_id TEXT NOT NULL DEFAULT 'default';
+ALTER TABLE orders ADD COLUMN session_id TEXT;
+ALTER TABLE orders ADD COLUMN loyalty_points_redeemed INTEGER DEFAULT 0;
+
+CREATE INDEX IF NOT EXISTS idx_alerts_key_created ON _alerts(alert_key, created_at);
+CREATE INDEX IF NOT EXISTS idx_cafe_tables_code_location ON cafe_tables(code, location_id);
+CREATE INDEX IF NOT EXISTS idx_cafe_tables_zone_id ON cafe_tables(zone_id);
+CREATE INDEX IF NOT EXISTS idx_campaign_enrollments_customer_type ON campaign_enrollments(customer_id, campaign_type, created_at);
+CREATE INDEX IF NOT EXISTS idx_campaign_logs_customer ON campaign_logs(customer_id, trigger);
+CREATE INDEX IF NOT EXISTS idx_campaign_logs_sent ON campaign_logs(sent_at);
+CREATE INDEX IF NOT EXISTS idx_campaign_logs_trigger_type ON campaign_logs(customer_id, trigger_type, created_at);
+CREATE INDEX IF NOT EXISTS idx_cash_payouts_shift_id ON cash_payouts(shift_id, status);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_checkins_customer_date ON checkins(customer_id, checkin_date);
+CREATE INDEX IF NOT EXISTS idx_checkins_date ON checkins(checkin_date);
+CREATE INDEX IF NOT EXISTS idx_client_errors_route ON client_errors(route);
+CREATE INDEX IF NOT EXISTS idx_client_errors_ts ON client_errors(ts);
+CREATE INDEX IF NOT EXISTS idx_consents_customer ON consents(customer_id, purpose, granted);
+CREATE INDEX IF NOT EXISTS idx_contact_tenant_classification_phone ON contact_messages(tenant_id, classification, phone);
+CREATE INDEX IF NOT EXISTS idx_cron_jobs_active_status ON cron_jobs(is_active, status);
+CREATE INDEX IF NOT EXISTS idx_cron_runs_job_started ON cron_runs(job_id, started_at);
+CREATE INDEX IF NOT EXISTS idx_customer_events_customer ON customer_events(customer_id, recorded_at);
+CREATE INDEX IF NOT EXISTS idx_customer_events_type ON customer_events(event_type, recorded_at);
+CREATE INDEX IF NOT EXISTS idx_customer_identities_customer ON customer_identities(customer_id);
+CREATE INDEX IF NOT EXISTS idx_customer_identities_type_value ON customer_identities(type, value);
+CREATE INDEX IF NOT EXISTS idx_customer_identities_value ON customer_identities(identifier_type, identifier_value);
+CREATE INDEX IF NOT EXISTS idx_customers_email ON customers(email);
+CREATE INDEX IF NOT EXISTS idx_customers_loyalty_tier ON customers(loyalty_tier);
+CREATE INDEX IF NOT EXISTS idx_customers_tenant ON customers(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_dindin_cart_updated_at ON dindin_cart(updated_at);
+CREATE INDEX IF NOT EXISTS idx_email_verifications_code ON email_verifications(email, code);
+CREATE INDEX IF NOT EXISTS idx_email_verifications_email ON email_verifications(email);
+CREATE INDEX IF NOT EXISTS idx_email_verifications_id ON email_verifications(id);
+CREATE INDEX IF NOT EXISTS idx_email_verifications_token ON email_verifications(token, type);
+CREATE INDEX IF NOT EXISTS idx_erpnext_mappings_local ON erpnext_mappings(local_type, local_id);
+CREATE INDEX IF NOT EXISTS idx_erpnext_sync_logs_status ON erpnext_sync_logs(status, retry_count);
+CREATE INDEX IF NOT EXISTS idx_expenses_date ON expenses(date);
+CREATE INDEX IF NOT EXISTS idx_ingredients_category ON ingredients(category);
+CREATE INDEX IF NOT EXISTS idx_ingredients_sku ON ingredients(sku);
+CREATE INDEX IF NOT EXISTS idx_inventory_forecast_snapshots_tenant ON inventory_forecast_snapshots(tenant_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_inventory_items_category ON inventory_items(category);
+CREATE INDEX IF NOT EXISTS idx_inventory_items_sku ON inventory_items(sku);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_inventory_snapshots_item_date ON inventory_snapshots(item_id, date);
+CREATE INDEX IF NOT EXISTS idx_inventory_transactions_created ON inventory_transactions(created_at);
+CREATE INDEX IF NOT EXISTS idx_inventory_transactions_item ON inventory_transactions(item_id);
+CREATE INDEX IF NOT EXISTS idx_invoices_period ON subscription_invoices(period_start, period_end);
+CREATE INDEX IF NOT EXISTS idx_invoices_status ON subscription_invoices(status);
+CREATE INDEX IF NOT EXISTS idx_invoices_subscription ON subscription_invoices(subscription_id);
+CREATE INDEX IF NOT EXISTS idx_loyalty_accounts_customer ON loyalty_accounts(customer_id);
+CREATE INDEX IF NOT EXISTS idx_loyalty_redemptions_customer ON loyalty_redemptions(customer_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_metrics_name_created ON _metrics(name, created_at);
+CREATE INDEX IF NOT EXISTS idx_mrr_snapshots_date ON mrr_snapshots(snapshot_date);
+CREATE INDEX IF NOT EXISTS idx_notification_audit_log_channel ON notification_audit_log(channel, created_at);
+CREATE INDEX IF NOT EXISTS idx_order_items_product ON order_items(product_id);
+CREATE INDEX IF NOT EXISTS idx_orders_created_at ON orders(created_at);
+CREATE INDEX IF NOT EXISTS idx_orders_order_number ON orders(order_number);
+CREATE INDEX IF NOT EXISTS idx_payment_transactions_order_id ON payment_transactions(order_id);
+CREATE INDEX IF NOT EXISTS idx_payments_created_at ON payments(created_at);
+CREATE INDEX IF NOT EXISTS idx_payments_order_id ON payments(order_id);
+CREATE INDEX IF NOT EXISTS idx_payments_tenant_order ON payments(tenant_id, order_id);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_payments_txn_unique ON payments(transaction_id) WHERE transaction_id != '';
+CREATE INDEX IF NOT EXISTS idx_po_items_po ON purchase_order_items(purchase_order_id);
+CREATE INDEX IF NOT EXISTS idx_po_status ON purchase_orders(status);
+CREATE INDEX IF NOT EXISTS idx_po_supplier ON purchase_orders(supplier_id);
+CREATE INDEX IF NOT EXISTS idx_pretix_webhook_log_code ON pretix_webhook_log(code, created_at);
+CREATE INDEX IF NOT EXISTS idx_push_subscriptions_endpoint ON push_subscriptions(endpoint);
+CREATE INDEX IF NOT EXISTS idx_push_subscriptions_role ON push_subscriptions(role);
+CREATE INDEX IF NOT EXISTS idx_recipe_ingredients_ingredient ON recipe_ingredients(ingredient_id);
+CREATE INDEX IF NOT EXISTS idx_recipe_items_recipe ON recipe_items(recipe_id);
+CREATE INDEX IF NOT EXISTS idx_recipes_product ON recipes(product_id);
+CREATE INDEX IF NOT EXISTS idx_recruitment_tenant_created ON recruitment_applications(tenant_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_referral_codes_code ON referral_codes(code);
+CREATE INDEX IF NOT EXISTS idx_referral_codes_customer ON referral_codes(customer_id);
+CREATE INDEX IF NOT EXISTS idx_referrals_referred ON referrals(referred_customer_id);
+CREATE INDEX IF NOT EXISTS idx_referrals_referrer ON referrals(referrer_id);
+CREATE INDEX IF NOT EXISTS idx_reservations_status ON reservations(status);
+CREATE INDEX IF NOT EXISTS idx_sessions_access_token ON sessions(access_token);
+CREATE INDEX IF NOT EXISTS idx_sessions_refresh_token ON sessions(refresh_token_hash);
+CREATE INDEX IF NOT EXISTS idx_sessions_refresh_token_value ON sessions(refresh_token);
+CREATE INDEX IF NOT EXISTS idx_sessions_user_id ON sessions(user_id);
+CREATE INDEX IF NOT EXISTS idx_shift_reconciliations_shift_id ON shift_reconciliations(shift_id, created_at);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_sop_reminders_dedup ON sop_reminders(tenant_id, template_id, kind, day_key, COALESCE(run_id, ''));
+CREATE INDEX IF NOT EXISTS idx_sop_reminders_open ON sop_reminders(tenant_id, acknowledged_at, sent_at);
+CREATE INDEX IF NOT EXISTS idx_sop_reminders_run ON sop_reminders(tenant_id, run_id);
+CREATE INDEX IF NOT EXISTS idx_sop_run_items_run ON sop_run_items(tenant_id, run_id, is_checked);
+CREATE INDEX IF NOT EXISTS idx_sop_run_items_tmpl ON sop_run_items(tenant_id, template_item_id);
+CREATE INDEX IF NOT EXISTS idx_sop_runs_shift ON sop_runs(tenant_id, shift_id);
+CREATE INDEX IF NOT EXISTS idx_sop_runs_staff ON sop_runs(tenant_id, staff_id, started_at);
+CREATE INDEX IF NOT EXISTS idx_sop_runs_template ON sop_runs(tenant_id, template_id);
+CREATE INDEX IF NOT EXISTS idx_sop_runs_tenant_day ON sop_runs(tenant_id, scheduled_date, status);
+CREATE INDEX IF NOT EXISTS idx_sop_template_items_order ON sop_template_items(tenant_id, template_id, order_index);
+CREATE INDEX IF NOT EXISTS idx_sop_templates_shift ON sop_templates(tenant_id, shift_type, is_active);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_sop_templates_tenant_code ON sop_templates(tenant_id, code);
+CREATE INDEX IF NOT EXISTS idx_sop_violations_month ON sop_violations(tenant_id, strftime('%Y-%m', occurred_at), staff_id);
+CREATE INDEX IF NOT EXISTS idx_sop_violations_status ON sop_violations(tenant_id, status);
+CREATE INDEX IF NOT EXISTS idx_sop_violations_tenant_staff ON sop_violations(tenant_id, staff_id, occurred_at);
+CREATE INDEX IF NOT EXISTS idx_staff_devices_staff_id ON staff_devices(staff_id);
+CREATE INDEX IF NOT EXISTS idx_staff_devices_token ON staff_devices(device_token);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_staff_shifts_one_active ON staff_shifts(tenant_id, staff_id) WHERE tenant_id IS NOT NULL AND staff_id IS NOT NULL AND clock_in IS NOT NULL AND clock_out IS NULL;
+CREATE INDEX IF NOT EXISTS idx_staff_shifts_tenant_date ON staff_shifts(tenant_id, date);
+CREATE INDEX IF NOT EXISTS idx_stock_movements_created ON stock_movements(created_at);
+CREATE INDEX IF NOT EXISTS idx_stock_movements_ingredient ON stock_movements(ingredient_id);
+CREATE INDEX IF NOT EXISTS idx_subscription_plans_active ON subscription_plans(is_active);
+CREATE INDEX IF NOT EXISTS idx_subscription_plans_slug ON subscription_plans(slug);
+CREATE INDEX IF NOT EXISTS idx_subscriptions_customer ON subscriptions(customer_id);
+CREATE INDEX IF NOT EXISTS idx_subscriptions_next_billing ON subscriptions(next_billing_date);
+CREATE INDEX IF NOT EXISTS idx_subscriptions_status ON subscriptions(status);
+CREATE INDEX IF NOT EXISTS idx_subscriptions_zone ON subscriptions(zone);
+CREATE INDEX IF NOT EXISTS idx_suppliers_name ON suppliers(name);
+CREATE INDEX IF NOT EXISTS idx_table_zones_slug_location ON table_zones(slug, location_id);
+CREATE INDEX IF NOT EXISTS idx_tables_status ON cafe_tables(status);
+CREATE INDEX IF NOT EXISTS idx_tables_zone ON cafe_tables(zone);
+CREATE INDEX IF NOT EXISTS idx_trusted_devices_user ON trusted_devices(user_id, device_id);
+CREATE INDEX IF NOT EXISTS idx_trusted_devices_user_fingerprint ON trusted_devices(user_id, fingerprint);
+CREATE INDEX IF NOT EXISTS idx_users_role ON users(role);
+CREATE INDEX IF NOT EXISTS idx_users_tenant ON users(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_visits_customer ON visits(customer_id, visited_at);
+CREATE INDEX IF NOT EXISTS idx_visits_date ON visits(visited_at);
+CREATE INDEX IF NOT EXISTS idx_waste_log_ingredient ON waste_log(ingredient_id);
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_payments_provider_ref_uniq ON payments(tenant_id, provider_reference) WHERE provider_reference IS NOT NULL AND provider_reference != '';
+CREATE UNIQUE INDEX IF NOT EXISTS idx_promotion_usages_idempotency_uniq ON promotion_usages(tenant_id, idempotency_key) WHERE idempotency_key IS NOT NULL AND idempotency_key != '';
+CREATE UNIQUE INDEX IF NOT EXISTS idx_loyalty_tx_idempotency_uniq ON loyalty_transactions(tenant_id, idempotency_key) WHERE idempotency_key IS NOT NULL AND idempotency_key != '';
+CREATE UNIQUE INDEX IF NOT EXISTS idx_inv_tx_order_item_dedup ON inventory_transactions(tenant_id, reference_type, reference_id, item_id, type) WHERE reference_type = 'order' AND reference_id IS NOT NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS idx_reservations_active_slot ON reservations(tenant_id, table_id, date, time) WHERE date IS NOT NULL AND time IS NOT NULL AND status IN ('pending', 'confirmed', 'approved', 'seated');
+CREATE UNIQUE INDEX IF NOT EXISTS idx_reservations_active_v1_slot ON reservations(tenant_id, table_id, reservation_date, reservation_time) WHERE reservation_date IS NOT NULL AND reservation_time IS NOT NULL AND status IN ('pending', 'confirmed', 'approved', 'seated');
+CREATE INDEX IF NOT EXISTS idx_staff_devices_tenant_staff ON staff_devices(tenant_id, staff_id, is_active);
+CREATE INDEX IF NOT EXISTS idx_otp_challenges_tenant_phone ON otp_challenges(tenant_id, phone, expires_at);
+CREATE INDEX IF NOT EXISTS idx_payments_tenant_order_status ON payments(tenant_id, order_id, status);
+CREATE INDEX IF NOT EXISTS idx_inv_tx_tenant_ref ON inventory_transactions(tenant_id, reference_type, reference_id);
+CREATE INDEX IF NOT EXISTS idx_stock_movements_tenant_ing ON stock_movements(tenant_id, ingredient_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_loyalty_tx_tenant_cust ON loyalty_transactions(tenant_id, customer_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_loyalty_logs_tenant_cust ON loyalty_point_logs(tenant_id, customer_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_consents_tenant_cust_channel ON consents(tenant_id, customer_id, purpose, channel);
+CREATE INDEX IF NOT EXISTS idx_erpnext_mappings_tenant_order ON erpnext_mappings(tenant_id, aura_order_id, sync_status);
+CREATE INDEX IF NOT EXISTS idx_waste_log_tenant_order ON waste_log(tenant_id, order_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_table_sessions_tenant_status ON table_sessions(tenant_id, table_id, status);
+CREATE INDEX IF NOT EXISTS idx_orders_tenant_session ON orders(tenant_id, session_id);

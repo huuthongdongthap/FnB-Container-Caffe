@@ -4,6 +4,8 @@ import { createLogger } from 'worker/src/middleware/logger';
 import type { Env } from 'worker/src/types/env';
 import type { Context } from 'hono';
 import { executeKdsStatusTransition } from './kds-status-transition';
+import { isHeldOutOfKds } from '../policies/kds-hold-policy';
+import { isTerminal } from '../../order/model/order-state-machine';
 import { getTenantId } from 'worker/src/middleware/tenant';
 import { requireStaff } from 'worker/src/middleware/staff-auth';
 
@@ -136,7 +138,7 @@ export async function getKdsMobile(
     try {
       orders = await context.env.AURA_DB
         .prepare(
-          `SELECT o.id, o.order_number, o.table_id, o.items, o.notes, o.status, o.order_type, o.payment_status, o.created_at, o.updated_at,
+          `SELECT o.id, o.order_number, o.table_id, o.items, o.notes, o.status, o.order_type, o.payment_status, o.payment_method, o.is_cod, o.created_at, o.updated_at,
                   COALESCE(t.table_number, t.id) as table_name
            FROM orders o
            LEFT JOIN cafe_tables t ON (t.id = o.table_id OR CAST(t.table_number AS TEXT) = CAST(o.table_id AS TEXT))
@@ -150,31 +152,46 @@ export async function getKdsMobile(
       try {
         orders = await context.env.AURA_DB
           .prepare(
-            `SELECT o.id, o.table_id, o.items, o.status, o.created_at, o.updated_at,
+            `SELECT o.id, o.order_number, o.table_id, o.items, o.notes, o.status, o.order_type, o.payment_status, o.created_at, o.updated_at,
                     COALESCE(t.table_number, t.id) as table_name
              FROM orders o
-             LEFT JOIN cafe_tables t ON t.id = o.table_id
-               AND COALESCE(NULLIF(TRIM(t.tenant_id), ''), 'default') = COALESCE(NULLIF(TRIM(o.tenant_id), ''), 'default')
+             LEFT JOIN cafe_tables t ON (t.id = o.table_id OR CAST(t.table_number AS TEXT) = CAST(o.table_id AS TEXT))
+               AND COALESCE(NULLIF(t.tenant_id, ''), 'default') = COALESCE(NULLIF(o.tenant_id, ''), 'default')
              WHERE o.status IN ('pending','confirmed','preparing','ready')${tenantClause}
              ORDER BY o.created_at ASC
              LIMIT 200`
           )
           .bind(...tenantBinds).all();
       } catch {
-        orders = await context.env.AURA_DB
-          .prepare(
-            `SELECT o.id, o.order_number, o.items, o.status, o.created_at, o.updated_at
-             FROM orders o
-             WHERE o.status IN ('pending','confirmed','preparing','ready')${tenantClause}
-             ORDER BY o.created_at ASC
-             LIMIT 200`
-          )
-          .bind(...tenantBinds).all();
+        try {
+          orders = await context.env.AURA_DB
+            .prepare(
+              `SELECT o.id, o.table_id, o.items, o.status, o.created_at, o.updated_at,
+                      COALESCE(t.table_number, t.id) as table_name
+               FROM orders o
+               LEFT JOIN cafe_tables t ON t.id = o.table_id
+                 AND COALESCE(NULLIF(TRIM(t.tenant_id), ''), 'default') = COALESCE(NULLIF(TRIM(o.tenant_id), ''), 'default')
+               WHERE o.status IN ('pending','confirmed','preparing','ready')${tenantClause}
+               ORDER BY o.created_at ASC
+               LIMIT 200`
+            )
+            .bind(...tenantBinds).all();
+        } catch {
+          orders = await context.env.AURA_DB
+            .prepare(
+              `SELECT o.id, o.order_number, o.items, o.status, o.created_at, o.updated_at
+               FROM orders o
+               WHERE o.status IN ('pending','confirmed','preparing','ready')${tenantClause}
+               ORDER BY o.created_at ASC
+               LIMIT 200`
+            )
+            .bind(...tenantBinds).all();
+        }
       }
     }
 
     const rows = (orders.results as Array<Record<string, unknown>>).filter(
-      (r) => !(r.order_type === 'delivery' && r.payment_status !== 'paid')
+      (r) => !isHeldOutOfKds(r)
     );
     return jsonResponse({
       success: true,
@@ -204,7 +221,7 @@ export async function markKdsOrderItemReady(
   try {
     const user = context.get('user') as { role?: string; tenantId?: string; tenant_id?: string } | undefined;
     const role = user?.role || '';
-    if (!UPDATE_ROLES.includes(role)) {
+    if (!UPDATE_ROLES.includes(role) || role === 'waiter') {
       return errorResponse('Không có quyền cập nhật', 403);
     }
 
@@ -237,12 +254,41 @@ export async function markKdsOrderItemReady(
     const tenantBinds = tenantId === '*' ? [] : [tenantId];
 
     const orderRow = await context.env.AURA_DB
-      .prepare(`SELECT id, status, items, tenant_id FROM orders WHERE id = ?${tenantClause}`)
+      .prepare(
+        `SELECT id, status, items, notes, order_type, payment_status, payment_method, is_cod, tenant_id FROM orders WHERE id = ?${tenantClause}`
+      )
       .bind(orderId, ...tenantBinds)
-      .first<{ id: string; status: string; items?: string; tenant_id?: string | null }>()
-      .catch(() => null);
+      .first<{
+        id: string;
+        status: string;
+        items?: string;
+        notes?: string | null;
+        order_type?: string | null;
+        payment_status?: string | null;
+        payment_method?: string | null;
+        is_cod?: number | string | null;
+        tenant_id?: string | null;
+      }>()
+      .catch(() =>
+        context.env.AURA_DB
+          .prepare(`SELECT id, status, items, tenant_id FROM orders WHERE id = ?${tenantClause}`)
+          .bind(orderId, ...tenantBinds)
+          .first<{ id: string; status: string; items?: string; tenant_id?: string | null }>()
+          .catch(() => null)
+      );
     if (!orderRow) {
       return errorResponse('Không tìm thấy đơn hàng', 404);
+    }
+    const normalizedOrderStatus = String(orderRow.status || '').trim().toLowerCase();
+    if (
+      isTerminal(normalizedOrderStatus) ||
+      normalizedOrderStatus === 'served' ||
+      !['pending', 'confirmed', 'preparing', 'ready'].includes(normalizedOrderStatus)
+    ) {
+      return errorResponse('Đơn hàng đã kết thúc hoặc đã phục vụ', 409);
+    }
+    if (isHeldOutOfKds(orderRow as unknown as Record<string, unknown>)) {
+      return errorResponse('Đơn hàng phải hoàn tất thanh toán trước khi chế biến', 409);
     }
 
     const rawItems = parseKdsItems(orderRow.items) as Array<Record<string, unknown>>;
@@ -329,19 +375,28 @@ export async function markKdsOrderItemReady(
       rawItems.length === 0 ||
       rawItems.every((it) => it.status === 'ready' || it.ready === true);
     let finalStatus = orderRow.status;
-    if (allReady && ['pending', 'confirmed', 'preparing'].includes(String(orderRow.status || '').toLowerCase())) {
-      if (orderRow.status === 'pending' || orderRow.status === 'confirmed') {
-        await executeKdsStatusTransition(context.env.AURA_DB, orderId, 'preparing', role, {
+    if (allReady && ['pending', 'confirmed', 'preparing'].includes(normalizedOrderStatus)) {
+      let canMarkReady = normalizedOrderStatus === 'preparing';
+      if (normalizedOrderStatus === 'pending' || normalizedOrderStatus === 'confirmed') {
+        const prepTrans = await executeKdsStatusTransition(context.env.AURA_DB, orderId, 'preparing', role, {
           tenantId: effectiveOrderTenant,
           kv: context.env.AUTH_KV,
+          env: context.env as unknown as Record<string, unknown>,
         }).catch(() => null);
+        if (prepTrans?.success) {
+          finalStatus = 'preparing';
+          canMarkReady = true;
+        }
       }
-      const trans = await executeKdsStatusTransition(context.env.AURA_DB, orderId, 'ready', role, {
-        tenantId: effectiveOrderTenant,
-        kv: context.env.AUTH_KV,
-      }).catch(() => null);
-      if (trans?.success) {
-        finalStatus = 'ready';
+      if (canMarkReady) {
+        const trans = await executeKdsStatusTransition(context.env.AURA_DB, orderId, 'ready', role, {
+          tenantId: effectiveOrderTenant,
+          kv: context.env.AUTH_KV,
+          env: context.env as unknown as Record<string, unknown>,
+        }).catch(() => null);
+        if (trans?.success) {
+          finalStatus = 'ready';
+        }
       }
     }
 

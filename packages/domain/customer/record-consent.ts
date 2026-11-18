@@ -17,8 +17,9 @@ import { genCustomerId, nowIso } from './helpers';
 
 const log = createLogger({ route: 'customer' });
 
-export type ConsentPurpose = 'crm' | 'marketing' | 'analytics' | 'erpnext_sync';
-export type ConsentSource = 'checkout' | 'signup' | 'setting' | 'staff';
+export type ConsentPurpose = 'crm' | 'marketing' | 'analytics' | 'erpnext_sync' | 'order' | 'loyalty' | 'referral';
+export type ConsentSource = 'checkout' | 'signup' | 'setting' | 'staff' | 'customer_portal' | 'staff_action';
+export type ConsentChannel = 'all' | 'zns' | 'sms' | 'email' | 'push';
 
 export const POLICY_VERSION = 'v1';
 
@@ -26,6 +27,7 @@ export interface RecordConsentInput {
   db: D1Database;
   customerId: string;
   purpose: ConsentPurpose;
+  channel?: ConsentChannel | string;
   granted: boolean;
   source: ConsentSource;
   policyVersion?: string;
@@ -132,21 +134,40 @@ export async function recordConsent(input: RecordConsentInput): Promise<ConsentW
     }
 
     const consentId = genCustomerId('con_');
+    const normalizedChannel = input.channel && String(input.channel).trim() !== ''
+      ? String(input.channel).trim().toLowerCase()
+      : 'all';
     if (effectiveTenant !== '*') {
-      try {
-        await db.prepare(
-          'INSERT INTO consents (id, customer_id, purpose, granted, source, policy_version, granted_at, revoked_at, tenant_id, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
-        ).bind(
-          consentId, customerId, purpose, granted ? 1 : 0, source,
-          policyVersion, now, null, effectiveTenant, now
-        ).run();
-      } catch {
-        await db.prepare(
-          'INSERT INTO consents (id, customer_id, purpose, granted, source, policy_version, granted_at, revoked_at, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'
-        ).bind(
-          consentId, customerId, purpose, granted ? 1 : 0, source,
-          policyVersion, now, null, now
-        ).run();
+      let insertedScopedChannel = false;
+      if (normalizedChannel !== 'all') {
+        try {
+          await db.prepare(
+            'INSERT INTO consents (id, customer_id, purpose, channel, granted, source, policy_version, granted_at, revoked_at, tenant_id, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+          ).bind(
+            consentId, customerId, purpose, normalizedChannel, granted ? 1 : 0, source,
+            policyVersion, now, null, effectiveTenant, now
+          ).run();
+          insertedScopedChannel = true;
+        } catch {
+          insertedScopedChannel = false;
+        }
+      }
+      if (!insertedScopedChannel) {
+        try {
+          await db.prepare(
+            'INSERT INTO consents (id, customer_id, purpose, granted, source, policy_version, granted_at, revoked_at, tenant_id, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+          ).bind(
+            consentId, customerId, purpose, granted ? 1 : 0, source,
+            policyVersion, now, null, effectiveTenant, now
+          ).run();
+        } catch {
+          await db.prepare(
+            'INSERT INTO consents (id, customer_id, purpose, granted, source, policy_version, granted_at, revoked_at, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'
+          ).bind(
+            consentId, customerId, purpose, granted ? 1 : 0, source,
+            policyVersion, now, null, now
+          ).run();
+        }
       }
     } else {
       await db.prepare(

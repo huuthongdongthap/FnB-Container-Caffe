@@ -557,8 +557,8 @@ export function registerSessionHandlers(router: Hono<{ Bindings: Env }>): void {
             .prepare(
               `SELECT id, status, payment_status FROM orders
                WHERE (session_id = ? OR table_id = ?)
-                 AND LOWER(COALESCE(status, 'pending')) NOT IN ('completed', 'cancelled', 'rejected', 'failed', 'expired', 'refunded')
-                 AND LOWER(COALESCE(payment_status, 'unpaid')) NOT IN ('paid', 'refunded')
+                 AND LOWER(COALESCE(status, 'pending')) NOT IN ('completed', 'cancelled', 'canceled', 'rejected', 'failed', 'expired', 'refunded')
+                 AND LOWER(COALESCE(payment_status, 'unpaid')) NOT IN ('paid', 'completed', 'refunded', 'cancelled', 'canceled')
                  AND (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?)
                LIMIT 1`
             )
@@ -574,8 +574,8 @@ export function registerSessionHandlers(router: Hono<{ Bindings: Env }>): void {
               .prepare(
                 `SELECT id, status, payment_status FROM orders
                  WHERE table_id = ?
-                   AND LOWER(COALESCE(status, 'pending')) NOT IN ('completed', 'cancelled', 'rejected', 'failed', 'expired', 'refunded')
-                   AND LOWER(COALESCE(payment_status, 'unpaid')) NOT IN ('paid', 'refunded')
+                   AND LOWER(COALESCE(status, 'pending')) NOT IN ('completed', 'cancelled', 'canceled', 'rejected', 'failed', 'expired', 'refunded')
+                   AND LOWER(COALESCE(payment_status, 'unpaid')) NOT IN ('paid', 'completed', 'refunded', 'cancelled', 'canceled')
                    AND (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?)
                  LIMIT 1`
               )
@@ -591,8 +591,8 @@ export function registerSessionHandlers(router: Hono<{ Bindings: Env }>): void {
                 .prepare(
                   `SELECT id, status, payment_status FROM orders
                    WHERE table_id = ?
-                     AND LOWER(COALESCE(status, 'pending')) NOT IN ('completed', 'cancelled', 'rejected', 'failed', 'expired', 'refunded')
-                     AND LOWER(COALESCE(payment_status, 'unpaid')) NOT IN ('paid', 'refunded')
+                     AND LOWER(COALESCE(status, 'pending')) NOT IN ('completed', 'cancelled', 'canceled', 'rejected', 'failed', 'expired', 'refunded')
+                     AND LOWER(COALESCE(payment_status, 'unpaid')) NOT IN ('paid', 'completed', 'refunded', 'cancelled', 'canceled')
                    LIMIT 1`
                 )
                 .bind(String(session.table_id ?? ''))
@@ -715,19 +715,27 @@ export function registerSessionHandlers(router: Hono<{ Bindings: Env }>): void {
     // Free the table when the session ends.
     if (isTerminalTransition) {
       await db.prepare(
-        "UPDATE cafe_tables SET status = ? WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
+        "UPDATE cafe_tables SET status = ?, current_order_id = NULL, current_session_id = NULL WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
       ).bind('Available', session.table_id, effectiveTenant).run().catch(() =>
         db.prepare(
-          "UPDATE tables SET status = ? WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
-        ).bind('available', session.table_id, effectiveTenant).run().catch(() => {
-          if (allowUnscopedFallback) {
-            return db.prepare(
-              'UPDATE cafe_tables SET status = ? WHERE id = ?'
-            ).bind('Available', session.table_id).run().catch(() =>
-              db.prepare('UPDATE tables SET status = ? WHERE id = ?').bind('available', session.table_id).run()
-            );
-          }
-        })
+          "UPDATE cafe_tables SET status = ? WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
+        ).bind('Available', session.table_id, effectiveTenant).run().catch(() =>
+          db.prepare(
+            "UPDATE tables SET status = ? WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
+          ).bind('available', session.table_id, effectiveTenant).run().catch(() => {
+            if (allowUnscopedFallback) {
+              return db.prepare(
+                'UPDATE cafe_tables SET status = ?, current_order_id = NULL, current_session_id = NULL WHERE id = ?'
+              ).bind('Available', session.table_id).run().catch(() =>
+                db.prepare(
+                  'UPDATE cafe_tables SET status = ? WHERE id = ?'
+                ).bind('Available', session.table_id).run().catch(() =>
+                  db.prepare('UPDATE tables SET status = ? WHERE id = ?').bind('available', session.table_id).run()
+                )
+              );
+            }
+          })
+        )
       );
     }
 
@@ -804,8 +812,8 @@ export function registerSessionHandlers(router: Hono<{ Bindings: Env }>): void {
           .prepare(
             `SELECT id, status, payment_status FROM orders
              WHERE (session_id = ? OR table_id = ?)
-               AND LOWER(COALESCE(status, 'pending')) NOT IN ('completed', 'cancelled', 'rejected', 'failed', 'expired', 'refunded')
-               AND LOWER(COALESCE(payment_status, 'unpaid')) NOT IN ('paid', 'refunded')
+               AND LOWER(COALESCE(status, 'pending')) NOT IN ('completed', 'cancelled', 'canceled', 'rejected', 'failed', 'expired', 'refunded')
+               AND LOWER(COALESCE(payment_status, 'unpaid')) NOT IN ('paid', 'completed', 'refunded', 'cancelled', 'canceled')
                AND (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?)
              LIMIT 1`
           )
@@ -821,37 +829,37 @@ export function registerSessionHandlers(router: Hono<{ Bindings: Env }>): void {
             .prepare(
               `SELECT id, status, payment_status FROM orders
                WHERE table_id = ?
-                 AND LOWER(COALESCE(status, 'pending')) NOT IN ('completed', 'cancelled', 'rejected', 'failed', 'expired', 'refunded')
-                 AND LOWER(COALESCE(payment_status, 'unpaid')) NOT IN ('paid', 'refunded')
+                 AND LOWER(COALESCE(status, 'pending')) NOT IN ('completed', 'cancelled', 'canceled', 'rejected', 'failed', 'expired', 'refunded')
+                 AND LOWER(COALESCE(payment_status, 'unpaid')) NOT IN ('paid', 'completed', 'refunded', 'cancelled', 'canceled')
                  AND (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?)
                LIMIT 1`
             )
             .bind(String(session.table_id ?? ''), effectiveTenant, effectiveTenant)
             .first()) as Record<string, unknown> | null;
+        if (unpaidRow && ('id' in unpaidRow || 'status' in unpaidRow || 'payment_status' in unpaidRow)) {
+          hasUnpaidOrder = true;
+          unpaidOrderId = unpaidRow.id !== undefined ? String(unpaidRow.id) : null;
+        }
+      } catch {
+        if (allowUnscopedFallback) {
+          const unpaidRow = (await db
+            .prepare(
+              `SELECT id, status, payment_status FROM orders
+               WHERE table_id = ?
+                 AND LOWER(COALESCE(status, 'pending')) NOT IN ('completed', 'cancelled', 'canceled', 'rejected', 'failed', 'expired', 'refunded')
+                 AND LOWER(COALESCE(payment_status, 'unpaid')) NOT IN ('paid', 'completed', 'refunded', 'cancelled', 'canceled')
+               LIMIT 1`
+            )
+            .bind(String(session.table_id ?? ''))
+            .first()
+            .catch(() => null)) as Record<string, unknown> | null;
           if (unpaidRow && ('id' in unpaidRow || 'status' in unpaidRow || 'payment_status' in unpaidRow)) {
             hasUnpaidOrder = true;
             unpaidOrderId = unpaidRow.id !== undefined ? String(unpaidRow.id) : null;
           }
-        } catch {
-          if (allowUnscopedFallback) {
-            const unpaidRow = (await db
-              .prepare(
-                `SELECT id, status, payment_status FROM orders
-                 WHERE table_id = ?
-                   AND LOWER(COALESCE(status, 'pending')) NOT IN ('completed', 'cancelled', 'rejected', 'failed', 'expired', 'refunded')
-                   AND LOWER(COALESCE(payment_status, 'unpaid')) NOT IN ('paid', 'refunded')
-                 LIMIT 1`
-              )
-              .bind(String(session.table_id ?? ''))
-              .first()
-              .catch(() => null)) as Record<string, unknown> | null;
-            if (unpaidRow && ('id' in unpaidRow || 'status' in unpaidRow || 'payment_status' in unpaidRow)) {
-              hasUnpaidOrder = true;
-              unpaidOrderId = unpaidRow.id !== undefined ? String(unpaidRow.id) : null;
-            }
-          }
         }
       }
+    }
       if (hasUnpaidOrder) {
         return c.json({ success: false, error: 'Cannot close session with unpaid active orders', unpaid_order_id: unpaidOrderId }, 409);
       }
@@ -909,17 +917,23 @@ export function registerSessionHandlers(router: Hono<{ Bindings: Env }>): void {
     }
 
     await db.prepare(
-      "UPDATE cafe_tables SET status = ? WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
+      "UPDATE cafe_tables SET status = ?, current_order_id = NULL, current_session_id = NULL WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
     ).bind('Available', session.table_id, effectiveTenant).run().catch(() =>
       db.prepare(
-        "UPDATE tables SET status = ? WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
-      ).bind('available', session.table_id, effectiveTenant).run().catch(() => {
-        if (allowUnscopedFallback) {
-          return db.prepare('UPDATE cafe_tables SET status = ? WHERE id = ?').bind('Available', session.table_id).run().catch(() =>
-            db.prepare('UPDATE tables SET status = ? WHERE id = ?').bind('available', session.table_id).run()
-          );
-        }
-      })
+        "UPDATE cafe_tables SET status = ? WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
+      ).bind('Available', session.table_id, effectiveTenant).run().catch(() =>
+        db.prepare(
+          "UPDATE tables SET status = ? WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
+        ).bind('available', session.table_id, effectiveTenant).run().catch(() => {
+          if (allowUnscopedFallback) {
+            return db.prepare('UPDATE cafe_tables SET status = ?, current_order_id = NULL, current_session_id = NULL WHERE id = ?').bind('Available', session.table_id).run().catch(() =>
+              db.prepare('UPDATE cafe_tables SET status = ? WHERE id = ?').bind('Available', session.table_id).run().catch(() =>
+                db.prepare('UPDATE tables SET status = ? WHERE id = ?').bind('available', session.table_id).run()
+              )
+            );
+          }
+        })
+      )
     );
 
     const updated = (await db.prepare('SELECT * FROM table_sessions WHERE id = ?').bind(id).first().catch(() => null)) as TableSession | null;

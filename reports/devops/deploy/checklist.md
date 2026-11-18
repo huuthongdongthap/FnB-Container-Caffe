@@ -1,30 +1,14 @@
-# Deployment Pre-Flight Checklist — AURA OS
+# Pre-Flight Checklist — Lượt 9 (`v2.3.0` Store Operations & Multi-Tenant Hardening)
 
-## Pre-Flight Gate Status: 🟢 ALL GATES PASSED
-
-| Gate | Verification Target | Command Executed | Result | Status |
-| :--- | :--- | :--- | :--- | :--- |
-| **G1: Client Typecheck** | Frontend TypeScript AST | `npm run typecheck` | 0 errors | ✅ PASSED |
-| **G2: Worker Typecheck** | Cloudflare Worker AST | `npm run typecheck:worker` | 0 errors | ✅ PASSED |
-| **G3: Code Quality Lint** | ESLint static analysis | `npm run lint` | 0 errors, 0 warnings | ✅ PASSED |
-| **G4: Unit & Integration**| Full test suite | `npm test` | 441 suites, 4,017 tests | ✅ PASSED |
-| **G5: Production Bundle** | Vite asset compilation | `npm run build` | `dist/` built cleanly (4.25s) | ✅ PASSED |
-| **G6: Edge Health Probe** | Live Worker `/api/health` | `curl -s .../api/health` | HTTP 200 OK | ✅ PASSED |
-| **G7: Edge Custom Domain**| Production `auraspace.cafe` | `curl -s https://auraspace.cafe` | HTTP 200 OK | ✅ PASSED |
-| **G8: Security & CSP Headers** | OWASP Headers + Google Fonts | `_headers` CSP config | Active on all routes | ✅ PASSED |
-| **G9: Safari Auth & i18n Audit** | Playwright WebKit E2E | `tests/playwright/admin-safari-audit.spec.ts` | 6/6 tests passed | ✅ PASSED |
-| **G10: Service Worker Version** | Client Cache Invalidation | `public/sw.js` | Bumped to `aura-static-v4` | ✅ PASSED |
-
----
-
-## Pre-Flight Environment Checks
-
-- **Node Version**: v20+ runtime compatible.
-- **Wrangler Auth**: Authenticated as `huuthong.dongthap@gmail.com` (Account `b69fee03bdd94234eea8e4114cfc36ab`).
-- **Cloudflare Edge Bindings**:
-  - Pages Project: `fnb-caffe-container`.
-  - Worker Script: `aura-space-worker` (`worker/wrangler.toml`).
-  - D1 Database: `AURA_DB` / `fnb-caffe-db` (`97ae7a5f-fc4d-460d-b019-8535332bd81f`).
-  - KV Namespace: `AUTH_KV`.
-  - Durable Objects: `OrderBroadcaster`.
-- **Pre-deploy Verification**: All 10 pre-flight gates green. Ready for deployment execution.
+- [x] `npm run lint` — 0 warnings / 0 errors
+- [x] `npm run lint:migrations` — 60 forward / 18 down in `worker/db/migrations` (87 forward total)
+- [x] `npm run check:contrast` — 11/11 MD3 token pairs pass WCAG AA
+- [x] `npm run typecheck:all` — 0 TypeScript errors across frontend, worker, and aura-deploy
+- [x] `npx vitest run` — 577 test files / 5,763 tests passing
+- [x] `node scripts/local-payment-flow/run.mjs --api-only` — 58/58 live loopback assertions passing
+- [x] `npm run build` — production SPA bundle built in `dist/`
+- [ ] **Outward Action Gate (Pending User Confirmation):**
+  1. Commit & push Lượt 2–9 converged branch to `origin/main` (or open PR).
+  2. Run `deploy.yml` → `apply-d1-migration` for `20261115_01_tenant_unique_constraints_and_indexes.sql` and `20261118_01_orders_loyalty_points_redeemed.sql` (exports pre-migration D1 backup first).
+  3. Run `deploy.yml` → `worker-canary-10` (10% canary split against baseline `33d9e23b-711c-4278-82d1-b8013fedc41a`).
+  4. Run `deploy.yml` → `deploy-pages` and `worker-promote-100` after smoke verification.

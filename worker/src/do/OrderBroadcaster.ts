@@ -107,7 +107,10 @@ export class OrderBroadcaster {
   private ready: Promise<void> = Promise.resolve();
   private pending: Promise<void> = Promise.resolve();
   public recentOrders: Map<string, Record<string, unknown>> = new Map();
-  private sessions: Map<{ send: (msg: string) => void }, { tenantId: string }> = new Map();
+  private sessions: Map<
+    { send: (msg: string) => void },
+    { tenantId: string; audience: 'staff' | 'guest'; orderId?: string }
+  > = new Map();
 
   /**
    * CF hands a DO its own `state` — which owns `storage` and
@@ -185,11 +188,30 @@ export class OrderBroadcaster {
         this.recentOrders.delete(oldestKey);
       }
 
-      const payloadMsg = JSON.stringify({ type: 'order_update', order: persisted, tenantId: orderTenant });
+      const staffPayloadMsg = JSON.stringify({ type: 'order_update', order: persisted, tenantId: orderTenant });
+      const guestRedactedOrder: OrderEvent = {
+        ...persisted,
+        customer_name: '',
+        customer_phone: '',
+      };
+      const guestPayloadMsg = JSON.stringify({
+        type: 'order_update',
+        order: guestRedactedOrder,
+        tenantId: orderTenant,
+      });
       for (const [sock, meta] of this.sessions.entries()) {
         if (meta.tenantId === '*' || meta.tenantId === orderTenant) {
+          if (meta.audience === 'guest') {
+            if (!meta.orderId || meta.orderId !== orderId) continue;
+            try {
+              sock.send(guestPayloadMsg);
+            } catch {
+              this.sessions.delete(sock);
+            }
+            continue;
+          }
           try {
-            sock.send(payloadMsg);
+            sock.send(staffPayloadMsg);
           } catch {
             this.sessions.delete(sock);
           }
@@ -218,16 +240,46 @@ export class OrderBroadcaster {
       url.searchParams.get('storeId') ||
       'default';
     const socketTenant = normalizeOrderTenant(rawTenant);
+    const rawAudience = (
+      request.headers.get('X-Realtime-Audience') ||
+      request.headers.get('x-realtime-audience') ||
+      ''
+    )
+      .trim()
+      .toLowerCase();
+    const audience: 'staff' | 'guest' = rawAudience === 'guest' ? 'guest' : 'staff';
+    const targetOrderId = (
+      request.headers.get('X-Realtime-Order-ID') ||
+      request.headers.get('x-realtime-order-id') ||
+      ''
+    ).trim();
 
-    const recentList = Array.from(this.recentOrders.values()).filter((item) => {
+    const tenantFiltered = Array.from(this.recentOrders.values()).filter((item) => {
       const itemTenant = normalizeOrderTenant(
         item.__tenant_id || item.tenant_id || item.tenantId || 'default'
       );
-      return socketTenant === '*' || itemTenant === socketTenant;
+      if (!(socketTenant === '*' || itemTenant === socketTenant)) return false;
+      if (audience === 'guest') {
+        return Boolean(targetOrderId) && String(item.orderId || '') === targetOrderId;
+      }
+      return true;
     });
+    const recentList =
+      audience === 'guest'
+        ? tenantFiltered.map((item) => ({
+            ...item,
+            customer_name: '',
+            customer_phone: '',
+          }))
+        : tenantFiltered;
+    const sessionMeta = {
+      tenantId: socketTenant,
+      audience,
+      ...(targetOrderId ? { orderId: targetOrderId } : {}),
+    };
 
     if (socketOverride) {
-      this.sessions.set(socketOverride, { tenantId: socketTenant });
+      this.sessions.set(socketOverride, sessionMeta);
       socketOverride.send(JSON.stringify({ type: 'snapshot', orders: recentList }));
       if (typeof socketOverride.addEventListener === 'function') {
         socketOverride.addEventListener('close', () => this.sessions.delete(socketOverride));
@@ -237,11 +289,14 @@ export class OrderBroadcaster {
 
     const WsPairCtor = (globalThis as unknown as { WebSocketPair?: new () => { 0: WebSocket; 1: WebSocket & { accept: () => void } } }).WebSocketPair;
     if (typeof WsPairCtor === 'function') {
+      if (request.headers.get('Upgrade')?.toLowerCase() !== 'websocket') {
+        return new Response('Expected Upgrade: websocket', { status: 426 });
+      }
       const pair = new WsPairCtor();
       const client = pair[0];
       const server = pair[1];
       server.accept();
-      this.sessions.set(server, { tenantId: socketTenant });
+      this.sessions.set(server, sessionMeta);
       server.send(JSON.stringify({ type: 'snapshot', orders: recentList }));
       server.addEventListener('close', () => this.sessions.delete(server));
       return new Response(null, { status: 101, webSocket: client } as ResponseInit);

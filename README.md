@@ -13,9 +13,9 @@ Premium F&B management system for **AURA CAFE**, an industrial-luxury container 
 | **Frontend** | Vite + React 19 + TypeScript + Tailwind CSS | Cloudflare Pages |
 | **Backend** | Hono + Cloudflare Workers + D1 (SQLite) | Cloudflare Workers |
 | **State** | TanStack Query + Zustand | — |
-| **Auth** | JWT (better-auth) | — |
-| **Storage** | Cloudflare D1 + KV | — |
-| **Payments** | PayOS, COD | — |
+| **Auth** | WebCrypto PBKDF2-SHA256 + Signed JWT (`httpOnly` cookie + Bearer) | — |
+| **Storage** | Cloudflare D1 (124 tables) + KV + Durable Objects (`OrderBroadcaster`) | — |
+| **Payments** | PayOS (VietQR), NOWPayments, COD | — |
 | **Notifications** | Web Push, Zalo ZNS, SMS (SpeedSMS), Email (Resend) | — |
 
 ## ✨ Features (30+)

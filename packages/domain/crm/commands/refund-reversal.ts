@@ -355,7 +355,77 @@ export async function reverseAccrual(
   const newPoints = Math.max(0, (customer.loyalty_points ?? 0) - pointsToDeduct);
   const newLifetimePoints = Math.max(0, (customer.lifetime_points ?? 0) - pointsToDeduct);
 
-  const refundLogId = genId('ptl_');
+  // Deterministic id: the primary key makes concurrent reversals of the same order collide so only one batch commits.
+  // Later partial refunds get a sequence suffix derived from the reversals already recorded.
+  const refundLogId = priorPointLogs.length === 0 ? `ptl_rev_${orderId}` : `ptl_rev_${orderId}_${priorPointLogs.length}`;
+
+  // Earn -> Redeem -> Refund: when the balance no longer covers the clawback, the spent points
+  // already became vouchers. Revoke the newest unused vouchers until the deficit is covered.
+  const pointDeficit = Math.max(0, pointsToDeduct - Math.max(0, Number(customer.loyalty_points ?? 0)));
+  const revokeVoucherIds: string[] = [];
+  const revokeVoucherCodes: string[] = [];
+  let redemptionsHaveTenantCol = false;
+  if (pointDeficit > 0) {
+    try {
+      let voucherRows: Array<{ id: string; points_spent: number; code?: string | null; voucher_code?: string | null }> = [];
+      try {
+        const scopedVouchers = await db
+          .prepare(
+            `SELECT id, points_spent, code, voucher_code FROM loyalty_redemptions
+             WHERE customer_id = ?
+               AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?
+               AND LOWER(COALESCE(status, 'active')) = 'active'
+               AND used_at IS NULL
+             ORDER BY COALESCE(redeemed_at, created_at) DESC`,
+          )
+          .bind(customer.id, writeTenant)
+          .all<{ id: string; points_spent: number; code?: string | null; voucher_code?: string | null }>();
+        voucherRows = scopedVouchers?.results ?? [];
+        redemptionsHaveTenantCol = true;
+      } catch {
+        if (!effectiveTenant || writeTenant === 'default') {
+          const fallbackVouchers = await db
+            .prepare(
+              `SELECT id, points_spent FROM loyalty_redemptions
+               WHERE customer_id = ? AND LOWER(COALESCE(status, 'active')) = 'active' AND used_at IS NULL
+               ORDER BY COALESCE(redeemed_at, created_at) DESC`,
+            )
+            .bind(customer.id)
+            .all<{ id: string; points_spent: number }>();
+          voucherRows = fallbackVouchers?.results ?? [];
+        }
+      }
+      let covered = 0;
+      for (const voucher of voucherRows) {
+        if (covered >= pointDeficit) break;
+        revokeVoucherIds.push(voucher.id);
+        const vCode = String(voucher.code ?? voucher.voucher_code ?? '').trim();
+        if (vCode) revokeVoucherCodes.push(vCode);
+        covered += Math.max(0, Number(voucher.points_spent ?? 0));
+      }
+    } catch {
+      // Minimal schemas without a voucher ledger have nothing to revoke.
+    }
+  }
+  const revokeVoucherStmts = revokeVoucherIds.map((id) =>
+    redemptionsHaveTenantCol
+      ? db
+          .prepare(
+            `UPDATE loyalty_redemptions SET status = 'revoked'
+             WHERE id = ?
+               AND customer_id = ?
+               AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?
+               AND LOWER(COALESCE(status, 'active')) = 'active'
+               AND used_at IS NULL`,
+          )
+          .bind(id, customer.id, writeTenant)
+      : db
+          .prepare(
+            `UPDATE loyalty_redemptions SET status = 'revoked'
+             WHERE id = ? AND customer_id = ? AND LOWER(COALESCE(status, 'active')) = 'active' AND used_at IS NULL`,
+          )
+          .bind(id, customer.id),
+  );
   const customerUpdateStmt = effectiveTenant
     ? db
         .prepare(
@@ -408,15 +478,21 @@ export async function reverseAccrual(
         refund_amount: refundAmountVnd,
         order_total: total,
         proportional: total > 0 && refundAmountVnd < total,
+        revoked_voucher_ids: revokeVoucherIds,
+        point_deficit: pointDeficit,
       }),
       now,
     );
+  const isUniqueViolation = (err: unknown) => /UNIQUE constraint|PRIMARY KEY|constraint failed/i.test(String((err as Error)?.message ?? ''));
   try {
-    await db.batch([customerUpdateStmt, pointLogStmt, auditLogStmt]);
+    await db.batch([customerUpdateStmt, pointLogStmt, auditLogStmt, ...revokeVoucherStmts]);
   } catch (e) {
+    // The whole batch rolled back: a primary-key collision means a concurrent reversal already committed.
+    if (isUniqueViolation(e)) return { ok: false, reason: 'already_reversed' };
     try {
-      await db.batch([customerUpdateStmt, pointLogStmt]);
-    } catch {
+      await db.batch([customerUpdateStmt, pointLogStmt, ...revokeVoucherStmts]);
+    } catch (retryErr) {
+      if (isUniqueViolation(retryErr)) return { ok: false, reason: 'already_reversed' };
       return { ok: false, reason: 'd1_error', error: `batch failed: ${(e as Error).message}` };
     }
   }
@@ -432,6 +508,34 @@ export async function reverseAccrual(
       .bind(writeTenant, customer.id, orderId, now)
       .run()
       .catch(() => {});
+    for (let i = 0; i < revokeVoucherIds.length; i++) {
+      const vId = revokeVoucherIds[i];
+      const vCode = revokeVoucherCodes[i] || '';
+      await db
+        .prepare(
+          `UPDATE user_rewards SET status = 'revoked'
+           WHERE customer_id = ?
+             AND (id = ? OR (? != '' AND code = ?))
+             AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?
+             AND LOWER(COALESCE(status, 'active')) = 'active'`
+        )
+        .bind(customer.id, vId, vCode, vCode, writeTenant)
+        .run()
+        .catch(() =>
+          !effectiveTenant || writeTenant === 'default'
+            ? db
+                .prepare(
+                  `UPDATE user_rewards SET status = 'revoked'
+                   WHERE customer_id = ?
+                     AND (id = ? OR (? != '' AND code = ?))
+                     AND LOWER(COALESCE(status, 'active')) = 'active'`
+                )
+                .bind(customer.id, vId, vCode, vCode)
+                .run()
+                .catch(() => {})
+            : undefined
+        );
+    }
   } catch {
     // Ignore optional tenant_id updates on minimal schemas
   }

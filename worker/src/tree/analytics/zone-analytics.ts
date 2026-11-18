@@ -35,7 +35,10 @@ export async function getZoneStats(
   LEFT JOIN cafe_tables ct ON ct.id = o.table_id${tableTenantJoin}
   WHERE o.status != 'cancelled'
     AND o.status NOT IN ('cancelled', 'refunded', 'failed', 'rejected', 'expired')
+    AND LOWER(COALESCE(TRIM(o.status), '')) NOT IN ('cancelled', 'canceled', 'refunded', 'failed', 'rejected', 'expired')
     AND COALESCE(o.payment_status, '') != 'refunded'
+    AND LOWER(COALESCE(TRIM(o.payment_status), '')) NOT IN ('refunded', 'failed', 'cancelled', 'canceled')
+    AND NOT (COALESCE(TRIM(o.notes), '') = 'Khách QR - cho don mon' AND COALESCE(TRIM(o.items), '[]') IN ('', '[]'))
     AND o.created_at >= datetime('now', '-' || ? || ' days')${tenantClause}
   GROUP BY label
   ORDER BY value DESC
@@ -51,6 +54,7 @@ export async function getZoneStats(
   LEFT JOIN cafe_tables ct ON ct.id = o.table_id${tableTenantJoin}
   WHERE o.status != 'cancelled'
     AND o.status NOT IN ('cancelled', 'refunded', 'failed', 'rejected', 'expired')
+    AND LOWER(COALESCE(TRIM(o.status), '')) NOT IN ('cancelled', 'canceled', 'refunded', 'failed', 'rejected', 'expired')
     AND o.created_at >= datetime('now', '-' || ? || ' days')${tenantClause}
   GROUP BY label
   ORDER BY value DESC
@@ -68,6 +72,7 @@ export async function getZoneStats(
   LEFT JOIN cafe_tables ct ON ct.id = o.table_id
   WHERE o.status != 'cancelled'
     AND o.status NOT IN ('cancelled', 'refunded', 'failed', 'rejected', 'expired')
+    AND LOWER(COALESCE(TRIM(o.status), '')) NOT IN ('cancelled', 'canceled', 'refunded', 'failed', 'rejected', 'expired')
     AND o.created_at >= datetime('now', '-' || ? || ' days')${tenantClause}
   GROUP BY label
   ORDER BY value DESC
@@ -90,6 +95,7 @@ export async function getZoneStats(
   LEFT JOIN tables t ON t.id = o.table_id AND COALESCE(NULLIF(TRIM(t.tenant_id), ''), 'default') = COALESCE(NULLIF(TRIM(o.tenant_id), ''), 'default')
   WHERE o.status != 'cancelled'
     AND o.status NOT IN ('cancelled', 'refunded', 'failed', 'rejected', 'expired')
+    AND LOWER(COALESCE(TRIM(o.status), '')) NOT IN ('cancelled', 'canceled', 'refunded', 'failed', 'rejected', 'expired')
     AND o.created_at >= datetime('now', '-' || ? || ' days')${tenantClause}
   GROUP BY label
   ORDER BY value DESC
@@ -109,6 +115,7 @@ export async function getZoneStats(
   LEFT JOIN tables t ON t.id = o.table_id
   WHERE o.status != 'cancelled'
     AND o.status NOT IN ('cancelled', 'refunded', 'failed', 'rejected', 'expired')
+    AND LOWER(COALESCE(TRIM(o.status), '')) NOT IN ('cancelled', 'canceled', 'refunded', 'failed', 'rejected', 'expired')
     AND o.created_at >= datetime('now', '-' || ? || ' days')${tenantClause}
   GROUP BY label
   ORDER BY value DESC
