@@ -11,7 +11,6 @@
 /failure.html                 /order-failure              301
 /success.html                 /order-success              301
 /receipt-template.html        /checkout                   301
-/signup/index.html            /loyalty                    301
 
 # ── 2. BULK wildcard: all remaining .html → clean URL ──
 /*.html                       /:splat                     301
@@ -25,7 +24,6 @@
 /dashboard/admin              /admin/dashboard            301
 /dashboard/login              /admin/login                301
 /kitchen                      /kds                        301
-/signup                       /loyalty                    301
 
 # ── 5. Security: block sensitive directories ──
 /docs/*                       /404                        404

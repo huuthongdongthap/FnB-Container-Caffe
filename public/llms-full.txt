@@ -1,0 +1,37 @@
+# AURA SPACE — Complete Reference (llms-full.txt)
+
+Canonical URL: https://auraspace.cafe/
+Last updated: 2026-11-19
+
+## 1. Flagship Store: AURA CAFE Sa Đéc
+- **Name**: AURA CAFE (AURA SPACE)
+- **Address**: 29 Nguyễn Tất Thành, Phường 1, TP. Sa Đéc, Đồng Tháp, Vietnam (opposite Thảo Trâm 2 Hotel)
+- **Hours**: 07:00 – 23:00 daily (Monday–Sunday)
+- **Phone**: +84 946 013 633
+- **Architecture**: 3 recycled shipping containers forming 5 distinct zones: Quầy Bar Container, Lounge Thủy Mộc, Sân Thượng Rooftop, Phòng Container 40ft (air-conditioned quiet work cabin), and Khu Sofa / Sân Vườn.
+- **Services**: Dine-in with QR table ordering, online table reservation, local Sa Đéc delivery, acoustic events, and AURA Points loyalty program.
+
+## 2. AURA SPACE SaaS v3.0 (F&B Commercial Operating System)
+AURA SPACE powers coffee shops, tea houses, bistros, and multi-branch F&B chains with zero order commission — customer payments settle directly into each merchant's own bank account (VietQR) or own PayOS merchant account (AES-256-GCM encrypted credentials).
+
+### Plans & Pricing (VND)
+- **Starter** — 199,000 VND/month (1,910,400 VND/year, -20%): Up to 15 tables, 3 staff accounts, QR table ordering, `/s/:slug` storefront, POS, KDS, thermal printing, direct VietQR.
+- **Pro (Recommended)** — 499,000 VND/month (4,790,400 VND/year, -20%): Everything in Starter plus BOM recipe & inventory tracking, P&L reporting, CRM & loyalty campaigns, merchant-owned PayOS integration, Custom Domain (DNS TXT verified), up to 50 tables and 15 staff accounts.
+- **Chain** — 1,290,000 VND/month (12,384,000 VND/year, -20%): Everything in Pro with unlimited tables and staff, multi-branch HQ rollup, AI analytics, and ERP/Zalo integrations.
+
+### Trial & Onboarding
+- **Free trial**: 14 days full-access trial, no credit card required, 3-day grace window, safe read-only fallback with full JSON data export at any time.
+- **60-second signup**: Visit `https://auraspace.cafe/signup` to choose a store slug (`/s/:slug`), pick a starter menu template (Coffee, Milk Tea, Bistro), and launch immediately.
+
+## 3. Public URLs
+- Home: https://auraspace.cafe/
+- Menu: https://auraspace.cafe/menu
+- SaaS Pricing: https://auraspace.cafe/pricing
+- SaaS Signup: https://auraspace.cafe/signup
+- Table Reservation: https://auraspace.cafe/table-reservation
+- Events: https://auraspace.cafe/events
+- Promotions: https://auraspace.cafe/promotions
+- Loyalty: https://auraspace.cafe/loyalty
+- About Us: https://auraspace.cafe/about-us
+- Contact: https://auraspace.cafe/contact
+- Brand Guideline: https://auraspace.cafe/brand-guideline

@@ -78,6 +78,10 @@ export function StitchKDSNew({
   onRefresh,
   activeFilter = 'all',
   onFilterChange,
+  soundEnabled = true,
+  isFullscreen = false,
+  onToggleSound,
+  onToggleFullscreen,
 }: Readonly<StitchKDSNewProps>) {
   const { t } = useTranslation();
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -109,6 +113,10 @@ export function StitchKDSNew({
         stationLabel={stationLabel}
         avgPrepTime={avgPrepTime}
         activeCount={activeCount}
+        soundEnabled={soundEnabled}
+        isFullscreen={isFullscreen}
+        onToggleSound={onToggleSound}
+        onToggleFullscreen={onToggleFullscreen}
       />
 
       <Sidebar

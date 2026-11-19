@@ -10,7 +10,7 @@ export function HeroSection({ heroBgUrl }: HeroSectionProps) {
   const { t } = useTranslation();
 
   return (
-    <section className="relative z-10 px-6 py-10 sm:px-16 sm:py-20 flex flex-col items-center justify-center min-h-[600px] sm:min-h-[870px] text-center">
+    <section className="relative z-10 px-6 pt-24 pb-12 sm:px-16 sm:pt-28 sm:pb-16 flex flex-col items-center justify-center min-h-[540px] sm:min-h-[680px] text-center">
       <div
         className="p-12 md:p-24 max-w-5xl w-full relative overflow-hidden"
         style={{

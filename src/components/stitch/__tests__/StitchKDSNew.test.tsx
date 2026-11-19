@@ -27,6 +27,10 @@ vi.mock('lucide-react', () => ({
   ChevronRight: () => null,
   ChefHat: () => null,
   CheckCircle2: () => null,
+  Maximize2: () => null,
+  Minimize2: () => null,
+  Volume2: () => null,
+  VolumeX: () => null,
 }));
 
 vi.mock('@/hooks/use-focus-trap', () => ({

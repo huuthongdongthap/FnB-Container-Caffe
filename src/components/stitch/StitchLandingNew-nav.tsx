@@ -96,12 +96,12 @@ export function LandingNav() {
         </a>
 
         {/* Desktop links */}
-        <div className="hidden md:flex items-center gap-8">
+        <div className="hidden md:flex items-center gap-6">
           {navLinks.map((link) => (
             <a
               key={link.href}
               href={link.href}
-              className={`pb-1 text-base transition-all font-display ${
+              className={`inline-flex min-h-[44px] items-center px-1 text-base transition-all font-display ${
                 isActive(link.href)
                   ? 'border-b-2 border-[var(--aura-chrome-bright)] text-[var(--aura-chrome-bright)] font-semibold'
                   : 'text-[var(--aura-chrome-soft)] hover:text-[var(--aura-chrome-bright)] font-medium'

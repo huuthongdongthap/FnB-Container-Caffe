@@ -7,7 +7,6 @@ import {
   type TicketStatus,
 } from '@/components/stitch/StitchKDSNew';
 import { OVERDUE_THRESHOLD_MIN, calcElapsedSeconds } from './kds-types';
-import { KdsToolbar } from './kds-toolbar';
 import { useKdsAudio } from '@/hooks/use-kds-audio';
 
 /* ─── Re-export types for backward compatibility ─────────────── */
@@ -170,13 +169,6 @@ export default function KDSPage() {
         description="Kitchen order display for AURA CAFE staff. He thong hien thi don hang cho nhan vien."
       />
       <div className="relative">
-        <KdsToolbar
-          soundEnabled={soundEnabled}
-          isFullscreen={isFullscreen}
-          onToggleSound={() => setSoundEnabled(!soundEnabled)}
-          onToggleFullscreen={toggleFullscreen}
-        />
-
         <StitchKDSNew
           tickets={tickets}
           stationName="KITCHEN STATION"
@@ -194,6 +186,10 @@ export default function KDSPage() {
           onFilterChange={(filter) => {
             if (filter) setViewFilter(filter);
           }}
+          soundEnabled={soundEnabled}
+          isFullscreen={isFullscreen}
+          onToggleSound={() => setSoundEnabled(!soundEnabled)}
+          onToggleFullscreen={toggleFullscreen}
         />
       </div>
     </>

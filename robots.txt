@@ -1,39 +1,32 @@
-# ═══════════════════════════════════════════════
-# AURA SPACE - Robots.txt
-# ═══════════════════════════════════════════════
-
+# AURA SPACE — robots.txt
 User-agent: *
 Allow: /
-
-# Disallow admin and private pages
 Disallow: /admin/
+Disallow: /kds
+Disallow: /kds/
+Disallow: /kitchen-display/
 Disallow: /auth/
 Disallow: /portal/
 Disallow: /dashboard/
-Disallow: /kds/
-Disallow: /kitchen-display/
+Disallow: /checkout
 Disallow: /success/
 Disallow: /failure/
-Disallow: /receipt-template.html
-Disallow: /test-*.html
-Disallow: /layout-*.html
-Disallow: /binh-phap-thi-cong.html
-Disallow: /project-brief.html
-Disallow: /lighthouse-report.html
+Disallow: /mobile/
 
-# Allow main public pages
-Allow: /index.html
-Allow: /menu.html
-Allow: /checkout.html
-Allow: /about-us.html
-Allow: /contact.html
-Allow: /loyalty.html
-Allow: /table-reservation.html
-Allow: /track-order
+# Explicitly welcome AI search & retrieval crawlers
+User-agent: OAI-SearchBot
+Allow: /
+Disallow: /admin/
+Disallow: /kds
 
-# Sitemap
+User-agent: Claude-SearchBot
+Allow: /
+Disallow: /admin/
+Disallow: /kds
+
+User-agent: PerplexityBot
+Allow: /
+Disallow: /admin/
+Disallow: /kds
+
 Sitemap: https://auraspace.cafe/sitemap.xml
-
-# Crawl-delay for polite crawling
-Crawl-delay: 1
-

@@ -349,7 +349,7 @@ export default function AdminSaasSettingsPage(): ReactNode {
       )}
 
       {/* Tabs */}
-      <div className="flex gap-2 border-b border-slate-800 pb-2 overflow-x-auto">
+      <div className="flex flex-wrap gap-2 border-b border-slate-800 pb-3">
         {[
           { id: 'billing', label: '1. Gói & Hóa đơn SaaS' },
           { id: 'payment', label: '2. Thanh toán trực tiếp (VietQR / PayOS)' },
@@ -360,7 +360,7 @@ export default function AdminSaasSettingsPage(): ReactNode {
             key={t.id}
             type="button"
             onClick={() => setTab(t.id as typeof tab)}
-            className={`px-4 py-2 rounded-lg text-xs font-semibold whitespace-nowrap transition ${
+            className={`min-h-[40px] px-4 py-2 rounded-lg text-xs font-semibold whitespace-nowrap transition ${
               tab === t.id ? 'bg-amber-500 text-slate-950' : 'bg-slate-900 text-slate-300 hover:bg-slate-800'
             }`}
           >
@@ -372,7 +372,7 @@ export default function AdminSaasSettingsPage(): ReactNode {
       {/* TAB 1: BILLING */}
       {tab === 'billing' && (
         <div className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
             {[
               { id: 'starter' as const, name: 'Starter', monthly: 199_000, annual: 1_910_000, desc: 'Tối đa 15 bàn, 3 nhân viên, VietQR' },
               { id: 'pro' as const, name: 'Pro', monthly: 499_000, annual: 4_790_000, desc: 'Không giới hạn bàn & NV, PayOS riêng, Tên miền riêng' },
@@ -383,21 +383,22 @@ export default function AdminSaasSettingsPage(): ReactNode {
                   <h3 className="text-lg font-bold text-white">{p.name}</h3>
                   <p className="text-xs text-slate-400 mt-1">{p.desc}</p>
                 </div>
-                <div className="text-2xl font-bold text-amber-400">
-                  {p.monthly.toLocaleString('vi-VN')}đ<span className="text-xs text-slate-400">/tháng</span>
+                <div className="flex flex-wrap items-baseline gap-1 text-2xl font-bold text-amber-400">
+                  <span>{p.monthly.toLocaleString('vi-VN')}đ</span>
+                  <span className="text-xs font-normal text-slate-400">/tháng</span>
                 </div>
                 <div className="flex flex-col gap-2">
                   <button
                     type="button"
                     onClick={() => handleCheckout(p.id, 'monthly')}
-                    className="rounded-lg bg-slate-800 py-2 text-xs font-semibold text-white hover:bg-slate-700"
+                    className="min-h-[44px] rounded-lg bg-slate-800 px-3 py-2 text-xs font-semibold text-white hover:bg-slate-700"
                   >
                     Thanh toán 1 tháng ({p.monthly.toLocaleString('vi-VN')}đ)
                   </button>
                   <button
                     type="button"
                     onClick={() => handleCheckout(p.id, 'annual')}
-                    className="rounded-lg bg-amber-500 py-2 text-xs font-bold text-slate-950 hover:bg-amber-400"
+                    className="min-h-[44px] rounded-lg bg-amber-500 px-3 py-2 text-xs font-bold text-slate-950 hover:bg-amber-400"
                   >
                     Thanh toán 1 năm (-20%: {p.annual.toLocaleString('vi-VN')}đ)
                   </button>

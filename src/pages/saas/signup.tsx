@@ -37,14 +37,75 @@ function slugifyInput(raw: string): string {
     .slice(0, 40);
 }
 
+const FALLBACK_TEMPLATES: TemplateItem[] = [
+  {
+    id: 'container-cafe',
+    nameVi: 'Quán Cà Phê & Container Cafe',
+    descriptionVi: 'Cà phê phin, espresso, trà trái cây, bánh ngọt và sơ đồ 12 bàn sẵn sàng.',
+    defaultTagline: 'Cà phê nguyên bản • Không gian mở',
+    primaryColor: '#051424',
+    accentColor: '#EFBD8A',
+    counts: { categories: 5, products: 18, tables: 12, shifts: 3 },
+  },
+  {
+    id: 'milk-tea-bar',
+    nameVi: 'Trà Sữa & Đồ Uống Giới Trẻ',
+    descriptionVi: 'Trà sữa topping, trà trái cây nhiệt đới, tùy chọn đường/đá linh hoạt.',
+    defaultTagline: 'Trà đậm vị • Topping tươi mỗi ngày',
+    primaryColor: '#1E1B4B',
+    accentColor: '#F59E0B',
+    counts: { categories: 4, products: 16, tables: 10, shifts: 3 },
+  },
+  {
+    id: 'bakery-bistro',
+    nameVi: 'Bánh Ngọt & Bistro Cafe',
+    descriptionVi: 'Croissant, bánh Âu, brunch, đồ uống specialty và quản lý bếp KDS.',
+    defaultTagline: 'Bánh nướng mỗi sáng • Specialty Coffee',
+    primaryColor: '#1C1917',
+    accentColor: '#D97706',
+    counts: { categories: 5, products: 20, tables: 15, shifts: 3 },
+  },
+];
+
+const FALLBACK_PLANS: PlanItem[] = [
+  {
+    id: 'starter',
+    name: 'Starter',
+    taglineVi: 'Tối đa 15 bàn, 3 nhân viên, VietQR 0% phí',
+    monthlyPriceVnd: 199_000,
+    annualPriceVnd: 1_910_000,
+    annualMonthlyEquivalentVnd: 159_000,
+    highlightsVi: ['POS & QR Order tại bàn', 'VietQR trực tiếp về tài khoản quán'],
+  },
+  {
+    id: 'pro',
+    name: 'Pro',
+    taglineVi: 'Không giới hạn bàn & NV, KDS, PayOS riêng, tên miền riêng',
+    monthlyPriceVnd: 499_000,
+    annualPriceVnd: 4_790_000,
+    annualMonthlyEquivalentVnd: 399_000,
+    popular: true,
+    highlightsVi: ['Không giới hạn bàn & nhân viên', 'KDS realtime & PayOS riêng'],
+  },
+  {
+    id: 'chain',
+    name: 'Chain',
+    taglineVi: 'Đa chi nhánh, HQ rollup, báo cáo P&L, API & Webhook',
+    monthlyPriceVnd: 1_290_000,
+    annualPriceVnd: 12_384_000,
+    annualMonthlyEquivalentVnd: 1_032_000,
+    highlightsVi: ['Quản trị đa chi nhánh tập trung', 'API & Webhook mở rộng'],
+  },
+];
+
 export default function SaasSignupPage(): ReactNode {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const initialPlan = searchParams.get('plan') || 'pro';
 
   const [step, setStep] = useState<1 | 2 | 3>(1);
-  const [templates, setTemplates] = useState<TemplateItem[]>([]);
-  const [plans, setPlans] = useState<PlanItem[]>([]);
+  const [templates, setTemplates] = useState<TemplateItem[]>(FALLBACK_TEMPLATES);
+  const [plans, setPlans] = useState<PlanItem[]>(FALLBACK_PLANS);
 
   const [shopName, setShopName] = useState('');
   const [slug, setSlug] = useState('');
@@ -75,7 +136,7 @@ export default function SaasSignupPage(): ReactNode {
       silent: true,
     })
       .then((res) => {
-        if (res.data?.templates) setTemplates(res.data.templates);
+        if (res.data?.templates && res.data.templates.length > 0) setTemplates(res.data.templates);
       })
       .catch(() => {});
 
@@ -83,7 +144,7 @@ export default function SaasSignupPage(): ReactNode {
       silent: true,
     })
       .then((res) => {
-        if (res.data?.plans) setPlans(res.data.plans);
+        if (res.data?.plans && res.data.plans.length > 0) setPlans(res.data.plans);
       })
       .catch(() => {});
   }, []);

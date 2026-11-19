@@ -48,10 +48,10 @@ export const Sidebar = forwardRef<HTMLElement, SidebarProps>(
       >
         {/* Brand header */}
         <div className="mb-6 px-6" aria-label={brandName}>
-          <Link to="/admin" onClick={onClose}>
-            <h1 className="font-display text-[32px] font-semibold leading-10 tracking-tight text-[var(--aura-text-primary, #e8e8e8)]">
+          <Link to="/admin" onClick={onClose} className="inline-block min-h-[44px]">
+            <span className="block font-display text-[32px] font-semibold leading-10 tracking-tight text-[var(--aura-text-primary, #e8e8e8)]">
               {t('hero.title') || brandName}
-            </h1>
+            </span>
           </Link>
           <p className="text-sm text-[var(--aura-text-secondary, #a0a8b0)] opacity-70">{brandSubtitle}</p>
         </div>

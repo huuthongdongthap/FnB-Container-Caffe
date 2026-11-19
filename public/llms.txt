@@ -1,0 +1,21 @@
+# AURA SPACE — Container Caffe Sa Đéc & F&B SaaS Platform
+
+> AURA SPACE combines our flagship Industrial-Luxury container coffee house in Sa Đéc, Đồng Tháp (est. 2018) with the AURA SPACE SaaS v3.0 operating system (POS, QR table ordering, KDS, BOM inventory, P&L, CRM, and direct VietQR/PayOS payments with 0% order commission).
+
+## Flagship Café (Sa Đéc, Vietnam)
+- [Trang chủ AURA CAFE](https://auraspace.cafe/index.html.md): Flagship 3-container coffee space at 29 Nguyễn Tất Thành, Phường 1, TP. Sa Đéc, Đồng Tháp (open 07:00–23:00 daily).
+- [Thực đơn / Menu](https://auraspace.cafe/menu.md): Specialty coffee, salt coffee, fruit teas, craft drinks, and local snacks with QR ordering and Sa Đéc delivery.
+- [Đặt bàn / Table Reservation](https://auraspace.cafe/table-reservation.md): Book tables across 5 zones (Container Bar, Lounge Thủy Mộc, Rooftop, Quiet 40ft AC Cabin, Garden Sofa).
+- [Sự kiện / Events](https://auraspace.cafe/events.md): Acoustic nights, workshops, and community gatherings at AURA CAFE.
+- [Khuyến mãi / Promotions](https://auraspace.cafe/promotions.md): Seasonal vouchers, member deals, and combo offers.
+- [Hội viên / Loyalty](https://auraspace.cafe/loyalty.md): AURA Points check-in, tier perks, and birthday rewards.
+- [Câu chuyện AURA / About Us](https://auraspace.cafe/about-us.md): Architecture, materials, and story of the Sa Đéc container café.
+- [Liên hệ / Contact](https://auraspace.cafe/contact.md): Address, phone (+84 946 013 633), opening hours, and directions.
+
+## AURA SPACE SaaS v3.0 (For F&B Owners)
+- [Bảng giá SaaS / Pricing](https://auraspace.cafe/pricing.md): Starter (199,000 VND/month), Pro (499,000 VND/month), Chain (1,290,000 VND/month). 20% off annual billing, 14-day full-access free trial, 0% order commission.
+- [Đăng ký mở quán / 60s Signup](https://auraspace.cafe/signup.md): Launch a branded `/s/:slug` storefront, QR ordering, POS, and KDS in 60 seconds with ready-made menu templates.
+
+## Optional
+- [Full Reference (llms-full.txt)](https://auraspace.cafe/llms-full.txt): Consolidated markdown summary of all flagship and SaaS details.
+- [Brand Guideline](https://auraspace.cafe/brand-guideline.md): Industrial Luxury design system, navy/bronze/silver palette, and typography rules.

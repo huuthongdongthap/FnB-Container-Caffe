@@ -1,0 +1,32 @@
+# AURA SPACE — robots.txt
+User-agent: *
+Allow: /
+Disallow: /admin/
+Disallow: /kds
+Disallow: /kds/
+Disallow: /kitchen-display/
+Disallow: /auth/
+Disallow: /portal/
+Disallow: /dashboard/
+Disallow: /checkout
+Disallow: /success/
+Disallow: /failure/
+Disallow: /mobile/
+
+# Explicitly welcome AI search & retrieval crawlers
+User-agent: OAI-SearchBot
+Allow: /
+Disallow: /admin/
+Disallow: /kds
+
+User-agent: Claude-SearchBot
+Allow: /
+Disallow: /admin/
+Disallow: /kds
+
+User-agent: PerplexityBot
+Allow: /
+Disallow: /admin/
+Disallow: /kds
+
+Sitemap: https://auraspace.cafe/sitemap.xml

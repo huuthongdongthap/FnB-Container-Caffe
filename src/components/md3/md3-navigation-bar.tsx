@@ -90,10 +90,10 @@ export function MD3NavigationBarItem({
       <span
         className={cn(
           'relative flex items-center justify-center',
-          'w-8 h-8 text-2xl [&_svg]:w-6 [&_svg]:h-6',
+          'h-8 text-2xl [&_svg]:w-6 [&_svg]:h-6 [&_svg]:shrink-0 transition-all',
           isActive
-            ? 'bg-md-secondary-container rounded-md-full px-5 py-1.5 text-md-on-secondary-container'
-            : 'text-md-on-surface-variant',
+            ? 'w-16 bg-md-secondary-container rounded-md-full text-md-on-secondary-container'
+            : 'w-8 text-md-on-surface-variant',
         )}
       >
         {icon}

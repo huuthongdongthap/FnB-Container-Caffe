@@ -68,14 +68,14 @@ export function MD3TopAppBar({
 
         {/* Title — inline for small / center-aligned */}
         {!isExpanded && (
-          <h1
+          <span
             className={cn(
               'text-[22px] font-normal leading-7 text-md-on-surface',
               variant === 'center-aligned' ? 'flex-1 text-center' : 'flex-1 truncate',
             )}
           >
             {title}
-          </h1>
+          </span>
         )}
 
         {/* Spacer for expanded variants when no leading icon */}
@@ -104,9 +104,9 @@ export function MD3TopAppBar({
             variant === 'large' ? 'pb-5' : 'pb-4',
           )}
         >
-          <h1 className="text-[28px] font-normal leading-9 text-md-on-surface">
+          <span className="text-[28px] font-normal leading-9 text-md-on-surface">
             {title}
-          </h1>
+          </span>
         </div>
       )}
     </header>

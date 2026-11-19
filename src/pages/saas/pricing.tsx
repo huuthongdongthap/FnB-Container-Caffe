@@ -13,15 +13,62 @@ interface SaasPlan {
   highlightsVi: string[];
 }
 
+const FALLBACK_SAAS_PLANS: SaasPlan[] = [
+  {
+    id: 'starter',
+    name: 'Starter',
+    taglineVi: 'Khởi đầu chuẩn chỉnh cho quán cà phê & trà sữa quy mô nhỏ',
+    monthlyPriceVnd: 199_000,
+    annualPriceVnd: 1_910_000,
+    annualMonthlyEquivalentVnd: 159_000,
+    highlightsVi: [
+      'Tối đa 15 bàn & 3 tài khoản nhân viên',
+      'QR Order tại bàn & POS thu ngân mượt mà',
+      'Thanh toán VietQR trực tiếp về tài khoản chủ quán (0% phí)',
+      'Báo cáo doanh thu theo ngày & ca làm việc',
+    ],
+  },
+  {
+    id: 'pro',
+    name: 'Pro',
+    taglineVi: 'Tối ưu vận hành tốc độ cao cho quán đông khách & thương hiệu riêng',
+    monthlyPriceVnd: 499_000,
+    annualPriceVnd: 4_790_000,
+    annualMonthlyEquivalentVnd: 399_000,
+    popular: true,
+    highlightsVi: [
+      'Không giới hạn số bàn & tài khoản nhân viên',
+      'Màn hình bếp KDS realtime & phân loại đồ uống',
+      'Tích hợp PayOS riêng & tự động xác nhận chuyển khoản',
+      'Tên miền riêng (Custom Domain) & nhận diện thương hiệu quán',
+      'Quản lý tồn kho, công thức định lượng & tích điểm Loyalty',
+    ],
+  },
+  {
+    id: 'chain',
+    name: 'Chain',
+    taglineVi: 'Kiểm soát tập trung cho chuỗi cửa hàng & mô hình nhượng quyền',
+    monthlyPriceVnd: 1_290_000,
+    annualPriceVnd: 12_384_000,
+    annualMonthlyEquivalentVnd: 1_032_000,
+    highlightsVi: [
+      'Quản lý đa chi nhánh & bảng điều khiển HQ tổng hợp',
+      'Báo cáo P&L, giá vốn & hiệu suất từng cửa hàng',
+      'Đồng bộ thực đơn & chương trình khuyến mãi toàn chuỗi',
+      'API & Webhook mở rộng tích hợp ERP / kế toán',
+    ],
+  },
+];
+
 export default function SaasPricingPage(): ReactNode {
-  const [plans, setPlans] = useState<SaasPlan[]>([]);
+  const [plans, setPlans] = useState<SaasPlan[]>(FALLBACK_SAAS_PLANS);
   const [billingCycle, setBillingCycle] = useState<'monthly' | 'annual'>('annual');
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     void apiFetch<{ success: boolean; data?: { plans: SaasPlan[] } }>('/api/saas/plans', { silent: true })
       .then((res) => {
-        if (res.data?.plans) setPlans(res.data.plans);
+        if (res.data?.plans && res.data.plans.length > 0) setPlans(res.data.plans);
       })
       .catch(() => {})
       .finally(() => setLoading(false));
@@ -46,8 +93,8 @@ export default function SaasPricingPage(): ReactNode {
             <button
               type="button"
               onClick={() => setBillingCycle('monthly')}
-              className={`px-4 py-2 rounded-lg text-xs font-semibold transition ${
-                billingCycle === 'monthly' ? 'bg-amber-500 text-slate-950' : 'text-slate-300'
+              className={`min-h-[44px] px-4 py-2 rounded-lg text-xs font-semibold transition ${
+                billingCycle === 'monthly' ? 'bg-amber-500 text-slate-950' : 'text-slate-300 hover:text-white'
               }`}
             >
               Thanh toán theo tháng
@@ -55,12 +102,18 @@ export default function SaasPricingPage(): ReactNode {
             <button
               type="button"
               onClick={() => setBillingCycle('annual')}
-              className={`px-4 py-2 rounded-lg text-xs font-semibold transition flex items-center gap-1.5 ${
-                billingCycle === 'annual' ? 'bg-amber-500 text-slate-950' : 'text-slate-300'
+              className={`min-h-[44px] px-4 py-2 rounded-lg text-xs font-semibold transition flex items-center gap-1.5 ${
+                billingCycle === 'annual' ? 'bg-amber-500 text-slate-950' : 'text-slate-300 hover:text-white'
               }`}
             >
-              Thanh toán theo năm
-              <span className="rounded-full bg-emerald-500/20 text-emerald-300 px-1.5 py-0.5 text-[10px]">
+              <span>Thanh toán theo năm</span>
+              <span
+                className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
+                  billingCycle === 'annual'
+                    ? 'bg-slate-950 text-emerald-300'
+                    : 'bg-emerald-500/20 text-emerald-300'
+                }`}
+              >
                 Tiết kiệm 20%
               </span>
             </button>

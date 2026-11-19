@@ -60,6 +60,13 @@ export default defineConfig(({ mode }) => {
               res.end(JSON.stringify({ success: true }));
               return;
             }
+            const cleanUrl = (req.url || '').split('?')[0];
+            if (cleanUrl.endsWith('.md') || cleanUrl === '/llms.txt' || cleanUrl === '/llms-full.txt') {
+              res.setHeader('X-Robots-Tag', 'noindex');
+              if (cleanUrl.endsWith('.md')) {
+                res.setHeader('Content-Type', 'text/markdown; charset=utf-8');
+              }
+            }
             next();
           });
         },

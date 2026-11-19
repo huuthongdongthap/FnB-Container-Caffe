@@ -23,7 +23,7 @@ export function LandingFooter({ brandName = 'AURA CAFE' }: { brandName?: string 
       <div className="flex flex-col md:flex-row justify-between items-center px-16 py-12 w-full gap-8">
         {/* Brand */}
         <div className="flex flex-col gap-3">
-          <a href="/" className="flex items-center gap-2.5">
+          <a href="/" className="inline-flex min-h-[44px] items-center gap-2.5">
             <img
               src="/images/aura-emblem.png"
               alt="AURA CAFE Logo"
@@ -53,10 +53,11 @@ export function LandingFooter({ brandName = 'AURA CAFE' }: { brandName?: string 
         </div>
 
         {/* Links */}
-        <div className="flex flex-wrap justify-center gap-6 md:gap-8">
+        <div className="flex flex-wrap justify-center gap-x-4 gap-y-1 md:gap-x-6">
           <FooterLink href="/menu" linkKey="landing.footerMenu" fallback="Thực đơn" t={t} />
           <FooterLink href="/table-reservation" linkKey="landing.footerReservation" fallback="Đặt bàn" t={t} />
           <FooterLink href="/promotions" linkKey="landing.footerPromotions" fallback="Ưu đãi" t={t} />
+          <FooterLink href="/pricing" linkKey="landing.footerPricing" fallback="Bảng giá SaaS" t={t} />
           <FooterLink href="/about" linkKey="landing.footerAbout" fallback="Câu chuyện AURA" t={t} />
           <FooterLink href="/gallery" linkKey="landing.footerGallery" fallback="Không gian" t={t} />
           <FooterLink href="/reviews" linkKey="landing.footerReviews" fallback="Đánh giá" t={t} />
@@ -88,7 +89,7 @@ function FooterLink({ href, linkKey, fallback, t, external }: FooterLinkProps) {
   return (
     <a
       href={href}
-      className="uppercase tracking-wider transition-colors"
+      className="inline-flex min-h-[44px] items-center px-2 uppercase tracking-wider transition-colors"
       style={footerLinkStyle}
       {...(external ? { target: '_blank', rel: 'noopener noreferrer' } : {})}
       onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--aura-chrome-bright)'; }}

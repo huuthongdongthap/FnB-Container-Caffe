@@ -2,7 +2,7 @@
  * StitchKDSNew — Top app bar header component
  *
  * Fixed header with title, station info, filter navigation, prep stats,
- * and notification/settings buttons. Includes mobile sidebar toggle.
+ * sound alert toggle, and fullscreen toggle. Includes mobile sidebar toggle.
  */
 
 'use client';
@@ -11,7 +11,9 @@ import { useTranslation } from 'react-i18next';
 import { cn } from '@/lib/cn';
 import {
   Bell,
-  Settings,
+  BellOff,
+  Maximize2,
+  Minimize2,
   ChevronLeft,
   ChevronRight,
 } from 'lucide-react';
@@ -26,6 +28,10 @@ interface HeaderProps {
   stationLabel: string;
   avgPrepTime: string;
   activeCount: number;
+  soundEnabled?: boolean;
+  isFullscreen?: boolean;
+  onToggleSound?: () => void;
+  onToggleFullscreen?: () => void;
 }
 
 export function Header({
@@ -36,39 +42,44 @@ export function Header({
   stationLabel,
   avgPrepTime,
   activeCount,
+  soundEnabled = true,
+  isFullscreen = false,
+  onToggleSound,
+  onToggleFullscreen,
 }: HeaderProps) {
   const { t } = useTranslation();
 
   return (
     <header
-      className="fixed left-0 top-0 z-50 flex w-full items-center justify-between border-b border-[var(--aura-chrome-dim)]/20 bg-[var(--aura-noir-void,#051424)]/60 px-8 py-4 backdrop-blur-[8px]"
+      className="fixed left-0 top-0 z-50 flex w-full items-center justify-between gap-4 border-b border-[var(--aura-chrome-dim)]/20 bg-[var(--aura-noir-void,#051424)]/85 px-4 py-3 backdrop-blur-md md:px-8 md:py-4"
       aria-label={t('kds.header', 'KDS Header')}
     >
-      <div className="flex items-center gap-6">
-        <button type="button"
-          className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded p-1 text-[var(--aura-chrome-bright,#d4e4fa)] transition-colors hover:bg-[var(--st-surface-container-highest,#273647)]/30 md:hidden"
+      <div className="flex min-w-0 items-center gap-3 md:gap-5">
+        <button
+          type="button"
+          className="flex min-h-[44px] min-w-[44px] shrink-0 items-center justify-center rounded-lg p-1 text-[var(--aura-chrome-bright,#d4e4fa)] transition-colors hover:bg-[var(--st-surface-container-highest,#273647)]/40 md:hidden"
           onClick={onToggleSidebar}
           aria-label={sidebarOpen ? t('kds.closeSidebar', 'Close sidebar') : t('kds.openSidebar', 'Open sidebar')}
         >
           {sidebarOpen ? <ChevronLeft className="h-5 w-5" /> : <ChevronRight className="h-5 w-5" />}
         </button>
         <h1
-          className="text-[48px] leading-[1.1] font-black tracking-tighter text-[var(--aura-chrome-bright,#d4e4fa)]"
+          className="truncate text-xl font-black tracking-tight text-[var(--aura-chrome-bright,#d4e4fa)] sm:text-2xl lg:text-3xl"
           style={{ fontFamily: 'var(--aura-font-display)' }}
         >
           {t('kds.title', 'HEARTH & STEEL KDS')}
         </h1>
-        <div className="h-8 w-px bg-[var(--aura-chrome-dim)]/30" />
-        <div className="flex flex-col">
+        <div className="hidden h-7 w-px bg-[var(--aura-chrome-dim)]/30 sm:block" />
+        <div className="hidden flex-col sm:flex">
           <span
-            className="text-[12px] leading-none tracking-[0.1em] font-bold uppercase text-[var(--aura-chrome-soft)] opacity-60"
-            style={{ fontFamily: "var(--aura-font-body)" }}
+            className="text-[11px] leading-none font-bold tracking-[0.1em] text-[var(--aura-chrome-soft)] uppercase opacity-75"
+            style={{ fontFamily: 'var(--aura-font-body)' }}
           >
             {t('kds.station', 'STATION')}
           </span>
           <span
-            className="text-[20px] leading-[1.2] font-semibold text-[var(--aura-chrome-soft)]"
-            style={{ fontFamily: "var(--aura-font-body)" }}
+            className="text-base leading-tight font-semibold text-[var(--aura-chrome-bright)]"
+            style={{ fontFamily: 'var(--aura-font-body)' }}
           >
             {stationLabel}
           </span>
@@ -76,54 +87,66 @@ export function Header({
       </div>
 
       {/* Filter navigation */}
-      <nav className="hidden items-center gap-8 md:flex" aria-label={t('kds.filterNav', 'Filter tickets')}>
-        {FILTERS.map((f) => (
-          <a
-            key={f.key}
-            href="#"
-            onClick={(e: React.MouseEvent) => { e.preventDefault(); onFilterChange?.(f.key); }}
-            className={cn(
-              'pb-1 transition-all',
-              'font-[family-name:--font-body]',
-              activeFilter === f.key
-                ? 'border-b-2 border-[var(--aura-chrome-bright)] font-bold text-[var(--aura-chrome-bright)]'
-                : 'rounded px-2 py-1 font-medium text-[var(--aura-chrome-soft)] hover:bg-[var(--st-surface-container-highest,#273647)]/30 transition-colors',
-            )}
-            aria-current={activeFilter === f.key ? 'page' : undefined}
-            aria-label={t(f.tKey, f.label)}
-          >
-            {f.label}
-          </a>
-        ))}
+      <nav
+        className="hidden items-center gap-2 lg:flex"
+        aria-label={t('kds.filterNav', 'Filter tickets')}
+        style={{ fontFamily: 'var(--aura-font-body)' }}
+      >
+        {FILTERS.map((f) => {
+          const isActive = activeFilter === f.key;
+          return (
+            <button
+              key={f.key}
+              type="button"
+              onClick={() => onFilterChange?.(f.key)}
+              className={cn(
+                'min-h-[40px] rounded-lg px-3.5 py-2 text-xs font-semibold tracking-wider uppercase transition-colors',
+                isActive
+                  ? 'border border-[#efbd8a]/50 bg-[#efbd8a]/20 text-[#f8d7b2]'
+                  : 'text-[var(--aura-chrome-soft)] hover:bg-[var(--st-surface-container-highest,#273647)]/40 hover:text-[var(--aura-chrome-bright)]',
+              )}
+              aria-current={isActive ? 'page' : undefined}
+              aria-label={t(f.tKey, f.label)}
+            >
+              {f.label}
+            </button>
+          );
+        })}
       </nav>
 
-      <div className="flex items-center gap-6">
-        <div className="flex flex-col items-end">
+      <div className="flex shrink-0 items-center gap-3 md:gap-5">
+        <div className="hidden flex-col items-end sm:flex">
           <span
-            className="text-[12px] leading-none tracking-[0.1em] font-bold uppercase text-[var(--aura-chrome-bright)]"
-            style={{ fontFamily: "var(--aura-font-body)" }}
+            className="text-xs leading-none font-bold tracking-[0.08em] text-[var(--aura-chrome-bright)] uppercase"
+            style={{ fontFamily: 'var(--aura-font-body)' }}
           >
             {t('kds.avgPrep', 'AVG PREP')}: {avgPrepTime}
           </span>
           <span
-            className="text-[16px] leading-[1.5] font-normal text-[var(--aura-chrome-soft)]"
-            style={{ fontFamily: "var(--aura-font-body)" }}
+            className="mt-1 text-xs leading-none font-medium text-[var(--aura-chrome-soft)]"
+            style={{ fontFamily: 'var(--aura-font-body)' }}
           >
             {t('kds.activeOrders', 'ACTIVE ORDERS')}: {activeCount}
           </span>
         </div>
-        <div className="flex gap-2">
-          <button type="button"
-            className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded p-2 text-[var(--aura-chrome-light,#C9D6DF)] transition-colors hover:bg-[var(--st-surface-container-highest,#273647)]/30"
-            aria-label={t('kds.notifications', 'Notifications')}
+        <div className="flex items-center gap-1.5">
+          <button
+            type="button"
+            onClick={onToggleSound}
+            className="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg border border-white/10 bg-white/5 p-2 text-[var(--aura-chrome-light,#C9D6DF)] transition-colors hover:bg-white/10"
+            title={soundEnabled ? 'Mute alerts' : 'Enable alerts'}
+            aria-label={soundEnabled ? 'Mute alerts' : 'Enable alerts'}
           >
-            <Bell className="h-5 w-5" aria-hidden="true" />
+            {soundEnabled ? <Bell className="h-5 w-5" aria-hidden="true" /> : <BellOff className="h-5 w-5 text-amber-300" aria-hidden="true" />}
           </button>
-          <button type="button"
-            className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded p-2 text-[var(--aura-chrome-light,#C9D6DF)] transition-colors hover:bg-[var(--st-surface-container-highest,#273647)]/30"
-            aria-label={t('kds.settings', 'Settings')}
+          <button
+            type="button"
+            onClick={onToggleFullscreen}
+            className="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg border border-white/10 bg-white/5 p-2 text-[var(--aura-chrome-light,#C9D6DF)] transition-colors hover:bg-white/10"
+            title={isFullscreen ? 'Exit fullscreen' : 'Fullscreen'}
+            aria-label={isFullscreen ? 'Exit fullscreen' : 'Fullscreen'}
           >
-            <Settings className="h-5 w-5" aria-hidden="true" />
+            {isFullscreen ? <Minimize2 className="h-5 w-5" aria-hidden="true" /> : <Maximize2 className="h-5 w-5" aria-hidden="true" />}
           </button>
         </div>
       </div>

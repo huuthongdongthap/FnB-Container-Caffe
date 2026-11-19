@@ -14,6 +14,7 @@ import { stitchRoutes } from '@/routes/stitch-routes';
 import { mobileRoutes } from '@/routes/mobile-routes';
 import { adminRoutes } from '@/routes/admin-routes';
 import { PageSkeletonLoader } from '@/components/ui/PageSkeletonLoader';
+import { RouteSeoManager } from '@/components/shared/route-seo-manager';
 
 const NotFoundNew = React.lazy(() => import('@/pages/stitch/not-found'));
 const KDSPage = React.lazy(() => import('@/pages/KDS'));
@@ -43,6 +44,7 @@ function AppContent() {
         <AppBanner />
         <OrderQueueIndicator />
         <BrowserRouter>
+          <RouteSeoManager />
           <React.Suspense fallback={<PageSkeletonLoader />}>
             <Routes>
               {/* ── OPS SHELL ── */}

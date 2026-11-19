@@ -40,6 +40,10 @@ export interface StitchKDSNewProps {
   onRefresh?: () => void;
   activeFilter?: 'all' | 'priority' | 'preparing' | 'ready';
   onFilterChange?: (filter: StitchKDSNewProps['activeFilter']) => void;
+  soundEnabled?: boolean;
+  isFullscreen?: boolean;
+  onToggleSound?: () => void;
+  onToggleFullscreen?: () => void;
 }
 
 /** Filter tab configuration */
