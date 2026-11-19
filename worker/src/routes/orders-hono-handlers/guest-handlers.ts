@@ -9,6 +9,7 @@ import { makeOrderId } from './types';
 import { createOrderFromAlias } from '../../../../packages/domain/order/commands/create-order-alias';
 import { hashOrderToken } from '../../../../packages/domain/customer/policies/order-ownership-policy';
 import { resolveOrderCreationScope, resolveOrderCreationTable, OrderCreationError } from '../../../../packages/domain/order/policies/order-creation-scope';
+import { assertTenantWritable } from '../../lib/saas-entitlement';
 
 const log = createLogger({ route: 'guest-orders' });
 
@@ -31,6 +32,18 @@ export async function handleGuestCheckin(c: Context<{ Bindings: Env }>) {
   try {
     const scope = await resolveOrderCreationScope(c.req.raw, c.env);
     tenantId = scope.tenantId;
+    const writeCheck = await assertTenantWritable(db, tenantId);
+    if (!writeCheck.allowed) {
+      return c.json(
+        {
+          success: false,
+          code: writeCheck.code,
+          error: writeCheck.message,
+          upgradeRequired: true,
+        },
+        writeCheck.status ?? 402
+      );
+    }
     const id = await resolveOrderCreationTable(db, data.table_id, tenantId);
     if (!id) return c.json({ success: false, error: 'Bàn không tồn tại' }, 404);
     tableRow = { id, table_number: data.table_id };

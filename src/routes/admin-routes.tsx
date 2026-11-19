@@ -39,6 +39,8 @@ const AdminDinDinOrderSuccessPage = React.lazy(() => import('@/pages/admin/DinDi
 const AdminDevicesPage = React.lazy(() => import('@/pages/admin/Devices'));
 const AdminInventoryPage = React.lazy(() => import('@/pages/admin/Inventory'));
 const TableManagementPage = React.lazy(() => import('@/pages/admin/TableManagement'));
+const AdminSaasSettingsPage = React.lazy(() => import('@/pages/admin/SaasSettings'));
+const AdminHqSaasPage = React.lazy(() => import('@/pages/admin/HqSaasAdmin'));
 
 export const adminRoutes = [
   <Route key="/admin/login" path="/admin/login" element={guarded(<AdminLoginPage />)} />,
@@ -70,6 +72,9 @@ export const adminRoutes = [
       <Route path="/admin/franchise" element={guarded(<FranchiseReportsPage />)} />
       <Route path="/admin/staff" element={guarded(<AdminStaffPage />)} />
       <Route path="/admin/subscriptions" element={guarded(<SubscriptionsManagerPage />)} />
+      <Route path="/admin/saas-settings" element={guarded(<AdminSaasSettingsPage />)} />
+      <Route path="/admin/hq-saas" element={guarded(<AdminHqSaasPage />)} />
+      <Route path="/admin/hq/tenants" element={guarded(<AdminHqSaasPage />)} />
       <Route path="/admin/dindin/menu" element={guarded(<AdminDinDinMenuPage />)} />
       <Route path="/admin/dindin/cart" element={guarded(<AdminDinDinCartPage />)} />
       <Route path="/admin/dindin/checkout" element={guarded(<AdminDinDinCheckoutPage />)} />

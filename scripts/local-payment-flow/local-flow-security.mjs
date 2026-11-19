@@ -52,9 +52,14 @@ export async function runSecurityChecks(runtime, context, check) {
   });
 
   await guarded('tenant-creation-binding', async () => {
-    const signed = await createOrder(runtime, 'cod', 'Signed tenant A checkout', {}, tokens['staff-a']);
-    check('tenant-signed-creation', signed.row?.tenant_id === 'cafe-a', 'derive cafe-a from signed staff session',
+    const signed = await createOrder(runtime, 'cod', 'Signed tenant A checkout', {
+      items: [{ product_id: 'review-coffee-a', id: 'review-coffee-a', name: 'Cà phê kiểm thử cafe-a', quantity: 1, price: 20000 }],
+    }, tokens['staff-a']);
+    check('tenant-signed-creation', signed.response.status === 201 && signed.row?.tenant_id === 'cafe-a', 'derive cafe-a from signed staff session',
       { status: signed.response.status, tenant: signed.row?.tenant_id });
+    const crossCatalog = await createOrder(runtime, 'cod', 'Cross-tenant catalog reject', {}, tokens['staff-a']);
+    check('tenant-cross-catalog-reject', !crossCatalog.row && crossCatalog.response.status === 400, 'tenant A cannot order default-tenant product',
+      { status: crossCatalog.response.status, error: crossCatalog.response.body?.error });
     const injected = await createOrder(runtime, 'cod', 'Client tenant injection', { tenant_id: 'cafe-b' });
     check('tenant-client-injection', (!injected.row && [400, 403].includes(injected.response.status)) || (injected.response.status === 201 && injected.row?.tenant_id === 'default'), 'untrusted guest cannot choose cafe-b',
       { status: injected.response.status, tenant: injected.row?.tenant_id });

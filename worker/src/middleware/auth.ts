@@ -3,6 +3,7 @@ import type { Env } from '../types/env';
 import { authenticateRequest } from '../lib/staff-session-auth';
 import { StaffSessionError } from '../lib/staff-session';
 import { getAuthToken } from '../lib/jwt';
+import { enforceSaasWriteGuard } from './saas-write-guard';
 
 export { authenticateRequest };
 
@@ -58,6 +59,7 @@ export function requireAuth(allowedRoles: string[] = DEFAULT_AUTHENTICATED_ROLES
 
     if (!env.JWT_SECRET) return c.json({ success: false, error: 'Server misconfiguration: JWT_SECRET not set' }, 500);
     if (!getAuthToken(c.req.raw)) return c.json({ success: false, error: 'Unauthorized — vui lòng đăng nhập', code: 'SESSION_EXPIRED' }, 401);
+    let authenticatedUser: ReturnType<typeof toUser> | undefined;
     try {
       const session = await authenticateRequest(c.req.raw, env);
       if (!session) return c.json({ success: false, error: 'Unauthorized — vui lòng đăng nhập' }, 401);
@@ -66,10 +68,13 @@ export function requireAuth(allowedRoles: string[] = DEFAULT_AUTHENTICATED_ROLES
       if (!allowedRoles.includes(user.role)) return c.json({ success: false, error: 'Không đủ quyền truy cập' }, 403);
       c.set('user', user);
       if (user.tier) c.set('userTier', user.tier);
+      authenticatedUser = user;
     } catch (error) {
       if (error instanceof StaffSessionError) return c.json({ success: false, error: error.message, code: error.code }, error.status);
       return c.json({ success: false, error: 'Authentication unavailable' }, 503);
     }
+    const saasBlocked = await enforceSaasWriteGuard(c, { authenticatedUser });
+    if (saasBlocked) return saasBlocked;
     await next();
   };
 }

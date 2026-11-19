@@ -6,6 +6,7 @@ import { createMetricsCollector } from '../../lib/metrics-collector';
 import type { Env } from '../../types/env';
 import { log, verifySignature } from './helpers';
 import { sendOrderPaidNotifications } from './notifications';
+import { resolveMerchantPaymentConfig } from '../../lib/merchant-payment';
 import { settlePayOS, type SettlementPayment } from './payos-settlement';
 import { writePaymentReviewMarker } from '../../../../packages/domain/payment/commands/payos-reconcile-lease';
 import { extractPayOSLinkId } from '../../../../packages/domain/payment/commands/payos-provider-verify';
@@ -24,7 +25,11 @@ function safeWaitUntil(c: any, promise: Promise<any>): void {
 }
 
 /** Both public PayOS webhook URLs share validation, atomic settlement and replay repair. */
-export async function handlePayosWebhook(c: Context<{ Bindings: Env }>, openApi = false): Promise<Response> {
+export async function handlePayosWebhook(
+  c: Context<{ Bindings: Env }>,
+  openApi = false,
+  explicitTenantSlugOrId?: string
+): Promise<Response> {
   const db = getDatabase(c as unknown as { env: Record<string, unknown> });
   const now = new Date().toISOString();
   const ack = (message: string) => openApi
@@ -32,14 +37,34 @@ export async function handlePayosWebhook(c: Context<{ Bindings: Env }>, openApi 
     : c.json({ error: 0, message, data: null });
   try {
     const payload = await c.req.json() as Record<string, unknown>;
-    if (!c.env.PAYOS_CHECKSUM_KEY) return c.json({ error: 1, message: 'Server misconfiguration' }, 500);
+    let targetTenantId = 'default';
+    if (explicitTenantSlugOrId) {
+      const tenantRow = await db
+        .prepare('SELECT id FROM saas_tenants WHERE id = ? OR slug = ? LIMIT 1')
+        .bind(explicitTenantSlugOrId, explicitTenantSlugOrId)
+        .first<{ id: string }>()
+        .catch(() => null);
+      if (!tenantRow) {
+        return c.json({ error: 1, message: 'Unknown tenant webhook endpoint' }, 404);
+      }
+      targetTenantId = tenantRow.id;
+    }
+
+    const merchantPayment = await resolveMerchantPaymentConfig(db, c.env, targetTenantId);
+    const checksumKey =
+      merchantPayment.payos?.checksumKey ||
+      (!explicitTenantSlugOrId ? c.env.PAYOS_CHECKSUM_KEY : undefined);
+    if (!checksumKey) {
+      return c.json({ error: 1, message: 'Merchant PayOS checksum key not configured' }, explicitTenantSlugOrId ? 400 : 500);
+    }
+
     if (!payload.data || typeof payload.data !== 'object' || !Object.keys(payload.data).length) return ack('Webhook endpoint alive');
     const signature = (payload.signature as string) || c.req.header('x-payos-signature');
     if (!signature) return c.json({ error: 1, message: 'Invalid signature' }, 401);
     const parsed = payosWebhookSchema.safeParse(payload);
     if (!parsed.success) return c.json({ error: 1, message: 'Invalid PayOS webhook payload' }, 400);
     const data = payload.data as Record<string, unknown>;
-    if (!await verifySignature(data, signature, c.env.PAYOS_CHECKSUM_KEY)) {
+    if (!await verifySignature(data, signature, checksumKey)) {
       await writePaymentReviewMarker(c.env.AUTH_KV, {
         orderCode: String(data.orderCode ?? ''),
         source: 'webhook',
@@ -112,6 +137,27 @@ export async function handlePayosWebhook(c: Context<{ Bindings: Env }>, openApi 
       return c.json({ error: 1, message: 'Payment link mismatch' }, 400);
     }
     const settledOrderTenant = rawOrderTenant || rawPaymentTenant || 'default';
+    if (explicitTenantSlugOrId && settledOrderTenant !== targetTenantId) {
+      await writePaymentReviewMarker(c.env.AUTH_KV, {
+        paymentId: payment.id,
+        orderId: payment.order_id,
+        orderCode,
+        source: 'webhook',
+        stage: 'tenant_webhook_isolation',
+        errorCode: 'CROSS_TENANT_WEBHOOK',
+      });
+      return c.json({ error: 1, message: 'Cross-tenant webhook order mismatch' }, 403);
+    }
+    if (!explicitTenantSlugOrId && settledOrderTenant !== 'default') {
+      const dedicatedConfig = await db
+        .prepare('SELECT payos_checksum_key_enc FROM tenant_payment_configs WHERE tenant_id = ? LIMIT 1')
+        .bind(settledOrderTenant)
+        .first<{ payos_checksum_key_enc?: string | null }>()
+        .catch(() => null);
+      if (dedicatedConfig?.payos_checksum_key_enc) {
+        return c.json({ error: 1, message: 'Tenant must use its dedicated PayOS webhook endpoint' }, 403);
+      }
+    }
     const rawStatus = String(data.status || '').toUpperCase();
     // The documented transaction result code is authoritative; a status label
     // cannot override a failed transfer code in a contradictory payload.
@@ -350,4 +396,5 @@ export async function handlePayosWebhook(c: Context<{ Bindings: Env }>, openApi 
 
 export function registerPayosWebhook(router: Hono<{ Bindings: Env }>): void {
   router.post('/payos', (c) => handlePayosWebhook(c));
+  router.post('/payos/:tenantSlug', (c) => handlePayosWebhook(c, false, c.req.param('tenantSlug')));
 }

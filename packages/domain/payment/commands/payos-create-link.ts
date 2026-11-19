@@ -5,6 +5,7 @@ import { createLogger } from 'worker/src/middleware/logger';
 import { payOSCreateLinkSchema } from 'worker/src/lib/validators';
 import { canAccessPaymentOrder, resolvePaymentCustomerOwnerIds, resolvePaymentTenantScope, verifyPaymentOrderToken } from '../policies/payment-access';
 import { getOrCreatePayOSAttempt } from './payos-attempt';
+import { resolveMerchantPaymentConfig } from '../../../../worker/src/lib/merchant-payment';
 import { PAYOS_ERROR_MESSAGES as errMsg } from './payos-helpers';
 import type { Env } from 'worker/src/types/env';
 
@@ -167,8 +168,24 @@ export const handleCreateLink = async (c: any, input?: unknown, openApi = false)
     if (parsed.data.amount !== undefined && parsed.data.amount !== amount) {
       return c.json({ success: false, error: 'Tampered amount: does not match order total' }, 400);
     }
-    const { PAYOS_CLIENT_ID: clientId, PAYOS_API_KEY: apiKey, PAYOS_CHECKSUM_KEY: checksumKey } = c.env;
-    if (!clientId || !apiKey || !checksumKey) return c.json({ success: false, error: errMsg.payos_not_configured[locale] }, 500);
+    const orderTenantId = String(order.tenant_id || 'default').trim() || 'default';
+    const merchantConfig = await resolveMerchantPaymentConfig(db, c.env as any, orderTenantId);
+    const clientId = merchantConfig.payos?.clientId;
+    const apiKey = merchantConfig.payos?.apiKey;
+    const checksumKey = merchantConfig.payos?.checksumKey;
+    if (!clientId || !apiKey || !checksumKey) {
+      return c.json(
+        {
+          success: false,
+          code: 'merchant_payos_not_configured',
+          error:
+            orderTenantId === 'default'
+              ? errMsg.payos_not_configured[locale]
+              : 'Quán chưa cấu hình cổng thanh toán PayOS riêng. Vui lòng thiết lập PayOS trong Cài đặt Thanh toán hoặc dùng VietQR.',
+        },
+        orderTenantId === 'default' ? 500 : 400
+      );
+    }
     const baseUrl = c.env.FE_BASE_URL || 'https://auraspace.cafe';
     const result = await getOrCreatePayOSAttempt({ db, kv: c.env.AUTH_KV ?? null, env: c.env as unknown as Record<string, unknown>, orderId: order_id, amount, clientId, apiKey, checksumKey,
       description: (description || `Order #${order_id}`).slice(0, 25), buyerName: customer_name || 'Khách hàng',

@@ -62,6 +62,8 @@ import {
 } from './admin-handlers';
 import { getPricing } from './saas-pricing';
 import { createTenantRoutes } from './saas-tenants';
+import { createSaasCommercialRoutes } from './saas-commercial';
+import { createHqSaasRoutes } from './hq-saas';
 import { franchiseRouter } from './franchise-locations';
 import { recommendationsRouter } from './recommendations';
 import { inventoryForecastingRouter } from './inventory-forecasting';
@@ -332,6 +334,8 @@ export function registerFeatureRoutes(app: Hono<{ Bindings: Env }>): void {
   app.get('/api/saas/pricing', optionalAuth(), getPricing);
   app.use('/api/saas/tenants/*', requireAuth(), tenantMiddleware);
   app.route('/api/saas/tenants', createTenantRoutes());
+  app.route('/api/saas', createSaasCommercialRoutes());
+  app.route('/api/hq/saas', createHqSaasRoutes());
   app.route('/api/franchise', franchiseRouter);
 
   // AI & Edge Automation

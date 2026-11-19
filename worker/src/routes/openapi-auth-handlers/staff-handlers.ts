@@ -3,6 +3,7 @@ import type { Env } from '../../types/env';
 import { AuthRoutes } from '../../schemas/auth';
 import { hashPassword, generateToken, writeAuthAuditLog } from './helpers';
 import { getTenantId, isHQSuperAdmin, resolvePilotStore, resolvePublicTenantId } from '../../middleware/tenant';
+import { assertTenantResourceLimit } from '../../lib/saas-entitlement';
 import { findExistingOwner } from '../../tree/auth/helpers';
 
 const STAFF_LIST_ROLES = ['owner', 'admin', 'manager', 'supervisor'];
@@ -86,6 +87,21 @@ export function registerStaffHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
       existing = await db.prepare('SELECT staff_id AS id FROM staff_login_identities WHERE lower(email) = lower(?)').bind(normalizedEmail).first().catch(() => null);
     }
     if (existing) return c.json({ success: false, error: 'Email already exists' }, 409);
+
+    const staffQuota = await assertTenantResourceLimit(db, tenantId, 'staff');
+    if (!staffQuota.allowed) {
+      return c.json(
+        {
+          success: false,
+          code: staffQuota.code,
+          error: staffQuota.message,
+          limit: staffQuota.limit,
+          current: staffQuota.currentUsage,
+          upgradeRequired: true,
+        },
+        staffQuota.status ?? 402
+      );
+    }
 
     const passwordHash = await hashPassword(body.password);
     const id = crypto.randomUUID();

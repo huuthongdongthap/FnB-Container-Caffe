@@ -449,6 +449,18 @@ describe('Loyalty, Referrals, Inventory PO, Customer Events & Audit Cutover (202
     sqlite.exec(migration1118_01Down);
     sqlite.exec(migration1118_01Up);
 
+    const migration1119_02Up = readFileSync(
+      resolve(__dirname, '../../../db/migrations/20261119_02_saas_commercial_v3.sql'),
+      'utf8'
+    );
+    const migration1119_02Down = readFileSync(
+      resolve(__dirname, '../../../db/migrations/20261119_02_saas_commercial_v3.down.sql'),
+      'utf8'
+    );
+    sqlite.exec(migration1119_02Up);
+    sqlite.exec(migration1119_02Down);
+    sqlite.exec(migration1119_02Up);
+
     const canonicalSqlite = new DatabaseSync(':memory:');
     canonicalSqlite.exec(readFileSync(resolve(__dirname, '../../../schema.sql'), 'utf8'));
     const getSchemaMap = (conn: DatabaseSync) => {
@@ -465,7 +477,7 @@ describe('Loyalty, Referrals, Inventory PO, Customer Events & Audit Cutover (202
     };
     const replicaSchema = getSchemaMap(sqlite);
     const canonicalSchema = getSchemaMap(canonicalSqlite);
-    expect(replicaSchema.tables).toHaveLength(127);
+    expect(replicaSchema.tables).toHaveLength(134);
     expect(replicaSchema.tables).toEqual(canonicalSchema.tables);
     expect(replicaSchema.map).toEqual(canonicalSchema.map);
 

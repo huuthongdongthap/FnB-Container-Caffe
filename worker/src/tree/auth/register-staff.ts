@@ -8,6 +8,7 @@ import { staffSessionErrorResponse, staffTenant } from '../../lib/staff-session'
 import { createStaffIdentity } from '../../lib/staff-login-identity';
 import { authenticateRequest } from '../../lib/staff-session-auth';
 import type { Env } from '../../types/env';
+import { assertTenantResourceLimit } from '../../lib/saas-entitlement';
 import { registerStaffSchema } from '../../lib/validators';
 import { generateId, parseJSON } from './helpers';
 
@@ -82,6 +83,24 @@ export async function registerStaff(
     const existingUser = authKV ? await authKV.get(`user:${email}`) : null;
     if (existingUser) {
       return errorResponse('Email đã được đăng ký', 409);
+    }
+
+    const effectiveTargetTenant = isHqAdmin ? (requestedTenant || actorTenant || 'default') : actorTenant;
+    const db = (env as unknown as Env).AURA_DB;
+    if (db) {
+      const staffLimitCheck = await assertTenantResourceLimit(db, effectiveTargetTenant, 'staff');
+      if (!staffLimitCheck.allowed) {
+        return jsonResponse(
+          {
+            success: false,
+            code: staffLimitCheck.code,
+            error: staffLimitCheck.message,
+            limit: staffLimitCheck.limit,
+            currentUsage: staffLimitCheck.currentUsage,
+          },
+          staffLimitCheck.status || 402
+        );
+      }
     }
 
     const hashedPassword = await hashPassword(password);

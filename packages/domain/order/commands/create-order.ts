@@ -3,6 +3,8 @@ import type { D1Database, D1PreparedStatement, KVNamespace } from '@cloudflare/w
 import { jsonResponse, errorResponse } from 'worker/src/middleware/cors';
 import { createLogger } from 'worker/src/middleware/logger';
 import { createOrderSchema, paymentMethodSchema } from 'worker/src/lib/validators';
+import { assertTenantWritable } from 'worker/src/lib/saas-entitlement';
+import { isHQSuperAdmin } from 'worker/src/middleware/tenant';
 import { generateId, parseJSON } from '../model/helpers';
 import { calculateCheckoutSnapshot } from '../policies/checkout-snapshot';
 import { resolveOrderCreationScope, resolveOrderCreationTable, orderCreationIdempotency, OrderCreationError, type OrderCreationActor } from '../policies/order-creation-scope';
@@ -33,11 +35,34 @@ export async function createOrder(
     const data = parsed.data;
     const validatedMethod = paymentMethodSchema.parse(data.payment_method);
     const { actor, tenantId } = await resolveOrderCreationScope(request, env, trustedActor);
+    const db = env.AURA_DB as D1Database;
+    if (
+      db &&
+      tenantId &&
+      tenantId !== 'default' &&
+      tenantId !== 'hq' &&
+      tenantId !== '*' &&
+      !(actor && isHQSuperAdmin(actor))
+    ) {
+      const writeCheck = await assertTenantWritable(db, tenantId);
+      if (!writeCheck.allowed) {
+        return jsonResponse(
+          {
+            ok: false,
+            success: false,
+            code: writeCheck.code || 'subscription_expired_readonly',
+            error: writeCheck.code || 'subscription_expired_readonly',
+            message: writeCheck.message,
+            lifecycleState: writeCheck.entitlement.lifecycleState,
+          },
+          402
+        );
+      }
+    }
     const idemKey = request.headers.get('Idempotency-Key');
     const scopedData = { ...data };
     delete scopedData.tenant_id;
     const idem = idemKey ? await orderCreationIdempotency(tenantId, actor?.id, idemKey, scopedData) : null;
-    const db = env.AURA_DB as D1Database;
     const findReplay = () => db.prepare('SELECT fingerprint, response_body FROM order_creation_requests WHERE scope_key = ?')
       .bind(idem!.key).first<SavedCreation>();
     // D1 is authoritative; KV eviction or outage must never duplicate an accepted offline order.

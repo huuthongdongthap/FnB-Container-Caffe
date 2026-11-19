@@ -191,6 +191,9 @@ export async function createLocalRuntime() {
     await db.prepare('INSERT INTO categories (id,name,slug) VALUES (?,?,?)').bind('review-category', 'Review Coffee', 'review-coffee').run();
     await db.prepare('INSERT INTO products (id,category_id,name,slug,price) VALUES (?,?,?,?,?)').bind('review-coffee', 'review-category', 'Cà phê kiểm thử local', 'review-coffee-product', 20000).run();
     await db.prepare('INSERT INTO menu_items (id,category,name,price,tags) VALUES (?,?,?,?,?)').bind('review-coffee', 'traditional-coffee', 'Cà phê kiểm thử local', 20000, '["Iced/Hot"]').run();
+    await db.prepare('INSERT INTO categories (id,name,slug,tenant_id) VALUES (?,?,?,?)').bind('review-category-a', 'Review Coffee Cafe A', 'review-coffee-a', 'cafe-a').run();
+    await db.prepare('INSERT INTO products (id,category_id,name,slug,price,tenant_id) VALUES (?,?,?,?,?,?)').bind('review-coffee-a', 'review-category-a', 'Cà phê kiểm thử cafe-a', 'review-coffee-product-a', 20000, 'cafe-a').run();
+    await db.prepare('INSERT INTO menu_items (id,category,name,price,tags,tenant_id) VALUES (?,?,?,?,?,?)').bind('review-coffee-a', 'traditional-coffee', 'Cà phê kiểm thử cafe-a', 20000, '["Iced/Hot"]', 'cafe-a').run();
     const menuSeedItems = [
       ['tc001', 'cat_trad_coffee', 'traditional-coffee', 'Cà phê sữa đá', 'ca-phe-sua-da', 20000, '["Iced/Hot"]'],
       ['tc007', 'cat_trad_coffee', 'traditional-coffee', 'Matcha latte đá', 'matcha-latte-da', 30000, '["Iced"]'],

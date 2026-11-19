@@ -48,6 +48,20 @@ export const handleCreateOrder = (c: import('hono').Context<{ Bindings: Env }>) 
   } catch {
     // No execution context in test environment
   }
+  const hostResolvedTenant = String((c as unknown as { get?: (k: string) => unknown }).get?.('tenantId') || '').trim();
+  const hasExplicitTenant = Boolean(
+    c.req.header('X-Tenant-ID') ||
+    c.req.header('x-tenant-id') ||
+    c.req.header('X-Store-ID') ||
+    c.req.header('x-store-id') ||
+    c.req.header('Authorization')
+  );
+  if (hostResolvedTenant && hostResolvedTenant !== 'default' && !hasExplicitTenant) {
+    const headers = new Headers(c.req.raw.headers);
+    headers.set('X-Tenant-ID', hostResolvedTenant);
+    const forwardedReq = new Request(c.req.raw, { headers });
+    return createOrder(forwardedReq, c.env, ctx);
+  }
   return createOrder(c.req.raw, c.env, ctx);
 };
 

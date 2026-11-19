@@ -12,6 +12,8 @@ import { securityHeaders } from './middleware/security-headers';
 import { orderBodyLimit, authBodyLimit } from './middleware/body-limit';
 import { requireAuth } from './middleware/auth';
 import { tenantMiddleware } from './middleware/tenant';
+import { hostTenantMiddleware } from './middleware/host-tenant';
+import { saasWriteGuard } from './middleware/saas-write-guard';
 import { withPrimarySession } from './lib/db';
 import { OrderBroadcaster } from './do/OrderBroadcaster';
 import { handleScheduled } from './scheduled';
@@ -71,6 +73,7 @@ app.use('/*', cors({
     'X-Request-ID',
     'Idempotency-Key',
     'X-Tenant-ID',
+    'X-Tenant-Slug',
     'X-Order-Token',
     'X-Local-ID',
     'X-Edge-Telemetry-Secret'
@@ -98,6 +101,8 @@ app.use('*', async (c, next) => {
 app.use('*', correlationId());
 app.use('*', securityHeaders());
 app.use('*', requestMetrics());
+app.use('*', hostTenantMiddleware);
+app.use('*', saasWriteGuard);
 // Body ceilings go before the routers so an oversized payload is rejected
 // before any route handler pays to parse it.
 app.use('/api/orders/*', orderBodyLimit());

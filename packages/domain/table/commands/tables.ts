@@ -8,6 +8,7 @@ import { signQRUrl } from 'worker/src/tree/qr/signer';
 import type { Env } from 'worker/src/types/env';
 import { optionalAuth, requireAuth } from 'worker/src/middleware/auth';
 import { getTenantId, matchesTenantRow, resolvePilotStore, resolvePublicTenantId } from 'worker/src/middleware/tenant';
+import { assertTenantResourceLimit } from '../../../../worker/src/lib/saas-entitlement';
 import { audit } from 'worker/src/middleware/audit-log';
 import type { CafeTable, QrCodeRow } from '../model/table-types';
 import { canTransitionTo, normalizeTableStatus } from '../policies/status';
@@ -501,6 +502,20 @@ tablesRouter.post('/', tableMutationAuth, audit('table_create'), async (c) => {
   const status = typeof body.status === 'string' && body.status.trim() ? body.status.trim() : 'Available';
   if (tableNumber === undefined || tableNumber === null || String(tableNumber).trim() === '') {
     return c.json({ success: false, error: 'table_number is required' }, 400);
+  }
+  const tableQuota = await assertTenantResourceLimit(db, effectiveTenant, 'tables');
+  if (!tableQuota.allowed) {
+    return c.json(
+      {
+        success: false,
+        code: tableQuota.code,
+        error: tableQuota.message,
+        limit: tableQuota.limit,
+        current: tableQuota.currentUsage,
+        upgradeRequired: true,
+      },
+      tableQuota.status ?? 402
+    );
   }
   const id = typeof body.id === 'string' && body.id.trim() ? body.id.trim() : `tbl_${crypto.randomUUID()}`;
   try {

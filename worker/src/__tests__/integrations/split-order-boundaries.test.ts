@@ -9,8 +9,12 @@ import { payosCheckoutResponse } from '../helpers/payment-sqlite-db';
 const fixtures: ReturnType<typeof orderCreationFixture>[] = [];
 const fixture = () => { const value = orderCreationFixture(); value.sqlite.prepare('INSERT INTO users(id,name,role,tenant_id) VALUES (?,?,?,?)').run('staff-a','Waiter','waiter','cafe-a'); fixtures.push(value); return value; };
 afterEach(() => { vi.restoreAllMocks(); for (const { sqlite } of fixtures.splice(0)) sqlite.close(); });
-const entry = { customer_name: 'Split guest', customer_phone: '0900000010', total: 1000,
-  items: [{ id: 'coffee', name: 'Forged', quantity: 1, price: 1000 }], discount: 19000, shipping_fee: 0 };
+const entryFor = (productId = 'coffee') => ({
+  customer_name: 'Split guest', customer_phone: '0900000010', total: 1000,
+  items: [{ id: productId, name: 'Forged', quantity: 1, price: 1000 }], discount: 19000, shipping_fee: 0,
+});
+const entry = entryFor('coffee-a');
+const guestEntry = entryFor('coffee');
 const auth = () => generateJWT({ id: 'staff-a', role: 'waiter', tenantId: 'cafe-a', ...staffSessionClaims() }, 'test-jwt-secret-at-least-16-chars', 28800);
 function split(env: any, table_id: string, orders: unknown[], token?: string) {
   return app.fetch(new Request('https://test.aura/api/orders/split?tenant_id=cafe-b', {
@@ -28,11 +32,11 @@ describe('Split bill server financial and tenant boundaries', () => {
     const { data } = await response.json() as any;
     expect(data).toHaveLength(2);
     expect(data[0]).toMatchObject({ total: 20000, table_id: 'table-a', payment_status: 'unpaid' });
-    expect(data[0].items[0]).toMatchObject({ name: 'Coffee', menuItemId: 'coffee', price: 20000 });
+    expect(data[0].items[0]).toMatchObject({ name: 'Coffee', menuItemId: 'coffee-a', price: 20000 });
     expect(sqlite.prepare('SELECT total, discount, tenant_id FROM orders').all())
       .toEqual([{ total: 20000, discount: 0, tenant_id: 'cafe-a' }, { total: 20000, discount: 0, tenant_id: 'cafe-a' }]);
     expect(sqlite.prepare('SELECT product_id,subtotal FROM order_items').all())
-      .toEqual([{ product_id: 'coffee', subtotal: 20000 }, { product_id: 'coffee', subtotal: 20000 }]);
+      .toEqual([{ product_id: 'coffee-a', subtotal: 20000 }, { product_id: 'coffee-a', subtotal: 20000 }]);
     expect(sqlite.prepare('SELECT method,amount,status FROM payments').all())
       .toEqual([{ method: 'cod', amount: 20000, status: 'pending' }]);
   });
@@ -41,7 +45,7 @@ describe('Split bill server financial and tenant boundaries', () => {
     const { env, sqlite } = fixture();
     vi.spyOn(globalThis, 'fetch').mockImplementation(async (_url, init) =>
       payosCheckoutResponse(JSON.parse(String(init?.body)), env.PAYOS_CHECKSUM_KEY, 'split-link'));
-    const response = await split(env, 'D1', [{ ...entry, payment_method: 'payos' }, entry]);
+    const response = await split(env, 'D1', [{ ...guestEntry, payment_method: 'payos' }, guestEntry]);
     expect(response.status).toBe(201);
     const { data } = await response.json() as any;
     const link = await app.fetch(new Request('https://test.aura/api/payment/create-link', {
@@ -60,7 +64,7 @@ describe('Split bill server financial and tenant boundaries', () => {
       expect(sqlite.prepare('SELECT status FROM cafe_tables WHERE id=?').get(table)).toMatchObject({ status: 'Available' });
     }
     const { env, sqlite } = fixture();
-    expect((await split(env, 'D1', [entry, entry])).status).toBe(201);
+    expect((await split(env, 'D1', [guestEntry, guestEntry])).status).toBe(201);
     expect(sqlite.prepare('SELECT DISTINCT tenant_id FROM orders').all()).toEqual([{ tenant_id: 'default' }]);
   });
 
