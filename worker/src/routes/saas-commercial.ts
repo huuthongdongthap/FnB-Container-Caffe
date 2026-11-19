@@ -54,9 +54,48 @@ import {
 import { buildVietQrImageUrl, resolveMerchantPaymentConfig } from '../lib/merchant-payment';
 
 const PAYOS_API_URL = 'https://api-merchant.payos.vn/v2/payment-requests';
+const PENDING_DOMAIN_CLAIM_TTL_MS = 24 * 60 * 60 * 1000;
 
 function isValidDomain(domain: string): boolean {
   return /^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,24}$/.test(domain);
+}
+
+function isAllowedCustomDomain(domain: string, platformDomainRaw?: string): boolean {
+  if (!isValidDomain(domain)) return false;
+  if (/^\d{1,3}(?:\.\d{1,3}){3}$/.test(domain)) return false;
+  if (
+    domain === 'localhost' ||
+    domain.endsWith('.localhost') ||
+    domain.endsWith('.local') ||
+    domain.endsWith('.internal') ||
+    domain.endsWith('.workers.dev') ||
+    domain.endsWith('.pages.dev')
+  ) {
+    return false;
+  }
+  const blockedBases = new Set<string>(['auraspace.cafe']);
+  const cleanPlatform = String(platformDomainRaw || '')
+    .trim()
+    .toLowerCase()
+    .replace(/:\d+$/, '');
+  if (cleanPlatform) blockedBases.add(cleanPlatform);
+  for (const base of blockedBases) {
+    if (domain === base || domain.endsWith(`.${base}`)) {
+      return false;
+    }
+  }
+  return true;
+}
+
+function isSafeLogoUrl(url: string): boolean {
+  if (!url) return true;
+  if (url.startsWith('/') && !url.startsWith('//')) return true;
+  try {
+    const parsed = new URL(url);
+    return parsed.protocol === 'https:' || parsed.protocol === 'http:';
+  } catch {
+    return false;
+  }
 }
 
 async function verifyDnsTxtRecord(domain: string, expectedToken: string): Promise<{ verified: boolean; records: string[]; error?: string }> {
@@ -144,7 +183,34 @@ export function createSaasCommercialRoutes() {
 
   router.post('/signup', async (c) => {
     try {
+      const kv = c.env.AUTH_KV;
+      const isProd = c.env.ENVIRONMENT === 'production';
+      const clientIp = c.req.header('cf-connecting-ip') || c.req.header('x-forwarded-for')?.split(',')[0]?.trim() || '';
+      if (kv && clientIp && (isProd || (clientIp !== '127.0.0.1' && clientIp !== 'localhost'))) {
+        const rateKey = `rate:saas-signup:${clientIp}`;
+        try {
+          const count = Number((await kv.get(rateKey)) || 0);
+          if (count >= 10) {
+            return c.json(
+              { success: false, code: 'rate_limited', error: 'Quá nhiều lượt đăng ký từ IP này. Vui lòng thử lại sau 15 phút.' },
+              429
+            );
+          }
+          await kv.put(rateKey, String(count + 1), { expirationTtl: 900 });
+        } catch {
+          // Fail open on transient KV errors
+        }
+      }
+
       const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
+      const rawLogoUrl = typeof body.logoUrl === 'string' ? body.logoUrl.trim() : undefined;
+      if (rawLogoUrl && !isSafeLogoUrl(rawLogoUrl)) {
+        return c.json(
+          { success: false, code: 'invalid_logo_url', error: 'URL logo không hợp lệ (chỉ chấp nhận https://, http:// hoặc đường dẫn tương đối /...).' },
+          400
+        );
+      }
+
       const result = await provisionSelfServeTenant(c.env.AURA_DB, {
         shopName: String(body.shopName || body.shop_name || ''),
         slug: String(body.slug || ''),
@@ -157,7 +223,10 @@ export function createSaasCommercialRoutes() {
         address: typeof body.address === 'string' ? body.address : '',
         primaryColor: typeof body.primaryColor === 'string' ? body.primaryColor : undefined,
         accentColor: typeof body.accentColor === 'string' ? body.accentColor : undefined,
-        logoUrl: typeof body.logoUrl === 'string' ? body.logoUrl : undefined,
+        logoUrl: rawLogoUrl,
+        attribution: body.attribution && typeof body.attribution === 'object'
+          ? (body.attribution as Record<string, string>)
+          : undefined,
       });
 
       let token: string | null = null;
@@ -177,6 +246,7 @@ export function createSaasCommercialRoutes() {
           success: true,
           data: {
             ...result,
+            seeded: result.seededCounts,
             storefrontPath: `/s/${result.slug}`,
             token,
           },
@@ -187,8 +257,10 @@ export function createSaasCommercialRoutes() {
       if (err instanceof ProvisionError) {
         return c.json({ success: false, code: err.code, error: err.message }, err.status);
       }
-      const msg = err instanceof Error ? err.message : 'Signup failed';
-      return c.json({ success: false, code: 'signup_error', error: msg }, 500);
+      return c.json(
+        { success: false, code: 'signup_error', error: 'Không thể khởi tạo quán lúc này. Vui lòng thử lại sau.' },
+        500
+      );
     }
   });
 
@@ -559,22 +631,61 @@ export function createSaasCommercialRoutes() {
     const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
     const nowIso = new Date().toISOString();
 
-    const displayName = String(body.displayName || body.display_name || '').trim();
-    const tagline = String(body.tagline || '').trim();
-    const logoUrl = String(body.logoUrl || body.logo_url || '').trim();
-    const primaryColor = /^#[0-9a-fA-F]{6}$/.test(String(body.primaryColor || ''))
-      ? String(body.primaryColor)
-      : '#1F2937';
-    const accentColor = /^#[0-9a-fA-F]{6}$/.test(String(body.accentColor || ''))
-      ? String(body.accentColor)
-      : '#D97706';
-    const address = String(body.address || '').trim();
-    const phone = String(body.phone || '').trim();
-    const receiptFooter = String(body.receiptFooter || body.receipt_footer || '').trim();
+    const [existingBranding, existingTenant] = await Promise.all([
+      db
+        .prepare('SELECT display_name, tagline, logo_url, primary_color, accent_color, address, phone, receipt_footer FROM tenant_branding WHERE tenant_id = ? LIMIT 1')
+        .bind(tenantId)
+        .first<Record<string, unknown>>(),
+      db
+        .prepare('SELECT name FROM saas_tenants WHERE id = ? LIMIT 1')
+        .bind(tenantId)
+        .first<{ name?: string }>(),
+    ]);
+
+    const hasDisplayName = 'displayName' in body || 'display_name' in body || 'brandName' in body;
+    const displayName = hasDisplayName
+      ? String(body.displayName ?? body.display_name ?? body.brandName ?? '').trim()
+      : String(existingBranding?.display_name ?? existingTenant?.name ?? '').trim();
 
     if (!displayName || displayName.length < 2) {
       return c.json({ success: false, error: 'Tên hiển thị quán phải có ít nhất 2 ký tự.' }, 400);
     }
+
+    const tagline = 'tagline' in body
+      ? String(body.tagline ?? '').trim()
+      : String(existingBranding?.tagline ?? '');
+    const hasLogoUrl = 'logoUrl' in body || 'logo_url' in body;
+    const logoUrl = hasLogoUrl
+      ? String(body.logoUrl ?? body.logo_url ?? '').trim()
+      : String(existingBranding?.logo_url ?? '');
+    if (logoUrl && !isSafeLogoUrl(logoUrl)) {
+      return c.json(
+        { success: false, code: 'invalid_logo_url', error: 'URL logo không hợp lệ (chỉ chấp nhận https://, http:// hoặc đường dẫn tương đối /...).' },
+        400
+      );
+    }
+
+    const existingPrimary = String(existingBranding?.primary_color ?? '#1F2937');
+    const existingAccent = String(existingBranding?.accent_color ?? '#D97706');
+    const rawPrimary = body.primaryColor ?? body.primary_color;
+    const rawAccent = body.accentColor ?? body.accent_color;
+    const primaryColor = typeof rawPrimary === 'string' && /^#[0-9a-fA-F]{6}$/.test(rawPrimary)
+      ? rawPrimary
+      : existingPrimary;
+    const accentColor = typeof rawAccent === 'string' && /^#[0-9a-fA-F]{6}$/.test(rawAccent)
+      ? rawAccent
+      : existingAccent;
+
+    const address = 'address' in body
+      ? String(body.address ?? '').trim()
+      : String(existingBranding?.address ?? '');
+    const phone = 'phone' in body
+      ? String(body.phone ?? '').trim()
+      : String(existingBranding?.phone ?? '');
+    const hasReceiptFooter = 'receiptFooter' in body || 'receipt_footer' in body;
+    const receiptFooter = hasReceiptFooter
+      ? String(body.receiptFooter ?? body.receipt_footer ?? '').trim()
+      : String(existingBranding?.receipt_footer ?? '');
 
     await db
       .prepare(
@@ -695,9 +806,9 @@ export function createSaasCommercialRoutes() {
         );
       }
       [clientIdEnc, apiKeyEnc, checksumKeyEnc] = await Promise.all([
-        encryptTenantSecret(payosClientId, c.env.TENANT_SECRETS_KEY),
-        encryptTenantSecret(payosApiKey, c.env.TENANT_SECRETS_KEY),
-        encryptTenantSecret(payosChecksumKey, c.env.TENANT_SECRETS_KEY),
+        encryptTenantSecret(payosClientId, c.env.TENANT_SECRETS_KEY, 1, `${tenantId}:payos_client_id`),
+        encryptTenantSecret(payosApiKey, c.env.TENANT_SECRETS_KEY, 1, `${tenantId}:payos_api_key`),
+        encryptTenantSecret(payosChecksumKey, c.env.TENANT_SECRETS_KEY, 1, `${tenantId}:payos_checksum_key`),
       ]);
     }
 
@@ -817,16 +928,28 @@ export function createSaasCommercialRoutes() {
 
     const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
     const domain = String(body.domain || '').trim().toLowerCase().replace(/^https?:\/\//, '').replace(/\/.*$/, '');
-    if (!isValidDomain(domain)) {
-      return c.json({ success: false, error: 'Tên miền không hợp lệ (ví dụ: order.quancuaban.vn).' }, 400);
+    if (!isAllowedCustomDomain(domain, c.env.SAAS_PLATFORM_DOMAIN)) {
+      return c.json(
+        { success: false, code: 'invalid_or_reserved_domain', error: 'Tên miền không hợp lệ hoặc thuộc miền dành riêng của nền tảng (ví dụ hợp lệ: order.quancuaban.vn).' },
+        400
+      );
     }
 
     const existing = await db
-      .prepare('SELECT id, tenant_id FROM tenant_domains WHERE LOWER(domain) = ? LIMIT 1')
+      .prepare('SELECT id, tenant_id, status, created_at FROM tenant_domains WHERE LOWER(domain) = ? LIMIT 1')
       .bind(domain)
-      .first<{ id: string; tenant_id: string }>();
+      .first<{ id: string; tenant_id: string; status: string; created_at: string }>();
     if (existing) {
-      return c.json({ success: false, error: 'Tên miền này đã được đăng ký.' }, 409);
+      const isStaleOtherTenantClaim =
+        existing.tenant_id !== tenantId &&
+        existing.status !== 'verified' &&
+        Number.isFinite(Date.parse(existing.created_at)) &&
+        Date.now() - Date.parse(existing.created_at) > PENDING_DOMAIN_CLAIM_TTL_MS;
+      if (isStaleOtherTenantClaim) {
+        await db.prepare("DELETE FROM tenant_domains WHERE id = ? AND status != 'verified'").bind(existing.id).run();
+      } else {
+        return c.json({ success: false, error: 'Tên miền này đã được đăng ký.' }, 409);
+      }
     }
 
     const id = `dom_${crypto.randomUUID().replace(/-/g, '').slice(0, 16)}`;
@@ -866,6 +989,11 @@ export function createSaasCommercialRoutes() {
     const db = c.env.AURA_DB;
     const tenantId = resolveScopedTenant(c);
     const id = c.req.param('id');
+
+    const featureCheck = await assertTenantFeature(db, tenantId, 'custom_domain');
+    if (!featureCheck.allowed) {
+      return c.json({ success: false, code: featureCheck.code, error: featureCheck.message }, featureCheck.status || 403);
+    }
 
     const row = await db
       .prepare('SELECT id, domain, verification_token, status FROM tenant_domains WHERE id = ? AND tenant_id = ? LIMIT 1')
@@ -977,10 +1105,28 @@ export function createSaasCommercialRoutes() {
     let checkoutUrl: string | null = null;
     let qrCode: string | null = null;
 
+    // Persist pending invoice before invoking PayOS so rapid payment webhooks never race ahead of the DB row.
+    await db
+      .prepare(
+        `INSERT INTO tenant_invoices (
+          id, tenant_id, tier, billing_cycle, amount_vnd, status, payos_order_code, checkout_url, created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, 'pending', ?, NULL, ?, ?)`
+      )
+      .bind(invoiceId, tenantId, planId, cycle, amountVnd, String(payosOrderCode), nowIso, nowIso)
+      .run();
+
+    const cleanupPendingInvoice = async () => {
+      await db
+        .prepare("DELETE FROM tenant_invoices WHERE id = ? AND status = 'pending'")
+        .bind(invoiceId)
+        .run()
+        .catch(() => {});
+    };
+
     {
       const baseUrl = c.env.FE_BASE_URL || 'https://auraspace.cafe';
-      const returnUrl = `${baseUrl}/admin?tab=saas-billing&invoice=${invoiceId}&status=paid`;
-      const cancelUrl = `${baseUrl}/admin?tab=saas-billing&invoice=${invoiceId}&status=cancelled`;
+      const returnUrl = `${baseUrl}/admin/saas-settings?tab=billing&invoice=${invoiceId}&status=paid`;
+      const cancelUrl = `${baseUrl}/admin/saas-settings?tab=billing&invoice=${invoiceId}&status=cancelled`;
       const description = `SAAS ${planId.toUpperCase()} ${cycle === 'annual' ? '1Y' : '1M'}`.slice(0, 25);
       const rawSig = `amount=${amountVnd}&cancelUrl=${cancelUrl}&description=${description}&orderCode=${payosOrderCode}&returnUrl=${returnUrl}`;
       const signature = await computeHmacSha256Hex(saasChecksumKey, rawSig);
@@ -1003,6 +1149,7 @@ export function createSaasCommercialRoutes() {
           }),
         });
         if (!res.ok) {
+          await cleanupPendingInvoice();
           return c.json(
             {
               success: false,
@@ -1014,6 +1161,7 @@ export function createSaasCommercialRoutes() {
         }
         const json = (await res.json()) as { code?: string; desc?: string; data?: { checkoutUrl?: string; qrCode?: string } };
         if (json.code !== '00' || !json.data?.checkoutUrl) {
+          await cleanupPendingInvoice();
           return c.json(
             {
               success: false,
@@ -1026,6 +1174,7 @@ export function createSaasCommercialRoutes() {
         checkoutUrl = json.data.checkoutUrl;
         qrCode = json.data.qrCode || null;
       } catch {
+        await cleanupPendingInvoice();
         return c.json(
           {
             success: false,
@@ -1038,12 +1187,8 @@ export function createSaasCommercialRoutes() {
     }
 
     await db
-      .prepare(
-        `INSERT INTO tenant_invoices (
-          id, tenant_id, tier, billing_cycle, amount_vnd, status, payos_order_code, checkout_url, created_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?)`
-      )
-      .bind(invoiceId, tenantId, planId, cycle, amountVnd, String(payosOrderCode), checkoutUrl, nowIso, nowIso)
+      .prepare('UPDATE tenant_invoices SET checkout_url = ?, updated_at = ? WHERE id = ?')
+      .bind(checkoutUrl, new Date().toISOString(), invoiceId)
       .run();
 
     return c.json(

@@ -19,6 +19,8 @@ declare module 'hono' {
     user: AuthUser;
     customer: Record<string, unknown>;
     tenantId?: string;
+    hostTenantId?: string;
+    resolvedTenantSlug?: string;
     userTier?: string;
   }
 }

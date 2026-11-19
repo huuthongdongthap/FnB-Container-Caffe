@@ -31,21 +31,21 @@ openssl rand -hex 32 | npx wrangler secret put TENANT_SECRETS_KEY
 ### Bước 2.1 — Backup D1
 ```bash
 cd worker
-npx wrangler d1 export aura-space-db --remote --output=../backups/d1-pre-saas-v3-$(date +%Y%m%d-%H%M%S).sql
+npx wrangler d1 export fnb-caffe-db --remote --output=../backups/d1-pre-saas-v3-$(date +%Y%m%d-%H%M%S).sql
 ```
 
 ### Bước 2.2 — Apply Migration (Staging trước, Production sau)
 ```bash
 # Staging
-npx wrangler d1 execute aura-space-db-staging --remote --file=db/migrations/20261119_02_saas_commercial_v3.sql
+npx wrangler d1 execute fnb-caffe-db-staging --remote --file=db/migrations/20261119_02_saas_commercial_v3.sql
 
 # Production (chỉ chạy sau khi pass Smoke Test mục 5 trên Staging)
-npx wrangler d1 execute aura-space-db --remote --file=db/migrations/20261119_02_saas_commercial_v3.sql
+npx wrangler d1 execute fnb-caffe-db --remote --file=db/migrations/20261119_02_saas_commercial_v3.sql
 ```
 
 ### Bước 2.3 — Xác minh bảng mới
 ```bash
-npx wrangler d1 execute aura-space-db --remote --command="
+npx wrangler d1 execute fnb-caffe-db --remote --command="
 SELECT name FROM sqlite_master
 WHERE type='table' AND name IN (
   'saas_tenants',
@@ -61,7 +61,7 @@ WHERE type='table' AND name IN (
 
 ### Rollback (nếu cần)
 ```bash
-npx wrangler d1 execute aura-space-db --remote --file=db/migrations/20261119_02_saas_commercial_v3.down.sql
+npx wrangler d1 execute fnb-caffe-db --remote --file=db/migrations/20261119_02_saas_commercial_v3.down.sql
 ```
 
 ---
@@ -74,7 +74,7 @@ npx wrangler d1 execute aura-space-db --remote --file=db/migrations/20261119_02_
    - Kiểm tra Cloudflare Pages / Worker Custom Domains đã bind cả `auraspace.cafe` và `*.auraspace.cafe`.
 2. **Custom Domain của từng quán (gói Pro / Chain):**
    - Bật **Cloudflare for SaaS (Custom Hostnames)** với Fallback Origin trỏ về Worker/Pages của `auraspace.cafe`.
-   - Khi chủ quán thêm tên miền trong `/admin/saas` (tab Tên miền), hệ thống cấp bản ghi `TXT _aura-verify.<domain>` và `CNAME <domain> -> cname.auraspace.cafe`.
+   - Khi chủ quán thêm tên miền trong `/admin/saas-settings` (tab Tên miền), hệ thống cấp bản ghi `TXT _aura-verify.<domain>` và `CNAME <domain> -> cname.auraspace.cafe`.
    - Chỉ khi `tenant_domains.status = 'verified'` thì `resolveTenantFromHost` mới map domain đó vào `tenant_id` tương ứng.
 
 ---
@@ -101,7 +101,7 @@ Thực hiện lần lượt trên Staging rồi Production:
 
 1. **Flagship `default` không bị ảnh hưởng:**
    - Mở `https://auraspace.cafe/` → đặt thử 1 đơn takeaway + kiểm tra `/admin` + `/kds`.
-2. **Đăng ký tự phục vụ 2 quán mới (`/saas/signup`):**
+2. **Đăng ký tự phục vụ 2 quán mới (`/signup`):**
    - Tạo `quan-pilot-a` (mẫu Quán Cà Phê Truyền Thống) và `quan-pilot-b` (mẫu Quán Trà Sữa).
    - Kiểm tra cả 2 quán tự động có sẵn danh mục, món, bàn, ca làm việc, hạn dùng thử 14 ngày.
 3. **Cách ly dữ liệu chéo & định tuyến tên miền:**
@@ -124,8 +124,8 @@ cd worker
 npx tsc --noEmit
 ../node_modules/.bin/vitest run src/__tests__/saas-commercial-v3.test.ts src/__tests__/saas-commercial-hardening.integration.test.ts
 
-# Frontend: typecheck + production build
-cd ../frontend
-npx tsc --noEmit
+# Frontend (ở thư mục gốc repo): typecheck + production build
+cd ..
+npm run typecheck
 npm run build
 ```

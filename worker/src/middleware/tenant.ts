@@ -165,15 +165,19 @@ export function getTenantId(c: {
 /**
  * Resolves tenantId for public/guest-accessible routes that support optional staff auth.
  * Authenticated users use getTenantId(c); unauthenticated guests resolve from
- * explicit context tenantId, ?tenant_id query, X-Tenant-ID header, or PILOT_TENANT_ID.
+ * explicit context tenantId, hostTenantId, ?tenant_id query, X-Tenant-ID header, or PILOT_TENANT_ID.
  */
 export function resolvePublicTenantId(c: Parameters<typeof getTenantId>[0]): string {
   if (c.get?.('user')) {
     return getTenantId(c);
   }
-  const explicitCtx = c.get?.('tenantId') as string | undefined;
-  if (explicitCtx && explicitCtx.trim() && explicitCtx.trim() !== '*' && explicitCtx.trim().toLowerCase() !== 'hq') {
-    return explicitCtx.trim();
+  const explicitCtx = (c.get?.('tenantId') as string | undefined)?.trim();
+  if (explicitCtx && explicitCtx !== '*' && explicitCtx.toLowerCase() !== 'hq') {
+    return explicitCtx;
+  }
+  const hostCtx = (c.get?.('hostTenantId') as string | undefined)?.trim();
+  if (hostCtx && hostCtx !== '*' && hostCtx.toLowerCase() !== 'hq') {
+    return hostCtx;
   }
   const raw = (
     c.req?.query?.('tenant_id') ||

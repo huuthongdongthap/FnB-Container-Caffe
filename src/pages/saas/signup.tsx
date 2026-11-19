@@ -22,6 +22,7 @@ interface PlanItem {
   annualPriceVnd: number;
   annualMonthlyEquivalentVnd: number;
   popular?: boolean;
+  isRecommended?: boolean;
   highlightsVi: string[];
 }
 
@@ -40,31 +41,40 @@ function slugifyInput(raw: string): string {
 
 const FALLBACK_TEMPLATES: TemplateItem[] = [
   {
-    id: 'container-cafe',
-    nameVi: 'Quán Cà Phê & Container Cafe',
-    descriptionVi: 'Cà phê phin, espresso, trà trái cây, bánh ngọt và sơ đồ 12 bàn sẵn sàng.',
-    defaultTagline: 'Cà phê nguyên bản • Không gian mở',
-    primaryColor: '#051424',
-    accentColor: '#EFBD8A',
-    counts: { categories: 5, products: 18, tables: 12, shifts: 3 },
+    id: 'traditional-cafe',
+    nameVi: 'Quán Cà Phê Truyền Thống',
+    descriptionVi: 'Cà phê phin đậm vị, bạc xỉu, trà trái cây và điểm tâm nhẹ.',
+    defaultTagline: 'Hương vị cà phê rang xay nguyên bản mỗi sáng',
+    primaryColor: '#3E2723',
+    accentColor: '#D97706',
+    counts: { categories: 3, products: 12, tables: 10, shifts: 3 },
   },
   {
-    id: 'milk-tea-bar',
-    nameVi: 'Trà Sữa & Đồ Uống Giới Trẻ',
-    descriptionVi: 'Trà sữa topping, trà trái cây nhiệt đới, tùy chọn đường/đá linh hoạt.',
-    defaultTagline: 'Trà đậm vị • Topping tươi mỗi ngày',
+    id: 'milktea-takeaway',
+    nameVi: 'Trà Sữa & Takeaway',
+    descriptionVi: 'Tối ưu tốc độ ra món mang đi, trà sữa topping và trà trái cây.',
+    defaultTagline: 'Trà tươi pha máy — Topping nấu mới mỗi ngày',
+    primaryColor: '#7C2D12',
+    accentColor: '#EC4899',
+    counts: { categories: 3, products: 12, tables: 8, shifts: 3 },
+  },
+  {
+    id: 'garden-container',
+    nameVi: 'Cà Phê Sân Vườn / Container',
+    descriptionVi: 'Không gian mở nhiều khu vực, specialty coffee, cold brew và ăn vặt.',
+    defaultTagline: 'Không gian xanh thoáng đãng — Cà phê chất lượng mỗi ngày',
+    primaryColor: '#14532D',
+    accentColor: '#10B981',
+    counts: { categories: 3, products: 12, tables: 12, shifts: 3 },
+  },
+  {
+    id: 'bistro-acoustic',
+    nameVi: 'Bistro & Acoustic Lounge',
+    descriptionVi: 'Đồ uống tối, mocktail, món Âu nhẹ và bàn khu sân khấu nhạc sống.',
+    defaultTagline: 'Âm nhạc mộc mạc — Ẩm thực tinh tế mỗi tối',
     primaryColor: '#1E1B4B',
     accentColor: '#F59E0B',
-    counts: { categories: 4, products: 16, tables: 10, shifts: 3 },
-  },
-  {
-    id: 'bakery-bistro',
-    nameVi: 'Bánh Ngọt & Bistro Cafe',
-    descriptionVi: 'Croissant, bánh Âu, brunch, đồ uống specialty và quản lý bếp KDS.',
-    defaultTagline: 'Bánh nướng mỗi sáng • Specialty Coffee',
-    primaryColor: '#1C1917',
-    accentColor: '#D97706',
-    counts: { categories: 5, products: 20, tables: 15, shifts: 3 },
+    counts: { categories: 3, products: 12, tables: 12, shifts: 3 },
   },
 ];
 
@@ -74,24 +84,25 @@ const FALLBACK_PLANS: PlanItem[] = [
     name: 'Starter',
     taglineVi: 'Tối đa 15 bàn, 3 nhân viên, VietQR 0% phí',
     monthlyPriceVnd: 199_000,
-    annualPriceVnd: 1_910_000,
-    annualMonthlyEquivalentVnd: 159_000,
+    annualPriceVnd: 1_910_400,
+    annualMonthlyEquivalentVnd: 159_200,
     highlightsVi: ['POS & QR Order tại bàn', 'VietQR trực tiếp về tài khoản quán'],
   },
   {
     id: 'pro',
     name: 'Pro',
-    taglineVi: 'Không giới hạn bàn & NV, KDS, PayOS riêng, tên miền riêng',
+    taglineVi: 'Tối đa 50 bàn, 15 nhân viên, KDS, PayOS riêng, tên miền riêng',
     monthlyPriceVnd: 499_000,
-    annualPriceVnd: 4_790_000,
-    annualMonthlyEquivalentVnd: 399_000,
+    annualPriceVnd: 4_790_400,
+    annualMonthlyEquivalentVnd: 399_200,
     popular: true,
-    highlightsVi: ['Không giới hạn bàn & nhân viên', 'KDS realtime & PayOS riêng'],
+    isRecommended: true,
+    highlightsVi: ['Tối đa 50 bàn & 15 nhân viên', 'KDS realtime & PayOS riêng'],
   },
   {
     id: 'chain',
     name: 'Chain',
-    taglineVi: 'Đa chi nhánh, HQ rollup, báo cáo P&L, API & Webhook',
+    taglineVi: 'Không giới hạn bàn & NV, đa chi nhánh, HQ rollup, API & Webhook',
     monthlyPriceVnd: 1_290_000,
     annualPriceVnd: 12_384_000,
     annualMonthlyEquivalentVnd: 1_032_000,
@@ -115,7 +126,7 @@ export default function SaasSignupPage(): ReactNode {
     checking: false,
   });
 
-  const [templateId, setTemplateId] = useState('container-cafe');
+  const [templateId, setTemplateId] = useState('traditional-cafe');
   const [planId, setPlanId] = useState(initialPlan);
   const [ownerName, setOwnerName] = useState('');
   const [ownerEmail, setOwnerEmail] = useState('');
@@ -212,7 +223,8 @@ export default function SaasSignupPage(): ReactNode {
           storefrontPath: string;
           trialEndsAt: string;
           token?: string | null;
-          seeded: { categories: number; products: number; tables: number; shifts: number };
+          seeded?: { categories: number; products: number; tables: number; shifts: number };
+          seededCounts?: { categories: number; products: number; tables: number; shifts: number };
         };
       }>('/api/saas/signup', {
         method: 'POST',
@@ -245,11 +257,17 @@ export default function SaasSignupPage(): ReactNode {
         });
       }
 
+      const seededSummary = res.data.seeded ?? res.data.seededCounts ?? {
+        categories: 0,
+        products: 0,
+        tables: 0,
+        shifts: 0,
+      };
       setCreatedStore({
         slug: res.data.slug,
         storefrontPath: res.data.storefrontPath,
         trialEndsAt: res.data.trialEndsAt,
-        seeded: res.data.seeded,
+        seeded: seededSummary,
       });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Lỗi kết nối máy chủ.');
@@ -466,7 +484,7 @@ export default function SaasSignupPage(): ReactNode {
                     <div>
                       <div className="flex items-center justify-between">
                         <span className="font-bold text-white">{p.name}</span>
-                        {p.popular && (
+                        {(p.isRecommended ?? p.popular) && (
                           <span className="text-[10px] uppercase bg-amber-500 text-slate-950 font-bold px-2 py-0.5 rounded-full">
                             Phổ biến
                           </span>

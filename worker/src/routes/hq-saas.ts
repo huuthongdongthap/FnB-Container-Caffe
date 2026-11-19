@@ -57,7 +57,7 @@ export function createHqSaasRoutes() {
     let mrrVnd = 0;
 
     for (const row of tenants) {
-      const state = resolveTenantLifecycle(
+      const lifecycle = resolveTenantLifecycle(
         {
           tenant_id: String(row.id),
           tier: String(row.sub_tier || row.tier || 'starter'),
@@ -68,9 +68,12 @@ export function createHqSaasRoutes() {
           grace_ends_at: row.grace_ends_at as string | null,
         },
         now
-      ).lifecycleState;
+      );
+      const state = lifecycle.lifecycleState;
 
-      if (state === 'active') {
+      if (lifecycle.rawStatus === 'suspended') {
+        suspended++;
+      } else if (state === 'active') {
         activePaid++;
         const plan = SAAS_PLANS[normalizeSaasPlanId(String(row.sub_tier || row.tier || 'starter'))];
         mrrVnd += row.billing_cycle === 'annual' ? Math.round(plan.annualPriceVnd / 12) : plan.monthlyPriceVnd;
@@ -80,8 +83,6 @@ export function createHqSaasRoutes() {
         inGrace++;
       } else if (state === 'readonly') {
         inReadOnly++;
-      } else if (state === 'suspended') {
-        suspended++;
       }
     }
 

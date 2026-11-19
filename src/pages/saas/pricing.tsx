@@ -11,6 +11,7 @@ interface SaasPlan {
   annualPriceVnd: number;
   annualMonthlyEquivalentVnd: number;
   popular?: boolean;
+  isRecommended?: boolean;
   highlightsVi: string[];
 }
 
@@ -20,8 +21,8 @@ const FALLBACK_SAAS_PLANS: SaasPlan[] = [
     name: 'Starter',
     taglineVi: 'Khởi đầu chuẩn chỉnh cho quán cà phê & trà sữa quy mô nhỏ',
     monthlyPriceVnd: 199_000,
-    annualPriceVnd: 1_910_000,
-    annualMonthlyEquivalentVnd: 159_000,
+    annualPriceVnd: 1_910_400,
+    annualMonthlyEquivalentVnd: 159_200,
     highlightsVi: [
       'Tối đa 15 bàn & 3 tài khoản nhân viên',
       'QR Order tại bàn & POS thu ngân mượt mà',
@@ -34,11 +35,12 @@ const FALLBACK_SAAS_PLANS: SaasPlan[] = [
     name: 'Pro',
     taglineVi: 'Tối ưu vận hành tốc độ cao cho quán đông khách & thương hiệu riêng',
     monthlyPriceVnd: 499_000,
-    annualPriceVnd: 4_790_000,
-    annualMonthlyEquivalentVnd: 399_000,
+    annualPriceVnd: 4_790_400,
+    annualMonthlyEquivalentVnd: 399_200,
     popular: true,
+    isRecommended: true,
     highlightsVi: [
-      'Không giới hạn số bàn & tài khoản nhân viên',
+      'Tối đa 50 bàn & 15 tài khoản nhân viên',
       'Màn hình bếp KDS realtime & phân loại đồ uống',
       'Tích hợp PayOS riêng & tự động xác nhận chuyển khoản',
       'Tên miền riêng (Custom Domain) & nhận diện thương hiệu quán',
@@ -129,13 +131,14 @@ export default function SaasPricingPage(): ReactNode {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             {plans.map((plan) => {
+              const isHighlighted = Boolean(plan.isRecommended ?? plan.popular);
               const displayPrice =
                 billingCycle === 'annual' ? plan.annualMonthlyEquivalentVnd : plan.monthlyPriceVnd;
               return (
                 <div
                   key={plan.id}
                   className={`rounded-2xl p-6 border flex flex-col justify-between ${
-                    plan.popular
+                    isHighlighted
                       ? 'border-amber-500 bg-slate-900 shadow-lg shadow-amber-500/10'
                       : 'border-slate-800 bg-slate-900/70'
                   }`}
@@ -143,7 +146,7 @@ export default function SaasPricingPage(): ReactNode {
                   <div className="space-y-4">
                     <div className="flex items-center justify-between">
                       <h2 className="text-xl font-bold text-white">{plan.name}</h2>
-                      {plan.popular && (
+                      {isHighlighted && (
                         <span className="rounded-full bg-amber-500 px-2.5 py-0.5 text-[11px] font-bold text-slate-950">
                           Phổ biến nhất
                         </span>
@@ -174,7 +177,7 @@ export default function SaasPricingPage(): ReactNode {
                   <Link
                     to={buildUrlWithUtm(`/signup?plan=${plan.id}`, utm)}
                     className={`mt-8 flex min-h-[44px] w-full items-center justify-center text-center rounded-xl py-3 text-sm font-bold transition ${
-                      plan.popular
+                      isHighlighted
                         ? 'bg-amber-500 text-slate-950 hover:bg-amber-400'
                         : 'bg-slate-800 text-white hover:bg-slate-700'
                     }`}

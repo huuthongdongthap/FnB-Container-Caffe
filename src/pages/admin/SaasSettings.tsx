@@ -1,4 +1,5 @@
 import { useEffect, useState, type ReactNode } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { apiFetch } from '@/lib/api-client';
 
 interface MePayload {
@@ -54,13 +55,40 @@ interface BillingInvoice {
   created_at: string;
 }
 
+const VALID_TABS = new Set(['billing', 'payment', 'branding', 'domains'] as const);
+
 export default function AdminSaasSettingsPage(): ReactNode {
-  const [tab, setTab] = useState<'billing' | 'payment' | 'branding' | 'domains'>('billing');
+  const [searchParams] = useSearchParams();
+  const initialTabParam = searchParams.get('tab');
+  const initialTab: 'billing' | 'payment' | 'branding' | 'domains' =
+    initialTabParam && VALID_TABS.has(initialTabParam as 'billing' | 'payment' | 'branding' | 'domains')
+      ? (initialTabParam as 'billing' | 'payment' | 'branding' | 'domains')
+      : 'billing';
+
+  const [tab, setTab] = useState<'billing' | 'payment' | 'branding' | 'domains'>(initialTab);
   const [me, setMe] = useState<MePayload | null>(null);
   const [payment, setPayment] = useState<PaymentConfigPayload | null>(null);
   const [invoices, setInvoices] = useState<BillingInvoice[]>([]);
   const [loading, setLoading] = useState(true);
   const [notice, setNotice] = useState<{ type: 'ok' | 'err'; text: string } | null>(null);
+
+  useEffect(() => {
+    const statusParam = searchParams.get('status');
+    const invoiceParam = searchParams.get('invoice');
+    if (statusParam === 'paid') {
+      setNotice({
+        type: 'ok',
+        text: invoiceParam
+          ? `Thanh toán hóa đơn ${invoiceParam} đã được ghi nhận. Gói dịch vụ sẽ tự động gia hạn ngay khi PayOS xác nhận.`
+          : 'Thanh toán đã được ghi nhận. Gói dịch vụ sẽ tự động gia hạn ngay khi PayOS xác nhận.',
+      });
+    } else if (statusParam === 'cancelled') {
+      setNotice({
+        type: 'err',
+        text: 'Giao dịch thanh toán gói dịch vụ đã bị hủy. Bạn có thể tạo hóa đơn mới bất kỳ lúc nào.',
+      });
+    }
+  }, [searchParams]);
 
   // Payment form state
   const [provider, setProvider] = useState<'vietqr' | 'payos'>('vietqr');
@@ -374,9 +402,9 @@ export default function AdminSaasSettingsPage(): ReactNode {
         <div className="space-y-6">
           <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
             {[
-              { id: 'starter' as const, name: 'Starter', monthly: 199_000, annual: 1_910_000, desc: 'Tối đa 15 bàn, 3 nhân viên, VietQR' },
-              { id: 'pro' as const, name: 'Pro', monthly: 499_000, annual: 4_790_000, desc: 'Không giới hạn bàn & NV, PayOS riêng, Tên miền riêng' },
-              { id: 'chain' as const, name: 'Chain', monthly: 1_290_000, annual: 12_384_000, desc: 'Đa chi nhánh, HQ rollup, API & Webhook' },
+              { id: 'starter' as const, name: 'Starter', monthly: 199_000, annual: 1_910_400, desc: 'Tối đa 15 bàn, 3 nhân viên, VietQR' },
+              { id: 'pro' as const, name: 'Pro', monthly: 499_000, annual: 4_790_400, desc: 'Tối đa 50 bàn, 15 nhân viên, PayOS riêng, Tên miền riêng' },
+              { id: 'chain' as const, name: 'Chain', monthly: 1_290_000, annual: 12_384_000, desc: 'Không giới hạn bàn & NV, đa chi nhánh, HQ rollup, API & Webhook' },
             ].map((p) => (
               <div key={p.id} className="rounded-xl border border-slate-800 bg-slate-900 p-5 space-y-4">
                 <div>

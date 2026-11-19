@@ -6,7 +6,7 @@ import { createMetricsCollector } from '../../lib/metrics-collector';
 import type { Env } from '../../types/env';
 import { log, verifySignature } from './helpers';
 import { sendOrderPaidNotifications } from './notifications';
-import { resolveMerchantPaymentConfig } from '../../lib/merchant-payment';
+import { isEnrolledSaasTenant, resolveMerchantPaymentConfig } from '../../lib/merchant-payment';
 import { settlePayOS, type SettlementPayment } from './payos-settlement';
 import { writePaymentReviewMarker } from '../../../../packages/domain/payment/commands/payos-reconcile-lease';
 import { extractPayOSLinkId } from '../../../../packages/domain/payment/commands/payos-provider-verify';
@@ -149,12 +149,8 @@ export async function handlePayosWebhook(
       return c.json({ error: 1, message: 'Cross-tenant webhook order mismatch' }, 403);
     }
     if (!explicitTenantSlugOrId && settledOrderTenant !== 'default') {
-      const dedicatedConfig = await db
-        .prepare('SELECT payos_checksum_key_enc FROM tenant_payment_configs WHERE tenant_id = ? LIMIT 1')
-        .bind(settledOrderTenant)
-        .first<{ payos_checksum_key_enc?: string | null }>()
-        .catch(() => null);
-      if (dedicatedConfig?.payos_checksum_key_enc) {
+      const enrolledSaas = await isEnrolledSaasTenant(db, settledOrderTenant);
+      if (enrolledSaas) {
         return c.json({ error: 1, message: 'Tenant must use its dedicated PayOS webhook endpoint' }, 403);
       }
     }
