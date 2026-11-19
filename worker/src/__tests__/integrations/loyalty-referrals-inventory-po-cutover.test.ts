@@ -163,6 +163,7 @@ describe('Loyalty, Referrals, Inventory PO, Customer Events & Audit Cutover (202
     '20261029_09_dindin_mautic_shift_reconciliation_and_column_cutover.sql',
     '20261029_10_crm_campaigns_table_zones_and_audit_column_cutover.sql',
     '20261029_11_loyalty_referrals_inventory_po_customer_events_and_audit_cutover.sql',
+    '20261119_01_tenant_settings_kv.sql',
   ].map((file) => readFileSync(resolve(__dirname, `../../../db/migrations/${file}`), 'utf-8'));
 
   const down11 = readFileSync(
@@ -448,18 +449,6 @@ describe('Loyalty, Referrals, Inventory PO, Customer Events & Audit Cutover (202
     sqlite.exec(migration1118_01Down);
     sqlite.exec(migration1118_01Up);
 
-    const migration1118_01Up = readFileSync(
-      resolve(__dirname, '../../../db/migrations/20261118_01_orders_loyalty_points_redeemed.sql'),
-      'utf8'
-    );
-    const migration1118_01Down = readFileSync(
-      resolve(__dirname, '../../../db/migrations/20261118_01_orders_loyalty_points_redeemed.down.sql'),
-      'utf8'
-    );
-    sqlite.exec(migration1118_01Up);
-    sqlite.exec(migration1118_01Down);
-    sqlite.exec(migration1118_01Up);
-
     const canonicalSqlite = new DatabaseSync(':memory:');
     canonicalSqlite.exec(readFileSync(resolve(__dirname, '../../../schema.sql'), 'utf8'));
     const getSchemaMap = (conn: DatabaseSync) => {
@@ -476,7 +465,7 @@ describe('Loyalty, Referrals, Inventory PO, Customer Events & Audit Cutover (202
     };
     const replicaSchema = getSchemaMap(sqlite);
     const canonicalSchema = getSchemaMap(canonicalSqlite);
-    expect(replicaSchema.tables).toHaveLength(126);
+    expect(replicaSchema.tables).toHaveLength(127);
     expect(replicaSchema.tables).toEqual(canonicalSchema.tables);
     expect(replicaSchema.map).toEqual(canonicalSchema.map);
 

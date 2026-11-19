@@ -590,6 +590,17 @@ CREATE TABLE IF NOT EXISTS referral_codes (
 CREATE INDEX idx_referral_codes_customer ON referral_codes(customer_id);
 CREATE INDEX idx_referral_codes_code ON referral_codes(code);
 
+-- Tenant-scoped key/value settings (per-store feature opt-outs read at runtime)
+CREATE TABLE IF NOT EXISTS settings (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  tenant_id TEXT NOT NULL DEFAULT 'default',
+  key TEXT NOT NULL,
+  value TEXT NOT NULL,
+  updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_settings_tenant_key ON settings(tenant_id, key);
+
 -- Referral tracking: records each successful referral
 CREATE TABLE IF NOT EXISTS referrals (
     id TEXT PRIMARY KEY,
@@ -2049,6 +2060,5 @@ CREATE INDEX IF NOT EXISTS idx_shifts_staff ON staff_shifts(staff_email);
 CREATE INDEX IF NOT EXISTS idx_users_phone ON users(phone);
 ALTER TABLE table_sessions ADD COLUMN tenant_id TEXT NOT NULL DEFAULT 'default';
 ALTER TABLE orders ADD COLUMN session_id TEXT;
-ALTER TABLE orders ADD COLUMN loyalty_points_redeemed INTEGER DEFAULT 0;
 CREATE INDEX IF NOT EXISTS idx_table_sessions_tenant_status ON table_sessions(tenant_id, table_id, status);
 CREATE INDEX IF NOT EXISTS idx_orders_tenant_session ON orders(tenant_id, session_id);
