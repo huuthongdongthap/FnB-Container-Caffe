@@ -203,6 +203,7 @@ CREATE TABLE IF NOT EXISTS orders (
     cashback_used INTEGER DEFAULT 0,
     cashback_earned INTEGER DEFAULT 0,
     points_earned INTEGER DEFAULT 0,
+    loyalty_points_redeemed INTEGER DEFAULT 0,
     locale TEXT DEFAULT 'vi-VN',
     location_id TEXT DEFAULT 'sa-dec-main',
     order_type TEXT DEFAULT 'dine_in',
