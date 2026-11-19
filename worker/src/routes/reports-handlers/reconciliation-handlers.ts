@@ -1,4 +1,5 @@
 import type { Hono } from 'hono';
+import type { D1Database } from '@cloudflare/workers-types';
 import type { Env } from '../../types/env';
 import { getTenantId } from '../../middleware/tenant';
 import {
@@ -14,6 +15,36 @@ const ICT_OFFSET_MS = 7 * 3600_000;
 function isCashReconciliationEnabled(env: Env | undefined): boolean {
   const flag = String(env?.CASH_RECONCILIATION_ENABLED ?? '').trim().toLowerCase();
   return flag === 'true' || flag === '1';
+}
+
+async function isTenantCashReconciliationOptedOut(
+  env: Env | undefined,
+  db: D1Database,
+  tenantId: string,
+): Promise<boolean> {
+  const disabledEnv = String(env?.CASH_RECONCILIATION_DISABLED_TENANTS ?? '')
+    .split(/[,\s]+/)
+    .map((s) => s.trim())
+    .filter(Boolean);
+  if (disabledEnv.includes(tenantId)) return true;
+  try {
+    // Tenant-specific row wins over the 'default' fallback row.
+    const res = await db
+      .prepare(
+        `SELECT value FROM settings
+         WHERE key = 'cash_reconciliation_enabled'
+           AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') IN (?, 'default')
+         ORDER BY CASE WHEN COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ? THEN 0 ELSE 1 END
+         LIMIT 1`,
+      )
+      .bind(tenantId, tenantId)
+      .all<{ value: string }>();
+    const resolved = res.results?.[0]?.value;
+    if (resolved !== undefined && ['false', '0'].includes(String(resolved).trim().toLowerCase())) return true;
+  } catch {
+    // settings table absent or unreadable → fall back to env flag only
+  }
+  return false;
 }
 
 export function registerReconciliationHandlers(app: Hono<{ Bindings: Env }>) {
@@ -41,6 +72,18 @@ export function registerReconciliationHandlers(app: Hono<{ Bindings: Env }>) {
 
     const authErr = await verifyReportAnalyticsAccess(c);
     if (authErr) return authErr;
+
+    const tenantId = getTenantId(c);
+    if (await isTenantCashReconciliationOptedOut(c.env, c.env.AURA_DB, tenantId)) {
+      return c.json(
+        {
+          success: false,
+          code: 'PILOT_CASH_RECONCILIATION_DISABLED',
+          error: 'Cash reconciliation disabled for tenant',
+        },
+        501,
+      );
+    }
 
     const db = c.env.AURA_DB;
     const tf = buildTenantClause(getTenantId(c));

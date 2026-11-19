@@ -18,6 +18,37 @@ function isCashReconciliationEnabled(env: Record<string, unknown> | undefined): 
   return flag === 'true' || flag === '1';
 }
 
+async function isTenantCashReconciliationOptedOut(
+  env: Record<string, unknown> | undefined,
+  db: { prepare: (sql: string) => { bind: (...args: unknown[]) => { all: <T = unknown>() => Promise<{ results?: T[] | null }> } } },
+  tenantId: string,
+): Promise<boolean> {
+  const disabledTenants = String(env?.CASH_RECONCILIATION_DISABLED_TENANTS ?? '')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
+  if (disabledTenants.includes(tenantId)) return true;
+
+  try {
+    // Tenant-specific row wins over the 'default' fallback row.
+    const res = await db
+      .prepare(
+        `SELECT value FROM settings
+         WHERE key = 'cash_reconciliation_enabled'
+           AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') IN (?, 'default')
+         ORDER BY CASE WHEN COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ? THEN 0 ELSE 1 END
+         LIMIT 1`,
+      )
+      .bind(tenantId, tenantId)
+      .all<{ value: string }>();
+    const resolved = res.results?.[0]?.value;
+    if (resolved !== undefined && ['false', '0'].includes(String(resolved).trim().toLowerCase())) return true;
+  } catch {
+    // settings table absent or unreadable → fall back to env flag only
+  }
+  return false;
+}
+
 function resolveReconciliationTenant(
   c: { req: { header: (k: string) => string | undefined; query: (k: string) => string | undefined }; get: (k: string) => unknown },
   user: Record<string, unknown>
@@ -69,6 +100,17 @@ export function reconciliationRoutes(app: Hono<any>) {
 
     const scope = resolveReconciliationTenant(c, user);
     if (scope.error) return c.json(scope.error.body, scope.error.status);
+
+    if (await isTenantCashReconciliationOptedOut(c.env, c.env.AURA_DB, scope.tenantId!)) {
+      return c.json(
+        {
+          success: false,
+          code: 'PILOT_CASH_RECONCILIATION_DISABLED',
+          error: 'Cash reconciliation disabled for tenant',
+        },
+        501,
+      );
+    }
 
     let body: Record<string, unknown>;
     try {
@@ -128,6 +170,17 @@ export function reconciliationRoutes(app: Hono<any>) {
 
     const scope = resolveReconciliationTenant(c, user);
     if (scope.error) return c.json(scope.error.body, scope.error.status);
+
+    if (await isTenantCashReconciliationOptedOut(c.env, c.env.AURA_DB, scope.tenantId!)) {
+      return c.json(
+        {
+          success: false,
+          code: 'PILOT_CASH_RECONCILIATION_DISABLED',
+          error: 'Cash reconciliation disabled for tenant',
+        },
+        501,
+      );
+    }
 
     const shiftId = c.req.param('id');
     const record = await getReconciliationForShift(c.env, shiftId, scope.tenantId);

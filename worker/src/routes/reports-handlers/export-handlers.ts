@@ -45,12 +45,13 @@ function createCsvResponse(csvString: string, filename: string): Response {
   });
 }
 
+export const VALID_EXPORT_ORDER_SQL =
+  "LOWER(COALESCE(status, '')) NOT IN ('cancelled', 'canceled', 'refunded', 'failed', 'rejected', 'expired') AND LOWER(COALESCE(payment_status, '')) NOT IN ('refunded', 'failed', 'cancelled', 'canceled') AND NOT (COALESCE(total, 0) = 0 AND (COALESCE(customer_name, '') = 'Khách QR - cho don mon' OR COALESCE(items, '') IN ('', '[]')))";
+
 export function registerExportHandlers(app: Hono<{ Bindings: Env }>) {
   const EXPORT_ALLOWED_ROLES = new Set(['owner', 'manager', 'admin']);
-  const VALID_EXPORT_ORDER_SQL =
-    "LOWER(COALESCE(status, '')) NOT IN ('cancelled', 'canceled', 'refunded', 'failed', 'rejected', 'expired') AND LOWER(COALESCE(payment_status, '')) NOT IN ('refunded', 'failed')";
   const VALID_JOINED_ORDER_SQL =
-    "LOWER(COALESCE(o.status, '')) NOT IN ('cancelled', 'canceled', 'refunded', 'failed', 'rejected', 'expired') AND LOWER(COALESCE(o.payment_status, '')) NOT IN ('refunded', 'failed')";
+    "LOWER(COALESCE(o.status, '')) NOT IN ('cancelled', 'canceled', 'refunded', 'failed', 'rejected', 'expired') AND LOWER(COALESCE(o.payment_status, '')) NOT IN ('refunded', 'failed', 'cancelled', 'canceled') AND NOT (COALESCE(o.total, 0) = 0 AND (COALESCE(o.customer_name, '') = 'Khách QR - cho don mon' OR COALESCE(o.items, '') IN ('', '[]')))";
   const VALID_CUSTOMER_EXPORT_PHONE_SQL =
     "TRIM(COALESCE(c.phone, '')) NOT IN ('', '0', '000000000', '0000000000', '00000000000', 'guest', 'walk-in', 'pos')";
 
@@ -175,13 +176,13 @@ export function registerExportHandlers(app: Hono<{ Bindings: Env }>) {
         const res = await db.prepare(
           `SELECT id, customer_name, customer_phone, total, status, payment_method,
                   DATE(datetime(created_at, '+7 hours')) as ict_date, created_at
-           FROM orders WHERE DATE(datetime(created_at, '+7 hours')) BETWEEN ? AND ?${tenantClause} ORDER BY created_at LIMIT 5000`
+           FROM orders WHERE DATE(datetime(created_at, '+7 hours')) BETWEEN ? AND ? AND ${VALID_EXPORT_ORDER_SQL}${tenantClause} ORDER BY created_at LIMIT 5000`
         ).bind(from, to, ...tenantBinds).all<OrderExportRow & { ict_date?: string }>();
         results = res.results || [];
       } catch {
         const res = await db.prepare(
           `SELECT id, customer_name, customer_phone, total, status, payment_method, created_at
-           FROM orders WHERE DATE(created_at) BETWEEN ? AND ?${tenantClause} ORDER BY created_at LIMIT 5000`
+           FROM orders WHERE DATE(created_at) BETWEEN ? AND ? AND ${VALID_EXPORT_ORDER_SQL}${tenantClause} ORDER BY created_at LIMIT 5000`
         ).bind(from, to, ...tenantBinds).all<OrderExportRow>();
         results = res.results || [];
       }

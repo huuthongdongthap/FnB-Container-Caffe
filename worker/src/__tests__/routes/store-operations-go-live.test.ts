@@ -2,15 +2,67 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { Hono } from 'hono';
 import type { Env } from '../../types/env';
 import { createOrder, updateOrder } from '@aura/domain-order';
+import { receivePurchaseOrder } from '@aura/domain-inventory';
 import { reportsRouter } from '../../routes/reports';
 import { reconciliationRoutes } from '@aura/domain-shift';
 import { loginRateLimit, resetLoginRateLimitMemory } from '../../middleware/rate-limit-login';
 import { authEndpointsRouter } from '../../routes/auth-endpoints';
 import { VALID_REVENUE_ORDER_SQL } from '../../routes/reports-handlers/analytics-handlers';
 import { generateJWT } from '../../lib/jwt';
+import { issueStaffSession } from '../../lib/staff-session';
+import { VALID_EXPORT_ORDER_SQL } from '../../routes/reports-handlers/export-handlers';
 
-function createStoreMockDb() {
-  const customers = new Map<string, { id: string; tenant_id: string; loyalty_points: number }>([
+// Minimal SQL literal parser so seeded INSERTs that inline literal values
+// (e.g. INSERT INTO purchase_order_items ... VALUES ('poi_1', ...)) land in the
+// in-memory tables instead of being silently dropped by the mock.
+function splitSqlValues(raw: string): unknown[] {
+  const out: unknown[] = [];
+  let cur = '';
+  let quote: string | null = null;
+  for (let i = 0; i < raw.length; i++) {
+    const ch = raw[i];
+    if (quote) {
+      if (ch === quote) {
+        if (raw[i + 1] === quote) { cur += quote; i++; continue; }
+        quote = null;
+        cur += ch;
+        continue;
+      }
+      cur += ch;
+      continue;
+    }
+    if (ch === "'" || ch === '"') { quote = ch; cur += ch; continue; }
+    if (ch === ',') { out.push(normalizeSqlValue(cur)); cur = ''; continue; }
+    cur += ch;
+  }
+  if (cur.trim() || out.length) out.push(normalizeSqlValue(cur));
+  return out;
+}
+
+function normalizeSqlValue(raw: string): unknown {
+  const s = raw.trim();
+  if (s === '?') return '__ARG__';
+  if ((s.startsWith("'") && s.endsWith("'")) || (s.startsWith('"') && s.endsWith('"'))) return s.slice(1, -1);
+  if (/^-?\d+(\.\d+)?$/.test(s)) return Number(s);
+  if (/^null$/i.test(s)) return null;
+  return s;
+}
+
+function parseInsertRow(sql: string, args: unknown[], table: string): Record<string, unknown> | null {
+  const m = sql.match(new RegExp(`INSERT\\s+INTO\\s+${table}\\s*\\(([^)]*)\\)\\s*VALUES\\s*\\(([\\s\\S]*)\\)`, 'i'));
+  if (!m) return null;
+  const cols = m[1].split(',').map((c) => c.trim()).filter(Boolean);
+  const values = splitSqlValues(m[2]);
+  let argIdx = 0;
+  const row: Record<string, unknown> = {};
+  cols.forEach((col, i) => {
+    const v = values[i];
+    row[col] = v === '__ARG__' ? args[argIdx++] : v;
+  });
+  return row;
+}
+
+export function createStoreMockDb() {  const customers = new Map<string, { id: string; tenant_id: string; loyalty_points: number }>([
     ['cust_sadec_1', { id: 'cust_sadec_1', tenant_id: 'default', loyalty_points: 250 }],
   ]);
   const orders = new Map<string, Record<string, unknown>>();
@@ -30,12 +82,37 @@ function createStoreMockDb() {
     ],
   ]);
   const shiftReconciliations: Array<Record<string, unknown>> = [];
+  const users = new Map<string, Record<string, unknown>>([
+    [
+      'owner_1',
+      {
+        id: 'owner_1',
+        name: 'Chủ quán Sa Đéc',
+        phone: '0909123456',
+        role: 'owner',
+        tenant_id: 'default',
+        is_active: 1,
+        auth_version: 1,
+      },
+    ],
+  ]);
+  const purchaseOrders = new Map<string, Record<string, unknown>>();
+  const purchaseOrderItems = new Map<string, Record<string, unknown>>();
+  const ingredients = new Map<string, Record<string, unknown>>();
+  const stockMovements: Array<Record<string, unknown>> = [];
+  const payments: Array<Record<string, unknown>> = [];
 
   const db = {
     customers,
     orders,
     loyaltyTx,
     shiftReconciliations,
+    users,
+    purchaseOrders,
+    purchaseOrderItems,
+    ingredients,
+    stockMovements,
+    payments,
     async batch(stmts: Array<{ run: () => Promise<unknown> }>) {
       const out = [];
       for (const s of stmts) {
@@ -44,8 +121,9 @@ function createStoreMockDb() {
       return out;
     },
     prepare(sql: string) {
-      return {
-        bind(...args: unknown[]) {
+      // D1 statements may be executed directly (db.prepare(sql).run()) or after
+      // bind(). Both shapes must reach the same handler with the same args.
+      const buildStatement = (args: unknown[]) => {
           const stmt = {
             async first<T = Record<string, unknown>>(): Promise<T | null> {
               if (sql.includes('FROM products WHERE id = ?') || sql.includes('FROM menu_items WHERE id = ?')) {
@@ -72,6 +150,29 @@ function createStoreMockDb() {
                 const o = orders.get(id);
                 return (o ? { ...o } : null) as T | null;
               }
+              if (sql.includes('FROM users WHERE id = ?')) {
+                const id = String(args[0]);
+                const u = users.get(id);
+                return (u ? { ...u } : null) as T | null;
+              }
+              if (sql.includes('FROM purchase_orders WHERE id = ?')) {
+                const id = String(args[0]);
+                const po = purchaseOrders.get(id);
+                return (po ? { ...po } : null) as T | null;
+              }
+              if (sql.includes('FROM purchase_order_items WHERE purchase_order_id = ?')) {
+                const poId = String(args[0]);
+                return { results: (purchaseOrderItems.get(poId) || []) as unknown as T[] };
+              }
+              if (sql.includes('FROM ingredients WHERE id = ?')) {
+                const id = String(args[0]);
+                const ing = ingredients.get(id);
+                return (ing ? { ...ing } : null) as T | null;
+              }
+              if (sql.includes('FROM payments WHERE order_id = ?')) {
+                const ordId = String(args[0]);
+                return { results: payments.filter((p) => p.order_id === ordId) as unknown as T[] };
+              }
               if (sql.includes("FROM loyalty_transactions WHERE order_id = ? AND type = 'redeem'")) {
                 const ordId = String(args[0]);
                 const tx = loyaltyTx.find((t) => t.order_id === ordId && t.type === 'redeem');
@@ -87,18 +188,62 @@ function createStoreMockDb() {
                 const s = shifts.get(id);
                 return (s ? { ...s } : null) as T | null;
               }
+              if (sql.includes('FROM purchase_orders WHERE id = ?')) {
+                const po = purchaseOrders.get(String(args[0]));
+                return (po ? { ...po } : null) as T | null;
+              }
+              if (sql.includes('FROM purchase_order_items WHERE purchase_order_id = ?')) {
+                const poId = String(args[0]);
+                const rows = [...purchaseOrderItems.values()].filter(
+                  (i: Record<string, unknown>) => String(i.purchase_order_id) === poId
+                );
+                return { results: rows.map((r) => ({ ...r })) } as unknown as T;
+              }
+              if (sql.includes('FROM ingredients WHERE id = ?')) {
+                const ing = ingredients.get(String(args[0]));
+                return (ing ? { ...ing } : null) as T | null;
+              }
               if (sql.includes('FROM shift_reconciliations WHERE shift_id = ?')) {
                 const shiftId = String(args[0]);
                 const found = shiftReconciliations.find((r) => r.shift_id === shiftId);
                 return (found ? { ...found } : null) as T | null;
               }
+              if (sql.includes('FROM purchase_order_items WHERE id = ?')) {
+                const id = String(args[0]);
+                const item = [...purchaseOrderItems.values()].find((i: Record<string, unknown>) => String(i.id) === id);
+                return (item ? { ...item } : null) as T | null;
+              }
+              if (sql.includes('FROM purchase_order_items') && sql.includes('purchase_order_id = ?')) {
+                const poId = String(args[0]);
+                const matched = [...purchaseOrderItems.values()].filter((i: Record<string, unknown>) =>
+                  String(i.purchase_order_id) === poId
+                );
+                return { results: matched.map((i) => ({ ...i })) as unknown as T[] };
+              }
               if (sql.includes('FROM payments') && (sql.includes('SUM(') || sql.includes("payment_method = 'cash'"))) {
                 return { total: 350000 } as unknown as T;
+              }
+              if (sql.includes('FROM orders') && sql.includes('SUM(')) {
+                return {
+                  results: [
+                    {
+                      date: '2026-11-18',
+                      total_collected: 110000,
+                      discounts: 45000,
+                      shipping_fee: 0,
+                      service_fee: 0,
+                      tip_amount: 0,
+                    },
+                  ] as unknown as T[],
+                };
               }
               if (sql.includes('FROM cash_payouts')) {
                 return { total: 50000 } as unknown as T;
               }
               return null;
+            },
+            async run(): Promise<{ changes: number; meta: { last_row_id: number } }> {
+              return { changes: 1, meta: { last_row_id: 1 } };
             },
             async all<T = Record<string, unknown>>(): Promise<{ results: T[] }> {
               if (sql.includes('FROM products WHERE id IN') || sql.includes('FROM menu_items WHERE id IN')) {
@@ -120,6 +265,37 @@ function createStoreMockDb() {
                 const o = orders.get(id);
                 return { results: (o ? [{ ...o }] : []) as unknown as T[] };
               }
+              if (sql.includes('FROM orders') && sql.includes('customer_name') && sql.includes('ORDER BY created_at')) {
+                // Row-level export SELECT: apply the same WHERE clauses SQLite would,
+                // but only the ones present in the SQL text the handler actually sent.
+                const from = String(args[0]);
+                const to = String(args[1]);
+                const badStatuses = ['cancelled', 'canceled', 'refunded', 'failed', 'rejected', 'expired'];
+                const badPayStatuses = ['refunded', 'failed', 'cancelled', 'canceled'];
+                const enforcesValidity = sql.includes("'cancelled'") && sql.includes('payment_status');
+                const matched = [...orders.values()].filter((o) => {
+                  const raw = String(o.created_at || '');
+                  const utcMs = Date.parse(raw.includes('T') ? raw : `${raw.replace(' ', 'T')}Z`);
+                  const ictDate = new Date(utcMs + 7 * 3600_000).toISOString().slice(0, 10);
+                  if (!(ictDate >= from && ictDate <= to)) return false;
+                  if (!enforcesValidity) return true;
+                  if (badStatuses.includes(String(o.status || '').toLowerCase())) return false;
+                  if (badPayStatuses.includes(String(o.payment_status || '').toLowerCase())) return false;
+                  const isQrPlaceholder =
+                    String(o.customer_name || '') === 'Khách QR - cho don mon' ||
+                    ['', '[]'].includes(String(o.items ?? ''));
+                  if (Number(o.total || 0) === 0 && isQrPlaceholder) return false;
+                  return true;
+                });
+                return {
+                  results: matched.map((o) => ({
+                    ...o,
+                    ict_date: new Date(
+                      Date.parse(String(o.created_at).includes('T') ? String(o.created_at) : `${String(o.created_at).replace(' ', 'T')}Z`) + 7 * 3600_000
+                    ).toISOString().slice(0, 10),
+                  })) as unknown as T[],
+                };
+              }
               if (sql.includes('FROM orders') && sql.includes("DATE(datetime(created_at, '+7 hours')) BETWEEN ? AND ?")) {
                 const from = String(args[0]);
                 const to = String(args[1]);
@@ -138,6 +314,25 @@ function createStoreMockDb() {
                   };
                 }
 
+                if (sql.includes('SUM(')) {
+                  const totalCollected = matched.reduce((acc, o) => acc + Number(o.total || 0), 0);
+                  const shippingFee = matched.reduce((acc, o) => acc + Number(o.shipping_fee || 0), 0);
+                  const serviceFee = matched.reduce((acc, o) => acc + Number(o.service_fee || 0), 0);
+                  const tipAmount = matched.reduce((acc, o) => acc + Number(o.tip_amount || 0), 0);
+                  const discounts = matched.reduce((acc, o) => acc + Number(o.discount || 0), 0);
+                  return {
+                    results: [{
+                      date: (matched[0]?.created_at ? new Date(Date.parse(String(matched[0].created_at).includes('T') ? String(matched[0].created_at) : `${String(matched[0].created_at).replace(' ', 'T')}Z`) + 7 * 3600_000).toISOString().slice(0, 10) : ''),
+                      orders: matched.length,
+                      total_collected: totalCollected,
+                      shipping_fee: shippingFee,
+                      service_fee: serviceFee,
+                      tip_amount: tipAmount,
+                      discounts: discounts,
+                    }] as unknown as T[],
+                  };
+                }
+
                 const byDate = new Map<string, { date: string; orders: number; net_revenue: number; discounts: number }>();
                 for (const o of matched) {
                   const raw = String(o.created_at || '');
@@ -151,13 +346,38 @@ function createStoreMockDb() {
                 }
                 return { results: [...byDate.values()] as unknown as T[] };
               }
+              if (sql.includes('FROM purchase_order_items WHERE purchase_order_id = ?')) {
+                const poId = String(args[0]);
+                const matched = [...purchaseOrderItems.values()].filter((i) => String(i.purchase_order_id) === poId);
+                return { results: matched.map((i) => ({ ...i })) as unknown as T[] };
+              }
+              if (sql.includes('FROM purchase_order_items WHERE id = ?')) {
+                const item = purchaseOrderItems.get(String(args[0]));
+                return { results: (item ? [{ ...item }] : []) as unknown as T[] };
+              }
               if (sql.includes('FROM inventory_transactions t')) {
                 return {
                   results: [{ date: '2026-11-18', cogs: 24000, waste_cost: 3000 }] as unknown as T[],
                 };
               }
               if (sql.includes('FROM refunds r')) {
-                return { results: [] };
+                // Simulate a deployment without the standalone refunds table so the
+                // handler falls back to the payments refund ledger.
+                throw new Error('no such table: refunds');
+              }
+              if (sql.includes('FROM payments') && sql.includes('refund_amount')) {
+                const byDate = new Map<string, { date: string; refunds: number }>();
+                for (const p of payments) {
+                  if (Number(p.refund_amount || 0) <= 0) continue;
+                  const raw = String(p.created_at || '');
+                  const utcMs = Date.parse(raw.includes('T') ? raw : `${raw.replace(' ', 'T')}Z`);
+                  if (!Number.isFinite(utcMs)) continue;
+                  const ictDate = new Date(utcMs + 7 * 3600_000).toISOString().slice(0, 10);
+                  const cur = byDate.get(ictDate) || { date: ictDate, refunds: 0 };
+                  cur.refunds += Number(p.refund_amount || 0);
+                  byDate.set(ictDate, cur);
+                }
+                return { results: [...byDate.values()] as unknown as T[] };
               }
               if (sql.includes('FROM shift_reconciliations')) {
                 return { results: shiftReconciliations as unknown as T[] };
@@ -197,6 +417,21 @@ function createStoreMockDb() {
               if (sql.includes('INSERT INTO orders')) {
                 const hasLoyaltyCol = sql.includes('loyalty_points_redeemed');
                 const id = String(args[0]);
+                // Literal-aware parse handles both bound domain inserts and raw test
+                // seeds that inline literal values. Normalize numeric/date fields after.
+                const parsed = parseInsertRow(sql, args, 'orders');
+                if (parsed) {
+                  const row = parsed;
+                  row.total = Number(row.total || 0);
+                  row.shipping_fee = Number(row.shipping_fee || 0);
+                  row.service_fee = Number(row.service_fee || 0);
+                  row.tip_amount = Number(row.tip_amount || 0);
+                  row.discount = Number(row.discount || 0);
+                  row.tenant_id = row.tenant_id ?? 'default';
+                  orders.set(String(row.id ?? id), row);
+                  return { meta: { changes: 1 } };
+                }
+                // Fallback: domain createOrder positional shape (all values bound).
                 orders.set(id, {
                   id,
                   items: args[1],
@@ -213,6 +448,79 @@ function createStoreMockDb() {
                   tenant_id: hasLoyaltyCol ? args[20] : args[19],
                   created_at: '2026-11-18T15:30:00.000Z',
                 });
+                return { meta: { changes: 1 } };
+              }
+              if (sql.includes('INSERT INTO purchase_orders')) {
+                const row = parseInsertRow(sql, args, 'purchase_orders');
+                if (!row) return { meta: { changes: 0 } };
+                purchaseOrders.set(String(row.id), row);
+                return { meta: { changes: 1 } };
+              }
+              if (sql.includes('INSERT INTO purchase_order_items')) {
+                const row = parseInsertRow(sql, args, 'purchase_order_items');
+                if (!row) return { meta: { changes: 0 } };
+                row.received_quantity = Number(row.received_quantity || 0);
+                row.quantity = Number(row.quantity || 0);
+                row.unit_price = Number(row.unit_price || 0);
+                purchaseOrderItems.set(String(row.id), row);
+                return { meta: { changes: 1 } };
+              }
+              if (sql.includes('UPDATE purchase_order_items SET received_quantity = COALESCE(received_quantity, 0) + ?')) {
+                // Atomic relative increment: args = [addQty, id, addQty(guard), ...]
+                const addQty = Number(args[0]);
+                const id = String(args[1]);
+                const item = purchaseOrderItems.get(id);
+                if (!item) return { meta: { changes: 0 } };
+                const next = Number(item.received_quantity || 0) + addQty;
+                if (next > Number(item.quantity || 0)) return { meta: { changes: 0 } };
+                item.received_quantity = next;
+                return { meta: { changes: 1 } };
+              }
+              if (sql.includes('UPDATE purchase_orders SET status = ?')) {
+                const id = String(args[2]);
+                const po = purchaseOrders.get(id);
+                if (!po) return { meta: { changes: 0 } };
+                po.status = String(args[0]);
+                return { meta: { changes: 1 } };
+              }
+              if (sql.includes('UPDATE ingredients SET current_stock = current_stock + ?')) {
+                const addQty = Number(args[0]);
+                const id = String(args[3]);
+                const ing = ingredients.get(id);
+                if (ing) {
+                  ing.current_stock = Number(ing.current_stock || 0) + addQty;
+                  return { meta: { changes: 1 } };
+                }
+                return { meta: { changes: 0 } };
+              }
+              if (sql.includes('INSERT INTO stock_movements')) {
+                stockMovements.push({
+                  id: args[0],
+                  ingredient_id: args[1],
+                  type: args[2],
+                  quantity: args[3],
+                  reference_id: args[4],
+                  reference_type: args[5],
+                  tenant_id: args[9] ?? 'default',
+                });
+                return { meta: { changes: 1 } };
+              }
+              if (sql.includes('INSERT INTO payments')) {
+                // Literal-aware parse so seeds that inline refund_amount/created_at
+                // are not shifted by the bound-args-only positional mapping.
+                const parsed = parseInsertRow(sql, args, 'payments');
+                if (parsed) {
+                  parsed.refund_amount = Number(parsed.refund_amount || 0);
+                  payments.push(parsed);
+                  return { meta: { changes: 1 } };
+                }
+                const colsMatch = sql.match(/INSERT INTO payments\s*\(([^)]*)\)/i);
+                const cols = (colsMatch?.[1] || '').split(',').map((c) => c.trim()).filter(Boolean);
+                const row: Record<string, unknown> = {};
+                cols.forEach((col, i) => {
+                  row[col] = args[i];
+                });
+                payments.push(row);
                 return { meta: { changes: 1 } };
               }
               if (sql.includes('UPDATE orders SET') && sql.includes('status = ?')) {
@@ -246,6 +554,14 @@ function createStoreMockDb() {
             },
           };
           return stmt;
+      };
+      const direct = buildStatement([]);
+      return {
+        first: direct.first,
+        run: direct.run,
+        all: direct.all,
+        bind(...args: unknown[]) {
+          return buildStatement(args);
         },
       };
     },
@@ -556,5 +872,188 @@ describe('Store Operations Go-Live Readiness Suite', () => {
     expect(VALID_REVENUE_ORDER_SQL).toContain("Khách QR - cho don mon");
     expect(VALID_REVENUE_ORDER_SQL).toContain("'cancelled'");
     expect(VALID_REVENUE_ORDER_SQL).toContain("'canceled'");
+  });
+
+  // ── Phase 37: Lượt 10 integration suite ──────────────────────────────
+
+  describe('Lượt 10 integration', () => {
+    const setupStoreDb = () => createStoreMockDb();
+
+    it('per-store cash reconciliation opt-out returns 501 PILOT_CASH_RECONCILIATION_DISABLED while default store succeeds', async () => {
+      const tenantDisabled = 'store-cantho';
+      const env = {
+        CASH_RECONCILIATION_ENABLED: 'true',
+        CASH_RECONCILIATION_DISABLED_TENANTS: tenantDisabled,
+        JWT_SECRET: 'test-secret-16-chars',
+        AURA_DB: setupStoreDb() as unknown as Env['AURA_DB'],
+      } as unknown as Record<string, unknown>;
+      const ownerToken = await generateJWT(
+        { sub: 'owner_1', role: 'owner', tenant_id: '*' },
+        'test-secret-16-chars',
+        3600
+      );
+
+      const app = new Hono<{ Bindings: Env }>();
+      app.use('*', async (c, next) => {
+        c.set('user', { id: 'owner_1', role: 'owner', tenant_id: '*' });
+        await next();
+      });
+      reconciliationRoutes(app);
+      const recReq = new Request(
+        'https://auraspace.cafe/api/shifts/shift_evening_1/reconcile',
+        { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Tenant-ID': 'store-cantho', Authorization: `Bearer ${ownerToken}` } }
+      );
+      const res = await app.request(recReq, undefined, env as never);
+      // Opted-out store returns 501
+      expect(res.status).toBe(501);
+      const body = (await res.json()) as { code?: string };
+      expect(body.code).toBe('PILOT_CASH_RECONCILIATION_DISABLED');
+
+      // Default store (not in disabled list) proceeds
+      const defaultEnv = {
+        ...env,
+        CASH_RECONCILIATION_DISABLED_TENANTS: '',
+        AURA_DB: setupStoreDb() as unknown as Env['AURA_DB'],
+      } as unknown as Record<string, unknown>;
+      const defaultApp = new Hono<{ Bindings: Env }>();
+      defaultApp.use('*', async (c, next) => {
+        c.set('user', { id: 'owner_1', role: 'owner', tenant_id: '*' });
+        await next();
+      });
+      reconciliationRoutes(defaultApp);
+      const defaultReq = new Request(
+        'https://auraspace.cafe/api/shifts/shift_evening_1/reconcile',
+        { method: 'POST', headers: { 'Content-Type': 'application/json' } }
+      );
+      const defaultRes = await defaultApp.request(defaultReq, undefined, defaultEnv as never);
+      expect(defaultRes.status).not.toBe(501);
+    });
+
+    it('/api/reports/pnl separates pure F&B net_revenue from pass-through fees and aggregates refunded payments when no refunds table', async () => {
+      const db = setupStoreDb();
+      // Seed orders with fees + a refunded payment (no standalone refunds table)
+      const now = new Date('2026-11-18T12:00:00.000Z').toISOString();
+      await db.prepare(
+        "INSERT INTO orders (id, tenant_id, status, payment_status, total, shipping_fee, service_fee, tip_amount, discount, created_at) VALUES (?, 'default', 'completed', 'completed', 150000, 15000, 10000, 5000, 10000, ?)"
+      ).bind('order_pnl_1', now).run();
+      await db.prepare(
+        "INSERT INTO orders (id, tenant_id, status, payment_status, total, shipping_fee, service_fee, tip_amount, discount, created_at) VALUES (?, 'default', 'completed', 'completed', 100000, 0, 0, 0, 0, ?)"
+      ).bind('order_pnl_2', now).run();
+      await db.prepare(
+        "INSERT INTO payments (id, order_id, tenant_id, refund_amount, refund_status, created_at) VALUES (?, 'order_pnl_2', 'default', 40000, 'refunded', ?)"
+      ).bind('payment_pnl_2', now).run();
+
+      const env = {
+        AURA_DB: db as unknown as Env['AURA_DB'],
+        JWT_SECRET: 'test-secret-16-chars',
+      } as unknown as Record<string, unknown>;
+
+      const { token: ownerToken } = await issueStaffSession(
+        env as { JWT_SECRET: string },
+        { id: 'owner_1', name: 'Chủ quán Sa Đéc', phone: '0909123456', role: 'owner', tenant_id: 'default', is_active: 1, auth_version: 1 },
+        { sessionType: 'staff-web' }
+      );
+
+      const app = new Hono<{ Bindings: Env }>();
+      app.route('/api/reports', reportsRouter);
+      const res = await app.request(
+        'https://auraspace.cafe/api/reports/pnl?from=2026-11-18&to=2026-11-18',
+        {
+          headers: { Authorization: `Bearer ${ownerToken}`, 'X-Tenant-Id': 'default' },
+        },
+        env as never
+      );
+      expect(res.status).toBe(200);
+      const body = (await res.json()) as {
+        data: {
+          daily: Array<{ net_revenue: number; shipping_fee: number; service_fee: number; tip_amount: number; total_collected: number; refunds: number; gross_sales: number }>;
+          totals: { net_revenue: number; shipping_fee: number; service_fee: number; tip_amount: number; total_collected: number; refunds: number; gross_sales: number };
+        };
+      };
+      const day = body.data.daily.find((d) => d.date === '2026-11-18');
+      expect(day?.total_collected).toBe(250000);
+      expect(day?.shipping_fee).toBe(15000);
+      expect(day?.service_fee).toBe(10000);
+      expect(day?.tip_amount).toBe(5000);
+      // pure F&B net_revenue = total_collected - shipping - service - tip
+      expect(day?.net_revenue).toBe(Math.max(0, 250000 - 15000 - 10000 - 5000));
+      // gross_sales = net_revenue + discounts
+      expect(day?.gross_sales).toBe((day?.net_revenue ?? 0) + 10000);
+      // refund aggregated from payments (no refunds table)
+      expect(day?.refunds).toBe(40000);
+      expect(body.data.totals.refunds).toBe(40000);
+    });
+
+    it('domain receivePurchaseOrder uses atomic relative COALESCE(received_quantity, 0) + ?', async () => {
+      const db = setupStoreDb();
+      await db.prepare(
+        "INSERT INTO purchase_orders (id, tenant_id, status, total_amount, created_at) VALUES ('po_atomic_1', 'default', 'pending', 200000, ?)"
+      ).bind(new Date('2026-11-18T08:00:00.000Z').toISOString()).run();
+      await db.prepare(
+        "INSERT INTO purchase_order_items (id, purchase_order_id, ingredient_id, quantity, unit_price, total_price, received_quantity) VALUES ('poi_atomic_1', 'po_atomic_1', 'ing_atomic_1', 10, 20000, 200000, 2)"
+      ).run();
+
+      const result = await receivePurchaseOrder(
+        db as unknown as Parameters<typeof receivePurchaseOrder>[0],
+        'po_atomic_1',
+        [{ ingredientId: 'ing_atomic_1', receivedQuantity: 3 }],
+        { tenantId: 'default' }
+      );
+      expect(result.ok).toBe(true);
+      expect(result.status).toBe('partially_received');
+
+      const row = await db.prepare('SELECT received_quantity FROM purchase_order_items WHERE id = ?').bind('poi_atomic_1').first();
+      expect(Number((row as { received_quantity: number })?.received_quantity)).toBe(5);
+    });
+
+    it('/api/reports/export excludes 0đ QR check-in placeholder rows and cancelled payment_status', async () => {
+      const db = setupStoreDb();
+      await db.prepare(
+        "INSERT INTO orders (id, tenant_id, status, payment_status, total, customer_name, items, created_at) VALUES ('export_qr_1', 'default', 'completed', 'completed', 0, 'Khách QR - cho don mon', '', ?)"
+      ).bind(new Date('2026-11-18T09:00:00.000Z').toISOString()).run();
+      await db.prepare(
+        "INSERT INTO orders (id, tenant_id, status, payment_status, total, customer_name, items, created_at) VALUES ('export_cancel_1', 'default', 'cancelled', 'cancelled', 100000, 'Khách hàng', '[]', ?)"
+      ).bind(new Date('2026-11-18T09:05:00.000Z').toISOString()).run();
+      await db.prepare(
+        "INSERT INTO orders (id, tenant_id, status, payment_status, total, customer_name, items, created_at) VALUES ('export_ok_1', 'default', 'completed', 'completed', 150000, 'Khách thật', '[{\"id\":\"p1\"}]', ?)"
+      ).bind(new Date('2026-11-18T09:10:00.000Z').toISOString()).run();
+
+      const env = {
+        AURA_DB: db as unknown as Env['AURA_DB'],
+        JWT_SECRET,
+      } as unknown as Record<string, unknown>;
+
+      const { token: ownerToken } = await issueStaffSession(
+        env as { JWT_SECRET: string },
+        { id: 'owner_1', name: 'Chủ quán Sa Đéc', phone: '0909123456', role: 'owner', tenant_id: 'default', is_active: 1, auth_version: 1 },
+        { sessionType: 'staff-web' }
+      );
+
+      const app2 = new Hono<{ Bindings: Env }>();
+      app2.route('/api/reports', reportsRouter);
+      const res = await app2.request('https://auraspace.cafe/api/reports/export?type=orders&from=2026-11-18&to=2026-11-18', {
+        headers: { Authorization: `Bearer ${ownerToken}` },
+      }, env);
+      expect(res.status).toBe(200);
+      expect(res.headers.get('content-type') || '').toContain('text/csv');
+      // CSV body: BOM + header row + one row per surviving order.
+      const csv = (await res.text()).replace(/^﻿/, '').trim();
+      const lines = csv.split('\n');
+      expect(lines[0]).toContain('id');
+      const body = lines.slice(1).join('\n');
+      expect(body).not.toContain('export_qr_1');
+      expect(body).not.toContain('export_cancel_1');
+      expect(body).toContain('export_ok_1');
+    });
+  });
+
+  describe('Lượt 10 validation', () => {
+    it('VALID_EXPORT_ORDER_SQL excludes cancelled/canceled payment_status and 0đ QR placeholders', () => {
+      // VALID_EXPORT_ORDER_SQL imported at top of file
+      expect(VALID_EXPORT_ORDER_SQL).toContain("'cancelled'");
+      expect(VALID_EXPORT_ORDER_SQL).toContain("'canceled'");
+      expect(VALID_EXPORT_ORDER_SQL).toContain("Khách QR - cho don mon");
+      expect(VALID_EXPORT_ORDER_SQL).toContain("COALESCE(total, 0) = 0");
+    });
   });
 });
