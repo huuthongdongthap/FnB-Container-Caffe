@@ -4,7 +4,6 @@ import { useTranslation } from 'react-i18next';
 import { HelmetHead } from '@/components/seo/HelmetHead';
 import { StitchMobileOrderNew, type CartItem } from '@/components/stitch';
 import { useOrderStore } from '@/hooks/stores/use-order-store';
-import { API_BASE } from '@/lib/api-client';
 
 function normalizePhone(raw: string): string {
   return raw.replace(/\D/g, '');
@@ -42,41 +41,13 @@ export function OrderPage() {
     async (cart: CartItem[]) => {
       setSubmitError(null);
 
-      if (isTableMode && !validateCustomerForm()) {
+      if (!validateCustomerForm()) {
         return;
       }
 
       setIsSubmitting(true);
 
       try {
-        // Guest check-in for QR table mode — resolves table occupancy first
-        if (isTableMode && tableId) {
-          const checkinRes = await fetch(
-            `${API_BASE}/api/orders/guest-checkin`,
-            {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                customer_name: guestName.trim(),
-                customer_phone: normalizePhone(guestPhone).trim(),
-                table_id: tableId,
-              }),
-            },
-          );
-
-          if (checkinRes.status === 404) {
-            setSubmitError('Mã QR không hợp lệ');
-            setIsSubmitting(false);
-            return;
-          }
-          if (!checkinRes.ok && checkinRes.status !== 409) {
-            const body = await checkinRes.json().catch(() => ({}));
-            throw new Error(
-              body.message || `Lỗi xác nhận bàn (${checkinRes.status})`,
-            );
-          }
-        }
-
         const total = cart.reduce(
           (sum, item) => sum + item.price * item.quantity,
           0,
@@ -91,8 +62,9 @@ export function OrderPage() {
           total,
           customer_name: guestName.trim(),
           customer_phone: normalizePhone(guestPhone).trim(),
-          customer_address: undefined,
-          payment_method: 'qr',
+          customer_address: '',
+          order_type: (isTableMode ? 'dine_in' : 'takeaway') as 'dine_in' | 'takeaway',
+          payment_method: 'payos' as const,
           table_id: isTableMode ? tableId : undefined,
         };
 
@@ -102,9 +74,11 @@ export function OrderPage() {
           (raw as { data?: { id?: string }; id?: string } | null)?.data ??
           raw;
         if (order?.id) {
-          navigate(`/order-success?order_id=${order.id}`);
+          navigate(`/order-success?order_id=${encodeURIComponent(order.id)}`);
+        } else if (useOrderStore.getState().queuedOffline) {
+          setSubmitError('Bạn đang offline. Đơn hàng sẽ được lưu và gửi khi có mạng.');
         } else {
-          throw new Error('Không nhận được mã đơn hàng');
+          throw new Error(useOrderStore.getState().error || 'Không nhận được mã đơn hàng');
         }
       } catch (err) {
         const msg =

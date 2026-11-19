@@ -4,6 +4,7 @@ import { getTenantId, isHQSuperAdmin, matchesTenantRow } from '../../middleware/
 import type { Env } from '../../types/env';
 import {
   findPromoForTenant,
+  isPubliclyActivePromotion,
   resolvePromoReadTenantId,
   resolvePromoWriteTenantId,
   validatePromotionNumericAndDateBounds,
@@ -12,17 +13,59 @@ import type { CreatePromotionInput } from './types';
 
 const PROMO_ADMIN_ROLES = ['owner', 'manager', 'admin'];
 const PROMO_READ_STAFF_ROLES = ['owner', 'manager', 'supervisor', 'admin', 'staff', 'cashier', 'waiter'];
+const PROMO_PUBLIC_READ_ROLES = [...PROMO_READ_STAFF_ROLES, 'customer'];
+
+function isStaffPromoReader(c: { get?: (k: string) => unknown }): boolean {
+  const user = (typeof c.get === 'function' ? c.get('user') : undefined) as { role?: string } | undefined;
+  const role = String(user?.role || '').trim().toLowerCase();
+  return Boolean(role && PROMO_READ_STAFF_ROLES.includes(role));
+}
 
 function verifyPromoCallerTenant(
   c: Parameters<typeof getTenantId>[0] & { json: (data: unknown, status?: number) => Response },
   allowedRoles: string[],
   requireUser: boolean,
 ): Response | null {
+  const candidateOverrides = [
+    c.req?.query?.('tenant_id'),
+    c.req?.query?.('tenantId'),
+    c.req?.query?.('store_id'),
+    c.req?.query?.('storeId'),
+    c.req?.header?.('X-Tenant-ID'),
+    c.req?.header?.('x-tenant-id'),
+    c.req?.header?.('X-Store-ID'),
+    c.req?.header?.('x-store-id'),
+  ]
+    .map((v) => (typeof v === 'string' ? v.trim() : ''))
+    .filter(Boolean);
+  if (new Set(candidateOverrides).size > 1) {
+    return c.json({ success: false, error: 'Không đủ quyền truy cập chi nhánh khác' }, 403);
+  }
+  const reqTenant = candidateOverrides[0] || '';
+  const pinnedPilotTenant = String(
+    ((c as unknown as { env?: Record<string, unknown> }).env?.PILOT_TENANT_ID as string | undefined) ?? '',
+  ).trim();
+
   const user = (typeof c.get === 'function' ? c.get('user') : undefined) as
     | { id?: string; role?: string; tenantId?: string; tenant_id?: string }
     | undefined;
   if (!user || !user.role) {
-    return requireUser ? c.json({ success: false, error: 'Unauthorized — vui lòng đăng nhập' }, 401) : null;
+    if (requireUser) {
+      return c.json({ success: false, error: 'Unauthorized — vui lòng đăng nhập' }, 401);
+    }
+    if (reqTenant === '*' || reqTenant.toLowerCase() === 'hq') {
+      return c.json({ success: false, error: 'Không đủ quyền truy cập chi nhánh khác' }, 403);
+    }
+    if (
+      pinnedPilotTenant &&
+      pinnedPilotTenant !== '*' &&
+      pinnedPilotTenant.toLowerCase() !== 'hq' &&
+      reqTenant &&
+      reqTenant !== pinnedPilotTenant
+    ) {
+      return c.json({ success: false, error: 'Không đủ quyền truy cập chi nhánh khác' }, 403);
+    }
+    return null;
   }
   const role = String(user.role).toLowerCase();
   if (!allowedRoles.includes(role)) {
@@ -32,17 +75,6 @@ function verifyPromoCallerTenant(
   const isWildcardHQ = (role === 'owner' || role === 'admin') && (userTenant === '*' || userTenant.toLowerCase() === 'hq');
   const hqAdmin = isHQSuperAdmin(c as Parameters<typeof isHQSuperAdmin>[0]) || isHQSuperAdmin(user) || isWildcardHQ;
   const boundTenant = userTenant || 'default';
-  const reqTenant = (
-    c.req?.query?.('tenant_id') ||
-    c.req?.query?.('tenantId') ||
-    c.req?.query?.('store_id') ||
-    c.req?.query?.('storeId') ||
-    c.req?.header?.('X-Tenant-ID') ||
-    c.req?.header?.('x-tenant-id') ||
-    c.req?.header?.('X-Store-ID') ||
-    c.req?.header?.('x-store-id') ||
-    ''
-  ).trim();
   const ctxTenant = (typeof c.get === 'function' ? (c.get('tenantId') as string | undefined) : undefined)?.trim() || '';
   const resolvedTenant = getTenantId(c).trim() || 'default';
 
@@ -82,11 +114,12 @@ const requirePromoAdminAuth: import('hono').MiddlewareHandler<{ Bindings: Env }>
 
 export function registerPromotionAdminHandlers(router: Hono<{ Bindings: Env }>): void {
   router.get('/', optionalAuth(), async (c) => {
-    const tenantCheck = verifyPromoCallerTenant(c, PROMO_READ_STAFF_ROLES, false);
+    const tenantCheck = verifyPromoCallerTenant(c, PROMO_PUBLIC_READ_ROLES, false);
     if (tenantCheck) return tenantCheck;
 
     const db = c.env.AURA_DB;
     const tenantId = resolvePromoReadTenantId(c);
+    const staffCaller = isStaffPromoReader(c);
     let results: unknown[] = [];
     if (tenantId !== '*') {
       try {
@@ -109,6 +142,10 @@ export function registerPromotionAdminHandlers(router: Hono<{ Bindings: Env }>):
       );
       results = res.results || [];
     }
+    if (!staffCaller) {
+      const nowMs = Date.now();
+      results = (results as Array<Record<string, unknown>>).filter((r) => isPubliclyActivePromotion(r, nowMs));
+    }
     return c.json({ success: true, data: results, promotions: results });
   });
 
@@ -118,11 +155,12 @@ export function registerPromotionAdminHandlers(router: Hono<{ Bindings: Env }>):
       await next();
       return;
     }
-    const tenantCheck = verifyPromoCallerTenant(c, PROMO_READ_STAFF_ROLES, false);
+    const tenantCheck = verifyPromoCallerTenant(c, PROMO_PUBLIC_READ_ROLES, false);
     if (tenantCheck) return tenantCheck;
 
     const db = c.env.AURA_DB;
     const tenantId = resolvePromoReadTenantId(c);
+    const staffCaller = isStaffPromoReader(c);
     let promo = await findPromoForTenant(db, code, tenantId);
     if (!promo && code === 'WELCOME') {
       promo = {
@@ -130,7 +168,9 @@ export function registerPromotionAdminHandlers(router: Hono<{ Bindings: Env }>):
         min_order: 0, usage_limit: 0, usage_count: 0, starts_at: null, expires_at: null, is_active: 1,
       };
     }
-    if (!promo) return c.json({ success: false, error: 'Không tìm thấy khuyến mãi' }, 404);
+    if (!promo || (!staffCaller && !isPubliclyActivePromotion(promo))) {
+      return c.json({ success: false, error: 'Không tìm thấy khuyến mãi' }, 404);
+    }
     return c.json({ success: true, data: promo, promotion: promo });
   });
 

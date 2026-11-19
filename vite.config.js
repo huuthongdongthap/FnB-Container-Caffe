@@ -3,8 +3,9 @@ import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
 import { resolve } from 'path';
 import { existsSync, copyFileSync } from 'fs';
+import { fileURLToPath } from 'url';
 
-const __rootDir = new URL('.', import.meta.url).pathname;
+const __rootDir = fileURLToPath(new URL('.', import.meta.url));
 
 // The config module loads before Vite's own env system is up, so import.meta.env
 // is undefined here. loadEnv reads .env* directly and is the only supported way

@@ -2,11 +2,22 @@
 set -euo pipefail
 
 # F&B Caffe Container — Cloudflare Deploy Script
-# Usage: bash deploy-cloudflare.sh [--worker-only | --pages-only] [--skip-tests] [--skip-migrations] [--migration-file=<name.sql>] [--skip-verify]
+# Usage: bash deploy-cloudflare.sh [--worker-only | --pages-only] [--skip-tests] [--skip-git-check]
+#                                  [--skip-migrations] [--migration-file=<name.sql>] [--skip-verify]
+#                                  [--backup-d1] [--verify-d1-schema] [--allow-diverged-branch]
 #
 # Normal deploys NEVER auto-run historical D1 migrations (fail-closed against
 # destructive table-rebuild replay when no verified D1 migration ledger exists).
 # To apply a specific forward migration during deploy, pass --migration-file=<name.sql>.
+#
+# Unless --skip-tests is passed, the pre-deploy gate runs the full quality suite
+# (lint, lint:migrations, check:contrast, typecheck:all, unit tests, payment loop).
+# Unless --skip-git-check is passed, a clean working tree and a branch that
+# contains origin/main are required, so a deploy cannot ship a stale or
+# diverged commit. D1 migrations always run before the Worker and Pages deploys.
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$SCRIPT_DIR"
 
 WORKER_DIR="worker"
 DIST_DIR="dist"
@@ -15,8 +26,12 @@ MIGRATIONS_DIR="worker/db/migrations"
 WORKER_ONLY=false
 PAGES_ONLY=false
 SKIP_TESTS=false
+SKIP_GIT_CHECK=false
 SKIP_MIGRATIONS=false
 SKIP_VERIFY=false
+BACKUP_D1=false
+VERIFY_D1_SCHEMA=false
+ALLOW_DIVERGED_BRANCH=false
 REQUESTED_BULK_MIGRATIONS=false
 MIGRATION_FILES=()
 
@@ -92,6 +107,22 @@ while [[ $# -gt 0 ]]; do
       SKIP_TESTS=true
       shift
       ;;
+    --skip-git-check)
+      SKIP_GIT_CHECK=true
+      shift
+      ;;
+    --allow-diverged-branch)
+      ALLOW_DIVERGED_BRANCH=true
+      shift
+      ;;
+    --backup-d1)
+      BACKUP_D1=true
+      shift
+      ;;
+    --verify-d1-schema)
+      VERIFY_D1_SCHEMA=true
+      shift
+      ;;
     --skip-migrations)
       SKIP_MIGRATIONS=true
       shift
@@ -140,18 +171,120 @@ fi
 
 echo "=== F&B Caffe Container — Deploy ==="
 
-# ── 0. Pre-deploy test gate ────────────────────────────────────────────────
-if [[ "$SKIP_TESTS" == "false" ]]; then
-  echo "[0/3] Running tests..."
-  npm test 2>&1 | tail -20
-  echo "Tests passed."
+# ── 0. Git hygiene gate ────────────────────────────────────────────────────
+# Runs only inside a real git checkout; the offline deploy simulation harness
+# copies this script into a bare temp directory and must still execute.
+if [[ -e "${SCRIPT_DIR}/.git" && "$SKIP_GIT_CHECK" == "false" ]]; then
+  echo "[0/5] Git pre-flight checks..."
+
+  if [[ -n "$(git status --porcelain)" ]]; then
+    echo "ERROR: Working tree has uncommitted changes. Commit them before deploying so the live version matches a real commit." >&2
+    git status --short | head -20 >&2
+    exit 1
+  fi
+
+  CURRENT_BRANCH="$(git rev-parse --abbrev-ref HEAD)"
+  echo "  Branch: ${CURRENT_BRANCH}"
+
+  if git rev-parse --verify --quiet origin/main >/dev/null; then
+    if ! git merge-base --is-ancestor origin/main HEAD; then
+      if [[ "$ALLOW_DIVERGED_BRANCH" == "true" ]]; then
+        echo "  WARNING: Branch does not contain origin/main (--allow-diverged-branch)."
+      else
+        echo "ERROR: Branch '${CURRENT_BRANCH}' does not contain origin/main. Merge or rebase origin/main first so the pull request stays mergeable." >&2
+        echo "       Override intentionally with --allow-diverged-branch." >&2
+        exit 1
+      fi
+    else
+      echo "  origin/main is contained in HEAD"
+    fi
+  else
+    echo "  origin/main not fetched; skipping ancestry check (run 'git fetch origin main' to enable it)"
+  fi
+
+  if git rev-parse --verify --quiet "origin/${CURRENT_BRANCH}" >/dev/null; then
+    if [[ "$(git rev-parse "origin/${CURRENT_BRANCH}")" != "$(git rev-parse HEAD)" ]]; then
+      if [[ "$ALLOW_DIVERGED_BRANCH" == "true" ]]; then
+        echo "  WARNING: Local HEAD is not pushed to origin/${CURRENT_BRANCH} (--allow-diverged-branch)."
+      else
+        echo "ERROR: HEAD is not pushed to origin/${CURRENT_BRANCH}. Push first, otherwise the deployed commit is not reproducible from the remote." >&2
+        echo "       Override intentionally with --allow-diverged-branch." >&2
+        exit 1
+      fi
+    else
+      echo "  HEAD matches origin/${CURRENT_BRANCH}"
+    fi
+  else
+    echo "  origin/${CURRENT_BRANCH} not found; skipping push-parity check"
+  fi
 else
-  echo "[0/3] Skipping tests (--skip-tests flag)"
+  echo "[0/5] Skipping git pre-flight checks (--skip-git-check or not a git checkout)"
 fi
 
-# ── 1. Frontend Build ────────────────────────────────────────────────────
+if [[ "$SKIP_TESTS" == "false" ]]; then
+  echo "[1/5] Running quality gates..."
+
+  echo "  typecheck:all"
+  npm run typecheck:all 2>&1 | tail -5
+
+  echo "  lint"
+  npm run lint 2>&1 | tail -10
+
+  echo "  lint:migrations"
+  npm run lint:migrations 2>&1 | tail -5
+
+  echo "  check:contrast"
+  npm run check:contrast 2>&1 | tail -5
+
+  echo "  test"
+  npm test 2>&1 | tail -20
+
+  echo "  payment flow (api-only)"
+  node scripts/local-payment-flow/run.mjs --api-only 2>&1 | tail -10
+
+  echo "Quality gates passed."
+else
+  echo "[1/5] Skipping quality gates (--skip-tests flag)"
+fi
+
+# ── 2. D1 Migrations (before Worker/Pages so live columns exist) ───────────
+# Fail-closed: only explicit --migration-file targets are ever applied.
+if [[ ${#MIGRATION_FILES[@]} -gt 0 ]]; then
+  echo "[2/5] Applying ${#MIGRATION_FILES[@]} D1 migration(s) before code deploy..."
+
+  if [[ "$BACKUP_D1" == "true" ]]; then
+    BACKUP_DIR="${SCRIPT_DIR}/backups"
+    mkdir -p "$BACKUP_DIR"
+    BACKUP_FILE="${BACKUP_DIR}/d1-$(date -u +%Y%m%dT%H%M%SZ).sql"
+    echo "  Exporting remote D1 snapshot to ${BACKUP_FILE}"
+    npx --no-install wrangler d1 export fnb-caffe-db --remote --output "$BACKUP_FILE" 2>&1 | tail -5
+  fi
+
+  APPLY_ARGS=()
+  for migration_name in "${MIGRATION_FILES[@]}"; do
+    APPLY_ARGS+=(--file "$migration_name")
+  done
+  bash "$WORKER_DIR/scripts/apply-migrations.sh" "${APPLY_ARGS[@]}"
+
+  if [[ "$VERIFY_D1_SCHEMA" == "true" ]]; then
+    echo "  Verifying remote schema: orders.loyalty_points_redeemed"
+    SCHEMA_DUMP="$(npx --no-install wrangler d1 execute fnb-caffe-db --remote \
+      --command "PRAGMA table_info(orders);" --json 2>/dev/null || echo '[]')"
+    if [[ "$SCHEMA_DUMP" != *"loyalty_points_redeemed"* ]]; then
+      echo "ERROR: Remote D1 schema is missing orders.loyalty_points_redeemed after migration." >&2
+      exit 1
+    fi
+    echo "  Remote schema verified"
+  fi
+
+  echo "  Migrations complete."
+else
+  echo "[2/5] Skipping D1 migrations (fail-closed default: pass --migration-file=<name.sql> to apply one)"
+fi
+
+# ── 3/5 Frontend Build + Pages Deploy ───────────────────────────────────────
 if [[ "$WORKER_ONLY" == "false" ]]; then
-  echo "[1/3] Building frontend with Vite..."
+  echo "[3/5] Building frontend with Vite..."
   npx --no-install vite build --mode production 2>&1 | tail -5
 
   echo "Copying static SEO and signage assets to dist..."
@@ -172,37 +305,23 @@ if [[ "$WORKER_ONLY" == "false" ]]; then
 VERSIONEOF
   echo "Cache-busting version.json written: $GIT_COMMIT_SHORT @ $BUILD_TIMESTAMP"
 
-  echo "[2/3] Deploying to Cloudflare Pages..."
+  echo "[4/5] Deploying to Cloudflare Pages..."
   npx --no-install wrangler pages deploy "$DIST_DIR" \
     --project-name=fnb-caffe-container \
     --branch=main \
     2>&1 | tail -5
 fi
 
-# ── 2. Worker Deploy ─────────────────────────────────────────────────────
+# ── 4/5 Worker Deploy (migrations already applied above) ────────────────────
 if [[ "$PAGES_ONLY" == "false" ]]; then
-  echo "[3/3] Deploying Cloudflare Worker..."
-  GIT_COMMIT_SHA=$(git rev-parse HEAD)
+  echo "[4/5] Deploying Cloudflare Worker..."
+  WORKER_SHA=$(git rev-parse HEAD 2>/dev/null || echo "unknown")
   cd "$WORKER_DIR"
-  npx --no-install wrangler deploy --config wrangler.toml --var GIT_COMMIT_SHA:"$GIT_COMMIT_SHA" 2>&1 | tail -5
+  npx --no-install wrangler deploy --config wrangler.toml --var GIT_COMMIT_SHA:"$WORKER_SHA" 2>&1 | tail -5
   cd ..
 fi
 
-# ── 3a. D1 Migrations (Fail-closed: explicit --migration-file only) ──────
-if [[ ${#MIGRATION_FILES[@]} -gt 0 ]]; then
-  echo ""
-  echo "--- D1 Migrations (Explicit Selection) ---"
-  APPLY_ARGS=()
-  for migration_name in "${MIGRATION_FILES[@]}"; do
-    APPLY_ARGS+=(--file "$migration_name")
-  done
-  bash "$WORKER_DIR/scripts/apply-migrations.sh" "${APPLY_ARGS[@]}"
-  echo "--- Migrations Complete ---"
-else
-  echo "Skipping D1 migrations by default (fail-closed: pass --migration-file=<name.sql> to apply an explicit migration)"
-fi
-
-# ── 3b. Post-deploy verification ──────────────────────────────────────────
+# ── 5/5 Post-deploy verification ──────────────────────────────────────────
 if [[ "$SKIP_VERIFY" == "false" ]]; then
   WORKER_URL="${DEPLOY_HEALTH_URL:-https://aura-space-worker.sadec-marketing-hub.workers.dev}"
   PAGES_DOMAIN="${DEPLOY_PAGES_URL:-https://auraspace.cafe}"

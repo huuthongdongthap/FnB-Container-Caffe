@@ -19,6 +19,7 @@ import type { Env } from 'worker/src/types/env';
 import { authenticateRequest } from 'worker/src/lib/staff-session-auth';
 import { StaffSessionError } from 'worker/src/lib/staff-session';
 import { getTenantId } from 'worker/src/middleware/tenant';
+import { isHeldOutOfKds } from '../policies/kds-hold-policy';
 
 // Max SSE connection duration: 120s — client reconnects naturally after.
 const SSE_TIMEOUT_MS = 120_000;
@@ -244,23 +245,33 @@ kdsStreamRouter.get('/stream', async(c) => {
         let results: OrderRecord[] | undefined;
         try {
           const statement = db.prepare(
-            `SELECT id, customer_name, table_id, items, notes, status, order_type, payment_status, created_at FROM orders
+            `SELECT id, customer_name, table_id, items, notes, status, order_type, payment_status, payment_method, is_cod, created_at FROM orders
              WHERE status IN ('pending', 'confirmed', 'preparing', 'ready')
              ${tenantClause}
              ORDER BY created_at ASC LIMIT 50`
           );
           ({ results } = await (tenantId === '*' ? statement : statement.bind(tenantId)).all<OrderRecord>());
         } catch {
-          const statement = db.prepare(
-            `SELECT id, customer_name, table_id, items, notes, status, created_at FROM orders
-             WHERE status IN ('pending', 'confirmed', 'preparing', 'ready')
-             ${tenantClause}
-             ORDER BY created_at ASC LIMIT 50`
-          );
-          ({ results } = await (tenantId === '*' ? statement : statement.bind(tenantId)).all<OrderRecord>());
+          try {
+            const statement = db.prepare(
+              `SELECT id, customer_name, table_id, items, notes, status, order_type, payment_status, created_at FROM orders
+               WHERE status IN ('pending', 'confirmed', 'preparing', 'ready')
+               ${tenantClause}
+               ORDER BY created_at ASC LIMIT 50`
+            );
+            ({ results } = await (tenantId === '*' ? statement : statement.bind(tenantId)).all<OrderRecord>());
+          } catch {
+            const statement = db.prepare(
+              `SELECT id, customer_name, table_id, items, notes, status, created_at FROM orders
+               WHERE status IN ('pending', 'confirmed', 'preparing', 'ready')
+               ${tenantClause}
+               ORDER BY created_at ASC LIMIT 50`
+            );
+            ({ results } = await (tenantId === '*' ? statement : statement.bind(tenantId)).all<OrderRecord>());
+          }
         }
         return (results || [])
-          .filter((r) => !(r.order_type === 'delivery' && r.payment_status !== 'paid'))
+          .filter((r) => !isHeldOutOfKds(r as unknown as Record<string, unknown>))
           .map(mapKdsOrder);
       };
 

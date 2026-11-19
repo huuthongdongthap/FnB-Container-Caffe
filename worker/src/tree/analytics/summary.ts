@@ -112,10 +112,14 @@ export function buildTenantFilter(
 
 const VALID_ORDER_WHERE = `status != 'cancelled'
     AND status NOT IN ('cancelled', 'refunded', 'failed', 'rejected', 'expired')
-    AND COALESCE(payment_status, '') != 'refunded'`;
+    AND LOWER(COALESCE(TRIM(status), '')) NOT IN ('cancelled', 'canceled', 'refunded', 'failed', 'rejected', 'expired')
+    AND COALESCE(payment_status, '') != 'refunded'
+    AND LOWER(COALESCE(TRIM(payment_status), '')) NOT IN ('refunded', 'failed', 'cancelled', 'canceled')
+    AND NOT (COALESCE(TRIM(notes), '') = 'Khách QR - cho don mon' AND COALESCE(TRIM(items), '[]') IN ('', '[]'))`;
 
 const VALID_ORDER_FALLBACK_WHERE = `status != 'cancelled'
-    AND status NOT IN ('cancelled', 'refunded', 'failed', 'rejected', 'expired')`;
+    AND status NOT IN ('cancelled', 'refunded', 'failed', 'rejected', 'expired')
+    AND LOWER(COALESCE(TRIM(status), '')) NOT IN ('cancelled', 'canceled', 'refunded', 'failed', 'rejected', 'expired')`;
 
 const VALID_CUSTOMER_PHONE_EXPR =
   "CASE WHEN TRIM(COALESCE(customer_phone, '')) NOT IN ('', '0', '000000000', '0000000000', '00000000000', 'guest', 'walk-in', 'pos') THEN customer_phone END";
@@ -264,7 +268,10 @@ const GROUP_QUERIES: Record<GroupBy, string> = {
       AND COALESCE(NULLIF(TRIM(c.tenant_id), ''), 'default') = COALESCE(NULLIF(TRIM(o.tenant_id), ''), 'default')
     WHERE o.status != 'cancelled'
       AND o.status NOT IN ('cancelled', 'refunded', 'failed', 'rejected', 'expired')
+      AND LOWER(COALESCE(TRIM(o.status), '')) NOT IN ('cancelled', 'canceled', 'refunded', 'failed', 'rejected', 'expired')
       AND COALESCE(o.payment_status, '') != 'refunded'
+      AND LOWER(COALESCE(TRIM(o.payment_status), '')) NOT IN ('refunded', 'failed', 'cancelled', 'canceled')
+      AND NOT (COALESCE(TRIM(o.notes), '') = 'Khách QR - cho don mon' AND COALESCE(TRIM(o.items), '[]') IN ('', '[]'))
       AND o.created_at >= datetime('now', '-' || ? || ' days')
     GROUP BY c.name
     ORDER BY value DESC
@@ -319,7 +326,7 @@ export async function getGrouped(
           JOIN categories c ON c.id = p.category_id
             AND COALESCE(NULLIF(TRIM(c.tenant_id), ''), 'default') = COALESCE(NULLIF(TRIM(o.tenant_id), ''), 'default')
           WHERE o.status != 'cancelled'
-            AND o.status NOT IN ('cancelled', 'refunded', 'failed', 'rejected', 'expired')
+            AND LOWER(COALESCE(TRIM(o.status), '')) NOT IN ('cancelled', 'canceled', 'refunded', 'failed', 'rejected', 'expired')
             AND o.created_at >= datetime('now', '-' || ? || ' days')${tf.clause}
           GROUP BY c.name
           ORDER BY value DESC
@@ -341,7 +348,7 @@ export async function getGrouped(
             JOIN categories c ON c.id = p.category_id
             JOIN orders o ON o.id = oi.order_id
             WHERE o.status != 'cancelled'
-              AND o.status NOT IN ('cancelled', 'refunded', 'failed', 'rejected', 'expired')
+              AND LOWER(COALESCE(TRIM(o.status), '')) NOT IN ('cancelled', 'canceled', 'refunded', 'failed', 'rejected', 'expired')
               AND o.created_at >= datetime('now', '-' || ? || ' days')${tf.clause}
             GROUP BY c.name
             ORDER BY value DESC
@@ -491,13 +498,13 @@ export async function getGrouped(
       }
     } else {
       try {
-        const fallbackSql = sql.replace(/\s*AND COALESCE\(payment_status, ''\) != 'refunded'/g, '');
+        const fallbackSql = sql.replace(VALID_ORDER_WHERE, VALID_ORDER_FALLBACK_WHERE);
         const { results } = await db.prepare(fallbackSql).bind(days, ...tf.binds).all<GroupRow>();
         rows = results || [];
       } catch {
         try {
           const legacySql = sql
-            .replace(/\s*AND COALESCE\(payment_status, ''\) != 'refunded'/g, '')
+            .replace(VALID_ORDER_WHERE, VALID_ORDER_FALLBACK_WHERE)
             .replace(/datetime\(created_at, '\+7 hours'\)/g, 'created_at');
           const { results } = await db.prepare(legacySql).bind(days, ...tf.binds).all<GroupRow>();
           rows = results || [];

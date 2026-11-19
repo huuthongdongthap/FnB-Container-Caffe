@@ -39,7 +39,10 @@ export async function getTopProducts(
       JOIN products p ON p.id = oi.product_id${productTenantJoin}
       WHERE o.status != 'cancelled'
         AND o.status NOT IN ('cancelled', 'refunded', 'failed', 'rejected', 'expired')
-        AND COALESCE(o.payment_status, '') != 'refunded'${orderAliasClause}
+        AND LOWER(COALESCE(TRIM(o.status), '')) NOT IN ('cancelled', 'canceled', 'refunded', 'failed', 'rejected', 'expired')
+        AND COALESCE(o.payment_status, '') != 'refunded'
+        AND LOWER(COALESCE(TRIM(o.payment_status), '')) NOT IN ('refunded', 'failed', 'cancelled', 'canceled')
+        AND NOT (COALESCE(TRIM(o.notes), '') = 'Khách QR - cho don mon' AND COALESCE(TRIM(o.items), '[]') IN ('', '[]'))${orderAliasClause}
       GROUP BY oi.product_id, p.name
       ORDER BY total_qty DESC
       LIMIT ?
@@ -56,7 +59,8 @@ export async function getTopProducts(
         JOIN orders o ON o.id = oi.order_id
         JOIN products p ON p.id = oi.product_id${productTenantJoin}
         WHERE o.status != 'cancelled'
-          AND o.status NOT IN ('cancelled', 'refunded', 'failed', 'rejected', 'expired')${orderAliasClause}
+          AND o.status NOT IN ('cancelled', 'refunded', 'failed', 'rejected', 'expired')
+          AND LOWER(COALESCE(TRIM(o.status), '')) NOT IN ('cancelled', 'canceled', 'refunded', 'failed', 'rejected', 'expired')${orderAliasClause}
         GROUP BY oi.product_id, p.name
         ORDER BY total_qty DESC
         LIMIT ?
@@ -75,7 +79,8 @@ export async function getTopProducts(
         JOIN products p ON p.id = oi.product_id
         JOIN orders o ON o.id = oi.order_id
         WHERE o.status != 'cancelled'
-          AND o.status NOT IN ('cancelled', 'refunded', 'failed', 'rejected', 'expired')${orderAliasClause}
+          AND o.status NOT IN ('cancelled', 'refunded', 'failed', 'rejected', 'expired')
+          AND LOWER(COALESCE(TRIM(o.status), '')) NOT IN ('cancelled', 'canceled', 'refunded', 'failed', 'rejected', 'expired')${orderAliasClause}
         GROUP BY oi.product_id, p.name
         ORDER BY total_qty DESC
         LIMIT ?
@@ -92,7 +97,9 @@ export async function getTopProducts(
         const stmt = db.prepare(`
           SELECT items, tenant_id FROM orders
           WHERE status != 'cancelled'
-            AND status NOT IN ('cancelled', 'refunded', 'failed', 'rejected', 'expired')${orderClause}
+            AND status NOT IN ('cancelled', 'refunded', 'failed', 'rejected', 'expired')
+            AND LOWER(COALESCE(TRIM(status), '')) NOT IN ('cancelled', 'canceled', 'refunded', 'failed', 'rejected', 'expired')
+            AND NOT (COALESCE(TRIM(notes), '') = 'Khách QR - cho don mon' AND COALESCE(TRIM(items), '[]') IN ('', '[]'))${orderClause}
           ORDER BY created_at DESC
           LIMIT 2000
         `);
@@ -101,17 +108,33 @@ export async function getTopProducts(
           : await stmt.all<{ items: string; tenant_id?: string | null }>();
         orderRows = res.results;
       } catch {
-        const stmt = db.prepare(`
-          SELECT items FROM orders
-          WHERE status != 'cancelled'
-            AND status NOT IN ('cancelled', 'refunded', 'failed', 'rejected', 'expired')${orderClause}
-          ORDER BY created_at DESC
-          LIMIT 2000
-        `);
-        const res = tenantBinds.length > 0
-          ? await stmt.bind(...tenantBinds).all<{ items: string }>()
-          : await stmt.all<{ items: string }>();
-        orderRows = res.results;
+        try {
+          const stmt = db.prepare(`
+            SELECT items, tenant_id FROM orders
+            WHERE status != 'cancelled'
+              AND status NOT IN ('cancelled', 'refunded', 'failed', 'rejected', 'expired')
+              AND LOWER(COALESCE(TRIM(status), '')) NOT IN ('cancelled', 'canceled', 'refunded', 'failed', 'rejected', 'expired')${orderClause}
+            ORDER BY created_at DESC
+            LIMIT 2000
+          `);
+          const res = tenantBinds.length > 0
+            ? await stmt.bind(...tenantBinds).all<{ items: string; tenant_id?: string | null }>()
+            : await stmt.all<{ items: string; tenant_id?: string | null }>();
+          orderRows = res.results;
+        } catch {
+          const stmt = db.prepare(`
+            SELECT items FROM orders
+            WHERE status != 'cancelled'
+              AND status NOT IN ('cancelled', 'refunded', 'failed', 'rejected', 'expired')
+              AND LOWER(COALESCE(TRIM(status), '')) NOT IN ('cancelled', 'canceled', 'refunded', 'failed', 'rejected', 'expired')${orderClause}
+            ORDER BY created_at DESC
+            LIMIT 2000
+          `);
+          const res = tenantBinds.length > 0
+            ? await stmt.bind(...tenantBinds).all<{ items: string }>()
+            : await stmt.all<{ items: string }>();
+          orderRows = res.results;
+        }
       }
 
       const parsedRows: Array<{

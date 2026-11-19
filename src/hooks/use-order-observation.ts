@@ -3,11 +3,16 @@ import {
   useOrderStoreWithOfflineFlush,
   type CustomerOrder,
 } from '@/hooks/stores/use-order-store';
+import {
+  rememberGuestOrderToken,
+  stripOrderTokenFromBrowserUrl,
+} from '@/lib/guest-order-token';
 
 const DEFAULT_OBSERVATION_TIMEOUT_MS = 10 * 60 * 1000;
 
 export interface UseOrderObservationOptions {
   timeoutMs?: number;
+  orderToken?: string | null;
 }
 
 export interface UseOrderObservationResult {
@@ -27,6 +32,7 @@ export function useOrderObservation(
   options?: UseOrderObservationOptions,
 ): UseOrderObservationResult {
   const timeoutMs = options?.timeoutMs ?? DEFAULT_OBSERVATION_TIMEOUT_MS;
+  const explicitToken = options?.orderToken;
   const {
     currentOrder,
     loading,
@@ -39,6 +45,19 @@ export function useOrderObservation(
   useEffect(() => {
     if (!orderId) return;
 
+    let urlToken = typeof explicitToken === 'string' && explicitToken.trim() ? explicitToken.trim() : '';
+    if (!urlToken && typeof window !== 'undefined' && window.location?.search) {
+      try {
+        urlToken = new URLSearchParams(window.location.search).get('order_token')?.trim() || '';
+      } catch {
+        urlToken = '';
+      }
+    }
+    if (urlToken) {
+      rememberGuestOrderToken(orderId, urlToken);
+      stripOrderTokenFromBrowserUrl();
+    }
+
     subscribeToOrder(orderId);
     void fetchOrder(orderId);
 
@@ -50,7 +69,7 @@ export function useOrderObservation(
       clearTimeout(timeout);
       unsubscribeFromOrder();
     };
-  }, [orderId, timeoutMs, fetchOrder, subscribeToOrder, unsubscribeFromOrder]);
+  }, [orderId, explicitToken, timeoutMs, fetchOrder, subscribeToOrder, unsubscribeFromOrder]);
 
   const refresh = useCallback(() => {
     if (!orderId) return;

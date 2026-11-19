@@ -9,6 +9,8 @@ export interface OfflineOrderRecord {
   orderData: object;
   createdAt: number;
   synced: boolean;
+  status?: 'pending' | 'synced' | 'needs_attention';
+  failureReason?: string;
   tenantId?: string | null;
   userId?: string | null;
   attemptCount?: number;
@@ -18,6 +20,34 @@ export interface OfflineOrderRecord {
 
 const DB_NAME = 'auradb';
 const STORE_NAME = 'offlineOrders';
+
+let activeOfflineSyncLock = false;
+
+export function tryAcquireOfflineSyncLock(): boolean {
+  if (activeOfflineSyncLock) return false;
+  activeOfflineSyncLock = true;
+  return true;
+}
+
+export function releaseOfflineSyncLock(): void {
+  activeOfflineSyncLock = false;
+}
+
+/* Records belong to exactly one tenant + actor; never replay or surface another session's queue. */
+function matchesOfflineContext(
+  r: OfflineOrderRecord,
+  ctxTenant: string | null,
+  ctxUser: string | null
+): boolean {
+  const recTenant = typeof r.tenantId === 'string' && r.tenantId.trim() ? r.tenantId.trim() : null;
+  const recUser = typeof r.userId === 'string' && r.userId.trim() ? r.userId.trim() : null;
+  if (ctxTenant) {
+    if ((recTenant ?? 'default') !== ctxTenant) return false;
+  } else if (recTenant && recTenant !== 'default') {
+    return false;
+  }
+  return recUser === ctxUser;
+}
 
 function openDB(): Promise<IDBDatabase> {
   return new Promise<IDBDatabase>((resolve, reject) => {
@@ -40,6 +70,14 @@ function openDB(): Promise<IDBDatabase> {
 }
 
 export class OfflineDB {
+  tryAcquireSyncLock(): boolean {
+    return tryAcquireOfflineSyncLock();
+  }
+
+  releaseSyncLock(): void {
+    releaseOfflineSyncLock();
+  }
+
   /* Generate a time-ordered local id (nanoid-adjacent). */
   private static generateId(): string {
     const ts = Date.now().toString(36);
@@ -71,6 +109,7 @@ export class OfflineDB {
         userId,
         createdAt: Date.now(),
         synced: false,
+        status: 'pending',
       });
       tx.oncomplete = () => resolve(localId);
       tx.onerror = () => reject(tx.error);
@@ -95,23 +134,12 @@ export class OfflineDB {
               preservedKeys.has(r.localId) ||
               r.localId?.startsWith('_') ||
               r.localId?.startsWith('menu:') ||
-              r.synced
+              r.synced ||
+              r.status === 'needs_attention'
             ) {
               return false;
             }
-            const recTenant = typeof r.tenantId === 'string' && r.tenantId.trim() ? r.tenantId.trim() : null;
-            const recUser = typeof r.userId === 'string' && r.userId.trim() ? r.userId.trim() : null;
-            if (ctxTenant) {
-              if ((recTenant ?? 'default') !== ctxTenant) return false;
-            } else if (recTenant && recTenant !== 'default') {
-              return false;
-            }
-            if (ctxUser) {
-              if (recUser && recUser !== ctxUser) return false;
-            } else if (recUser) {
-              return false;
-            }
-            return true;
+            return matchesOfflineContext(r, ctxTenant, ctxUser);
           })
           .map(r => ({
             ...(typeof r.orderData === 'object' && r.orderData !== null ? r.orderData : {}),
@@ -123,6 +151,25 @@ export class OfflineDB {
             synced: r.synced,
           }));
         resolve(records);
+      };
+      req.onerror = () => reject(req.error);
+    });
+  }
+
+  /* Count quarantined orders visible to the active tenant/user so POS can surface them for review. */
+  async countNeedsAttention(
+    context?: { tenantId?: string | null; userId?: string | null }
+  ): Promise<number> {
+    const db = await openDB();
+    const ctxTenant = context?.tenantId?.trim() || null;
+    const ctxUser = context?.userId?.trim() || null;
+    return new Promise<number>((resolve, reject) => {
+      const tx = db.transaction(STORE_NAME, 'readonly');
+      const req = tx.objectStore(STORE_NAME).getAll();
+      req.onsuccess = () => {
+        resolve((req.result as OfflineOrderRecord[]).filter(
+          r => r.status === 'needs_attention' && matchesOfflineContext(r, ctxTenant, ctxUser)
+        ).length);
       };
       req.onerror = () => reject(req.error);
     });
@@ -150,11 +197,63 @@ export class OfflineDB {
         const record = req.result;
         if (record) {
           record.synced = true;
+          record.status = 'synced';
           store.put(record);
         }
       };
       tx.oncomplete = () => resolve();
       tx.onerror = () => reject(tx.error);
+    });
+  }
+
+  /* Quarantine an order that failed server validation so POS staff can review instead of losing data. */
+  async markNeedsAttention(localId: string, reason?: string): Promise<void> {
+    const db = await openDB();
+    return new Promise<void>((resolve, reject) => {
+      const tx = db.transaction(STORE_NAME, 'readwrite');
+      const store = tx.objectStore(STORE_NAME);
+      const req = store.get(localId);
+      req.onsuccess = () => {
+        const record = req.result as OfflineOrderRecord | undefined;
+        if (record) {
+          record.status = 'needs_attention';
+          record.failureReason = reason || 'Validation failed';
+          record.lastAttemptAt = Date.now();
+          record.attemptCount = (record.attemptCount ?? 0) + 1;
+          store.put(record);
+        }
+      };
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+    });
+  }
+
+  /* Clear cached menu/category entries and already-synced records while keeping unsynced POS orders intact. */
+  async clearCachesAndSynced(): Promise<void> {
+    const db = await openDB();
+    return new Promise<void>((resolve, reject) => {
+      const tx = db.transaction(STORE_NAME, 'readwrite');
+      const store = tx.objectStore(STORE_NAME);
+      const req = store.openCursor();
+      req.onsuccess = () => {
+        const cursor = req.result;
+        if (!cursor) return;
+        const key = String(cursor.primaryKey ?? '');
+        const val = cursor.value as OfflineOrderRecord;
+        const isCacheKey = key === 'menu' || key === '_meta_categories' || key.startsWith('_') || key.startsWith('menu:');
+        if (isCacheKey || val?.synced === true) {
+          store.delete(cursor.primaryKey);
+        }
+        cursor.continue();
+      };
+      tx.oncomplete = () => {
+        try { db.close(); } catch {}
+        resolve();
+      };
+      tx.onerror = () => {
+        try { db.close(); } catch {}
+        reject(tx.error);
+      };
     });
   }
 

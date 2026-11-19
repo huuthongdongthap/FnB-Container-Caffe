@@ -7,6 +7,7 @@ Conflict resolution: last-write-wins (server timestamp wins).
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { offlineDb, type OfflineOrderRecord } from '@/lib/offline-db';
 import { API_BASE } from '@/lib/api-client';
+import { captureGuestOrderTokenFromResponse } from '@/lib/guest-order-token';
 import { isSameSessionSnapshot, readClientSession, readSessionSnapshot, subscribeSessionChange } from '@/lib/client-session';
 import { logger } from '@/lib/logger';
 
@@ -26,6 +27,8 @@ function resolveActiveOfflineContext(): { tenantId: string | null; userId: strin
 interface SyncState {
   isOnline: boolean;
   pendingCount: number;
+  /** Orders rejected by server validation, kept locally for staff review. */
+  quarantinedCount: number;
   syncing: boolean;
   lastSyncAt: number | null;
   error: string | null;
@@ -37,6 +40,7 @@ export function useOfflineSync() {
   const [state, setState] = useState<SyncState>({
     isOnline: typeof navigator !== 'undefined' ? navigator.onLine : true,
     pendingCount: 0,
+    quarantinedCount: 0,
     syncing: false,
     lastSyncAt: null,
     error: null,
@@ -48,9 +52,11 @@ export function useOfflineSync() {
 
   /* ── Count pending ──────────────────────────────────────────── */
   const refreshPendingCount = useCallback(async () => {
-    const pending = await offlineDb.getPendingOrders(resolveActiveOfflineContext());
+    const ctx = resolveActiveOfflineContext();
+    const pending = await offlineDb.getPendingOrders(ctx);
+    const quarantined = await offlineDb.countNeedsAttention(ctx).catch(() => 0);
     if (mountedRef.current) {
-      setState(s => ({ ...s, pendingCount: pending.length }));
+      setState(s => ({ ...s, pendingCount: pending.length, quarantinedCount: quarantined }));
     }
     return pending;
   }, []);
@@ -58,7 +64,12 @@ export function useOfflineSync() {
   /* ── Sync a single item ─────────────────────────────────────── */
   const syncItem = useCallback(async (item: QueuedItem): Promise<boolean> => {
     try {
-      const token = typeof localStorage !== 'undefined' ? localStorage.getItem('aura_auth_token') : null;
+      const sessionToken = readClientSession().token;
+      const token =
+        sessionToken ||
+        (typeof localStorage !== 'undefined'
+          ? localStorage.getItem('aura_auth_token') || localStorage.getItem('mobile_token')
+          : null);
       const activeCtx = resolveActiveOfflineContext();
       const itemTenant = typeof item.tenantId === 'string' && item.tenantId.trim() ? item.tenantId.trim() : null;
       if (itemTenant && activeCtx.tenantId && itemTenant !== activeCtx.tenantId) {
@@ -67,10 +78,8 @@ export function useOfflineSync() {
       if (itemTenant && itemTenant !== 'default' && !activeCtx.tenantId) {
         return false;
       }
-      if (item.userId && activeCtx.userId && item.userId !== activeCtx.userId) {
-        return false;
-      }
-      if (item.userId && !activeCtx.userId) {
+      const itemUser = typeof item.userId === 'string' && item.userId.trim() ? item.userId.trim() : null;
+      if (itemUser !== activeCtx.userId) {
         return false;
       }
       const effectiveTenant = itemTenant || activeCtx.tenantId;
@@ -90,6 +99,13 @@ export function useOfflineSync() {
       });
 
       if (res.ok) {
+        if (typeof res.json === 'function') {
+          try {
+            captureGuestOrderTokenFromResponse(await res.json());
+          } catch {
+            // Non-JSON sync response is non-fatal
+          }
+        }
         await offlineDb.removeOrder(item.localId);
         return true;
       }
@@ -98,7 +114,7 @@ export function useOfflineSync() {
         logger.warn('OfflineSync conflict — keeping in queue', { localId: item.localId });
         return false;
       }
-      // Terminal validation errors (400/404/422) — drop from queue; auth/transient errors (401/403/408/429) remain queued
+      // Terminal validation errors (400/404/422) — quarantine as needs_attention instead of deleting POS data
       if (
         res.status >= 400 &&
         res.status < 500 &&
@@ -107,8 +123,14 @@ export function useOfflineSync() {
         res.status !== 408 &&
         res.status !== 429
       ) {
-        await offlineDb.removeOrder(item.localId);
-        return true;
+        if (typeof offlineDb.markNeedsAttention === 'function') {
+          await offlineDb.markNeedsAttention(item.localId, `HTTP ${res.status}`);
+        }
+        logger.warn('OfflineSync validation rejected — marked needs_attention', {
+          localId: item.localId,
+          status: res.status,
+        });
+        return false;
       }
       return false;
     } catch {
@@ -121,6 +143,11 @@ export function useOfflineSync() {
   const syncAll = useCallback(async () => {
     const currentlyOnline = typeof navigator !== 'undefined' ? navigator.onLine : true;
     if (syncingRef.current || !currentlyOnline) return;
+    const acquiredSharedLock =
+      typeof offlineDb.tryAcquireSyncLock === 'function'
+        ? offlineDb.tryAcquireSyncLock()
+        : true;
+    if (!acquiredSharedLock) return;
     syncingRef.current = true;
     setState(s => ({ ...s, syncing: true, error: null }));
 
@@ -136,15 +163,33 @@ export function useOfflineSync() {
       }
 
       if (mountedRef.current && isSameSessionSnapshot(snap, readSessionSnapshot())) {
-        setState(s => ({
-          ...s,
-          syncing: false,
-          pendingCount: failed,
-          lastSyncAt: Date.now(),
-          error: failed > 0 ? `${failed} orders chưa đồng bộ (có thể do offline)` : null,
-        }));
+        const currentCtx = resolveActiveOfflineContext();
+        let remainingPending = failed;
+        let nextQuarantined = 0;
+        try {
+          const remaining = await offlineDb.getPendingOrders(currentCtx);
+          remainingPending = remaining.length;
+          if (typeof offlineDb.countNeedsAttention === 'function') {
+            nextQuarantined = await offlineDb.countNeedsAttention(currentCtx);
+          }
+        } catch {
+          // Retain fallback counts when IndexedDB read fails
+        }
+        if (mountedRef.current && isSameSessionSnapshot(snap, readSessionSnapshot())) {
+          setState(s => ({
+            ...s,
+            syncing: false,
+            pendingCount: remainingPending,
+            quarantinedCount: nextQuarantined,
+            lastSyncAt: Date.now(),
+            error: remainingPending > 0 ? `${remainingPending} orders chưa đồng bộ (có thể do offline)` : null,
+          }));
+        }
       }
     } finally {
+      if (typeof offlineDb.releaseSyncLock === 'function') {
+        offlineDb.releaseSyncLock();
+      }
       syncingRef.current = false;
     }
   }, [syncItem]);
@@ -176,9 +221,15 @@ export function useOfflineSync() {
     const handleOffline = () => {
       setState(s => ({ ...s, isOnline: false }));
     };
+    const handleServiceWorkerMessage = (event: MessageEvent) => {
+      if ((event.data as { type?: string } | null)?.type === 'FLUSH_OFFLINE_ORDERS') {
+        void syncAll();
+      }
+    };
 
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);
+    navigator.serviceWorker?.addEventListener?.('message', handleServiceWorkerMessage);
     const unsubscribeSession = subscribeSessionChange(() => {
       if (mountedRef.current) {
         setState(s => ({ ...s, syncing: false, error: null }));
@@ -201,6 +252,7 @@ export function useOfflineSync() {
       unsubscribeSession();
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
+      navigator.serviceWorker?.removeEventListener?.('message', handleServiceWorkerMessage);
       if (syncTimerRef.current) clearInterval(syncTimerRef.current);
     };
   }, [refreshPendingCount, syncAll]);

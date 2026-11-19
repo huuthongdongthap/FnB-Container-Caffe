@@ -18,6 +18,56 @@ export interface OrderStatusResult {
   order?: { id: string; status: string; previous_status: string };
 }
 
+export const PAID_ORDER_CANCEL_ERROR = 'Paid order cannot be cancelled; initiate a refund instead';
+export const ISSUED_EINVOICE_CANCEL_ERROR = 'Cannot cancel an order with an issued e-invoice; issue a credit note or adjustment instead';
+
+const ISSUED_INVOICE_SYNC_STATUSES = ['synced', 'submitted', 'issued', 'completed'] as const;
+
+export async function hasIssuedEInvoiceForOrder(db: OrderStatusDb, orderId: string): Promise<boolean> {
+  const placeholders = ISSUED_INVOICE_SYNC_STATUSES.map(() => '?').join(', ');
+  const queries: Array<{ sql: string; binds: unknown[] }> = [
+    {
+      sql: `SELECT id, sync_status, erpnext_id, erpnext_invoice_id FROM erpnext_mappings
+             WHERE (aura_order_id = ? OR (local_type IN ('order', 'sales_invoice') AND local_id = ?))
+               AND LOWER(COALESCE(sync_status, '')) IN (${placeholders})
+               AND COALESCE(NULLIF(TRIM(erpnext_invoice_id), ''), NULLIF(TRIM(CAST(erpnext_id AS TEXT)), '')) IS NOT NULL
+             LIMIT 1`,
+      binds: [orderId, orderId, ...ISSUED_INVOICE_SYNC_STATUSES],
+    },
+    {
+      sql: `SELECT id, sync_status, erpnext_id FROM erpnext_mappings
+             WHERE local_type IN ('order', 'sales_invoice') AND local_id = ?
+               AND LOWER(COALESCE(sync_status, '')) IN (${placeholders})
+               AND NULLIF(TRIM(CAST(erpnext_id AS TEXT)), '') IS NOT NULL
+             LIMIT 1`,
+      binds: [orderId, ...ISSUED_INVOICE_SYNC_STATUSES],
+    },
+  ];
+  for (const q of queries) {
+    try {
+      const stmt = db.prepare(q.sql);
+      if (typeof stmt?.bind !== 'function') return false;
+      const bound = stmt.bind(...q.binds);
+      if (typeof bound?.first !== 'function') return false;
+      const row = await bound.first<{
+        id?: unknown;
+        sync_status?: unknown;
+        erpnext_id?: unknown;
+        erpnext_invoice_id?: unknown;
+      }>();
+      if (!row || typeof row !== 'object') return false;
+      const syncStatus = typeof row.sync_status === 'string' ? row.sync_status.trim().toLowerCase() : '';
+      const hasInvoiceRef =
+        (row.erpnext_invoice_id !== undefined && row.erpnext_invoice_id !== null && String(row.erpnext_invoice_id).trim() !== '') ||
+        (row.erpnext_id !== undefined && row.erpnext_id !== null && String(row.erpnext_id).trim() !== '');
+      return (ISSUED_INVOICE_SYNC_STATUSES as readonly string[]).includes(syncStatus) && hasInvoiceRef;
+    } catch {
+      // Column variant or table absent in minimal schema: try narrower variant
+    }
+  }
+  return false;
+}
+
 /** D1 must confirm the write; an unknown result must never publish a success. */
 export function changedRows(result: unknown): number {
   const value = result as { meta?: { changes?: number }; changes?: number } | null;
@@ -32,7 +82,9 @@ export async function transitionOrderStatus(
   actorRole: string | undefined,
   options: {
     tenantId?: string;
-    currentOrder?: { id: string; status: string };
+    currentOrder?: { id: string; status: string; payment_status?: string | null };
+    paymentStatus?: string | null;
+    allowPaidCompensation?: boolean;
     fields?: { notes?: unknown; delivery_time?: unknown };
   } = {},
 ): Promise<OrderStatusResult> {
@@ -97,11 +149,43 @@ export async function transitionOrderStatus(
 
   if (targetStatus === 'preparing') {
     try {
-      const paymentRow = await db
-        .prepare(`SELECT order_type, payment_status FROM orders WHERE id = ?${writeTenantClause}`)
-        .bind(orderId, ...writeTenantBinds)
-        .first<{ order_type?: string | null; payment_status?: string | null }>();
-      if (paymentRow?.order_type === 'delivery' && paymentRow?.payment_status !== 'paid') {
+      let paymentRow: {
+        order_type?: string | null;
+        payment_status?: string | null;
+        payment_method?: string | null;
+        is_cod?: number | string | null;
+      } | null = null;
+      try {
+        paymentRow = await db
+          .prepare(`SELECT order_type, payment_status, payment_method, is_cod FROM orders WHERE id = ?${writeTenantClause}`)
+          .bind(orderId, ...writeTenantBinds)
+          .first();
+      } catch {
+        try {
+          paymentRow = await db
+            .prepare(`SELECT order_type, payment_status, payment_method FROM orders WHERE id = ?${writeTenantClause}`)
+            .bind(orderId, ...writeTenantBinds)
+            .first();
+        } catch {
+          paymentRow = await db
+            .prepare(`SELECT order_type, payment_status FROM orders WHERE id = ?${writeTenantClause}`)
+            .bind(orderId, ...writeTenantBinds)
+            .first();
+        }
+      }
+      const method = String(paymentRow?.payment_method ?? '').trim().toLowerCase();
+      const rawPaymentStatus =
+        typeof paymentRow?.payment_status === 'string' ? paymentRow.payment_status.trim().toLowerCase() : '';
+      const isCodDelivery = method === 'cod' || Number(paymentRow?.is_cod ?? 0) === 1;
+      const isPrepaidOnline = method === 'payos' || method === 'bank_transfer' || method === 'qr';
+      if (isPrepaidOnline && rawPaymentStatus && rawPaymentStatus !== 'paid') {
+        return {
+          success: false,
+          error: 'Đơn thanh toán trực tuyến phải hoàn tất thanh toán trước khi chế biến',
+          statusCode: 409,
+        };
+      }
+      if (paymentRow?.order_type === 'delivery' && paymentRow?.payment_status !== 'paid' && !isCodDelivery) {
         return {
           success: false,
           error: 'Đơn giao tận nơi phải hoàn tất thanh toán trước khi chế biến',
@@ -110,6 +194,46 @@ export async function transitionOrderStatus(
       }
     } catch {
       // Allow fallback when minimal schema omits order_type or payment_status
+    }
+  }
+
+  if (targetStatus === 'cancelled' && !isNoOp) {
+    const canProbeIssuedInvoice =
+      !options.currentOrder ||
+      'payment_status' in options.currentOrder ||
+      'total' in options.currentOrder;
+    if (canProbeIssuedInvoice && (await hasIssuedEInvoiceForOrder(db, orderId))) {
+      return {
+        success: false,
+        error: ISSUED_EINVOICE_CANCEL_ERROR,
+        statusCode: 409,
+      };
+    }
+    // A settled payment must never be dropped by a raw status transition; only management-authorized
+    // rollback paths that unwind loyalty, inventory, and wallet state may compensate a paid order.
+    const normalizedActor = (actorRole ?? '').trim().toLowerCase();
+    const canCompensatePaid = Boolean(
+      options.allowPaidCompensation &&
+        (normalizedActor === 'owner' ||
+          normalizedActor === 'admin' ||
+          normalizedActor === 'manager' ||
+          normalizedActor === 'supervisor'),
+    );
+    let knownPaymentStatus: string | null | undefined =
+      options.paymentStatus ?? (options.currentOrder as { payment_status?: string | null } | undefined)?.payment_status;
+    if (!canCompensatePaid && (knownPaymentStatus === undefined || knownPaymentStatus === null)) {
+      try {
+        const row = await db
+          .prepare(`SELECT payment_status FROM orders WHERE id = ?${writeTenantClause}`)
+          .bind(orderId, ...writeTenantBinds)
+          .first<{ payment_status?: string | null }>();
+        knownPaymentStatus = row?.payment_status;
+      } catch {
+        // Minimal schemas without payment_status cannot hold a paid order.
+      }
+    }
+    if (!canCompensatePaid && String(knownPaymentStatus ?? '').trim().toLowerCase() === 'paid') {
+      return { success: false, error: PAID_ORDER_CANCEL_ERROR, statusCode: 409 };
     }
   }
 

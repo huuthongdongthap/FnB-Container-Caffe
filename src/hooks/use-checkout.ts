@@ -1,5 +1,6 @@
 import { useMutation } from '@tanstack/react-query';
 import { apiFetch } from '@/lib/api-client';
+import { captureGuestOrderTokenFromResponse, getGuestOrderToken } from '@/lib/guest-order-token';
 import type { OrderApiPayload } from '@/lib/validators';
 
 /* ═══════════════════════════════════════════════════════════════════
@@ -44,6 +45,7 @@ export function useCheckout() {
         method: 'POST',
         body: JSON.stringify(payload),
       });
+      captureGuestOrderTokenFromResponse(res);
       if (!res.order && res.data) {
         return {
           ...res,
@@ -95,16 +97,23 @@ interface PayOSResponse {
 export function useProcessPayOS() {
   return useMutation<PayOSResponse, Error, PayOSRequest>({
     mutationFn: async (payload) => {
-      const normalizedPayload = payload.total !== undefined
-        ? payload
-        : { ...payload, total: payload.totalAmount ?? 0 };
+      const resolvedTotal = payload.total ?? payload.totalAmount ?? 0;
+      const normalizedPayload = {
+        ...payload,
+        total: resolvedTotal,
+        amount: resolvedTotal,
+      };
       const storedToken = typeof localStorage !== 'undefined'
         ? (localStorage.getItem('aura_auth_token') || localStorage.getItem('auth_token') || localStorage.getItem('token'))
         : null;
+      const orderToken = getGuestOrderToken(normalizedPayload.order_id);
+      const headers: Record<string, string> = {};
+      if (storedToken) headers.Authorization = `Bearer ${storedToken}`;
+      if (orderToken) headers['X-Order-Token'] = orderToken;
       const res = await apiFetch<PayOSResponse>('/api/payment/create-link', {
         method: 'POST',
         body: JSON.stringify(normalizedPayload),
-        ...(storedToken ? { headers: { Authorization: `Bearer ${storedToken}` } } : {}),
+        ...(Object.keys(headers).length > 0 ? { headers } : {}),
       });
       const checkoutUrl =
         res.checkout_url

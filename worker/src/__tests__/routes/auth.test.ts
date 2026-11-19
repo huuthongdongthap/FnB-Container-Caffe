@@ -241,9 +241,10 @@ describe('verifyEmail & registerWithVerification hardening', () => {
     expect(devBody.success).toBe(true);
     expect(devBody.data).toEqual(
       expect.arrayContaining([
-        expect.objectContaining({ id: 'device-1', fingerprint: 'local-device-token', platform: 'mobile', isTrusted: true }),
+        expect.objectContaining({ id: 'device-1', fingerprint: '***oken', platform: 'mobile', isTrusted: true }),
       ])
     );
+    expect(JSON.stringify(devBody)).not.toContain('local-device-token');
 
     const { openApiAuthRouter } = await import('../../routes/openapi-auth');
     const ownerToken = await f.token('owner');

@@ -18,6 +18,10 @@ vi.mock('@/hooks/use-checkout', () => ({
   useProcessPayOS: vi.fn(),
 }));
 
+vi.mock('@/hooks/use-offline-sync', () => ({
+  useOfflineSync: vi.fn(),
+}));
+
 vi.mock('@/components/stitch/StitchPOSNew', () => ({
   StitchPOSNew: ({ menuItems, loading, error, brandName, onCompleteOrder }: any) => (
     <div data-testid="stitch-pos">
@@ -46,6 +50,7 @@ vi.mock('lucide-react', () => ({
 
 import { useMenu } from '@/hooks/use-menu';
 import { useCheckout, useProcessPayOS } from '@/hooks/use-checkout';
+import { useOfflineSync } from '@/hooks/use-offline-sync';
 import AdminPOSPage from '@/pages/admin/POS';
 
 const MOCK_MENU = {
@@ -79,6 +84,18 @@ function setupMocks(overrides: {
     mutateAsync: vi.fn(),
     isPending: false,
     reset: vi.fn(),
+  } as any);
+
+  vi.mocked(useOfflineSync).mockReturnValue({
+    isOnline: true,
+    pendingCount: 0,
+    quarantinedCount: 0,
+    syncing: false,
+    lastSyncAt: null,
+    error: null,
+    syncAll: vi.fn(),
+    refreshPendingCount: vi.fn(),
+    enqueueOrder: vi.fn(),
   } as any);
 }
 
@@ -121,5 +138,21 @@ describe('AdminPOSPage', () => {
   it('renders checkout button from Stitch component', () => {
     renderWithProviders(<AdminPOSPage />);
     expect(screen.getByTestId('pos-checkout-btn')).toBeTruthy();
+  });
+
+  it('surfaces quarantined offline orders banner when quarantinedCount > 0', () => {
+    vi.mocked(useOfflineSync).mockReturnValue({
+      isOnline: true,
+      pendingCount: 0,
+      quarantinedCount: 3,
+      syncing: false,
+      lastSyncAt: null,
+      error: null,
+      syncAll: vi.fn(),
+      refreshPendingCount: vi.fn(),
+      enqueueOrder: vi.fn(),
+    } as any);
+    renderWithProviders(<AdminPOSPage />);
+    expect(screen.getByTestId('pos-quarantined-banner')).toBeTruthy();
   });
 });

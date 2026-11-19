@@ -23,27 +23,6 @@ export function resolveOpenApiOrdersTenant(
   const user = c.get?.('user') as
     | { id?: string; role?: string; tenantId?: string; tenant_id?: string }
     | undefined;
-  if (user?.id === 'local-staff') {
-    const rawUserTenant =
-      typeof user.tenantId === 'string' && user.tenantId.trim()
-        ? user.tenantId.trim()
-        : typeof user.tenant_id === 'string' && user.tenant_id.trim()
-          ? user.tenant_id.trim()
-          : 'default';
-    const role = (user.role || '').trim().toLowerCase();
-    const hqAdmin =
-      isHQSuperAdmin(user) ||
-      isHQSuperAdmin(c) ||
-      ((role === 'owner' || role === 'admin') && (rawUserTenant === '*' || rawUserTenant.toLowerCase() === 'hq'));
-    if (hqAdmin) {
-      const qTenant = typeof c.req?.query?.('tenant_id') === 'string' ? c.req.query('tenant_id').trim() : '';
-      return {
-        ok: true,
-        tenantId: !qTenant || qTenant === '*' || qTenant.toLowerCase() === 'hq' ? '*' : qTenant,
-      };
-    }
-    return { ok: true, tenantId: rawUserTenant };
-  }
   if (new Set(candidateOverrides).size > 1) {
     return {
       ok: false,

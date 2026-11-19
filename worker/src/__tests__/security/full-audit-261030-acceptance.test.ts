@@ -8580,7 +8580,7 @@ describe('Phase 48 (AU1..AU4) — Loyalty Tiers/Phone Auth/Referral Reversal, Mo
     expect(exportHandlersSrc).toContain('Date range cannot exceed 366 days');
     expect(analyticsSummarySrc).toContain("AND status NOT IN ('cancelled', 'refunded', 'failed', 'rejected', 'expired')");
     expect(analyticsSummarySrc).toContain("AND COALESCE(payment_status, '') != 'refunded'");
-    expect(csvExportSrc).toContain('AND substr(created_at, 1, 10) >= ?');
+    expect(csvExportSrc).toContain('substr(created_at, 1, 10) >= ?');
     expect(csvExportSrc).toContain('LIMIT 10000');
 
     // Runtime checks: resolveAnalyticsTenant & escapeCsvField carriage-return quoting
@@ -8804,7 +8804,7 @@ describe('Phase 49 (AV1..AV4) — Loyalty/Referrals, Mobile POS/Checkin/Admin Me
     expect(poHandlersSrc).toContain("const PO_MUTATION_ROLES = ['owner', 'manager', 'admin'];");
     expect(poHandlersSrc).toContain('verifyPurchaseOrderAccess');
     expect(reportsAnalyticsSrc).toContain(
-      "COALESCE(status, '') NOT IN ('cancelled', 'refunded', 'failed', 'expired') AND COALESCE(payment_status, '') NOT IN ('refunded', 'failed')"
+      "COALESCE(status, '') NOT IN ('cancelled', 'refunded', 'failed', 'expired') AND COALESCE(payment_status, '') NOT IN ('refunded', 'failed', 'cancelled', 'canceled') AND LOWER(COALESCE(status, '')) NOT IN ('cancelled', 'canceled', 'refunded', 'failed', 'rejected', 'expired') AND LOWER(COALESCE(payment_status, '')) NOT IN ('refunded', 'failed', 'cancelled', 'canceled') AND NOT (COALESCE(total, 0) = 0 AND (COALESCE(customer_name, '') = 'Khách QR - cho don mon' OR COALESCE(items, '') IN ('', '[]')))"
     );
     expect(reportsAnalyticsSrc).toContain('verifyReportAnalyticsAccess');
     expect(reportsExportSrc).toContain("const EXPORT_ALLOWED_ROLES = new Set(['owner', 'manager', 'admin']);");

@@ -9,6 +9,7 @@ import {
   paymentTenantScope,
   resolvePaymentCustomerOwnerIds,
   resolvePaymentTenantScope,
+  verifyPaymentOrderToken,
 } from '../../../../packages/domain/payment/policies/payment-access';
 import { isHQSuperAdmin } from '../../middleware/tenant';
 
@@ -114,15 +115,21 @@ export function registerPaymentReadHandlers(router: OpenAPIHono<{ Bindings: Env 
     const { id } = c.req.valid('param' as never) as { id: string };
     let payment: PaymentRow | null = null;
     try {
-      payment = await db.prepare('SELECT p.*, o.tenant_id, o.customer_id, o.order_token FROM payments p JOIN orders o ON o.id = p.order_id WHERE p.id = ?')
+      payment = await db.prepare('SELECT p.*, o.tenant_id, o.customer_id, o.guest_token_hash FROM payments p JOIN orders o ON o.id = p.order_id WHERE p.id = ?')
         .bind(id).first<PaymentRow>();
     } catch {
-      payment = await db.prepare('SELECT p.*, o.tenant_id, o.customer_id FROM payments p JOIN orders o ON o.id = p.order_id WHERE p.id = ?')
-        .bind(id).first<PaymentRow>();
+      try {
+        payment = await db.prepare('SELECT p.*, o.tenant_id, o.customer_id, o.order_token FROM payments p JOIN orders o ON o.id = p.order_id WHERE p.id = ?')
+          .bind(id).first<PaymentRow>();
+      } catch {
+        payment = await db.prepare('SELECT p.*, o.tenant_id, o.customer_id FROM payments p JOIN orders o ON o.id = p.order_id WHERE p.id = ?')
+          .bind(id).first<PaymentRow>();
+      }
     }
     if (!payment) return c.json({ success: false, error: 'Payment not found' }, 404);
 
-    let effectivePayment = payment;
+    const orderTokenVerified = await verifyPaymentOrderToken(c, payment);
+    let effectivePayment: PaymentRow = { ...payment, orderTokenVerified };
     if (user && String(user.role || '').trim().toLowerCase() === 'customer' && payment.customer_id) {
       const userId = String(user.id ?? user.sub ?? '').trim();
       const orderCustomerId = String(payment.customer_id).trim();
@@ -135,7 +142,7 @@ export function registerPaymentReadHandlers(router: OpenAPIHono<{ Bindings: Env 
       const ownerIds = await resolveCustomerOwnerIds(db, user, orderTenant);
       try { c.set?.('customerOwnerIds', ownerIds); } catch { /* optional on mock context */ }
       if (ownerIds.includes(orderCustomerId)) {
-        effectivePayment = { ...payment, customer_id: userId || orderCustomerId };
+        effectivePayment = { ...effectivePayment, customer_id: userId || orderCustomerId };
       }
     }
 

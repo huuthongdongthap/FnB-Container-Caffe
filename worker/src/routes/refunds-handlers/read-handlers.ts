@@ -7,6 +7,7 @@ import {
   extractRequestedPaymentTenant,
   FINANCIAL_ROLES,
   hasPaymentTenantMismatch,
+  verifyPaymentOrderToken,
 } from '../../../../packages/domain/payment/policies/payment-access';
 import { isHQSuperAdmin } from '../../middleware/tenant';
 
@@ -48,22 +49,32 @@ export function registerRefundReadHandlers(router: Hono<{ Bindings: Env }>): voi
         tenant_id: string | null;
         customer_id: string | null;
         order_token?: string | null;
+        guest_token_hash?: string | null;
+        orderTokenVerified?: boolean;
       };
       let payment: RefundDetailRow | null = null;
       try {
         payment = await db.prepare(
-          `SELECT p.*, o.tenant_id, o.customer_id, o.order_token FROM payments p
+          `SELECT p.*, o.tenant_id, o.customer_id, o.guest_token_hash FROM payments p
            JOIN orders o ON o.id = p.order_id WHERE p.id = ?`
         ).bind(paymentId).first<RefundDetailRow>();
       } catch {
-        payment = await db.prepare(
-          `SELECT p.*, o.tenant_id, o.customer_id FROM payments p
-           JOIN orders o ON o.id = p.order_id WHERE p.id = ?`
-        ).bind(paymentId).first<RefundDetailRow>();
+        try {
+          payment = await db.prepare(
+            `SELECT p.*, o.tenant_id, o.customer_id, o.order_token FROM payments p
+             JOIN orders o ON o.id = p.order_id WHERE p.id = ?`
+          ).bind(paymentId).first<RefundDetailRow>();
+        } catch {
+          payment = await db.prepare(
+            `SELECT p.*, o.tenant_id, o.customer_id FROM payments p
+             JOIN orders o ON o.id = p.order_id WHERE p.id = ?`
+          ).bind(paymentId).first<RefundDetailRow>();
+        }
       }
 
-      let effectivePayment = payment;
-      if (payment && user && String(user.role || '').trim().toLowerCase() === 'customer' && payment.customer_id) {
+      const orderTokenVerified = payment ? await verifyPaymentOrderToken(c, payment) : false;
+      let effectivePayment = payment ? { ...payment, orderTokenVerified } : null;
+      if (payment && effectivePayment && user && String(user.role || '').trim().toLowerCase() === 'customer' && payment.customer_id) {
         const userId = String(user.id ?? user.sub ?? '').trim();
         const orderCustomerId = String(payment.customer_id).trim();
         const directCustomerId = String(user.customerId ?? user.customer_id ?? '').trim();
@@ -84,7 +95,7 @@ export function registerRefundReadHandlers(router: Hono<{ Bindings: Env }>): voi
           linkedMatch = Boolean(row?.id);
         }
         if (linkedMatch && userId) {
-          effectivePayment = { ...payment, customer_id: userId };
+          effectivePayment = { ...effectivePayment, customer_id: userId };
         }
       }
 

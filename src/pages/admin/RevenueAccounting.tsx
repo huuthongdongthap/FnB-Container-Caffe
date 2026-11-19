@@ -14,6 +14,10 @@ interface DailyPnlEntry {
   gross_sales: number;
   discounts: number;
   net_revenue: number;
+  shipping_fee: number;
+  service_fee: number;
+  tip_amount: number;
+  total_collected: number;
   refunds: number;
   cogs: number;
   waste_cost: number;
@@ -30,6 +34,10 @@ interface PnlSummaryReport {
     gross_sales: number;
     discounts: number;
     net_revenue: number;
+    shipping_fee: number;
+    service_fee: number;
+    tip_amount: number;
+    total_collected: number;
     refunds: number;
     cogs: number;
     waste_cost: number;

@@ -1,4 +1,5 @@
 import { createOrder, http, sign } from './local-flow-api.mjs';
+import { runOperationalParityChecks } from './local-flow-operational-parity.mjs';
 
 export async function runSecurityChecks(runtime, context, check) {
   const { db } = runtime;
@@ -51,9 +52,14 @@ export async function runSecurityChecks(runtime, context, check) {
   });
 
   await guarded('tenant-creation-binding', async () => {
-    const signed = await createOrder(runtime, 'cod', 'Signed tenant A checkout', {}, tokens['staff-a']);
-    check('tenant-signed-creation', signed.row?.tenant_id === 'cafe-a', 'derive cafe-a from signed staff session',
+    const signed = await createOrder(runtime, 'cod', 'Signed tenant A checkout', {
+      items: [{ product_id: 'review-coffee-a', id: 'review-coffee-a', name: 'Cà phê kiểm thử cafe-a', quantity: 1, price: 20000 }],
+    }, tokens['staff-a']);
+    check('tenant-signed-creation', signed.response.status === 201 && signed.row?.tenant_id === 'cafe-a', 'derive cafe-a from signed staff session',
       { status: signed.response.status, tenant: signed.row?.tenant_id });
+    const crossCatalog = await createOrder(runtime, 'cod', 'Cross-tenant catalog reject', {}, tokens['staff-a']);
+    check('tenant-cross-catalog-reject', !crossCatalog.row && crossCatalog.response.status === 400, 'tenant A cannot order default-tenant product',
+      { status: crossCatalog.response.status, error: crossCatalog.response.body?.error });
     const injected = await createOrder(runtime, 'cod', 'Client tenant injection', { tenant_id: 'cafe-b' });
     check('tenant-client-injection', (!injected.row && [400, 403].includes(injected.response.status)) || (injected.response.status === 201 && injected.row?.tenant_id === 'default'), 'untrusted guest cannot choose cafe-b',
       { status: injected.response.status, tenant: injected.row?.tenant_id });
@@ -113,4 +119,127 @@ export async function runSecurityChecks(runtime, context, check) {
       && !runtime.providerRequests.some(request => request.kind === 'refund'),
       'unsupported automatic refund422 with no financial writes or provider calls', { status: own.status, before, after });
   });
+
+  await guarded('paid-cancel-and-einvoice-guards', async () => {
+    const rawPaidCancel = await http(runtime, `/api/orders/${payos.id}/status`, {
+      method: 'PATCH', token: tokens['cashier-default'], body: { status: 'cancelled' },
+    });
+    const stillPaid = await db.prepare('SELECT status,payment_status FROM orders WHERE id = ?').bind(payos.id).first();
+    check('paid-order-blocks-raw-cancel', [403, 409].includes(rawPaidCancel.status) && stillPaid?.status !== 'cancelled',
+      'paid order rejects uncompensated status cancel', { status: rawPaidCancel.status, order: stillPaid });
+
+    const unpaidPayos = await createOrder(runtime, 'payos', 'Unpaid KDS hold check');
+    const kdsQueue = await http(runtime, '/api/kds/orders', { token: tokens['staff-default'] });
+    const kdsIds = (kdsQueue.body.data || []).map(order => order.id);
+    check('kds-holds-unpaid-payos', kdsQueue.status === 200 && Boolean(unpaidPayos.id) && !kdsIds.includes(unpaidPayos.id),
+      'unpaid PayOS order excluded from KDS queue', { unpaidOrderId: unpaidPayos.id, kdsCount: kdsIds.length });
+
+    const guestOrderToken = unpaidPayos.response.body.data?.order_token || unpaidPayos.response.body.order_token;
+    const unauthDetail = await http(runtime, `/api/orders/${unpaidPayos.id}`);
+    const tokenDetail = guestOrderToken
+      ? await http(runtime, `/api/orders/${unpaidPayos.id}?order_token=${encodeURIComponent(guestOrderToken)}`)
+      : { status: 0 };
+    check('guest-order-token-bola-guard', Boolean(guestOrderToken) && [401, 403, 404].includes(unauthDetail.status) && tokenDetail.status === 200,
+      'anonymous order detail blocked without order_token and allowed with valid capability token',
+      { unauthStatus: unauthDetail.status, hasToken: Boolean(guestOrderToken), tokenStatus: tokenDetail.status });
+
+    await db.prepare(
+      "INSERT OR REPLACE INTO erpnext_mappings (id, local_type, local_id, erpnext_id, sync_status, tenant_id) VALUES (?, 'sales_invoice', ?, 'SINV-LOCAL-001', 'synced', 'default')"
+    ).bind(`map_${unpaidPayos.id}`, unpaidPayos.id).run();
+    const einvoiceCancel = await http(runtime, `/api/orders/${unpaidPayos.id}/cancel`, {
+      method: 'POST', token: tokens['staff-default'], body: { reason: 'attempted void after invoice' },
+    });
+    check('einvoice-blocks-order-cancel', einvoiceCancel.status === 409,
+      'issued e-invoice blocks order cancellation with 409', { status: einvoiceCancel.status, body: einvoiceCancel.body });
+
+    const anonTrack = await http(runtime, `/api/orders/${unpaidPayos.id}/track`);
+    const forgedTrack = await http(runtime, `/api/orders/${unpaidPayos.id}/track?order_token=forged-capability-token`);
+    const validTrack = guestOrderToken
+      ? await http(runtime, `/api/orders/${unpaidPayos.id}/track?order_token=${encodeURIComponent(guestOrderToken)}`)
+      : { status: 0 };
+    check('track-forged-order-token-guard',
+      anonTrack.status === 200 && forgedTrack.status === 403 && validTrack.status === 200,
+      'anonymous shareable track returns 200 while forged token returns 403 and valid token returns 200',
+      { anonStatus: anonTrack.status, forgedStatus: forgedTrack.status, validStatus: validTrack.status });
+  });
+
+  await guarded('split-bill-kds-and-cod-realtime', async () => {
+    await db.prepare(
+      "INSERT OR IGNORE INTO cafe_tables (id, table_number, zone, capacity, status, tenant_id) VALUES ('tbl_split_local', 'T-SPLIT-LOCAL', 'Indoor', 4, 'Available', 'default')"
+    ).run();
+    const splitRes = await fetch(`${runtime.url}/api/orders/split`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'Idempotency-Key': `idem-split-${Date.now()}`,
+        Connection: 'close',
+      },
+      body: JSON.stringify({
+        table_id: 'T-SPLIT-LOCAL',
+        orders: [
+          {
+            customer_name: 'Split Guest A',
+            customer_phone: '0901112221',
+            payment_method: 'cod',
+            items: [{ product_id: 'review-coffee', id: 'review-coffee', name: 'Cà phê kiểm thử local', quantity: 1, price: 20000 }],
+          },
+          {
+            customer_name: 'Split Guest B',
+            customer_phone: '0901112222',
+            payment_method: 'cod',
+            items: [{ product_id: 'review-coffee', id: 'review-coffee', name: 'Cà phê kiểm thử local', quantity: 1, price: 20000 }],
+          },
+        ],
+      }),
+      signal: AbortSignal.timeout(15000),
+    });
+    const splitBody = await splitRes.json().catch(() => ({}));
+    const tokenMap = splitBody?.order_tokens || {};
+    const splitIds = Object.keys(tokenMap);
+    const firstSplitId = splitIds[0];
+    const firstSplitToken = firstSplitId ? tokenMap[firstSplitId] : '';
+    const splitUnauth = firstSplitId ? await http(runtime, `/api/orders/${firstSplitId}`) : { status: 0 };
+    const splitWithToken = firstSplitId && firstSplitToken
+      ? await http(runtime, `/api/orders/${firstSplitId}?order_token=${encodeURIComponent(firstSplitToken)}`)
+      : { status: 0 };
+    check('split-bill-guest-token-minting',
+      splitRes.status === 201 && splitIds.length === 2 && [401, 403, 404].includes(splitUnauth.status) && splitWithToken.status === 200,
+      'split bill mints per-child capability tokens and enforces them on order detail',
+      { status: splitRes.status, tokenCount: splitIds.length, unauth: splitUnauth.status, withToken: splitWithToken.status });
+
+    await seed('ORD_KITCHEN_HANDOFF', 'default', 'ready');
+    const kitchenServed = await http(runtime, '/api/orders/ORD_KITCHEN_HANDOFF/status', {
+      method: 'PATCH', token: tokens['kitchen-default'], body: { status: 'served' },
+    });
+    const kitchenCompleted = await http(runtime, '/api/orders/ORD_KITCHEN_HANDOFF/status', {
+      method: 'PATCH', token: tokens['kitchen-default'], body: { status: 'completed' },
+    });
+    const handoffRow = await db.prepare('SELECT status FROM orders WHERE id = ?').bind('ORD_KITCHEN_HANDOFF').first();
+    check('kitchen-ready-to-served-handoff',
+      kitchenServed.status === 200 && kitchenCompleted.status === 403 && handoffRow?.status === 'served',
+      'kitchen role transitions ready to served (200) and blocks served to completed (403)',
+      { servedStatus: kitchenServed.status, completedStatus: kitchenCompleted.status, dbStatus: handoffRow?.status });
+
+    await db.prepare(
+      "INSERT INTO orders (id,items,total,status,customer_name,customer_phone,payment_method,payment_status,notes,tenant_id) VALUES ('ORD_QR_PLACEHOLDER','[]',0,'pending','QR Guest','0902223333','cod','unpaid','Khách QR - cho don mon','default')"
+    ).run();
+    const kdsAfterCheckin = await http(runtime, '/api/kds/orders', { token: tokens['staff-default'] });
+    const kdsAfterIds = (kdsAfterCheckin.body.data || []).map(order => order.id);
+    check('kds-holds-checkin-placeholder',
+      kdsAfterCheckin.status === 200 && !kdsAfterIds.includes('ORD_QR_PLACEHOLDER'),
+      'standalone QR check-in empty placeholder excluded from KDS queue',
+      { kdsStatus: kdsAfterCheckin.status, leaked: kdsAfterIds.includes('ORD_QR_PLACEHOLDER') });
+
+    await seed('ORD_COD_RT_CHECK', 'default', 'served');
+    const codMarkPaid = await http(runtime, '/api/orders/ORD_COD_RT_CHECK/mark-cod-paid', {
+      method: 'PATCH', token: tokens['cashier-default'],
+    });
+    const codRow = await db.prepare('SELECT payment_status FROM orders WHERE id = ?').bind('ORD_COD_RT_CHECK').first();
+    check('cod-settlement-realtime-event',
+      codMarkPaid.status === 200 && codRow?.payment_status === 'paid',
+      'cashier COD collection settles order payment_status to paid cleanly',
+      { status: codMarkPaid.status, paymentStatus: codRow?.payment_status });
+  });
+
+  await runOperationalParityChecks(runtime, context, check);
 }

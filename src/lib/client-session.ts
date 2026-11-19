@@ -63,7 +63,7 @@ export function saveClientSession(token: string, user: ClientSessionUser, device
     if (previous?.id !== user.id || previous?.tenantId !== user.tenantId || previous?.role !== user.role) {
       accountScopedKeys.forEach(key => localStorage.removeItem(key));
       try { sessionStorage.removeItem('aura_checkout_intent_v1'); } catch { /* ignore */ }
-      void offlineDb.clear().catch(() => {});
+      void offlineDb.clearCachesAndSynced().catch(() => {});
     }
     for (const key of ['aura_auth_user', 'aura_user_data', 'mobile_user']) localStorage.setItem(key, JSON.stringify(user));
     for (const key of ['mobile_token', 'aura_auth_token']) localStorage.setItem(key, token);
@@ -78,7 +78,7 @@ export function invalidateClientSession(expectedToken?: string | null, error: st
     sessionKeys.forEach(key => localStorage.removeItem(key));
     if (forgetDevice) ['mobile_device', 'aura_device_token'].forEach(key => localStorage.removeItem(key));
     try { sessionStorage.removeItem('aura_checkout_intent_v1'); } catch { /* ignore */ }
-    void offlineDb.clear().catch(() => {});
+    void offlineDb.clearCachesAndSynced().catch(() => {});
     if (typeof navigator !== 'undefined' && navigator.serviceWorker?.controller) {
       navigator.serviceWorker.controller.postMessage({ type: 'CLEAR_AUTH_CACHE' });
     }

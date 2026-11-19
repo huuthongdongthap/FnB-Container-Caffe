@@ -14,8 +14,18 @@ import {
   type OrderCreationActor,
 } from '../policies/order-creation-scope';
 import { publishOrderEvent } from '../policies/customer-order-payload';
-import { resolveServerOrderOwnership } from '../../customer/policies/order-ownership-policy';
+import {
+   resolveServerOrderOwnership,
+  generateOrderToken,
+  hashOrderToken,
+} from '../../customer/policies/order-ownership-policy';
 import { runPostOrderSideEffects } from './create-order-side-effects';
+import { cancelOpenPayOSAttemptForOrder } from '../../payment/commands/payos-attempt';
+import {
+  hasIssuedEInvoiceForOrder,
+  ISSUED_EINVOICE_CANCEL_ERROR,
+  PAID_ORDER_CANCEL_ERROR,
+} from '../policies/order-status-transition';
 
 const log = createLogger({ route: 'orders' });
 const splitOrderEntrySchema = z.object({
@@ -27,6 +37,7 @@ const splitOrderEntrySchema = z.object({
   payment_method: paymentMethodSchema.default('cod'), notes: z.string().optional(),
   delivery_time: z.string().optional(), shipping_fee: z.number().nonnegative().optional(),
   discount: z.number().nonnegative().optional(),
+  // Accepted for client compatibility only; tax is never taken from the request.
   tax: z.number().nonnegative().optional(),
   tip: z.number().nonnegative().optional(),
 });
@@ -144,24 +155,61 @@ export async function splitOrders(
 
     const db = env.AURA_DB as D1Database;
     const parentOrderId = (parsed.data.order_id || parsed.data.parent_order_id || '').trim();
-    let parentOrder: { id: string; table_id?: string | null; tenant_id?: string | null; status?: string | null } | null = null;
+    let parentOrder: {
+      id: string;
+      table_id?: string | null;
+      tenant_id?: string | null;
+      status?: string | null;
+      payment_status?: string | null;
+      total?: number | null;
+      session_id?: string | null;
+    } | null = null;
     if (parentOrderId) {
       parentOrder = await db
         .prepare(
-          "SELECT id, table_id, tenant_id, status FROM orders WHERE id = ? AND (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?) LIMIT 1"
+          "SELECT id, table_id, tenant_id, status, payment_status, total, session_id FROM orders WHERE id = ? AND (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?) LIMIT 1"
         )
         .bind(parentOrderId, scopeTenant, scopeTenant)
-        .first<{ id: string; table_id?: string | null; tenant_id?: string | null; status?: string | null }>()
+        .first<{ id: string; table_id?: string | null; tenant_id?: string | null; status?: string | null; payment_status?: string | null; total?: number | null; session_id?: string | null }>()
         .catch(() =>
-          (scopeTenant === 'default' || scopeTenant === '*')
-            ? db
-                .prepare('SELECT id, table_id, status FROM orders WHERE id = ? LIMIT 1')
-                .bind(parentOrderId)
-                .first<{ id: string; table_id?: string | null; tenant_id?: string | null; status?: string | null }>()
-                .catch(() => null)
-            : null
+          db
+            .prepare(
+              "SELECT id, table_id, tenant_id, status, payment_status, total FROM orders WHERE id = ? AND (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?) LIMIT 1"
+            )
+            .bind(parentOrderId, scopeTenant, scopeTenant)
+            .first<{ id: string; table_id?: string | null; tenant_id?: string | null; status?: string | null; payment_status?: string | null; total?: number | null; session_id?: string | null }>()
+            .catch(() =>
+              db
+                .prepare(
+                  "SELECT id, table_id, tenant_id, status, payment_status FROM orders WHERE id = ? AND (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?) LIMIT 1"
+                )
+                .bind(parentOrderId, scopeTenant, scopeTenant)
+                .first<{ id: string; table_id?: string | null; tenant_id?: string | null; status?: string | null; payment_status?: string | null; total?: number | null; session_id?: string | null }>()
+                .catch(() =>
+                  (scopeTenant === 'default' || scopeTenant === '*')
+                    ? db
+                        .prepare('SELECT id, table_id, status FROM orders WHERE id = ? LIMIT 1')
+                        .bind(parentOrderId)
+                        .first<{ id: string; table_id?: string | null; tenant_id?: string | null; status?: string | null; payment_status?: string | null; total?: number | null; session_id?: string | null }>()
+                        .catch(() => null)
+                    : null
+                )
+            )
         );
+      if (parentOrder && !parentOrder.session_id) {
+        const sesRow = await db.prepare('SELECT session_id, total FROM orders WHERE id = ? LIMIT 1')
+          .bind(parentOrder.id).first<{ session_id?: string | null; total?: number | null }>().catch(() => null);
+        if (sesRow?.session_id) parentOrder.session_id = sesRow.session_id;
+        if (parentOrder.total === undefined && sesRow?.total !== undefined) parentOrder.total = sesRow.total;
+      }
       if (!parentOrder) return errorResponse('Order not found', 404);
+      const parentPayStatus = String(parentOrder.payment_status ?? '').trim().toLowerCase();
+      if (parentPayStatus === 'paid' || parentPayStatus === 'completed' || parentPayStatus === 'refunded') {
+        return errorResponse(PAID_ORDER_CANCEL_ERROR, 409);
+      }
+      if (await hasIssuedEInvoiceForOrder(db, parentOrder.id)) {
+        return errorResponse(ISSUED_EINVOICE_CANCEL_ERROR, 409);
+      }
     }
 
     let tableId: string | null = null;
@@ -220,16 +268,18 @@ export async function splitOrders(
                     ),
                 ),
             );
+    let inferredTableOrderTenant = '';
     if (!parentOrder && scopeTenant === '*' && (!tableRow || !('tenant_id' in tableRow) || !tableRow.tenant_id)) {
-      parentOrder = await db
-        .prepare('SELECT id, table_id, tenant_id, status FROM orders WHERE table_id = ? ORDER BY created_at DESC LIMIT 1')
+      const latestTableOrder = await db
+        .prepare('SELECT tenant_id FROM orders WHERE table_id = ? ORDER BY created_at DESC LIMIT 1')
         .bind(tableId)
-        .first<{ id: string; table_id?: string | null; tenant_id?: string | null; status?: string | null }>()
+        .first<{ tenant_id?: string | null }>()
         .catch(() => null);
+      inferredTableOrderTenant = latestTableOrder?.tenant_id ? String(latestTableOrder.tenant_id).trim() : '';
     }
 
     const rawTableTenant = tableRow && 'tenant_id' in tableRow && tableRow.tenant_id ? String(tableRow.tenant_id).trim() : '';
-    const rawParentTenant = parentOrder?.tenant_id ? String(parentOrder.tenant_id).trim() : '';
+    const rawParentTenant = (parentOrder?.tenant_id ? String(parentOrder.tenant_id).trim() : '') || inferredTableOrderTenant;
     const inheritedTenant =
       (rawTableTenant && rawTableTenant !== '*' && rawTableTenant.toLowerCase() !== 'hq' ? rawTableTenant : '') ||
       (rawParentTenant && rawParentTenant !== '*' && rawParentTenant.toLowerCase() !== 'hq' ? rawParentTenant : '');
@@ -244,7 +294,31 @@ export async function splitOrders(
       request.headers.get('idempotency-key') ||
       ''
     ).trim();
-    const idem = await orderCreationIdempotency(effectiveTenant, actor?.id, rawIdempotencyKey, parsed.data);
+    const idem = rawIdempotencyKey
+      ? await orderCreationIdempotency(effectiveTenant, actor?.id, rawIdempotencyKey, parsed.data)
+      : null;
+    // D1 is authoritative; KV eviction or outage must never duplicate an accepted split bill.
+    const findSavedSplit = async () => idem
+      ? db.prepare('SELECT fingerprint, response_body FROM order_creation_requests WHERE scope_key = ?')
+          .bind(`split:${idem.key}`).first<{ fingerprint: string; response_body: string }>().catch(() => null)
+      : null;
+    const replaySavedSplit = (saved: { fingerprint: string; response_body: string }) => {
+      if (saved.fingerprint !== idem!.fingerprint) {
+        return errorResponse('Idempotency-Key reused with different order data', 409);
+      }
+      let replayBody = saved.response_body;
+      try {
+        replayBody = JSON.stringify({ ...JSON.parse(saved.response_body), replayed: true });
+      } catch { /* keep stored body */ }
+      return new Response(replayBody, {
+        status: 200,
+        headers: { 'Content-Type': 'application/json', 'X-Cache': 'HIT' },
+      });
+    };
+    if (idem) {
+      const savedSplit = await findSavedSplit();
+      if (savedSplit) return replaySavedSplit(savedSplit);
+    }
     if (idem && env.AUTH_KV) {
       const kv = env.AUTH_KV as KVNamespace;
       const kvScopedKey = `split_idempotency:${effectiveTenant}:${rawIdempotencyKey}`;
@@ -280,6 +354,20 @@ export async function splitOrders(
         }
       }
     }
+    if (parentOrder) {
+      const parentStatus = String(parentOrder.status || '').trim().toLowerCase();
+      if (['cancelled', 'canceled', 'completed', 'refunded'].includes(parentStatus)) {
+        return errorResponse(`Cannot split an order in ${parentStatus} status`, 409);
+      }
+      const parentPayment = await db
+        .prepare('SELECT payment_status FROM orders WHERE id = ?')
+        .bind(parentOrder.id)
+        .first<{ payment_status?: string | null }>()
+        .catch(() => null);
+      if (['paid', 'completed', 'refunded'].includes(String(parentPayment?.payment_status || '').trim().toLowerCase())) {
+        return errorResponse('Paid order cannot be split; initiate a refund instead', 409);
+      }
+    }
     if (tableRow && tableRow.status) {
       const normalizedTableStatus = String(tableRow.status).trim().toLowerCase();
       if (
@@ -306,13 +394,13 @@ export async function splitOrders(
       if (orderData.tax !== undefined && (!Number.isFinite(orderData.tax) || orderData.tax < 0)) {
         return errorResponse('Invalid tax amount', 400);
       }
+      // Cap statutory VAT at 10% of server-derived subtotal (+1 VND rounding tolerance).
       const maxAllowedTax = snapshot.subtotal > 0 ? Math.ceil(snapshot.subtotal * 0.1) + 1 : 0;
       if (typeof orderData.tax === 'number' && orderData.tax > maxAllowedTax) {
         return errorResponse('Split order tax exceeds maximum statutory rate (10% of subtotal)', 400);
       }
       const isLegacyPlaceholderTotal =
         orderData.total === 1000 &&
-        orderData.tax === undefined &&
         orderData.items.length === 1 &&
         orderData.items[0]?.price === 1000 &&
         snapshot.subtotal !== 2000 &&
@@ -341,8 +429,20 @@ export async function splitOrders(
       tenantId,
     })));
     const statements: D1PreparedStatement[] = [];
+    const noGuestHashStatements: D1PreparedStatement[] = [];
+    const legacyWithHashStatements: D1PreparedStatement[] = [];
     const legacyStatements: D1PreparedStatement[] = [];
     const now = new Date().toISOString();
+    const orderTokens: Record<string, string> = {};
+    const guestTokens = await Promise.all(
+      parsed.data.orders.map(async (_order, index) => {
+        const resolvedCustomerId = ownerships[index]?.customerId ?? null;
+        if (resolvedCustomerId) return { token: null, hash: null };
+        const token = generateOrderToken();
+        const hash = await hashOrderToken(token);
+        return { token, hash };
+      }),
+    );
     const sideEffectInputs: Array<{
       id: string;
       order: z.infer<typeof splitOrderEntrySchema>;
@@ -352,8 +452,25 @@ export async function splitOrders(
     const createdOrders = parsed.data.orders.map((order, index) => {
       const id = generateId('ORD_');
       const snapshot = snapshots[index];
-      const orderTotal = snapshot.total + (typeof order.tax === 'number' && order.tax > 0 ? Math.round(order.tax) : 0);
+      const taxAmount = typeof order.tax === 'number' && order.tax > 0 ? Math.round(order.tax) : 0;
+      const orderTotal = snapshot.total + taxAmount;
       const resolvedCustomerId = ownerships[index]?.customerId ?? null;
+      const guestCap = guestTokens[index];
+      if (guestCap?.token) {
+        orderTokens[id] = guestCap.token;
+      }
+      const orderInsertArgsWithHash = [
+        id, snapshot.itemsJson, orderTotal, 'pending', order.customer_name, order.customer_phone,
+        order.customer_email || null, order.customer_address || null, order.payment_method, 'unpaid',
+        snapshot.shipping_fee, snapshot.discount, order.notes || null, order.delivery_time || 'now',
+        tableId, 'dine_in', snapshot.tip_amount, resolvedCustomerId, guestCap?.hash ?? null, tenantId, now, now,
+      ] as const;
+      const orderInsertSqlWithHash = `INSERT INTO orders (
+        id, items, total, status, customer_name, customer_phone,
+        customer_email, customer_address, payment_method, payment_status,
+        shipping_fee, discount, notes, delivery_time, table_id,
+        order_type, tip_amount, customer_id, guest_token_hash, tenant_id, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
       const orderInsertArgs = [
         id, snapshot.itemsJson, orderTotal, 'pending', order.customer_name, order.customer_phone,
         order.customer_email || null, order.customer_address || null, order.payment_method, 'unpaid',
@@ -366,31 +483,41 @@ export async function splitOrders(
         shipping_fee, discount, notes, delivery_time, table_id,
         order_type, tip_amount, customer_id, tenant_id, created_at, updated_at
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
-      statements.push(db.prepare(orderInsertSql).bind(...orderInsertArgs));
+      statements.push(db.prepare(orderInsertSqlWithHash).bind(...orderInsertArgsWithHash));
+      legacyWithHashStatements.push(db.prepare(orderInsertSqlWithHash).bind(...orderInsertArgsWithHash));
+      noGuestHashStatements.push(db.prepare(orderInsertSql).bind(...orderInsertArgs));
       legacyStatements.push(db.prepare(orderInsertSql).bind(...orderInsertArgs));
       for (const item of snapshot.items) {
         const itemId = generateId('ITEM_');
         const modifiersJson = JSON.stringify(item.modifiers || []);
-        statements.push(db.prepare(`INSERT INTO order_items (
+        const itemStmt = db.prepare(`INSERT INTO order_items (
           id, order_id, product_id, quantity, subtotal, modifiers, tenant_id, created_at
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`)
           .bind(itemId, id, item.menuItemId, item.quantity, item.subtotalCents,
-            modifiersJson, tenantId, now));
-        legacyStatements.push(db.prepare(`INSERT INTO order_items (
+            modifiersJson, tenantId, now);
+        const legacyItemStmt = db.prepare(`INSERT INTO order_items (
           id, order_id, product_id, quantity, subtotal, modifiers, created_at
         ) VALUES (?, ?, ?, ?, ?, ?, ?)`)
           .bind(itemId, id, item.menuItemId, item.quantity, item.subtotalCents,
-            modifiersJson, now));
+            modifiersJson, now);
+        statements.push(itemStmt);
+        noGuestHashStatements.push(itemStmt);
+        legacyWithHashStatements.push(legacyItemStmt);
+        legacyStatements.push(legacyItemStmt);
       }
       // PayOS reserves its own identified attempt when creating the provider link.
       if (order.payment_method === 'cod') {
         const payId = generateId('PAY_');
-        statements.push(db.prepare(`INSERT INTO payments (id, order_id, method, amount, status, tenant_id, created_at, updated_at)
+        const payStmt = db.prepare(`INSERT INTO payments (id, order_id, method, amount, status, tenant_id, created_at, updated_at)
           VALUES (?, ?, ?, ?, ?, ?, ?, ?)`)
-          .bind(payId, id, 'cod', orderTotal, 'pending', tenantId, now, now));
-        legacyStatements.push(db.prepare(`INSERT INTO payments (id, order_id, method, amount, status, created_at, updated_at)
+          .bind(payId, id, 'cod', orderTotal, 'pending', tenantId, now, now);
+        const legacyPayStmt = db.prepare(`INSERT INTO payments (id, order_id, method, amount, status, created_at, updated_at)
           VALUES (?, ?, ?, ?, ?, ?, ?)`)
-          .bind(payId, id, 'cod', orderTotal, 'pending', now, now));
+          .bind(payId, id, 'cod', orderTotal, 'pending', now, now);
+        statements.push(payStmt);
+        noGuestHashStatements.push(payStmt);
+        legacyWithHashStatements.push(legacyPayStmt);
+        legacyStatements.push(legacyPayStmt);
       }
       sideEffectInputs.push({ id, order, snapshot: { ...snapshot, total: orderTotal }, resolvedCustomerId });
       return {
@@ -398,23 +525,82 @@ export async function splitOrders(
         customer_name: order.customer_name, customer_phone: order.customer_phone,
         customer_address: order.customer_address || null, payment_method: order.payment_method,
         notes: order.notes || null, table_id: tableId, created_at: now,
+        ...(parentOrder?.session_id ? { session_id: String(parentOrder.session_id).trim() } : {}),
+        ...(guestCap?.token ? { order_token: guestCap.token } : {}),
       };
     });
     const tblClause = tenantId === 'default'
       ? "AND (tenant_id = ? OR tenant_id IS NULL OR tenant_id = '' OR TRIM(tenant_id) = '')"
       : 'AND (tenant_id = ? OR TRIM(tenant_id) = ?2)';
-    const tableOccupySql = `UPDATE cafe_tables SET status = 'Occupied' WHERE id = ? ${tblClause} AND LOWER(status) = 'available'`;
+    const tableOccupySql = `UPDATE cafe_tables SET status = 'Occupied' WHERE id = ? ${tblClause} AND LOWER(TRIM(status)) IN ('available', 'reserved', 'seated')`;
     statements.push(db.prepare(tableOccupySql).bind(tableId, tenantId));
+    noGuestHashStatements.push(db.prepare(tableOccupySql).bind(tableId, tenantId));
+    legacyWithHashStatements.push(db.prepare(tableOccupySql).bind(tableId, tenantId));
     legacyStatements.push(db.prepare(tableOccupySql).bind(tableId, tenantId));
+    const responsePayload = {
+      success: true,
+      data: createdOrders,
+      orders: createdOrders,
+      ...(Object.keys(orderTokens).length > 0 ? { order_tokens: orderTokens } : {}),
+      message: `Đã tạo ${createdOrders.length} đơn hàng`,
+    };
+    if (idem) {
+      const idemSql = `INSERT INTO order_creation_requests
+        (scope_key, fingerprint, order_id, response_body, created_at) VALUES (?, ?, ?, ?, ?)`;
+      const idemArgs = [`split:${idem.key}`, idem.fingerprint, createdOrders[0]?.id || '', JSON.stringify(responsePayload), now] as const;
+      statements.push(db.prepare(idemSql).bind(...idemArgs));
+      noGuestHashStatements.push(db.prepare(idemSql).bind(...idemArgs));
+      legacyWithHashStatements.push(db.prepare(idemSql).bind(...idemArgs));
+      legacyStatements.push(db.prepare(idemSql).bind(...idemArgs));
+    }
+    let claimedParentPriorStatus: string | null = null;
+    if (parentOrder) {
+      const splitNote = `Split into children: ${createdOrders.map(o => o.id).join(', ')}`;
+      const claimParentSql =
+        "UPDATE orders SET status = 'cancelled', notes = COALESCE(NULLIF(notes, '') || ' | ', '') || ?, updated_at = ? WHERE id = ? AND LOWER(COALESCE(status, '')) NOT IN ('cancelled', 'canceled', 'completed', 'refunded') AND LOWER(COALESCE(payment_status, 'unpaid')) NOT IN ('paid', 'completed', 'refunded') AND (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?)";
+      const legacyClaimParentSql =
+        "UPDATE orders SET status = 'cancelled', notes = COALESCE(NULLIF(notes, '') || ' | ', '') || ?, updated_at = ? WHERE id = ? AND LOWER(COALESCE(status, '')) NOT IN ('cancelled', 'canceled', 'completed', 'refunded')";
+      const claimRes = (await db
+        .prepare(claimParentSql)
+        .bind(splitNote, now, parentOrder.id, tenantId, tenantId)
+        .run()
+        .catch(() => db.prepare(legacyClaimParentSql).bind(splitNote, now, parentOrder!.id).run())) as
+        | { meta?: { changes?: number }; changes?: number }
+        | null;
+      const claimChanges = claimRes?.meta?.changes ?? claimRes?.changes;
+      if (claimChanges !== undefined && Number(claimChanges) < 1) {
+        if (idem) {
+          const savedRace = await findSavedSplit();
+          if (savedRace) return replaySavedSplit(savedRace);
+        }
+        return errorResponse('Parent order is already cancelled or was split concurrently', 409);
+      }
+      claimedParentPriorStatus = String(parentOrder.status || 'pending');
+    }
     // D1 rolls back the whole group if any sub-order or ledger write fails.
+    try {
     try {
       await db.batch(statements);
     } catch (batchErr) {
       const msg = String((batchErr as Error)?.message ?? '');
-      if (msg.includes('tenant_id') || msg.includes('no column named') || msg.includes('no such table')) {
+      if (msg.includes('guest_token_hash')) {
         try {
-          await db.batch(legacyStatements);
-        } catch (legacyErr) {
+          await db.batch(noGuestHashStatements);
+        } catch (subErr) {
+          const subMsg = String((subErr as Error)?.message ?? '');
+          if (subMsg.includes('tenant_id') || subMsg.includes('no column named') || subMsg.includes('no such table')) {
+            await db.batch(legacyStatements);
+          } else {
+            throw subErr;
+          }
+        }
+      } else if (msg.includes('tenant_id') || msg.includes('no column named') || msg.includes('no such table')) {
+        try {
+          await db.batch(legacyWithHashStatements);
+        } catch {
+          try {
+            await db.batch(legacyStatements);
+          } catch (legacyErr) {
           const legacyMsg = String((legacyErr as Error)?.message ?? '');
           if (!legacyMsg.includes('no column named') && !legacyMsg.includes('no such table')) {
             throw legacyErr;
@@ -467,9 +653,211 @@ export async function splitOrders(
             }
           }
           await db.prepare(tableOccupySql).bind(tableId, tenantId).run().catch(() => {});
+          if (idem) {
+            await db.prepare(
+              `INSERT OR REPLACE INTO order_creation_requests (scope_key, fingerprint, order_id, response_body, created_at) VALUES (?, ?, ?, ?, ?)`
+            ).bind(`split:${idem.key}`, idem.fingerprint, createdOrders[0]?.id || '', JSON.stringify(responsePayload), now).run().catch(() => {});
+          }
+          }
         }
       } else {
         throw batchErr;
+      }
+    }
+    } catch (commitErr) {
+      if (parentOrder && claimedParentPriorStatus) {
+        await db
+          .prepare("UPDATE orders SET status = ?, updated_at = ? WHERE id = ? AND status = 'cancelled'")
+          .bind(claimedParentPriorStatus, now, parentOrder.id)
+          .run()
+          .catch(() => {});
+      }
+      const savedAfterConflict = idem ? await findSavedSplit() : null;
+      if (savedAfterConflict) return replaySavedSplit(savedAfterConflict);
+      throw commitErr;
+    }
+    if (parentOrder) {
+      const parentSessionId = parentOrder.session_id ? String(parentOrder.session_id).trim() : '';
+      if (parentSessionId && createdOrders.length > 0) {
+        const childIds = createdOrders.map(o => o.id);
+        const placeholders = childIds.map(() => '?').join(', ');
+        await db
+          .prepare(
+            `UPDATE orders SET session_id = ? WHERE id IN (${placeholders}) AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?`
+          )
+          .bind(parentSessionId, ...childIds, effectiveTenant)
+          .run()
+          .catch(() =>
+            effectiveTenant === 'default'
+              ? db
+                  .prepare(`UPDATE orders SET session_id = ? WHERE id IN (${placeholders})`)
+                  .bind(parentSessionId, ...childIds)
+                  .run()
+                  .catch(() => {})
+              : null
+          );
+        const parentTotal = Math.max(0, Number(parentOrder.total ?? 0));
+        const childrenTotal = createdOrders.reduce((sum, o) => sum + Math.max(0, Number(o.total ?? 0)), 0);
+        const childCount = createdOrders.length;
+        const primaryChildId = createdOrders[0]?.id ?? null;
+        try {
+          await db
+            .prepare(
+              `UPDATE table_sessions
+               SET order_count = MAX(0, COALESCE(order_count, 0) - 1) + ?,
+                   total_amount = MAX(0, COALESCE(total_amount, 0) - ?) + ?,
+                   current_order_id = CASE WHEN current_order_id = ? THEN ? ELSE current_order_id END,
+                   updated_at = ?
+               WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?`
+            )
+            .bind(childCount, parentTotal, childrenTotal, parentOrder.id, primaryChildId, now, parentSessionId, effectiveTenant)
+            .run();
+        } catch {
+          try {
+            await db
+              .prepare(
+                `UPDATE table_sessions
+                 SET order_count = MAX(0, COALESCE(order_count, 0) - 1) + ?,
+                     total_amount = MAX(0, COALESCE(total_amount, 0) - ?) + ?,
+                     updated_at = ?
+                 WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?`
+              )
+              .bind(childCount, parentTotal, childrenTotal, now, parentSessionId, effectiveTenant)
+              .run();
+          } catch {
+            await db
+              .prepare(
+                `UPDATE table_sessions
+                 SET order_count = MAX(0, COALESCE(order_count, 0) - 1) + ?,
+                     total_amount = MAX(0, COALESCE(total_amount, 0) - ?) + ?
+                 WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?`
+              )
+              .bind(childCount, parentTotal, childrenTotal, parentSessionId, effectiveTenant)
+              .run()
+              .catch(() =>
+                effectiveTenant === 'default'
+                  ? db
+                      .prepare(
+                        `UPDATE table_sessions
+                         SET order_count = MAX(0, COALESCE(order_count, 0) - 1) + ?,
+                             total_amount = MAX(0, COALESCE(total_amount, 0) - ?) + ?
+                         WHERE id = ?`
+                      )
+                      .bind(childCount, parentTotal, childrenTotal, parentSessionId)
+                      .run()
+                      .catch(() => {})
+                  : null
+              );
+          }
+        }
+      }
+      await cancelOpenPayOSAttemptForOrder(db, env as Record<string, unknown>, parentOrder.id, tenantId).catch(err => {
+        log.warn('Failed to cancel open parent PayOS attempt on split', { parentId: parentOrder?.id, message: (err as Error)?.message });
+      });
+      // Restore BOM ingredients reserved by the cancelled parent order before deducting sub-order stock.
+      try {
+        const { restoreInventoryForOrder } = await import('@aura/domain-inventory');
+        await restoreInventoryForOrder(env as any, parentOrder.id, effectiveTenant);
+      } catch (invErr) {
+        log.warn('Failed to restore parent order inventory on split', { parentId: parentOrder.id, message: (invErr as Error)?.message });
+      }
+      // Refund any held cashback on the cancelled parent order idempotently via atomic cashback_used CAS.
+      try {
+        const parentSpend = await db
+          .prepare("SELECT customer_id, cashback_used FROM orders WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?")
+          .bind(parentOrder.id, effectiveTenant)
+          .first<{ customer_id?: string | null; cashback_used?: number | null }>()
+          .catch(() =>
+            effectiveTenant === 'default'
+              ? db.prepare('SELECT customer_id, cashback_used FROM orders WHERE id = ?').bind(parentOrder!.id).first<{ customer_id?: string | null; cashback_used?: number | null }>().catch(() => null)
+              : null
+          );
+        const refundCustId = parentSpend?.customer_id ? String(parentSpend.customer_id).trim() : '';
+        const refundAmt = Number(parentSpend?.cashback_used ?? 0);
+        if (refundCustId && refundAmt > 0) {
+          const zeroed = await db
+            .prepare("UPDATE orders SET cashback_used = 0 WHERE id = ? AND COALESCE(cashback_used, 0) > 0 AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?")
+            .bind(parentOrder.id, effectiveTenant)
+            .run()
+            .catch(() =>
+              effectiveTenant === 'default'
+                ? db.prepare('UPDATE orders SET cashback_used = 0 WHERE id = ? AND COALESCE(cashback_used, 0) > 0').bind(parentOrder!.id).run().catch(() => null)
+                : null
+            );
+          const zeroChanges = (zeroed as { meta?: { changes?: number }; changes?: number } | null)?.meta?.changes
+            ?? (zeroed as { changes?: number } | null)?.changes;
+          if (zeroed && (zeroChanges === undefined || Number(zeroChanges) > 0)) {
+            await db
+              .prepare("UPDATE cashback_wallets SET balance = COALESCE(balance, 0) + ?, total_spent = MAX(0, COALESCE(total_spent, 0) - ?), updated_at = datetime('now') WHERE customer_id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?")
+              .bind(refundAmt, refundAmt, refundCustId, effectiveTenant)
+              .run()
+              .catch(() => {});
+            await db
+              .prepare("UPDATE customers SET cashback_balance = COALESCE(cashback_balance, 0) + ? WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?")
+              .bind(refundAmt, refundCustId, effectiveTenant)
+              .run()
+              .catch(() => {});
+            const wRow = await db
+              .prepare("SELECT id, balance FROM cashback_wallets WHERE customer_id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ? LIMIT 1")
+              .bind(refundCustId, effectiveTenant)
+              .first<{ id?: string; balance?: number }>()
+              .catch(() => null);
+            const walletId = wRow?.id || `wal_${refundCustId}`;
+            const balAfter = Number(wRow?.balance ?? refundAmt);
+            await db
+              .prepare(
+                `INSERT INTO cashback_transactions (id, wallet_id, customer_id, order_id, type, amount, balance_after, tenant_id, created_at)
+                 SELECT ?, ?, ?, ?, 'refund', ?, ?, ?, datetime('now')
+                 WHERE NOT EXISTS (SELECT 1 FROM cashback_transactions WHERE order_id = ? AND type = 'refund' AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?)`
+              )
+              .bind(`cb_ref_${parentOrder.id}`, walletId, refundCustId, parentOrder.id, refundAmt, balAfter, effectiveTenant, parentOrder.id, effectiveTenant)
+              .run()
+              .catch(() =>
+                db
+                  .prepare(
+                    `INSERT INTO cashback_transactions (id, customer_id, order_id, type, amount, balance_after, tenant_id)
+                     SELECT ?, ?, ?, 'refund', ?, ?, ?
+                     WHERE NOT EXISTS (SELECT 1 FROM cashback_transactions WHERE order_id = ? AND type = 'refund' AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?)`
+                  )
+                  .bind(`cb_ref_${parentOrder.id}`, refundCustId, parentOrder.id, refundAmt, balAfter, effectiveTenant, parentOrder.id, effectiveTenant)
+                  .run()
+                  .catch(() => {})
+              );
+          }
+        }
+      } catch { /* non-blocking parent cashback cleanup */ }
+      if (env.AUTH_KV) {
+        const kv = env.AUTH_KV as KVNamespace;
+        await Promise.all([
+          kv.delete('orders:active:all').catch(() => {}),
+          kv.delete(`orders:active:${effectiveTenant}`).catch(() => {}),
+          publishOrderEvent(kv, parentOrder.id, 'cancelled', {
+            tenantId: effectiveTenant,
+            paymentStatus: String(parentOrder.payment_status || 'unpaid'),
+          }).catch(() => {}),
+        ]);
+      }
+      if (env.ORDER_BROADCASTER) {
+        try {
+          const ns = env.ORDER_BROADCASTER as import('@cloudflare/workers-types').DurableObjectNamespace;
+          const doChannel = effectiveTenant !== 'default' ? `${effectiveTenant}:${parentOrder.id}` : parentOrder.id;
+          const stub = ns.get(ns.idFromName(doChannel)) as unknown as {
+            broadcast?: (msg: unknown) => Promise<void>;
+            fetch?: (input: RequestInfo, init?: RequestInit) => Promise<Response>;
+          };
+          const cancelEvent = {
+            orderId: parentOrder.id,
+            status: 'cancelled',
+            payment_status: String(parentOrder.payment_status || 'unpaid'),
+            table_id: tableId,
+            ...(effectiveTenant !== 'default' ? { tenant_id: effectiveTenant } : {}),
+            updatedAt: Date.now(),
+          };
+          if (typeof stub.broadcast === 'function') await stub.broadcast(cancelEvent);
+          else if (typeof stub.fetch === 'function') {
+            await stub.fetch('https://do/broadcast', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(cancelEvent) });
+          }
+        } catch { /* non-blocking parent DO broadcast */ }
       }
     }
     for (let i = 0; i < createdOrders.length; i++) {
@@ -505,17 +893,12 @@ export async function splitOrders(
       if (env.AUTH_KV) {
         await publishOrderEvent(env.AUTH_KV as KVNamespace, order.id, 'pending', {
           tenantId: effectiveTenant,
+          paymentStatus: 'unpaid',
         }).catch(error => {
           log.warn('Split order event failed after commit', { orderId: order.id, message: (error as Error).message });
         });
       }
     }
-    const responsePayload = {
-      success: true,
-      data: createdOrders,
-      orders: createdOrders,
-      message: `Đã tạo ${createdOrders.length} đơn hàng`,
-    };
     if (idem && env.AUTH_KV) {
       const kv = env.AUTH_KV as KVNamespace;
       const serialized = JSON.stringify({

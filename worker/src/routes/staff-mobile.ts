@@ -44,10 +44,6 @@ const enforceMobileTenantScope = async (c: any, next: () => Promise<void>) => {
   }
   const requested = candidates[0] || '';
   const user = c.get?.('user') as { id?: string; role?: string; tenantId?: string; tenant_id?: string } | undefined;
-  if (user?.id === 'local-staff') {
-    await next();
-    return;
-  }
   if (user && requested) {
     const rawCallerTenant = user.tenantId ?? user.tenant_id;
     const callerTenant = typeof rawCallerTenant === 'string' && rawCallerTenant.trim() ? rawCallerTenant.trim() : 'default';

@@ -5,6 +5,7 @@ import { getTenantId, isHQSuperAdmin } from '../../middleware/tenant';
 import {
   getCustomerAccount,
   updateConsent,
+  eraseCustomerPii,
   CONSENT_PURPOSES,
 } from '@aura/domain-crm';
 
@@ -141,6 +142,7 @@ export function registerAccountHandlers(router: Hono<{ Bindings: Env }>): void {
       {
         customerId: targetCustomerId,
         purpose: body.purpose,
+        channel: typeof body.channel === 'string' ? body.channel : undefined,
         granted: body.granted,
         source: user.role === 'customer' ? 'customer_portal' : 'staff_action',
         policyVersion: body.policyVersion,
@@ -171,4 +173,80 @@ export function registerAccountHandlers(router: Hono<{ Bindings: Env }>): void {
   router.get('/consent-purposes', async (c) => {
     return c.json({ success: true, data: CONSENT_PURPOSES });
   });
+
+  /**
+   * POST /api/crm/account/erase & DELETE /api/crm/account/me
+   * One-way ledger-safe PII anonymization for customer self-service or authorized staff.
+   */
+  const handleEraseAccount = async (c: any) => {
+    const db = c.env.AURA_DB;
+    const user = c.get('user') as {
+      id: string;
+      userId?: string;
+      customerId?: string;
+      customer_id?: string;
+      sub?: string;
+      role: string;
+      tenantId?: string;
+      tenant_id?: string;
+    } | undefined;
+
+    if (!user) {
+      return c.json({ success: false, error: 'Unauthorized' }, 401);
+    }
+    if (hasCrmAccountTenantMismatch(c)) {
+      return c.json({ success: false, error: 'Forbidden' }, 403);
+    }
+
+    let body: Record<string, unknown> = {};
+    try {
+      body = (await c.req.json()) as Record<string, unknown>;
+    } catch {
+      body = {};
+    }
+
+    if (user.role !== 'customer' && !CRM_MANAGEMENT_ROLES.has(user.role)) {
+      return c.json({ success: false, error: 'Forbidden' }, 403);
+    }
+
+    const selfIds = [user.id, user.userId, user.customerId, user.customer_id, user.sub]
+      .filter((v): v is string => typeof v === 'string' && v.trim() !== '');
+    if (user.role === 'customer' && body.customerId !== undefined && !selfIds.includes(String(body.customerId))) {
+      return c.json({ success: false, error: 'Forbidden' }, 403);
+    }
+
+    const rawBodyCustomerId = typeof body.customerId === 'string' ? body.customerId.trim() : '';
+    if (user.role !== 'customer' && !rawBodyCustomerId) {
+      return c.json({ success: false, error: 'customerId is required' }, 400);
+    }
+
+    const targetCustomerId = user.role === 'customer'
+      ? (user.customerId || user.customer_id || user.id)
+      : rawBodyCustomerId;
+    const tenantId = resolveCrmAccountTenantId(c, user);
+    const kv = c.env.AUTH_KV as import('@cloudflare/workers-types').KVNamespace | undefined;
+
+    const res = await eraseCustomerPii(db, {
+      customerId: targetCustomerId,
+      actorId: user.id,
+      actorRole: user.role,
+      tenantId,
+      kv,
+    });
+    if (res.notFound) {
+      return c.json({ success: false, error: 'Customer not found' }, 404);
+    }
+
+    return c.json({
+      success: true,
+      data: {
+        customerId: res.customerId,
+        anonymized: true,
+        ledgerPreserved: true,
+      },
+    });
+  };
+
+  router.post('/account/erase', requireAuth(['customer', 'manager', 'admin', 'owner']), handleEraseAccount);
+  router.delete('/account/me', requireAuth(['customer']), handleEraseAccount);
 }

@@ -6,6 +6,7 @@
 import { verifyJWT } from '../lib/jwt';
 import { matchesTenantRow } from '../lib/db';
 import { resolvePilotStore } from '../lib/pilot-store';
+import { eraseCustomerPii } from '@aura/domain-crm';
 
 function resolveEnvTenant(env: Record<string, unknown>, explicitTenantId?: string): string {
   if (explicitTenantId && explicitTenantId.trim()) {
@@ -293,15 +294,20 @@ export async function updateAdminCustomer(request: Request, env: Record<string, 
 export async function deleteAdminCustomer(env: Record<string, unknown>, id: string, effectiveTenantId?: string) {
   const db = (env.AURA_DB ?? env.DB) as import('@cloudflare/workers-types').D1Database;
   const tenantId = resolveEnvTenant(env, effectiveTenantId);
-  try {
-    await db.prepare("DELETE FROM customers WHERE id = ? AND (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?)").bind(id, tenantId, tenantId).run();
-  } catch (err) {
-    if (!/no such column:\s*tenant_id/i.test(err instanceof Error ? err.message : String(err)) || (tenantId !== 'default' && tenantId !== '*')) {
-      throw err;
-    }
-    await db.prepare('DELETE FROM customers WHERE id = ?').bind(id).run();
+  const actorId = String((env as { user?: { id?: string } })?.user?.id || 'admin');
+  const actorRole = String((env as { user?: { role?: string } })?.user?.role || 'admin');
+  const kv = env.AUTH_KV as import('@cloudflare/workers-types').KVNamespace | undefined;
+  const res = await eraseCustomerPii(db, {
+    customerId: id,
+    actorId,
+    actorRole,
+    tenantId,
+    kv,
+  });
+  if (res.notFound) {
+    return Response.json({ success: false, error: 'Customer not found' }, { status: 404 });
   }
-  return Response.json({ success: true, id });
+  return Response.json({ success: true, id, anonymized: true });
 }
 
 export async function getStuckPayments(request: Request, env: Record<string, unknown>, callerTenantId?: string) {

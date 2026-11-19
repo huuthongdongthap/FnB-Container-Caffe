@@ -276,7 +276,7 @@ export async function receivePurchaseOrder(
   const now = new Date().toISOString();
   const receiptKey = options?.receiptId || `grn_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
   const receivedSummaries = [];
-  const appliedPoiUpdates: Array<{ id: string; prevReceivedQuantity: number }> = [];
+  const appliedPoiUpdates: Array<{ id: string; appliedQuantity: number }> = [];
   const appliedIngredientUpdates: Array<{ ingredientId: string; receivedQuantity: number }> = [];
   const pendingMovements: Array<{ movId: string; ingredientId: string; receivedQuantity: number }> = [];
 
@@ -297,56 +297,52 @@ export async function receivePurchaseOrder(
     for (const poiUpd of appliedPoiUpdates) {
       if (effectiveTenant && effectiveTenant !== '*') {
         await db.prepare(
-          "UPDATE purchase_order_items SET received_quantity = ? WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
-        ).bind(poiUpd.prevReceivedQuantity, poiUpd.id, effectiveTenant).run().catch(async () => {
+          "UPDATE purchase_order_items SET received_quantity = MAX(0, COALESCE(received_quantity, 0) - ?) WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
+        ).bind(poiUpd.appliedQuantity, poiUpd.id, effectiveTenant).run().catch(async () => {
           if (effectiveTenant === 'default') {
             await db.prepare(
-              'UPDATE purchase_order_items SET received_quantity = ? WHERE id = ?'
-            ).bind(poiUpd.prevReceivedQuantity, poiUpd.id).run().catch(() => {});
+              'UPDATE purchase_order_items SET received_quantity = MAX(0, COALESCE(received_quantity, 0) - ?) WHERE id = ?'
+            ).bind(poiUpd.appliedQuantity, poiUpd.id).run().catch(() => {});
           }
         });
       } else {
         await db.prepare(
-          'UPDATE purchase_order_items SET received_quantity = ? WHERE id = ?'
-        ).bind(poiUpd.prevReceivedQuantity, poiUpd.id).run().catch(() => {});
+          'UPDATE purchase_order_items SET received_quantity = MAX(0, COALESCE(received_quantity, 0) - ?) WHERE id = ?'
+        ).bind(poiUpd.appliedQuantity, poiUpd.id).run().catch(() => {});
       }
     }
-    if (options?.receiptId) {
-      await db.prepare(
-        'DELETE FROM stock_movements WHERE reference_id = ?'
-      ).bind(receiptKey).run().catch(() => {});
-    }
+    await db.prepare(
+      'DELETE FROM stock_movements WHERE reference_id = ?'
+    ).bind(receiptKey).run().catch(() => {});
   };
 
   try {
     for (const rcv of mergedItems) {
       const poi = poItems.find(p => p.ingredient_id === rcv.ingredientId)!;
       const prevReceivedQuantity = Number(poi.received_quantity || 0);
-      const newTotalReceived = prevReceivedQuantity + rcv.receivedQuantity;
-
-      // Atomic conditional update prevents concurrent over-receiving beyond ordered quantity
+      // Atomic relative increment prevents concurrent over-receiving beyond ordered quantity
       let poiRes: { meta?: { changes?: number } } | undefined;
       if (effectiveTenant && effectiveTenant !== '*') {
         try {
           poiRes = await db.prepare(
-            "UPDATE purchase_order_items SET received_quantity = ? WHERE id = ? AND COALESCE(received_quantity, 0) + ? <= quantity AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
-          ).bind(newTotalReceived, poi.id, rcv.receivedQuantity, effectiveTenant).run();
+            "UPDATE purchase_order_items SET received_quantity = COALESCE(received_quantity, 0) + ? WHERE id = ? AND COALESCE(received_quantity, 0) + ? <= quantity AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
+          ).bind(rcv.receivedQuantity, poi.id, rcv.receivedQuantity, effectiveTenant).run();
         } catch (err) {
           if (effectiveTenant !== 'default') throw err;
           poiRes = await db.prepare(
-            'UPDATE purchase_order_items SET received_quantity = ? WHERE id = ? AND COALESCE(received_quantity, 0) + ? <= quantity'
-          ).bind(newTotalReceived, poi.id, rcv.receivedQuantity).run();
+            'UPDATE purchase_order_items SET received_quantity = COALESCE(received_quantity, 0) + ? WHERE id = ? AND COALESCE(received_quantity, 0) + ? <= quantity'
+          ).bind(rcv.receivedQuantity, poi.id, rcv.receivedQuantity).run();
         }
       } else {
         poiRes = await db.prepare(
-          'UPDATE purchase_order_items SET received_quantity = ? WHERE id = ? AND COALESCE(received_quantity, 0) + ? <= quantity'
-        ).bind(newTotalReceived, poi.id, rcv.receivedQuantity).run();
+          'UPDATE purchase_order_items SET received_quantity = COALESCE(received_quantity, 0) + ? WHERE id = ? AND COALESCE(received_quantity, 0) + ? <= quantity'
+        ).bind(rcv.receivedQuantity, poi.id, rcv.receivedQuantity).run();
       }
       if (poiRes?.meta && typeof poiRes.meta.changes === 'number' && poiRes.meta.changes === 0) {
         await rollbackPartialReceipt();
         return { ok: false, error: 'Cannot receive more than ordered quantity' };
       }
-      appliedPoiUpdates.push({ id: poi.id, prevReceivedQuantity });
+      appliedPoiUpdates.push({ id: poi.id, appliedQuantity: rcv.receivedQuantity });
 
       // Receiving is the ONLY gateway that increases stock from purchases; preserve positive cost_per_unit when PO unit_price is 0
       if (effectiveTenant) {
@@ -374,6 +370,7 @@ export async function receivePurchaseOrder(
         receivedQuantity: rcv.receivedQuantity,
       });
 
+      const newTotalReceived = prevReceivedQuantity + rcv.receivedQuantity;
       receivedSummaries.push({
         ingredientId: rcv.ingredientId,
         quantity: rcv.receivedQuantity,

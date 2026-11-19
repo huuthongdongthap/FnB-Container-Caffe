@@ -3,9 +3,9 @@ import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import type { CartItem } from '@/components/stitch';
 import {
+  useOrderStore,
   useOrderStoreWithOfflineFlush,
 } from '@/hooks/stores/use-order-store';
-import { API_BASE } from '@/lib/api-client';
 import { normalizePhone } from './TableOrder-utils';
 
 interface UseHandleViewCartArgs {
@@ -56,66 +56,6 @@ export function useHandleViewCart({
 
       setIsSubmitting(true);
       try {
-        if (hasValidTable && tableId) {
-          try {
-            const storedToken = typeof localStorage !== 'undefined'
-              ? (localStorage.getItem('aura_auth_token') || localStorage.getItem('auth_token') || localStorage.getItem('token'))
-              : null;
-            const checkinRes = await fetch(
-              `${API_BASE}/api/orders/guest-checkin`,
-              {
-                method: 'POST',
-                credentials: 'include',
-                headers: {
-                  'Content-Type': 'application/json',
-                  ...(storedToken ? { Authorization: `Bearer ${storedToken}` } : {}),
-                },
-                body: JSON.stringify({
-                  customer_name: guestName.trim(),
-                  customer_phone: normalizePhone(guestPhone).trim(),
-                  table_id: tableId,
-                }),
-              },
-            );
-            if (checkinRes.status === 404) {
-              setSubmitError(
-                t('invalidQR', { defaultValue: 'Mã QR này không hợp lệ.' }),
-              );
-              setIsSubmitting(false);
-              return;
-            }
-            if (!checkinRes.ok && checkinRes.status !== 409) {
-              let bodyMsg: string | undefined;
-              try {
-                const parsed = (await checkinRes.json()) as Record<
-                  string,
-                  unknown
-                >;
-                if (typeof parsed.message === 'string') bodyMsg = parsed.message;
-              } catch {
-                // ignore malformed body
-              }
-              throw new Error(
-                bodyMsg ??
-                  t('checkinFailed', {
-                    defaultValue: `Lỗi xác nhận bàn (${checkinRes.status})`,
-                  }),
-              );
-            }
-          } catch (err) {
-            if (err instanceof TypeError) {
-              setSubmitError(
-                t('checkinNetworkError', {
-                  defaultValue: 'Không thể kết nối đến máy chủ.',
-                }),
-              );
-              setIsSubmitting(false);
-              return;
-            }
-            throw err;
-          }
-        }
-
         const total = cart.reduce(
           (sum, item) => sum + item.price * item.quantity,
           0,
@@ -150,12 +90,20 @@ export function useHandleViewCart({
           navigate(
             `/order-success?order_id=${encodeURIComponent(resolvedOrder.id)}`,
           );
-        } else {
-          throw new Error(
-            t('noOrderId', {
+        } else if (useOrderStore.getState().queuedOffline) {
+          setSubmitError(
+            t('offlineQueued', {
               defaultValue:
-                'Không nhận được mã đơn hàng. Vui lòng thử lại.',
+                'Bạn đang offline. Đơn hàng sẽ được lưu và gửi khi có mạng.',
             }),
+          );
+        } else {
+          const storeError = useOrderStore.getState().error;
+          throw new Error(
+            storeError ||
+              t('noOrderId', {
+                defaultValue: 'Không nhận được mã đơn hàng.',
+              }),
           );
         }
       } catch (err) {

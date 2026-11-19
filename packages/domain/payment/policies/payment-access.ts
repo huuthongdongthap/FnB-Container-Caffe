@@ -1,4 +1,5 @@
 import { getTenantId, isHQSuperAdmin, resolvePublicTenantId } from 'worker/src/middleware/tenant';
+import { verifyGuestOrderToken } from '../../customer/policies/order-ownership-policy';
 
 export const FINANCIAL_ROLES = ['owner', 'manager', 'admin', 'cashier'];
 export const PAYMENT_ROLES = [...FINANCIAL_ROLES, 'supervisor', 'staff', 'waiter', 'shipper'];
@@ -7,6 +8,8 @@ export interface PaymentOrderIdentity {
   tenant_id?: string | null;
   customer_id?: string | null;
   order_token?: string | null;
+  guest_token_hash?: string | null;
+  orderTokenVerified?: boolean;
 }
 
 export interface PaymentTenantScopeResult {
@@ -201,6 +204,21 @@ export async function resolvePaymentCustomerOwnerIds(
   return Array.from(ids);
 }
 
+export async function verifyPaymentOrderToken(
+  c: any,
+  order: PaymentOrderIdentity | null | undefined,
+): Promise<boolean> {
+  if (!order) return false;
+  const reqOrderToken = extractRequestOrderToken(c);
+  if (!reqOrderToken) return false;
+  const guestHash = typeof order.guest_token_hash === 'string' ? order.guest_token_hash.trim() : '';
+  if (guestHash && (await verifyGuestOrderToken(guestHash, reqOrderToken))) {
+    return true;
+  }
+  const orderToken = typeof order.order_token === 'string' ? order.order_token.trim() : '';
+  return Boolean(orderToken && constantTimeTokenMatch(reqOrderToken, orderToken));
+}
+
 export function canAccessPaymentOrder(c: any, order: PaymentOrderIdentity, allowGuest = false): boolean {
   const scope = resolvePaymentTenantScope(c, allowGuest);
   if (!scope) return false;
@@ -224,13 +242,20 @@ export function canAccessPaymentOrder(c: any, order: PaymentOrderIdentity, allow
 
   const reqOrderToken = extractRequestOrderToken(c);
   const orderToken = typeof order.order_token === 'string' ? order.order_token.trim() : '';
-  const hasValidOrderToken = Boolean(orderToken && reqOrderToken && constantTimeTokenMatch(reqOrderToken, orderToken));
+  const guestHash = typeof order.guest_token_hash === 'string' ? order.guest_token_hash.trim() : '';
+  const hasValidOrderToken = Boolean(
+    order.orderTokenVerified === true ||
+      (orderToken && reqOrderToken && constantTimeTokenMatch(reqOrderToken, orderToken))
+  );
   if (hasValidOrderToken) {
     return true;
   }
 
   const orderCustomerId = order.customer_id ? String(order.customer_id).trim() : '';
   if (!user) {
+    if (reqOrderToken && guestHash && order.orderTokenVerified === false) {
+      return false;
+    }
     return Boolean(allowGuest && !orderCustomerId && !orderToken);
   }
   if (userRole === 'customer') {

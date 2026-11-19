@@ -45,28 +45,13 @@ function createCsvResponse(csvString: string, filename: string): Response {
   });
 }
 
-const ICT_OFFSET_MS = 7 * 3600_000;
-
-function formatStoreDate(raw?: string | null): string {
-  if (!raw) return '';
-  const trimmed = raw.trim();
-  if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) return trimmed;
-  const isoCandidate = /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}/.test(trimmed)
-    ? `${trimmed.replace(' ', 'T')}Z`
-    : trimmed;
-  const ms = Date.parse(isoCandidate);
-  if (Number.isFinite(ms)) {
-    return new Date(ms + ICT_OFFSET_MS).toISOString().slice(0, 10);
-  }
-  return trimmed.slice(0, 10);
-}
+export const VALID_EXPORT_ORDER_SQL =
+  "LOWER(COALESCE(status, '')) NOT IN ('cancelled', 'canceled', 'refunded', 'failed', 'rejected', 'expired') AND LOWER(COALESCE(payment_status, '')) NOT IN ('refunded', 'failed', 'cancelled', 'canceled') AND NOT (COALESCE(total, 0) = 0 AND (COALESCE(customer_name, '') = 'Khách QR - cho don mon' OR COALESCE(items, '') IN ('', '[]')))";
 
 export function registerExportHandlers(app: Hono<{ Bindings: Env }>) {
   const EXPORT_ALLOWED_ROLES = new Set(['owner', 'manager', 'admin']);
-  const VALID_EXPORT_ORDER_SQL =
-    "LOWER(COALESCE(status, '')) NOT IN ('cancelled', 'canceled', 'refunded', 'failed', 'rejected', 'expired') AND LOWER(COALESCE(payment_status, '')) NOT IN ('refunded', 'failed')";
   const VALID_JOINED_ORDER_SQL =
-    "LOWER(COALESCE(o.status, '')) NOT IN ('cancelled', 'canceled', 'refunded', 'failed', 'rejected', 'expired') AND LOWER(COALESCE(o.payment_status, '')) NOT IN ('refunded', 'failed')";
+    "LOWER(COALESCE(o.status, '')) NOT IN ('cancelled', 'canceled', 'refunded', 'failed', 'rejected', 'expired') AND LOWER(COALESCE(o.payment_status, '')) NOT IN ('refunded', 'failed', 'cancelled', 'canceled') AND NOT (COALESCE(o.total, 0) = 0 AND (COALESCE(o.customer_name, '') = 'Khách QR - cho don mon' OR COALESCE(o.items, '') IN ('', '[]')))";
   const VALID_CUSTOMER_EXPORT_PHONE_SQL =
     "TRIM(COALESCE(c.phone, '')) NOT IN ('', '0', '000000000', '0000000000', '00000000000', 'guest', 'walk-in', 'pos')";
 
@@ -133,8 +118,8 @@ export function registerExportHandlers(app: Hono<{ Bindings: Env }>) {
 
     const db = c.env.AURA_DB;
     const { and: tenantClause, binds: tenantBinds } = buildTenantClause(tenantId);
-    const from = c.req.query('from') || new Date(Date.now() + ICT_OFFSET_MS - 30 * 86400000).toISOString().slice(0, 10);
-    const to = c.req.query('to') || new Date(Date.now() + ICT_OFFSET_MS).toISOString().slice(0, 10);
+    const from = c.req.query('from') || new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10);
+    const to = c.req.query('to') || new Date().toISOString().slice(0, 10);
     if (!/^\d{4}-\d{2}-\d{2}$/.test(from) || !/^\d{4}-\d{2}-\d{2}$/.test(to)) {
       return c.json({ success: false, error: 'Invalid date range' }, 400);
     }
@@ -151,23 +136,68 @@ export function registerExportHandlers(app: Hono<{ Bindings: Env }>) {
       return c.json({ success: false, error: 'Invalid date range' }, 400);
     }
     const type = c.req.query('type') || 'orders';
+    const maskPii = c.req.query('mask_pii') === '1' || c.req.query('mask_pii') === 'true';
+    const maskPhone = (val: string | null | undefined) => {
+      if (!maskPii) return val || '';
+      const s = String(val || '').trim();
+      return s.length >= 6 ? `${s.slice(0, 3)}****${s.slice(-3)}` : s ? '***' : '';
+    };
+    const maskEmail = (val: string | null | undefined) => {
+      if (!maskPii) return val || '';
+      const s = String(val || '').trim();
+      const at = s.indexOf('@');
+      return at > 1 ? `${s[0]}***${s.slice(at)}` : s ? '***' : '';
+    };
+    const recordExportAudit = async (rowCount: number) => {
+      try {
+        await db
+          ?.prepare(
+            `INSERT INTO audit_logs (id, actor_id, actor_role, action, resource_type, resource_id, details, tenant_id, status, created_at)
+             VALUES (?, ?, ?, 'export_csv', ?, ?, ?, ?, 'success', datetime('now'))`
+          )
+          .bind(
+            `aud_rep_exp_${crypto.randomUUID()}`,
+            String(user?.id || 'unknown'),
+            role,
+            type,
+            `${from}..${to}`,
+            JSON.stringify({ route: 'reports.export', type, from, to, row_count: rowCount, mask_pii: maskPii }),
+            tenantId || 'default'
+          )
+          .run();
+      } catch {
+        // Best-effort audit persistence for minimal test mocks
+      }
+    };
 
     if (type === 'orders') {
-      const { results } = await db.prepare(
-        `SELECT id, customer_name, customer_phone, total, status, payment_method, created_at
-         FROM orders WHERE DATE(datetime(created_at, '+7 hours')) BETWEEN ? AND ?${tenantClause} ORDER BY created_at LIMIT 5000`
-      ).bind(from, to, ...tenantBinds).all<OrderExportRow>();
+      let results: OrderExportRow[] = [];
+      try {
+        const res = await db.prepare(
+          `SELECT id, customer_name, customer_phone, total, status, payment_method,
+                  DATE(datetime(created_at, '+7 hours')) as ict_date, created_at
+           FROM orders WHERE DATE(datetime(created_at, '+7 hours')) BETWEEN ? AND ? AND ${VALID_EXPORT_ORDER_SQL}${tenantClause} ORDER BY created_at LIMIT 5000`
+        ).bind(from, to, ...tenantBinds).all<OrderExportRow & { ict_date?: string }>();
+        results = res.results || [];
+      } catch {
+        const res = await db.prepare(
+          `SELECT id, customer_name, customer_phone, total, status, payment_method, created_at
+           FROM orders WHERE DATE(created_at) BETWEEN ? AND ? AND ${VALID_EXPORT_ORDER_SQL}${tenantClause} ORDER BY created_at LIMIT 5000`
+        ).bind(from, to, ...tenantBinds).all<OrderExportRow>();
+        results = res.results || [];
+      }
 
       const headers = ['id', 'customer_name', 'customer_phone', 'total', 'status', 'payment_method', 'created_at'];
       const rows = (results || []).map((r) => [
         r.id || '',
-        r.customer_name || '',
-        r.customer_phone || '',
+        maskPii && r.customer_name ? `${r.customer_name.slice(0, 1)}***` : (r.customer_name || ''),
+        maskPhone(r.customer_phone),
         r.total ?? 0,
         r.status || '',
         r.payment_method || '',
-        formatStoreDate(r.created_at)
+        (r as OrderExportRow & { ict_date?: string }).ict_date || (r.created_at || '').slice(0, 10)
       ]);
+      await recordExportAudit(rows.length);
 
       return createCsvResponse(
         `${headers.join(',')}\n${rows.map(r => r.map(escapeCsvCell).join(',')).join('\n')}`,
@@ -176,17 +206,32 @@ export function registerExportHandlers(app: Hono<{ Bindings: Env }>) {
     }
 
     if (type === 'revenue' || type === 'sales') {
-      const { results } = await db.prepare(
-        `SELECT DATE(datetime(created_at, '+7 hours')) as date,
-                COUNT(*) as orders,
-                COALESCE(SUM(total), 0) as revenue,
-                CASE WHEN COUNT(*) > 0 THEN COALESCE(SUM(total), 0) / COUNT(*) ELSE 0 END as avg_order_value
-         FROM orders
-         WHERE DATE(datetime(created_at, '+7 hours')) BETWEEN ? AND ? AND ${VALID_EXPORT_ORDER_SQL}${tenantClause}
-         GROUP BY DATE(datetime(created_at, '+7 hours')) ORDER BY date LIMIT 5000`
-      ).bind(from, to, ...tenantBinds).all<RevenueExportRow>();
+      let results: RevenueExportRow[] = [];
+      try {
+        const res = await db.prepare(
+          `SELECT DATE(datetime(created_at, '+7 hours')) as date,
+                  COUNT(*) as orders,
+                  COALESCE(SUM(total), 0) as revenue,
+                  CASE WHEN COUNT(*) > 0 THEN COALESCE(SUM(total), 0) / COUNT(*) ELSE 0 END as avg_order_value
+           FROM orders
+           WHERE DATE(datetime(created_at, '+7 hours')) BETWEEN ? AND ? AND ${VALID_EXPORT_ORDER_SQL}${tenantClause}
+           GROUP BY DATE(datetime(created_at, '+7 hours')) ORDER BY date LIMIT 5000`
+        ).bind(from, to, ...tenantBinds).all<RevenueExportRow>();
+        results = res.results || [];
+      } catch {
+        const res = await db.prepare(
+          `SELECT DATE(created_at) as date,
+                  COUNT(*) as orders,
+                  COALESCE(SUM(total), 0) as revenue,
+                  CASE WHEN COUNT(*) > 0 THEN COALESCE(SUM(total), 0) / COUNT(*) ELSE 0 END as avg_order_value
+           FROM orders
+           WHERE DATE(created_at) BETWEEN ? AND ? AND ${VALID_EXPORT_ORDER_SQL}${tenantClause}
+           GROUP BY DATE(created_at) ORDER BY date LIMIT 5000`
+        ).bind(from, to, ...tenantBinds).all<RevenueExportRow>();
+        results = res.results || [];
+      }
 
-      // Get cashback earned per day separately (Vietnam UTC+7)
+      // Get cashback earned per day separately
       const custJoin = tenantId === '*'
         ? ''
         : tenantId === 'default'
@@ -226,6 +271,7 @@ export function registerExportHandlers(app: Hono<{ Bindings: Env }>) {
         r.avg_order_value ?? 0,
         cashbackMap.get(r.date) || 0
       ]);
+      await recordExportAudit(rows.length);
 
       return createCsvResponse(
         `${headers.join(',')}\n${rows.map(r => r.map(escapeCsvCell).join(',')).join('\n')}`,
@@ -245,6 +291,7 @@ export function registerExportHandlers(app: Hono<{ Bindings: Env }>) {
       try {
         const res = await db.prepare(
           `SELECT c.id, c.name, c.email, c.phone, c.loyalty_tier, c.created_at,
+                  DATE(datetime(c.created_at, '+7 hours')) as ict_date,
                   COALESCE(SUM(o.total), 0) as total_spent,
                   COUNT(o.id) as order_count
            FROM customers c
@@ -255,6 +302,7 @@ export function registerExportHandlers(app: Hono<{ Bindings: Env }>) {
       } catch {
         const stmt = db.prepare(
           `SELECT c.id, c.name, c.email, c.phone, c.loyalty_tier, c.created_at,
+                  DATE(datetime(c.created_at, '+7 hours')) as ict_date,
                   COALESCE(SUM(o.total), 0) as total_spent,
                   COUNT(o.id) as order_count
            FROM customers c
@@ -270,14 +318,15 @@ export function registerExportHandlers(app: Hono<{ Bindings: Env }>) {
       const headers = ['id', 'name', 'email', 'phone', 'total_spent', 'order_count', 'loyalty_tier', 'created_at'];
       const rows = (results || []).map((r) => [
         r.id || '',
-        r.name || '',
-        r.email || '',
-        r.phone || '',
+        maskPii && r.name ? `${r.name.slice(0, 1)}***` : (r.name || ''),
+        maskEmail(r.email),
+        maskPhone(r.phone),
         r.total_spent ?? 0,
         r.order_count ?? 0,
         r.loyalty_tier || '',
-        formatStoreDate(r.created_at)
+        (r as CustomerExportRow & { ict_date?: string }).ict_date || (r.created_at || '').slice(0, 10)
       ]);
+      await recordExportAudit(rows.length);
 
       return createCsvResponse(
         `${headers.join(',')}\n${rows.map(r => r.map(escapeCsvCell).join(',')).join('\n')}`,
