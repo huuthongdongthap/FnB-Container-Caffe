@@ -42,14 +42,23 @@ export function TicketQueue({ orders, station, onComplete, loading }: TicketQueu
     );
   }
 
-  const pendingCount = sortedOrders.filter((o) => o.status === 'pending').length;
+  const cancelledOrders = sortedOrders.filter((o) => o.status === 'cancelled');
+  const pendingCount = sortedOrders.filter((o) => o.status === 'pending' || o.status === 'confirmed').length;
   const preparingCount = sortedOrders.filter((o) => o.status === 'preparing').length;
   const readyCount = sortedOrders.filter((o) => o.status === 'ready').length;
   const servedCount = sortedOrders.filter((o) => o.status === 'served').length;
 
   if (station === 'all') {
     return (
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="space-y-4">
+        {cancelledOrders.length > 0 && (
+          <div role="region" aria-label="Đơn đã hủy" className="space-y-2">
+            {cancelledOrders.map((order) => (
+              <OrderTicket key={order.id} order={order} />
+            ))}
+          </div>
+        )}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <QueueColumn
           title="Chờ xác nhận"
           count={pendingCount}
@@ -57,7 +66,7 @@ export function TicketQueue({ orders, station, onComplete, loading }: TicketQueu
           dataCol="pending"
         >
           {sortedOrders
-            .filter((o) => o.status === 'pending')
+            .filter((o) => o.status === 'pending' || o.status === 'confirmed')
             .map((order) => (
               <OrderTicket
                 key={order.id}
@@ -105,6 +114,7 @@ export function TicketQueue({ orders, station, onComplete, loading }: TicketQueu
               <OrderTicket key={order.id} order={order} />
             ))}
         </QueueColumn>
+        </div>
       </div>
     );
   }

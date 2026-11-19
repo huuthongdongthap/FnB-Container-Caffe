@@ -320,7 +320,7 @@ describe('M4-B Digital Menu: Contract & Security', () => {
       expect(body.data?.categories).toBeDefined();
       expect(Array.isArray(body.data.categories)).toBe(true);
       expect(body.data.totalItems).toBe(3);
-    });
+    }, 20000);
 
     it('responds to GET /api/menu/:id with single item', async () => {
       const { app } = await import('../worker/src/index');

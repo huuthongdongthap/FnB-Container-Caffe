@@ -51,7 +51,7 @@ function createAuthRateLimit(opts?: { allowWriteDegradation?: boolean }): Middle
   };
 }
 
-const authRateLimit = createAuthRateLimit();
+const authRateLimit = createAuthRateLimit({ allowWriteDegradation: true });
 const passwordRotationRateLimit = createAuthRateLimit({ allowWriteDegradation: true });
 
 authEndpointsRouter.post('/register', authRateLimit, (c) => registerWithVerification(c.req.raw, c.env));

@@ -34,7 +34,10 @@ export async function getPeakHours(
       WHERE o.created_at >= datetime('now', '-' || ? || ' days')
         AND o.status != 'cancelled'
         AND o.status NOT IN ('cancelled', 'refunded', 'failed', 'rejected', 'expired')
-        AND COALESCE(o.payment_status, '') != 'refunded'${tenantClause}
+        AND LOWER(COALESCE(TRIM(o.status), '')) NOT IN ('cancelled', 'canceled', 'refunded', 'failed', 'rejected', 'expired')
+        AND COALESCE(o.payment_status, '') != 'refunded'
+        AND LOWER(COALESCE(TRIM(o.payment_status), '')) NOT IN ('refunded', 'failed', 'cancelled', 'canceled')
+        AND NOT (COALESCE(TRIM(o.notes), '') = 'Khách QR - cho don mon' AND COALESCE(TRIM(o.items), '[]') IN ('', '[]'))${tenantClause}
       GROUP BY hour
       ORDER BY hour
     `).bind(...binds).all<PeakHourRow>();
@@ -49,25 +52,46 @@ export async function getPeakHours(
         FROM orders o
         WHERE o.created_at >= datetime('now', '-' || ? || ' days')
           AND o.status != 'cancelled'
-          AND o.status NOT IN ('cancelled', 'refunded', 'failed', 'rejected', 'expired')${tenantClause}
+          AND o.status NOT IN ('cancelled', 'refunded', 'failed', 'rejected', 'expired')
+          AND LOWER(COALESCE(TRIM(o.status), '')) NOT IN ('cancelled', 'canceled', 'refunded', 'failed', 'rejected', 'expired')
+          AND COALESCE(o.payment_status, '') != 'refunded'
+          AND LOWER(COALESCE(TRIM(o.payment_status), '')) NOT IN ('refunded', 'failed', 'cancelled', 'canceled')${tenantClause}
         GROUP BY hour
         ORDER BY hour
       `).bind(...binds).all<PeakHourRow>();
       results = res.results;
     } catch {
-      const res = await db.prepare(`
-        SELECT
-          CAST(strftime('%H', created_at) AS INTEGER) AS hour,
-          COUNT(*) AS order_count,
-          COALESCE(SUM(o.total), 0) AS revenue
-        FROM orders o
-        WHERE o.created_at >= datetime('now', '-' || ? || ' days')
-          AND o.status != 'cancelled'
-          AND o.status NOT IN ('cancelled', 'refunded', 'failed', 'rejected', 'expired')${tenantClause}
-        GROUP BY hour
-        ORDER BY hour
-      `).bind(...binds).all<PeakHourRow>();
-      results = res.results;
+      try {
+        const res = await db.prepare(`
+          SELECT
+            CAST(strftime('%H', datetime(created_at, '+7 hours')) AS INTEGER) AS hour,
+            COUNT(*) AS order_count,
+            COALESCE(SUM(o.total), 0) AS revenue
+          FROM orders o
+          WHERE o.created_at >= datetime('now', '-' || ? || ' days')
+            AND o.status != 'cancelled'
+            AND o.status NOT IN ('cancelled', 'refunded', 'failed', 'rejected', 'expired')
+            AND LOWER(COALESCE(TRIM(o.status), '')) NOT IN ('cancelled', 'canceled', 'refunded', 'failed', 'rejected', 'expired')${tenantClause}
+          GROUP BY hour
+          ORDER BY hour
+        `).bind(...binds).all<PeakHourRow>();
+        results = res.results;
+      } catch {
+        const res = await db.prepare(`
+          SELECT
+            CAST(strftime('%H', created_at) AS INTEGER) AS hour,
+            COUNT(*) AS order_count,
+            COALESCE(SUM(o.total), 0) AS revenue
+          FROM orders o
+          WHERE o.created_at >= datetime('now', '-' || ? || ' days')
+            AND o.status != 'cancelled'
+            AND o.status NOT IN ('cancelled', 'refunded', 'failed', 'rejected', 'expired')
+            AND LOWER(COALESCE(TRIM(o.status), '')) NOT IN ('cancelled', 'canceled', 'refunded', 'failed', 'rejected', 'expired')${tenantClause}
+          GROUP BY hour
+          ORDER BY hour
+        `).bind(...binds).all<PeakHourRow>();
+        results = res.results;
+      }
     }
   }
 

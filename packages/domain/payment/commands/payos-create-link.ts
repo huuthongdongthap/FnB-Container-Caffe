@@ -3,7 +3,7 @@ import { Hono } from 'hono';
 import { optionalAuth } from 'worker/src/middleware/auth';
 import { createLogger } from 'worker/src/middleware/logger';
 import { payOSCreateLinkSchema } from 'worker/src/lib/validators';
-import { canAccessPaymentOrder, resolvePaymentCustomerOwnerIds, resolvePaymentTenantScope } from '../policies/payment-access';
+import { canAccessPaymentOrder, resolvePaymentCustomerOwnerIds, resolvePaymentTenantScope, verifyPaymentOrderToken } from '../policies/payment-access';
 import { getOrCreatePayOSAttempt } from './payos-attempt';
 import { PAYOS_ERROR_MESSAGES as errMsg } from './payos-helpers';
 import type { Env } from 'worker/src/types/env';
@@ -30,65 +30,94 @@ export const handleCreateLink = async (c: any, input?: unknown, openApi = false)
       customer_id: string | null;
       tenant_id?: string | null;
       order_token?: string | null;
+      guest_token_hash?: string | null;
+      orderTokenVerified?: boolean;
     };
     let order: Order | null = null;
     try {
       order = await db
         .prepare(
-          'SELECT id, COALESCE(total, total_amount) AS total, status, payment_status, payment_method, customer_id, tenant_id, order_token FROM orders WHERE id = ?'
+          'SELECT id, COALESCE(total, total_amount) AS total, status, payment_status, payment_method, customer_id, tenant_id, guest_token_hash FROM orders WHERE id = ?'
         )
         .bind(order_id)
         .first<Order>();
     } catch {
       try {
         order = await db
-          .prepare('SELECT id, total, status, payment_status, payment_method, customer_id, tenant_id, order_token FROM orders WHERE id = ?')
+          .prepare(
+            'SELECT id, total, status, payment_status, payment_method, customer_id, tenant_id, guest_token_hash FROM orders WHERE id = ?'
+          )
           .bind(order_id)
           .first<Order>();
       } catch {
         try {
           order = await db
-            .prepare('SELECT id, total_amount AS total, status, payment_status, payment_method, customer_id, tenant_id, order_token FROM orders WHERE id = ?')
+            .prepare(
+              'SELECT id, total_amount AS total, status, payment_status, payment_method, customer_id, tenant_id, guest_token_hash FROM orders WHERE id = ?'
+            )
             .bind(order_id)
             .first<Order>();
         } catch {
           try {
             order = await db
-              .prepare('SELECT id, COALESCE(total, total_amount) AS total, status, payment_status, payment_method, customer_id, tenant_id FROM orders WHERE id = ?')
+              .prepare(
+                'SELECT id, COALESCE(total, total_amount) AS total, status, payment_status, payment_method, customer_id, tenant_id, order_token FROM orders WHERE id = ?'
+              )
+              .bind(order_id)
+              .first<Order>();
+      } catch {
+        try {
+          order = await db
+            .prepare('SELECT id, total, status, payment_status, payment_method, customer_id, tenant_id, order_token FROM orders WHERE id = ?')
+            .bind(order_id)
+            .first<Order>();
+        } catch {
+          try {
+            order = await db
+              .prepare('SELECT id, total_amount AS total, status, payment_status, payment_method, customer_id, tenant_id, order_token FROM orders WHERE id = ?')
               .bind(order_id)
               .first<Order>();
           } catch {
             try {
               order = await db
-                .prepare('SELECT id, total, status, payment_status, payment_method, customer_id, tenant_id FROM orders WHERE id = ?')
+                .prepare('SELECT id, COALESCE(total, total_amount) AS total, status, payment_status, payment_method, customer_id, tenant_id FROM orders WHERE id = ?')
                 .bind(order_id)
                 .first<Order>();
             } catch {
               try {
                 order = await db
-                  .prepare('SELECT id, total_amount AS total, status, payment_status, payment_method, customer_id, tenant_id FROM orders WHERE id = ?')
+                  .prepare('SELECT id, total, status, payment_status, payment_method, customer_id, tenant_id FROM orders WHERE id = ?')
                   .bind(order_id)
                   .first<Order>();
               } catch {
-                if (scope.tenantId === 'default' || scope.wildcard) {
-                  try {
-                    order = await db
-                      .prepare(
-                        'SELECT id, COALESCE(total, total_amount) AS total, status, payment_status, payment_method, customer_id, order_token FROM orders WHERE id = ?'
-                      )
-                      .bind(order_id)
-                      .first<Order>();
-                  } catch {
+                try {
+                  order = await db
+                    .prepare('SELECT id, total_amount AS total, status, payment_status, payment_method, customer_id, tenant_id FROM orders WHERE id = ?')
+                    .bind(order_id)
+                    .first<Order>();
+                } catch {
+                  if (scope.tenantId === 'default' || scope.wildcard) {
                     try {
                       order = await db
-                        .prepare('SELECT id, total, status, payment_status, payment_method, customer_id FROM orders WHERE id = ?')
+                        .prepare(
+                          'SELECT id, COALESCE(total, total_amount) AS total, status, payment_status, payment_method, customer_id, order_token FROM orders WHERE id = ?'
+                        )
                         .bind(order_id)
                         .first<Order>();
                     } catch {
-                      order = await db
-                        .prepare('SELECT id, total_amount AS total, status, payment_status, payment_method, customer_id FROM orders WHERE id = ?')
-                        .bind(order_id)
-                        .first<Order>();
+                      try {
+                        order = await db
+                          .prepare('SELECT id, total, status, payment_status, payment_method, customer_id FROM orders WHERE id = ?')
+                          .bind(order_id)
+                          .first<Order>();
+                      } catch {
+                        order = await db
+                          .prepare('SELECT id, total_amount AS total, status, payment_status, payment_method, customer_id FROM orders WHERE id = ?')
+                          .bind(order_id)
+                          .first<Order>();
+                      }
+                    }
+                  }
                     }
                   }
                 }
@@ -106,7 +135,8 @@ export const handleCreateLink = async (c: any, input?: unknown, openApi = false)
       String(order.tenant_id).trim().toLowerCase() !== 'hq')
         ? String(order.tenant_id).trim()
         : (scope.wildcard ? 'default' : scope.tenantId);
-    let effectiveOrderForAccess: Order = order;
+    const orderTokenVerified = await verifyPaymentOrderToken(c, order);
+    let effectiveOrderForAccess: Order = { ...order, orderTokenVerified };
     const user = c?.get?.('user') as Record<string, any> | undefined;
     if (user && String(user.role || '').trim().toLowerCase() === 'customer' && order.customer_id) {
       const ownerIds = await resolvePaymentCustomerOwnerIds(db, user, orderTenant);
@@ -114,7 +144,7 @@ export const handleCreateLink = async (c: any, input?: unknown, openApi = false)
       const ordCustId = String(order.customer_id).trim();
       if (ownerIds.includes(ordCustId)) {
         const canonicalActorId = String(user.id ?? user.sub ?? ordCustId).trim() || ordCustId;
-        effectiveOrderForAccess = { ...order, customer_id: canonicalActorId };
+        effectiveOrderForAccess = { ...effectiveOrderForAccess, customer_id: canonicalActorId };
       }
     }
     if (!canAccessPaymentOrder(c, effectiveOrderForAccess, true)) return c.json({ success: false, error: errMsg.forbidden[locale] }, 403);
@@ -140,7 +170,7 @@ export const handleCreateLink = async (c: any, input?: unknown, openApi = false)
     const { PAYOS_CLIENT_ID: clientId, PAYOS_API_KEY: apiKey, PAYOS_CHECKSUM_KEY: checksumKey } = c.env;
     if (!clientId || !apiKey || !checksumKey) return c.json({ success: false, error: errMsg.payos_not_configured[locale] }, 500);
     const baseUrl = c.env.FE_BASE_URL || 'https://auraspace.cafe';
-    const result = await getOrCreatePayOSAttempt({ db, kv: c.env.AUTH_KV ?? null, orderId: order_id, amount, clientId, apiKey, checksumKey,
+    const result = await getOrCreatePayOSAttempt({ db, kv: c.env.AUTH_KV ?? null, env: c.env as unknown as Record<string, unknown>, orderId: order_id, amount, clientId, apiKey, checksumKey,
       description: (description || `Order #${order_id}`).slice(0, 25), buyerName: customer_name || 'Khách hàng',
       returnUrl: `${baseUrl}/order-success?order_id=${encodeURIComponent(order_id)}`,
       cancelUrl: `${baseUrl}/checkout?cancelled=true&order_id=${encodeURIComponent(order_id)}`,

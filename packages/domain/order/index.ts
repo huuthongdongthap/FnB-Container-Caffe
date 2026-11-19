@@ -16,11 +16,15 @@ export type { OrderSortColumn, OrderListOptions } from './queries/shared-listing
 export { getLatestOrderTimestamp } from './queries/latest-timestamp';
 // policies
 export { creditLoyaltyIfEligible } from './policies/loyalty-trigger';
+export { releaseTableIfNoActiveOrders } from './policies/table-occupancy-release';
 export { calculateOrderSnapshot } from './policies/order-snapshot';
 export { canActorTransition, toActorRole } from './policies/transition-authorization';
 export type { ActorRole } from './policies/transition-authorization';
 export {
   canAccessOrder,
+  generateOrderToken,
+  hashOrderToken,
+  verifyGuestOrderToken,
   projectCustomerOrderPayload,
   publishOrderEvent,
 } from './policies/customer-order-payload';

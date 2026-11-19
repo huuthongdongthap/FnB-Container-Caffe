@@ -102,16 +102,22 @@ describe('Phase 46 Slice AS3 — Purchasing & Receiving, BOM Depletion, Cash Rec
                 });
                 return { meta: { changes: 1 } };
               }
-              if (sql.includes('UPDATE purchase_order_items SET received_quantity = ?')) {
+              if (sql.includes('UPDATE purchase_order_items SET received_quantity = COALESCE(received_quantity, 0) + ?')) {
                 if (simulateConcurrentOverReceive) {
                   return { meta: { changes: 0 } };
                 }
+                const incoming = Number(args[0] ?? 0);
                 const item = purchaseOrderItems.find((i) => i.id === args[1]);
-                const incoming = Number(args[2] ?? 0);
                 if (!item || Number(item.received_quantity || 0) + incoming > Number(item.quantity)) {
                   return { meta: { changes: 0 } };
                 }
-                item.received_quantity = args[0];
+                item.received_quantity = Number(item.received_quantity || 0) + incoming;
+                return { meta: { changes: 1 } };
+              }
+              if (sql.includes('UPDATE purchase_order_items SET received_quantity = MAX(0, COALESCE(received_quantity, 0) - ?)')) {
+                const applied = Number(args[0] ?? 0);
+                const item = purchaseOrderItems.find((i) => i.id === args[1]);
+                if (item) item.received_quantity = Math.max(0, Number(item.received_quantity || 0) - applied);
                 return { meta: { changes: 1 } };
               }
               if (sql.includes('UPDATE ingredients SET current_stock = current_stock + ?')) {

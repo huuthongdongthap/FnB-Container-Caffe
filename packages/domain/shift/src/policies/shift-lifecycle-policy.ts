@@ -13,6 +13,18 @@ import type {
   ShiftRecord,
 } from '../model/shift-pos-types';
 
+const recordedShiftOrderKeys = new WeakMap<object, Set<string>>();
+
+function getRecordedShiftOrderSet(db: D1Database): Set<string> {
+  const key = db as unknown as object;
+  let set = recordedShiftOrderKeys.get(key);
+  if (!set) {
+    set = new Set<string>();
+    recordedShiftOrderKeys.set(key, set);
+  }
+  return set;
+}
+
 export function canStaffOperateShift(role: StaffRole): boolean {
   const roleStr = String(role);
   return (
@@ -299,33 +311,88 @@ export async function recordShiftSale(
   const cashDelta = isCash ? input.amount : 0;
   const onlineDelta = isCash ? 0 : input.amount;
   const now = new Date().toISOString();
+  const normalizedOrderId = typeof input.orderId === 'string' ? input.orderId.trim() : '';
+  const dedupEntityId = normalizedOrderId ? `${input.shiftId}:${normalizedOrderId}` : '';
+  const dedupMemoryKey = normalizedOrderId ? `${effectiveShiftTenant}:${dedupEntityId}` : '';
 
+  if (normalizedOrderId) {
+    const seen = getRecordedShiftOrderSet(db);
+    if (seen.has(dedupMemoryKey)) {
+      return { ok: true, alreadyRecorded: true };
+    }
+    const existingAudit = await db
+      .prepare(
+        "SELECT id FROM audit_logs WHERE entity_type = 'shift_sale' AND entity_id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ? LIMIT 1"
+      )
+      .bind(dedupEntityId, effectiveShiftTenant)
+      .first<{ id?: number | string }>()
+      .catch(() => null);
+    if (existingAudit) {
+      seen.add(dedupMemoryKey);
+      return { ok: true, alreadyRecorded: true };
+    }
+  }
+
+  let saleRunResult: { meta?: { changes?: number }; changes?: number } | null = null;
   try {
     try {
-      await db.prepare(
+      saleRunResult = (await db.prepare(
         `UPDATE staff_shifts
          SET cash_sales = cash_sales + ?,
              online_sales = online_sales + ?,
              total_sales = total_sales + ?,
              order_count = order_count + 1,
              updated_at = ?
-         WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?`
-      ).bind(cashDelta, onlineDelta, input.amount, now, input.shiftId, effectiveShiftTenant).run();
+         WHERE id = ?
+           AND status = 'open'
+           AND (clock_out IS NULL OR clock_out = '')
+           AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?`
+      ).bind(cashDelta, onlineDelta, input.amount, now, input.shiftId, effectiveShiftTenant).run()) as {
+        meta?: { changes?: number };
+        changes?: number;
+      };
     } catch {
       if (effectiveShiftTenant === 'default') {
-        await db.prepare(
+        saleRunResult = (await db.prepare(
           `UPDATE staff_shifts
            SET cash_sales = cash_sales + ?,
                online_sales = online_sales + ?,
                total_sales = total_sales + ?,
                order_count = order_count + 1,
                updated_at = ?
-           WHERE id = ?`
-        ).bind(cashDelta, onlineDelta, input.amount, now, input.shiftId).run();
+           WHERE id = ?
+             AND status = 'open'
+             AND (clock_out IS NULL OR clock_out = '')`
+        ).bind(cashDelta, onlineDelta, input.amount, now, input.shiftId).run()) as {
+          meta?: { changes?: number };
+          changes?: number;
+        };
       }
     }
   } catch {
     // Fallback when shifts table does not store inline sales counters
+  }
+  const saleChanges = saleRunResult?.meta?.changes ?? saleRunResult?.changes;
+  if (saleChanges !== undefined && Number(saleChanges) < 1) {
+    return { ok: false, error: 'closed_shift_immutable' };
+  }
+
+  if (normalizedOrderId) {
+    getRecordedShiftOrderSet(db).add(dedupMemoryKey);
+    await db
+      .prepare(
+        `INSERT INTO audit_logs (actor_id, action, entity_type, entity_id, tenant_id, created_at)
+         SELECT ?, 'shift_sale_recorded', 'shift_sale', ?, ?, ?
+         WHERE NOT EXISTS (
+           SELECT 1 FROM audit_logs
+           WHERE entity_type = 'shift_sale'
+             AND entity_id = ?
+             AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?
+         )`
+      )
+      .bind(input.staffId || shift.staff_id || 'pos', dedupEntityId, effectiveShiftTenant, now, dedupEntityId, effectiveShiftTenant)
+      .run()
+      .catch(() => {});
   }
 
   return { ok: true, alreadyRecorded: false };
@@ -403,9 +470,10 @@ export async function closeCanonicalShift(
   const variance = input.actualCash - expectedCash;
   const now = new Date().toISOString();
 
+  let closeRunResult: { meta?: { changes?: number }; changes?: number } | null = null;
   try {
     try {
-      await db.prepare(
+      closeRunResult = (await db.prepare(
         `UPDATE staff_shifts
          SET status = 'closed',
              clock_out = ?,
@@ -414,11 +482,17 @@ export async function closeCanonicalShift(
              cash_variance = ?,
              notes = COALESCE(?, notes),
              updated_at = ?
-         WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?`
-      ).bind(now, expectedCash, input.actualCash, variance, input.notes || null, now, input.shiftId, effectiveShiftTenant).run();
+         WHERE id = ?
+           AND status = 'open'
+           AND (clock_out IS NULL OR clock_out = '')
+           AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?`
+      ).bind(now, expectedCash, input.actualCash, variance, input.notes || null, now, input.shiftId, effectiveShiftTenant).run()) as {
+        meta?: { changes?: number };
+        changes?: number;
+      };
     } catch (err) {
       if (effectiveShiftTenant === 'default') {
-        await db.prepare(
+        closeRunResult = (await db.prepare(
           `UPDATE staff_shifts
            SET status = 'closed',
                clock_out = ?,
@@ -427,8 +501,13 @@ export async function closeCanonicalShift(
                cash_variance = ?,
                notes = COALESCE(?, notes),
                updated_at = ?
-           WHERE id = ?`
-        ).bind(now, expectedCash, input.actualCash, variance, input.notes || null, now, input.shiftId).run();
+           WHERE id = ?
+             AND status = 'open'
+             AND (clock_out IS NULL OR clock_out = '')`
+        ).bind(now, expectedCash, input.actualCash, variance, input.notes || null, now, input.shiftId).run()) as {
+          meta?: { changes?: number };
+          changes?: number;
+        };
       } else {
         throw err;
       }
@@ -437,12 +516,12 @@ export async function closeCanonicalShift(
     try {
       try {
         await db.prepare(
-          `UPDATE shifts SET clock_out = ?, notes = COALESCE(?, notes) WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?`
+          `UPDATE shifts SET clock_out = ?, notes = COALESCE(?, notes) WHERE id = ? AND clock_out IS NULL AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?`
         ).bind(now, input.notes || null, input.shiftId, effectiveShiftTenant).run();
       } catch (err) {
         if (effectiveShiftTenant === 'default') {
           await db.prepare(
-            `UPDATE shifts SET clock_out = ?, notes = COALESCE(?, notes) WHERE id = ?`
+            `UPDATE shifts SET clock_out = ?, notes = COALESCE(?, notes) WHERE id = ? AND clock_out IS NULL`
           ).bind(now, input.notes || null, input.shiftId).run();
         } else {
           throw err;
@@ -461,6 +540,10 @@ export async function closeCanonicalShift(
         }
       }
     }
+  }
+  const closeChanges = closeRunResult?.meta?.changes ?? closeRunResult?.changes;
+  if (closeChanges !== undefined && Number(closeChanges) < 1) {
+    return { ok: false, error: 'shift_already_closed' };
   }
 
   const updatedShift: ShiftRecord = {

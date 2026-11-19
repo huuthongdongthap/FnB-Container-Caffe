@@ -23,16 +23,16 @@ function seed(sqlite: ReturnType<typeof orderCreationFixture>['sqlite']) {
     ('order-a','[]',20000,'pending','A customer','0900000010','cod','table-a','cafe-a'),
     ('order-b','[]',90000,'pending','PRIVATE B CUSTOMER','0999999999','cod','table-b','cafe-b');`);
 }
-async function get(env: any, path: string, tenantId = 'cafe-a', role = 'waiter') {
+async function get(env: any, path: string, tenantId = 'cafe-a', role = 'waiter', headerTenant = tenantId) {
   const token = await generateJWT({ id: 'local-staff', role, tenantId,
     authVersion: 1, authTime: Math.floor(Date.now() / 1000), sessionType: 'staff-web' }, 'test-jwt-secret-at-least-16-chars', 28800);
-  return app.fetch(new Request(`https://test.aura${path}`, { headers: { Authorization: `Bearer ${token}`, 'x-tenant-id': 'cafe-b' } }), env);
+  return app.fetch(new Request(`https://test.aura${path}`, { headers: { Authorization: `Bearer ${token}`, 'x-tenant-id': headerTenant } }), env);
 }
 
 describe('All staff order read aliases enforce signed tenant confinement', () => {
-  it.each(['/mobile/orders', '/api/orders'])('scopes list %s despite client tenant injection', async path => {
+  it.each(['/mobile/orders', '/api/orders'])('scopes list %s to the signed tenant', async path => {
     const { env, sqlite } = fixture('waiter'); seed(sqlite);
-    const response = await get(env, `${path}?tenant_id=cafe-b`);
+    const response = await get(env, `${path}?tenant_id=cafe-a`);
     expect(response.status).toBe(200);
     const content = JSON.stringify(await response.json());
     expect(content).toContain('order-a');
@@ -40,11 +40,21 @@ describe('All staff order read aliases enforce signed tenant confinement', () =>
     expect(content).not.toContain('PRIVATE B CUSTOMER');
   });
 
+  it.each(['/mobile/orders', '/api/orders'])('rejects a foreign tenant override on list %s', async path => {
+    const { env, sqlite } = fixture('waiter'); seed(sqlite);
+    const response = await get(env, `${path}?tenant_id=cafe-b`, 'cafe-a', 'waiter', 'cafe-b');
+    expect(response.status).toBe(403);
+    expect(await response.text()).not.toContain('PRIVATE B CUSTOMER');
+  });
+
   it.each(['/mobile/orders', '/api/orders'])('denies foreign detail %s but allows own store', async path => {
     const { env, sqlite } = fixture('waiter'); seed(sqlite);
-    const denied = await get(env, `${path}/order-b?tenant_id=cafe-b`);
-    expect(denied.status).toBe(404);
+    const denied = await get(env, `${path}/order-b?tenant_id=cafe-b`, 'cafe-a', 'waiter', 'cafe-b');
+    expect(denied.status).toBe(403);
     expect(await denied.text()).not.toContain('PRIVATE B CUSTOMER');
+    const crossRead = await get(env, `${path}/order-b`);
+    expect([403, 404]).toContain(crossRead.status);
+    expect(await crossRead.text()).not.toContain('PRIVATE B CUSTOMER');
     expect((await get(env, `${path}/order-a`)).status).toBe(200);
   });
 
@@ -58,7 +68,7 @@ describe('All staff order read aliases enforce signed tenant confinement', () =>
     // tenant binding follow it: the session gate compares the row's role to the
     // token live, and only an HQ tenant may carry the '*' cross-tenant override.
     sqlite.prepare(`UPDATE users SET role = 'owner', tenant_id = 'hq' WHERE id = 'local-staff'`).run();
-    const global = await get(env, '/api/orders?tenant_id=*', 'hq', 'owner');
+    const global = await get(env, '/api/orders?tenant_id=*', 'hq', 'owner', '*');
     expect(global.status).toBe(200);
     const content = JSON.stringify(await global.json());
     expect(content).toContain('order-a'); expect(content).toContain('order-b');

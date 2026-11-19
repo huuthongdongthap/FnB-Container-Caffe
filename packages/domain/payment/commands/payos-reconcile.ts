@@ -8,6 +8,7 @@ export { RECONCILE_LEASE_MS, claimReconcileJob, releaseReconcileJob, writePaymen
 export interface ReconcilePayOSInput {
   db: D1Database;
   kv?: KVNamespace | null;
+  env?: Record<string, unknown> | null;
   paymentId: string;
   tenantId?: string | null;
   clientId: string;
@@ -233,21 +234,109 @@ export async function reconcilePayOSPayment(input: ReconcilePayOSInput): Promise
         .bind('payment_success', JSON.stringify({ method: 'payos', source: input.source, tenant_id: rowTenant }), nowIso)
         .run().catch(() => {});
       if (input.kv && !isTerminalNonPayable) {
-        await input.kv.put(
-          `payment_event:${row.order_id}`,
-          JSON.stringify({ type: 'payment_confirmed', orderId: row.order_id, amount: expectedAmount, reference: '', tenant_id: rowTenant, tenantId: rowTenant, timestamp: nowIso }),
-          { expirationTtl: 300 }
-        ).catch(() => {});
-        await input.kv.put(
-          `order_event:${row.order_id}`,
-          JSON.stringify({ orderId: row.order_id, status: after?.order_status ?? fresh.order_status, payment_status: 'paid', tenant_id: rowTenant, tenantId: rowTenant, timestamp: nowIso }),
-          { expirationTtl: 60 }
-        ).catch(() => {});
+        const settledStatus = String(after?.order_status ?? fresh.order_status ?? 'pending');
+        const paymentEvtPayload = JSON.stringify({
+          type: 'payment_confirmed',
+          orderId: row.order_id,
+          amount: expectedAmount,
+          reference: '',
+          tenant_id: rowTenant,
+          tenantId: rowTenant,
+          timestamp: nowIso,
+        });
+        const orderEvtPayload = JSON.stringify({
+          orderId: row.order_id,
+          status: settledStatus,
+          payment_status: 'paid',
+          tenant_id: rowTenant,
+          tenantId: rowTenant,
+          timestamp: nowIso,
+        });
+        const nowTsStr = String(Date.now());
+        await Promise.all([
+          input.kv.put(`payment_event:${row.order_id}`, paymentEvtPayload, { expirationTtl: 300 }).catch(() => {}),
+          input.kv.put(`payment_event:${rowTenant}:${row.order_id}`, paymentEvtPayload, { expirationTtl: 300 }).catch(() => {}),
+          input.kv.put(`order_event:${row.order_id}`, orderEvtPayload, { expirationTtl: 60 }).catch(() => {}),
+          input.kv.put(`order_event:${rowTenant}:${row.order_id}`, orderEvtPayload, { expirationTtl: 60 }).catch(() => {}),
+          input.kv.put('latest_order_ts', nowTsStr, { expirationTtl: 86400 }).catch(() => {}),
+          input.kv.put(`latest_order_ts:${rowTenant}`, nowTsStr, { expirationTtl: 86400 }).catch(() => {}),
+          input.kv.put('orders:latest_updated_at', nowIso, { expirationTtl: 86400 }).catch(() => {}),
+          input.kv.put(`orders:latest_updated_at:${rowTenant}`, nowIso, { expirationTtl: 86400 }).catch(() => {}),
+        ]);
+      }
+      if (!isTerminalNonPayable && input.env?.ORDER_BROADCASTER) {
+        try {
+          const ns = input.env.ORDER_BROADCASTER as {
+            idFromName(name: string): unknown;
+            get(id: unknown): {
+              broadcast?: (msg: unknown) => Promise<void>;
+              fetch?: (req: RequestInfo, init?: RequestInit) => Promise<Response>;
+            };
+          };
+          const doChannel = rowTenant !== 'default' ? `${rowTenant}:${row.order_id}` : row.order_id;
+          const stub = ns.get(ns.idFromName(doChannel));
+          const ordDetails = await input.db
+            .prepare(
+              "SELECT items, COALESCE(total, total_amount) AS total, customer_name, customer_phone, table_id, created_at FROM orders WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?",
+            )
+            .bind(row.order_id, rowTenant)
+            .first<Record<string, unknown>>()
+            .catch(() =>
+              rowTenant === 'default'
+                ? input.db
+                    .prepare('SELECT items, total, customer_name, customer_phone, table_id, created_at FROM orders WHERE id = ?')
+                    .bind(row.order_id)
+                    .first<Record<string, unknown>>()
+                    .catch(() => null)
+                : Promise.resolve(null),
+            );
+          let parsedItems: unknown[] = [];
+          if (Array.isArray(ordDetails?.items)) {
+            parsedItems = ordDetails.items;
+          } else if (typeof ordDetails?.items === 'string') {
+            try {
+              parsedItems = JSON.parse(ordDetails.items) as unknown[];
+            } catch {
+              parsedItems = [];
+            }
+          }
+          const eventPayload = {
+            orderId: row.order_id,
+            status: String(after?.order_status ?? fresh.order_status ?? 'pending'),
+            payment_status: 'paid',
+            items: parsedItems,
+            total: Number(ordDetails?.total ?? expectedOrderTotal ?? expectedAmount ?? 0),
+            customer_name: String(ordDetails?.customer_name ?? ''),
+            customer_phone: String(ordDetails?.customer_phone ?? ''),
+            table_id: ordDetails?.table_id ? String(ordDetails.table_id) : null,
+            ...(rowTenant !== 'default' ? { tenant_id: rowTenant } : {}),
+            createdAt: ordDetails?.created_at
+              ? new Date(String(ordDetails.created_at)).getTime()
+              : Date.now(),
+            updatedAt: Date.now(),
+          };
+          if (typeof stub.broadcast === 'function') {
+            await stub.broadcast(eventPayload).catch(() => {});
+          } else if (typeof stub.fetch === 'function') {
+            await stub
+              .fetch('https://do/broadcast', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(eventPayload),
+              })
+              .catch(() => {});
+          }
+        } catch {
+          // Non-blocking realtime broadcast after reconciliation settlement
+        }
       }
       if (!isTerminalNonPayable) {
         try {
           const { creditLoyaltyIfEligible, sanitizeCustomerIdentity } = await import('../../order/policies/loyalty-trigger');
-          const envForLoyalty: Record<string, unknown> = input.kv ? { AUTH_KV: input.kv } : {};
+          const envForLoyalty: Record<string, unknown> = {
+            ...(input.env ?? {}),
+            ...(input.kv ? { AUTH_KV: input.kv } : {}),
+          };
           await creditLoyaltyIfEligible(input.db, envForLoyalty, row.order_id).catch(() => {});
 
           const ordRow = await input.db

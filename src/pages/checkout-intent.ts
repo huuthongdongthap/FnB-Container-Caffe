@@ -1,4 +1,5 @@
 import { apiFetch } from '@/lib/api-client';
+import { getGuestOrderToken } from '@/lib/guest-order-token';
 import type { CreateOrderPayload, OrderState } from '@/hooks/stores/order-store-types';
 
 /** One checkout intent survives network errors and short page reloads. */
@@ -65,7 +66,11 @@ export async function resolveCheckoutOrder(options: {
   let alreadyPaid = false;
   requireSameIdentity();
   if (intent.order) {
-    const tracked = await apiFetch<any>(`/api/orders/${encodeURIComponent(intent.order.id)}/track`, { silent: true }).catch(() => null);
+    const orderToken = getGuestOrderToken(intent.order.id);
+    const tracked = await apiFetch<any>(`/api/orders/${encodeURIComponent(intent.order.id)}/track`, {
+      silent: true,
+      ...(orderToken ? { headers: { 'X-Order-Token': orderToken } } : {}),
+    }).catch(() => null);
     const previous = tracked?.data ?? tracked;
     requireSameIdentity();
     // A settled order after a lost return remains this same checkout. Show its

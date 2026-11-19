@@ -156,6 +156,7 @@ export async function manualReconcilePayment(c: Context<{ Bindings: Env }>): Pro
     const result = await reconcilePayOSPayment({
       db,
       kv,
+      env: c.env as unknown as Record<string, unknown>,
       paymentId: existing.id,
       tenantId,
       clientId,

@@ -75,6 +75,7 @@ export async function handleClaimOrder(c: Context<{ Bindings: Env }>) {
     tableId,
     orderToken,
     requireVerification: true,
+    requireVerifiedPhone: true,
   });
 
   if (!result.success) {

@@ -5,6 +5,10 @@ import type { ApiFetchOptions } from '@/lib/api-client';
 import { useOnlineStatus } from '@/hooks/use-online-status';
 import { offlineDb } from '@/lib/offline-db';
 import {
+  captureGuestOrderTokenFromResponse,
+  getGuestOrderToken,
+} from '@/lib/guest-order-token';
+import {
   readClientSession,
   readSessionSnapshot,
   isSameSessionSnapshot,
@@ -71,6 +75,7 @@ export const useOrderStore = create<OrderState>((set, get) => ({
         set({ loading: false });
         return null;
       }
+      captureGuestOrderTokenFromResponse(body);
       const order: CustomerOrder = body.data ?? body;
       set({ currentOrder: order, loading: false, error: null, queuedOffline: false });
       return order;
@@ -97,7 +102,11 @@ export const useOrderStore = create<OrderState>((set, get) => ({
     } else if (get().observedOrderId !== id) {
       set({ observedOrderId: id });
     }
-    const opts: ApiFetchOptions = { signal: owner.signal };
+    const guestToken = getGuestOrderToken(id);
+    const opts: ApiFetchOptions = {
+      signal: owner.signal,
+      ...(guestToken ? { headers: { 'X-Order-Token': guestToken } } : {}),
+    };
     set({ loading: true, error: null });
     try {
       let body: { data?: CustomerOrder } & Partial<CustomerOrder>;
@@ -181,7 +190,8 @@ export const useOrderStore = create<OrderState>((set, get) => ({
       ...(shouldClearStaleOrder ? { currentOrder: null } : {}),
     });
 
-    const url = `${API_BASE}/api/orders/${encodeURIComponent(id)}/events`;
+    const guestToken = getGuestOrderToken(id);
+    const url = `${API_BASE}/api/orders/${encodeURIComponent(id)}/events${guestToken ? `?order_token=${encodeURIComponent(guestToken)}` : ''}`;
     const es = new EventSource(url, { withCredentials: true });
     es.addEventListener('update_order', (event: MessageEvent) => {
       if (controller.signal.aborted || get().observedOrderId !== id) return;
@@ -237,35 +247,73 @@ export const useOrderStore = create<OrderState>((set, get) => ({
   flushQueuedOrders: async () => {
     // A reconnect can fire the trigger twice, and both calls would walk the same
     // IndexedDB records and sync each one twice. The second caller sees the
-    // flag and returns; the in-flight run owns the queue until it settles.
+    // flag or shared sync mutex and returns; the in-flight run owns the queue until it settles.
     if (get().flushInProgress) return null;
+    const acquiredSharedLock =
+      typeof offlineDb.tryAcquireSyncLock === 'function'
+        ? offlineDb.tryAcquireSyncLock()
+        : true;
+    if (!acquiredSharedLock) return null;
     const sessionSnap = readSessionSnapshot();
     set({ flushInProgress: true });
     try {
-      const sessionUser = readClientSession().user;
+      const sessionUser = readClientSession().user as
+        | { id?: string; tenantId?: string; tenant_id?: string }
+        | null;
+      const activeTenant = String(sessionUser?.tenantId ?? sessionUser?.tenant_id ?? '').trim() || null;
       const pending = await offlineDb.getPendingOrders({
-        tenantId: sessionUser?.tenantId ?? null,
+        tenantId: activeTenant,
         userId: sessionUser?.id ?? null,
       });
       if (pending.length === 0) { set({ queuedOffline: false }); return null; }
       let lastOrder: CustomerOrder | null = null;
-      let allSucceeded = true;
+      let hadTransientFailure = false;
+      let hadQuarantined = false;
+      let lastValidationError: string | null = null;
       for (const record of pending) {
         if (!isSameSessionSnapshot(sessionSnap, readSessionSnapshot())) {
           return null;
         }
         try {
-          const body = await apiFetch<any>('/api/orders/sync', { method: 'POST', body: JSON.stringify(record) });
+          const recordTenant =
+            (typeof record.tenantId === 'string' && record.tenantId.trim()) || activeTenant;
+          const body = await apiFetch<any>('/api/orders/sync', {
+            method: 'POST',
+            ...(recordTenant ? { headers: { 'X-Tenant-ID': recordTenant } } : {}),
+            body: JSON.stringify(record),
+          });
           if (!isSameSessionSnapshot(sessionSnap, readSessionSnapshot())) {
             return null;
           }
-          lastOrder = body.data as CustomerOrder;
+          captureGuestOrderTokenFromResponse(body);
+          lastOrder = (body?.data ?? body) as CustomerOrder;
           set({ currentOrder: lastOrder, error: null });
           if (record.localId && typeof offlineDb.removeOrder === 'function') {
             try { await offlineDb.removeOrder(record.localId); } catch { /* ignore */ }
           }
-        } catch {
-          allSucceeded = false;
+        } catch (err) {
+          const status = typeof (err as { status?: unknown })?.status === 'number'
+            ? (err as { status: number }).status
+            : undefined;
+          const isTerminalValidationError =
+            status !== undefined &&
+            status >= 400 &&
+            status < 500 &&
+            status !== 401 &&
+            status !== 403 &&
+            status !== 408 &&
+            status !== 409 &&
+            status !== 429;
+          if (isTerminalValidationError) {
+            hadQuarantined = true;
+            const reason = err instanceof Error && err.message ? err.message : `HTTP ${status}`;
+            lastValidationError = reason;
+            if (record.localId && typeof offlineDb.markNeedsAttention === 'function') {
+              try { await offlineDb.markNeedsAttention(record.localId, reason); } catch { /* ignore */ }
+            }
+            continue;
+          }
+          hadTransientFailure = true;
           if (isSameSessionSnapshot(sessionSnap, readSessionSnapshot())) {
             set({ error: 'Lỗi kết nối khi gửi đơn hàng', loading: false });
           }
@@ -276,19 +324,54 @@ export const useOrderStore = create<OrderState>((set, get) => ({
         return null;
       }
       try {
-        if (allSucceeded && lastOrder) {
+        if (!hadTransientFailure && !hadQuarantined && lastOrder) {
           await offlineDb.clearOrders();
           set({ queuedOffline: false, loading: false });
+        } else if (!hadTransientFailure && hadQuarantined) {
+          set({
+            queuedOffline: false,
+            loading: false,
+            ...(lastOrder ? {} : { error: lastValidationError }),
+          });
         } else {
           set({ loading: false });
         }
       } catch { /* retry next reconnect */ }
       return lastOrder;
     } finally {
+      if (typeof offlineDb.releaseSyncLock === 'function') {
+        offlineDb.releaseSyncLock();
+      }
       set({ flushInProgress: false });
     }
   },
 }));
+
+async function hydratePendingOfflineState(): Promise<void> {
+  if (typeof offlineDb?.getPendingOrders !== 'function') return;
+  const sessionSnap = readSessionSnapshot();
+  try {
+    const sessionUser = readClientSession().user as
+      | { id?: string; tenantId?: string; tenant_id?: string }
+      | null;
+    const activeTenant = String(sessionUser?.tenantId ?? sessionUser?.tenant_id ?? '').trim() || null;
+    const pending = await offlineDb.getPendingOrders({
+      tenantId: activeTenant,
+      userId: sessionUser?.id ?? null,
+    });
+    if (!isSameSessionSnapshot(sessionSnap, readSessionSnapshot())) return;
+    if (pending.length > 0) {
+      useOrderStore.setState({ queuedOffline: true });
+      if (typeof navigator === 'undefined' || navigator.onLine !== false) {
+        void useOrderStore.getState().flushQueuedOrders();
+      }
+    } else {
+      useOrderStore.setState({ queuedOffline: false });
+    }
+  } catch {
+    // IndexedDB unavailable in non-browser or restricted private-mode contexts
+  }
+}
 
 // Tear down active order streams/polling and clear order state whenever the
 // authenticated user or tenant scope changes.
@@ -302,6 +385,7 @@ if (typeof window !== 'undefined') {
       error: null,
       queuedOffline: false,
     });
+    void hydratePendingOfflineState();
   });
 }
 
@@ -313,7 +397,22 @@ export function useOrderStoreWithOfflineFlush<T>(selector?: (state: OrderState) 
   const flushQueuedOrders = useOrderStore((s) => s.flushQueuedOrders);
   const queuedOffline = useOrderStore((s) => s.queuedOffline);
   useEffect(() => {
-    if (wasOffline && queuedOffline) void flushQueuedOrders();
+    void hydratePendingOfflineState();
+  }, []);
+  useEffect(() => {
+    if ((wasOffline || isOnline) && queuedOffline) void flushQueuedOrders();
   }, [isOnline, wasOffline, queuedOffline, flushQueuedOrders]);
+  useEffect(() => {
+    if (typeof navigator === 'undefined' || !navigator.serviceWorker?.addEventListener) return;
+    const handleSwMessage = (event: MessageEvent) => {
+      if (event?.data?.type === 'FLUSH_OFFLINE_ORDERS') {
+        void flushQueuedOrders();
+      }
+    };
+    navigator.serviceWorker.addEventListener('message', handleSwMessage);
+    return () => {
+      navigator.serviceWorker.removeEventListener('message', handleSwMessage);
+    };
+  }, [flushQueuedOrders]);
   return selector ? useStore(useOrderStore, selector) : useStore(useOrderStore);
 }

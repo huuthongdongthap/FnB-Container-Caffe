@@ -19,6 +19,9 @@ export type { CustomerAccount, AccountOptions } from './commands/get-customer-ac
 export { updateConsent, CONSENT_PURPOSES } from './commands/update-consent';
 export type { ConsentUpdate, ConsentRow, ConsentResult } from './commands/update-consent';
 
+export { eraseCustomerPii } from './commands/erase-customer-pii';
+export type { EraseCustomerPiiInput, EraseCustomerPiiResult } from './commands/erase-customer-pii';
+
 export { placeOrder, VALID_CHANNELS } from './commands/place-order';
 export type {
   PlaceOrderInput,

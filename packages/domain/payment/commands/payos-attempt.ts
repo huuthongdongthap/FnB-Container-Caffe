@@ -1,7 +1,7 @@
 import type { D1Database, KVNamespace } from '@cloudflare/workers-types';
 import { buildPayOSSignature, generateOrderCode, PAYOS_API } from './payos-helpers';
 import { verifyPayOSSignature } from '../policies/payos-signature';
-import { buildCheckoutUrl, verifyPayOSPaymentRequest } from './payos-provider-verify';
+import { buildCheckoutUrl, extractPayOSLinkId, verifyPayOSPaymentRequest } from './payos-provider-verify';
 import { reconcilePayOSPayment } from './payos-reconcile';
 
 export interface PayOSAttempt {
@@ -9,7 +9,7 @@ export interface PayOSAttempt {
   payment_url: string | null; status: string; tenant_id?: string | null; created_at: string; updated_at: string;
 }
 interface AttemptInput {
-  db: D1Database; kv?: KVNamespace | null; orderId: string; amount: number; clientId: string; apiKey: string;
+  db: D1Database; kv?: KVNamespace | null; env?: Record<string, unknown> | null; orderId: string; amount: number; clientId: string; apiKey: string;
   checksumKey: string; description: string; returnUrl: string; cancelUrl: string; buyerName?: string; tenantId?: string;
 }
 type AttemptResult = { ok: true; payment: PayOSAttempt; cached: boolean }
@@ -41,7 +41,26 @@ async function reserveAttempt(input: AttemptInput): Promise<{ payment: PayOSAtte
     );
     // Historical duplicate invoices need reconciliation; never guess which is payable.
     if (existing.results.length > 1) return null;
-    if (existing.results[0]) return { payment: existing.results[0], owned: false };
+    const prior = existing.results[0];
+    if (prior && prior.status === 'expired') {
+      // An expired provider link on an unpaid order is replaced in place with a fresh order code,
+      // keeping exactly one payable PayOS row per order. The CAS makes concurrent retries pick one winner.
+      const refreshedAt = new Date().toISOString();
+      const freshCode = String(generateOrderCode());
+      const rotated = await db.prepare(`
+        UPDATE payments SET status = 'pending', transaction_id = ?, payment_url = NULL, amount = ?, updated_at = ?
+        WHERE id = ? AND status = ? AND transaction_id = ?
+        AND EXISTS (SELECT 1 FROM orders WHERE id = ? AND LOWER(COALESCE(NULLIF(TRIM(payment_status), ''), 'unpaid')) IN ('unpaid', 'pending'))
+      `).bind(freshCode, amount, refreshedAt, prior.id, prior.status, prior.transaction_id, orderId).run().catch(() => null);
+      if ((rotated?.meta?.changes ?? 0) > 0) {
+        return { payment: { ...prior, status: 'pending', transaction_id: freshCode, payment_url: null, amount,
+          updated_at: refreshedAt }, owned: true };
+      }
+      // Lost the race or the order is settled: re-read before deciding.
+      const reread = await db.prepare('SELECT * FROM payments WHERE id = ?').bind(prior.id).first<PayOSAttempt>().catch(() => null);
+      return { payment: reread ?? prior, owned: false };
+    }
+    if (prior) return { payment: prior, owned: false };
     const now = new Date().toISOString();
     const orderCode = String(generateOrderCode());
     const id = `payos:${orderId}`;
@@ -120,6 +139,7 @@ export async function getOrCreatePayOSAttempt(input: AttemptInput): Promise<Atte
       const reconciled = await reconcilePayOSPayment({
         db: input.db,
         kv: input.kv,
+        env: input.env ?? null,
         paymentId: payment.id,
         clientId: input.clientId,
         apiKey: input.apiKey,
@@ -186,4 +206,59 @@ export async function getOrCreatePayOSAttempt(input: AttemptInput): Promise<Atte
     // Never delete the reservation or generate a new code after an unknown result.
     return { ok: false, status: 502, error: 'Payment result pending; retry the same order', payment };
   }
+}
+
+/**
+ * Closes any still-payable PayOS attempt of an order that is being cancelled or replaced.
+ * Local state is closed first (a late paid webhook can still settle a cancelled row), then the provider
+ * link is cancelled best-effort; provider failures never block the caller.
+ */
+export async function cancelOpenPayOSAttemptForOrder(
+  db: D1Database,
+  env: Record<string, unknown>,
+  orderId: string,
+  tenantId?: string,
+): Promise<{ cancelled: number; providerNotified: number }> {
+  const rawTenant = tenantId && tenantId.trim() ? tenantId.trim() : '';
+  const tenant = rawTenant && rawTenant !== '*' && rawTenant.toLowerCase() !== 'hq' ? rawTenant : 'default';
+  type OpenRow = { id: string; transaction_id: string; payment_url: string | null };
+  let rows: OpenRow[] = [];
+  try {
+    const found = await db.prepare(
+      "SELECT id, transaction_id, payment_url FROM payments WHERE order_id = ? AND method = 'payos' AND status = 'pending' AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
+    ).bind(orderId, tenant).all<OpenRow>();
+    rows = found.results ?? [];
+  } catch {
+    if (tenant !== 'default') return { cancelled: 0, providerNotified: 0 };
+    const found = await db.prepare(
+      "SELECT id, transaction_id, payment_url FROM payments WHERE order_id = ? AND method = 'payos' AND status = 'pending'"
+    ).bind(orderId).all<OpenRow>().catch(() => ({ results: [] as OpenRow[] }));
+    rows = found.results ?? [];
+  }
+  const clientId = typeof env.PAYOS_CLIENT_ID === 'string' ? env.PAYOS_CLIENT_ID : '';
+  const apiKey = typeof env.PAYOS_API_KEY === 'string' ? env.PAYOS_API_KEY : '';
+  let cancelled = 0;
+  let providerNotified = 0;
+  for (const row of rows) {
+    const closed = await db.prepare(
+      "UPDATE payments SET status = 'cancelled', updated_at = ? WHERE id = ? AND status = 'pending'"
+    ).bind(new Date().toISOString(), row.id).run().catch(() => null);
+    if (!((closed?.meta?.changes ?? 0) > 0)) continue;
+    cancelled += 1;
+    if (!clientId || !apiKey) continue;
+    const reference = extractPayOSLinkId(row.payment_url) ?? (/^\d+$/.test(row.transaction_id) ? row.transaction_id : null);
+    if (!reference) continue;
+    try {
+      const res = await fetch(`${PAYOS_API}/${reference}/cancel`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-client-id': clientId, 'x-api-key': apiKey },
+        body: JSON.stringify({ cancellationReason: 'order_closed' }),
+        signal: AbortSignal.timeout(5000),
+      });
+      if (res.ok) providerNotified += 1;
+    } catch {
+      // Best effort: the local row is already closed and the provider link expires on its own.
+    }
+  }
+  return { cancelled, providerNotified };
 }

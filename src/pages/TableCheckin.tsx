@@ -18,6 +18,7 @@ import { HelmetHead } from '@/components/seo/HelmetHead';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { apiFetch } from '@/lib/api-client';
+import { captureGuestOrderTokenFromResponse } from '@/lib/guest-order-token';
 
 export default function TableCheckinPage() {
   const { t: _t } = useTranslation();
@@ -46,7 +47,7 @@ export default function TableCheckinPage() {
 
     setLoading(true);
     try {
-      const body = await apiFetch<{ success: boolean; data?: { id?: string }; error?: string }>('/api/orders/guest-checkin', {
+      const body = await apiFetch<{ success: boolean; order_token?: string; data?: { id?: string; order_token?: string }; error?: string }>('/api/orders/guest-checkin', {
         method: 'POST',
         body: JSON.stringify({ customer_name: name.trim(), customer_phone: phone.trim(), table_id: tableSlug }),
       });
@@ -55,6 +56,7 @@ export default function TableCheckinPage() {
         setLoading(false);
         return;
       }
+      captureGuestOrderTokenFromResponse(body);
       const orderId = body.data?.id;
       navigate(`/order?table=${encodeURIComponent(tableSlug)}${orderId ? '&orderId=' + encodeURIComponent(orderId) : ''}`);
     } catch (err) {

@@ -3,6 +3,7 @@ import type { Env } from '../../types/env';
 import { requireAuth } from '../../middleware/auth';
 import { resolvePilotStore } from '../../lib/pilot-store';
 import { updateCustomerProfileSchema, zodErrorResponse } from '../../lib/validators';
+import { eraseCustomerPii } from '@aura/domain-crm';
 import { type CustomerRecord, PROFILE_SQL } from './types';
 
 function resolveCustomerTenantScope(c: {
@@ -285,5 +286,37 @@ export function registerProfileHandlers(router: Hono<{ Bindings: Env }>): void {
     }
 
     return c.json({ success: true, data: customer });
+  });
+
+  // DELETE /api/customers/me — self-service ledger-safe PII erasure (customer role only)
+  router.delete('/me', requireAuth(['customer']), async (c) => {
+    const db = c.env.AURA_DB;
+    const user = c.get('user' as any) as { id?: string; sub?: string; customerId?: string; customer_id?: string; role?: string } | undefined;
+    if (!user || user.role !== 'customer') {
+      return c.json({ success: false, error: 'Forbidden' }, 403);
+    }
+
+    const customerId = user.customerId || user.customer_id || user.id || user.sub;
+    if (!customerId) {
+      return c.json({ success: false, error: 'No customer ID in token' }, 400);
+    }
+    const scope = resolveCustomerTenantScope(c as unknown as Parameters<typeof resolveCustomerTenantScope>[0]);
+    if (scope.forbidden) {
+      return c.json({ success: false, error: 'Cross-tenant access denied' }, 403);
+    }
+
+    const kv = c.env.AUTH_KV as import('@cloudflare/workers-types').KVNamespace | undefined;
+    const res = await eraseCustomerPii(db, {
+      customerId,
+      actorId: customerId,
+      actorRole: 'customer',
+      tenantId: scope.tenantId,
+      kv,
+    });
+    if (res.notFound) {
+      return c.json({ success: false, error: 'Customer not found' }, 404);
+    }
+
+    return c.json({ success: true, id: customerId, anonymized: true, ledgerPreserved: true });
   });
 }

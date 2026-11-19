@@ -45,8 +45,44 @@ export function resolvePromoReadTenantId(c: Parameters<typeof resolvePublicTenan
     const raw = resolvePublicTenantId(c).trim() || '*';
     return raw === 'default' || raw.toLowerCase() === 'hq' ? '*' : raw;
   }
+  if (!user?.role) {
+    const pinnedPilotTenant = String(
+      ((c as unknown as { env?: Record<string, unknown> }).env?.PILOT_TENANT_ID as string | undefined) ?? '',
+    ).trim();
+    if (
+      pinnedPilotTenant &&
+      pinnedPilotTenant !== '*' &&
+      pinnedPilotTenant.toLowerCase() !== 'hq'
+    ) {
+      return pinnedPilotTenant;
+    }
+  }
   const raw = resolvePublicTenantId(c).trim() || 'default';
   return raw === '*' || raw.toLowerCase() === 'hq' ? 'default' : raw;
+}
+
+export function isPubliclyActivePromotion(
+  promo: Record<string, unknown> | null | undefined,
+  nowMs: number = Date.now(),
+): boolean {
+  if (!promo || typeof promo !== 'object') return false;
+  if (promo.is_active === false || Number(promo.is_active ?? 1) !== 1) {
+    return false;
+  }
+  if (typeof promo.starts_at === 'string' && promo.starts_at.trim()) {
+    const startMs = Date.parse(promo.starts_at.trim());
+    if (!Number.isNaN(startMs) && startMs > nowMs) return false;
+  }
+  if (typeof promo.expires_at === 'string' && promo.expires_at.trim()) {
+    const endMs = Date.parse(promo.expires_at.trim());
+    if (!Number.isNaN(endMs) && endMs < nowMs) return false;
+  }
+  const usageLimit = Number(promo.usage_limit ?? 0);
+  const usageCount = Number(promo.usage_count ?? 0);
+  if (Number.isFinite(usageLimit) && usageLimit > 0 && usageCount >= usageLimit) {
+    return false;
+  }
+  return true;
 }
 
 export function resolvePromoWriteTenantId(

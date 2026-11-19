@@ -63,5 +63,33 @@ describe('fresh Worker bootstrap payment and operational schema', () => {
       const rootCols = rootDb.prepare(`PRAGMA table_info(${table})`).all().map(r => String(r.name)).sort();
       expect(rootCols, `columns mismatch for ${table}`).toEqual(workerCols);
     }
+    const listIndexes = (db: DatabaseSync) =>
+      db.prepare("SELECT name FROM sqlite_master WHERE type='index' AND sql IS NOT NULL ORDER BY name")
+        .all()
+        .map(row => String(row.name));
+    const workerIndexes = listIndexes(workerDb);
+    const rootIndexes = listIndexes(rootDb);
+    expect(workerIndexes.length).toBeGreaterThanOrEqual(160);
+    expect(rootIndexes).toEqual(workerIndexes);
+  });
+
+  it('enforces tenant-scoped partial unique indexes for promos, loyalty, inventory, and reservations', () => {
+    const db = freshDatabase();
+    db.prepare("INSERT INTO promotions(id, code, name, tenant_id) VALUES ('p1', 'COFFEE10', 'Promo', 'store-a')").run();
+    db.prepare("INSERT INTO promotion_usages(id, promotion_id, tenant_id, idempotency_key) VALUES ('u1', 'p1', 'store-a', 'idem-1')").run();
+    expect(() =>
+      db.prepare("INSERT INTO promotion_usages(id, promotion_id, tenant_id, idempotency_key) VALUES ('u2', 'p1', 'store-a', 'idem-1')").run()
+    ).toThrow(/UNIQUE/);
+
+    db.prepare("INSERT INTO loyalty_transactions(id, type, points, tenant_id, idempotency_key) VALUES ('l1', 'earn', 10, 'store-a', 'l-idem-1')").run();
+    expect(() =>
+      db.prepare("INSERT INTO loyalty_transactions(id, type, points, tenant_id, idempotency_key) VALUES ('l2', 'earn', 10, 'store-a', 'l-idem-1')").run()
+    ).toThrow(/UNIQUE/);
+
+    db.prepare("INSERT INTO cafe_tables(id, table_number, zone, capacity, tenant_id) VALUES ('t1', 'B01', 'indoor', 4, 'store-a')").run();
+    db.prepare("INSERT INTO reservations(id, table_id, customer_name, customer_phone, date, time, zone, status, tenant_id) VALUES ('r1', 't1', 'Guest A', '0900000001', '2026-11-20', '19:00', 'indoor', 'confirmed', 'store-a')").run();
+    expect(() =>
+      db.prepare("INSERT INTO reservations(id, table_id, customer_name, customer_phone, date, time, zone, status, tenant_id) VALUES ('r2', 't1', 'Guest B', '0900000002', '2026-11-20', '19:00', 'indoor', 'confirmed', 'store-a')").run()
+    ).toThrow(/UNIQUE/);
   });
 });

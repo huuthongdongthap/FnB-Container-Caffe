@@ -80,6 +80,20 @@ describe('TicketQueue', () => {
     expect(screen.getByText('Bàn 3')).toBeInTheDocument();
     expect(screen.getByText('Bàn 7')).toBeInTheDocument();
   });
+
+  it('allows completing preparing orders in multi-column TicketQueue', () => {
+    const onComplete = vi.fn();
+    render(
+      <TicketQueue
+        orders={[mockPendingOrders[2]!]}
+        station="all"
+        onComplete={onComplete}
+      />
+    );
+    fireEvent.click(screen.getByText('Hoàn thành'));
+    fireEvent.click(screen.getByText('Xác nhận'));
+    expect(onComplete).toHaveBeenCalledWith('ORD-003');
+  });
 });
 
 describe('OrderTicket', () => {
@@ -131,7 +145,7 @@ describe('OrderTicket', () => {
     };
     render(<OrderTicket order={oldOrder} />);
     const ticket = screen.getByTestId('order-ticket');
-    expect(ticket.className).toContain('bg-red');
+    expect(ticket.className).toContain('bg-[var(--md-sys-color-error)]/10');
   });
 
   it('shows table number prominently', () => {

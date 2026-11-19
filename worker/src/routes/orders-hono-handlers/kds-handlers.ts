@@ -4,9 +4,10 @@ import { updateOrderStatusSchema, zodErrorResponse } from '../../lib/validators'
 import type { Env } from '../../types/env';
 import { requireAuth } from '../../middleware/auth';
 import { getTenantId } from '../../middleware/tenant';
+import { getDatabase } from '../../lib/db';
 import { audit } from '../../middleware/audit-log';
 import { buildOrderTail, publishOrderEvent } from '@aura/domain-order';
-import { executeKdsStatusTransition, buildIndexFromDbRows } from '@aura/domain-kitchen';
+import { executeKdsStatusTransition, buildIndexFromDbRows, isHeldOutOfKds } from '@aura/domain-kitchen';
 import { type OrderRecord, type OrderItem, type KdsOrder } from './types';
 
 function verifyKdsOrderTenant(
@@ -88,12 +89,25 @@ function verifyKdsOrderTenant(
   return { ok: true, tenantId: userTenant };
 }
 
+const CANCEL_ALERT_WINDOW_MS = 10 * 60_000;
+const PREP_HISTORY_STATUSES = new Set(['preparing', 'ready', 'served', 'completed']);
+
+/** A cancelled order the kitchen already started on, so baristas must stop and discard. */
+function isRecentPrepCancellation(order: Record<string, unknown>, nowMs: number): boolean {
+  if (String(order.status ?? '').trim().toLowerCase() !== 'cancelled') return false;
+  const cancelledMs = order.cancelled_at ? Date.parse(String(order.cancelled_at).replace(' ', 'T') + (/[zZ]|[+-]\d{2}:?\d{2}$/.test(String(order.cancelled_at)) ? '' : 'Z')) : NaN;
+  if (!Number.isFinite(cancelledMs) || nowMs - cancelledMs > CANCEL_ALERT_WINDOW_MS || nowMs < cancelledMs - 60_000) return false;
+  const prev = String(order.previous_status ?? '').trim().toLowerCase();
+  const explicit = order.cancel_alert === true || Number(order.cancel_alert) === 1;
+  return explicit || PREP_HISTORY_STATUSES.has(prev) || Boolean(order.served_at);
+}
+
 export async function handleGetKdsOrders(c: Context<{ Bindings: Env }>) {
   const tenantCheck = verifyKdsOrderTenant(c, 'read');
   if (!tenantCheck.ok) {
     return c.json({ success: false, error: 'Cross-tenant KDS access denied' }, 403);
   }
-  const db = c.env.AURA_DB;
+  const db = getDatabase(c as unknown as { env: Record<string, unknown> });
   const stationId = c.req.query('station_id') || c.req.query('station');
   const tenantId = tenantCheck.tenantId;
 
@@ -137,10 +151,29 @@ export async function handleGetKdsOrders(c: Context<{ Bindings: Env }>) {
   );
   const { results } = await (tenantId === '*' ? statement : statement.bind(tenantId)).all<OrderRecord>();
 
+  const nowMs = Date.now();
+  let recentCancelled: OrderRecord[] = [];
+  try {
+    const cancelledStatement = db.prepare(
+      `SELECT * FROM orders WHERE status = 'cancelled' AND cancelled_at IS NOT NULL AND datetime(cancelled_at) >= datetime(?)${tenantClause ? tenantClause.replace('?1', '?2') : ''} LIMIT 20`
+    );
+    const cutoff = new Date(nowMs - CANCEL_ALERT_WINDOW_MS).toISOString().replace('T', ' ').slice(0, 19);
+    const cancelledRes = await (tenantId === '*'
+      ? cancelledStatement.bind(cutoff)
+      : cancelledStatement.bind(cutoff, tenantId)).all<OrderRecord>();
+    const activeIds = new Set((results || []).map((o) => o.id));
+    recentCancelled = (cancelledRes?.results || []).filter(
+      (o) => !activeIds.has(o.id) && isRecentPrepCancellation(o as unknown as Record<string, unknown>, nowMs)
+    );
+  } catch {
+    // cancelled_at / previous_status absent in minimal schemas: no cancel alerts
+  }
+
   const kdsOrders: KdsOrder[] = [];
-  for (const order of results || []) {
+  for (const order of [...(results || []), ...recentCancelled]) {
     const rawOrder = order as unknown as Record<string, unknown>;
-    if (rawOrder.order_type === 'delivery' && rawOrder.payment_status !== 'paid') continue;
+    const isCancelAlert = rawOrder.status === 'cancelled';
+    if (!isCancelAlert && isHeldOutOfKds(rawOrder)) continue;
     let items: OrderItem[] = [];
     if (Array.isArray(order.items)) {
       items = order.items;
@@ -160,7 +193,7 @@ export async function handleGetKdsOrders(c: Context<{ Bindings: Env }>) {
     }
 
     const elapsed = Math.round((Date.now() - new Date(order.created_at).getTime()) / 60000);
-    kdsOrders.push({
+    const entry: KdsOrder & { cancel_alert?: boolean; kds_alert?: string } = {
       id: order.id,
       customer_name: order.customer_name,
       table_id: order.table_id,
@@ -169,7 +202,9 @@ export async function handleGetKdsOrders(c: Context<{ Bindings: Env }>) {
       status: order.status,
       elapsed_minutes: elapsed,
       created_at: order.created_at,
-    });
+      ...(isCancelAlert ? { cancel_alert: true, kds_alert: 'cancelled' } : {}),
+    };
+    kdsOrders.push(entry as KdsOrder);
   }
 
   return c.json({ success: true, data: kdsOrders });
@@ -180,7 +215,7 @@ export async function handleUpdateOrderStatus(c: Context<{ Bindings: Env }>, for
   if (!tenantCheck.ok) {
     return c.json({ success: false, error: 'Cross-tenant KDS access denied' }, 403);
   }
-  const db = c.env.AURA_DB;
+  const db = getDatabase(c as unknown as { env: Record<string, unknown> });
   const id = c.req.param('id')!;
   const body = typeof forcedStatus === 'string' ? { status: forcedStatus } : await c.req.json().catch(() => null);
   const parsed = updateOrderStatusSchema.safeParse(body);
@@ -207,11 +242,15 @@ export async function handleUpdateOrderStatus(c: Context<{ Bindings: Env }>, for
 
 type CodOrderLookupRow = {
   id: string;
+  items?: string | unknown[] | null;
   total?: number | null;
   total_amount?: number | null;
   customer_id?: string | null;
+  customer_name?: string | null;
   customer_phone?: string | null;
   customer_email?: string | null;
+  table_id?: string | null;
+  created_at?: string | null;
   tenant_id?: string | null;
 };
 
@@ -222,21 +261,23 @@ export async function handleMarkCodPaid(c: Context<{ Bindings: Env }>) {
   }
   const id = c.req.param('id');
   if (!id) return c.json({ success: false, error: 'Missing order id' }, 400);
+  const db = getDatabase(c as unknown as { env: Record<string, unknown> });
   const callerTenant = tenantCheck.tenantId;
-  const result = await collectCodPayment(c.env.AURA_DB, id, callerTenant);
+  const actor = c.get('user' as any) as { id?: string; sub?: string } | undefined;
+  const result = await collectCodPayment(db, id, callerTenant, actor?.id || actor?.sub);
   if (result.success === false) return c.json({ success: false, error: result.error }, result.statusCode);
   let orderRow: CodOrderLookupRow | null = null;
   if (!result.idempotent) {
     try {
       orderRow = await (callerTenant && callerTenant !== '*'
-        ? c.env.AURA_DB.prepare(
-            "SELECT id, total, total_amount, customer_id, customer_phone, customer_email, tenant_id FROM orders WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
+        ? db.prepare(
+            "SELECT id, items, total, total_amount, customer_id, customer_name, customer_phone, customer_email, table_id, created_at, tenant_id FROM orders WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
           ).bind(id, callerTenant).first<CodOrderLookupRow>().catch(() => null)
-        : c.env.AURA_DB.prepare(
-            'SELECT id, total, total_amount, customer_id, customer_phone, customer_email, tenant_id FROM orders WHERE id = ?'
+        : db.prepare(
+            'SELECT id, items, total, total_amount, customer_id, customer_name, customer_phone, customer_email, table_id, created_at, tenant_id FROM orders WHERE id = ?'
           ).bind(id).first<CodOrderLookupRow>().catch(() => null));
       if (!orderRow) {
-        orderRow = await c.env.AURA_DB.prepare(
+        orderRow = await db.prepare(
           'SELECT id, total, total_amount, customer_id, customer_phone, customer_email FROM orders WHERE id = ?'
         ).bind(id).first<CodOrderLookupRow>().catch(() => null);
       }
@@ -257,13 +298,74 @@ export async function handleMarkCodPaid(c: Context<{ Bindings: Env }>) {
     await publishOrderEvent(c.env.AUTH_KV, id, result.status, {
       previousStatus: result.status,
       tenantId: effectiveEventTenant,
+      paymentStatus: 'paid',
     }).catch(() => {});
+  }
+  if (!result.idempotent && c.env.ORDER_BROADCASTER) {
+    try {
+      const ns = c.env.ORDER_BROADCASTER as unknown as {
+        idFromName?: (name: string) => unknown;
+        get?: (doId: unknown) => { fetch: (input: Request | string, init?: RequestInit) => Promise<unknown> };
+      };
+      if (ns?.idFromName && ns?.get) {
+        const doChannel = effectiveEventTenant !== 'default' ? `${effectiveEventTenant}:${id}` : id;
+        const stub = ns.get(ns.idFromName(doChannel));
+        let parsedItems: unknown[] = [];
+        if (Array.isArray(orderRow?.items)) {
+          parsedItems = orderRow.items;
+        } else if (typeof orderRow?.items === 'string' && orderRow.items.trim()) {
+          try {
+            const parsed = JSON.parse(orderRow.items);
+            if (Array.isArray(parsed)) parsedItems = parsed;
+          } catch {
+            parsedItems = [];
+          }
+        }
+        const createdMs = orderRow?.created_at
+          ? Date.parse(
+              orderRow.created_at.includes('T')
+                ? orderRow.created_at
+                : `${orderRow.created_at.replace(' ', 'T')}Z`,
+            )
+          : NaN;
+        const event = {
+          orderId: id,
+          status: result.status,
+          payment_status: 'paid',
+          items: parsedItems,
+          total: Number(orderRow?.total ?? orderRow?.total_amount ?? 0),
+          customer_name: orderRow?.customer_name ?? '',
+          customer_phone: orderRow?.customer_phone ?? '',
+          table_id: orderRow?.table_id ?? null,
+          ...(effectiveEventTenant !== 'default' ? { tenant_id: effectiveEventTenant } : {}),
+          createdAt: Number.isFinite(createdMs) ? createdMs : Date.now(),
+          updatedAt: Date.now(),
+        };
+        const broadcastPromise = stub
+          .fetch(
+            new Request('https://do/broadcast', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(event),
+            }),
+          )
+          .catch(() => {});
+        try {
+          if (c.executionCtx) c.executionCtx.waitUntil(broadcastPromise);
+          else await broadcastPromise;
+        } catch {
+          await broadcastPromise;
+        }
+      }
+    } catch {
+      /* Non-blocking DO broadcast after COD settlement */
+    }
   }
   if (!result.idempotent) {
     try {
       if (orderRow && (orderRow.customer_id || orderRow.customer_phone || orderRow.customer_email)) {
         const { creditLoyaltyIfEligible } = await import('@aura/domain-order');
-        await creditLoyaltyIfEligible(c.env.AURA_DB, c.env as unknown as Record<string, unknown>, id).catch(() => {});
+        await creditLoyaltyIfEligible(db, c.env as unknown as Record<string, unknown>, id).catch(() => {});
         const digits = String(orderRow.customer_phone || '').replace(/\D/g, '');
         const normalizedPhone = digits.length >= 9 && digits.length <= 15 && !/^0+$/.test(digits) ? digits : null;
         const trimmedEmail = typeof orderRow.customer_email === 'string' ? orderRow.customer_email.trim() : '';
@@ -275,12 +377,12 @@ export async function handleMarkCodPaid(c: Context<{ Bindings: Env }>) {
             : callerTenant;
           let cust: { id: string } | null = null;
           try {
-            cust = await c.env.AURA_DB.prepare(
+            cust = await db.prepare(
               "SELECT id FROM customers WHERE ((email = ? AND email IS NOT NULL) OR (phone = ? AND phone IS NOT NULL)) AND (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?) LIMIT 1"
             ).bind(sanitizedEmail, normalizedPhone, orderTenant, orderTenant).first<{ id: string }>();
           } catch {
             if (orderTenant === 'default' || orderTenant === '*') {
-              cust = await c.env.AURA_DB.prepare(
+              cust = await db.prepare(
                 'SELECT id FROM customers WHERE (email = ? AND email IS NOT NULL) OR (phone = ? AND phone IS NOT NULL) LIMIT 1'
               ).bind(sanitizedEmail, normalizedPhone).first<{ id: string }>().catch(() => null);
             }
@@ -294,7 +396,7 @@ export async function handleMarkCodPaid(c: Context<{ Bindings: Env }>) {
             ? orderRow.tenant_id.trim()
             : (callerTenant && callerTenant !== '*' ? callerTenant : undefined);
           const refPolicy = await resolveReferralPolicy(c.env.AUTH_KV, orderTenantForRef).catch(() => DEFAULT_REFERRAL_POLICY);
-          await rewardReferralOnFirstOrder(c.env.AURA_DB, refCustomerId, id, orderTotal, refPolicy, orderTenantForRef).catch(() => {});
+          await rewardReferralOnFirstOrder(db, refCustomerId, id, orderTotal, refPolicy, orderTenantForRef).catch(() => {});
         }
       }
     } catch { /* Non-blocking post-payment loyalty/referral trigger */ }
