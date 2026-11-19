@@ -13,6 +13,28 @@ export function useSWRegistration() {
     if (!('serviceWorker' in navigator)) return;
 
     const serviceWorker = navigator.serviceWorker;
+
+    // Never register SW in Vite dev mode: stale cache-first .js/index.html entries
+    // cause blank screens across dev server restarts or branch switches.
+    // Actively unregister any previously installed dev SW so local tabs self-heal.
+    if (import.meta.env.MODE === 'development') {
+      if (typeof serviceWorker.getRegistrations === 'function') {
+        serviceWorker
+          .getRegistrations()
+          .then((regs) => Promise.all(regs.map((r) => r.unregister())))
+          .catch(() => {});
+      }
+      if (typeof caches !== 'undefined') {
+        caches
+          .keys()
+          .then((keys) =>
+            Promise.all(keys.filter((k) => k.startsWith('aura-')).map((k) => caches.delete(k)))
+          )
+          .catch(() => {});
+      }
+      return;
+    }
+
     let disposed = false;
     let observedRegistration: ServiceWorkerRegistration | null = null;
     let releaseRegistration = () => {};

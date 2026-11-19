@@ -8,9 +8,9 @@
  *   NAV    (network-only)  -> any other navigation route (no caching)
  */
 
-const STATIC_CACHE = 'aura-static-v5';
-const API_QUEUE_CACHE = 'aura-api-queue-v5';
-const CACHE_VERSION = 'aura-v5';
+const STATIC_CACHE = 'aura-static-v6';
+const API_QUEUE_CACHE = 'aura-api-queue-v6';
+const CACHE_VERSION = 'aura-v6';
 
 // ---- Pre-cache list (critical shell assets) ----
 const PRECACHE_URLS = [
@@ -79,6 +79,14 @@ self.addEventListener('fetch', (event) => {
 
   const url = new URL(event.request.url);
   if (url.origin !== self.location.origin) return;
+  // Never intercept Vite dev server / HMR / source module paths
+  if (
+    url.pathname.startsWith('/@') ||
+    url.pathname.startsWith('/node_modules/') ||
+    url.pathname.startsWith('/src/')
+  ) {
+    return;
+  }
   // Mobile aliases may return private JSON outside /api. Neither authenticated
   // responses nor these aliases belong in the navigation/static cache.
   if (event.request.headers.has('Authorization') || url.pathname.startsWith('/mobile/')) {
