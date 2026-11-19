@@ -8,6 +8,7 @@ vi.mock('@/lib/offline-db', () => ({
   offlineDb: {
     saveOrder: vi.fn().mockResolvedValue(undefined),
     getPendingOrders: vi.fn().mockResolvedValue([]),
+    countNeedsAttention: vi.fn().mockResolvedValue(0),
     clear: vi.fn().mockResolvedValue(undefined),
   },
 }));

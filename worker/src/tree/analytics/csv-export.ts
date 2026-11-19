@@ -15,6 +15,17 @@ export interface OrderExportRow {
   created_at: string;
 }
 
+export interface OrderExportOptions {
+  alignIct?: boolean;
+  maskPii?: boolean;
+}
+
+export function maskPhoneForCsv(phone: string | null | undefined): string {
+  const raw = String(phone || '').trim();
+  if (!raw || raw.length < 6) return raw ? '***' : '';
+  return `${raw.slice(0, 3)}****${raw.slice(-3)}`;
+}
+
 /**
  * Get all orders (non-cancelled) within a date range.
  */
@@ -22,7 +33,8 @@ export async function getOrdersInRange(
   db: import('@cloudflare/workers-types').D1Database,
   start: string,
   end: string,
-  tenantId?: string
+  tenantId?: string,
+  options?: OrderExportOptions
 ): Promise<OrderExportRow[]> {
   const hasTenant = Boolean(tenantId && tenantId !== '*');
   const tenantClause = !hasTenant
@@ -31,13 +43,18 @@ export async function getOrdersInRange(
       ? " AND (tenant_id = ? OR tenant_id IS NULL OR tenant_id = '' OR TRIM(tenant_id) = '')"
       : ' AND TRIM(tenant_id) = ?';
   const binds = hasTenant && tenantId ? [start, end, tenantId] : [start, end];
+  const datePredicate = options?.alignIct
+    ? `DATE(datetime(created_at, '+7 hours')) >= ?
+      AND DATE(datetime(created_at, '+7 hours')) <= ?`
+    : `substr(created_at, 1, 10) >= ?
+      AND substr(created_at, 1, 10) <= ?`;
   const baseSql = `
     SELECT id, customer_name, customer_phone, total, status, payment_method, items, created_at
     FROM orders
-    WHERE LOWER(COALESCE(status, '')) NOT IN ('cancelled', 'canceled', 'refunded', 'failed', 'rejected', 'expired')
-      AND LOWER(COALESCE(payment_status, '')) NOT IN ('refunded', 'failed')
-      AND substr(created_at, 1, 10) >= ?
-      AND substr(created_at, 1, 10) <= ?${tenantClause}
+    WHERE LOWER(COALESCE(TRIM(status), '')) NOT IN ('cancelled', 'canceled', 'refunded', 'failed', 'rejected', 'expired')
+      AND LOWER(COALESCE(TRIM(payment_status), '')) NOT IN ('refunded', 'failed', 'cancelled', 'canceled')
+      AND NOT (COALESCE(TRIM(notes), '') = 'Khách QR - cho don mon' AND COALESCE(TRIM(items), '[]') IN ('', '[]'))
+      AND ${datePredicate}${tenantClause}
     ORDER BY created_at ASC
     LIMIT 10000
   `;
@@ -45,12 +62,30 @@ export async function getOrdersInRange(
     const { results } = await db.prepare(baseSql).bind(...binds).all<OrderExportRow>();
     return results || [];
   } catch {
-    const fallbackSql = baseSql.replace(
-      /\s*AND LOWER\(COALESCE\(payment_status, ''\)\) NOT IN \('refunded', 'failed'\)/,
-      ''
-    );
-    const { results } = await db.prepare(fallbackSql).bind(...binds).all<OrderExportRow>();
-    return results || [];
+    try {
+      const noNotesSql = `
+        SELECT id, customer_name, customer_phone, total, status, payment_method, items, created_at
+        FROM orders
+        WHERE LOWER(COALESCE(TRIM(status), '')) NOT IN ('cancelled', 'canceled', 'refunded', 'failed', 'rejected', 'expired')
+          AND LOWER(COALESCE(TRIM(payment_status), '')) NOT IN ('refunded', 'failed', 'cancelled', 'canceled')
+          AND ${datePredicate}${tenantClause}
+        ORDER BY created_at ASC
+        LIMIT 10000
+      `;
+      const { results } = await db.prepare(noNotesSql).bind(...binds).all<OrderExportRow>();
+      return results || [];
+    } catch {
+      const fallbackSql = `
+        SELECT id, customer_name, customer_phone, total, status, payment_method, items, created_at
+        FROM orders
+        WHERE LOWER(COALESCE(TRIM(status), '')) NOT IN ('cancelled', 'canceled', 'refunded', 'failed', 'rejected', 'expired')
+          AND ${datePredicate}${tenantClause}
+        ORDER BY created_at ASC
+        LIMIT 10000
+      `;
+      const { results } = await db.prepare(fallbackSql).bind(...binds).all<OrderExportRow>();
+      return results || [];
+    }
   }
 }
 
@@ -132,8 +167,9 @@ export async function getDailyRevenueInRange(
            COALESCE(SUM(total), 0) AS revenue,
            CASE WHEN COUNT(*) > 0 THEN ROUND(COALESCE(SUM(total), 0) * 1.0 / COUNT(*)) ELSE 0 END AS avg_order_value
     FROM orders
-    WHERE LOWER(COALESCE(status, '')) NOT IN ('cancelled', 'canceled', 'refunded', 'failed', 'rejected', 'expired')
-      AND LOWER(COALESCE(payment_status, '')) NOT IN ('refunded', 'failed')
+    WHERE LOWER(COALESCE(TRIM(status), '')) NOT IN ('cancelled', 'canceled', 'refunded', 'failed', 'rejected', 'expired')
+      AND LOWER(COALESCE(TRIM(payment_status), '')) NOT IN ('refunded', 'failed', 'cancelled', 'canceled')
+      AND NOT (COALESCE(TRIM(notes), '') = 'Khách QR - cho don mon' AND COALESCE(TRIM(items), '[]') IN ('', '[]'))
       AND DATE(datetime(created_at, '+7 hours')) BETWEEN ? AND ?${tenantClause}
     GROUP BY DATE(datetime(created_at, '+7 hours'))
     ORDER BY date ASC
@@ -143,10 +179,18 @@ export async function getDailyRevenueInRange(
     const { results } = await db.prepare(baseSql).bind(...binds).all<DailyRevenueExportRow>();
     return results || [];
   } catch {
-    const fallbackSql = baseSql.replace(
-      /\s*AND LOWER\(COALESCE\(payment_status, ''\)\) NOT IN \('refunded', 'failed'\)/,
-      ''
-    );
+    const fallbackSql = `
+      SELECT DATE(datetime(created_at, '+7 hours')) AS date,
+             COUNT(*) AS orders,
+             COALESCE(SUM(total), 0) AS revenue,
+             CASE WHEN COUNT(*) > 0 THEN ROUND(COALESCE(SUM(total), 0) * 1.0 / COUNT(*)) ELSE 0 END AS avg_order_value
+      FROM orders
+      WHERE LOWER(COALESCE(TRIM(status), '')) NOT IN ('cancelled', 'canceled', 'refunded', 'failed', 'rejected', 'expired')
+        AND DATE(datetime(created_at, '+7 hours')) BETWEEN ? AND ?${tenantClause}
+      GROUP BY DATE(datetime(created_at, '+7 hours'))
+      ORDER BY date ASC
+      LIMIT 1000
+    `;
     const { results } = await db.prepare(fallbackSql).bind(...binds).all<DailyRevenueExportRow>();
     return results || [];
   }

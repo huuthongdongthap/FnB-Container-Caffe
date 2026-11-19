@@ -139,21 +139,38 @@ export function registerOrderHandlers(router: Hono<{ Bindings: Env }>): void {
       }
       const orderTotal = Number(order.total_amount ?? order.total ?? 0);
       // Prevent cross-table order hijacking: reject if order is already assigned to a different table
-      if (order.table_id && String(order.table_id) !== String(session.table_id)) {
+      let sameTable = !order.table_id || String(order.table_id) === String(session.table_id);
+      if (!sameTable && session.table_id) {
+        const matchedSameTable = await db
+          .prepare(
+            "SELECT id FROM cafe_tables WHERE COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ? AND (id = ? OR table_number = ?) AND (id = ? OR table_number = ?) LIMIT 1"
+          )
+          .bind(effectiveSessionTenant, String(order.table_id), String(order.table_id), String(session.table_id), String(session.table_id))
+          .first<{ id: string }>()
+          .catch(() => null);
+        sameTable = Boolean(matchedSameTable?.id);
+      }
+      if (!sameTable) {
         return c.json({ success: false, error: 'Order already attached to another table' }, 409);
       }
       const orderHasSessionIdCol = 'session_id' in (order as unknown as Record<string, unknown>);
       const orderSessionId = (order as unknown as { session_id?: string | null }).session_id;
+      if (orderSessionId && String(orderSessionId).trim() !== '' && String(orderSessionId) !== String(id)) {
+        return c.json({ success: false, error: 'Order already attached to another session' }, 409);
+      }
       const alreadyLinkedToThisSession =
         (orderSessionId && String(orderSessionId) === String(id)) ||
         ((session as unknown as { current_order_id?: string | null }).current_order_id &&
           String((session as unknown as { current_order_id?: string | null }).current_order_id) === String(orderId)) ||
         (Boolean(order.table_id) &&
-          String(order.table_id) === String(session.table_id) &&
+          sameTable &&
           (!orderHasSessionIdCol || orderSessionId === undefined) &&
           Number((session as unknown as { order_count?: number }).order_count ?? 0) > 0 &&
           Number((session as unknown as { total_amount?: number }).total_amount ?? 0) >= orderTotal);
-      if (order.table_id && String(order.table_id) === String(session.table_id) && alreadyLinkedToThisSession) {
+      if (
+        (orderSessionId && String(orderSessionId) === String(id)) ||
+        (order.table_id && sameTable && alreadyLinkedToThisSession)
+      ) {
         return c.json({
           success: true,
           idempotent: true,
@@ -190,7 +207,65 @@ export function registerOrderHandlers(router: Hono<{ Bindings: Env }>): void {
           return c.json({ success: false, error: 'Order already attached to another table' }, 409);
         }
       }
-      await db.prepare('UPDATE orders SET session_id = ? WHERE id = ?').bind(id, orderId).run().catch(() => {});
+      if (orderHasSessionIdCol) {
+        let sessionClaimResult: { meta?: { changes?: number } } | null = null;
+        let sessionClaimSucceeded = false;
+        try {
+          sessionClaimResult = (await db
+            .prepare(
+              "UPDATE orders SET session_id = ?, updated_at = ? WHERE id = ? AND (session_id IS NULL OR session_id = '') AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?",
+            )
+            .bind(id, now, orderId, effectiveSessionTenant)
+            .run()) as { meta?: { changes?: number } } | null;
+          sessionClaimSucceeded = true;
+        } catch {
+          if (allowUnscopedOrderFallback) {
+            sessionClaimResult = (await db
+              .prepare(
+                "UPDATE orders SET session_id = ? WHERE id = ? AND (session_id IS NULL OR session_id = '')",
+              )
+              .bind(id, orderId)
+              .run()
+              .catch(() => null)) as { meta?: { changes?: number } } | null;
+            sessionClaimSucceeded = sessionClaimResult !== null;
+          }
+        }
+        if (
+          sessionClaimSucceeded &&
+          sessionClaimResult?.meta &&
+          typeof sessionClaimResult.meta.changes === 'number' &&
+          sessionClaimResult.meta.changes === 0
+        ) {
+          const latestOrder = await db
+            .prepare('SELECT session_id FROM orders WHERE id = ?')
+            .bind(orderId)
+            .first<{ session_id?: string | null }>()
+            .catch(() => null);
+          const latestSessionId = latestOrder?.session_id ? String(latestOrder.session_id).trim() : '';
+          if (latestSessionId && latestSessionId === String(id)) {
+            return c.json({
+              success: true,
+              idempotent: true,
+              already_attached: true,
+              data: {
+                ...session,
+                session_id: id,
+                order_id: orderId,
+                table_id: session.table_id,
+                order_total: orderTotal,
+                already_attached: true,
+              },
+            });
+          }
+          return c.json({ success: false, error: 'Order already attached to another session' }, 409);
+        }
+      } else {
+        await db
+          .prepare("UPDATE orders SET session_id = ? WHERE id = ? AND (session_id IS NULL OR session_id = '')")
+          .bind(id, orderId)
+          .run()
+          .catch(() => {});
+      }
 
       try {
         await db.prepare(

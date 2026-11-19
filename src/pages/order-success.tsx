@@ -27,6 +27,7 @@ import { useOrderObservation } from '@/hooks/use-order-observation';
 import { useCartStore } from '@/hooks/stores/use-cart-store';
 import { useToast } from '@/components/ui/toast';
 import { StitchOrderSuccessNew, type OrderSuccessNewData } from '@/components/stitch/StitchOrderSuccessNew';
+import { rememberGuestOrderToken, stripOrderTokenFromBrowserUrl } from '@/lib/guest-order-token';
 import { acknowledgeCheckoutOrder } from './checkout-intent';
 
 /* ---- Types --------------------------------------------------------- */
@@ -45,10 +46,20 @@ export function OrderSuccessPage(_props: Readonly<OrderSuccessPageProps>) {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const orderId = searchParams.get('order_id');
+  const queryOrderToken = searchParams.get('order_token');
+  useEffect(() => {
+    if (orderId && queryOrderToken) {
+      rememberGuestOrderToken(orderId, queryOrderToken);
+      stripOrderTokenFromBrowserUrl();
+    }
+  }, [orderId, queryOrderToken]);
   const POLL_TIMEOUT_MS = 10 * 60 * 1000; // 10 min
 
   const { currentOrder, matchedOrder, loading, error, refresh: handleRetry } =
-    useOrderObservation(orderId, { timeoutMs: POLL_TIMEOUT_MS });
+    useOrderObservation(orderId, {
+      timeoutMs: POLL_TIMEOUT_MS,
+      orderToken: queryOrderToken,
+    });
 
   useEffect(() => {
     if (orderId && matchedOrder

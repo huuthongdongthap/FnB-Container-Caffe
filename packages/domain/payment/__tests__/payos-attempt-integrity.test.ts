@@ -81,9 +81,38 @@ describe('PayOS durable attempt invariant (real SQLite)', () => {
     expect(codes).toEqual([123456]);
   });
 
-  it.each(['completed', 'cancelled', 'expired', 'failed', 'refunded'])('does not recreate a terminal %s attempt', async (status) => {
+  it.each(['completed', 'cancelled', 'failed', 'refunded'])('does not recreate a terminal %s attempt', async (status) => {
     const { input, payment } = fixture();
     payment('order-1', status);
+    const spy = vi.spyOn(globalThis, 'fetch');
+    expect(await getOrCreatePayOSAttempt(input)).toMatchObject({ ok: false, status: 409 });
+    expect(spy).not.toHaveBeenCalled();
+  });
+
+  it('rotates an expired attempt in place to a fresh orderCode when the order is still unpaid', async () => {
+    const { input, payment, sqlite } = fixture();
+    payment('order-1', 'expired');
+    const codes: number[] = [];
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (_url, init) => {
+      const body = JSON.parse(String(init?.body));
+      codes.push(body.orderCode);
+      return payosCheckoutResponse({ orderCode: body.orderCode, amount: 20000 }, 'local-checksum', 'rotated-link');
+    });
+    const rotated = await getOrCreatePayOSAttempt(input);
+    expect(rotated).toMatchObject({ ok: true, cached: false });
+    expect(codes).toHaveLength(1);
+    expect(codes[0]).not.toBe(123456);
+    expect(sqlite.prepare('SELECT COUNT(*) count FROM payments').get()?.count).toBe(1);
+    expect(sqlite.prepare('SELECT status, transaction_id FROM payments').get()).toMatchObject({
+      status: 'pending',
+      transaction_id: String(codes[0]),
+    });
+  });
+
+  it('does not rotate an expired attempt when the order is already marked paid', async () => {
+    const { input, payment, sqlite } = fixture();
+    payment('order-1', 'expired');
+    sqlite.exec("UPDATE orders SET payment_status = 'paid' WHERE id = 'order-1'");
     const spy = vi.spyOn(globalThis, 'fetch');
     expect(await getOrCreatePayOSAttempt(input)).toMatchObject({ ok: false, status: 409 });
     expect(spy).not.toHaveBeenCalled();

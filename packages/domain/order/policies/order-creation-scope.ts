@@ -139,6 +139,8 @@ export async function resolveOrderCreationScope(
   return { actor: actor || null, tenantId };
 }
 
+const UNORDERABLE_TABLE_STATUSES = new Set(['disabled', 'inactive', 'maintenance', 'out_of_order', 'outoforder']);
+
 /** Never fall back to a lookup without tenant_id when a schema is outdated. */
 export async function resolveOrderCreationTable(db: D1Like, tableId: string | undefined, tenantId: string) {
   if (!tableId?.trim()) return null;
@@ -147,26 +149,26 @@ export async function resolveOrderCreationTable(db: D1Like, tableId: string | un
   const tenantClause = normTenant === 'default'
     ? "AND (tenant_id = ? OR tenant_id IS NULL OR tenant_id = '')"
     : 'AND tenant_id = ?';
-  let table: { id: string } | null = null;
+  let table: { id: string; status?: string | null } | null = null;
   try {
-    const byNumber = await db.prepare(`SELECT id FROM cafe_tables WHERE table_number = ? ${tenantClause}`)
-      .bind(code, normTenant).first<{ id: string }>();
+    const byNumber = await db.prepare(`SELECT id, status FROM cafe_tables WHERE table_number = ? ${tenantClause}`)
+      .bind(code, normTenant).first<{ id: string; status?: string | null }>();
     table = byNumber || (code !== code.toUpperCase()
-      ? await db.prepare(`SELECT id FROM cafe_tables WHERE table_number = ? ${tenantClause}`)
-        .bind(code.toUpperCase(), normTenant).first<{ id: string }>() : null)
-      || await db.prepare(`SELECT id FROM cafe_tables WHERE id = ? ${tenantClause}`)
-        .bind(code, normTenant).first<{ id: string }>();
+      ? await db.prepare(`SELECT id, status FROM cafe_tables WHERE table_number = ? ${tenantClause}`)
+        .bind(code.toUpperCase(), normTenant).first<{ id: string; status?: string | null }>() : null)
+      || await db.prepare(`SELECT id, status FROM cafe_tables WHERE id = ? ${tenantClause}`)
+        .bind(code, normTenant).first<{ id: string; status?: string | null }>();
     if (!table) {
       const slugOrPaddedMatch = code.match(/^[tT]?0*([1-9]\d*)(?:-[a-z0-9-]+)?$/i);
       if (slugOrPaddedMatch) {
         const normalizedNumber = slugOrPaddedMatch[1];
         const paddedId = `t${normalizedNumber.padStart(2, '0')}`;
-        table = await db.prepare(`SELECT id FROM cafe_tables WHERE table_number = ? ${tenantClause}`)
-          .bind(normalizedNumber, normTenant).first<{ id: string }>()
-          || await db.prepare(`SELECT id FROM cafe_tables WHERE table_number = ? ${tenantClause}`)
-            .bind(Number(normalizedNumber), normTenant).first<{ id: string }>()
-          || await db.prepare(`SELECT id FROM cafe_tables WHERE id = ? ${tenantClause}`)
-            .bind(paddedId, normTenant).first<{ id: string }>();
+        table = await db.prepare(`SELECT id, status FROM cafe_tables WHERE table_number = ? ${tenantClause}`)
+          .bind(normalizedNumber, normTenant).first<{ id: string; status?: string | null }>()
+          || await db.prepare(`SELECT id, status FROM cafe_tables WHERE table_number = ? ${tenantClause}`)
+            .bind(Number(normalizedNumber), normTenant).first<{ id: string; status?: string | null }>()
+          || await db.prepare(`SELECT id, status FROM cafe_tables WHERE id = ? ${tenantClause}`)
+            .bind(paddedId, normTenant).first<{ id: string; status?: string | null }>();
       }
     }
   } catch (err) {
@@ -177,6 +179,10 @@ export async function resolveOrderCreationTable(db: D1Like, tableId: string | un
     throw err;
   }
   if (!table) throw new OrderCreationError('A valid table_id in this store is required', 400);
+  const tableStatus = String(table.status ?? '').trim().toLowerCase().replace(/[\s-]+/g, '_');
+  if (UNORDERABLE_TABLE_STATUSES.has(tableStatus)) {
+    throw new OrderCreationError('Table is unavailable for service', 400);
+  }
   return table.id;
 }
 

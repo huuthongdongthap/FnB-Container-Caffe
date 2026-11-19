@@ -5,7 +5,7 @@
  * Verifies two independent database initialization paths:
  *   1. Fresh install from `worker/schema.sql` and `db/schema.sql` (no migration needed)
  *   2. Upgrade from pre-v3 schema (`fixtures/pre-v3-schema.sql`) by running
- *      `worker/db/migrations/20261119_01_saas_commercial_v3.sql` verbatim
+ *      `worker/db/migrations/20261119_02_saas_commercial_v3.sql` verbatim
  *      (must fail loudly on duplicate columns — never swallowed).
  *
  * Compares resulting SaaS tables, columns, and indexes across all paths and runs
@@ -26,7 +26,7 @@ const REPO_ROOT = path.resolve(__dirname, '../../..');
 const WORKER_SCHEMA_PATH = path.join(REPO_ROOT, 'worker/schema.sql');
 const DB_SCHEMA_PATH = path.join(REPO_ROOT, 'db/schema.sql');
 const PRE_V3_SCHEMA_PATH = path.join(__dirname, 'fixtures/pre-v3-schema.sql');
-const V3_MIGRATION_PATH = path.join(REPO_ROOT, 'worker/db/migrations/20261119_01_saas_commercial_v3.sql');
+const V3_MIGRATION_PATH = path.join(REPO_ROOT, 'worker/db/migrations/20261119_02_saas_commercial_v3.sql');
 
 const SAAS_TABLES = [
   'saas_tenants',

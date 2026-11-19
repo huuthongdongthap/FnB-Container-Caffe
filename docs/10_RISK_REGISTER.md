@@ -1,7 +1,7 @@
 ---
-date: 2025-06-19
-version: 1.0
-status: stable
+date: 2026-11-18
+version: 2.5
+status: active
 ---
 
 # RISK REGISTER — AURA CAFE CONTAINER
@@ -14,20 +14,22 @@ This register tracks identified risks across technical, business, operational, c
 
 | ID | Risk Category | Description | Likelihood | Impact | Risk Score | Status |
 |-----|---------------|-------------|------------|--------|------------|--------|
-| **TECH-01** | Technical | D1 database connection limit exceeded (concurrent writes) | Medium | High | 8 | 🟡 Monitoring |
+| **TECH-01** | Technical | D1 SQLite single-writer contention & replica read-after-write lag (`withPrimarySession('first-primary')` wired in `getDatabase()` and scheduled cron `handleScheduled`) | Low | High | 4 | ✅ Mitigated |
 | **TECH-02** | Technical | Cloudflare Workers CPU time limit exceeded | Low | High | 4 | ✅ Mitigated |
-| **TECH-03** | Technical | KV storage quota exceeded (rate limiting) | Medium | Medium | 6 | 🟡 Monitoring |
-| **TECH-04** | Technical | PayOS webhook failures → missed payments | Low | High | 4 | ✅ Mitigated |
-| **TECH-05** | Technical | Third-party API downtime (PayOS, SMTP) | Medium | Medium | 6 | 🟡 Mitigated |
+| **TECH-03** | Technical | Workers KV ~60s eventual consistency on auth/OTP/idempotency (moved authority to D1 CAS) | Medium | High | 8 | ✅ Mitigated |
+| **TECH-04** | Technical | PayOS webhook replay / amount mismatch / paid-vs-cancel race / reconciliation realtime fanout | Low | Critical | 5 | ✅ Mitigated |
+| **TECH-05** | Technical | Third-party API downtime (PayOS, ERPNext, ZNS/SMTP) | Medium | Medium | 6 | 🟡 Mitigated |
+| **TECH-06** | Technical | Split-bill concurrent parent double-cancellation / 2× BOM deduction, manual refund realtime drift, shift sale replay, or QR placeholder analytics skew (atomic parent CAS + BOM restore + voucher `user_rewards` clawback + `(shiftId, orderId)` dedup + placeholder exclusion enforced) | Low | High | 4 | ✅ Mitigated |
+| **TECH-07** | Technical | PayOS `'completed'` orders blocking table session close / mobile table release, `table_sessions` ledger drift on order cancel/split, or QR placeholder + single-L `'canceled'` skew in secondary analytics (peak hours, zones, top products, customer metrics, CSV export) | Low | Medium | 3 | ✅ Mitigated |
 | **BIZ-01** | Business | Payment gateway fee increases (>3%) | Medium | Medium | 6 | ⚠️ Watch |
 | **BIZ-02** | Business | Customer acquisition cost > LTV | Medium | High | 8 | 🟡 Mitigated |
-| **BIZ-03** | Business | Loyalty program abuse (cashback farming) | Low | Medium | 3 | ✅ Mitigated |
-| **OPS-01** | Operational | Staff data tampering (order cancellation) | Low | Medium | 3 | ✅ Mitigated |
-| **OPS-02** | Operational | Admin credentials compromised | Medium | High | 8 | 🟡 Mitigated |
-| **OPS-03** | Operational | Backup failure / data loss | Low | Critical | 5 | ✅ Mitigated |
-| **COMP-01** | Compliance | E-invoicing not implemented by deadline | Low | High | 4 | 🟡 In Progress |
-| **COMP-02** | Compliance | Customer data retention violation (GDPR-ish) | Low | Medium | 3 | ✅ Mitigated |
-| **SEC-01** | Security | JWT secret leakage | Low | Critical | 5 | ✅ Mitigated |
+| **BIZ-03** | Business | Loyalty / promo abuse (concurrent promo limit, public draft promo filtering & Earn->Redeem->Refund voucher clawback) | Low | High | 4 | ✅ Mitigated |
+| **OPS-01** | Operational | Unpaid online-prepaid KDS hold, paid-order cancellation, table occupancy release, BOM unit mismatch (`g`/`kg`), or restocking brewed waste | Low | High | 4 | ✅ Mitigated |
+| **OPS-02** | Operational | Staff device/session compromise, cross-store POS offline queue bleed, or duplicate `table_sessions` order attach (CAS guarded) | Low | High | 4 | ✅ Mitigated |
+| **OPS-03** | Operational | D1 migration drift (`worker/schema.sql` vs `db/schema.sql` 160+ index parity enforced in CI) | Low | Critical | 5 | ✅ Mitigated |
+| **COMP-01** | Compliance | E-invoice immutability after ERPNext issuance (Nghị định 70/2025/NĐ-CP credit-note lock) | Low | High | 4 | ✅ Mitigated |
+| **COMP-02** | Compliance | Personal Data Protection lifecycle, per-channel consent & ledger-safe erasure (Luật 91/2025/QH15 & NĐ 356/2025/NĐ-CP) | Low | High | 4 | ✅ Mitigated |
+| **SEC-01** | Security | JWT secret leakage & phone-less QR guest review `X-Order-Token` ownership verification | Low | Critical | 5 | ✅ Mitigated |
 | **SEC-02** | Security | XSS attack via customer input | Medium | High | 8 | ✅ Mitigated |
 | **SEC-03** | Security | SQL injection via API | Low | High | 4 | ✅ Mitigated |
 | **SEC-04** | Security | Rate limit bypass (IP spoofing) | Low | Medium | 3 | ✅ Mitigated |
@@ -160,6 +162,58 @@ This register tracks identified risks across technical, business, operational, c
 
 ---
 
+### SEC-02: Anonymous Guest Order BOLA / Capability Token Leakage
+
+**Description:** Sequential or shareable order IDs could expose customer PII or allow unauthorized promotion redemption, post-login order claiming, or cross-customer tracking enumeration on unclaimed guest orders.
+
+**Likelihood:** Low (cryptographic capability tokens enforced)  
+**Impact:** High (unauthorized PII disclosure or fraudulent order claiming)
+
+**Mitigation:**
+- Mint 192-bit random `order_token` values on guest order creation, offline sync, guest check-in, and split-bill creation; store only SHA-256 `guest_token_hash` in D1
+- Require verified `X-Order-Token` (or `?order_token=`) for guest order detail, SSE events, promotion redemption, and post-login order claiming; block forged tokens and signed-in foreign customer enumeration on `/track` while keeping anonymous shareable `/track` responses zero-PII
+- Bound client token storage to 32 entries with 24-hour TTL scoped by session/tenant, and purge `memory` + `sessionStorage` + `localStorage` on logout or tenant switch
+
+**Owner:** Security Engineer / Backend Lead  
+**Status:** ✅ Mitigated (enforced across REST, OpenAPI, split-bill, and SSE surfaces)
+
+---
+
+### TECH-05: Offline Queue Replay Duplication & Replica Lag on Order/Payment Reads
+
+**Description:** Concurrent reconnect handlers or page reloads while offline could either replay queued IndexedDB orders twice or strand unsynced customer orders, and D1 read-replica lag could serve stale payment/order state right after PayOS webhook or COD settlement.
+
+**Likelihood:** Low (shared mutex + primary session pinning active)  
+**Impact:** Medium (duplicate kitchen tickets or delayed payment confirmation UI)
+
+**Mitigation:**
+- Enforce shared module-level offline sync mutex across store and POS sync hooks, plus server-side `localId` / `Idempotency-Key` deduplication
+- Hydrate pending IndexedDB state on mount and session transitions so offline customer orders survive page reloads and auto-flush on reconnect
+- Pin order, KDS, and PayOS webhook handlers to primary D1 session (`withPrimarySession('first-primary')`) and broadcast both PayOS and cashier COD settlements to `ORDER_BROADCASTER` + tenant-scoped KV events
+
+**Owner:** Backend / Frontend Lead  
+**Status:** ✅ Mitigated (verified in automated test suite and local cutover harness)
+
+---
+
+### TECH-07: Table Session Settlement Parity, Session Ledger Drift & Secondary Analytics Skew
+
+**Description:** PayOS settlement writes `payment_status = 'completed'` while cash/COD writes `'paid'`; guards that only accepted `'paid'` blocked session close and mobile table release for PayOS-settled tables, and closed sessions left stale `current_order_id` / `current_session_id` on `cafe_tables`. Cancelled or split orders did not update `table_sessions.order_count` / `total_amount`, and split children lost `session_id`. Secondary analytics counted empty QR check-in placeholders and single-L `'canceled'` orders.
+
+**Likelihood:** Low (guards aligned and regression-tested)  
+**Impact:** Medium (tables stuck Occupied, wrong session totals at checkout, inflated reports)
+
+**Mitigation:**
+- Accept `'paid'`, `'completed'`, and `'refunded'` as settled across session close, session status PATCH, mobile table release, floor plan, domain table status, payment reconciliation, PayOS webhook settlement, and spend cashback; terminal session transitions clear `cafe_tables.current_order_id` and `current_session_id`
+- Order cancel decrements session `order_count` / `total_amount` and unlinks `current_order_id`; split inherits parent `session_id`, replaces parent totals with children totals, and repoints `current_order_id` to the first child
+- Customer metrics, peak hours, top products, zone stats, and CSV export exclude QR placeholders (`Khách QR - cho don mon` with empty items), `'canceled'`/`'cancelled'` statuses, and failed/refunded payment status, with schema-tolerant fallbacks
+- Locked by `table-session-split-cancel-analytics-integrity.test.ts` (real SQLite) and live `workerd` loopback checks in `local-flow-table-sessions-analytics-subroutes.mjs`
+
+**Owner:** Backend Lead  
+**Status:** ✅ Mitigated (verified in automated test suite and local loopback harness)
+
+---
+
 ### COMP-01: E-invoicing Compliance
 
 **Description:** Vietnamese law requires e-invoicing from June 2025. Failure = fines.
@@ -208,4 +262,4 @@ This register tracks identified risks across technical, business, operational, c
 
 ---
 
-*Last updated: 2025-06-19 — Initial risk register*
+*Last updated: 2026-11-18 — Added PayOS `'completed'` table session release parity, split/cancel session ledger synchronization, and secondary analytics QR placeholder exclusion mitigations*

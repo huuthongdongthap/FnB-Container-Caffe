@@ -4,6 +4,7 @@
  */
 
 import type { D1Database } from '@cloudflare/workers-types';
+import { generateOrderToken, hashOrderToken } from '../../customer/policies/order-ownership-policy';
 
 export type FulfillmentChannel = 'pickup' | 'delivery';
 
@@ -22,6 +23,8 @@ export interface PlaceOrderInput {
   notes?: string;
   tenantId?: string;
   kv?: import('@cloudflare/workers-types').KVNamespace;
+  /** Client retry key; the same key + payload returns the first order instead of creating another. */
+  idempotencyKey?: string;
 }
 
 export interface OrderItemResult {
@@ -40,12 +43,14 @@ export interface PlaceOrderSuccess {
   channel: FulfillmentChannel;
   items: OrderItemResult[];
   totalCents: number;
+  orderToken?: string;
+  replayed?: boolean;
 }
 
 export interface PlaceOrderError {
   ok: false;
   status?: number;
-  code: 'empty_items' | 'invalid_item' | 'invalid_items' | 'invalid_quantity' | 'invalid_channel' | 'd1_error';
+  code: 'empty_items' | 'invalid_item' | 'invalid_items' | 'invalid_quantity' | 'invalid_channel' | 'd1_error' | 'idempotency_conflict';
   error: string;
 }
 
@@ -65,6 +70,13 @@ function generateOrderId(): string {
   const bytes = new Uint8Array(5);
   (globalThis as unknown as { crypto: CryptoLike }).crypto.getRandomValues(bytes);
   return 'ord_' + Array.from(bytes, (b: number) => b.toString(16).padStart(2, '0')).join('');
+}
+
+const MAX_IDEMPOTENCY_KEY_LENGTH = 128;
+
+async function sha256Hex(value: string): Promise<string> {
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value));
+  return Array.from(new Uint8Array(digest), (b) => b.toString(16).padStart(2, '0')).join('');
 }
 
 async function fetchMenuPriceCents(
@@ -154,6 +166,39 @@ export async function placeOrder(
   const rawTargetTenant = (input.tenantId && input.tenantId.trim()) ? input.tenantId.trim() : 'default';
   const targetTenant =
     rawTargetTenant === '*' || rawTargetTenant.toLowerCase() === 'hq' ? '*' : rawTargetTenant;
+
+  const idemKey = (input.idempotencyKey ?? '').trim();
+  if (idemKey.length > MAX_IDEMPOTENCY_KEY_LENGTH) {
+    return { ok: false, status: 400, code: 'invalid_items', error: 'Idempotency-Key is too long' };
+  }
+  let idem: { scopeKey: string; fingerprint: string } | null = null;
+  if (idemKey) {
+    const fingerprint = await sha256Hex(JSON.stringify({
+      channel: input.channel,
+      notes: input.notes ?? null,
+      items: input.items.map((i) => [i.menuItemId, Number(i.quantity), i.note ?? null]),
+    }));
+    idem = { scopeKey: `place:${targetTenant}:${input.customerId}:${idemKey}`, fingerprint };
+  }
+  const findSaved = async (): Promise<PlaceOrderResult | null> => {
+    if (!idem) return null;
+    const saved = await db
+      .prepare('SELECT fingerprint, response_body FROM order_creation_requests WHERE scope_key = ?')
+      .bind(idem.scopeKey)
+      .first<{ fingerprint: string; response_body: string }>()
+      .catch(() => null);
+    if (!saved) return null;
+    if (saved.fingerprint !== idem.fingerprint) {
+      return { ok: false, status: 409, code: 'idempotency_conflict', error: 'Idempotency-Key reused with different order data' };
+    }
+    try {
+      return { ...(JSON.parse(saved.response_body) as PlaceOrderSuccess), replayed: true };
+    } catch {
+      return null;
+    }
+  };
+  const replay = await findSaved();
+  if (replay) return replay;
   let inferredStoreTenant: string | undefined;
   const items: OrderItemResult[] = [];
   let totalCents = 0;
@@ -204,8 +249,60 @@ export async function placeOrder(
   })));
 
   const effectiveTenant = (targetTenant !== '*' ? targetTenant : inferredStoreTenant) || 'default';
-  try {
-    await db.prepare(`
+  const isGuestOrder = !input.customerId || input.customerId.trim() === '' || input.customerId.trim().toLowerCase() === 'guest';
+  const guestOrderToken = isGuestOrder ? generateOrderToken() : undefined;
+  const guestTokenHash = guestOrderToken ? await hashOrderToken(guestOrderToken) : null;
+  const successResult: PlaceOrderSuccess = {
+    ok: true,
+    orderId,
+    status: 'pending',
+    channel: input.channel,
+    items,
+    totalCents,
+    ...(guestOrderToken ? { orderToken: guestOrderToken } : {}),
+  };
+  // The request record commits in the same D1 batch as the order, so a retry sees both or neither.
+  const exec = (stmt: ReturnType<D1Database['prepare']>) =>
+    idem
+      ? db.batch([
+          stmt,
+          db.prepare(
+            'INSERT INTO order_creation_requests (scope_key, fingerprint, order_id, response_body, created_at) VALUES (?, ?, ?, ?, ?)'
+          ).bind(idem.scopeKey, idem.fingerprint, orderId, JSON.stringify(successResult), now),
+        ])
+      : stmt.run();
+  // A concurrent same-key request that committed first wins; its result is returned verbatim.
+  const failed = async (err: unknown): Promise<PlaceOrderResult> =>
+    (await findSaved()) ?? { ok: false, code: 'd1_error', error: `failed to create order: ${(err as Error).message}` };
+  let insertedWithGuestHash = false;
+  if (guestTokenHash) {
+    try {
+      await exec(db.prepare(`
+        INSERT INTO orders (
+          id, items, total, status, customer_name, customer_phone,
+          order_type, notes, customer_id, guest_token_hash, tenant_id, created_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `).bind(
+        orderId,
+        itemsJson,
+        totalCents,
+        'pending',
+        input.customerName ?? null,
+        input.customerPhone,
+        input.channel,
+        input.notes ?? null,
+        input.customerId || null,
+        guestTokenHash,
+        effectiveTenant,
+        now,
+      ));
+      insertedWithGuestHash = true;
+    } catch {
+      insertedWithGuestHash = false;
+    }
+  }
+  if (!insertedWithGuestHash) try {
+    await exec(db.prepare(`
       INSERT INTO orders (
         id, items, total, status, customer_name, customer_phone,
         order_type, notes, customer_id, tenant_id, created_at
@@ -222,11 +319,11 @@ export async function placeOrder(
       input.customerId,
       effectiveTenant,
       now,
-    ).run();
+    ));
   } catch (firstErr) {
     try {
       const orderNumber = `ORD-${orderId.replace(/^ord_/i, '').toUpperCase()}`;
-      await db.prepare(`
+      await exec(db.prepare(`
         INSERT INTO orders (
           id, order_number, items, total, status, customer_name, customer_phone,
           order_type, notes, customer_id, tenant_id, created_at, updated_at
@@ -245,14 +342,14 @@ export async function placeOrder(
         effectiveTenant,
         now,
         now,
-      ).run();
+      ));
     } catch (scopedErr) {
       if (effectiveTenant !== 'default') {
         const err = scopedErr ?? firstErr;
-        return { ok: false, code: 'd1_error', error: `failed to create order: ${(err as Error).message}` };
+        return failed(err);
       }
       try {
-        await db.prepare(`
+        await exec(db.prepare(`
           INSERT INTO orders (
             id, items, total, status, customer_name, customer_phone,
             order_type, notes, customer_id, created_at
@@ -268,11 +365,11 @@ export async function placeOrder(
           input.notes ?? null,
           input.customerId,
           now,
-        ).run();
+        ));
       } catch {
         try {
           const orderNumber = `ORD-${orderId.replace(/^ord_/i, '').toUpperCase()}`;
-          await db.prepare(`
+          await exec(db.prepare(`
             INSERT INTO orders (
               id, order_number, items, total, status, customer_name, customer_phone,
               order_type, notes, customer_id, created_at, updated_at
@@ -290,9 +387,9 @@ export async function placeOrder(
             input.customerId,
             now,
             now,
-          ).run();
+          ));
         } catch (e) {
-          return { ok: false, code: 'd1_error', error: `failed to create order: ${(e as Error).message}` };
+          return failed(e);
         }
       }
     }
@@ -303,12 +400,5 @@ export async function placeOrder(
   // pending orders from minting spendable cashback or referral payouts.
   void kv;
 
-  return {
-    ok: true,
-    orderId,
-    status: 'pending',
-    channel: input.channel,
-    items,
-    totalCents,
-  };
+  return successResult;
 }

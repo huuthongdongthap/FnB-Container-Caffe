@@ -7,6 +7,7 @@ vi.mock('@/lib/offline-db', () => ({
   offlineDb: {
     saveOrder: vi.fn(),
     getPendingOrders: vi.fn(),
+    countNeedsAttention: vi.fn(),
     removeOrder: vi.fn(),
     clearOrders: vi.fn(),
   },
@@ -26,6 +27,7 @@ describe('useOfflineSync', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     (offlineDb.getPendingOrders as any).mockResolvedValue([]);
+    (offlineDb.countNeedsAttention as any).mockResolvedValue(0);
     (offlineDb.saveOrder as any).mockResolvedValue('local_test_123');
     (offlineDb.removeOrder as any).mockResolvedValue(undefined);
   });
@@ -47,6 +49,18 @@ describe('useOfflineSync', () => {
 
     expect(result.current.pendingCount).toBe(1);
     expect(result.current.isOnline).toBe(true);
+  });
+
+  it('surfaces quarantined orders rejected by server validation', async () => {
+    (offlineDb.countNeedsAttention as any).mockResolvedValue(2);
+
+    const { result } = renderHook(() => useOfflineSync());
+
+    await act(async () => {
+      await result.current.refreshPendingCount();
+    });
+
+    expect(result.current.quarantinedCount).toBe(2);
   });
 
   it('queues a mutation and executes sync when online', async () => {

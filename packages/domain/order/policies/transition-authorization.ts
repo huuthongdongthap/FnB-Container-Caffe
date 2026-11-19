@@ -38,10 +38,11 @@ const RIDER_TARGETS: Record<string, readonly string[]> = {
   delivered: ['completed'],
 };
 
-/** Kitchen stations only move work forward through prep, never billing states. */
+/** Kitchen stations move work through prep and counter pickup, never billing completion. */
 const KITCHEN_TARGETS: Record<string, readonly string[]> = {
   confirmed: ['preparing'],
   preparing: ['ready'],
+  ready: ['served'],
 };
 
 /**

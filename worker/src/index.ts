@@ -14,6 +14,7 @@ import { requireAuth } from './middleware/auth';
 import { tenantMiddleware } from './middleware/tenant';
 import { hostTenantMiddleware } from './middleware/host-tenant';
 import { saasWriteGuard } from './middleware/saas-write-guard';
+import { withPrimarySession } from './lib/db';
 import { OrderBroadcaster } from './do/OrderBroadcaster';
 import { handleScheduled } from './scheduled';
 import type { Env } from './types/env';
@@ -73,6 +74,8 @@ app.use('/*', cors({
     'Idempotency-Key',
     'X-Tenant-ID',
     'X-Tenant-Slug',
+    'X-Order-Token',
+    'X-Local-ID',
     'X-Edge-Telemetry-Secret'
   ],
   exposeHeaders: ['X-Request-ID'],
@@ -81,6 +84,20 @@ app.use('/*', cors({
 } as Parameters<typeof cors>[0]));
 
 // ── Global Middleware ──
+app.use('*', async (c, next) => {
+  if (typeof c.env?.AURA_DB?.withSession === 'function') {
+    const pinned = withPrimarySession(c.env.AURA_DB);
+    if (pinned !== c.env.AURA_DB) {
+      const envProto = Object.getPrototypeOf(c.env) ?? Object.prototype;
+      const clonedEnv = Object.assign(Object.create(envProto), c.env, {
+        AURA_DB: pinned,
+        ...((c.env as unknown as Record<string, unknown>).DB === c.env.AURA_DB ? { DB: pinned } : {}),
+      });
+      c.env = clonedEnv;
+    }
+  }
+  await next();
+});
 app.use('*', correlationId());
 app.use('*', securityHeaders());
 app.use('*', requestMetrics());

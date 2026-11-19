@@ -165,26 +165,72 @@ export async function resolveServerOrderOwnership(
   return { customerId: null, stage: 'anonymous_guest', isGuest: true, resolvedVia: 'anonymous' };
 }
 
+/** High-entropy capability token returned once at guest order creation. */
+export function generateOrderToken(): string {
+  const bytes = crypto.getRandomValues(new Uint8Array(24));
+  return Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('');
+}
+
+/** SHA-256 hex digest of a guest order capability token (only the digest is stored). */
+export async function hashOrderToken(token: string): Promise<string> {
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(token));
+  return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join('');
+}
+
+/** Constant-time comparison of a presented token against the stored digest. */
+export async function verifyGuestOrderToken(
+  storedHash: string | null | undefined,
+  presentedToken: string | null | undefined
+): Promise<boolean> {
+  const expected = typeof storedHash === 'string' ? storedHash.trim().toLowerCase() : '';
+  const token = typeof presentedToken === 'string' ? presentedToken.trim() : '';
+  if (!expected || !token) return false;
+  const actual = await hashOrderToken(token);
+  if (actual.length !== expected.length) return false;
+  let diff = 0;
+  for (let i = 0; i < actual.length; i += 1) diff |= actual.charCodeAt(i) ^ expected.charCodeAt(i);
+  return diff === 0;
+}
+
+function hasGuestTokenHash(order: { guest_token_hash?: string | null }): boolean {
+  return typeof order.guest_token_hash === 'string' && order.guest_token_hash.trim().length > 0;
+}
+
+/**
+ * Reads of guest orders (no customer_id) are gated by the order capability token
+ * once the order carries a guest_token_hash. Callers that have verified the
+ * presented token with verifyGuestOrderToken pass `orderTokenVerified: true`.
+ * Legacy guest rows without a hash stay readable so existing receipts keep working.
+ */
 export function canAccessOrder(
   actor: ActorContext | null | undefined,
-  order: { id: string; customer_id?: string | null }
+  order: { id: string; customer_id?: string | null; guest_token_hash?: string | null },
+  options: { orderTokenVerified?: boolean } = {}
 ): { allowed: boolean; reason?: string } {
   const role = actor?.role;
   if (role && PRIVILEGED_STAFF_ROLES.includes(role)) {
     return { allowed: true };
   }
+  const guestTokenOk = !hasGuestTokenHash(order) || options.orderTokenVerified === true;
   const actorIds = [actor?.id, actor?.customerId, actor?.customer_id]
     .map((v) => (typeof v === 'string' ? v.trim() : ''))
     .filter(Boolean);
   if (role === 'customer' && actorIds.length > 0) {
-    if (!order.customer_id || actorIds.includes(String(order.customer_id).trim())) {
+    if (actorIds.includes(String(order.customer_id ?? '').trim()) && order.customer_id) {
       return { allowed: true };
+    }
+    if (!order.customer_id) {
+      return guestTokenOk
+        ? { allowed: true }
+        : { allowed: false, reason: 'A valid order token is required to view this guest order' };
     }
     return { allowed: false, reason: 'Unauthorized access to customer order' };
   }
   if (!actor || actorIds.length === 0) {
     if (!order.customer_id) {
-      return { allowed: true };
+      return guestTokenOk
+        ? { allowed: true }
+        : { allowed: false, reason: 'A valid order token is required to view this guest order' };
     }
     return { allowed: false, reason: 'This order belongs to a registered customer. Please sign in.' };
   }
@@ -258,6 +304,12 @@ export interface EvaluateOrderClaimPolicyInput {
   tableId?: string | null;
   orderToken?: string | null;
   requirePlaceholderVerification?: boolean;
+  /** True when the presented order token matched orders.guest_token_hash. */
+  orderTokenVerified?: boolean;
+  /** True when the claiming customer's phone was OTP-verified (customers.verified_at set). */
+  customerPhoneVerified?: boolean;
+  /** Reject phone-match claims unless customerPhoneVerified is true. */
+  requireVerifiedPhone?: boolean;
 }
 
 export function evaluateOrderClaimPolicy(
@@ -274,6 +326,10 @@ export function evaluateOrderClaimPolicy(
     return { allowed: false, statusCode: 403, error: 'Order already belongs to another registered customer' };
   }
   if (actor.role !== 'customer') {
+    return { allowed: true, statusCode: 200 };
+  }
+  // Possession of the order capability token proves the caller received this order.
+  if (input.orderTokenVerified === true) {
     return { allowed: true, statusCode: 200 };
   }
 
@@ -316,6 +372,12 @@ export function evaluateOrderClaimPolicy(
       }
     } else if (!customerPhoneNorm) {
       return { allowed: false, statusCode: 403, error: 'Phone verification is required to claim this order' };
+    }
+    // A matching phone number alone is not ownership: when the caller demands it
+    // (the public claim endpoint does), the profile phone must be OTP-verified,
+    // otherwise anyone can sign up with a stranger's number and take the order.
+    if (input.requireVerifiedPhone === true && input.customerPhoneVerified !== true) {
+      return { allowed: false, statusCode: 403, error: 'A verified phone number or valid order token is required to claim this order' };
     }
     return { allowed: true, statusCode: 200 };
   }
@@ -362,6 +424,8 @@ export interface ClaimGuestOrderInput {
   tableId?: string | null;
   orderToken?: string | null;
   requireVerification?: boolean;
+  /** Public claim endpoints set this so an unverified phone cannot claim by number alone. */
+  requireVerifiedPhone?: boolean;
 }
 
 export interface ClaimGuestOrderResult {
@@ -386,6 +450,7 @@ export async function claimGuestOrder(input: ClaimGuestOrderInput): Promise<Clai
     customer_id?: string | null;
     customer_phone?: string | null;
     table_id?: string | null;
+    guest_token_hash?: string | null;
     order_token?: string | null;
     total?: number;
     order_type?: string;
@@ -394,10 +459,28 @@ export async function claimGuestOrder(input: ClaimGuestOrderInput): Promise<Clai
   let order: ClaimOrderRow | null = null;
   try {
     order = await db.prepare(
-      'SELECT id, customer_id, customer_phone, table_id, order_token, total, order_type, tenant_id FROM orders WHERE id = ?'
+      'SELECT id, customer_id, customer_phone, table_id, guest_token_hash, total, order_type, tenant_id FROM orders WHERE id = ?'
     ).bind(orderId).first<ClaimOrderRow>();
   } catch {
     order = null;
+  }
+  if (!order) {
+    try {
+      order = await db.prepare(
+        'SELECT id, customer_id, customer_phone, table_id, order_token, total, order_type, tenant_id FROM orders WHERE id = ?'
+      ).bind(orderId).first<ClaimOrderRow>();
+    } catch {
+      order = null;
+    }
+  }
+  if (!order) {
+    try {
+      order = await db.prepare(
+        'SELECT id, customer_id, customer_phone, table_id, guest_token_hash, total, tenant_id FROM orders WHERE id = ?'
+      ).bind(orderId).first<ClaimOrderRow>();
+    } catch {
+      order = null;
+    }
   }
   if (!order) {
     try {
@@ -421,6 +504,13 @@ export async function claimGuestOrder(input: ClaimGuestOrderInput): Promise<Clai
     order = await db.prepare(
       'SELECT id, customer_id, total, order_type FROM orders WHERE id = ?'
     ).bind(orderId).first<ClaimOrderRow>().catch(() => null);
+  }
+  if (!order) {
+    order = await db.prepare(
+      'SELECT id, customer_id, customer_phone, table_id, total FROM orders WHERE id = ?'
+    ).bind(orderId).first<ClaimOrderRow>().catch(() =>
+      db.prepare('SELECT id, customer_id FROM orders WHERE id = ?').bind(orderId).first<ClaimOrderRow>().catch(() => null)
+    );
   }
 
   if (!order) {
@@ -511,10 +601,47 @@ export async function claimGuestOrder(input: ClaimGuestOrderInput): Promise<Clai
       }
     }
 
+    // Capability token and OTP-verified phone are looked up separately so older
+    // schemas that lack these columns degrade to "not verified" instead of erroring.
+    let orderTokenVerified = false;
+    const vTypeNorm = typeof input.verificationType === 'string' ? input.verificationType.trim().toLowerCase() : '';
+    const vValNorm = typeof input.verificationValue === 'string' ? input.verificationValue.trim() : '';
+    const presentedToken =
+      (typeof input.orderToken === 'string' && input.orderToken.trim() ? input.orderToken.trim() : '') ||
+      (vTypeNorm === 'token' || vTypeNorm === 'order_token' ? vValNorm : '');
+    if (presentedToken) {
+      try {
+        const candidateHash =
+          typeof order.guest_token_hash === 'string' && order.guest_token_hash.trim()
+            ? order.guest_token_hash
+            : (
+                await db
+                  .prepare('SELECT guest_token_hash FROM orders WHERE id = ?')
+                  .bind(orderId)
+                  .first<{ guest_token_hash?: string | null }>()
+                  .catch(() => null)
+              )?.guest_token_hash;
+        orderTokenVerified = await verifyGuestOrderToken(candidateHash, presentedToken);
+      } catch {
+        orderTokenVerified = false;
+      }
+    }
+    let customerPhoneVerified = false;
+    try {
+      const verifiedRow = await db.prepare('SELECT verified_at FROM customers WHERE id = ? LIMIT 1')
+        .bind(actor.id).first<{ verified_at?: string | null }>();
+      customerPhoneVerified = typeof verifiedRow?.verified_at === 'string' && verifiedRow.verified_at.trim().length > 0;
+    } catch {
+      customerPhoneVerified = false;
+    }
+
     const decision = evaluateOrderClaimPolicy({
       actor,
       order,
       customerProfilePhone,
+      orderTokenVerified,
+      customerPhoneVerified,
+      requireVerifiedPhone: input.requireVerifiedPhone,
       verificationType: input.verificationType,
       verificationValue: input.verificationValue,
       phone: input.phone,

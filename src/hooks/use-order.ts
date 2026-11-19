@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { apiFetch } from '@/lib/api-client';
+import { getGuestOrderToken } from '@/lib/guest-order-token';
 import type { CustomerOrder } from './stores/order-store-types';
 export type { CustomerOrder, CustomerOrderItem } from './stores/order-store-types';
 
@@ -17,7 +18,13 @@ export interface OrderResponse {
 export function useOrder(orderId: string | null, options?: { refetchInterval?: number }) {
   return useQuery<OrderResponse>({
     queryKey: ['order', orderId],
-    queryFn: () => apiFetch<OrderResponse>(`/api/orders/${orderId}`),
+    queryFn: () => {
+      const orderToken = getGuestOrderToken(orderId);
+      return apiFetch<OrderResponse>(
+        `/api/orders/${orderId}`,
+        orderToken ? { headers: { 'X-Order-Token': orderToken } } : undefined,
+      );
+    },
     enabled: !!orderId,
     refetchInterval: options?.refetchInterval ?? false,
   });

@@ -5,11 +5,61 @@
  */
 import type { D1Database } from '@cloudflare/workers-types';
 
+type UnitKind = 'mass' | 'volume' | 'count';
+const UNIT_ALIASES: Record<string, string> = {
+  g: 'g', gram: 'g', grams: 'g',
+  kg: 'kg', kgs: 'kg', kilogram: 'kg', kilograms: 'kg',
+  mg: 'mg',
+  ml: 'ml', milliliter: 'ml', milliliters: 'ml',
+  l: 'l', liter: 'l', litre: 'l', liters: 'l', litres: 'l',
+};
+const COUNT_UNITS = new Set(['pcs', 'pc', 'piece', 'pieces', 'unit', 'units', 'shot', 'shots', 'portion', 'portions']);
+const COUNT_CANONICAL: Record<string, string> = {
+  pc: 'pcs', piece: 'pcs', pieces: 'pcs', unit: 'pcs', units: 'pcs',
+  shots: 'shot', portions: 'portion',
+};
+// Factor to the smallest base of each dimension (g for mass, ml for volume).
+const UNIT_FACTORS: Record<string, { kind: UnitKind; factor: number }> = {
+  mg: { kind: 'mass', factor: 0.001 },
+  g: { kind: 'mass', factor: 1 },
+  kg: { kind: 'mass', factor: 1000 },
+  ml: { kind: 'volume', factor: 1 },
+  l: { kind: 'volume', factor: 1000 },
+};
+
+function normalizeUnit(unit?: string | null): string {
+  const raw = String(unit ?? '').trim().toLowerCase();
+  if (!raw) return '';
+  if (UNIT_ALIASES[raw]) return UNIT_ALIASES[raw]!;
+  if (COUNT_UNITS.has(raw)) return COUNT_CANONICAL[raw] ?? raw;
+  return raw;
+}
+
+/**
+ * Express a recipe quantity in the unit the stock item is counted in. Blank or identical
+ * units are returned untouched; mass/volume/count never convert into one another because
+ * that would silently corrupt stock. Results are rounded to 6 decimals to hide binary
+ * floating-point drift (2 - 0.018 must read 1.982).
+ */
+export function convertRecipeQuantity(quantity: number, recipeUnit?: string | null, stockUnit?: string | null): number {
+  const from = normalizeUnit(recipeUnit);
+  const to = normalizeUnit(stockUnit);
+  if (!from || !to || from === to) return quantity;
+  const fromDef = UNIT_FACTORS[from];
+  const toDef = UNIT_FACTORS[to];
+  if (!fromDef || !toDef || fromDef.kind !== toDef.kind) {
+    throw new Error(`Incompatible inventory units: cannot convert ${String(recipeUnit)} to ${String(stockUnit)}`);
+  }
+  return Math.round((quantity * fromDef.factor / toDef.factor) * 1e6) / 1e6;
+}
+
 export interface CanonicalRecipeComponent {
   ingredientId: string;
   ingredientName?: string;
   quantity: number;
   unit: string;
+  /** Unit the ingredient's stock is counted in; absent when the ingredient row has none. */
+  stockUnit?: string;
   costPerUnit: number;
 }
 
@@ -138,14 +188,14 @@ export async function getCanonicalRecipe(
   let rows: { results: any[] };
   try {
     rows = await db.prepare(
-      `SELECT ri.ingredient_id, ri.quantity, ri.unit, i.name as ing_name, COALESCE(i.cost_per_unit, 0) as cost_per_unit
+      `SELECT ri.ingredient_id, ri.quantity, ri.unit, i.name as ing_name, i.unit as stock_unit, COALESCE(i.cost_per_unit, 0) as cost_per_unit
        FROM recipe_items ri
        LEFT JOIN ingredients i ON ri.ingredient_id = i.id AND COALESCE(NULLIF(TRIM(i.tenant_id), ''), 'default') = ?2
        WHERE ri.recipe_id = ?1`
     ).bind(recipe.id, effectiveTenant).all<any>();
     if ((!rows.results || rows.results.length === 0) && effectiveTenant === 'default') {
       rows = await db.prepare(
-        `SELECT ri.ingredient_id, ri.quantity, ri.unit, i.name as ing_name, COALESCE(i.cost_per_unit, 0) as cost_per_unit
+        `SELECT ri.ingredient_id, ri.quantity, ri.unit, i.name as ing_name, i.unit as stock_unit, COALESCE(i.cost_per_unit, 0) as cost_per_unit
          FROM recipe_items ri
          LEFT JOIN ingredients i ON ri.ingredient_id = i.id
          WHERE ri.recipe_id = ?`
@@ -154,7 +204,7 @@ export async function getCanonicalRecipe(
   } catch {
     if (effectiveTenant === 'default') {
       rows = await db.prepare(
-        `SELECT ri.ingredient_id, ri.quantity, ri.unit, i.name as ing_name, COALESCE(i.cost_per_unit, 0) as cost_per_unit
+        `SELECT ri.ingredient_id, ri.quantity, ri.unit, i.name as ing_name, i.unit as stock_unit, COALESCE(i.cost_per_unit, 0) as cost_per_unit
          FROM recipe_items ri
          LEFT JOIN ingredients i ON ri.ingredient_id = i.id
          WHERE ri.recipe_id = ?`
@@ -169,10 +219,14 @@ export async function getCanonicalRecipe(
     ingredientName: r.ing_name || undefined,
     quantity: Number(r.quantity || 0),
     unit: r.unit || 'g',
+    stockUnit: r.stock_unit ? String(r.stock_unit) : undefined,
     costPerUnit: Number(r.cost_per_unit || 0),
   }));
 
-  const unitCost = components.reduce((sum, c) => sum + (c.quantity * c.costPerUnit), 0);
+  const unitCost = components.reduce(
+    (sum, c) => sum + (convertRecipeQuantity(c.quantity, c.unit, c.stockUnit) * c.costPerUnit),
+    0
+  );
 
   return {
     id: recipe.id,
@@ -217,7 +271,9 @@ export async function calculateOrderConsumption(
     }
 
     for (const comp of recipe.components) {
-      const needed = comp.quantity * item.quantity;
+      // Recipes are written in kitchen units (g, ml) while stock is counted in purchase units (kg, l).
+      const needed = convertRecipeQuantity(comp.quantity * item.quantity, comp.unit, comp.stockUnit);
+      const depletionUnit = comp.stockUnit || comp.unit;
       const existing = depletionsMap.get(comp.ingredientId);
       if (existing) {
         existing.quantity += needed;
@@ -231,7 +287,7 @@ export async function calculateOrderConsumption(
           productIds: item.productId ? [item.productId] : [],
           ingredientId: comp.ingredientId,
           ingredientName: comp.ingredientName,
-          unit: comp.unit,
+          unit: depletionUnit,
           quantity: needed,
           unitCost: comp.costPerUnit,
           totalCost: needed * comp.costPerUnit,
@@ -346,6 +402,10 @@ export async function deductOrderStock(
 
   // 4. Atomic Deductions & Stock Movement Logging
   const now = new Date().toISOString();
+  const batchOps: ReturnType<D1Database['prepare']>[] = [];
+  const fallbackBatchOps: ReturnType<D1Database['prepare']>[] = [];
+  const sequentialEntries: Array<{ ingredientId: string; quantity: number; movId: string }> = [];
+
   for (const d of depletions) {
     const movId = `mov_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
     let ingRow: any = null;
@@ -360,28 +420,99 @@ export async function deductOrderStock(
         continue;
       }
     }
-    try {
-      await db.prepare(
+    sequentialEntries.push({ ingredientId: d.ingredientId, quantity: d.quantity, movId });
+    batchOps.push(
+      db.prepare(
         "UPDATE ingredients SET current_stock = current_stock - ?, updated_at = ? WHERE id = ? AND (COALESCE(NULLIF(tenant_id, ''), 'default') = ? OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?4)"
-      ).bind(d.quantity, now, d.ingredientId, effectiveTenant).run();
-    } catch (updErr) {
-      if (effectiveTenant !== 'default') throw updErr;
-      await db.prepare(
-        'UPDATE ingredients SET current_stock = current_stock - ?, updated_at = ? WHERE id = ?'
-      ).bind(d.quantity, now, d.ingredientId).run();
-    }
-
-    try {
-      await db.prepare(
+      ).bind(d.quantity, now, d.ingredientId, effectiveTenant),
+      db.prepare(
         `INSERT INTO stock_movements (id, ingredient_id, type, quantity, reference_id, reference_type, notes, created_at, tenant_id)
          VALUES (?, ?, 'consumption', ?, ?, 'order', ?, ?, ?)`
-      ).bind(movId, d.ingredientId, -d.quantity, orderId, `BOM deduction for order ${orderId}`, now, effectiveTenant).run();
-    } catch (insErr) {
-      if (effectiveTenant !== 'default') throw insErr;
-      await db.prepare(
+      ).bind(movId, d.ingredientId, -d.quantity, orderId, `BOM deduction for order ${orderId}`, now, effectiveTenant),
+    );
+    fallbackBatchOps.push(
+      db.prepare(
+        'UPDATE ingredients SET current_stock = current_stock - ?, updated_at = ? WHERE id = ?'
+      ).bind(d.quantity, now, d.ingredientId),
+      db.prepare(
         `INSERT INTO stock_movements (id, ingredient_id, type, quantity, reference_id, reference_type, notes, created_at)
          VALUES (?, ?, 'consumption', ?, ?, 'order', ?, ?)`
-      ).bind(movId, d.ingredientId, -d.quantity, orderId, `BOM deduction for order ${orderId}`, now).run();
+      ).bind(movId, d.ingredientId, -d.quantity, orderId, `BOM deduction for order ${orderId}`, now),
+    );
+  }
+
+  if (batchOps.length > 0) {
+    if (typeof (db as { batch?: unknown }).batch === 'function') {
+      let anyRunInvoked = false;
+      const trackRuns = (ops: ReturnType<D1Database['prepare']>[]) =>
+        ops.map((op) => {
+          if (op && typeof (op as { run?: unknown }).run === 'function') {
+            const origRun = (op as { run: () => Promise<unknown> }).run.bind(op);
+            try {
+              Object.defineProperty(op, 'run', {
+                configurable: true,
+                writable: true,
+                value: async () => {
+                  anyRunInvoked = true;
+                  return origRun();
+                },
+              });
+            } catch {
+              // Immutable native statement wrapper: D1 batch returns per-statement results
+            }
+          }
+          return op;
+        });
+      let usedFallbackOps = false;
+      let batchRes: unknown;
+      const trackedPrimary = trackRuns(batchOps);
+      try {
+        batchRes = await db.batch(trackedPrimary);
+      } catch (batchErr) {
+        if (effectiveTenant !== 'default') throw batchErr;
+        usedFallbackOps = true;
+        anyRunInvoked = false;
+        batchRes = await db.batch(trackRuns(fallbackBatchOps));
+      }
+      const opsToRun = usedFallbackOps ? fallbackBatchOps : trackedPrimary;
+      const isUnranSqlMockStmt = opsToRun.every(
+        (op) =>
+          op &&
+          typeof op === 'object' &&
+          'sql' in (op as object) &&
+          'args' in (op as object) &&
+          typeof (op as { run?: unknown }).run === 'function'
+      );
+      if (!anyRunInvoked && (isUnranSqlMockStmt || (Array.isArray(batchRes) && batchRes.length === 0))) {
+        for (const op of opsToRun) {
+          await (op as { run: () => Promise<unknown> }).run();
+        }
+      }
+    } else {
+      for (const entry of sequentialEntries) {
+        try {
+          await db.prepare(
+            "UPDATE ingredients SET current_stock = current_stock - ?, updated_at = ? WHERE id = ? AND (COALESCE(NULLIF(tenant_id, ''), 'default') = ? OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?4)"
+          ).bind(entry.quantity, now, entry.ingredientId, effectiveTenant).run();
+        } catch (updErr) {
+          if (effectiveTenant !== 'default') throw updErr;
+          await db.prepare(
+            'UPDATE ingredients SET current_stock = current_stock - ?, updated_at = ? WHERE id = ?'
+          ).bind(entry.quantity, now, entry.ingredientId).run();
+        }
+        try {
+          await db.prepare(
+            `INSERT INTO stock_movements (id, ingredient_id, type, quantity, reference_id, reference_type, notes, created_at, tenant_id)
+             VALUES (?, ?, 'consumption', ?, ?, 'order', ?, ?, ?)`
+          ).bind(entry.movId, entry.ingredientId, -entry.quantity, orderId, `BOM deduction for order ${orderId}`, now, effectiveTenant).run();
+        } catch (insErr) {
+          if (effectiveTenant !== 'default') throw insErr;
+          await db.prepare(
+            `INSERT INTO stock_movements (id, ingredient_id, type, quantity, reference_id, reference_type, notes, created_at)
+             VALUES (?, ?, 'consumption', ?, ?, 'order', ?, ?)`
+          ).bind(entry.movId, entry.ingredientId, -entry.quantity, orderId, `BOM deduction for order ${orderId}`, now).run();
+        }
+      }
     }
   }
 

@@ -94,6 +94,16 @@ export async function authenticateRequest(
             const dbCustTenant = (custRecord.tenant_id && String(custRecord.tenant_id).trim()) || 'default';
             customerTenant = dbCustTenant;
           }
+          // D1 is the revocation authority for phone-only customers; KV is a cache.
+          const custVerRow = await env.AURA_DB.prepare('SELECT auth_version FROM customers WHERE id = ? LIMIT 1')
+            .bind(payload.id)
+            .first<{ auth_version?: number | null }>()
+            .catch(() => null);
+          const custVer = Number(custVerRow?.auth_version);
+          if (custVerRow && Number.isFinite(custVer) && custVer > 0) {
+            hasVersionRecord = true;
+            storedVersion = Math.max(storedVersion, custVer);
+          }
         }
         let d1User: {
           id?: string | null;

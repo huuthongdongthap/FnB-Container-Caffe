@@ -4,6 +4,7 @@
  */
 
 import { transitionOrderStatus, type OrderStatusDb, type OrderStatusResult } from '../../order/policies/order-status-transition';
+import { releaseTableIfNoActiveOrders } from '../../order/policies/table-occupancy-release';
 
 export type TransitionKdsResult = OrderStatusResult;
 export type KdsTransitionDb = OrderStatusDb;
@@ -14,6 +15,7 @@ export interface KdsTransitionOptions {
   waitUntil?: (promise: Promise<unknown>) => void;
   env?: Record<string, unknown>;
   skipCancelSideEffects?: boolean;
+  allowPaidCompensation?: boolean;
 }
 
 /**
@@ -32,7 +34,10 @@ export async function executeKdsStatusTransition(
   userRole?: string,
   options?: KdsTransitionOptions,
 ): Promise<TransitionKdsResult> {
-  const result = await transitionOrderStatus(db, orderId, targetStatus, userRole, { tenantId: options?.tenantId });
+  const result = await transitionOrderStatus(db, orderId, targetStatus, userRole, {
+    tenantId: options?.tenantId,
+    allowPaidCompensation: options?.allowPaidCompensation,
+  });
   if (!result.success || result.idempotent) return result;
   const order = result.order!;
   const now = new Date().toISOString();
@@ -44,26 +49,35 @@ export async function executeKdsStatusTransition(
       rawRequestedCancelTenant && (rawRequestedCancelTenant === '*' || rawRequestedCancelTenant.toLowerCase() === 'hq')
         ? '*'
         : rawRequestedCancelTenant;
+    type CancelOrdRow = {
+      total?: number;
+      total_amount?: number;
+      table_id?: string | null;
+      payment_status?: string | null;
+      tenant_id?: string | null;
+      customer_id?: string | null;
+      cashback_used?: number | null;
+    };
     const ordRow = await (requestedCancelTenant && requestedCancelTenant !== '*'
       ? rawDb
           .prepare(
             "SELECT total, total_amount, tenant_id, customer_id, cashback_used FROM orders WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?",
           )
           .bind(orderId, requestedCancelTenant)
-          .first<{ total?: number; total_amount?: number; payment_status?: string | null; tenant_id?: string | null; customer_id?: string | null; cashback_used?: number | null }>()
+          .first<CancelOrdRow>()
           .catch(() =>
             requestedCancelTenant === 'default'
               ? rawDb
                   .prepare('SELECT total, total_amount, tenant_id, customer_id, cashback_used FROM orders WHERE id = ?')
                   .bind(orderId)
-                  .first<{ total?: number; total_amount?: number; payment_status?: string | null; tenant_id?: string | null; customer_id?: string | null; cashback_used?: number | null }>()
+                  .first<CancelOrdRow>()
                   .catch(() => null)
               : null,
           )
       : rawDb
           .prepare('SELECT total, total_amount, tenant_id, customer_id, cashback_used FROM orders WHERE id = ?')
           .bind(orderId)
-          .first<{ total?: number; total_amount?: number; payment_status?: string | null; tenant_id?: string | null; customer_id?: string | null; cashback_used?: number | null }>()
+          .first<CancelOrdRow>()
           .catch(() => null));
     const ordTenantAttr =
       ordRow?.tenant_id &&
@@ -78,7 +92,12 @@ export async function executeKdsStatusTransition(
     const effectiveCancelTenant = resolvedTenant || 'default';
     try {
       const { restoreInventoryForOrder } = await import('@aura/domain-inventory');
-      await restoreInventoryForOrder({ AURA_DB: rawDb }, orderId, effectiveCancelTenant);
+      await restoreInventoryForOrder(
+        { AURA_DB: rawDb },
+        orderId,
+        effectiveCancelTenant,
+        { preCancelStatus: order.previous_status, releaseUnconsumedReserves: true },
+      );
     } catch {
       // Non-blocking when inventory tables are absent in minimal test schemas
     }
@@ -504,6 +523,17 @@ export async function executeKdsStatusTransition(
         // Optional promotion_usages table in partial schemas
       }
       try {
+        const { cancelOpenPayOSAttemptForOrder } = await import('@aura/domain-payment');
+        await cancelOpenPayOSAttemptForOrder(
+          rawDb,
+          (options?.env ?? {}) as Record<string, unknown>,
+          orderId,
+          effectiveCancelTenant,
+        ).catch(() => {});
+      } catch {
+        // Optional PayOS payment table/module in partial schemas
+      }
+      try {
         await rawDb
           .prepare(
             "UPDATE payments SET status = 'cancelled', updated_at = ? WHERE order_id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ? AND status = 'pending'",
@@ -521,6 +551,18 @@ export async function executeKdsStatusTransition(
           });
       } catch {
         // Optional payments table in partial schemas
+      }
+      const cancelTableId =
+        (order as Record<string, unknown>).table_id ??
+        (
+          await rawDb
+            .prepare('SELECT table_id FROM orders WHERE id = ?')
+            .bind(orderId)
+            .first<{ table_id?: string | null }>()
+            .catch(() => null)
+        )?.table_id;
+      if (cancelTableId && String(cancelTableId).trim()) {
+        await releaseTableIfNoActiveOrders(rawDb, String(cancelTableId).trim(), effectiveCancelTenant).catch(() => false);
       }
     } catch {
       // Optional CRM/promotion tables in partial schemas
@@ -653,6 +695,9 @@ export async function executeKdsStatusTransition(
             }
           }
         }
+        if (ordRow.table_id) {
+          await releaseTableIfNoActiveOrders(rawDb, ordRow.table_id, ordTenant).catch(() => false);
+        }
       }
     } catch {
       // Optional loyalty/customer/referral tables in partial schemas
@@ -738,7 +783,9 @@ export async function executeKdsStatusTransition(
           const items = Array.isArray(row.items) ? row.items : JSON.parse(row.items);
           if (!Array.isArray(items)) return;
           const createdAt = Date.parse(row.created_at.includes('T') ? row.created_at : `${row.created_at.replace(' ', 'T')}Z`);
-          const doId = broadcaster.idFromName(orderId);
+          const doTenant = tenantId && tenantId !== '*' && tenantId.toLowerCase() !== 'hq' ? tenantId : 'default';
+          const doChannel = doTenant !== 'default' ? `${doTenant}:${orderId}` : orderId;
+          const doId = broadcaster.idFromName(doChannel);
           const stub = broadcaster.get(doId);
           await stub.fetch(
             new Request('https://do/broadcast', {
@@ -749,7 +796,9 @@ export async function executeKdsStatusTransition(
                 status: targetStatus,
                 payment_status: row.payment_status,
                 items, total: row.total, customer_name: row.customer_name, customer_phone: row.customer_phone,
-                table_id: row.table_id, createdAt: Number.isFinite(createdAt) ? createdAt : Date.now(), updatedAt: Date.now(),
+                table_id: row.table_id,
+                ...(doTenant !== 'default' ? { tenant_id: doTenant } : {}),
+                createdAt: Number.isFinite(createdAt) ? createdAt : Date.now(), updatedAt: Date.now(),
               }),
             })
           );

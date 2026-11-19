@@ -20,6 +20,43 @@ import type { Env } from '../types/env';
 
 export const realtimeOrdersRouter = new Hono();
 
+const STAFF_REALTIME_ROLES = new Set([
+  'owner',
+  'admin',
+  'manager',
+  'supervisor',
+  'staff',
+  'kitchen',
+  'barista',
+  'chef',
+  'cashier',
+  'waiter',
+]);
+
+function isStoreWideChannel(channelId: string, tenantId: string): boolean {
+  const trimmed = channelId.trim();
+  if (!trimmed) return true;
+  if (tenantId && trimmed === tenantId) return true;
+  const suffix = trimmed.includes(':') ? trimmed.split(':').slice(1).join(':') : trimmed;
+  return /^(kds|orders|all|kitchen|pos|store|stream)$/i.test(suffix);
+}
+
+async function sha256Hex(value: string): Promise<string> {
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value));
+  return Array.from(new Uint8Array(digest))
+    .map((b) => b.toString(16).padStart(2, '0'))
+    .join('');
+}
+
+function timingSafeHexEqual(a: string, b: string): boolean {
+  if (!a || !b || a.length !== b.length) return false;
+  let diff = 0;
+  for (let i = 0; i < a.length; i++) {
+    diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  }
+  return diff === 0;
+}
+
 export async function handleRealtimeChannel(c: Context) {
   const channelId = c.req.param('channelId') || '';
   if (!channelId) {
@@ -150,6 +187,126 @@ export async function handleRealtimeChannel(c: Context) {
     return c.json({ error: 'Realtime not available — ORDER_BROADCASTER binding missing' }, 503);
   }
 
+  const actorRole = String(actor?.role || '').trim().toLowerCase();
+  const isStaffActor = STAFF_REALTIME_ROLES.has(actorRole);
+  const rawOrderId = channelId.includes(':') ? channelId.split(':').slice(1).join(':') : channelId;
+
+  // Store-wide feeds require authenticated staff whenever auth runtime (JWT_SECRET) is configured
+  if (Boolean(env.JWT_SECRET) && isStoreWideChannel(channelId, tenantId)) {
+    if (!actor) {
+      return c.json({ error: 'Unauthorized: staff session required for store realtime channel' }, 401);
+    }
+    if (!isStaffActor) {
+      return c.json({ error: 'Forbidden: staff role required for store realtime channel' }, 403);
+    }
+  }
+
+  // Non-staff single-order tracking channel: verify guest_token_hash / customer_id when row exists
+  const db = (env.AURA_DB ?? env.DB) as
+    | {
+        prepare?: (sql: string) => {
+          bind?: (...args: unknown[]) => { first?: <T>() => Promise<T | null> };
+        };
+      }
+    | undefined;
+  if (!isStaffActor && db && typeof db.prepare === 'function') {
+    let orderRow: {
+      id?: string;
+      customer_id?: string | null;
+      guest_token_hash?: string | null;
+      tenant_id?: string | null;
+    } | null = null;
+    let queryExecuted = false;
+    let queryFailed = false;
+    try {
+      const stmt = db.prepare(
+        'SELECT id, customer_id, guest_token_hash, tenant_id FROM orders WHERE id = ? LIMIT 1'
+      );
+      if (stmt && typeof stmt.bind === 'function') {
+        const bound = stmt.bind(rawOrderId);
+        if (bound && typeof bound.first === 'function') {
+          orderRow = await bound.first();
+          queryExecuted = true;
+        }
+      }
+    } catch (err) {
+      if (/no such column:\s*guest_token_hash/i.test(String(err))) {
+        try {
+          const fallbackStmt = db.prepare('SELECT id, customer_id, tenant_id FROM orders WHERE id = ? LIMIT 1');
+          const fallbackBound = fallbackStmt?.bind?.(rawOrderId);
+          if (fallbackBound && typeof fallbackBound.first === 'function') {
+            orderRow = await fallbackBound.first();
+            queryExecuted = true;
+          }
+        } catch (fallbackErr) {
+          if (!/no such table:\s*orders/i.test(String(fallbackErr))) {
+            queryFailed = true;
+          }
+          orderRow = null;
+        }
+      } else if (!/no such table:\s*orders/i.test(String(err))) {
+        queryFailed = true;
+        orderRow = null;
+      } else {
+        orderRow = null;
+      }
+    }
+
+    if (queryFailed) {
+      return c.json({ error: 'Order ownership verification unavailable', retryable: true }, 503);
+    }
+
+    if (queryExecuted && !orderRow) {
+      return c.json({ error: 'Order not found' }, 404);
+    }
+
+    if (orderRow) {
+      const rowTenant = String(orderRow.tenant_id || '').trim() || 'default';
+      if (tenantId && tenantId !== '*' && rowTenant !== tenantId) {
+        return c.json({ error: 'Forbidden: cross-tenant realtime channel' }, 403);
+      }
+      const actorRec = actor as { id?: string; customerId?: string; customer_id?: string } | null;
+      const actorCandidateIds = [actorRec?.id, actorRec?.customerId, actorRec?.customer_id]
+        .map((v) => (typeof v === 'string' ? v.trim() : ''))
+        .filter(Boolean);
+      const ordCustId = orderRow.customer_id ? String(orderRow.customer_id).trim() : '';
+      let customerOwnsOrder = Boolean(ordCustId) && actorCandidateIds.includes(ordCustId);
+      if (!customerOwnsOrder && ordCustId && actorRec?.id) {
+        try {
+          const linkStmt = db.prepare(
+            "SELECT id FROM customers WHERE id = ? AND user_id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ? LIMIT 1"
+          );
+          const linkRow = await linkStmt?.bind?.(ordCustId, actorRec.id, rowTenant)?.first?.<{ id?: string }>();
+          customerOwnsOrder = Boolean(linkRow?.id);
+        } catch {
+          // Optional customers.user_id linkage
+        }
+      }
+      if (!customerOwnsOrder) {
+        if (orderRow.guest_token_hash) {
+          const providedToken = (
+            c.req.header('X-Order-Token') ||
+            c.req.header('x-order-token') ||
+            c.req.query('order_token') ||
+            ''
+          ).trim();
+          if (!providedToken) {
+            return c.json({ error: 'Unauthorized: order tracking token required' }, 401);
+          }
+          const candidateHash = await sha256Hex(providedToken);
+          if (!timingSafeHexEqual(candidateHash, String(orderRow.guest_token_hash))) {
+            return c.json({ error: 'Forbidden: invalid order tracking token' }, 403);
+          }
+        } else if (ordCustId) {
+          return c.json(
+            { error: actor ? 'Forbidden: order belongs to another customer' : 'Unauthorized' },
+            actor ? 403 : 401
+          );
+        }
+      }
+    }
+  }
+
   const normalizedChannel =
     tenantId === '*' && channelId.toLowerCase().startsWith('hq:')
       ? `*:${channelId.slice(3)}`
@@ -172,21 +329,27 @@ export async function handleRealtimeChannel(c: Context) {
   };
   const targetId = typeof ns.idFromName === 'function' ? ns.idFromName(scopedChannel) : scopedChannel;
   const stub = ns.get(targetId);
+  const audience: 'staff' | 'guest' = isStaffActor ? 'staff' : 'guest';
   let forwardReq = c.req.raw;
-  if (tenantId && c.req.raw) {
+  if (c.req.raw) {
     try {
       const url = new URL(c.req.raw.url);
       if (
-        url.searchParams.has('tenant_id') ||
-        url.searchParams.has('tenantId') ||
-        url.searchParams.has('store_id') ||
-        url.searchParams.has('storeId') ||
-        tenantId === '*'
+        tenantId &&
+        (url.searchParams.has('tenant_id') ||
+          url.searchParams.has('tenantId') ||
+          url.searchParams.has('store_id') ||
+          url.searchParams.has('storeId') ||
+          tenantId === '*')
       ) {
         url.searchParams.set('tenant_id', tenantId);
       }
       const headers = new Headers(c.req.raw.headers);
-      headers.set('X-Tenant-ID', tenantId);
+      if (tenantId) headers.set('X-Tenant-ID', tenantId);
+      headers.set('X-Realtime-Audience', audience);
+      if (audience === 'guest') {
+        headers.set('X-Realtime-Order-ID', rawOrderId);
+      }
       forwardReq = new Request(url.toString(), {
         method: c.req.raw.method,
         headers,

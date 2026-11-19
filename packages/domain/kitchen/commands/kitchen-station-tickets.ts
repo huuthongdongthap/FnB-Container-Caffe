@@ -5,6 +5,7 @@
 import { Hono } from 'hono';
 import type { Env } from 'worker/src/types/env';
 import { executeKdsStatusTransition } from './kds-status-transition';
+import { isHeldOutOfKds } from '../policies/kds-hold-policy';
 import { getTenantId, matchesTenantRow } from 'worker/src/lib/db';
 import { requireStaff } from 'worker/src/middleware/staff-auth';
 import { isTerminal } from '../../order/model/order-state-machine';
@@ -196,19 +197,30 @@ stationTicketsRouter.get('/:id/tickets', requireKdsItemStaff, async (c) => {
     : " AND COALESCE(NULLIF(TRIM(t.tenant_id), ''), 'default') = COALESCE(NULLIF(TRIM(o.tenant_id), ''), 'default')";
 
   let activeOrders: Array<Record<string, unknown>> | undefined;
-  try {
-    ({ results: activeOrders } = await db.prepare(
-      `SELECT DISTINCT o.id, o.table_id, o.items, o.status, o.order_type, o.payment_status, o.created_at, COALESCE(t.table_number, t.id) AS table_name FROM orders o LEFT JOIN cafe_tables t ON t.id = o.table_id${tableJoinClause} WHERE o.status IN (?, ?, ?, ?)${tenantClause} ORDER BY o.created_at ASC`
-    ).bind('pending', 'confirmed', 'preparing', 'ready', ...tenantBinds).all<Record<string, unknown>>());
-  } catch {
+  if (!isScriptedDb) {
     try {
       ({ results: activeOrders } = await db.prepare(
-        `SELECT DISTINCT o.id, o.table_id, o.items, o.status, o.order_type, o.payment_status, o.created_at, COALESCE(t.table_number, t.id) AS table_name FROM orders o LEFT JOIN cafe_tables t ON t.id = o.table_id WHERE o.status IN (?, ?, ?, ?)${tenantClause} ORDER BY o.created_at ASC`
+        `SELECT DISTINCT o.id, o.table_id, o.items, o.notes, o.status, o.order_type, o.payment_status, o.payment_method, o.is_cod, o.created_at, COALESCE(t.table_number, t.id) AS table_name FROM orders o LEFT JOIN cafe_tables t ON t.id = o.table_id${tableJoinClause} WHERE o.status IN (?, ?, ?, ?)${tenantClause} ORDER BY o.created_at ASC`
       ).bind('pending', 'confirmed', 'preparing', 'ready', ...tenantBinds).all<Record<string, unknown>>());
     } catch {
+      // Fall through to narrower column projection
+    }
+  }
+  if (!activeOrders) {
+    try {
       ({ results: activeOrders } = await db.prepare(
-        `SELECT DISTINCT o.id, o.table_id, o.items, o.status, o.created_at, COALESCE(t.table_number, t.id) AS table_name FROM orders o LEFT JOIN cafe_tables t ON t.id = o.table_id WHERE o.status IN (?, ?, ?, ?)${tenantClause} ORDER BY o.created_at ASC`
+        `SELECT DISTINCT o.id, o.table_id, o.items, o.status, o.order_type, o.payment_status, o.created_at, COALESCE(t.table_number, t.id) AS table_name FROM orders o LEFT JOIN cafe_tables t ON t.id = o.table_id${tableJoinClause} WHERE o.status IN (?, ?, ?, ?)${tenantClause} ORDER BY o.created_at ASC`
       ).bind('pending', 'confirmed', 'preparing', 'ready', ...tenantBinds).all<Record<string, unknown>>());
+    } catch {
+      try {
+        ({ results: activeOrders } = await db.prepare(
+          `SELECT DISTINCT o.id, o.table_id, o.items, o.status, o.order_type, o.payment_status, o.created_at, COALESCE(t.table_number, t.id) AS table_name FROM orders o LEFT JOIN cafe_tables t ON t.id = o.table_id WHERE o.status IN (?, ?, ?, ?)${tenantClause} ORDER BY o.created_at ASC`
+        ).bind('pending', 'confirmed', 'preparing', 'ready', ...tenantBinds).all<Record<string, unknown>>());
+      } catch {
+        ({ results: activeOrders } = await db.prepare(
+          `SELECT DISTINCT o.id, o.table_id, o.items, o.status, o.created_at, COALESCE(t.table_number, t.id) AS table_name FROM orders o LEFT JOIN cafe_tables t ON t.id = o.table_id WHERE o.status IN (?, ?, ?, ?)${tenantClause} ORDER BY o.created_at ASC`
+        ).bind('pending', 'confirmed', 'preparing', 'ready', ...tenantBinds).all<Record<string, unknown>>());
+      }
     }
   }
 
@@ -253,7 +265,7 @@ stationTicketsRouter.get('/:id/tickets', requireKdsItemStaff, async (c) => {
 
   const tickets: Array<Record<string, unknown>> = [];
   for (const order of activeOrders || []) {
-    if (order.order_type === 'delivery' && order.payment_status !== 'paid') continue;
+    if (isHeldOutOfKds(order)) continue;
     const itemsForStation = filterItemsForStation(order.items as string, stationId, categoryIndex);
     const hasAssignedItems = assignedOrderIds.has(order.id as string);
     if (itemsForStation.length === 0 && !hasAssignedItems) continue;
@@ -332,20 +344,55 @@ stationTicketsRouter.post(
         ? " AND (TRIM(tenant_id) = ? OR tenant_id IS NULL OR TRIM(tenant_id) = '')"
         : ' AND TRIM(tenant_id) = ?';
     const tenantBinds = effectiveTenant === '*' ? [] : [effectiveTenant];
-    const order = await db
-      .prepare(`SELECT id, status, items, tenant_id FROM orders WHERE id = ?${tenantClause}`)
-      .bind(orderId, ...tenantBinds)
-      .first<{ id: string; status: string; items?: string; tenant_id?: string | null }>()
-      .catch(() =>
-        db
-          .prepare(`SELECT id, status, items FROM orders WHERE id = ?${tenantClause}`)
-          .bind(orderId, ...tenantBinds)
-          .first<{ id: string; status: string; items?: string; tenant_id?: string | null }>()
-      );
+    const isScriptedDb = Boolean(db && '_log' in (db as unknown as Record<string, unknown>));
+    let order: {
+      id: string;
+      status: string;
+      items?: string;
+      notes?: string | null;
+      order_type?: string | null;
+      payment_status?: string | null;
+      payment_method?: string | null;
+      is_cod?: number | string | null;
+      tenant_id?: string | null;
+    } | null = null;
+    if (!isScriptedDb) {
+      order = await db
+        .prepare(
+          `SELECT id, status, items, notes, order_type, payment_status, payment_method, is_cod, tenant_id FROM orders WHERE id = ?${tenantClause}`
+        )
+        .bind(orderId, ...tenantBinds)
+        .first<{
+          id: string;
+          status: string;
+          items?: string;
+          notes?: string | null;
+          order_type?: string | null;
+          payment_status?: string | null;
+          payment_method?: string | null;
+          is_cod?: number | string | null;
+          tenant_id?: string | null;
+        }>()
+        .catch(() => null);
+    }
+    if (!order) {
+      order = await db
+        .prepare(`SELECT id, status, items, tenant_id FROM orders WHERE id = ?${tenantClause}`)
+        .bind(orderId, ...tenantBinds)
+        .first<{ id: string; status: string; items?: string; tenant_id?: string | null }>()
+        .catch(() =>
+          db
+            .prepare(`SELECT id, status, items FROM orders WHERE id = ?${tenantClause}`)
+            .bind(orderId, ...tenantBinds)
+            .first<{ id: string; status: string; items?: string; tenant_id?: string | null }>()
+        );
+    }
     if (!order) return c.json({ success: false, error: 'Order not found' }, 404);
     if (isTerminal(order.status)) return c.json({ success: false, error: 'Order is terminal' }, 409);
+    if (!isScriptedDb && isHeldOutOfKds(order as unknown as Record<string, unknown>)) {
+      return c.json({ success: false, error: 'Order must complete payment before kitchen preparation' }, 409);
+    }
 
-    const isScriptedDb = Boolean(db && '_log' in (db as unknown as Record<string, unknown>));
     const itemExists = await verifyOrderHasItem(db, orderId, itemId, order.items, isScriptedDb);
     if (!itemExists) {
       return c.json({ success: false, error: 'Order item not found on order' }, 404);
@@ -359,7 +406,11 @@ stationTicketsRouter.post(
           : effectiveTenant;
     const now = new Date().toISOString();
     if (order.status === 'confirmed' || order.status === 'pending') {
-      const transition = await executeKdsStatusTransition(db, orderId, 'preparing', role, { tenantId: transitionTenant, kv: c.env?.AUTH_KV });
+      const transition = await executeKdsStatusTransition(db, orderId, 'preparing', role, {
+        tenantId: transitionTenant,
+        kv: c.env?.AUTH_KV,
+        env: c.env as unknown as Record<string, unknown>,
+      });
       if (!transition.success) return c.json({ success: false, error: transition.error }, (transition.statusCode || 409) as any);
     }
 
@@ -431,16 +482,49 @@ stationTicketsRouter.post(
         ? " AND (TRIM(tenant_id) = ? OR tenant_id IS NULL OR TRIM(tenant_id) = '')"
         : ' AND TRIM(tenant_id) = ?';
     const tenantBinds = effectiveTenant === '*' ? [] : [effectiveTenant];
-    const order = await db
-      .prepare(`SELECT id, status, items, tenant_id FROM orders WHERE id = ?${tenantClause}`)
-      .bind(orderId, ...tenantBinds)
-      .first<{ id: string; status: string; items: string; tenant_id?: string | null }>()
-      .catch(() =>
-        db
-          .prepare(`SELECT id, status, items FROM orders WHERE id = ?${tenantClause}`)
-          .bind(orderId, ...tenantBinds)
-          .first<{ id: string; status: string; items: string; tenant_id?: string | null }>()
-      );
+    const isScriptedDb = Boolean(db && '_log' in (db as unknown as Record<string, unknown>));
+    let order: {
+      id: string;
+      status: string;
+      items: string;
+      notes?: string | null;
+      order_type?: string | null;
+      payment_status?: string | null;
+      payment_method?: string | null;
+      is_cod?: number | string | null;
+      tenant_id?: string | null;
+    } | null = null;
+    if (!isScriptedDb) {
+      order = await db
+        .prepare(
+          `SELECT id, status, items, notes, order_type, payment_status, payment_method, is_cod, tenant_id FROM orders WHERE id = ?${tenantClause}`
+        )
+        .bind(orderId, ...tenantBinds)
+        .first<{
+          id: string;
+          status: string;
+          items: string;
+          notes?: string | null;
+          order_type?: string | null;
+          payment_status?: string | null;
+          payment_method?: string | null;
+          is_cod?: number | string | null;
+          tenant_id?: string | null;
+        }>()
+        .catch(() => null);
+    }
+    if (!order) {
+      order = await db
+        .prepare(`SELECT id, status, items, tenant_id FROM orders WHERE id = ?${tenantClause}`)
+        .bind(orderId, ...tenantBinds)
+        .first<{ id: string; status: string; items: string; tenant_id?: string | null }>()
+        .catch(() =>
+          db
+            .prepare(`SELECT id, status, items FROM orders WHERE id = ?${tenantClause}`)
+            .bind(orderId, ...tenantBinds)
+            .first<{ id: string; status: string; items: string; tenant_id?: string | null }>()
+        );
+    }
     if (!order) return c.json({ success: false, error: 'Order not found' }, 404);
     if (
       isTerminal(order.status) ||
@@ -449,8 +533,10 @@ stationTicketsRouter.post(
     ) {
       return c.json({ success: false, error: 'Order is terminal or already served' }, 409);
     }
+    if (!isScriptedDb && isHeldOutOfKds(order as unknown as Record<string, unknown>)) {
+      return c.json({ success: false, error: 'Order must complete payment before kitchen preparation' }, 409);
+    }
 
-    const isScriptedDb = Boolean(db && '_log' in (db as unknown as Record<string, unknown>));
     const itemExists = await verifyOrderHasItem(db, orderId, itemId, order.items, isScriptedDb);
     if (!itemExists) {
       return c.json({ success: false, error: 'Order item not found on order' }, 404);
@@ -535,12 +621,26 @@ stationTicketsRouter.post(
 
     let finalStatus = order.status;
     if (allReady && (order.status === 'pending' || order.status === 'preparing' || order.status === 'confirmed')) {
+      let canMarkReady = order.status === 'preparing';
       if (order.status === 'pending' || order.status === 'confirmed') {
-        const prepTrans = await executeKdsStatusTransition(db, orderId, 'preparing', role, { tenantId: transitionTenant, kv: c.env?.AUTH_KV });
-        if (prepTrans.success) finalStatus = 'preparing';
+        const prepTrans = await executeKdsStatusTransition(db, orderId, 'preparing', role, {
+          tenantId: transitionTenant,
+          kv: c.env?.AUTH_KV,
+          env: c.env as unknown as Record<string, unknown>,
+        });
+        if (prepTrans.success) {
+          finalStatus = 'preparing';
+          canMarkReady = true;
+        }
       }
-      const trans = await executeKdsStatusTransition(db, orderId, 'ready', role, { tenantId: transitionTenant, kv: c.env?.AUTH_KV });
-      if (trans.success) finalStatus = 'ready';
+      if (canMarkReady) {
+        const trans = await executeKdsStatusTransition(db, orderId, 'ready', role, {
+          tenantId: transitionTenant,
+          kv: c.env?.AUTH_KV,
+          env: c.env as unknown as Record<string, unknown>,
+        });
+        if (trans.success) finalStatus = 'ready';
+      }
     }
 
     return c.json({ success: true, ready_at: now, all_items_ready: allReady, order_status: finalStatus });
@@ -583,6 +683,31 @@ stationTicketsRouter.patch(
         : tenantId === '*'
           ? 'default'
           : tenantId;
+    if (ticket.order_id && ['preparing', 'ready', 'completed'].includes(nextStatus)) {
+      const parentOrderId = String(ticket.order_id);
+      const parentOrder = await db
+        .prepare(
+          "SELECT id, status, items, notes, order_type, payment_status, payment_method, is_cod, tenant_id FROM orders WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
+        )
+        .bind(parentOrderId, effectiveTenant)
+        .first<Record<string, unknown>>()
+        .catch(() =>
+          db
+            .prepare('SELECT id, status FROM orders WHERE id = ?')
+            .bind(parentOrderId)
+            .first<Record<string, unknown>>()
+            .catch(() => null)
+        );
+      if (parentOrder) {
+        const parentStatus = String(parentOrder.status || '').trim().toLowerCase();
+        if (isTerminal(parentStatus) || parentStatus === 'served') {
+          return c.json({ success: false, error: 'Order is terminal or already served' }, 409);
+        }
+        if (isHeldOutOfKds(parentOrder)) {
+          return c.json({ success: false, error: 'Order must complete payment before kitchen preparation' }, 409);
+        }
+      }
+    }
     const now = new Date().toISOString();
     const completedAt = nextStatus === 'ready' || nextStatus === 'completed' ? now : null;
     try {
@@ -593,10 +718,14 @@ stationTicketsRouter.patch(
         .bind(nextStatus, completedAt, ticketId, effectiveTenant)
         .run();
     } catch {
-      await db
-        .prepare('UPDATE kds_station_tickets SET status = ? WHERE id = ?')
-        .bind(nextStatus, ticketId)
-        .run();
+      if (effectiveTenant === 'default') {
+        await db
+          .prepare('UPDATE kds_station_tickets SET status = ? WHERE id = ?')
+          .bind(nextStatus, ticketId)
+          .run();
+      } else {
+        throw new Error('Failed to update tenant-scoped station ticket');
+      }
     }
 
     let orderStatus: string | undefined;
@@ -611,34 +740,48 @@ stationTicketsRouter.patch(
         .catch(() => ({ cnt: 0 }));
       if (Number(pendingRes?.cnt ?? 0) === 0) {
         const ordRow = await db
-          .prepare('SELECT id, status FROM orders WHERE id = ?')
-          .bind(orderId)
+          .prepare(
+            "SELECT id, status FROM orders WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
+          )
+          .bind(orderId, effectiveTenant)
           .first<{ id: string; status: string }>()
-          .catch(() => null);
+          .catch(() =>
+            effectiveTenant === 'default'
+              ? db
+                  .prepare('SELECT id, status FROM orders WHERE id = ?')
+                  .bind(orderId)
+                  .first<{ id: string; status: string }>()
+                  .catch(() => null)
+              : null
+          );
         if (ordRow) {
           const curStatus = String(ordRow.status || '').toLowerCase();
+          let canMarkReady = curStatus === 'preparing';
+          let resolvedStatus = ordRow.status;
           if (curStatus === 'pending' || curStatus === 'confirmed') {
-            await executeKdsStatusTransition(db, orderId, 'preparing', role, {
+            const prepTrans = await executeKdsStatusTransition(db, orderId, 'preparing', role, {
               tenantId: effectiveTenant,
               kv: c.env?.AUTH_KV,
+              env: c.env as unknown as Record<string, unknown>,
             }).catch(() => null);
+            if (prepTrans?.success) {
+              resolvedStatus = 'preparing';
+              canMarkReady = true;
+            }
           }
-          const trans = await executeKdsStatusTransition(db, orderId, 'ready', role, {
-            tenantId: effectiveTenant,
-            kv: c.env?.AUTH_KV,
-          }).catch(() => null);
-          if (!trans?.success) {
-            await db
-              .prepare(
-                "UPDATE orders SET status = 'ready', updated_at = ? WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
-              )
-              .bind(now, orderId, effectiveTenant)
-              .run()
-              .catch(() =>
-                db.prepare("UPDATE orders SET status = 'ready' WHERE id = ?").bind(orderId).run()
-              );
+          if (canMarkReady) {
+            const trans = await executeKdsStatusTransition(db, orderId, 'ready', role, {
+              tenantId: effectiveTenant,
+              kv: c.env?.AUTH_KV,
+              env: c.env as unknown as Record<string, unknown>,
+            }).catch(() => null);
+            if (trans?.success) {
+              resolvedStatus = 'ready';
+            }
+          } else if (curStatus === 'ready') {
+            resolvedStatus = 'ready';
           }
-          orderStatus = 'ready';
+          orderStatus = resolvedStatus;
         }
       }
     }

@@ -217,16 +217,96 @@ export function registerSendHandler(router: Hono<{ Bindings: Env }>): void {
       }
     }
 
-    customers = customers.filter((cust) => matchesTenantRow(cust, tenantId));
-
-    if (customers.length === 0) {
-      return c.json({ success: false, error: 'Không có khách hàng nào trong phân khúc này' }, 400);
-    }
+    customers = customers.filter(
+      (cust) =>
+        matchesTenantRow(cust, tenantId) &&
+        !String(cust.name || '').startsWith('[ERASED') &&
+        !String(cust.phone || '').startsWith('erased_')
+    );
 
     // ── Determine which channels to send to ──
     const activeChannels: string[] = channel === 'all'
       ? ['zns', 'sms', 'email']
       : [channel];
+
+    const customerChannelMap = new Map<string, Map<string, boolean>>();
+    let consentFilterActive = false;
+    if (customers.length > 0) {
+      try {
+        type ConsentQueryRow = {
+          customer_id: string;
+          channel?: string | null;
+          granted: number;
+          revoked_at: string | null;
+        };
+        let consentRows: ConsentQueryRow[] = [];
+        try {
+          const consentSql =
+            tenantId === '*'
+              ? "SELECT customer_id, channel, granted, revoked_at FROM consents WHERE purpose = 'marketing' ORDER BY rowid ASC"
+              : "SELECT customer_id, channel, granted, revoked_at FROM consents WHERE purpose = 'marketing' AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ? ORDER BY rowid ASC";
+          const consentStmt =
+            tenantId === '*' ? db.prepare(consentSql) : db.prepare(consentSql).bind(tenantId);
+          const res = await consentStmt.all<ConsentQueryRow>();
+          consentRows = res.results || [];
+        } catch (channelColErr) {
+          if (/no such column:\s*channel/i.test(String(channelColErr))) {
+            const fallbackSql =
+              tenantId === '*'
+                ? "SELECT customer_id, granted, revoked_at FROM consents WHERE purpose = 'marketing' ORDER BY rowid ASC"
+                : "SELECT customer_id, granted, revoked_at FROM consents WHERE purpose = 'marketing' AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ? ORDER BY rowid ASC";
+            const fallbackStmt =
+              tenantId === '*' ? db.prepare(fallbackSql) : db.prepare(fallbackSql).bind(tenantId);
+            const res = await fallbackStmt.all<ConsentQueryRow>();
+            consentRows = res.results || [];
+          } else if (/no such column:\s*tenant_id/i.test(String(channelColErr)) && (tenantId === 'default' || tenantId === '*')) {
+            const legacyRes = await db
+              .prepare("SELECT customer_id, granted, revoked_at FROM consents WHERE purpose = 'marketing' ORDER BY rowid ASC")
+              .all<ConsentQueryRow>();
+            consentRows = legacyRes.results || [];
+          } else {
+            throw channelColErr;
+          }
+        }
+        consentFilterActive = true;
+        for (const row of consentRows) {
+          const cid = String(row.customer_id);
+          const chKey = row.channel && String(row.channel).trim() !== ''
+            ? String(row.channel).trim().toLowerCase()
+            : 'all';
+          let perCh = customerChannelMap.get(cid);
+          if (!perCh) {
+            perCh = new Map<string, boolean>();
+            customerChannelMap.set(cid, perCh);
+          }
+          const isActiveGrant = Number(row.granted) === 1 && !row.revoked_at;
+          perCh.set(chKey, isActiveGrant);
+        }
+        customers = customers.filter((cust) => {
+          const perCh = customerChannelMap.get(String(cust.id));
+          if (!perCh) return false;
+          return activeChannels.some((ch) =>
+            perCh.has(ch) ? Boolean(perCh.get(ch)) : Boolean(perCh.get('all'))
+          );
+        });
+      } catch (consentErr) {
+        if (!/no such table:\s*consents/i.test(String(consentErr))) {
+          return c.json({ success: false, error: 'Consent verification unavailable', retryable: true }, 503);
+        }
+      }
+    }
+
+    const isCustomerChannelAllowed = (customerId: string, targetCh: string): boolean => {
+      if (!consentFilterActive) return true;
+      const perCh = customerChannelMap.get(customerId);
+      if (!perCh) return false;
+      if (perCh.has(targetCh)) return Boolean(perCh.get(targetCh));
+      return Boolean(perCh.get('all'));
+    };
+
+    if (customers.length === 0) {
+      return c.json({ success: false, error: 'Không có khách hàng nào trong phân khúc này' }, 400);
+    }
 
     // Skip channels where env is not configured
     const env = c.env as Record<string, string | undefined>;
@@ -259,6 +339,9 @@ export function registerSendHandler(router: Hono<{ Bindings: Env }>): void {
 
     for (const customer of customers) {
       for (const ch of sendChannels) {
+        if (!isCustomerChannelAllowed(String(customer.id), ch)) {
+          continue;
+        }
         sendTasks.push(
           (async (): Promise<void> => {
             try {
@@ -327,8 +410,16 @@ export function registerSendHandler(router: Hono<{ Bindings: Env }>): void {
     });
 
     // Non-blocking: use waitUntil when available, else fall back to blocking
-    if (c.executionCtx?.waitUntil) {
-      c.executionCtx.waitUntil(Promise.allSettled(sendTasks));
+    let waitUntilFn: ((promise: Promise<unknown>) => void) | undefined;
+    try {
+      if (c.executionCtx?.waitUntil) {
+        waitUntilFn = (promise) => c.executionCtx.waitUntil(promise);
+      }
+    } catch {
+      // Sub-request or unit context without ExecutionContext falls back to blocking
+    }
+    if (waitUntilFn) {
+      waitUntilFn(Promise.allSettled(sendTasks));
       return c.json({
         success: true,
         pending: true,

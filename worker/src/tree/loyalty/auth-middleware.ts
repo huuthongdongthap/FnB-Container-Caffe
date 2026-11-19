@@ -180,6 +180,22 @@ export const authCustomer: MiddlewareHandler<{ Bindings: Env }> = async(c, next)
     } catch {
       // Optional users table in partial loyalty test schemas
     }
+    // Phone-only customers have no users row, so their revocation authority is
+    // customers.auth_version in D1 rather than the eventually consistent KV key.
+    if (idBind) {
+      try {
+        const d1Customer = await c.env.AURA_DB.prepare('SELECT auth_version FROM customers WHERE id = ?')
+          .bind(String(idBind))
+          .first<{ auth_version?: number | null }>();
+        const customerVer = Number(d1Customer?.auth_version);
+        if (d1Customer && Number.isFinite(customerVer) && customerVer > 0) {
+          hasVersionRecord = true;
+          storedVersion = Math.max(storedVersion, customerVer);
+        }
+      } catch {
+        // customers.auth_version is absent in partial loyalty test schemas
+      }
+    }
   }
   const tokenVersion = Number(payload.authVersion || 1);
   if ((hasVersionRecord && storedVersion !== tokenVersion) || (!hasVersionRecord && tokenVersion < 1)) {
@@ -263,6 +279,60 @@ export const authStaff: MiddlewareHandler<{ Bindings: Env }> = async (c, next) =
   }
   if (!isStaffRole(payload.role)) {
     return c.json({ success: false, error: 'Forbidden' }, 403);
+  }
+  if (c.env.AUTH_KV && typeof c.env.AUTH_KV.get === 'function') {
+    let revoked: string | null = null;
+    try {
+      revoked = await c.env.AUTH_KV.get(`revoked:${token}`);
+    } catch {
+      return c.json({ success: false, error: 'Authentication state unavailable' }, 503);
+    }
+    if (revoked) {
+      return c.json({ success: false, error: 'Token đã bị thu hồi' }, 401);
+    }
+  }
+  const tokenVersion = Number((payload as unknown as { authVersion?: number }).authVersion || 1);
+  let verifiedLiveStaff = false;
+  if (c.env.AURA_DB && typeof c.env.AURA_DB.prepare === 'function' && payload.id) {
+    const dbStaff = await c.env.AURA_DB
+      .prepare('SELECT is_active, auth_version, role FROM users WHERE id = ? LIMIT 1')
+      .bind(payload.id)
+      .first<{ is_active?: number | null; auth_version?: number | null; role?: string | null }>()
+      .catch(() => null);
+    if (dbStaff) {
+      verifiedLiveStaff = true;
+      if (dbStaff.is_active === 0) {
+        return c.json({ success: false, error: 'Tài khoản nhân sự đã bị khóa' }, 403);
+      }
+      if (dbStaff.role && !isStaffRole(dbStaff.role)) {
+        return c.json({ success: false, error: 'Forbidden' }, 403);
+      }
+      if (Number(dbStaff.auth_version || 1) !== tokenVersion) {
+        return c.json({ success: false, error: 'Phiên đăng nhập đã hết hiệu lực' }, 401);
+      }
+    }
+  }
+  if (!verifiedLiveStaff && c.env.AUTH_KV && typeof c.env.AUTH_KV.get === 'function') {
+    const kvKey = payload.email ? `user:${payload.email}` : payload.id ? `user:${payload.id}` : '';
+    if (kvKey) {
+      const rawStaff = await c.env.AUTH_KV.get(kvKey).catch(() => null);
+      if (rawStaff) {
+        try {
+          const parsedStaff = JSON.parse(rawStaff) as { is_active?: number | boolean; auth_version?: number; role?: string };
+          if (parsedStaff.is_active === 0 || parsedStaff.is_active === false) {
+            return c.json({ success: false, error: 'Tài khoản nhân sự đã bị khóa' }, 403);
+          }
+          if (parsedStaff.role && !isStaffRole(parsedStaff.role)) {
+            return c.json({ success: false, error: 'Forbidden' }, 403);
+          }
+          if (Number(parsedStaff.auth_version || 1) !== tokenVersion) {
+            return c.json({ success: false, error: 'Phiên đăng nhập đã hết hiệu lực' }, 401);
+          }
+        } catch {
+          // Ignore malformed auxiliary KV record
+        }
+      }
+    }
   }
   const payloadAny = payload as unknown as { tenantId?: string; tenant_id?: string };
   const rawUserTenant = String(payloadAny.tenantId ?? payloadAny.tenant_id ?? '').trim();

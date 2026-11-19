@@ -59,13 +59,23 @@ export function useKDS(station: string = 'all'): KDSResult {
   }, [identity, enabled, station, queryClient]);
 
   const completeMutation = useMutation({
-    mutationFn: (orderId: string) => apiFetch(`/api/orders/${orderId}/status`, {
-      method: 'PATCH', body: JSON.stringify({ status: 'ready' }),
-    }),
-    onSuccess: (_data, orderId) => {
+    mutationFn: async (orderId: string) => {
+      const cached = queryClient.getQueryData<KDSOrder[]>(queryKey) ?? [];
+      const current = cached.find((o) => o.id === orderId);
+      const nextStatus: KDSOrder['status'] =
+        current?.status === 'pending' || current?.status === 'confirmed'
+          ? 'preparing'
+          : 'ready';
+      await apiFetch(`/api/orders/${orderId}/status`, {
+        method: 'PATCH',
+        body: JSON.stringify({ status: nextStatus }),
+      });
+      return nextStatus;
+    },
+    onSuccess: (nextStatus, orderId) => {
       if (useAuthStore.getState().sessionVersion !== sessionVersion) return;
       queryClient.setQueryData<KDSOrder[]>(queryKey, (prev = []) =>
-        prev.map((o) => (o.id === orderId ? { ...o, status: 'ready' } : o))
+        prev.map((o) => (o.id === orderId ? { ...o, status: nextStatus } : o))
       );
       queryClient.invalidateQueries({ queryKey: ['kds-orders'] });
     },

@@ -122,7 +122,7 @@ export async function getOrdersMobile(
         ? context.req.query('tenantId') || context.req.query('store_id') || context.req.query('storeId')
         : undefined
     )?.trim() || '';
-    if (!isHQSuperAdmin(user as any) && user?.id !== 'local-staff') {
+    if (!isHQSuperAdmin(user as any)) {
       if (
         userTenant === '*' ||
         userTenant.toLowerCase() === 'hq' ||
@@ -280,7 +280,7 @@ export async function getOrderDetail(
         ? context.req.query('tenantId') || context.req.query('store_id') || context.req.query('storeId')
         : undefined
     )?.trim() || '';
-    if (!isHQSuperAdmin(user as any) && user?.id !== 'local-staff') {
+    if (!isHQSuperAdmin(user as any)) {
       if (
         userTenant === '*' ||
         userTenant.toLowerCase() === 'hq' ||

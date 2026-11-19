@@ -96,14 +96,19 @@ export default function KDSPage() {
   }, [orders]);
 
   const stationLoadPct = useMemo(() => {
-    const active = orders.filter((o) => o.status !== 'served').length;
+    const active = orders.filter((o) => o.status !== 'served' && o.status !== 'cancelled').length;
     return Math.min(Math.round((active / 20) * 100), 100);
   }, [orders]);
+
+  const cancelledOrders = useMemo(
+    () => orders.filter((o) => o.status === 'cancelled'),
+    [orders],
+  );
 
   const tickets = useMemo((): Ticket[] => {
     const seenShort = new Set<string>();
     return orders
-      .filter((o) => o.status !== 'served')
+      .filter((o) => o.status !== 'served' && o.status !== 'cancelled')
       .map((o): Ticket => {
         const shortId = `#${o.id.slice(-4)}`;
         const ticketId = seenShort.has(shortId) ? `#${o.id}` : shortId;
@@ -169,6 +174,24 @@ export default function KDSPage() {
         description="Kitchen order display for AURA CAFE staff. He thong hien thi don hang cho nhan vien."
       />
       <div className="relative">
+        {cancelledOrders.length > 0 && (
+          <div
+            role="alert"
+            aria-live="assertive"
+            className="mx-4 my-2 rounded-[var(--md-sys-shape-corner-medium)] border-2 border-[var(--md-sys-color-error)] bg-[var(--md-sys-color-error-container)] px-4 py-3 text-[var(--md-sys-color-on-error-container)]"
+          >
+            <p className="text-sm font-bold uppercase tracking-wide">
+              ĐÃ HỦY — DỪNG PHA CHẾ ({cancelledOrders.length})
+            </p>
+            <div className="mt-1 flex flex-wrap gap-3 text-xs font-mono">
+              {cancelledOrders.map((c) => (
+                <span key={c.id} className="line-through">
+                  #{c.id.slice(-4)} {c.table ? `(Bàn ${c.table})` : '(Mang đi)'}: {c.items.map((i) => `${i.quantity}x ${i.name}`).join(', ')}
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
         <StitchKDSNew
           tickets={tickets}
           stationName="KITCHEN STATION"

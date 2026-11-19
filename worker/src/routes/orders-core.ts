@@ -113,6 +113,9 @@ export const handleSyncOrders = async (c: import('hono').Context<{ Bindings: Env
       success: true,
       ok: true,
       localId: localId ?? null,
+      ...(typeof resData.order_token === 'string' && resData.order_token
+        ? { order_token: resData.order_token }
+        : {}),
       data: resData.data ?? resData,
       order: resData.data ?? resData,
     };

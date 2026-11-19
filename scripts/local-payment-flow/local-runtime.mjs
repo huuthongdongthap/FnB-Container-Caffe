@@ -1,7 +1,7 @@
 import { createRequire, builtinModules } from 'node:module';
 import { mkdtemp, readFile, writeFile } from 'node:fs/promises';
 import { existsSync, readdirSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { homedir, tmpdir } from 'node:os';
 import path from 'node:path';
 import { pbkdf2Sync, createHmac } from 'node:crypto';
 
@@ -18,8 +18,12 @@ export const verificationDir = () => process.env.LOCAL_FLOW_VERIFICATION_DIR
 const runtimeCandidates = [
   ...(process.env.MINIFLARE_RUNTIME_PATH ? [process.env.MINIFLARE_RUNTIME_PATH] : []),
   path.join(ROOT, 'node_modules/miniflare'),
+  path.join(ROOT, 'worker/node_modules/miniflare'),
+  path.join(ROOT, 'worker/node_modules/wrangler/node_modules/miniflare'),
   path.join(path.dirname(ROOT), 'PTP Tech/platform/node_modules/miniflare'),
   path.join(path.dirname(ROOT), 'sophia-ai-factory/node_modules/wrangler/node_modules/miniflare'),
+  path.join(homedir(), 'projects/PTP Tech/platform/node_modules/miniflare'),
+  path.join(homedir(), 'projects/algo-trader/node_modules/miniflare'),
 ];
 for (const parent of [ROOT, path.dirname(ROOT)]) {
   const store = path.join(parent, 'node_modules/.pnpm');
@@ -51,6 +55,7 @@ export async function createLocalRuntime() {
       if (pathname.startsWith('/__local_review/') && request.headers.get('x-local-review') === 'fixture-only') {
         try {
           const body = await request.json();
+          if (pathname.endsWith('/kv-delete')) { await env.AUTH_KV.delete(body.key); return Response.json({ok:true}); }
           if (pathname.endsWith('/kv')) { await env.AUTH_KV.put(body.key, body.value); return Response.json({ok:true}); }
           if (body.op === 'batch') return Response.json(await env.AURA_DB.batch(body.statements.map(sql => env.AURA_DB.prepare(sql))));
           const statement = env.AURA_DB.prepare(body.sql).bind(...(body.binds || []));
@@ -178,11 +183,17 @@ export async function createLocalRuntime() {
         return fixtureCall('db', { op: 'batch', statements });
       },
     };
-    const kv = { put: (key, value) => fixtureCall('kv', { key, value }) };
+    const kv = {
+      put: (key, value) => fixtureCall('kv', { key, value }),
+      delete: (key) => fixtureCall('kv-delete', { key }),
+    };
     await db.exec(await readFile(path.join(ROOT, 'worker/schema.sql'), 'utf8'));
     await db.prepare('INSERT INTO categories (id,name,slug) VALUES (?,?,?)').bind('review-category', 'Review Coffee', 'review-coffee').run();
     await db.prepare('INSERT INTO products (id,category_id,name,slug,price) VALUES (?,?,?,?,?)').bind('review-coffee', 'review-category', 'Cà phê kiểm thử local', 'review-coffee-product', 20000).run();
     await db.prepare('INSERT INTO menu_items (id,category,name,price,tags) VALUES (?,?,?,?,?)').bind('review-coffee', 'traditional-coffee', 'Cà phê kiểm thử local', 20000, '["Iced/Hot"]').run();
+    await db.prepare('INSERT INTO categories (id,name,slug,tenant_id) VALUES (?,?,?,?)').bind('review-category-a', 'Review Coffee Cafe A', 'review-coffee-a', 'cafe-a').run();
+    await db.prepare('INSERT INTO products (id,category_id,name,slug,price,tenant_id) VALUES (?,?,?,?,?,?)').bind('review-coffee-a', 'review-category-a', 'Cà phê kiểm thử cafe-a', 'review-coffee-product-a', 20000, 'cafe-a').run();
+    await db.prepare('INSERT INTO menu_items (id,category,name,price,tags,tenant_id) VALUES (?,?,?,?,?,?)').bind('review-coffee-a', 'traditional-coffee', 'Cà phê kiểm thử cafe-a', 20000, '["Iced/Hot"]', 'cafe-a').run();
     const menuSeedItems = [
       ['tc001', 'cat_trad_coffee', 'traditional-coffee', 'Cà phê sữa đá', 'ca-phe-sua-da', 20000, '["Iced/Hot"]'],
       ['tc007', 'cat_trad_coffee', 'traditional-coffee', 'Matcha latte đá', 'matcha-latte-da', 30000, '["Iced"]'],

@@ -1,6 +1,6 @@
 ---
-date: 2025-06-19
-version: 1.0
+date: 2026-11-17
+version: 2.3
 status: stable
 ---
 
@@ -10,29 +10,29 @@ status: stable
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                     Cloudflare Pages                        │
+│              Cloudflare Pages + Workers Edge                │
 │  ┌───────────────────────────────────────────────────────┐  │
-│  │  Static Assets (HTML, CSS, JS, images)               │  │
-│  │  Built by Vite → dist/                                │  │
+│  │  React 19 + TypeScript 6 + Tailwind 4 SPA / PWA       │  │
+│  │  Built by Vite 8 → dist/ + IndexedDB Offline Queue    │  │
 │  └───────────────────────────────────────────────────────┘  │
 │                              ↓                              │
 │  ┌───────────────────────────────────────────────────────┐  │
-│  │  Worker: _worker.js (Hono app)                       │  │
-│  │  - 27 route modules                                  │  │
-│  │  - 4 middleware                                      │  │
-│  │  - KV + D1 bindings                                  │  │
+│  │  Cloudflare Worker (Hono 4.12 + @hono/zod-openapi)    │  │
+│  │  - 19 DDD packages under packages/domain/*            │  │
+│  │  - Multi-tenant middleware + D1 session authority     │  │
+│  │  - SQLite Durable Object: OrderBroadcaster (SSE/WS)   │  │
 │  └───────────────────────────────────────────────────────┘  │
 │                              ↓                              │
 │  ┌───────────────────────────────────────────────────────┐  │
-│  │  D1 Database (SQLite)                                │  │
-│  │  - 11 tables                                         │  │
-│  │  - 5 migrations                                      │  │
+│  │  Cloudflare D1 (AURA_DB — SQLite Primary Authority)   │  │
+│  │  - 126 canonical tables & 160+ synced indexes         │  │
+│  │  - 3-way parity: worker/schema.sql = db/schema.sql    │  │
 │  └───────────────────────────────────────────────────────┘  │
 │                              ↓                              │
 │  ┌───────────────────────────────────────────────────────┐  │
-│  │  KV Namespace                                        │  │
-│  │  - Rate limit counters                               │  │
-│  │  - Session data                                      │  │
+│  │  Cloudflare KV (AUTH_KV — Cache & Rate-Limit Hints)   │  │
+│  │  - Rate limit counters & early-reject token cache     │  │
+│  │  - Never sole authority for OTP, money, or authZ      │  │
 │  └───────────────────────────────────────────────────────┘  │
 └─────────────────────────────────────────────────────────────┘
 
@@ -42,116 +42,48 @@ Database: AURA_DB (D1 SQLite)
 Cache: AUTH_KV (KV namespace)
 ```
 
-**Total endpoints:** ~45+ routes  
-**Total pages:** 35+ HTML pages  
-**Database tables:** 26 tables (includes loyalty, subscription, notification, integration, marketing tables)  
-**Frontend modules:** 25 JavaScript modules  
+**Total endpoints:** 90+ Hono & OpenAPI routes  
+**Total SPA routes:** 35+ lazy-loaded React 19 routes (`src/routes/*`)  
+**Database tables:** 126 canonical tables & 86 D1 migrations (`worker/schema.sql` = `db/schema.sql`)  
+**Domain packages:** 19 bounded-context packages (`packages/domain/*`)  
 
 ---
 
 ## Frontend Architecture
 
-### HTML Pages
+### React 19 SPA & PWA Route Groups (`src/routes/*`)
 
-**Core Customer Pages (11):**
-1. `index.html` — Homepage với water ripple animation (Bazi Chrome-Silver)
-2. `menu.html` — Menu display với categories & products
-3. `checkout.html` — Shopping cart & checkout flow
-4. `success.html` — Order success confirmation
-5. `failure.html` — Payment failure page
-6. `loyalty.html` — Loyalty program tiers & rewards
-7. `track-order.html` — Real-time order tracking
-8. `kds.html` — Kitchen Display System (real-time polling)
-9. `table-reservation.html` — Table booking form
-10. `about-us.html` — About page
-11. `contact.html` — Contact form
+**Public & Customer Routes (`src/routes/public-routes.tsx`):**
+1. `/` — Homepage (`src/pages/HomePage.tsx`)
+2. `/menu` — Menu catalog, modifiers & cart drawer (`src/pages/Menu.tsx`)
+3. `/checkout` — Order submission, promo validation & PayOS link creation (`src/pages/Checkout.tsx`)
+4. `/order-success` — Confirmation, guest capability token capture & SSE stream (`src/pages/order-success.tsx`)
+5. `/order-failure` — Payment retry / recovery (`src/pages/stitch/order-failure/index.tsx`)
+6. `/track-order` — Live SSE + fallback polling tracker (`src/pages/stitch/track-order/index.tsx`)
+7. `/loyalty` & `/account` — Tier progress, cashback wallet & automatic guest-to-customer order claiming (`src/pages/Account.tsx`)
+8. `/checkin` & `/table-order` — QR dine-in check-in & split-bill ordering (`src/pages/TableCheckin.tsx`, `src/pages/TableOrder.tsx`)
 
-**Additional Pages:**
-- `admin/*.html` — Admin dashboard (8+ pages)
-- `brand-guideline.html` — Design system showcase
-- `receipt-template.html` — Receipt printing template
-- `promotions.html` — Promotions landing page
-- `checkin.html` — Loyalty check-in page
+**Operations, KDS & Admin Routes (`src/routes/admin-routes.tsx`, `src/routes/kds-routes.tsx`, `src/routes/mobile-routes.tsx`):**
+- `/kds` — Multi-station Kitchen Display System (`TicketQueue`, `OrderTicket`, WebSocket `OrderBroadcaster` + fallback sync)
+- `/admin/pos` — Cashier POS with IndexedDB offline queue & MD3 quarantine banner (`src/pages/admin/POS.tsx`)
+- `/admin/*` — Analytics, menu/recipe BOM, inventory, CRM broadcasts, loyalty policy, shifts & ERPNext sync
 
-### JavaScript Modules (25)
+### Client State & Offline Stores (`src/hooks/*`, `src/lib/*`)
 
-**Core functionality:**
-- `main.js` — App initialization (200+ LOC)
-- `api-client.js` — Fetch wrapper with auth headers
-- `config.js` — App configuration (API base URL, constants)
-- `theme.js` — Light/dark auto-switch (06:00-18:00 local)
-
-**E-commerce flow:**
-- `cart.js` — Cart state management (localStorage sync)
-- `checkout.js` — Checkout flow (form validation, submission)
-- `track-order.js` — Real-time order status polling
-- `promo.js` — Promotion code application
-
-**Loyalty:**
-- `loyalty.js` — Tier display, points tracking
-- `signup-loyalty.js` — Registration with loyalty signup
-- `checkin.js` — Check-in QR code scanning
-
-**KDS & Admin:**
-- `kds-app.js` — Kitchen display rendering
-- `kds-poll.js` — Polling for new orders (3s interval)
-- `pos.js` — POS mode (fullscreen, quick actions)
-
-**UI/UX:**
-- `ui-animations.js` — Shared animation utilities
-- `premium-ui.js` — Glassmorphism components
-- `asian-wow.js` — "Wow" effect triggers
-- `hero-aura.js` — Hero section water ripple
-- `shared-nav.js` — Navigation bar component
-- `mobile-nav.js` — Mobile hamburger menu
-
-**Infra:**
-- `auth.js` — Auth state (JWT token storage, refresh)
-- `websocket-client.js` — WebSocket for real-time (planned)
-- `i18n.js` — Vietnamese/English strings
-- `utils.js` — General utilities (date format, currency)
-
-### CSS Design System
-
-**Bazi v5.1 Color Tokens** (`css/brand-tokens.css`):
-
-```css
-/* Thủy (Water) — Primary */
---md-sys-color-primary: #0A1A2E;      /* Deep Navy */
---md-sys-color-primary-container: #1A2A4E;  /* Ocean */
---md-sys-color-on-primary: #ffffff;
-
-/* Kim (Metal) — Accent */
---md-sys-color-secondary: #C9D6DF;    /* Chrome Silver */
---md-sys-color-secondary-container: #6B9FB8; /* Steel Blue */
---md-sys-color-tertiary: #3A6B80;     /* Steel */
-
-/* Mộc (Wood) — Balance */
---md-sys-color-tertiary-container: #1A2D1F;  /* Deep Forest */
---md-sys-color-surface: #2D5A3D;      /* Jade Green */
---md-sys-color-surface-variant: #A8C5A0; /* Moss */
-
-/* Neutrals */
---md-sys-color-background: #060a13;   /* Deep dark bg */
---md-sys-color-surface: #0d1117;      /* Card bg */
---md-sys-color-on-surface: #e8eaed;   /* Text */
-
-/* Banned (Fire/Earth) — MUST NOT USE */
-#FFD700, #D4AF37, #FF6B35, #FF1744, #8B4513, etc.
-```
-
-**Typography:**
-- Display/Heading: `'Quicksand', 'Be Vietnam Pro', sans-serif` → `--aura-font-display` (Google Fonts)
-- Body: `'Be Vietnam Pro', 'Quicksand', sans-serif` → `--aura-font-body` (Google Fonts)
-- Tech/Prices: `--aura-font-mono` (system monospace fallback)
+- `src/lib/client-session.ts` — Multi-tenant session snapshot isolation (`useClientSessionScope`, `subscribeSessionChange`)
+- `src/lib/guest-order-token.ts` — Session-scoped 192-bit guest `order_token` store (`sessionStorage` + memory fallback, URL query stripping, and post-login claim enumeration)
+- `src/hooks/stores/use-order-store.ts` & `src/hooks/use-order-observation.ts` — Order creation, SSE `EventSource` subscription, and IndexedDB offline flush (`quarantines` terminal `4xx` payloads via `offlineDb.markNeedsAttention`)
+- `public/sw.js` — Shell pre-cache (`aura-static-v5`), bypassing cache storage for `Authorization`, `X-Order-Token`, and URL capability tokens
 
 ---
 
 ## Backend Architecture
 
-### Framework: Hono v4.12.12
+### Framework: Hono v4.12 (`@hono/zod-openapi`)
 
-**Entry point:** `worker/src/index.js` (210 LOC)
+**Entry point:** `worker/src/index.ts`
+**D1 Primary Session Pinning:** `worker/src/lib/db.ts` wraps `AURA_DB` via `withPrimarySession('first-primary')` so read-after-write flows remain consistent under Cloudflare D1 Read Replication.
+**Realtime Coordination:** `worker/src/do/OrderBroadcaster.ts` shards Durable Object instances by `${tenantId}:${channelId}` (with `guest_token_hash` SHA-256 verification on guest channels) alongside `worker/src/routes/order-stream.ts` SSE (`(status, paymentStatus)` change deduplication).
 
 ### Middleware Stack (in order)
 
@@ -699,6 +631,8 @@ See `docs/pretix-setup-guide.md` for full bilingual deployment guide covering:
 
 **Foreign keys:** Enforced at application layer (D1/SQLite doesn't support FK constraints).
 
+**Read-after-write consistency:** Worker D1 helpers (`worker/src/lib/db.ts`) pin database handles via `db.withSession('first-primary')` when D1 Read Replication is available, falling back to the raw `D1Database` binding in local/test runtimes.
+
 ### Migrations
 
 `db/migrations/` (5 files):
@@ -786,6 +720,7 @@ GitHub Actions (expected in `.github/workflows/`):
 - **Owner:** Full access, can bootstrap, register staff, view all data
 - **Staff:** Can manage orders, tables, reservations, menu items
 - **Customer:** Self-service via public pages, limited to own data
+- **Guest orders:** Order creation returns a one-time 192-bit capability `order_token` stored client-side per session/tenant (`sessionStorage`) and hashed server-side as `orders.guest_token_hash = sha256(order_token)`. Full order reads, SSE status streams, payment/refund reads, PayOS link creation token checks, and guest promo redemptions verify `X-Order-Token` (or `?order_token=` on SSE) against `guest_token_hash`.
 
 ### Compliance
 
