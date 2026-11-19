@@ -26,6 +26,7 @@ export default defineConfig({
   resolve: {
     alias: {
       'worker': fileURLToPath(new URL('.', import.meta.url)),
+      '@/lib/guest-order-token': fileURLToPath(new URL('../src/lib/guest-order-token.ts', import.meta.url)),
       '@/lib/client-session': fileURLToPath(new URL('../src/lib/client-session.ts', import.meta.url)),
       '@/lib/api-client': fileURLToPath(new URL('../src/lib/api-client.ts', import.meta.url)),
       '@/lib/offline-db': fileURLToPath(new URL('../src/lib/offline-db.ts', import.meta.url)),
