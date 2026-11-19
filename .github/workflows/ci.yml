@@ -49,17 +49,6 @@ jobs:
     - name: Production Bundle Build
       run: npm run build
 
-    - name: Upload coverage reports
-      uses: codecov/codecov-action@ad42fb2c9b38c6a236622706f999c383431e7528 # v4.6.0
-      if: always()
-      continue-on-error: true
-      env:
-        CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
-      with:
-        files: ./coverage/coverage-final.json
-        flags: unittests
-        fail_ci_if_error: false
-
   e2e-smoke:
     needs: lint-and-test
     runs-on: ubuntu-24.04
