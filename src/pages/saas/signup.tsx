@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { apiFetch } from '@/lib/api-client';
 import { saveClientSession } from '@/lib/client-session';
+import { captureUtmFromSearch, type UtmAttribution } from '@/lib/utm';
 
 interface TemplateItem {
   id: string;
@@ -124,6 +125,7 @@ export default function SaasSignupPage(): ReactNode {
 
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [utm, setUtm] = useState<UtmAttribution | null>(null);
   const [createdStore, setCreatedStore] = useState<{
     slug: string;
     storefrontPath: string;
@@ -132,6 +134,8 @@ export default function SaasSignupPage(): ReactNode {
   } | null>(null);
 
   useEffect(() => {
+    setUtm(captureUtmFromSearch());
+
     void apiFetch<{ success: boolean; data?: { templates: TemplateItem[] } }>('/api/saas/templates', {
       silent: true,
     })
@@ -222,6 +226,7 @@ export default function SaasSignupPage(): ReactNode {
           ownerPhone,
           password,
           address,
+          ...(utm ? { attribution: utm } : {}),
         }),
       });
 
@@ -314,6 +319,16 @@ export default function SaasSignupPage(): ReactNode {
           <p className="text-slate-400 text-sm">
             Tiền bán nước về trực tiếp tài khoản ngân hàng / PayOS của quán bạn.
           </p>
+          {(utm?.utm_source || utm?.utm_campaign) && (
+            <div className="pt-1">
+              <span className="inline-flex max-w-full flex-wrap items-center justify-center gap-1.5 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-3 py-1 text-[11px] font-medium text-emerald-300">
+                <span>Nguồn chiến dịch:</span>
+                <span className="font-mono text-emerald-200 break-all">
+                  {[utm.utm_source, utm.utm_campaign].filter(Boolean).join(' · ')}
+                </span>
+              </span>
+            </div>
+          )}
         </div>
 
         {/* Stepper */}
