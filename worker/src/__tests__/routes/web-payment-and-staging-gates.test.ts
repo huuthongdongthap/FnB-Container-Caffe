@@ -732,11 +732,11 @@ exit 0
         required: true,
         blocking: true,
         activationStatus: 'active',
-        forwardCount: 59,
-        downCount: 17,
+        forwardCount: 60,
+        downCount: 18,
         missingDownCount: 42,
         safeReversibleCount: 0,
-        unsafeDownCount: 17,
+        unsafeDownCount: 18,
         fileCoverageComplete: false,
         safeReversibilityComplete: false,
         complete: false,
@@ -788,7 +788,7 @@ exit 0
       'Static rollback commands detected (pages=static_command_detected, worker=static_command_detected, d1=static_command_detected; evidence=static_script_inspection, runtimeVerified=false)'
     );
     expect(gate3.detail).toContain(
-      'Incomplete migration rollback readiness on selected target(s): 17/59 .down.sql files present (42 missing), 0/59 safely reversible without data-loss/schema-drift hazards (17 existing .down.sql flagged'
+      'Incomplete migration rollback readiness on selected target(s): 18/60 .down.sql files present (42 missing), 0/60 safely reversible without data-loss/schema-drift hazards (18 existing .down.sql flagged'
     );
   });
 });
@@ -806,8 +806,8 @@ describe('Priority 3: Migration Source of Truth, Multi-Directory Linting & Simul
     ]);
 
     const canonicalDir = lintMigrationsDirectory(resolve(REPO_ROOT, 'worker/db/migrations'));
-    expect(canonicalDir.forwardCount).toBe(59);
-    expect(canonicalDir.downCount).toBe(17);
+    expect(canonicalDir.forwardCount).toBe(60);
+    expect(canonicalDir.downCount).toBe(18);
     expect(canonicalDir.missingDownCount).toBe(42);
   });
 

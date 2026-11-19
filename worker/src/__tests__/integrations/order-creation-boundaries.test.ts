@@ -16,11 +16,12 @@ const fixture = (tenantId = 'cafe-a', id = 'staff-a') => {
   return value;
 };
 afterEach(() => { for (const { sqlite } of fixtures.splice(0)) sqlite.close(); });
-const payload = {
+const payloadFor = (productId = 'coffee') => ({
   customer_name: 'Local checkout', customer_phone: '0900000010', total: 1000,
   payment_method: 'payos', order_type: 'takeaway',
-  items: [{ product_id: 'coffee', name: 'Coffee', quantity: 1, price: 1000 }],
-};
+  items: [{ product_id: productId, name: 'Coffee', quantity: 1, price: 1000 }],
+});
+const payload = payloadFor('coffee');
 /**
  * Mints a signed staff token and guarantees its account row exists.
  *
@@ -60,7 +61,8 @@ describe('Order creation financial and tenant boundaries (real local SQLite)', (
   it.each(['/api/orders/guest-checkout', '/api/orders/checkout', '/mobile/orders'])('prices %s from the catalog', async path => {
     const { env, sqlite } = fixture();
     const auth = path.includes('guest-') ? undefined : await token('cafe-a', 'staff-a', sqlite);
-    const response = await send(env, path, { ...payload, fulfillment_type: 'TAKEAWAY',
+    const bodyPayload = path.includes('guest-') ? payload : payloadFor('coffee-a');
+    const response = await send(env, path, { ...bodyPayload, fulfillment_type: 'TAKEAWAY',
       ...(path === '/mobile/orders' ? { table_id: 'table-a' } : {}) }, auth);
     expect(response.status).toBe(201);
     const body = await response.json() as any;
@@ -72,7 +74,8 @@ describe('Order creation financial and tenant boundaries (real local SQLite)', (
   it('binds staff to signed cafe-a and guests to default despite body/header/query injection', async () => {
     const { env, sqlite } = fixture();
     for (const auth of [undefined, await token('cafe-a', 'staff-a', sqlite)]) {
-      const response = await send(env, '/api/orders?tenant_id=cafe-b', { ...payload, tenant_id: 'cafe-b' }, auth, { 'x-tenant-id': 'cafe-b' });
+      const bodyPayload = auth ? payloadFor('coffee-a') : payload;
+      const response = await send(env, '/api/orders?tenant_id=cafe-b', { ...bodyPayload, tenant_id: 'cafe-b' }, auth, { 'x-tenant-id': 'cafe-b' });
       expect(response.status).toBe(201);
       const { data } = await response.json() as any;
       expect(sqlite.prepare('SELECT tenant_id FROM orders WHERE id=?').get(data.id))
@@ -102,17 +105,19 @@ describe('Order creation financial and tenant boundaries (real local SQLite)', (
     const { env, sqlite } = fixture();
     const headers = { 'Idempotency-Key': 'same-offline-key' };
     const a = await token('cafe-a', 'staff-a', sqlite);
-    const first = await send(env, path, payload, a, headers);
-    const replay = await send(env, path, payload, a, headers);
-    const otherTenant = await send(env, path, payload, await token('cafe-b', 'staff-b', sqlite), headers);
-    const otherActor = await send(env, path, payload, await token('cafe-a', 'another-staff', sqlite), headers);
+    const payloadA = payloadFor('coffee-a');
+    const payloadB = payloadFor('coffee-b');
+    const first = await send(env, path, payloadA, a, headers);
+    const replay = await send(env, path, payloadA, a, headers);
+    const otherTenant = await send(env, path, payloadB, await token('cafe-b', 'staff-b', sqlite), headers);
+    const otherActor = await send(env, path, payloadA, await token('cafe-a', 'another-staff', sqlite), headers);
     expect(first.status).toBe(201);
     expect(replay.status).toBe(200);
     expect(replay.headers.get('X-Cache')).toBe('HIT');
     expect(otherTenant.status).toBe(201);
     expect(otherActor.status).toBe(201);
     expect(sqlite.prepare('SELECT COUNT(*) AS count FROM orders').get()).toMatchObject({ count: 3 });
-    const changed = await send(env, path, { ...payload, customer_name: 'different order' }, a, headers);
+    const changed = await send(env, path, { ...payloadA, customer_name: 'different order' }, a, headers);
     expect(changed.status).toBe(409);
   });
 

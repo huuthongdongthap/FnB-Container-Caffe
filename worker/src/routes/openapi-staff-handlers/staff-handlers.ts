@@ -1,5 +1,6 @@
 import type { OpenAPIHono } from '@hono/zod-openapi';
 import type { Env } from '../../types/env';
+import { assertTenantResourceLimit } from '../../lib/saas-entitlement';
 import { StaffRoutes } from '../../schemas/staff';
 import { getDatabase, matchesTenantRow } from '../../lib/db';
 import { hashPassword } from '../../lib/jwt';
@@ -387,6 +388,20 @@ export function registerStaffHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
     const staffTenant = tenantCheck.isHq
       ? (rawTenantId === '*' ? (cleanBodyTenant || 'default') : rawTenantId)
       : tenantCheck.callerTenant;
+
+    const staffLimitCheck = await assertTenantResourceLimit(db, staffTenant, 'staff');
+    if (!staffLimitCheck.allowed) {
+      return c.json(
+        {
+          success: false,
+          code: staffLimitCheck.code,
+          error: staffLimitCheck.message,
+          limit: staffLimitCheck.limit,
+          currentUsage: staffLimitCheck.currentUsage,
+        },
+        staffLimitCheck.status || 402
+      );
+    }
 
     // Check if email exists within the target tenant
     let existing: Record<string, unknown> | null = null;

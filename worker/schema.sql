@@ -9,6 +9,7 @@
 -- CATEGORIES TABLE
 -- =====================================================
 CREATE TABLE categories (
+    tenant_id TEXT NOT NULL DEFAULT 'default',
     id TEXT PRIMARY KEY,
     name TEXT NOT NULL,
     slug TEXT UNIQUE NOT NULL,
@@ -30,6 +31,7 @@ CREATE INDEX idx_categories_sort_order ON categories(sort_order);
 -- PRODUCTS TABLE (canonical Product master for POS/KDS/Inventory/ERPNext)
 -- =====================================================
 CREATE TABLE products (
+    tenant_id TEXT NOT NULL DEFAULT 'default',
     id TEXT PRIMARY KEY,
     category_id TEXT NOT NULL,
     name TEXT NOT NULL,
@@ -92,6 +94,7 @@ CREATE INDEX idx_cafe_tables_code_location ON cafe_tables(code, location_id);
 -- MENU_ITEMS TABLE
 -- =====================================================
 CREATE TABLE menu_items (
+    tenant_id TEXT NOT NULL DEFAULT 'default',
     id TEXT PRIMARY KEY,
     category TEXT NOT NULL,
     name TEXT NOT NULL,
@@ -277,6 +280,7 @@ END;
 -- ORDER_ITEMS TABLE (normalised line items for KDS)
 -- =====================================================
 CREATE TABLE order_items (
+    tenant_id TEXT NOT NULL DEFAULT 'default',
     id TEXT PRIMARY KEY,
     order_id TEXT NOT NULL,
     product_id TEXT NOT NULL,
@@ -340,6 +344,7 @@ CREATE TABLE contact_messages (
 -- REVIEWS TABLE
 -- =====================================================
 CREATE TABLE reviews (
+    tenant_id TEXT NOT NULL DEFAULT 'default',
     id TEXT PRIMARY KEY,
     order_id TEXT,
     customer_id TEXT,
@@ -401,6 +406,7 @@ CREATE TABLE IF NOT EXISTS cashback_transactions (
 
 -- Loyalty tier definitions
 CREATE TABLE IF NOT EXISTS loyalty_tiers (
+    tenant_id TEXT NOT NULL DEFAULT 'default',
     tier_name TEXT PRIMARY KEY,
     min_points INTEGER NOT NULL,
     cashback_rate REAL NOT NULL DEFAULT 0.02,
@@ -416,6 +422,7 @@ CREATE TABLE IF NOT EXISTS loyalty_tiers (
 
 -- Loyalty points transaction log
 CREATE TABLE IF NOT EXISTS loyalty_point_logs (
+    tenant_id TEXT NOT NULL DEFAULT 'default',
     id TEXT PRIMARY KEY,
     customer_id TEXT NOT NULL,
     order_id TEXT,
@@ -430,6 +437,7 @@ CREATE TABLE IF NOT EXISTS loyalty_point_logs (
 
 -- Reward catalog
 CREATE TABLE IF NOT EXISTS rewards (
+    tenant_id TEXT NOT NULL DEFAULT 'default',
     id TEXT PRIMARY KEY,
     title TEXT NOT NULL,
     description TEXT,
@@ -445,6 +453,7 @@ CREATE TABLE IF NOT EXISTS rewards (
 
 -- User's redeemed rewards
 CREATE TABLE IF NOT EXISTS user_rewards (
+    tenant_id TEXT NOT NULL DEFAULT 'default',
     id TEXT PRIMARY KEY,
     customer_id TEXT NOT NULL,
     reward_id TEXT NOT NULL,
@@ -814,6 +823,7 @@ CREATE TABLE resource_creation_requests (
 -- SUBSCRIPTION TABLES (Container Lease Billing)
 -- =====================================================
 CREATE TABLE IF NOT EXISTS subscription_plans (
+    tenant_id TEXT NOT NULL DEFAULT 'default',
   id TEXT PRIMARY KEY,
   name TEXT NOT NULL,
   slug TEXT UNIQUE NOT NULL,
@@ -830,6 +840,7 @@ CREATE TABLE IF NOT EXISTS subscription_plans (
   updated_at TEXT DEFAULT (datetime('now'))
 );
 CREATE TABLE IF NOT EXISTS subscriptions (
+    tenant_id TEXT NOT NULL DEFAULT 'default',
   id TEXT PRIMARY KEY,
   plan_id TEXT NOT NULL REFERENCES subscription_plans(id),
   customer_id TEXT,
@@ -854,6 +865,7 @@ CREATE TABLE IF NOT EXISTS subscriptions (
   updated_at TEXT DEFAULT (datetime('now'))
 );
 CREATE TABLE IF NOT EXISTS subscription_invoices (
+    tenant_id TEXT NOT NULL DEFAULT 'default',
   id TEXT PRIMARY KEY,
   subscription_id TEXT NOT NULL REFERENCES subscriptions(id),
   amount_vnd INTEGER NOT NULL,
@@ -883,6 +895,7 @@ CREATE TABLE IF NOT EXISTS mrr_snapshots (
   created_at TEXT DEFAULT (datetime('now'))
 );
 CREATE TABLE IF NOT EXISTS erpnext_sync_logs (
+    tenant_id TEXT NOT NULL DEFAULT 'default',
   id TEXT PRIMARY KEY,
   method TEXT NOT NULL DEFAULT 'POST',
   endpoint TEXT NOT NULL,
@@ -895,6 +908,7 @@ CREATE TABLE IF NOT EXISTS erpnext_sync_logs (
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 CREATE TABLE IF NOT EXISTS erpnext_mappings (
+    tenant_id TEXT NOT NULL DEFAULT 'default',
   id TEXT PRIMARY KEY,
   local_type TEXT NOT NULL,
   local_id TEXT NOT NULL,
@@ -906,6 +920,7 @@ CREATE TABLE IF NOT EXISTS erpnext_mappings (
   created_at TEXT DEFAULT (datetime('now'))
 );
 CREATE TABLE IF NOT EXISTS notification_audit_log (
+    tenant_id TEXT NOT NULL DEFAULT 'default',
   id TEXT PRIMARY KEY,
   order_id TEXT,
   customer_id TEXT,
@@ -974,6 +989,7 @@ CREATE INDEX IF NOT EXISTS idx_invoices_period ON subscription_invoices(period_s
 -- PUSH SUBSCRIPTIONS TABLE (Web Push API)
 -- =====================================================
 CREATE TABLE IF NOT EXISTS push_subscriptions (
+    tenant_id TEXT NOT NULL DEFAULT 'default',
   id TEXT PRIMARY KEY,
   customer_id TEXT,
   endpoint TEXT NOT NULL UNIQUE,
@@ -1036,6 +1052,7 @@ CREATE TABLE IF NOT EXISTS users (
 );
 
 CREATE TABLE IF NOT EXISTS staff_login_identities (
+    tenant_id TEXT NOT NULL DEFAULT 'default',
   email TEXT PRIMARY KEY,
   staff_id TEXT NOT NULL UNIQUE REFERENCES users(id)
 );
@@ -1047,6 +1064,7 @@ CREATE INDEX IF NOT EXISTS idx_users_tenant ON users(tenant_id);
 -- CAMPAIGN ENGINE — logs + per-trigger configs
 -- =====================================================
 CREATE TABLE IF NOT EXISTS campaign_configs (
+    tenant_id TEXT NOT NULL DEFAULT 'default',
   trigger TEXT PRIMARY KEY,
   is_active INTEGER NOT NULL DEFAULT 1,
   channels TEXT NOT NULL DEFAULT '["sms"]',  -- JSON array of channel slugs
@@ -1055,6 +1073,7 @@ CREATE TABLE IF NOT EXISTS campaign_configs (
 );
 
 CREATE TABLE IF NOT EXISTS campaign_logs (
+    tenant_id TEXT NOT NULL DEFAULT 'default',
   id TEXT PRIMARY KEY,
   customer_id TEXT NOT NULL,
   trigger TEXT NOT NULL,
@@ -1076,6 +1095,7 @@ CREATE INDEX IF NOT EXISTS idx_campaign_logs_trigger_type ON campaign_logs(custo
 -- Canonical hierarchy: modifier_groups -> modifier_choices -> product_modifier_groups
 -- =====================================================
 CREATE TABLE IF NOT EXISTS modifier_groups (
+    tenant_id TEXT NOT NULL DEFAULT 'default',
   id          TEXT PRIMARY KEY,
   name        TEXT NOT NULL,
   type        TEXT NOT NULL DEFAULT 'single',
@@ -1087,6 +1107,7 @@ CREATE TABLE IF NOT EXISTS modifier_groups (
 );
 
 CREATE TABLE IF NOT EXISTS modifier_choices (
+    tenant_id TEXT NOT NULL DEFAULT 'default',
   id           TEXT PRIMARY KEY,
   group_id     TEXT NOT NULL,
   name         TEXT NOT NULL,
@@ -1099,6 +1120,7 @@ CREATE TABLE IF NOT EXISTS modifier_choices (
 );
 
 CREATE TABLE IF NOT EXISTS product_modifier_groups (
+    tenant_id TEXT NOT NULL DEFAULT 'default',
   product_id  TEXT NOT NULL,
   group_id    TEXT NOT NULL,
   sort_order  INTEGER NOT NULL DEFAULT 0,
@@ -1127,6 +1149,7 @@ CREATE INDEX IF NOT EXISTS idx_pm_groups_prod_grp ON product_modifier_groups(pro
 --    canonical one and stays marked is_primary.
 -- ─────────────────────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS customer_identities (
+    tenant_id TEXT NOT NULL DEFAULT 'default',
   id TEXT PRIMARY KEY,
   customer_id TEXT NOT NULL,            -- FK customers.id
   identifier_type TEXT NOT NULL,        -- phone | email | zalo | other
@@ -1153,6 +1176,7 @@ CREATE INDEX IF NOT EXISTS idx_customer_identities_type_value
 --    check an active consent row before mutating state.
 -- ─────────────────────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS consents (
+    tenant_id TEXT NOT NULL DEFAULT 'default',
   id TEXT PRIMARY KEY,
   customer_id TEXT NOT NULL,            -- FK customers.id
   purpose TEXT NOT NULL,                -- crm | marketing | analytics | erpnext_sync
@@ -1176,6 +1200,7 @@ CREATE INDEX IF NOT EXISTS idx_consents_customer
 --    delete a row once written; corrections append a new compensating row.
 -- ─────────────────────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS customer_events (
+    tenant_id TEXT NOT NULL DEFAULT 'default',
   id TEXT PRIMARY KEY,
   customer_id TEXT NOT NULL,            -- FK customers.id (nullable only for anonymous)
   event_type TEXT NOT NULL,
@@ -1198,6 +1223,7 @@ CREATE INDEX IF NOT EXISTS idx_customer_events_type
 --    frequency/value queries (v2 §13 the 6 questions).
 -- ─────────────────────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS visits (
+    tenant_id TEXT NOT NULL DEFAULT 'default',
   id TEXT PRIMARY KEY,
   customer_id TEXT NOT NULL,            -- FK customers.id
   visited_at TEXT NOT NULL,             -- ISO arrival time
@@ -1232,6 +1258,7 @@ CREATE INDEX IF NOT EXISTS idx_client_errors_route ON client_errors(route);
 CREATE INDEX IF NOT EXISTS idx_client_errors_ts ON client_errors(ts);
 -- 1. Observability: _metrics
 CREATE TABLE IF NOT EXISTS _metrics (
+    tenant_id TEXT NOT NULL DEFAULT 'default',
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   name TEXT NOT NULL,
   value REAL NOT NULL DEFAULT 1,
@@ -1276,6 +1303,7 @@ CREATE INDEX IF NOT EXISTS idx_inventory_items_category ON inventory_items(categ
 
 -- 5. Domain Inventory: inventory_transactions
 CREATE TABLE IF NOT EXISTS inventory_transactions (
+    tenant_id TEXT NOT NULL DEFAULT 'default',
   id TEXT PRIMARY KEY,
   item_id TEXT NOT NULL,
   type TEXT NOT NULL CHECK(type IN ('in', 'out', 'adjust', 'waste', 'reserve', 'release')),
@@ -1291,6 +1319,7 @@ CREATE INDEX IF NOT EXISTS idx_inventory_transactions_created ON inventory_trans
 
 -- 6. Domain Inventory: inventory_snapshots
 CREATE TABLE IF NOT EXISTS inventory_snapshots (
+    tenant_id TEXT NOT NULL DEFAULT 'default',
   id TEXT PRIMARY KEY,
   item_id TEXT NOT NULL,
   date TEXT NOT NULL DEFAULT (date('now')),
@@ -1302,6 +1331,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_inventory_snapshots_item_date ON inventory
 
 -- 7. OpenAPI Inventory: ingredients
 CREATE TABLE IF NOT EXISTS ingredients (
+    tenant_id TEXT NOT NULL DEFAULT 'default',
   id TEXT PRIMARY KEY,
   name TEXT NOT NULL,
   sku TEXT UNIQUE NOT NULL,
@@ -1320,6 +1350,7 @@ CREATE INDEX IF NOT EXISTS idx_ingredients_category ON ingredients(category);
 
 -- 8. OpenAPI Inventory: stock_movements
 CREATE TABLE IF NOT EXISTS stock_movements (
+    tenant_id TEXT NOT NULL DEFAULT 'default',
   id TEXT PRIMARY KEY,
   ingredient_id TEXT NOT NULL,
   type TEXT NOT NULL,
@@ -1336,6 +1367,7 @@ CREATE INDEX IF NOT EXISTS idx_stock_movements_created ON stock_movements(create
 
 -- 9. OpenAPI Inventory: suppliers
 CREATE TABLE IF NOT EXISTS suppliers (
+    tenant_id TEXT NOT NULL DEFAULT 'default',
   id TEXT PRIMARY KEY,
   name TEXT NOT NULL,
   contact_person TEXT,
@@ -1352,6 +1384,7 @@ CREATE INDEX IF NOT EXISTS idx_suppliers_name ON suppliers(name);
 
 -- 10. OpenAPI Inventory: purchase_orders
 CREATE TABLE IF NOT EXISTS purchase_orders (
+    tenant_id TEXT NOT NULL DEFAULT 'default',
   id TEXT PRIMARY KEY,
   po_number TEXT UNIQUE NOT NULL,
   supplier_id TEXT NOT NULL,
@@ -1373,6 +1406,7 @@ CREATE INDEX IF NOT EXISTS idx_po_status ON purchase_orders(status);
 
 -- 11. OpenAPI Inventory: purchase_order_items
 CREATE TABLE IF NOT EXISTS purchase_order_items (
+    tenant_id TEXT NOT NULL DEFAULT 'default',
   id TEXT PRIMARY KEY,
   purchase_order_id TEXT NOT NULL,
   ingredient_id TEXT NOT NULL,
@@ -1387,6 +1421,7 @@ CREATE INDEX IF NOT EXISTS idx_po_items_po ON purchase_order_items(purchase_orde
 
 -- 12. Recipe / BOM & Waste
 CREATE TABLE IF NOT EXISTS recipes (
+    tenant_id TEXT NOT NULL DEFAULT 'default',
   id TEXT PRIMARY KEY,
   product_id TEXT NOT NULL,
   item_id TEXT,
@@ -1400,6 +1435,7 @@ CREATE TABLE IF NOT EXISTS recipes (
 CREATE INDEX IF NOT EXISTS idx_recipes_product ON recipes(product_id);
 
 CREATE TABLE IF NOT EXISTS recipe_items (
+    tenant_id TEXT NOT NULL DEFAULT 'default',
   id TEXT PRIMARY KEY,
   recipe_id TEXT NOT NULL,
   ingredient_id TEXT NOT NULL,
@@ -1440,6 +1476,7 @@ CREATE INDEX IF NOT EXISTS idx_payment_reconcile_due
 
 -- 14. OpenAPI Auth Sessions & Trusted Devices
 CREATE TABLE IF NOT EXISTS sessions (
+    tenant_id TEXT NOT NULL DEFAULT 'default',
   id TEXT PRIMARY KEY,
   user_id TEXT NOT NULL,
   token_hash TEXT NOT NULL DEFAULT '',
@@ -1463,6 +1500,7 @@ CREATE INDEX IF NOT EXISTS idx_sessions_access_token ON sessions(access_token);
 CREATE INDEX IF NOT EXISTS idx_sessions_refresh_token_value ON sessions(refresh_token);
 
 CREATE TABLE IF NOT EXISTS trusted_devices (
+    tenant_id TEXT NOT NULL DEFAULT 'default',
   id TEXT PRIMARY KEY,
   user_id TEXT NOT NULL,
   device_id TEXT,
@@ -1484,6 +1522,7 @@ CREATE INDEX IF NOT EXISTS idx_trusted_devices_user_fingerprint ON trusted_devic
 
 -- 15. OpenAPI Cron Jobs & Cron Runs
 CREATE TABLE IF NOT EXISTS cron_jobs (
+    tenant_id TEXT NOT NULL DEFAULT 'default',
   id TEXT PRIMARY KEY,
   name TEXT NOT NULL,
   description TEXT,
@@ -1509,6 +1548,7 @@ CREATE TABLE IF NOT EXISTS cron_jobs (
 CREATE INDEX IF NOT EXISTS idx_cron_jobs_active_status ON cron_jobs(is_active, status);
 
 CREATE TABLE IF NOT EXISTS cron_runs (
+    tenant_id TEXT NOT NULL DEFAULT 'default',
   id TEXT PRIMARY KEY,
   job_id TEXT NOT NULL,
   status TEXT NOT NULL DEFAULT 'running',
@@ -1526,12 +1566,14 @@ CREATE INDEX IF NOT EXISTS idx_cron_runs_job_started ON cron_runs(job_id, starte
 
 -- 16. DinDin Kiosk, Mautic Enrollments, Shift Reconciliations, Expenses & Webhook Logs
 CREATE TABLE IF NOT EXISTS dindin_config (
+    tenant_id TEXT NOT NULL DEFAULT 'default',
   id INTEGER PRIMARY KEY,
   config TEXT NOT NULL DEFAULT '{"menu":{"sections":[]},"settings":{}}',
   updated_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
 CREATE TABLE IF NOT EXISTS dindin_cart (
+    tenant_id TEXT NOT NULL DEFAULT 'default',
   session_id TEXT PRIMARY KEY,
   raw TEXT NOT NULL DEFAULT '{"items":[],"total":0}',
   cart TEXT,
@@ -1540,6 +1582,7 @@ CREATE TABLE IF NOT EXISTS dindin_cart (
 CREATE INDEX IF NOT EXISTS idx_dindin_cart_updated_at ON dindin_cart(updated_at);
 
 CREATE TABLE IF NOT EXISTS campaign_enrollments (
+    tenant_id TEXT NOT NULL DEFAULT 'default',
   id TEXT PRIMARY KEY,
   customer_id TEXT NOT NULL,
   campaign_type TEXT NOT NULL,
@@ -1553,6 +1596,7 @@ CREATE INDEX IF NOT EXISTS idx_campaign_enrollments_customer_type
   ON campaign_enrollments(customer_id, campaign_type, created_at);
 
 CREATE TABLE IF NOT EXISTS shift_reconciliations (
+    tenant_id TEXT NOT NULL DEFAULT 'default',
   id TEXT PRIMARY KEY,
   shift_id TEXT NOT NULL,
   staff_id TEXT NOT NULL DEFAULT '',
@@ -1581,6 +1625,7 @@ CREATE INDEX IF NOT EXISTS idx_shift_reconciliations_shift_id
   ON shift_reconciliations(shift_id, created_at);
 
 CREATE TABLE IF NOT EXISTS cash_payouts (
+    tenant_id TEXT NOT NULL DEFAULT 'default',
   id TEXT PRIMARY KEY,
   shift_id TEXT NOT NULL DEFAULT '',
   amount REAL NOT NULL DEFAULT 0,
@@ -1593,6 +1638,7 @@ CREATE INDEX IF NOT EXISTS idx_cash_payouts_shift_id
   ON cash_payouts(shift_id, status);
 
 CREATE TABLE IF NOT EXISTS expenses (
+    tenant_id TEXT NOT NULL DEFAULT 'default',
   id TEXT PRIMARY KEY,
   amount REAL NOT NULL DEFAULT 0,
   category TEXT NOT NULL,
@@ -1605,6 +1651,7 @@ CREATE TABLE IF NOT EXISTS expenses (
 CREATE INDEX IF NOT EXISTS idx_expenses_date ON expenses(date);
 
 CREATE TABLE IF NOT EXISTS pretix_webhook_log (
+    tenant_id TEXT NOT NULL DEFAULT 'default',
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   notification_id INTEGER,
   organizer TEXT NOT NULL DEFAULT '',
@@ -1659,6 +1706,7 @@ CREATE TABLE IF NOT EXISTS audit_logs (
 
 -- 18. Loyalty Accounts, Tier Configs, Redemptions, Recipe Ingredients, Forecasting, Payment Transactions & Auth Devices
 CREATE TABLE IF NOT EXISTS loyalty_accounts (
+    tenant_id TEXT NOT NULL DEFAULT 'default',
   id TEXT PRIMARY KEY,
   customer_id TEXT UNIQUE NOT NULL,
   current_points INTEGER NOT NULL DEFAULT 0,
@@ -1681,6 +1729,7 @@ CREATE INDEX IF NOT EXISTS idx_loyalty_accounts_customer
   ON loyalty_accounts(customer_id);
 
 CREATE TABLE IF NOT EXISTS tier_configs (
+    tenant_id TEXT NOT NULL DEFAULT 'default',
   tier TEXT PRIMARY KEY,
   tier_name TEXT,
   min_points INTEGER NOT NULL DEFAULT 0,
@@ -1702,6 +1751,7 @@ CREATE TABLE IF NOT EXISTS tier_configs (
 );
 
 CREATE TABLE IF NOT EXISTS loyalty_redemptions (
+    tenant_id TEXT NOT NULL DEFAULT 'default',
   id TEXT PRIMARY KEY,
   customer_id TEXT NOT NULL,
   reward_id TEXT NOT NULL,
@@ -1719,6 +1769,7 @@ CREATE INDEX IF NOT EXISTS idx_loyalty_redemptions_customer
   ON loyalty_redemptions(customer_id, created_at);
 
 CREATE TABLE IF NOT EXISTS recipe_ingredients (
+    tenant_id TEXT NOT NULL DEFAULT 'default',
   id TEXT PRIMARY KEY,
   recipe_id TEXT NOT NULL,
   product_id TEXT,
@@ -1752,6 +1803,7 @@ CREATE INDEX IF NOT EXISTS idx_inventory_forecast_snapshots_tenant
   ON inventory_forecast_snapshots(tenant_id, created_at);
 
 CREATE TABLE IF NOT EXISTS payment_transactions (
+    tenant_id TEXT NOT NULL DEFAULT 'default',
   id TEXT PRIMARY KEY,
   payment_id TEXT,
   order_id TEXT NOT NULL,
@@ -1794,6 +1846,7 @@ CREATE INDEX IF NOT EXISTS idx_email_verifications_token
   ON email_verifications(token, type);
 
 CREATE TABLE IF NOT EXISTS staff_devices (
+    tenant_id TEXT NOT NULL DEFAULT 'default',
   id TEXT PRIMARY KEY,
   staff_id TEXT NOT NULL,
   device_name TEXT,
@@ -1813,37 +1866,37 @@ CREATE INDEX IF NOT EXISTS idx_staff_devices_staff_id
 -- 19. Production D1 Canonical Parity Tables & Columns
 CREATE TABLE IF NOT EXISTS ai_barista_interactions ( id TEXT PRIMARY KEY, tenant_id TEXT NOT NULL DEFAULT 'default', customer_id TEXT, customer_phone TEXT, query_prompt TEXT, preferences_json TEXT, recommended_product_id TEXT NOT NULL, recommended_product_name TEXT NOT NULL, engine_used TEXT NOT NULL DEFAULT 'deterministic', feedback TEXT, created_at TEXT DEFAULT (datetime('now')) );
 CREATE TABLE IF NOT EXISTS ai_product_affinities ( id TEXT PRIMARY KEY, tenant_id TEXT NOT NULL DEFAULT 'default', item_a TEXT NOT NULL, item_b TEXT NOT NULL, co_occurrence_count INTEGER NOT NULL DEFAULT 1, affinity_score REAL NOT NULL DEFAULT 0.0, created_at TEXT DEFAULT (datetime('now')), updated_at TEXT DEFAULT (datetime('now')) );
-CREATE TABLE IF NOT EXISTS birthday_redemptions ( id TEXT PRIMARY KEY, customer_id TEXT NOT NULL, discount_percent INTEGER NOT NULL DEFAULT 15, order_id TEXT, redeemed_at TEXT NOT NULL DEFAULT (datetime('now')), FOREIGN KEY (customer_id) REFERENCES customers(id) );
-CREATE TABLE IF NOT EXISTS category_stations (category_id TEXT NOT NULL, station_id TEXT NOT NULL, PRIMARY KEY (category_id, station_id));
+CREATE TABLE IF NOT EXISTS birthday_redemptions ( tenant_id TEXT NOT NULL DEFAULT 'default',  id TEXT PRIMARY KEY, customer_id TEXT NOT NULL, discount_percent INTEGER NOT NULL DEFAULT 15, order_id TEXT, redeemed_at TEXT NOT NULL DEFAULT (datetime('now')), FOREIGN KEY (customer_id) REFERENCES customers(id) );
+CREATE TABLE IF NOT EXISTS category_stations ( tenant_id TEXT NOT NULL DEFAULT 'default', category_id TEXT NOT NULL, station_id TEXT NOT NULL, PRIMARY KEY (category_id, station_id));
 CREATE TABLE IF NOT EXISTS container_telemetry_logs ( id TEXT PRIMARY KEY, container_id TEXT NOT NULL, tenant_id TEXT NOT NULL DEFAULT 'default', power_source TEXT NOT NULL, battery_percentage REAL, ambient_temp_celsius REAL NOT NULL, kds_online INTEGER NOT NULL DEFAULT 1, network_ping_ms INTEGER DEFAULT 20, alert_status TEXT NOT NULL DEFAULT 'NORMAL', alert_message TEXT, created_at TEXT DEFAULT (datetime('now')) );
 CREATE TABLE IF NOT EXISTS customer_support_interactions ( id TEXT PRIMARY KEY, tenant_id TEXT NOT NULL DEFAULT 'default', channel TEXT NOT NULL DEFAULT 'web', customer_phone TEXT, user_query TEXT NOT NULL, detected_intent TEXT NOT NULL, bot_response TEXT NOT NULL, engine_used TEXT NOT NULL DEFAULT 'deterministic', created_at TEXT DEFAULT (datetime('now')) );
 CREATE TABLE IF NOT EXISTS dynamic_pricing_rules ( id TEXT PRIMARY KEY, tenant_id TEXT NOT NULL DEFAULT 'default', name TEXT NOT NULL, rule_type TEXT NOT NULL, discount_percent REAL NOT NULL, target_category TEXT, target_product_id TEXT, min_margin_percent REAL NOT NULL DEFAULT 30.0, days_of_week TEXT NOT NULL DEFAULT '1,2,3,4,5', start_time TEXT NOT NULL, end_time TEXT NOT NULL, is_active INTEGER NOT NULL DEFAULT 1, created_at TEXT DEFAULT (datetime('now')), updated_at TEXT DEFAULT (datetime('now')) );
-CREATE TABLE IF NOT EXISTS erpnext_product_sync (product_id TEXT PRIMARY KEY, erpnext_product_id INTEGER NOT NULL, last_synced_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, erpnext_write_date TEXT, cached_stock INTEGER, cached_price REAL, erpnext_item_code TEXT, erpnext_modified TEXT);
-CREATE TABLE IF NOT EXISTS erpnext_sync_log ( id TEXT PRIMARY KEY, method TEXT NOT NULL DEFAULT 'POST', endpoint TEXT NOT NULL, request_body TEXT, response_body TEXT, error TEXT, status TEXT NOT NULL DEFAULT 'pending', retry_count INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL DEFAULT (datetime('now')) );
-CREATE TABLE IF NOT EXISTS erpnext_sync_queue ( id INTEGER PRIMARY KEY AUTOINCREMENT, entity_type TEXT NOT NULL, entity_id TEXT NOT NULL, erpnext_id TEXT, action TEXT NOT NULL, payload TEXT NOT NULL, status TEXT DEFAULT 'pending', error_message TEXT, attempts INTEGER DEFAULT 0, next_retry_at TEXT, created_at TEXT DEFAULT (datetime('now')), updated_at TEXT DEFAULT (datetime('now')) );
-CREATE TABLE IF NOT EXISTS erpnext_webhook_log ( id INTEGER PRIMARY KEY AUTOINCREMENT, doctype TEXT NOT NULL, docname TEXT NOT NULL, action TEXT NOT NULL, payload TEXT, created_at TEXT DEFAULT (datetime('now')) );
+CREATE TABLE IF NOT EXISTS erpnext_product_sync ( tenant_id TEXT NOT NULL DEFAULT 'default', product_id TEXT PRIMARY KEY, erpnext_product_id INTEGER NOT NULL, last_synced_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, erpnext_write_date TEXT, cached_stock INTEGER, cached_price REAL, erpnext_item_code TEXT, erpnext_modified TEXT);
+CREATE TABLE IF NOT EXISTS erpnext_sync_log ( tenant_id TEXT NOT NULL DEFAULT 'default',  id TEXT PRIMARY KEY, method TEXT NOT NULL DEFAULT 'POST', endpoint TEXT NOT NULL, request_body TEXT, response_body TEXT, error TEXT, status TEXT NOT NULL DEFAULT 'pending', retry_count INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL DEFAULT (datetime('now')) );
+CREATE TABLE IF NOT EXISTS erpnext_sync_queue ( tenant_id TEXT NOT NULL DEFAULT 'default',  id INTEGER PRIMARY KEY AUTOINCREMENT, entity_type TEXT NOT NULL, entity_id TEXT NOT NULL, erpnext_id TEXT, action TEXT NOT NULL, payload TEXT NOT NULL, status TEXT DEFAULT 'pending', error_message TEXT, attempts INTEGER DEFAULT 0, next_retry_at TEXT, created_at TEXT DEFAULT (datetime('now')), updated_at TEXT DEFAULT (datetime('now')) );
+CREATE TABLE IF NOT EXISTS erpnext_webhook_log ( tenant_id TEXT NOT NULL DEFAULT 'default',  id INTEGER PRIMARY KEY AUTOINCREMENT, doctype TEXT NOT NULL, docname TEXT NOT NULL, action TEXT NOT NULL, payload TEXT, created_at TEXT DEFAULT (datetime('now')) );
 CREATE TABLE IF NOT EXISTS franchise_locations ( id TEXT PRIMARY KEY, tenant_id TEXT NOT NULL DEFAULT 'default', code TEXT UNIQUE NOT NULL, name TEXT NOT NULL, address TEXT, city TEXT DEFAULT 'Sa Đéc', phone TEXT, royalty_percentage REAL DEFAULT 5.0, status TEXT DEFAULT 'active', created_at TEXT DEFAULT (datetime('now')), updated_at TEXT DEFAULT (datetime('now')) );
-CREATE TABLE IF NOT EXISTS frigate_events ( id TEXT PRIMARY KEY, camera TEXT NOT NULL, label TEXT NOT NULL, start_time REAL NOT NULL, end_time REAL, score REAL, payload TEXT, received_at TEXT DEFAULT (datetime('now')) );
-CREATE TABLE IF NOT EXISTS ha_automation_log ( id INTEGER PRIMARY KEY AUTOINCREMENT, automation_id TEXT NOT NULL, trigger_entity TEXT, payload TEXT, result TEXT, executed_at TEXT DEFAULT (datetime('now')) );
+CREATE TABLE IF NOT EXISTS frigate_events ( tenant_id TEXT NOT NULL DEFAULT 'default',  id TEXT PRIMARY KEY, camera TEXT NOT NULL, label TEXT NOT NULL, start_time REAL NOT NULL, end_time REAL, score REAL, payload TEXT, received_at TEXT DEFAULT (datetime('now')) );
+CREATE TABLE IF NOT EXISTS ha_automation_log ( tenant_id TEXT NOT NULL DEFAULT 'default',  id INTEGER PRIMARY KEY AUTOINCREMENT, automation_id TEXT NOT NULL, trigger_entity TEXT, payload TEXT, result TEXT, executed_at TEXT DEFAULT (datetime('now')) );
 CREATE TABLE IF NOT EXISTS ha_device_states ( id INTEGER PRIMARY KEY AUTOINCREMENT, entity_id TEXT NOT NULL UNIQUE, state TEXT NOT NULL, attributes TEXT, tenant_id TEXT NOT NULL DEFAULT 'default', last_changed TEXT DEFAULT (datetime('now')), last_updated TEXT DEFAULT (datetime('now')) );
 CREATE TABLE IF NOT EXISTS happy_hour_windows (id TEXT PRIMARY KEY, name TEXT NOT NULL, day_of_week INTEGER NOT NULL, start_time TEXT NOT NULL, end_time TEXT NOT NULL, discount_rate REAL NOT NULL DEFAULT 0, apply_to TEXT NOT NULL DEFAULT 'all', apply_ids TEXT, priority INTEGER NOT NULL DEFAULT 0, active INTEGER NOT NULL DEFAULT 1, tenant_id TEXT NOT NULL DEFAULT 'default', created_at TEXT DEFAULT (datetime('now')), updated_at TEXT DEFAULT (datetime('now')));
 CREATE TABLE IF NOT EXISTS kds_stations (id TEXT PRIMARY KEY, name TEXT NOT NULL, categories TEXT NOT NULL DEFAULT '[]', is_active INTEGER DEFAULT 1, created_at TEXT DEFAULT (datetime('now')));
-CREATE TABLE IF NOT EXISTS kitchen_stations (id TEXT PRIMARY KEY, name TEXT NOT NULL, slug TEXT NOT NULL, sort_order INTEGER NOT NULL DEFAULT 0, active INTEGER NOT NULL DEFAULT 1, created_at TEXT DEFAULT (datetime('now')), updated_at TEXT DEFAULT (datetime('now')));
-CREATE TABLE IF NOT EXISTS loyalty_rewards ( id TEXT PRIMARY KEY, name TEXT NOT NULL, name_en TEXT, description TEXT, points_cost INTEGER NOT NULL DEFAULT 100, points_required INTEGER NOT NULL DEFAULT 100, type TEXT NOT NULL DEFAULT 'voucher', reward_type TEXT NOT NULL DEFAULT 'voucher', value REAL DEFAULT 0, reward_value TEXT DEFAULT '0', menu_item_id TEXT, min_tier TEXT DEFAULT 'bronze', max_redemptions INTEGER, stock INTEGER, current_redemptions INTEGER DEFAULT 0, redeemed_count INTEGER DEFAULT 0, valid_from TEXT, valid_to TEXT, valid_until TEXT, image_url TEXT, terms TEXT, is_active INTEGER NOT NULL DEFAULT 1, created_at TEXT DEFAULT (datetime('now')), updated_at TEXT DEFAULT (datetime('now')) );
-CREATE TABLE IF NOT EXISTS loyalty_tier_configs ( tier TEXT PRIMARY KEY, name TEXT NOT NULL, min_points INTEGER NOT NULL DEFAULT 0, max_points INTEGER, point_multiplier REAL NOT NULL DEFAULT 1.0, points_multiplier REAL NOT NULL DEFAULT 1.0, discount_percent REAL DEFAULT 0, birthday_bonus INTEGER DEFAULT 500, free_shipping INTEGER DEFAULT 0, priority_support INTEGER DEFAULT 0, benefits TEXT DEFAULT '[]', color TEXT, icon TEXT, updated_at TEXT DEFAULT (datetime('now')) );
-CREATE TABLE IF NOT EXISTS loyalty_transactions ( id TEXT PRIMARY KEY, account_id TEXT, customer_id TEXT, type TEXT NOT NULL, points INTEGER NOT NULL DEFAULT 0, balance_after INTEGER NOT NULL DEFAULT 0, order_id TEXT, reward_id TEXT, description TEXT, reason TEXT, idempotency_key TEXT, created_by TEXT, created_at TEXT DEFAULT (datetime('now')) );
-CREATE TABLE IF NOT EXISTS menu_modifiers (id TEXT PRIMARY KEY, group_id TEXT NOT NULL, option_name TEXT NOT NULL, price_delta INTEGER NOT NULL DEFAULT 0, available INTEGER NOT NULL DEFAULT 1, updated_at TEXT DEFAULT (datetime('now')));
-CREATE TABLE IF NOT EXISTS mixpost_posts ( id INTEGER PRIMARY KEY AUTOINCREMENT, content TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'draft', platforms TEXT DEFAULT '[]', media_urls TEXT DEFAULT '[]', source TEXT DEFAULT 'manual', scheduled_at TEXT, published_at TEXT, created_at TEXT DEFAULT (datetime('now')) );
-CREATE TABLE IF NOT EXISTS mixpost_templates ( id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, content_template TEXT NOT NULL, accounts TEXT DEFAULT '[]', schedule_cron TEXT NOT NULL DEFAULT '* *', is_active INTEGER NOT NULL DEFAULT 1, created_at TEXT DEFAULT (datetime('now')) );
-CREATE TABLE IF NOT EXISTS notifications ( id TEXT PRIMARY KEY, user_id TEXT NOT NULL, type TEXT DEFAULT 'info', title_vi TEXT NOT NULL, title_en TEXT NOT NULL, body_vi TEXT, body_en TEXT, data TEXT DEFAULT '{}', read_at TEXT, created_at TEXT DEFAULT (datetime('now')) );
+CREATE TABLE IF NOT EXISTS kitchen_stations ( tenant_id TEXT NOT NULL DEFAULT 'default', id TEXT PRIMARY KEY, name TEXT NOT NULL, slug TEXT NOT NULL, sort_order INTEGER NOT NULL DEFAULT 0, active INTEGER NOT NULL DEFAULT 1, created_at TEXT DEFAULT (datetime('now')), updated_at TEXT DEFAULT (datetime('now')));
+CREATE TABLE IF NOT EXISTS loyalty_rewards ( tenant_id TEXT NOT NULL DEFAULT 'default',  id TEXT PRIMARY KEY, name TEXT NOT NULL, name_en TEXT, description TEXT, points_cost INTEGER NOT NULL DEFAULT 100, points_required INTEGER NOT NULL DEFAULT 100, type TEXT NOT NULL DEFAULT 'voucher', reward_type TEXT NOT NULL DEFAULT 'voucher', value REAL DEFAULT 0, reward_value TEXT DEFAULT '0', menu_item_id TEXT, min_tier TEXT DEFAULT 'bronze', max_redemptions INTEGER, stock INTEGER, current_redemptions INTEGER DEFAULT 0, redeemed_count INTEGER DEFAULT 0, valid_from TEXT, valid_to TEXT, valid_until TEXT, image_url TEXT, terms TEXT, is_active INTEGER NOT NULL DEFAULT 1, created_at TEXT DEFAULT (datetime('now')), updated_at TEXT DEFAULT (datetime('now')) );
+CREATE TABLE IF NOT EXISTS loyalty_tier_configs ( tenant_id TEXT NOT NULL DEFAULT 'default',  tier TEXT PRIMARY KEY, name TEXT NOT NULL, min_points INTEGER NOT NULL DEFAULT 0, max_points INTEGER, point_multiplier REAL NOT NULL DEFAULT 1.0, points_multiplier REAL NOT NULL DEFAULT 1.0, discount_percent REAL DEFAULT 0, birthday_bonus INTEGER DEFAULT 500, free_shipping INTEGER DEFAULT 0, priority_support INTEGER DEFAULT 0, benefits TEXT DEFAULT '[]', color TEXT, icon TEXT, updated_at TEXT DEFAULT (datetime('now')) );
+CREATE TABLE IF NOT EXISTS loyalty_transactions ( tenant_id TEXT NOT NULL DEFAULT 'default',  id TEXT PRIMARY KEY, account_id TEXT, customer_id TEXT, type TEXT NOT NULL, points INTEGER NOT NULL DEFAULT 0, balance_after INTEGER NOT NULL DEFAULT 0, order_id TEXT, reward_id TEXT, description TEXT, reason TEXT, idempotency_key TEXT, created_by TEXT, created_at TEXT DEFAULT (datetime('now')) );
+CREATE TABLE IF NOT EXISTS menu_modifiers ( tenant_id TEXT NOT NULL DEFAULT 'default', id TEXT PRIMARY KEY, group_id TEXT NOT NULL, option_name TEXT NOT NULL, price_delta INTEGER NOT NULL DEFAULT 0, available INTEGER NOT NULL DEFAULT 1, updated_at TEXT DEFAULT (datetime('now')));
+CREATE TABLE IF NOT EXISTS mixpost_posts ( tenant_id TEXT NOT NULL DEFAULT 'default',  id INTEGER PRIMARY KEY AUTOINCREMENT, content TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'draft', platforms TEXT DEFAULT '[]', media_urls TEXT DEFAULT '[]', source TEXT DEFAULT 'manual', scheduled_at TEXT, published_at TEXT, created_at TEXT DEFAULT (datetime('now')) );
+CREATE TABLE IF NOT EXISTS mixpost_templates ( tenant_id TEXT NOT NULL DEFAULT 'default',  id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, content_template TEXT NOT NULL, accounts TEXT DEFAULT '[]', schedule_cron TEXT NOT NULL DEFAULT '* *', is_active INTEGER NOT NULL DEFAULT 1, created_at TEXT DEFAULT (datetime('now')) );
+CREATE TABLE IF NOT EXISTS notifications ( tenant_id TEXT NOT NULL DEFAULT 'default',  id TEXT PRIMARY KEY, user_id TEXT NOT NULL, type TEXT DEFAULT 'info', title_vi TEXT NOT NULL, title_en TEXT NOT NULL, body_vi TEXT, body_en TEXT, data TEXT DEFAULT '{}', read_at TEXT, created_at TEXT DEFAULT (datetime('now')) );
 CREATE TABLE IF NOT EXISTS order_item_stations (order_item_id TEXT NOT NULL, station_id TEXT NOT NULL, started_at TEXT, ready_at TEXT, PRIMARY KEY (order_item_id, station_id));
 CREATE TABLE IF NOT EXISTS saas_pricing ( id TEXT PRIMARY KEY, slug TEXT NOT NULL UNIQUE, name_vi TEXT NOT NULL, name_en TEXT NOT NULL, description_vi TEXT, description_en TEXT, price_vnd INTEGER NOT NULL, price_usd REAL, currency TEXT NOT NULL DEFAULT 'VND', billing_period TEXT NOT NULL DEFAULT 'monthly', sort_order INTEGER NOT NULL DEFAULT 0, is_recommended INTEGER NOT NULL DEFAULT 0, features_vi TEXT NOT NULL DEFAULT '[]', features_en TEXT NOT NULL DEFAULT '[]', cta_text_vi TEXT NOT NULL DEFAULT 'Bắt đầu', cta_text_en TEXT NOT NULL DEFAULT 'Get Started', cta_link TEXT NOT NULL DEFAULT '/register', active INTEGER NOT NULL DEFAULT 1, created_at TEXT DEFAULT (datetime('now')), updated_at TEXT DEFAULT (datetime('now')) );
-CREATE TABLE IF NOT EXISTS saas_tenants ( id TEXT PRIMARY KEY, slug TEXT UNIQUE NOT NULL, name TEXT, tier TEXT NOT NULL DEFAULT 'BASIC', status TEXT NOT NULL DEFAULT 'trial', owner_user_id TEXT, trial_ends_at TEXT, current_period_end TEXT, created_at TEXT DEFAULT (datetime('now')), updated_at TEXT DEFAULT (datetime('now')) );
-CREATE TABLE IF NOT EXISTS table_qr_codes ( id INTEGER PRIMARY KEY AUTOINCREMENT, table_id INTEGER NOT NULL UNIQUE, slug TEXT NOT NULL UNIQUE, created_at TEXT DEFAULT (datetime('now')), updated_at TEXT DEFAULT (datetime('now')) );
-CREATE TABLE IF NOT EXISTS table_sessions (id TEXT PRIMARY KEY, table_id TEXT NOT NULL, customer_id TEXT, customer_name TEXT, customer_phone TEXT, status TEXT NOT NULL DEFAULT 'active', opened_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, closed_at DATETIME, order_count INTEGER NOT NULL DEFAULT 0, total_amount INTEGER NOT NULL DEFAULT 0, notes TEXT, created_at DATETIME DEFAULT CURRENT_TIMESTAMP, updated_at DATETIME DEFAULT CURRENT_TIMESTAMP, order_id TEXT, current_order_id TEXT, started_at TEXT, ended_at TEXT);
-CREATE TABLE IF NOT EXISTS ti_menu_cache ( id TEXT PRIMARY KEY, name TEXT NOT NULL, sku TEXT, price REAL DEFAULT 0, active INTEGER DEFAULT 1, cached_at TEXT DEFAULT (datetime('now')) );
+CREATE TABLE IF NOT EXISTS saas_tenants ( template_id TEXT, subdomain TEXT, owner_email TEXT, owner_name TEXT, owner_phone TEXT, config_json TEXT DEFAULT '{}',  id TEXT PRIMARY KEY, slug TEXT UNIQUE NOT NULL, name TEXT, tier TEXT NOT NULL DEFAULT 'BASIC', status TEXT NOT NULL DEFAULT 'trial', owner_user_id TEXT, trial_ends_at TEXT, current_period_end TEXT, created_at TEXT DEFAULT (datetime('now')), updated_at TEXT DEFAULT (datetime('now')) );
+CREATE TABLE IF NOT EXISTS table_qr_codes ( tenant_id TEXT NOT NULL DEFAULT 'default',  id INTEGER PRIMARY KEY AUTOINCREMENT, table_id INTEGER NOT NULL UNIQUE, slug TEXT NOT NULL UNIQUE, created_at TEXT DEFAULT (datetime('now')), updated_at TEXT DEFAULT (datetime('now')) );
+CREATE TABLE IF NOT EXISTS table_sessions ( tenant_id TEXT NOT NULL DEFAULT 'default', id TEXT PRIMARY KEY, table_id TEXT NOT NULL, customer_id TEXT, customer_name TEXT, customer_phone TEXT, status TEXT NOT NULL DEFAULT 'active', opened_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, closed_at DATETIME, order_count INTEGER NOT NULL DEFAULT 0, total_amount INTEGER NOT NULL DEFAULT 0, notes TEXT, created_at DATETIME DEFAULT CURRENT_TIMESTAMP, updated_at DATETIME DEFAULT CURRENT_TIMESTAMP, order_id TEXT, current_order_id TEXT, started_at TEXT, ended_at TEXT);
+CREATE TABLE IF NOT EXISTS ti_menu_cache ( tenant_id TEXT NOT NULL DEFAULT 'default',  id TEXT PRIMARY KEY, name TEXT NOT NULL, sku TEXT, price REAL DEFAULT 0, active INTEGER DEFAULT 1, cached_at TEXT DEFAULT (datetime('now')) );
 CREATE TABLE IF NOT EXISTS ti_order_bridge ( id TEXT PRIMARY KEY, local_order_id TEXT NOT NULL, ti_order_id TEXT, status TEXT NOT NULL, error TEXT, synced_at TEXT, tenant_id TEXT NOT NULL DEFAULT 'default', created_at TEXT DEFAULT (datetime('now')) );
-CREATE TABLE IF NOT EXISTS wifi_sessions ( id TEXT PRIMARY KEY, client_mac TEXT NOT NULL, ip_address TEXT, phone TEXT, customer_id TEXT, status TEXT NOT NULL, session_timeout INTEGER DEFAULT 3600, authorized_at TEXT DEFAULT (datetime('now')), expires_at TEXT NOT NULL, created_at TEXT DEFAULT (datetime('now')) );
+CREATE TABLE IF NOT EXISTS wifi_sessions ( tenant_id TEXT NOT NULL DEFAULT 'default',  id TEXT PRIMARY KEY, client_mac TEXT NOT NULL, ip_address TEXT, phone TEXT, customer_id TEXT, status TEXT NOT NULL, session_timeout INTEGER DEFAULT 3600, authorized_at TEXT DEFAULT (datetime('now')), expires_at TEXT NOT NULL, created_at TEXT DEFAULT (datetime('now')) );
 ALTER TABLE _alerts ADD COLUMN value REAL;
 ALTER TABLE _alerts ADD COLUMN threshold REAL;
 ALTER TABLE _alerts ADD COLUMN resolved_at TEXT;
@@ -1984,3 +2037,216 @@ ALTER TABLE users ADD COLUMN full_name TEXT;
 ALTER TABLE users ADD COLUMN password_changed_at TEXT;
 ALTER TABLE users ADD COLUMN tier TEXT DEFAULT 'Member';
 ALTER TABLE users ADD COLUMN total_points INTEGER DEFAULT 0;
+
+-- =====================================================
+-- SAAS COMMERCIAL V3 TABLES & TENANT_ID INDEXES
+-- =====================================================
+CREATE UNIQUE INDEX IF NOT EXISTS idx_saas_tenants_subdomain ON saas_tenants(subdomain) WHERE subdomain IS NOT NULL;
+-- 3. Tenant Subscriptions (SaaS platform billing, separate from legacy container rentals)
+-- -----------------------------------------------------
+CREATE TABLE IF NOT EXISTS tenant_subscriptions (
+    id TEXT PRIMARY KEY,
+    tenant_id TEXT NOT NULL UNIQUE,
+    tier TEXT NOT NULL DEFAULT 'starter',
+    billing_cycle TEXT NOT NULL DEFAULT 'monthly',
+    status TEXT NOT NULL DEFAULT 'trial',
+    trial_ends_at TEXT,
+    grace_ends_at TEXT,
+    current_period_start TEXT,
+    current_period_end TEXT,
+    price_vnd INTEGER NOT NULL DEFAULT 199000,
+    cancel_at_period_end INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT DEFAULT (datetime('now')),
+    updated_at TEXT DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_tenant_subscriptions_tenant_id ON tenant_subscriptions(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_tenant_subscriptions_status ON tenant_subscriptions(status);
+
+-- -----------------------------------------------------
+-- 4. Tenant Branding (storefront, QR, KDS, thermal receipts)
+-- -----------------------------------------------------
+CREATE TABLE IF NOT EXISTS tenant_branding (
+    tenant_id TEXT PRIMARY KEY,
+    display_name TEXT NOT NULL,
+    tagline TEXT DEFAULT '',
+    logo_url TEXT DEFAULT '',
+    primary_color TEXT NOT NULL DEFAULT '#1F2937',
+    accent_color TEXT NOT NULL DEFAULT '#D97706',
+    address TEXT DEFAULT '',
+    phone TEXT DEFAULT '',
+    wifi_ssid TEXT DEFAULT '',
+    wifi_password TEXT DEFAULT '',
+    receipt_footer TEXT DEFAULT 'Cảm ơn quý khách đã ghé thăm!',
+    template_id TEXT DEFAULT 'traditional-cafe',
+    created_at TEXT DEFAULT (datetime('now')),
+    updated_at TEXT DEFAULT (datetime('now'))
+);
+
+-- -----------------------------------------------------
+-- 5. Tenant Domains (verified custom domains and subdomains)
+-- -----------------------------------------------------
+CREATE TABLE IF NOT EXISTS tenant_domains (
+    id TEXT PRIMARY KEY,
+    tenant_id TEXT NOT NULL,
+    domain TEXT NOT NULL UNIQUE,
+    domain_type TEXT NOT NULL DEFAULT 'custom',
+    verification_token TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'pending',
+    verified_at TEXT,
+    created_at TEXT DEFAULT (datetime('now')),
+    updated_at TEXT DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_tenant_domains_tenant_id ON tenant_domains(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_tenant_domains_status ON tenant_domains(status);
+
+-- -----------------------------------------------------
+-- 6. Tenant Payment Configs (merchant PayOS AES-256-GCM encrypted or VietQR)
+-- -----------------------------------------------------
+CREATE TABLE IF NOT EXISTS tenant_payment_configs (
+    tenant_id TEXT PRIMARY KEY,
+    provider TEXT NOT NULL DEFAULT 'vietqr',
+    payos_client_id_enc TEXT,
+    payos_api_key_enc TEXT,
+    payos_checksum_key_enc TEXT,
+    key_version INTEGER NOT NULL DEFAULT 1,
+    bank_bin TEXT,
+    bank_account_no TEXT,
+    bank_account_name TEXT,
+    bank_name TEXT,
+    is_active INTEGER NOT NULL DEFAULT 1,
+    updated_by TEXT,
+    created_at TEXT DEFAULT (datetime('now')),
+    updated_at TEXT DEFAULT (datetime('now'))
+);
+
+-- -----------------------------------------------------
+-- 7. Platform SaaS Billing Invoices & Ledger (separate from merchant beverage payments)
+-- -----------------------------------------------------
+CREATE TABLE IF NOT EXISTS tenant_invoices (
+    id TEXT PRIMARY KEY,
+    tenant_id TEXT NOT NULL,
+    tier TEXT NOT NULL DEFAULT 'pro',
+    billing_cycle TEXT NOT NULL DEFAULT 'monthly',
+    amount_vnd INTEGER NOT NULL,
+    status TEXT NOT NULL DEFAULT 'pending',
+    payos_order_code TEXT UNIQUE,
+    checkout_url TEXT,
+    paid_at TEXT,
+    created_at TEXT DEFAULT (datetime('now')),
+    updated_at TEXT DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_tenant_invoices_tenant_id ON tenant_invoices(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_tenant_invoices_status ON tenant_invoices(status);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_tenant_invoices_payos_order_code ON tenant_invoices(payos_order_code);
+
+CREATE TABLE IF NOT EXISTS saas_billing_transactions (
+    id TEXT PRIMARY KEY,
+    tenant_id TEXT NOT NULL,
+    subscription_id TEXT,
+    plan_id TEXT NOT NULL,
+    billing_cycle TEXT NOT NULL DEFAULT 'monthly',
+    amount_vnd INTEGER NOT NULL,
+    order_code INTEGER NOT NULL UNIQUE,
+    provider TEXT NOT NULL DEFAULT 'payos',
+    provider_txn_id TEXT,
+    status TEXT NOT NULL DEFAULT 'pending',
+    checkout_url TEXT,
+    raw_webhook_hash TEXT,
+    paid_at TEXT,
+    created_at TEXT DEFAULT (datetime('now')),
+    updated_at TEXT DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_saas_billing_txn_tenant ON saas_billing_transactions(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_saas_billing_txn_status ON saas_billing_transactions(status);
+
+-- -----------------------------------------------------
+-- 8. Platform SaaS Audit Logs (HQ lifecycle actions & tenant changes)
+-- -----------------------------------------------------
+CREATE TABLE IF NOT EXISTS saas_audit_logs (
+    id TEXT PRIMARY KEY,
+    tenant_id TEXT NOT NULL,
+    actor_user_id TEXT,
+    actor_role TEXT,
+    action TEXT NOT NULL,
+    before_json TEXT,
+    after_json TEXT,
+    reason TEXT,
+    created_at TEXT DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_saas_audit_logs_tenant ON saas_audit_logs(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_saas_audit_logs_created ON saas_audit_logs(created_at);
+
+
+CREATE INDEX IF NOT EXISTS idx__metrics_tenant_id ON _metrics(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_birthday_redemptions_tenant_id ON birthday_redemptions(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_campaign_configs_tenant_id ON campaign_configs(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_campaign_enrollments_tenant_id ON campaign_enrollments(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_campaign_logs_tenant_id ON campaign_logs(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_cash_payouts_tenant_id ON cash_payouts(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_categories_tenant_id ON categories(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_category_stations_tenant_id ON category_stations(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_consents_tenant_id ON consents(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_cron_jobs_tenant_id ON cron_jobs(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_cron_runs_tenant_id ON cron_runs(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_customer_events_tenant_id ON customer_events(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_customer_identities_tenant_id ON customer_identities(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_dindin_cart_tenant_id ON dindin_cart(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_dindin_config_tenant_id ON dindin_config(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_erpnext_mappings_tenant_id ON erpnext_mappings(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_erpnext_product_sync_tenant_id ON erpnext_product_sync(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_erpnext_sync_log_tenant_id ON erpnext_sync_log(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_erpnext_sync_logs_tenant_id ON erpnext_sync_logs(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_erpnext_sync_queue_tenant_id ON erpnext_sync_queue(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_erpnext_webhook_log_tenant_id ON erpnext_webhook_log(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_expenses_tenant_id ON expenses(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_frigate_events_tenant_id ON frigate_events(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_ha_automation_log_tenant_id ON ha_automation_log(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_ingredients_tenant_id ON ingredients(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_inventory_snapshots_tenant_id ON inventory_snapshots(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_inventory_transactions_tenant_id ON inventory_transactions(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_kitchen_stations_tenant_id ON kitchen_stations(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_loyalty_accounts_tenant_id ON loyalty_accounts(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_loyalty_point_logs_tenant_id ON loyalty_point_logs(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_loyalty_redemptions_tenant_id ON loyalty_redemptions(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_loyalty_rewards_tenant_id ON loyalty_rewards(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_loyalty_tier_configs_tenant_id ON loyalty_tier_configs(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_loyalty_tiers_tenant_id ON loyalty_tiers(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_loyalty_transactions_tenant_id ON loyalty_transactions(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_menu_items_tenant_id ON menu_items(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_menu_modifiers_tenant_id ON menu_modifiers(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_mixpost_posts_tenant_id ON mixpost_posts(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_mixpost_templates_tenant_id ON mixpost_templates(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_modifier_choices_tenant_id ON modifier_choices(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_modifier_groups_tenant_id ON modifier_groups(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_notification_audit_log_tenant_id ON notification_audit_log(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_notifications_tenant_id ON notifications(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_order_items_tenant_id ON order_items(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_payment_transactions_tenant_id ON payment_transactions(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_pretix_webhook_log_tenant_id ON pretix_webhook_log(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_product_modifier_groups_tenant_id ON product_modifier_groups(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_products_tenant_id ON products(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_purchase_order_items_tenant_id ON purchase_order_items(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_purchase_orders_tenant_id ON purchase_orders(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_push_subscriptions_tenant_id ON push_subscriptions(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_recipe_ingredients_tenant_id ON recipe_ingredients(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_recipe_items_tenant_id ON recipe_items(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_recipes_tenant_id ON recipes(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_reviews_tenant_id ON reviews(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_rewards_tenant_id ON rewards(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_sessions_tenant_id ON sessions(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_shift_reconciliations_tenant_id ON shift_reconciliations(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_staff_devices_tenant_id ON staff_devices(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_staff_login_identities_tenant_id ON staff_login_identities(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_stock_movements_tenant_id ON stock_movements(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_subscription_invoices_tenant_id ON subscription_invoices(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_subscription_plans_tenant_id ON subscription_plans(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_subscriptions_tenant_id ON subscriptions(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_suppliers_tenant_id ON suppliers(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_table_qr_codes_tenant_id ON table_qr_codes(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_table_sessions_tenant_id ON table_sessions(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_ti_menu_cache_tenant_id ON ti_menu_cache(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_tier_configs_tenant_id ON tier_configs(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_trusted_devices_tenant_id ON trusted_devices(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_user_rewards_tenant_id ON user_rewards(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_visits_tenant_id ON visits(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_wifi_sessions_tenant_id ON wifi_sessions(tenant_id);

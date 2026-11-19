@@ -1,5 +1,6 @@
 import type { OpenAPIHono } from '@hono/zod-openapi';
 import type { Env } from '../../types/env';
+import { assertTenantResourceLimit } from '../../lib/saas-entitlement';
 import { TableRoutes } from '../../schemas/tables';
 import { formatTable, isAllowedLocationForTenant, resolveOpenApiTablesTenant, writeTableAuditLog } from './helpers';
 import { getDatabase } from '../../lib/db';
@@ -426,6 +427,19 @@ export function registerTableCrudHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
     const user = c.get('user');
     if (user?.role && !['owner', 'admin', 'manager', 'supervisor'].includes(user.role)) {
       return c.json({ success: false, error: 'Insufficient permissions' }, 403);
+    }
+    const tableLimitCheck = await assertTenantResourceLimit(db, writeTenant, 'tables');
+    if (!tableLimitCheck.allowed) {
+      return c.json(
+        {
+          success: false,
+          code: tableLimitCheck.code,
+          error: tableLimitCheck.message,
+          limit: tableLimitCheck.limit,
+          currentUsage: tableLimitCheck.currentUsage,
+        },
+        tableLimitCheck.status || 402
+      );
     }
     const now = new Date().toISOString();
 

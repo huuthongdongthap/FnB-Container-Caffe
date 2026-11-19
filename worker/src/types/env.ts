@@ -21,10 +21,21 @@ export interface Env {
   JWT_AUDIENCE?: string;
   JWT_ISSUER?: string;
 
-  // PayOS
+  // PayOS (Legacy single-store / platform fallback for 'default' tenant only)
   PAYOS_CLIENT_ID?: string;
   PAYOS_API_KEY?: string;
   PAYOS_CHECKSUM_KEY?: string;
+
+  // SaaS Platform PayOS (subscription fees collected by platform)
+  SAAS_PAYOS_CLIENT_ID?: string;
+  SAAS_PAYOS_API_KEY?: string;
+  SAAS_PAYOS_CHECKSUM_KEY?: string;
+
+  // AES-256-GCM master key (32 bytes base64/hex) for encrypting per-tenant merchant secrets
+  TENANT_SECRETS_KEY?: string;
+
+  // SaaS root domain for subdomain routing (e.g., auracafe.vn)
+  SAAS_PLATFORM_DOMAIN?: string;
 
   // Frontend base URL (for payment return URLs)
   FE_BASE_URL?: string;

@@ -17,7 +17,9 @@ const ReferralPage = React.lazy(() => import('@/pages/referral'));
 const EventsPage = React.lazy(() => import('@/pages/events'));
 const AccountPage = React.lazy(() => import('@/pages/account'));
 const TableCheckinPage = React.lazy(() => import('@/pages/TableCheckin'));
-const PricingPage = React.lazy(() => import('@/pages/[locale]/pricing'));
+const PricingPage = React.lazy(() => import('@/pages/saas/pricing'));
+const SaasSignupPage = React.lazy(() => import('@/pages/saas/signup'));
+const TenantStorefrontPage = React.lazy(() => import('@/pages/saas/storefront'));
 const BrandGuideline = React.lazy(() => import('@/pages/BrandGuideline'));
 const TableOrder = React.lazy(() => import('@/pages/TableOrder'));
 const ContainerPage = React.lazy(() => import('@/pages/container'));
@@ -90,7 +92,11 @@ export const publicRoutes = [
   <Route key="/loyalty-calculator" path="/loyalty-calculator" element={guarded(<LoyaltyCalcNew />)} />,
   <Route key="/pricing" path="/pricing" element={guarded(<PricingPage />)} />,
   <Route key="/:locale/pricing" path="/:locale/pricing" element={guarded(<PricingPage />)} />,
-  <Route key="/saas" element={<ProtectedRoute />}>
+  <Route key="/saas" path="/saas" element={guarded(<PricingPage />)} />,
+  <Route key="/signup" path="/signup" element={guarded(<SaasSignupPage />)} />,
+  <Route key="/s/:slug" path="/s/:slug" element={guarded(<TenantStorefrontPage />)} />,
+  <Route key="/s/:slug/*" path="/s/:slug/*" element={guarded(<TenantStorefrontPage />)} />,
+  <Route key="/saas-protected" element={<ProtectedRoute />}>
     <Route path="/saas/dashboard" element={guarded(<CustomerDashboard />)} />
     <Route path="/saas/onboard/tenant" element={guarded(<TenantCreate />)} />
     <Route path="/saas/onboard" element={guarded(<OnboardingWizard />)} />

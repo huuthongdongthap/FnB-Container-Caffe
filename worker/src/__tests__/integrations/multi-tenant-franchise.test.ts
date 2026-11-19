@@ -406,8 +406,12 @@ describe('Multi-Tenant & Franchise Preparation Integration', () => {
           ? accountStatement('manager', 'tenant_sadec_02')
           : {
             bind: vi.fn((...args: unknown[]) => {
-              insertedArgs = args;
+              if (/^\s*INSERT\b/i.test(sql)) {
+                insertedArgs = args;
+              }
               return {
+                first: vi.fn().mockResolvedValue(null),
+                all: vi.fn().mockResolvedValue({ results: [], success: true }),
                 run: vi.fn().mockResolvedValue({ success: true })
               };
             })

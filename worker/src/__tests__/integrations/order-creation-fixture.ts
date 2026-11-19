@@ -12,10 +12,16 @@ export function orderCreationFixture() {
   // looked for a schema under a directory that does not exist.
   const here = dirname(fileURLToPath(import.meta.url));
   sqlite.exec(readFileSync(resolve(here, '../../../schema.sql'), 'utf8'));
-  sqlite.exec(`INSERT INTO categories (id,name,slug) VALUES ('coffee','Coffee','coffee');
-    INSERT INTO products (id,category_id,name,price) VALUES ('coffee','coffee','Coffee',20000);
+  sqlite.exec(`INSERT INTO categories (id,name,slug,tenant_id) VALUES
+      ('coffee','Coffee','coffee','default'),
+      ('coffee-a','Coffee','coffee-a','cafe-a'),
+      ('coffee-b','Coffee','coffee-b','cafe-b');
+    INSERT INTO products (id,category_id,name,price,tenant_id) VALUES
+      ('coffee','coffee','Coffee',20000,'default'),
+      ('coffee-a','coffee-a','Coffee',20000,'cafe-a'),
+      ('coffee-b','coffee-b','Coffee',20000,'cafe-b');
     INSERT INTO cafe_tables (id,table_number,capacity,zone,tenant_id) VALUES
-      ('table-default','D1',4,'A','default'), ('table-a','A1',4,'A','cafe-a'), ('table-b','B1',4,'B','cafe-b');`);
+      ('table-default','D1',4,'A','default'), ('table-a','A1',4,'A','cafe-a'), ('table-b','B1',4,'A','cafe-b');`);
   const db = {
     prepare(sql: string) {
       let binds: (string | number | null)[] = [];
