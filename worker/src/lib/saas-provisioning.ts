@@ -103,6 +103,23 @@ export interface ProvisionTenantInput {
   primaryColor?: string;
   accentColor?: string;
   logoUrl?: string;
+  attribution?: Record<string, string>;
+}
+
+function sanitizeAttribution(raw: unknown): Record<string, string> | undefined {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return undefined;
+  const clean: Record<string, string> = {};
+  let count = 0;
+  for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
+    if (count >= 16) break;
+    if (!/^[a-zA-Z0-9_-]{1,32}$/.test(k)) continue;
+    if (typeof v !== 'string') continue;
+    const trimmed = v.trim().slice(0, 200);
+    if (!trimmed) continue;
+    clean[k] = trimmed;
+    count++;
+  }
+  return count > 0 ? clean : undefined;
 }
 
 export interface ProvisionTenantResult {
@@ -199,6 +216,13 @@ export async function provisionSelfServeTenant(
   const accentColor = /^#[0-9a-fA-F]{6}$/.test(String(input.accentColor || ''))
     ? String(input.accentColor)
     : template.accentColor;
+  const attribution = sanitizeAttribution(input.attribution);
+  const tenantConfig = {
+    templateId,
+    planId,
+    currency: 'VND',
+    ...(attribution ? { attribution } : {}),
+  };
 
   const statements: D1PreparedStatement[] = [];
 
@@ -224,7 +248,7 @@ export async function provisionSelfServeTenant(
         planId,
         trialEndsAt,
         trialEndsAt,
-        JSON.stringify({ templateId, planId, currency: 'VND' }),
+        JSON.stringify(tenantConfig),
         nowIso,
         nowIso
       )
@@ -452,7 +476,7 @@ export async function provisionSelfServeTenant(
         auditId,
         tenantId,
         ownerId,
-        JSON.stringify({ slug, templateId, planId, trialEndsAt }),
+        JSON.stringify({ slug, templateId, planId, trialEndsAt, ...(attribution ? { attribution } : {}) }),
         'Self-serve onboarding',
         nowIso
       )
@@ -469,7 +493,7 @@ export async function provisionSelfServeTenant(
         'Slug quán hoặc email chủ quán đã tồn tại. Vui lòng chọn giá trị khác.'
       );
     }
-    throw new ProvisionError(500, 'provisioning_failed', `Không thể khởi tạo quán: ${msg}`);
+    throw new ProvisionError(500, 'provisioning_failed', 'Không thể khởi tạo quán lúc này. Vui lòng thử lại sau.');
   }
 
   return {

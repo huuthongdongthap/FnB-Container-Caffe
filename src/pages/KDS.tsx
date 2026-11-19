@@ -192,7 +192,6 @@ export default function KDSPage() {
             </div>
           </div>
         )}
-
         <StitchKDSNew
           tickets={tickets}
           stationName="KITCHEN STATION"

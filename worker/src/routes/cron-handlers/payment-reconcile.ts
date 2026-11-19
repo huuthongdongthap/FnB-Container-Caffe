@@ -1,6 +1,8 @@
 import type { D1Database, KVNamespace } from '@cloudflare/workers-types';
+import type { Env } from '../../types/env';
 import { createLogger } from '../../middleware/logger';
 import { resolvePilotStore } from '../../middleware/tenant';
+import { resolvePayosReconcileCredentials } from '../../lib/merchant-payment';
 import {
   claimReconcileJob,
   reconcilePayOSPayment,
@@ -82,8 +84,22 @@ export async function runPaymentReconciliation(
   const apiKey = String(env.PAYOS_API_KEY ?? '');
   const checksumKey = String(env.PAYOS_CHECKSUM_KEY ?? '');
 
-  if (!db || !clientId || !apiKey || !checksumKey) {
+  const hasGlobalPayos = Boolean(clientId && apiKey && checksumKey);
+  if (!db) {
     return { processed: 0, outcomes: {} };
+  }
+  if (!hasGlobalPayos) {
+    const anyTenantPayos = await db
+      .prepare(
+        `SELECT tenant_id FROM tenant_payment_configs
+         WHERE provider = 'payos' AND COALESCE(is_active, 1) = 1 AND payos_checksum_key_enc IS NOT NULL
+         LIMIT 1`
+      )
+      .first<{ tenant_id: string }>()
+      .catch(() => null);
+    if (!anyTenantPayos) {
+      return { processed: 0, outcomes: {} };
+    }
   }
 
   const startWallMs = Date.now();
@@ -268,15 +284,25 @@ export async function runPaymentReconciliation(
               ? rawCandidateTenant
               : 'default'
             : activeTenant;
+        const creds = await resolvePayosReconcileCredentials(db, env as unknown as Env, candidateTenant);
+        if (!creds) {
+          const jobRow = await db.prepare('SELECT attempts FROM payment_reconciliation_jobs WHERE payment_id = ?')
+            .bind(candidate.payment_id).first<{ attempts: number }>().catch(() => null);
+          const attempts = Number(jobRow?.attempts ?? (candidate.attempts ?? 0) + 1);
+          const nextMs = computeNextAttemptAtMs('provider_error', attempts, currentNowMs);
+          await releaseReconcileJob(db, candidate.payment_id, leaseOwner, 'provider_error', nextMs, currentNowMs);
+          outcomes[candidate.payment_id] = 'provider_error';
+          continue;
+        }
         const res = await reconcilePayOSPayment({
           db,
           kv,
           env,
           paymentId: candidate.payment_id,
           tenantId: candidateTenant,
-          clientId,
-          apiKey,
-          checksumKey,
+          clientId: creds.clientId,
+          apiKey: creds.apiKey,
+          checksumKey: creds.checksumKey,
           source: 'cron',
         });
         const jobRow = await db.prepare('SELECT attempts FROM payment_reconciliation_jobs WHERE payment_id = ?')

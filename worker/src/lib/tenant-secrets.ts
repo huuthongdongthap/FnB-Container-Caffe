@@ -66,27 +66,43 @@ async function importMasterKey(rawKey: string | undefined): Promise<CryptoKey> {
 export async function encryptTenantSecret(
   plaintext: string,
   masterKey: string | undefined,
-  keyVersion: number = CURRENT_KEY_VERSION
+  keyVersion: number = CURRENT_KEY_VERSION,
+  aad?: string
 ): Promise<string> {
   const key = await importMasterKey(masterKey);
   const iv = crypto.getRandomValues(new Uint8Array(12));
   const encoded = new TextEncoder().encode(plaintext);
-  const cipherBuffer = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, encoded);
-  return `v${keyVersion}:${bytesToBase64(iv)}:${bytesToBase64(new Uint8Array(cipherBuffer))}`;
+  const additionalData = aad ? new TextEncoder().encode(aad) : undefined;
+  const cipherBuffer = await crypto.subtle.encrypt(
+    additionalData ? { name: 'AES-GCM', iv, additionalData } : { name: 'AES-GCM', iv },
+    key,
+    encoded
+  );
+  const prefix = additionalData ? `v${keyVersion}a` : `v${keyVersion}`;
+  return `${prefix}:${bytesToBase64(iv)}:${bytesToBase64(new Uint8Array(cipherBuffer))}`;
 }
 
 export async function decryptTenantSecret(
   payload: string,
-  masterKey: string | undefined
+  masterKey: string | undefined,
+  aad?: string
 ): Promise<string> {
   const parts = String(payload || '').split(':');
-  if (parts.length !== 3 || !parts[0].startsWith('v')) {
+  if (parts.length !== 3 || !/^v\d+a?$/.test(parts[0])) {
     throw new Error('Malformed encrypted tenant secret payload');
+  }
+  const usesAad = parts[0].endsWith('a');
+  if (usesAad && !aad) {
+    throw new Error('Missing AAD context for authenticated tenant secret');
   }
   const key = await importMasterKey(masterKey);
   const iv = new Uint8Array(base64ToBytes(parts[1]));
   const cipherBytes = new Uint8Array(base64ToBytes(parts[2]));
-  const plainBuffer = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, key, cipherBytes);
+  const plainBuffer = await crypto.subtle.decrypt(
+    usesAad ? { name: 'AES-GCM', iv, additionalData: new TextEncoder().encode(aad) } : { name: 'AES-GCM', iv },
+    key,
+    cipherBytes
+  );
   return new TextDecoder().decode(plainBuffer);
 }
 

@@ -15,6 +15,7 @@ import type { Context, MiddlewareHandler } from 'hono';
 import type { Env } from '../types/env';
 import { assertTenantWritable } from '../lib/saas-entitlement';
 import { getAuthToken } from '../lib/jwt';
+import { authenticateRequest } from '../lib/staff-session-auth';
 import { isHQSuperAdmin } from './tenant';
 
 const WRITE_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
@@ -38,7 +39,8 @@ export function isSaasWriteExemptPath(pathname: string): boolean {
 }
 
 function resolveGuestCandidateTenant(c: Context<{ Bindings: Env }>): string {
-  const fromCtx = String((c as unknown as { get?: (k: string) => unknown }).get?.('tenantId') || '').trim();
+  const ctxGetter = (c as unknown as { get?: (k: string) => unknown }).get;
+  const fromCtx = String(ctxGetter?.('tenantId') || ctxGetter?.('hostTenantId') || '').trim();
   if (fromCtx) return fromCtx;
   const readHeader = (name: string): string =>
     typeof c.req.header === 'function'
@@ -93,25 +95,43 @@ export async function enforceSaasWriteGuard(
     return null;
   }
 
-  const user =
+  let resolvedUser =
     options.authenticatedUser ??
     (c as unknown as {
       get?: (k: string) => { id?: string; role?: string; tenantId?: string; tenant_id?: string } | undefined;
     }).get?.('user');
 
-  // If running globally before requireAuth and a bearer/cookie token is present,
-  // defer to requireAuth (or createOrder's authoritative JWT scope) so we enforce
-  // against the verified JWT tenant rather than untrusted guest headers.
-  if (!user && options.deferIfAuthTokenPresent && getAuthToken(c.req.raw)) {
+  // When running globally before requireAuth with a bearer/cookie token present, verify the token
+  // so forged tokens cannot bypass read-only enforcement on public write routes and untrusted
+  // guest headers cannot override a signed JWT's tenant scope.
+  if (!resolvedUser && options.deferIfAuthTokenPresent && getAuthToken(c.req.raw)) {
+    if (c.env?.JWT_SECRET) {
+      try {
+        const session = await authenticateRequest(c.req.raw, c.env, { optional: true });
+        if (session && 'payload' in session) {
+          resolvedUser = {
+            id: session.payload.id,
+            role: session.payload.role,
+            tenantId: session.payload.tenantId,
+          };
+        } else if (session && 'blocked' in session) {
+          const guestTenant = resolveGuestCandidateTenant(c);
+          if (!guestTenant || guestTenant === 'default' || guestTenant === 'hq' || guestTenant === '*') {
+            return null;
+          }
+        }
+      } catch {
+        // Invalid/forged token: fall through to guest tenant enforcement
+      }
+    }
+  }
+
+  if (resolvedUser && isHQSuperAdmin(resolvedUser)) {
     return null;
   }
 
-  if (user && isHQSuperAdmin(user)) {
-    return null;
-  }
-
-  const resolvedTenant = user
-    ? String(user.tenantId || user.tenant_id || '').trim()
+  const resolvedTenant = resolvedUser
+    ? String(resolvedUser.tenantId || resolvedUser.tenant_id || '').trim()
     : resolveGuestCandidateTenant(c);
 
   if (!resolvedTenant || resolvedTenant === 'default' || resolvedTenant === 'hq' || resolvedTenant === '*') {

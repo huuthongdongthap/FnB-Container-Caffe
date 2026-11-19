@@ -24,24 +24,24 @@ export function formatTime(seconds: number): string {
 export const STATUS_BADGE_CONFIG: Record<TicketStatus, StatusBadgeConfig> = {
   preparing: {
     tKey: 'kds.preparing',
-    bg: 'bg-[#efbd8a]/20 border border-[#efbd8a]/40',
-    text: 'text-[#f8d7b2]',
+    bg: 'bg-[var(--md-sys-color-primary-container)] border border-[var(--aura-border-chrome)]',
+    text: 'text-[var(--md-sys-color-on-primary-container)]',
     pulse: true,
   },
   pending: {
     tKey: 'kds.pending',
-    bg: 'bg-[#1d2c3f] border border-[#b8c7e2]/20',
-    text: 'text-[#d4e4fa]',
+    bg: 'bg-[var(--st-surface-container-highest)] border border-[var(--aura-chrome-dim)]',
+    text: 'text-[var(--aura-chrome-bright)]',
   },
   ready: {
     tKey: 'kds.ready',
-    bg: 'bg-emerald-500/15 border border-emerald-400/35',
-    text: 'text-emerald-300',
+    bg: 'bg-[var(--md-sys-color-secondary-container)] border border-[var(--aura-border-chrome)]',
+    text: 'text-[var(--aura-success)]',
   },
   overdue: {
     tKey: 'kds.overdue',
-    bg: 'bg-red-500/20 border border-red-400/40',
-    text: 'text-red-200',
+    bg: 'bg-[var(--md-sys-color-error-container)] border border-[var(--md-sys-color-error)]',
+    text: 'text-[var(--md-sys-color-on-error-container)]',
     pulse: true,
   },
 };

@@ -69,9 +69,9 @@ export async function resolveMerchantPaymentConfig(
       row.payos_checksum_key_enc
     ) {
       const [clientId, apiKey, checksumKey] = await Promise.all([
-        decryptTenantSecret(row.payos_client_id_enc, env.TENANT_SECRETS_KEY),
-        decryptTenantSecret(row.payos_api_key_enc, env.TENANT_SECRETS_KEY),
-        decryptTenantSecret(row.payos_checksum_key_enc, env.TENANT_SECRETS_KEY),
+        decryptTenantSecret(row.payos_client_id_enc, env.TENANT_SECRETS_KEY, `${cleanTenant}:payos_client_id`),
+        decryptTenantSecret(row.payos_api_key_enc, env.TENANT_SECRETS_KEY, `${cleanTenant}:payos_api_key`),
+        decryptTenantSecret(row.payos_checksum_key_enc, env.TENANT_SECRETS_KEY, `${cleanTenant}:payos_checksum_key`),
       ]);
       return {
         tenantId: cleanTenant,
@@ -123,6 +123,65 @@ export async function resolveMerchantPaymentConfig(
     tenantId: cleanTenant,
     provider: 'unconfigured',
   };
+}
+
+/**
+ * Returns true if the non-default tenant is an enrolled SaaS tenant (registered in `saas_tenants`
+ * or having a dedicated `tenant_payment_configs` record). Enrolled SaaS tenants are strictly
+ * isolated from global flagship `env.PAYOS_*` credentials and un-scoped PayOS webhooks.
+ */
+export async function isEnrolledSaasTenant(db: D1Database, tenantId: string): Promise<boolean> {
+  const cleanTenant = String(tenantId || 'default').trim() || 'default';
+  if (cleanTenant === 'default') return false;
+
+  const [saasRow, configRow] = await Promise.all([
+    db
+      .prepare('SELECT id FROM saas_tenants WHERE id = ? LIMIT 1')
+      .bind(cleanTenant)
+      .first<{ id: string }>()
+      .catch(() => null),
+    db
+      .prepare('SELECT tenant_id FROM tenant_payment_configs WHERE tenant_id = ? LIMIT 1')
+      .bind(cleanTenant)
+      .first<{ tenant_id: string }>()
+      .catch(() => null),
+  ]);
+
+  return Boolean(saasRow?.id || configRow?.tenant_id);
+}
+
+/**
+ * Resolves PayOS API credentials for payment reconciliation.
+ * - Uses per-tenant encrypted credentials when configured.
+ * - For flagship `'default'`, falls back to global `env.PAYOS_*`.
+ * - For enrolled SaaS tenants without PayOS credentials, fails closed (returns `null`) so
+ *   reconcilers never cross-pollute with flagship merchant credentials.
+ * - Preserves global fallback only for un-enrolled legacy internal branches.
+ */
+export async function resolvePayosReconcileCredentials(
+  db: D1Database,
+  env: Env,
+  tenantId: string
+): Promise<{ clientId: string; apiKey: string; checksumKey: string } | null> {
+  const cleanTenant = String(tenantId || 'default').trim() || 'default';
+  const resolved = await resolveMerchantPaymentConfig(db, env, cleanTenant);
+  if (resolved.provider === 'payos' && resolved.payos) {
+    return resolved.payos;
+  }
+  if (cleanTenant === 'default') {
+    return null;
+  }
+  if (await isEnrolledSaasTenant(db, cleanTenant)) {
+    return null;
+  }
+  if (env.PAYOS_CLIENT_ID && env.PAYOS_API_KEY && env.PAYOS_CHECKSUM_KEY) {
+    return {
+      clientId: env.PAYOS_CLIENT_ID,
+      apiKey: env.PAYOS_API_KEY,
+      checksumKey: env.PAYOS_CHECKSUM_KEY,
+    };
+  }
+  return null;
 }
 
 export function buildVietQrImageUrl(params: {

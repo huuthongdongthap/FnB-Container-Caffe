@@ -1,6 +1,7 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { apiFetch } from '@/lib/api-client';
+import { buildUrlWithUtm, captureUtmFromSearch, type UtmAttribution } from '@/lib/utm';
 
 interface SaasPlan {
   id: string;
@@ -10,6 +11,7 @@ interface SaasPlan {
   annualPriceVnd: number;
   annualMonthlyEquivalentVnd: number;
   popular?: boolean;
+  isRecommended?: boolean;
   highlightsVi: string[];
 }
 
@@ -19,8 +21,8 @@ const FALLBACK_SAAS_PLANS: SaasPlan[] = [
     name: 'Starter',
     taglineVi: 'Khởi đầu chuẩn chỉnh cho quán cà phê & trà sữa quy mô nhỏ',
     monthlyPriceVnd: 199_000,
-    annualPriceVnd: 1_910_000,
-    annualMonthlyEquivalentVnd: 159_000,
+    annualPriceVnd: 1_910_400,
+    annualMonthlyEquivalentVnd: 159_200,
     highlightsVi: [
       'Tối đa 15 bàn & 3 tài khoản nhân viên',
       'QR Order tại bàn & POS thu ngân mượt mà',
@@ -33,11 +35,12 @@ const FALLBACK_SAAS_PLANS: SaasPlan[] = [
     name: 'Pro',
     taglineVi: 'Tối ưu vận hành tốc độ cao cho quán đông khách & thương hiệu riêng',
     monthlyPriceVnd: 499_000,
-    annualPriceVnd: 4_790_000,
-    annualMonthlyEquivalentVnd: 399_000,
+    annualPriceVnd: 4_790_400,
+    annualMonthlyEquivalentVnd: 399_200,
     popular: true,
+    isRecommended: true,
     highlightsVi: [
-      'Không giới hạn số bàn & tài khoản nhân viên',
+      'Tối đa 50 bàn & 15 tài khoản nhân viên',
       'Màn hình bếp KDS realtime & phân loại đồ uống',
       'Tích hợp PayOS riêng & tự động xác nhận chuyển khoản',
       'Tên miền riêng (Custom Domain) & nhận diện thương hiệu quán',
@@ -64,8 +67,11 @@ export default function SaasPricingPage(): ReactNode {
   const [plans, setPlans] = useState<SaasPlan[]>(FALLBACK_SAAS_PLANS);
   const [billingCycle, setBillingCycle] = useState<'monthly' | 'annual'>('annual');
   const [loading, setLoading] = useState(false);
+  const [utm, setUtm] = useState<UtmAttribution | null>(null);
 
   useEffect(() => {
+    setUtm(captureUtmFromSearch());
+
     void apiFetch<{ success: boolean; data?: { plans: SaasPlan[] } }>('/api/saas/plans', { silent: true })
       .then((res) => {
         if (res.data?.plans && res.data.plans.length > 0) setPlans(res.data.plans);
@@ -125,13 +131,14 @@ export default function SaasPricingPage(): ReactNode {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             {plans.map((plan) => {
+              const isHighlighted = Boolean(plan.isRecommended ?? plan.popular);
               const displayPrice =
                 billingCycle === 'annual' ? plan.annualMonthlyEquivalentVnd : plan.monthlyPriceVnd;
               return (
                 <div
                   key={plan.id}
                   className={`rounded-2xl p-6 border flex flex-col justify-between ${
-                    plan.popular
+                    isHighlighted
                       ? 'border-amber-500 bg-slate-900 shadow-lg shadow-amber-500/10'
                       : 'border-slate-800 bg-slate-900/70'
                   }`}
@@ -139,7 +146,7 @@ export default function SaasPricingPage(): ReactNode {
                   <div className="space-y-4">
                     <div className="flex items-center justify-between">
                       <h2 className="text-xl font-bold text-white">{plan.name}</h2>
-                      {plan.popular && (
+                      {isHighlighted && (
                         <span className="rounded-full bg-amber-500 px-2.5 py-0.5 text-[11px] font-bold text-slate-950">
                           Phổ biến nhất
                         </span>
@@ -168,9 +175,9 @@ export default function SaasPricingPage(): ReactNode {
                   </div>
 
                   <Link
-                    to={`/signup?plan=${plan.id}`}
-                    className={`mt-8 block w-full text-center rounded-xl py-3 text-sm font-bold transition ${
-                      plan.popular
+                    to={buildUrlWithUtm(`/signup?plan=${plan.id}`, utm)}
+                    className={`mt-8 flex min-h-[44px] w-full items-center justify-center text-center rounded-xl py-3 text-sm font-bold transition ${
+                      isHighlighted
                         ? 'bg-amber-500 text-slate-950 hover:bg-amber-400'
                         : 'bg-slate-800 text-white hover:bg-slate-700'
                     }`}
@@ -182,6 +189,79 @@ export default function SaasPricingPage(): ReactNode {
             })}
           </div>
         )}
+
+        {/* Flagship Live Case Study — AURA CAFE Sa Đéc */}
+        <section
+          aria-labelledby="flagship-case-study-heading"
+          className="rounded-3xl border border-slate-800 bg-gradient-to-br from-slate-900 via-slate-900/95 to-slate-950 p-6 sm:p-8 lg:p-10 shadow-2xl overflow-hidden"
+        >
+          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-8">
+            <div className="space-y-4 max-w-2xl">
+              <div className="inline-flex flex-wrap items-center gap-2 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-3.5 py-1 text-xs font-semibold text-emerald-300">
+                <span className="h-2 w-2 rounded-full bg-emerald-400" />
+                <span>Flagship Live Case Study • AURA CAFE Sa Đéc</span>
+              </div>
+              <h2
+                id="flagship-case-study-heading"
+                className="text-2xl sm:text-3xl font-bold text-white leading-tight"
+              >
+                Vận hành thực tế mỗi ngày tại mô hình Container Cafe 3 khối &amp; 5 phân khu
+              </h2>
+              <p className="text-sm sm:text-base text-slate-300 leading-relaxed">
+                Không chỉ là bản demo — toàn bộ hệ thống POS, QR Order tại bàn và màn hình pha chế KDS đang chạy trực tiếp tại AURA CAFE (29 Nguyễn Tất Thành, Sa Đéc), giúp xử lý đơn nhanh, đối soát tự động và giữ trọn doanh thu cho chủ quán.
+              </p>
+            </div>
+
+            <div className="flex flex-col sm:flex-row lg:flex-col gap-3 shrink-0 w-full sm:w-auto lg:w-64">
+              <Link
+                to={buildUrlWithUtm('/signup?plan=pro', utm)}
+                className="min-h-[44px] w-full inline-flex items-center justify-center rounded-xl bg-amber-500 px-5 py-3 text-sm font-bold text-slate-950 hover:bg-amber-400 transition text-center"
+              >
+                Dùng thử miễn phí 14 ngày
+              </Link>
+              <Link
+                to="/menu"
+                className="min-h-[44px] w-full inline-flex items-center justify-center rounded-xl border border-slate-700 bg-slate-800/80 px-5 py-3 text-sm font-semibold text-slate-100 hover:border-slate-500 hover:bg-slate-800 transition text-center"
+              >
+                Trải nghiệm thực đơn sống
+              </Link>
+            </div>
+          </div>
+
+          <div className="mt-8 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            {[
+              {
+                metric: '3 khối · 5 khu',
+                title: 'Mô hình Container Sa Đéc',
+                detail: 'Quản lý sơ đồ bàn linh hoạt từ quầy bar, sân vườn đến khu máy lạnh.',
+              },
+              {
+                metric: 'QR → KDS',
+                title: 'Đồng bộ quầy pha chế',
+                detail: 'Khách quét QR tại bàn, đơn đẩy thẳng xuống màn hình KDS theo thời gian thực.',
+              },
+              {
+                metric: '0% hoa hồng',
+                title: 'VietQR & PayOS trực tiếp',
+                detail: 'Tiền thanh toán về thẳng tài khoản chủ quán, tự động xác nhận không cần chụp bill.',
+              },
+              {
+                metric: '60 giây',
+                title: 'Khởi tạo quán mới',
+                detail: 'Tự động tạo sẵn thực đơn mẫu, mã QR bàn và phân ca để bán ngay lập tức.',
+              },
+            ].map((item) => (
+              <div
+                key={item.title}
+                className="rounded-2xl border border-slate-800/90 bg-slate-950/70 p-4 space-y-1.5"
+              >
+                <div className="text-base font-extrabold text-amber-400">{item.metric}</div>
+                <div className="text-sm font-semibold text-white">{item.title}</div>
+                <p className="text-xs text-slate-400 leading-relaxed">{item.detail}</p>
+              </div>
+            ))}
+          </div>
+        </section>
       </div>
     </div>
   );

@@ -1,8 +1,9 @@
 import { useState, useRef } from 'react';
+import { Link } from 'react-router-dom';
 import { LandingNav } from '@/components/stitch/StitchLandingNew-nav';
 import { LandingFooter } from '@/components/stitch/StitchLandingNew-footer';
 import { HelmetHead } from '@/components/seo/HelmetHead';
-import { QrCode, Sparkles, Phone, ArrowRight, CheckCircle2 } from 'lucide-react';
+import { QrCode, Sparkles, Phone, ArrowRight, CheckCircle2, Store } from 'lucide-react';
 
 export default function CheckinNew() {
   const [phone, setPhone] = useState('');
@@ -132,6 +133,33 @@ export default function CheckinNew() {
             </div>
           </div>
         )}
+
+        {/* In-Store QR Promo Card for F&B Owners */}
+        <aside
+          aria-label="Giải pháp POS & QR Order cho chủ quán F&B"
+          className="mt-8 rounded-2xl border border-white/10 bg-white/[0.03] backdrop-blur-md p-5 flex flex-col gap-4"
+        >
+          <div className="flex items-start gap-3">
+            <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-amber-400/25 bg-amber-500/10 text-amber-300">
+              <Store className="h-4 w-4" />
+            </div>
+            <div className="space-y-1">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-amber-300/90">
+                AURA F&amp;B Platform
+              </p>
+              <p className="text-xs sm:text-sm text-[var(--aura-chrome-soft)] leading-relaxed">
+                Bạn là chủ quán cà phê / F&amp;B? AURA CAFE Sa Đéc đang vận hành POS, QR Order &amp; KDS với 0% hoa hồng.
+              </p>
+            </div>
+          </div>
+          <Link
+            to="/pricing?utm_source=instore&utm_medium=checkin_promo&utm_campaign=flagship_sadec_30d&utm_content=checkin_footer_card"
+            className="min-h-[44px] w-full inline-flex items-center justify-center gap-2 rounded-xl border border-amber-400/35 bg-amber-500/15 px-4 py-2.5 text-xs font-semibold text-amber-200 hover:bg-amber-500/25 hover:text-white transition-colors"
+          >
+            <span>Xem bảng giá &amp; Dùng thử 14 ngày</span>
+            <ArrowRight className="h-3.5 w-3.5 shrink-0" />
+          </Link>
+        </aside>
       </div>
 
       <LandingFooter />

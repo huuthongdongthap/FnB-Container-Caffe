@@ -1,5 +1,6 @@
 import type { Context } from 'hono';
 import { getTenantId, matchesTenantRow } from '../../lib/db';
+import { resolvePayosReconcileCredentials } from '../../lib/merchant-payment';
 import { isHQSuperAdmin } from '../../middleware/tenant';
 import type { Env } from '../../types/env';
 import {
@@ -119,10 +120,8 @@ export async function manualReconcilePayment(c: Context<{ Bindings: Env }>): Pro
     existing.order_payment_status === 'paid' ||
     existing.order_payment_status === 'refunded';
 
-  const clientId = String(c.env.PAYOS_CLIENT_ID ?? '');
-  const apiKey = String(c.env.PAYOS_API_KEY ?? '');
-  const checksumKey = String(c.env.PAYOS_CHECKSUM_KEY ?? '');
-  if (isAlreadySettled && (!clientId || !apiKey || !checksumKey)) {
+  const creds = await resolvePayosReconcileCredentials(db, c.env, tenantId);
+  if (isAlreadySettled && !creds) {
     return c.json({
       paymentId: existing.id,
       orderId: existing.order_id,
@@ -130,7 +129,7 @@ export async function manualReconcilePayment(c: Context<{ Bindings: Env }>): Pro
       outcome: 'skipped_already_settled',
     }, 200);
   }
-  if (!isAlreadySettled && (!clientId || !apiKey || !checksumKey)) {
+  if (!isAlreadySettled && !creds) {
     return c.json({
       paymentId: existing.id,
       orderId: existing.order_id,
@@ -159,9 +158,9 @@ export async function manualReconcilePayment(c: Context<{ Bindings: Env }>): Pro
       env: c.env as unknown as Record<string, unknown>,
       paymentId: existing.id,
       tenantId,
-      clientId,
-      apiKey,
-      checksumKey,
+      clientId: creds!.clientId,
+      apiKey: creds!.apiKey,
+      checksumKey: creds!.checksumKey,
       source: 'manual',
     });
 

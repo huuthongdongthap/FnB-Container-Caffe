@@ -48,7 +48,8 @@ export const handleCreateOrder = (c: import('hono').Context<{ Bindings: Env }>) 
   } catch {
     // No execution context in test environment
   }
-  const hostResolvedTenant = String((c as unknown as { get?: (k: string) => unknown }).get?.('tenantId') || '').trim();
+  const ctxGetter = (c as unknown as { get?: (k: string) => unknown }).get;
+  const hostResolvedTenant = String(ctxGetter?.('tenantId') || ctxGetter?.('hostTenantId') || '').trim();
   const hasExplicitTenant = Boolean(
     c.req.header('X-Tenant-ID') ||
     c.req.header('x-tenant-id') ||
@@ -86,11 +87,21 @@ export const handleSyncOrders = async (c: import('hono').Context<{ Bindings: Env
   delete orderPayload.createdAt;
   delete orderPayload.offlineCreatedAt;
 
-  // Inject Idempotency-Key header for createOrder
+  // Inject Idempotency-Key header for createOrder and forward host-resolved tenant when unauthenticated
   const headers = new Headers(c.req.raw.headers);
   headers.set('Content-Type', 'application/json');
   if (localId && !headers.has('Idempotency-Key')) {
     headers.set('Idempotency-Key', `offline:${localId}`);
+  }
+  const ctxGetter = (c as unknown as { get?: (k: string) => unknown }).get;
+  const hostResolvedTenant = String(ctxGetter?.('tenantId') || ctxGetter?.('hostTenantId') || '').trim();
+  const hasExplicitTenant = Boolean(
+    headers.get('X-Tenant-ID') ||
+    headers.get('X-Store-ID') ||
+    headers.get('Authorization')
+  );
+  if (hostResolvedTenant && hostResolvedTenant !== 'default' && !hasExplicitTenant) {
+    headers.set('X-Tenant-ID', hostResolvedTenant);
   }
 
   const req = new Request(c.req.raw.url, {

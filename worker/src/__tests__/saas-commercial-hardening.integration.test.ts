@@ -19,8 +19,9 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { D1Database, KVNamespace } from '@cloudflare/workers-types';
 import { app } from '../index';
 import type { Env } from '../types/env';
-import { computeHmacSha256Hex } from '../lib/tenant-secrets';
+import { computeHmacSha256Hex, decryptTenantSecret, encryptTenantSecret } from '../lib/tenant-secrets';
 import { calculatePlanAmountVnd } from '../lib/saas-plans';
+import { issueStaffSession } from '../lib/staff-session';
 
 const JWT_SECRET = 'saas-commercial-v3-integration-jwt-secret-32ch!';
 const TENANT_SECRETS_KEY = '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef';
@@ -1275,5 +1276,386 @@ describe('SaaS Commercial Hardening — Multi-Tenant Isolation, Write Guard & Bi
     } finally {
       fetchSpy.mockRestore();
     }
+  });
+
+  it('prevents cross-tenant access on authenticated endpoints when X-Tenant-Slug or X-Forwarded-Host targets another tenant', async () => {
+    const { db, sqlite } = createMigratedD1();
+    const env = buildEnv(db);
+
+    const tenantA = await signupTenant(env, {
+      slug: 'auth-scope-a',
+      shopName: 'Quán Scope A',
+      ownerEmail: 'scope-a@quan.vn',
+    });
+    const tenantB = await signupTenant(env, {
+      slug: 'auth-scope-b',
+      shopName: 'Quán Scope B',
+      ownerEmail: 'scope-b@quan.vn',
+    });
+
+    sqlite
+      .prepare('UPDATE cafe_tables SET name = ? WHERE tenant_id = ?')
+      .run('TENANT_B_SECRET_TABLE', tenantB.data.tenantId);
+
+    const tablesRes = await app.fetch(
+      new Request('https://auraspace.cafe/api/tables', {
+        headers: {
+          Authorization: `Bearer ${tenantA.token}`,
+          'X-Tenant-Slug': 'auth-scope-b',
+          'X-Forwarded-Host': 'auth-scope-b.auraspace.cafe',
+        },
+      }),
+      env,
+      dummyCtx
+    );
+    expect(tablesRes.status).toBe(200);
+    const tablesText = await tablesRes.text();
+    expect(tablesText).not.toContain('TENANT_B_SECRET_TABLE');
+
+    const meRes = await app.fetch(
+      new Request('https://auth-scope-b.auraspace.cafe/api/saas/me', {
+        headers: {
+          Authorization: `Bearer ${tenantA.token}`,
+          'X-Tenant-Slug': 'auth-scope-b',
+          'X-Forwarded-Host': 'auth-scope-b.auraspace.cafe',
+          Host: 'auth-scope-b.auraspace.cafe',
+        },
+      }),
+      env,
+      dummyCtx
+    );
+    expect(meRes.status).toBe(200);
+    const meJson = (await meRes.json()) as {
+      data?: { tenantId?: string; branding?: { display_name?: string } };
+    };
+    expect(meJson.data?.tenantId).toBe(tenantA.data.tenantId);
+    expect(meJson.data?.branding?.display_name).toBe('Quán Scope A');
+  });
+
+  it('enforces 402 readonly guard on public order writes even when a forged Authorization header is sent', async () => {
+    const { db, sqlite } = createMigratedD1();
+    const env = buildEnv(db);
+
+    const tenant = await signupTenant(env, {
+      slug: 'forged-bearer-expired',
+      shopName: 'Quán Hết Hạn Forged Bearer',
+      ownerEmail: 'forged-bearer@quan.vn',
+    });
+
+    const past = new Date(Date.now() - 10 * 86_400_000).toISOString();
+    sqlite
+      .prepare("UPDATE tenant_subscriptions SET status = 'trial', trial_ends_at = ?, current_period_end = ?, grace_ends_at = ? WHERE tenant_id = ?")
+      .run(past, past, past, tenant.data.tenantId);
+
+    const product = sqlite
+      .prepare('SELECT id, name, price FROM products WHERE tenant_id = ? LIMIT 1')
+      .get(tenant.data.tenantId) as { id: string; name: string; price: number };
+
+    const orderRes = await app.fetch(
+      new Request('https://forged-bearer-expired.auraspace.cafe/api/orders', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: 'Bearer forged-invalid-jwt-token',
+          Host: 'forged-bearer-expired.auraspace.cafe',
+        },
+        body: JSON.stringify({
+          order_type: 'takeaway',
+          payment_method: 'cod',
+          total: product.price,
+          customer_name: 'Khách Forged',
+          customer_phone: '0909999999',
+          items: [{ id: product.id, name: product.name, price: product.price, quantity: 1 }],
+        }),
+      }),
+      env,
+      dummyCtx
+    );
+    expect(orderRes.status).toBe(402);
+    const orderJson = (await orderRes.json()) as { code?: string };
+    expect(orderJson.code).toBe('subscription_expired_readonly');
+
+    const syncRes = await app.fetch(
+      new Request('https://forged-bearer-expired.auraspace.cafe/api/orders/sync', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: 'Bearer forged-invalid-jwt-token',
+          Host: 'forged-bearer-expired.auraspace.cafe',
+        },
+        body: JSON.stringify({ orders: [] }),
+      }),
+      env,
+      dummyCtx
+    );
+    expect(syncRes.status).toBe(402);
+    const syncJson = (await syncRes.json()) as { code?: string };
+    expect(syncJson.code).toBe('subscription_expired_readonly');
+  });
+
+  it('rejects unscoped flagship PayOS webhook settlement for enrolled VietQR-only SaaS tenant orders', async () => {
+    const { db, sqlite } = createMigratedD1();
+    const env = buildEnv(db);
+
+    const tenant = await signupTenant(env, {
+      slug: 'vietqr-only-shop',
+      shopName: 'Quán VietQR Only',
+      ownerEmail: 'vietqr-only@quan.vn',
+    });
+
+    const orderCode = 77889911;
+    sqlite
+      .prepare(
+        `INSERT INTO orders (id, order_number, items, total, status, customer_name, customer_phone, payment_method, payment_status, tenant_id)
+         VALUES (?, ?, '[]', 45000, 'pending', 'Khách Test', '0901111222', 'payos', 'unpaid', ?)`
+      )
+      .run('ord_vietqr_only_1', 'ORD-VQ-1', tenant.data.tenantId);
+    sqlite
+      .prepare(
+        `INSERT INTO payments (id, order_id, method, amount, status, transaction_id, tenant_id)
+         VALUES (?, ?, 'payos', 45000, 'pending', ?, ?)`
+      )
+      .run('pay_vietqr_only_1', 'ord_vietqr_only_1', String(orderCode), tenant.data.tenantId);
+
+    const drinkData = {
+      orderCode,
+      amount: 45000,
+      description: 'ORD-VQ-1',
+      accountNumber: '111122223333',
+      reference: 'REF-VQ-1',
+      transactionDateTime: '2026-11-19 10:00:00',
+      currency: 'VND',
+      paymentLinkId: 'plink_vq_1',
+      code: '00',
+      desc: 'success',
+    };
+    const flagshipSig = await signPayosData(drinkData, FLAGSHIP_PAYOS_CHECKSUM);
+
+    const res = await app.fetch(
+      new Request('https://auraspace.cafe/api/webhook/payos', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          code: '00',
+          desc: 'success',
+          success: true,
+          data: drinkData,
+          signature: flagshipSig,
+        }),
+      }),
+      env,
+      dummyCtx
+    );
+    expect(res.status).toBe(403);
+
+    const orderRow = sqlite
+      .prepare('SELECT payment_status FROM orders WHERE id = ?')
+      .get('ord_vietqr_only_1') as { payment_status: string };
+    expect(orderRow.payment_status).toBe('unpaid');
+  });
+
+  it('persists sanitized signup attribution in config_json and returns both seeded and seededCounts', async () => {
+    const { db, sqlite } = createMigratedD1();
+    const env = buildEnv(db);
+
+    const res = await app.fetch(
+      new Request('https://auraspace.cafe/api/saas/signup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          shopName: 'Quán UTM Campaign',
+          slug: 'quan-utm-campaign',
+          ownerName: 'Chủ Campaign',
+          ownerEmail: 'campaign@quan.vn',
+          ownerPhone: '0903333444',
+          password: 'StrongPassword#2026',
+          templateId: 'traditional-cafe',
+          planId: 'pro',
+          attribution: {
+            utm_source: 'facebook',
+            utm_medium: 'cpc',
+            utm_campaign: 'flagship_launch',
+            'invalid key!': 'should-be-dropped',
+          },
+        }),
+      }),
+      env,
+      dummyCtx
+    );
+    expect(res.status).toBe(201);
+    const body = (await res.json()) as {
+      success: boolean;
+      data: {
+        tenantId: string;
+        seeded: { categories: number; products: number; tables: number };
+        seededCounts: { categories: number; products: number; tables: number };
+      };
+    };
+    expect(body.success).toBe(true);
+    expect(body.data.seeded).toEqual(body.data.seededCounts);
+    expect(body.data.seeded.products).toBeGreaterThan(0);
+
+    const tenantRow = sqlite
+      .prepare('SELECT config_json FROM saas_tenants WHERE id = ?')
+      .get(body.data.tenantId) as { config_json: string };
+    const config = JSON.parse(tenantRow.config_json) as { attribution?: Record<string, string> };
+    expect(config.attribution).toEqual({
+      utm_source: 'facebook',
+      utm_medium: 'cpc',
+      utm_campaign: 'flagship_launch',
+    });
+  });
+
+  it('counts suspended tenants separately from readonly in HQ SaaS overview', async () => {
+    const { db, sqlite } = createMigratedD1();
+    const env = buildEnv(db);
+
+    const tenant = await signupTenant(env, {
+      slug: 'hq-suspended-shop',
+      shopName: 'Quán Bị Tạm Ngưng',
+      ownerEmail: 'suspended@quan.vn',
+    });
+
+    sqlite
+      .prepare("INSERT INTO users (id, name, role, tenant_id, is_active, auth_version) VALUES ('hq_admin_1', 'HQ Admin', 'owner', 'hq', 1, 1)")
+      .run();
+
+    const hqSession = await issueStaffSession(
+      env,
+      {
+        id: 'hq_admin_1',
+        name: 'HQ Admin',
+        phone: null,
+        role: 'owner',
+        tenant_id: 'hq',
+        is_active: 1,
+        auth_version: 1,
+      },
+      { email: 'hq@auraspace.cafe', sessionType: 'staff-web' }
+    );
+    const hqToken = hqSession.token;
+
+    const suspendRes = await app.fetch(
+      new Request(`https://auraspace.cafe/api/hq/saas/tenants/${tenant.data.tenantId}/suspend`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${hqToken}`,
+        },
+        body: JSON.stringify({ suspended: true, reason: 'policy_review' }),
+      }),
+      env,
+      dummyCtx
+    );
+    expect(suspendRes.status).toBe(200);
+
+    const overviewRes = await app.fetch(
+      new Request('https://auraspace.cafe/api/hq/saas/overview', {
+        headers: { Authorization: `Bearer ${hqToken}` },
+      }),
+      env,
+      dummyCtx
+    );
+    expect(overviewRes.status).toBe(200);
+    const overview = (await overviewRes.json()) as {
+      data: { suspended: number; inReadOnly: number; totalTenants: number };
+    };
+    expect(overview.data.suspended).toBe(1);
+    expect(overview.data.inReadOnly).toBe(0);
+  });
+
+  it('validates branding logoUrl, preserves omitted colors, rejects platform domains, and binds AES-GCM secrets via AAD', async () => {
+    const { db } = createMigratedD1();
+    const env = buildEnv(db);
+
+    const tenant = await signupTenant(env, {
+      slug: 'branding-domain-aad',
+      shopName: 'Quán Branding Domain',
+      ownerEmail: 'branding-domain@quan.vn',
+      planId: 'pro',
+    });
+
+    // Reject javascript: logo URL
+    const badLogoRes = await app.fetch(
+      new Request('https://auraspace.cafe/api/saas/branding', {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${tenant.token}`,
+        },
+        body: JSON.stringify({ logoUrl: 'javascript:alert(1)' }),
+      }),
+      env,
+      dummyCtx
+    );
+    expect(badLogoRes.status).toBe(400);
+
+    // Save custom primary color, then update brandName only -> primaryColor must be preserved
+    const setColorRes = await app.fetch(
+      new Request('https://auraspace.cafe/api/saas/branding', {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${tenant.token}`,
+        },
+        body: JSON.stringify({ primaryColor: '#112233', accentColor: '#445566' }),
+      }),
+      env,
+      dummyCtx
+    );
+    expect(setColorRes.status).toBe(200);
+
+    const partialPatchRes = await app.fetch(
+      new Request('https://auraspace.cafe/api/saas/branding', {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${tenant.token}`,
+        },
+        body: JSON.stringify({ displayName: 'Quán Đổi Tên' }),
+      }),
+      env,
+      dummyCtx
+    );
+    expect(partialPatchRes.status).toBe(200);
+
+    const getMeRes = await app.fetch(
+      new Request('https://auraspace.cafe/api/saas/me', {
+        headers: { Authorization: `Bearer ${tenant.token}` },
+      }),
+      env,
+      dummyCtx
+    );
+    expect(getMeRes.status).toBe(200);
+    const meJson = (await getMeRes.json()) as {
+      data: { branding: { display_name: string; primary_color: string; accent_color: string } };
+    };
+    expect(meJson.data.branding.display_name).toBe('Quán Đổi Tên');
+    expect(meJson.data.branding.primary_color).toBe('#112233');
+    expect(meJson.data.branding.accent_color).toBe('#445566');
+
+    // Reject platform subdomain and reserved internal domain
+    for (const badDomain of ['evil.auraspace.cafe', 'localhost', '127.0.0.1']) {
+      const domRes = await app.fetch(
+        new Request('https://auraspace.cafe/api/saas/domains', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${tenant.token}`,
+          },
+          body: JSON.stringify({ domain: badDomain }),
+        }),
+        env,
+        dummyCtx
+      );
+      expect(domRes.status).toBe(400);
+    }
+
+    // AES-GCM AAD binding prevents cross-tenant secret transplantation
+    const cipherA = await encryptTenantSecret('secret-key-a', TENANT_SECRETS_KEY, 1, 'tenant-a:payos_api_key');
+    expect(await decryptTenantSecret(cipherA, TENANT_SECRETS_KEY, 'tenant-a:payos_api_key')).toBe('secret-key-a');
+    await expect(
+      decryptTenantSecret(cipherA, TENANT_SECRETS_KEY, 'tenant-b:payos_api_key')
+    ).rejects.toThrow();
   });
 });
