@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useOrderStoreWithOfflineFlush } from '@/hooks/stores/use-order-store';
+import { rememberGuestOrderToken, stripOrderTokenFromBrowserUrl } from '@/lib/guest-order-token';
 import { useTranslation } from 'react-i18next';
 import { HelmetHead } from '@/components/seo/HelmetHead';
 import { TrackOrderSearchCard } from '@/components/tracking/track-order-search-card';
@@ -26,7 +27,12 @@ export default function TrackOrderPage() {
 
   useEffect(() => {
     const paramId = (searchParams.get('id') || searchParams.get('order_id') || '').trim();
+    const paramToken = (searchParams.get('order_token') || '').trim();
     if (paramId) {
+      if (paramToken) {
+        rememberGuestOrderToken(paramId, paramToken);
+        stripOrderTokenFromBrowserUrl();
+      }
       setOrderId(paramId);
       setActiveOrderId(paramId);
       fetchOrder(paramId).then(() => startPolling(paramId)).catch(() => {});

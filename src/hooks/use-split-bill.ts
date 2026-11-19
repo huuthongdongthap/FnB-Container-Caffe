@@ -1,6 +1,7 @@
 import { useState, useCallback, useMemo } from 'react';
 import { useCartStore, type CartItem } from '@/hooks/stores/use-cart-store';
-import { API_BASE } from '@/lib/api-client';
+import { apiFetch } from '@/lib/api-client';
+import { captureGuestOrderTokenFromResponse } from '@/lib/guest-order-token';
 import { type SplitResult, type SplitConfirmPayload } from './split-bill-types';
 import { computeSplits, computeUnassignedItems, buildSplitOrders } from './split-bill-helpers';
 
@@ -121,28 +122,32 @@ export function useSplitBill() {
 
       try {
         const orders = buildSplitOrders(splits, formData, tableId);
-        const token = typeof localStorage !== 'undefined' ? localStorage.getItem('aura_auth_token') : null;
-        const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-        if (token) headers.Authorization = `Bearer ${token}`;
-
-        const res = await fetch(`${API_BASE}/api/orders/split`, {
+        const idemKey =
+          typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+            ? crypto.randomUUID()
+            : `split_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
+        const body = await apiFetch<{
+          success?: boolean;
+          data?: unknown;
+          orders?: unknown;
+          order_tokens?: Record<string, string>;
+          error?: string;
+        }>('/api/orders/split', {
           method: 'POST',
-          credentials: 'include',
-          headers,
+          headers: { 'Idempotency-Key': idemKey },
           body: JSON.stringify({ orders, table_id: tableId }),
         });
 
-        const body = await res.json();
-
-        if (!res.ok || !body.success) {
+        if (body && body.success === false) {
           setError(body.error || 'Không thể tạo đơn chia bill');
           setIsSubmitting(false);
           return null;
         }
 
+        captureGuestOrderTokenFromResponse(body);
         clearCart();
         setIsSubmitting(false);
-        return body.data ?? body;
+        return (body?.data ?? body) as any;
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Lỗi kết nối máy chủ');
         setIsSubmitting(false);

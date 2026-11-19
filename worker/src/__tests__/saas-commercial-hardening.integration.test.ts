@@ -3,7 +3,7 @@
  * SaaS Commercial v3 — Full-Stack Multi-Tenant Hardening & Integration Suite
  *
  * Executes against the real unified Hono `app` (`worker/src/index.ts`) backed by
- * `node:sqlite` loaded with `worker/schema.sql` + `worker/db/migrations/20261119_01_saas_commercial_v3.sql`.
+ * `node:sqlite` loaded with `worker/schema.sql` + `worker/db/migrations/20261119_02_saas_commercial_v3.sql`.
  *
  * Verifies all commercial go-live gates:
  *  1. 2-tenant self-serve signup, isolated menu/orders/KDS/export, custom domain & subdomain routing, flagship immunity

@@ -16,7 +16,7 @@ import { StaffSessionError } from '../lib/staff-session';
 import { getTenantId, resolvePublicTenantId, matchesTenantRow } from '../middleware/tenant';
 import { Hono, type Context } from 'hono';
 import type { Env } from '../types/env';
-import { isTerminal, canAccessOrder, projectCustomerOrderPayload } from '@aura/domain-order';
+import { isTerminal, canAccessOrder, verifyGuestOrderToken, projectCustomerOrderPayload } from '@aura/domain-order';
 import { appendEventToLog, replayEventsSince, fetchOrderRecord, type OrderStreamEvent } from './order-stream-log';
 
 interface OrderEvent {
@@ -109,15 +109,29 @@ export const handleOrderStreamEvents: (c: Context<{ Bindings: Env }>) => Promise
       return c.json({ error: 'Cross-tenant access denied' }, 403);
     }
     const resolvedPublic = String((await (resolvePublicTenantId as any)(c as any, c.env.AURA_DB)) || '').trim();
-    if (user?.role === 'customer' && userTenant) {
+    let effectiveCustomerTenant = userTenant;
+    if (user?.role === 'customer' && !effectiveCustomerTenant && user.id && typeof db?.prepare === 'function') {
+      const custTenantRow = await db
+        .prepare('SELECT tenant_id FROM customers WHERE id = ? OR user_id = ? LIMIT 1')
+        .bind(user.id, user.id)
+        .first<{ tenant_id?: string | null }>()
+        .catch(() => null);
+      if (custTenantRow?.tenant_id && String(custTenantRow.tenant_id).trim()) {
+        effectiveCustomerTenant = String(custTenantRow.tenant_id).trim();
+      }
+    }
+    if (user?.role === 'customer' && effectiveCustomerTenant) {
       if (
-        (explicitHeaderOrQuery && explicitHeaderOrQuery !== userTenant) ||
-        (ctxTenant && ctxTenant !== 'default' && ctxTenant !== userTenant)
+        (explicitHeaderOrQuery && explicitHeaderOrQuery !== effectiveCustomerTenant) ||
+        (ctxTenant && ctxTenant !== 'default' && ctxTenant !== effectiveCustomerTenant)
       ) {
         return c.json({ error: 'Cross-tenant access denied' }, 403);
       }
-      tenantId = userTenant;
-    } else if (user?.role === 'customer' && !userTenant && (!resolvedPublic || resolvedPublic === 'default') && explicitHeaderOrQuery) {
+      tenantId = effectiveCustomerTenant;
+    } else if (user?.role === 'customer' && !effectiveCustomerTenant && (!resolvedPublic || resolvedPublic === 'default') && explicitHeaderOrQuery) {
+      if (ctxTenant && ctxTenant !== 'default' && explicitHeaderOrQuery !== ctxTenant) {
+        return c.json({ error: 'Cross-tenant access denied' }, 403);
+      }
       tenantId = explicitHeaderOrQuery;
     } else {
       const fallbackTenant = resolvedPublic || (getTenantId(c as any) || 'default').trim() || 'default';
@@ -128,25 +142,42 @@ export const handleOrderStreamEvents: (c: Context<{ Bindings: Env }>) => Promise
     }
   }
 
-  let order: { id: string; customer_id?: string | null; status: string; tenant_id?: string | null } | null = null;
+  type StreamOrderRow = {
+    id: string;
+    customer_id?: string | null;
+    guest_token_hash?: string | null;
+    status: string;
+    tenant_id?: string | null;
+  };
+  let order: StreamOrderRow | null = null;
   try {
     order = await db.prepare(
-      `SELECT id, customer_id, status, tenant_id FROM orders WHERE id = ? AND (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?)`
-    ).bind(orderId, tenantId, tenantId).first<{ id: string; customer_id?: string | null; status: string; tenant_id?: string | null }>();
+      `SELECT id, customer_id, guest_token_hash, status, tenant_id FROM orders WHERE id = ? AND (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?)`
+    ).bind(orderId, tenantId, tenantId).first<StreamOrderRow>()
+      .catch(() =>
+        db.prepare(
+          `SELECT id, customer_id, status, tenant_id FROM orders WHERE id = ? AND (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?)`
+        ).bind(orderId, tenantId, tenantId).first<StreamOrderRow>()
+      );
     if (!order && tenantId === 'default') {
       order = await db.prepare(
         `SELECT id, customer_id, status FROM orders WHERE id = ? AND (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?)`
-      ).bind(orderId, tenantId, tenantId).first<{ id: string; customer_id?: string | null; status: string; tenant_id?: string | null }>();
+      ).bind(orderId, tenantId, tenantId).first<StreamOrderRow>();
     }
   } catch {
     if (tenantId === 'default' || tenantId === '*') {
-      order = await db.prepare('SELECT id, customer_id, status, tenant_id FROM orders WHERE id = ?')
+      order = await db.prepare('SELECT id, customer_id, guest_token_hash, status, tenant_id FROM orders WHERE id = ?')
         .bind(orderId)
-        .first<{ id: string; customer_id?: string | null; status: string; tenant_id?: string | null }>()
+        .first<StreamOrderRow>()
+        .catch(() =>
+          db.prepare('SELECT id, customer_id, status, tenant_id FROM orders WHERE id = ?')
+            .bind(orderId)
+            .first<StreamOrderRow>()
+        )
         .catch(() =>
           db.prepare('SELECT id, customer_id, status FROM orders WHERE id = ?')
             .bind(orderId)
-            .first<{ id: string; customer_id?: string | null; status: string; tenant_id?: string | null }>()
+            .first<StreamOrderRow>()
         );
     } else {
       order = null;
@@ -195,10 +226,28 @@ export const handleOrderStreamEvents: (c: Context<{ Bindings: Env }>) => Promise
     }
   }
 
-  const access = canAccessOrder(effectiveUser, order);
-  if (!access.allowed) return c.json({ error: access.reason || 'Forbidden' }, 403);
+  const presentedOrderToken = (
+    c.req.header('X-Order-Token') ||
+    c.req.header('x-order-token') ||
+    c.req.query('order_token') ||
+    ''
+  ).trim();
+  const orderTokenVerified = order.guest_token_hash
+    ? await verifyGuestOrderToken(order.guest_token_hash, presentedOrderToken)
+    : false;
+  const access = canAccessOrder(effectiveUser, order, { orderTokenVerified });
+  if (!access.allowed) {
+    const isRegisteredOrder = Boolean(
+      order.customer_id &&
+      String(order.customer_id).trim() &&
+      String(order.customer_id).trim() !== 'guest'
+    );
+    const status = !effectiveUser && !presentedOrderToken && !isRegisteredOrder ? 401 : 403;
+    return c.json({ error: access.reason || (status === 401 ? 'Unauthorized' : 'Forbidden') }, status);
+  }
 
   let currentStatus = order.status || '';
+  let currentPaymentStatus = '';
 
   let cancelStream = () => {};
   const stream = new ReadableStream({
@@ -249,8 +298,13 @@ export const handleOrderStreamEvents: (c: Context<{ Bindings: Env }>) => Promise
           }
           const eventId: string = ev.eventId;
           send(ev.type, ev.data, eventId);
-          if (ev.type === 'update_order' && typeof ev.data === 'object' && ev.data && 'status' in ev.data) {
-            currentStatus = String((ev.data as { status: string }).status);
+          if (ev.type === 'update_order' && typeof ev.data === 'object' && ev.data) {
+            if ('status' in ev.data) {
+              currentStatus = String((ev.data as { status: string }).status);
+            }
+            if ('paymentStatus' in ev.data) {
+              currentPaymentStatus = String((ev.data as { paymentStatus: string }).paymentStatus);
+            }
           }
           replayedCount++;
         }
@@ -259,8 +313,13 @@ export const handleOrderStreamEvents: (c: Context<{ Bindings: Env }>) => Promise
       const initialOrder = await fetchOrderRecord(db, orderId, tenantId === '*' ? orderTenant : tenantId);
       if (initialOrder) {
         const safePayload = projectCustomerOrderPayload(initialOrder);
-        if (replayedCount === 0 || safePayload.status !== currentStatus) {
+        if (
+          replayedCount === 0 ||
+          safePayload.status !== currentStatus ||
+          safePayload.paymentStatus !== currentPaymentStatus
+        ) {
           currentStatus = safePayload.status;
+          currentPaymentStatus = safePayload.paymentStatus;
           const initialEventId = String(Date.now());
           send('update_order', safePayload, initialEventId);
           const streamEvent: OrderStreamEvent = {
@@ -275,7 +334,7 @@ export const handleOrderStreamEvents: (c: Context<{ Bindings: Env }>) => Promise
         }
       }
 
-      if (!initialOrder && tenantId !== '*') { closeStream(); return; }
+      if (!initialOrder) { closeStream(); return; }
       if (isTerminal(currentStatus as any)) {
         closeStream();
         return;
@@ -298,12 +357,29 @@ export const handleOrderStreamEvents: (c: Context<{ Bindings: Env }>) => Promise
             let shouldFetch = false;
             if (eventRaw) {
               try {
-                const event = JSON.parse(eventRaw) as OrderEvent & { tenant_id?: string };
+                const event = JSON.parse(eventRaw) as OrderEvent & {
+                  tenant_id?: string;
+                  paymentStatus?: string;
+                  payment_status?: string;
+                };
                 const evTenant = (event.tenantId || event.tenant_id || '').trim();
                 const eventTenantMatches = !evTenant || evTenant === orderTenant;
-                if (eventTenantMatches && event.status && event.status !== currentStatus) shouldFetch = true;
+                if (eventTenantMatches) {
+                  const evPayment = (event.paymentStatus || event.payment_status || '').trim();
+                  if (evPayment && evPayment !== currentPaymentStatus) {
+                    shouldFetch = true;
+                  } else if (event.status === 'paid') {
+                    if (currentPaymentStatus !== 'paid') shouldFetch = true;
+                  } else if (event.status && event.status !== currentStatus) {
+                    shouldFetch = true;
+                  }
+                }
               } catch {
-                if (eventRaw !== currentStatus) shouldFetch = true;
+                if (eventRaw === 'paid') {
+                  if (currentPaymentStatus !== 'paid') shouldFetch = true;
+                } else if (eventRaw !== currentStatus) {
+                  shouldFetch = true;
+                }
               }
             }
 
@@ -334,19 +410,32 @@ export const handleOrderStreamEvents: (c: Context<{ Bindings: Env }>) => Promise
                 }
               }
               if (dbOrder && !matchesTenantRow(dbOrder, orderTenant)) dbOrder = null;
-              if (!dbOrder && tenantId !== '*') { closeStream(); break; }
-              if (dbOrder && (dbOrder.status ?? '') !== currentStatus) shouldFetch = true;
+              if (!dbOrder) { closeStream(); break; }
+              if (
+                dbOrder &&
+                ((dbOrder.status ?? '') !== currentStatus ||
+                  (dbOrder.payment_status !== undefined &&
+                    (dbOrder.payment_status ?? '') !== currentPaymentStatus))
+              ) {
+                shouldFetch = true;
+              }
             }
 
             if (shouldFetch) {
               const updated = await fetchOrderRecord(db, orderId, tenantId === '*' ? orderTenant : tenantId);
-              if (!updated && tenantId !== '*') { closeStream(); break; }
+              if (!updated) { closeStream(); break; }
               if (updated) {
                 const payload = projectCustomerOrderPayload(updated);
-                currentStatus = payload.status;
-                const eventId = String(Date.now());
-                send('update_order', payload, eventId);
-                await appendEventToLog(kv, orderId, { eventId, orderId, type: 'update_order', data: payload, timestamp: new Date().toISOString(), tenantId: orderTenant }, orderTenant);
+                if (
+                  payload.status !== currentStatus ||
+                  payload.paymentStatus !== currentPaymentStatus
+                ) {
+                  currentStatus = payload.status;
+                  currentPaymentStatus = payload.paymentStatus;
+                  const eventId = String(Date.now());
+                  send('update_order', payload, eventId);
+                  await appendEventToLog(kv, orderId, { eventId, orderId, type: 'update_order', data: payload, timestamp: new Date().toISOString(), tenantId: orderTenant }, orderTenant);
+                }
 
                 if (isTerminal(currentStatus as any)) {
                   closeStream();

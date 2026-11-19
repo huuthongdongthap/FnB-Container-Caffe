@@ -1,4 +1,4 @@
-import { writeFile } from 'node:fs/promises';
+import { mkdir, writeFile } from 'node:fs/promises';
 import { readFileSync, existsSync } from 'node:fs';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
@@ -20,9 +20,17 @@ const sourceHash = () => {
   }
   return hash.digest('hex');
 };
+// Shallow PR checkouts have no origin/main ref; this value is report metadata only.
+const revParse = (rev) => {
+  try {
+    return execFileSync('git', ['rev-parse', rev], { cwd: ROOT, stdio: ['ignore', 'pipe', 'ignore'] }).toString().trim();
+  } catch {
+    return 'unavailable';
+  }
+};
 report.baseline = {
-  head: execFileSync('git', ['rev-parse', 'HEAD'], { cwd: ROOT }).toString().trim(),
-  originMain: execFileSync('git', ['rev-parse', 'origin/main'], { cwd: ROOT }).toString().trim(),
+  head: revParse('HEAD'),
+  originMain: revParse('origin/main'),
   sourceDiffSha256: sourceHash(),
   miniflare: '4.20260515.0', workerd: '1.20260515.1', compatibilityDate: '2025-01-01',
   schema: 'fresh worker/schema.sql including additive operational contracts; no remote migration or production snapshot',
@@ -50,6 +58,7 @@ try {
   report.finishedAt = new Date().toISOString();
   report.sourceDiffUnchanged = sourceHash() === report.baseline.sourceDiffSha256;
   report.summary = { passed: report.checks.filter(check => check.pass).length, failed: report.checks.filter(check => !check.pass).length, fatal: Boolean(report.fatal) };
+  await mkdir(verificationDir(), { recursive: true });
   await writeFile(path.join(verificationDir(), `${apiOnly ? 'api-flow-results' : 'local-flow-results'}.json`), JSON.stringify(report, null, 2));
   console.log('RESULT', JSON.stringify(report.summary));
   process.exitCode = report.summary.failed || report.summary.fatal ? 1 : 0;

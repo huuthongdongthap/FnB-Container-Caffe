@@ -90,12 +90,12 @@ function resolveRangeHours(range: string): number {
  *     })
  *   );
  */
-export function recordMetric(
+export async function recordMetric(
   db: D1Database,
   name: string,
   value: number = 1,
   tags?: Record<string, string>
-): void {
+): Promise<void> {
   if (!db || typeof db.prepare !== 'function') {
     return;
   }
@@ -107,10 +107,7 @@ export function recordMetric(
       ? prepared.bind(name, value, JSON.stringify(tags ?? {}))
       : prepared;
     if (typeof stmt?.run === 'function') {
-      Promise.resolve(stmt.run()).catch((err: unknown) => {
-        const errMsg = err instanceof Error ? err.message : String(err);
-        log.error('recordMetric_failed', { error: errMsg });
-      });
+      await Promise.resolve(stmt.run());
     }
   } catch (err: unknown) {
     const errMsg = err instanceof Error ? err.message : String(err);

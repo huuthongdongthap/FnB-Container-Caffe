@@ -54,7 +54,7 @@ export default function FranchiseReportsPage() {
     queryKey: ['admin-franchise-metrics', locations.map((l) => l.id).join(','), startDate, endDate],
     enabled: locations.length > 0,
     queryFn: async () => {
-      const results = await Promise.all(
+      const settled = await Promise.allSettled(
         locations.map(async (loc) => {
           const res = await apiFetch<{ success: boolean; data: FranchiseLocationMetrics }>(
             `/api/franchise/locations/${encodeURIComponent(loc.id)}/metrics?start_date=${encodeURIComponent(startDate)}&end_date=${encodeURIComponent(endDate)}`
@@ -62,7 +62,9 @@ export default function FranchiseReportsPage() {
           return res.data;
         })
       );
-      return results.filter(Boolean);
+      return settled
+        .filter((r): r is PromiseFulfilledResult<FranchiseLocationMetrics> => r.status === 'fulfilled' && Boolean(r.value))
+        .map((r) => r.value);
     },
   });
 

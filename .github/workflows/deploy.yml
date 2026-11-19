@@ -15,7 +15,7 @@ on:
           - worker-rollback
         default: worker-canary-10
       migration_file:
-        description: 'Canonical forward D1 migration file in worker/db/migrations/ (required when action is apply-d1-migration, e.g. 20261118_01_orders_loyalty_points_redeemed.sql)'
+        description: 'Canonical forward D1 migration file in worker/db/migrations/ (required when action is apply-d1-migration, e.g. 20261119_02_saas_commercial_v3.sql)'
         required: false
         type: string
         default: ''
@@ -25,7 +25,7 @@ on:
         type: string
         default: ''
       baseline_version_id:
-        description: 'Baseline Worker Version ID for 90% canary (leave blank to auto-detect active production version)'
+        description: 'Baseline Worker Version ID for the 90% canary slice. Leave empty to auto-detect the live 100% production version.'
         required: false
         type: string
         default: ''
@@ -33,79 +33,102 @@ on:
         description: 'Rollback message/reason (used when action is worker-rollback)'
         required: false
         type: string
-        default: 'Emergency production rollback via GitHub Actions'
+        default: 'Manual rollback triggered through GitHub Actions'
+
+# One production rollout at a time; never cancel a half-applied migration or traffic split.
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
 
 env:
+  TZ: UTC
   MIGRATION_FILE_INPUT: ${{ inputs.migration_file }}
   BASELINE_VERSION_ID: ${{ inputs.baseline_version_id }}
   WORKER_VERSION_ID: ${{ inputs.worker_version_id }}
   ROLLBACK_REASON_INPUT: ${{ inputs.rollback_reason }}
+  CLOUDFLARE_ACCOUNT_ID: b69fee03bdd94234eea8e4114cfc36ab
+  # wrangler is installed only inside worker/node_modules (worker is not an npm workspace),
+  # so the repo root has no wrangler binary. Worker steps use working-directory: worker;
+  # root-level steps (migration scripts, Pages deploy) prepend worker/node_modules/.bin to PATH.
+  WRANGLER_DIR: worker
+
+permissions:
+  contents: read
 
 jobs:
   apply-d1-migration:
     name: Backup & Apply Explicit D1 Migration
     if: ${{ inputs.action == 'apply-d1-migration' }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     environment: production
     permissions:
       contents: read
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
-          node-version: '22.x'
+          node-version-file: '.nvmrc'
 
       - name: Install root & worker dependencies
         run: |
           npm ci --silent
           cd worker && npm ci --silent
 
-      - name: Validate migration file & export pre-migration D1 backup
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: b69fee03bdd94234eea8e4114cfc36ab
+      - name: Validate migration file selection
         run: |
           set -euo pipefail
           if ! printf '%s' "$MIGRATION_FILE_INPUT" | grep -Eq '^[0-9]{8}_[0-9]{2}_[a-z0-9_]+\.sql$'; then
             echo "Error: invalid migration_file format (expected YYYYMMDD_NN_slug.sql)" >&2
             exit 1
           fi
-          bash worker/scripts/apply-migrations.sh --dry-run --file "$MIGRATION_FILE_INPUT"
-          mkdir -p d1-backups
-          BACKUP_PATH="d1-backups/fnb-caffe-db-pre-${MIGRATION_FILE_INPUT%.sql}-$(date -u +%Y%m%dT%H%M%SZ).sql"
-          echo "Exporting remote D1 backup before migration..."
-          npx --no-install wrangler d1 export fnb-caffe-db --remote --output="$BACKUP_PATH" --config worker/wrangler.toml
+          PATH="$GITHUB_WORKSPACE/worker/node_modules/.bin:$PATH" \
+            bash worker/scripts/apply-migrations.sh --dry-run --file "$MIGRATION_FILE_INPUT"
 
-      - name: Retain pre-migration D1 backup artifact
-        uses: actions/upload-artifact@v4
+      - name: Export pre-migration D1 backup
+        working-directory: worker
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          set -euo pipefail
+          BACKUP_DIR="$GITHUB_WORKSPACE/d1-backups"
+          mkdir -p "$BACKUP_DIR"
+          BACKUP_PATH="$BACKUP_DIR/fnb-caffe-db-pre-${MIGRATION_FILE_INPUT%.sql}-$(date -u +%Y%m%dT%H%M%SZ).sql"
+          echo "Exporting remote D1 backup before migration to $BACKUP_PATH..."
+          npx --no-install wrangler d1 export fnb-caffe-db --remote --output="$BACKUP_PATH"
+          test -s "$BACKUP_PATH"
+          echo "BACKUP_PATH=$BACKUP_PATH" >> "$GITHUB_ENV"
+
+      - name: Upload pre-migration D1 backup artifact
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: d1-backup-pre-migration-${{ github.run_id }}
-          path: d1-backups/*.sql
-          retention-days: 30
+          name: d1-pre-migration-backup-${{ github.run_id }}
+          path: d1-backups/
           if-no-files-found: error
+          retention-days: 30
+          compression-level: 0
 
       - name: Apply explicit forward D1 migration
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: b69fee03bdd94234eea8e4114cfc36ab
         run: |
           set -euo pipefail
-          PATH="$PWD/node_modules/.bin:$PATH" bash worker/scripts/apply-migrations.sh --remote --file "$MIGRATION_FILE_INPUT"
+          PATH="$GITHUB_WORKSPACE/worker/node_modules/.bin:$PATH" \
+            bash worker/scripts/apply-migrations.sh --remote --file "$MIGRATION_FILE_INPUT"
 
   deploy-pages:
     name: Deploy Cloudflare Pages
     if: ${{ inputs.action == 'deploy-pages' }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     environment: production
     permissions:
       contents: read
       deployments: write
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
       - name: Verify Checked-out SHA
         run: |
@@ -113,12 +136,23 @@ jobs:
           echo "Local Checked-out HEAD SHA: $(git rev-parse HEAD)"
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
-          node-version: '22.x'
+          node-version-file: '.nvmrc'
 
-      - name: Install root dependencies
-        run: npm ci --silent
+      - name: Install root and worker dependencies
+        run: |
+          npm ci --silent
+          cd worker && npm ci --silent
+
+      - name: Run Pre-Deploy Quality Gates
+        run: |
+          npm run lint
+          npm run lint:migrations
+          npm run check:contrast
+          npm run typecheck:all
+          npm run test:ci
+          node scripts/local-payment-flow/run.mjs --api-only
 
       - name: Build frontend
         run: |
@@ -140,17 +174,19 @@ jobs:
       - name: Deploy to Cloudflare Pages
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: b69fee03bdd94234eea8e4114cfc36ab
-        run: npx --no-install wrangler pages deploy dist --project-name=fnb-caffe-container
+        run: |
+          set -euo pipefail
+          PATH="$GITHUB_WORKSPACE/worker/node_modules/.bin:$PATH" \
+            npx --no-install wrangler pages deploy dist --project-name=fnb-caffe-container --branch=main
 
   worker-canary:
     name: Worker Canary (10% Traffic)
     if: ${{ inputs.action == 'worker-canary-10' }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     environment: production
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
       - name: Verify Checked-out SHA
         run: |
@@ -158,9 +194,9 @@ jobs:
           echo "Local Checked-out HEAD SHA: $(git rev-parse HEAD)"
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
-          node-version: '22.x'
+          node-version-file: '.nvmrc'
 
       - name: Install root dependencies
         run: npm ci --silent
@@ -171,57 +207,79 @@ jobs:
       - name: Install worker dependencies
         run: cd worker && npm ci --silent
 
+      - name: Run pre-canary verification gates
+        run: |
+          npm run lint
+          npm run lint:migrations
+          npm run check:contrast
+          npm run typecheck:all
+          npm run test:ci
+          node scripts/local-payment-flow/run.mjs --api-only
+
+      - name: Record pre-canary D1 Time Travel bookmark
+        working-directory: worker
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: npx --no-install wrangler d1 time-travel info fnb-caffe-db --json || true
+
+      - name: Resolve baseline version
+        working-directory: worker
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          set -euo pipefail
+          BASELINE="$BASELINE_VERSION_ID"
+          if [[ -z "$BASELINE" ]]; then
+            echo "baseline_version_id not supplied; detecting live production version..." >&2
+            BASELINE="$(npx --no-install wrangler deployments list --json | node -e "let d='';process.stdin.on('data',c=>d+=c).on('end',()=>{const l=JSON.parse(d);l.sort((a,b)=>Date.parse(b.created_on)-Date.parse(a.created_on));const v=[...(l[0]&&l[0].versions||[])].sort((a,b)=>(b.percentage||0)-(a.percentage||0));process.stdout.write(String(v[0]&&v[0].version_id||''))})")"
+          fi
+          if ! printf '%s' "$BASELINE" | grep -Eq '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$'; then
+            echo "Error: could not resolve a valid baseline Worker Version ID (got '$BASELINE')" >&2
+            exit 1
+          fi
+          echo "Resolved baseline version: $BASELINE"
+          echo "BASELINE_VERSION_ID=$BASELINE" >> "$GITHUB_ENV"
+
       - name: Upload Version and Deploy 10% Canary
         working-directory: worker
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: b69fee03bdd94234eea8e4114cfc36ab
         run: |
-          set -e
-          RESOLVED_BASELINE="$BASELINE_VERSION_ID"
-          if [ -z "$RESOLVED_BASELINE" ]; then
-            echo "Auto-detecting active production Worker baseline version..."
-            DEPLOYMENTS_JSON=$(npx --no-install wrangler deployments list --json 2>/dev/null || true)
-            RESOLVED_BASELINE=$(printf '%s' "$DEPLOYMENTS_JSON" | node -e "
-              const fs = require('fs');
-              try {
-                const list = JSON.parse(fs.readFileSync(0, 'utf8'));
-                const latest = Array.isArray(list) ? list[list.length - 1] : null;
-                const ver = latest && Array.isArray(latest.versions) ? latest.versions[0]?.version_id : '';
-                if (ver) process.stdout.write(String(ver));
-              } catch {}
-            ")
-          fi
-          if ! printf '%s' "$RESOLVED_BASELINE" | grep -Eq '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$'; then
-            echo "Error: could not determine valid active baseline_version_id UUID. Pass baseline_version_id explicitly."
-            exit 1
-          fi
+          set -euo pipefail
           echo "Uploading candidate version for SHA ${{ github.sha }}..."
           UPLOAD_OUTPUT=$(npx --no-install wrangler versions upload --message "Candidate SHA ${{ github.sha }}" --var GIT_COMMIT_SHA:${{ github.sha }})
           echo "$UPLOAD_OUTPUT"
           VERSION_ID=$(echo "$UPLOAD_OUTPUT" | grep -oE '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}' | head -n 1)
           if [ -z "$VERSION_ID" ]; then
-            echo "Error: Could not extract Worker Version ID from wrangler output"
+            echo "Error: Could not extract Worker Version ID from wrangler output" >&2
+            exit 1
+          fi
+          if [ "$VERSION_ID" = "$BASELINE_VERSION_ID" ]; then
+            echo "Error: candidate version equals baseline version; a canary split would be a no-op" >&2
             exit 1
           fi
           echo "Candidate Version ID: $VERSION_ID"
-          echo "Baseline Version ID: $RESOLVED_BASELINE"
-          echo "Deploying traffic split: 10% -> $VERSION_ID, 90% -> $RESOLVED_BASELINE"
-          npx --no-install wrangler versions deploy "$VERSION_ID@10" "$RESOLVED_BASELINE@90" --yes
+          echo "Baseline Version ID: $BASELINE_VERSION_ID"
+          echo "Deploying traffic split: 10% -> $VERSION_ID, 90% -> $BASELINE_VERSION_ID"
+          npx --no-install wrangler versions deploy "$VERSION_ID@10" "$BASELINE_VERSION_ID@90" --yes
+          echo "CANARY_VERSION_ID=$VERSION_ID" >> "$GITHUB_ENV"
+
+      - name: Report canary candidate version
+        run: echo "Canary candidate version $CANARY_VERSION_ID is serving 10% of production traffic."
 
   worker-promote:
     name: Worker Promote to 100%
     if: ${{ inputs.action == 'worker-promote-100' }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     environment: production
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
-          node-version: '22.x'
+          node-version-file: '.nvmrc'
 
       - name: Install root dependencies
         run: npm ci --silent
@@ -236,16 +294,15 @@ jobs:
         working-directory: worker
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: b69fee03bdd94234eea8e4114cfc36ab
         run: |
-          set -e
+          set -euo pipefail
           VERSION_ID="$WORKER_VERSION_ID"
           if [ -z "$VERSION_ID" ]; then
-            echo "Error: worker_version_id is required for worker-promote-100"
+            echo "Error: worker_version_id is required for worker-promote-100" >&2
             exit 1
           fi
           if ! printf '%s' "$VERSION_ID" | grep -Eq '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$'; then
-            echo "Error: invalid worker_version_id UUID format"
+            echo "Error: invalid worker_version_id UUID format" >&2
             exit 1
           fi
           echo "Promoting Worker Version $VERSION_ID to 100% production traffic..."
@@ -254,16 +311,16 @@ jobs:
   worker-rollback:
     name: Worker Rollback
     if: ${{ inputs.action == 'worker-rollback' }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     environment: production
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
-          node-version: '22.x'
+          node-version-file: '.nvmrc'
 
       - name: Install root dependencies
         run: npm ci --silent
@@ -278,18 +335,20 @@ jobs:
         working-directory: worker
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: b69fee03bdd94234eea8e4114cfc36ab
         run: |
-          set -e
-          TARGET_VERSION="${WORKER_VERSION_ID:-$BASELINE_VERSION_ID}"
-          if [ -n "$TARGET_VERSION" ]; then
-            if ! printf '%s' "$TARGET_VERSION" | grep -Eq '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$'; then
-              echo "Error: invalid rollback target version UUID format"
-              exit 1
-            fi
-            echo "Rolling back Worker to explicit version $TARGET_VERSION..."
-            npx --no-install wrangler rollback "$TARGET_VERSION" --message "$ROLLBACK_REASON_INPUT" --yes
-          else
-            echo "Rolling back Worker to immediately preceding active deployment..."
-            npx --no-install wrangler rollback --message "$ROLLBACK_REASON_INPUT" --yes
+          set -euo pipefail
+          TARGET_VERSION="$WORKER_VERSION_ID"
+          if [ -z "$TARGET_VERSION" ]; then
+            TARGET_VERSION="$BASELINE_VERSION_ID"
           fi
+          if [ -z "$TARGET_VERSION" ]; then
+            echo "No explicit target version supplied; rolling back to the previous deployment."
+            npx --no-install wrangler rollback --message "$ROLLBACK_REASON_INPUT" --yes
+            exit 0
+          fi
+          if ! printf '%s' "$TARGET_VERSION" | grep -Eq '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$'; then
+            echo "Error: invalid rollback target version UUID format" >&2
+            exit 1
+          fi
+          echo "Rolling back Worker to version $TARGET_VERSION..."
+          npx --no-install wrangler rollback "$TARGET_VERSION" --message "$ROLLBACK_REASON_INPUT" --yes

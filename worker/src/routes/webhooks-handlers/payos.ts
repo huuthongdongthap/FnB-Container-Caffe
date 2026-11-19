@@ -1,5 +1,6 @@
 import type { Hono, Context } from 'hono';
 import { publishOrderEvent } from '@aura/domain-order';
+import { getDatabase } from '../../lib/db';
 import { payosWebhookSchema } from '../../lib/validators';
 import { createMetricsCollector } from '../../lib/metrics-collector';
 import type { Env } from '../../types/env';
@@ -8,6 +9,15 @@ import { sendOrderPaidNotifications } from './notifications';
 import { resolveMerchantPaymentConfig } from '../../lib/merchant-payment';
 import { settlePayOS, type SettlementPayment } from './payos-settlement';
 import { writePaymentReviewMarker } from '../../../../packages/domain/payment/commands/payos-reconcile-lease';
+import { extractPayOSLinkId } from '../../../../packages/domain/payment/commands/payos-provider-verify';
+
+const normalizeTenantId = (value: unknown): string => {
+  const trimmed = typeof value === 'string' ? value.trim() : '';
+  return trimmed && trimmed !== '*' && trimmed.toLowerCase() !== 'hq' ? trimmed : 'default';
+};
+
+/** PayOS dashboard registration sends a signed synthetic payload with this fixed order code. */
+const PAYOS_PROBE_ORDER_CODE = 123;
 
 function safeWaitUntil(c: any, promise: Promise<any>): void {
   promise.catch(() => {});
@@ -20,7 +30,7 @@ export async function handlePayosWebhook(
   openApi = false,
   explicitTenantSlugOrId?: string
 ): Promise<Response> {
-  const db = c.env.AURA_DB;
+  const db = getDatabase(c as unknown as { env: Record<string, unknown> });
   const now = new Date().toISOString();
   const ack = (message: string) => openApi
     ? c.json({ success: true, data: { received: true } })
@@ -64,14 +74,26 @@ export async function handlePayosWebhook(
       });
       return c.json({ error: 1, message: 'Invalid signature' }, 401);
     }
+    // Signed registration probe: acknowledged without touching any business table.
+    if (Number(data.orderCode) === PAYOS_PROBE_ORDER_CODE) {
+      return openApi
+        ? c.json({ success: true, data: { received: true, probe: true } })
+        : c.json({ error: 0, message: 'Probe acknowledged', data: { probe: true } });
+    }
     const orderCode = String(data.orderCode);
-    let payment: (SettlementPayment & { tenant_id?: string | null }) | null = null;
+    type WebhookPayment = SettlementPayment & { tenant_id?: string | null; payment_url?: string | null };
+    let payment: WebhookPayment | null = null;
     try {
-      payment = await db.prepare('SELECT id, order_id, status, amount, method, tenant_id FROM payments WHERE transaction_id = ?')
-        .bind(orderCode).first<SettlementPayment & { tenant_id?: string | null }>();
+      payment = await db.prepare('SELECT id, order_id, status, amount, method, tenant_id, payment_url FROM payments WHERE transaction_id = ?')
+        .bind(orderCode).first<WebhookPayment>();
     } catch {
-      payment = await db.prepare('SELECT id, order_id, status, amount, method FROM payments WHERE transaction_id = ?')
-        .bind(orderCode).first<SettlementPayment & { tenant_id?: string | null }>();
+      try {
+        payment = await db.prepare('SELECT id, order_id, status, amount, method, tenant_id FROM payments WHERE transaction_id = ?')
+          .bind(orderCode).first<WebhookPayment>();
+      } catch {
+        payment = await db.prepare('SELECT id, order_id, status, amount, method FROM payments WHERE transaction_id = ?')
+          .bind(orderCode).first<WebhookPayment>();
+      }
     }
     if (!payment) {
       await writePaymentReviewMarker(c.env.AUTH_KV, {
@@ -86,11 +108,10 @@ export async function handlePayosWebhook(
     const order = await db.prepare('SELECT * FROM orders WHERE id = ?')
       .bind(payment.order_id).first<{ id: string; payment_status: string; payment_method: string; total?: number | null; total_amount?: number | null; tenant_id?: string | null }>();
     if (!order || order.payment_method !== 'payos') return c.json({ error: 1, message: 'Payment method mismatch' }, 409);
-    const rawPaymentTenant = typeof payment.tenant_id === 'string' ? payment.tenant_id.trim() : '';
-    const rawOrderTenant =
-      typeof (order as Record<string, unknown>).tenant_id === 'string' && String((order as Record<string, unknown>).tenant_id).trim()
-        ? String((order as Record<string, unknown>).tenant_id).trim()
-        : '';
+    const orderRow = order as Record<string, unknown>;
+    // A missing tenant column means a legacy single-tenant schema; a present NULL/'' means 'default'.
+    const rawPaymentTenant = 'tenant_id' in payment ? normalizeTenantId(payment.tenant_id) : '';
+    const rawOrderTenant = 'tenant_id' in orderRow ? normalizeTenantId(orderRow.tenant_id) : '';
     if (rawPaymentTenant && rawOrderTenant && rawPaymentTenant !== rawOrderTenant) {
       await writePaymentReviewMarker(c.env.AUTH_KV, {
         paymentId: payment.id,
@@ -101,6 +122,19 @@ export async function handlePayosWebhook(
         errorCode: 'TENANT_MISMATCH',
       });
       return c.json({ error: 1, message: 'Payment tenant mismatch' }, 409);
+    }
+    const storedLinkId = extractPayOSLinkId(payment.payment_url);
+    const webhookLinkId = typeof data.paymentLinkId === 'string' ? data.paymentLinkId.trim() : '';
+    if (storedLinkId && webhookLinkId && storedLinkId !== webhookLinkId) {
+      await writePaymentReviewMarker(c.env.AUTH_KV, {
+        paymentId: payment.id,
+        orderId: payment.order_id,
+        orderCode,
+        source: 'webhook',
+        stage: 'link_check',
+        errorCode: 'PAYMENT_LINK_MISMATCH',
+      });
+      return c.json({ error: 1, message: 'Payment link mismatch' }, 400);
     }
     const settledOrderTenant = rawOrderTenant || rawPaymentTenant || 'default';
     if (explicitTenantSlugOrId && settledOrderTenant !== targetTenantId) {
@@ -152,7 +186,24 @@ export async function handlePayosWebhook(
     if (payment.status === 'refunded' || order.payment_status === 'refunded') return ack('Already processed');
     if (payment.status === 'completed' && (!success || order.payment_status === 'paid' || isInitialTerminalOrder)) return ack('Already processed');
     const status = success ? 'completed' : rawStatus === 'EXPIRED' ? 'expired' : rawStatus === 'CANCELLED' ? 'cancelled' : 'failed';
-    const settled = await settlePayOS(db, payment, success, status, now);
+    const providerReference = typeof data.reference === 'string' ? data.reference.trim() : '';
+    let settled: Awaited<ReturnType<typeof settlePayOS>>;
+    try {
+      settled = await settlePayOS(db, payment, success, status, now, providerReference || null);
+    } catch (err) {
+      if (/UNIQUE constraint failed:.*provider_reference/i.test(String(err))) {
+        await writePaymentReviewMarker(c.env.AUTH_KV, {
+          paymentId: payment.id,
+          orderId: payment.order_id,
+          orderCode,
+          source: 'webhook',
+          stage: 'provider_reference_check',
+          errorCode: 'DUPLICATE_PROVIDER_REFERENCE',
+        });
+        return c.json({ error: 1, message: 'Duplicate provider reference' }, 409);
+      }
+      throw err;
+    }
     if (success && !settled.paymentChanged && payment.status !== 'completed') {
       const current = await db.prepare('SELECT status FROM payments WHERE id = ?').bind(payment.id).first<{ status: string }>();
       if (current?.status !== 'completed') return c.json({ error: 1, message: 'Payment requires reconciliation' }, 409);
@@ -224,11 +275,67 @@ export async function handlePayosWebhook(
       } else {
         const kv = c.env.AUTH_KV;
         if (kv) {
-          const latestOrderKey = settledOrderTenant === 'default' ? 'latest_order_ts' : `latest_order_ts:${settledOrderTenant}`;
-          const latestUpdatedKey = settledOrderTenant === 'default' ? 'orders:latest_updated_at' : `orders:latest_updated_at:${settledOrderTenant}`;
-          await kv.put(latestOrderKey, now).catch(() => {});
-          await kv.put(latestUpdatedKey, now).catch(() => {});
-          await publishOrderEvent(kv, payment.order_id, 'paid').catch(() => {});
+          await publishOrderEvent(
+            kv,
+            payment.order_id,
+            String(effectiveOrderRecord.status || 'pending'),
+            {
+              tenantId: settledOrderTenant,
+              paymentStatus: 'paid',
+            },
+          ).catch(() => {});
+        }
+        if (c.env.ORDER_BROADCASTER) {
+          try {
+            const ns = c.env.ORDER_BROADCASTER;
+            const doChannel =
+              settledOrderTenant !== 'default'
+                ? `${settledOrderTenant}:${payment.order_id}`
+                : payment.order_id;
+            const stub = ns.get(ns.idFromName(doChannel));
+            let parsedItems: unknown[] = [];
+            if (Array.isArray(effectiveOrderRecord.items)) {
+              parsedItems = effectiveOrderRecord.items;
+            } else if (typeof effectiveOrderRecord.items === 'string') {
+              try {
+                parsedItems = JSON.parse(effectiveOrderRecord.items) as unknown[];
+              } catch {
+                parsedItems = [];
+              }
+            }
+            const eventPayload = {
+              orderId: payment.order_id,
+              status: String(effectiveOrderRecord.status || 'pending'),
+              payment_status: 'paid',
+              items: parsedItems,
+              total: Number(effectiveOrderRecord.total ?? effectiveOrderRecord.total_amount ?? payment.amount ?? 0),
+              customer_name: String(effectiveOrderRecord.customer_name ?? ''),
+              customer_phone: String(effectiveOrderRecord.customer_phone ?? ''),
+              table_id: effectiveOrderRecord.table_id ? String(effectiveOrderRecord.table_id) : null,
+              ...(settledOrderTenant !== 'default' ? { tenant_id: settledOrderTenant } : {}),
+              createdAt: effectiveOrderRecord.created_at
+                ? new Date(String(effectiveOrderRecord.created_at)).getTime()
+                : Date.now(),
+              updatedAt: Date.now(),
+            };
+            const rpcStub = stub as unknown as {
+              broadcast?: (msg: unknown) => Promise<void>;
+              fetch?: (input: RequestInfo, init?: RequestInit) => Promise<Response>;
+            };
+            const doPromise =
+              typeof rpcStub.broadcast === 'function'
+                ? rpcStub.broadcast(eventPayload)
+                : typeof rpcStub.fetch === 'function'
+                  ? rpcStub.fetch('https://do/broadcast', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify(eventPayload),
+                    })
+                  : Promise.resolve();
+            safeWaitUntil(c, Promise.resolve(doPromise));
+          } catch {
+            /* Non-blocking realtime broadcast */
+          }
         }
         // One notification per successful payment transition; repair/replay cannot double-send.
         if (settled.paymentChanged && details) {

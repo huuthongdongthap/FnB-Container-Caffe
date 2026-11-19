@@ -3,6 +3,7 @@ import type { D1Database } from '@cloudflare/workers-types';
 import { validatePromotionSchema, redeemPromotionSchema } from '../../lib/validators';
 import { optionalAuth } from '../../middleware/auth';
 import { isHQSuperAdmin, matchesTenantRow, resolvePublicTenantId } from '../../middleware/tenant';
+import { verifyGuestOrderToken } from '../../../../packages/domain/customer/policies/order-ownership-policy';
 import type { Env } from '../../types/env';
 import { isPlaceholderPhone } from './helpers';
 import type { PromotionCode } from './types';
@@ -429,25 +430,38 @@ export function registerPromotionValidationHandlers(router: Hono<{ Bindings: Env
       customer_phone?: string | null;
       customer_name?: string | null;
       order_token?: string | null;
+      guest_token_hash?: string | null;
       subtotal?: number | null;
       total?: number | null;
       total_amount?: number | null;
     };
     const orderRow = await db.prepare(
-      'SELECT id, tenant_id, status, payment_status, customer_id, customer_phone, customer_name, order_token, subtotal, total, total_amount FROM orders WHERE id = ? LIMIT 1'
+      'SELECT id, tenant_id, status, payment_status, customer_id, customer_phone, customer_name, guest_token_hash, subtotal, total, total_amount FROM orders WHERE id = ? LIMIT 1'
     ).bind(data.order_id).first<RedeemOrderLookupRow>().catch(() =>
       db.prepare(
-        'SELECT id, tenant_id, status, payment_status, customer_id, customer_phone, customer_name, order_token, subtotal, total FROM orders WHERE id = ? LIMIT 1'
+        'SELECT id, tenant_id, status, payment_status, customer_id, customer_phone, customer_name, guest_token_hash, subtotal, total FROM orders WHERE id = ? LIMIT 1'
       ).bind(data.order_id).first<RedeemOrderLookupRow>().catch(() =>
         db.prepare(
-          'SELECT id, tenant_id, status, payment_status, customer_id, customer_phone, customer_name, subtotal, total FROM orders WHERE id = ? LIMIT 1'
+          'SELECT id, tenant_id, status, payment_status, customer_id, customer_phone, customer_name, guest_token_hash, total FROM orders WHERE id = ? LIMIT 1'
         ).bind(data.order_id).first<RedeemOrderLookupRow>().catch(() =>
           db.prepare(
-            'SELECT id, tenant_id, status, customer_id, customer_phone, customer_name, subtotal, total FROM orders WHERE id = ? LIMIT 1'
+            'SELECT id, tenant_id, status, payment_status, customer_id, customer_phone, customer_name, order_token, subtotal, total, total_amount FROM orders WHERE id = ? LIMIT 1'
           ).bind(data.order_id).first<RedeemOrderLookupRow>().catch(() =>
             db.prepare(
-              'SELECT id, tenant_id, status FROM orders WHERE id = ? LIMIT 1'
-            ).bind(data.order_id).first<RedeemOrderLookupRow>().catch(() => null)
+              'SELECT id, tenant_id, status, payment_status, customer_id, customer_phone, customer_name, order_token, subtotal, total FROM orders WHERE id = ? LIMIT 1'
+            ).bind(data.order_id).first<RedeemOrderLookupRow>().catch(() =>
+              db.prepare(
+                'SELECT id, tenant_id, status, payment_status, customer_id, customer_phone, customer_name, subtotal, total FROM orders WHERE id = ? LIMIT 1'
+              ).bind(data.order_id).first<RedeemOrderLookupRow>().catch(() =>
+                db.prepare(
+                  'SELECT id, tenant_id, status, customer_id, customer_phone, customer_name, subtotal, total FROM orders WHERE id = ? LIMIT 1'
+                ).bind(data.order_id).first<RedeemOrderLookupRow>().catch(() =>
+                  db.prepare(
+                    'SELECT id, tenant_id, status FROM orders WHERE id = ? LIMIT 1'
+                  ).bind(data.order_id).first<RedeemOrderLookupRow>().catch(() => null)
+                )
+              )
+            )
           )
         )
       )
@@ -519,8 +533,13 @@ export function registerPromotionValidationHandlers(router: Hono<{ Bindings: Env
         c.req.query('order_token') ||
         ''
       ).trim();
+      const hashTokenVerified =
+        reqOrderToken && typeof orderRow.guest_token_hash === 'string' && orderRow.guest_token_hash.trim()
+          ? await verifyGuestOrderToken(orderRow.guest_token_hash, reqOrderToken)
+          : false;
       const hasValidOrderToken = Boolean(
-        reqOrderToken && typeof orderRow.order_token === 'string' && orderRow.order_token.trim() === reqOrderToken
+        hashTokenVerified ||
+          (reqOrderToken && typeof orderRow.order_token === 'string' && orderRow.order_token.trim() === reqOrderToken)
       );
 
       if (orderCustomerId) {
@@ -548,7 +567,7 @@ export function registerPromotionValidationHandlers(router: Hono<{ Bindings: Env
         !orderCustomerPhone &&
         orderRow.id === data.order_id &&
         !hasValidOrderToken &&
-        ('customer_phone' in orderRow || 'order_token' in orderRow || tenantId !== 'default')
+        ('customer_phone' in orderRow || 'order_token' in orderRow || 'guest_token_hash' in orderRow || tenantId !== 'default')
       ) {
         return c.json({ success: false, error: 'Forbidden' }, 403);
       }
@@ -766,27 +785,79 @@ export function registerPromotionValidationHandlers(router: Hono<{ Bindings: Env
       }
     }
 
+    // Undo the usage reservation above with the same row key, counter column and tenant scope.
+    const releaseUsageReservation = async (): Promise<void> => {
+      const hasId = promo.id !== undefined && promo.id !== null;
+      const keySql = hasId ? 'id = ?' : 'UPPER(code) = UPPER(?)';
+      const key = hasId ? promo.id : promo.code;
+      const tenantSql = tenantId === '*'
+        ? ''
+        : " AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?";
+      const binds = tenantId === '*' ? [key] : [key, tenantId];
+      for (const column of ['usage_count', 'used_count']) {
+        try {
+          const res = await db.prepare(
+            `UPDATE promotions SET ${column} = CASE WHEN COALESCE(${column}, 0) > 0 THEN ${column} - 1 ELSE 0 END WHERE ${keySql}${tenantSql}`
+          ).bind(...binds).run() as { meta?: { changes?: number } };
+          if ((res?.meta?.changes ?? 1) > 0) return;
+        } catch {
+          // Column absent in this schema; try the legacy counter.
+        }
+      }
+    };
+
     // Log redemption
     const redeemedAtIso = new Date().toISOString();
     const targetTenantId = tenantId === '*'
       ? ((orderRow?.tenant_id ? String(orderRow.tenant_id).trim() : '') || (promo.tenant_id ? String(promo.tenant_id).trim() : '') || 'default')
       : (tenantId || 'default');
+    const enforcePerCustomer = !isWelcome && perCustomerLimit > 0 && Boolean(effectiveCustomerId);
+    let guardedInsert: { meta?: { changes?: number } } | null = null;
     try {
+      // The per-customer count is evaluated inside the INSERT so concurrent redemptions cannot both pass.
+      guardedInsert = await db.prepare(
+        `INSERT INTO promotion_redemptions (promotion_id, code, order_id, customer_id, tenant_id, discount_amount, order_total, redeemed_at)
+         SELECT ?, ?, ?, ?, ?, ?, ?, ?
+         WHERE ? = 0 OR (SELECT COUNT(*) FROM promotion_redemptions
+           WHERE (promotion_id = ? OR UPPER(code) = ?) AND customer_id = ?
+           AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?) < ?`
+      ).bind(
+        promo.id ?? promo.code, promo.code, data.order_id, effectiveCustomerId ?? null, targetTenantId,
+        discountAmount, effectiveOrderTotal, redeemedAtIso,
+        enforcePerCustomer ? 1 : 0,
+        promo.id ?? promo.code, upperCode, effectiveCustomerId ?? null, targetTenantId, perCustomerLimit,
+      ).run() as { meta?: { changes?: number } };
+    } catch (insertErr) {
+      if (/UNIQUE constraint failed/i.test(String(insertErr))) {
+        // A concurrent request already redeemed this order: undo our extra usage reservation and replay.
+        await releaseUsageReservation();
+        return c.json({
+          success: true,
+          data: { code: promo.code, percent, discount_amount: discountAmount, order_id: data.order_id, idempotent: true },
+        });
+      }
+      // Partial schemas without the customer/tenant columns keep the legacy two-step write.
+      try {
+        await db.prepare(
+          'INSERT INTO promotion_redemptions (promotion_id, code, order_id, discount_amount, order_total, redeemed_at) VALUES (?, ?, ?, ?, ?, ?)'
+        ).bind(promo.id ?? promo.code, promo.code, data.order_id, discountAmount, effectiveOrderTotal, redeemedAtIso).run();
+      } catch {
+        await db.prepare(
+          'INSERT INTO promotion_redemptions (id, promotion_id, order_id, discount_amount, redeemed_at) VALUES (?, ?, ?, ?, ?)'
+        ).bind(crypto.randomUUID(), promo.id ?? promo.code, data.order_id, discountAmount, redeemedAtIso).run().catch(() => {});
+      }
       await db.prepare(
-        'INSERT INTO promotion_redemptions (promotion_id, code, order_id, discount_amount, order_total, redeemed_at) VALUES (?, ?, ?, ?, ?, ?)'
-      ).bind(promo.id ?? promo.code, promo.code, data.order_id, discountAmount, effectiveOrderTotal, redeemedAtIso).run();
-    } catch {
-      await db.prepare(
-        'INSERT INTO promotion_redemptions (id, promotion_id, order_id, discount_amount, redeemed_at) VALUES (?, ?, ?, ?, ?)'
-      ).bind(crypto.randomUUID(), promo.id ?? promo.code, data.order_id, discountAmount, redeemedAtIso).run().catch(() => {});
+        'UPDATE promotion_redemptions SET tenant_id = ?, customer_id = ? WHERE order_id = ?'
+      ).bind(targetTenantId, effectiveCustomerId ?? null, data.order_id).run().catch(async () => {
+        await db.prepare(
+          'UPDATE promotion_redemptions SET tenant_id = ? WHERE order_id = ?'
+        ).bind(targetTenantId, data.order_id).run().catch(() => {});
+      });
     }
-    await db.prepare(
-      'UPDATE promotion_redemptions SET tenant_id = ?, customer_id = ? WHERE order_id = ?'
-    ).bind(targetTenantId, effectiveCustomerId ?? null, data.order_id).run().catch(async () => {
-      await db.prepare(
-        'UPDATE promotion_redemptions SET tenant_id = ? WHERE order_id = ?'
-      ).bind(targetTenantId, data.order_id).run().catch(() => {});
-    });
+    if (enforcePerCustomer && guardedInsert && (guardedInsert.meta?.changes ?? 1) === 0) {
+      await releaseUsageReservation();
+      return c.json({ success: false, error: 'Per-customer usage limit reached' }, 409);
+    }
 
     return c.json({
       success: true,

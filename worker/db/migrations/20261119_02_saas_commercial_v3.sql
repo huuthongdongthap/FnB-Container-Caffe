@@ -1,4 +1,4 @@
--- Migration: 20261119_01_saas_commercial_v3.sql
+-- Migration: 20261119_02_saas_commercial_v3.sql
 -- Multi-tenant SaaS commercial edition schema parity + SaaS billing, branding, domains, merchant payment configs, and HQ audit logs.
 
 -- -----------------------------------------------------
@@ -20,7 +20,6 @@ ALTER TABLE categories ADD COLUMN tenant_id TEXT NOT NULL DEFAULT 'default';
 CREATE INDEX IF NOT EXISTS idx_categories_tenant_id ON categories(tenant_id);
 ALTER TABLE category_stations ADD COLUMN tenant_id TEXT NOT NULL DEFAULT 'default';
 CREATE INDEX IF NOT EXISTS idx_category_stations_tenant_id ON category_stations(tenant_id);
-ALTER TABLE consents ADD COLUMN tenant_id TEXT NOT NULL DEFAULT 'default';
 CREATE INDEX IF NOT EXISTS idx_consents_tenant_id ON consents(tenant_id);
 ALTER TABLE cron_jobs ADD COLUMN tenant_id TEXT NOT NULL DEFAULT 'default';
 CREATE INDEX IF NOT EXISTS idx_cron_jobs_tenant_id ON cron_jobs(tenant_id);
@@ -34,7 +33,6 @@ ALTER TABLE dindin_cart ADD COLUMN tenant_id TEXT NOT NULL DEFAULT 'default';
 CREATE INDEX IF NOT EXISTS idx_dindin_cart_tenant_id ON dindin_cart(tenant_id);
 ALTER TABLE dindin_config ADD COLUMN tenant_id TEXT NOT NULL DEFAULT 'default';
 CREATE INDEX IF NOT EXISTS idx_dindin_config_tenant_id ON dindin_config(tenant_id);
-ALTER TABLE erpnext_mappings ADD COLUMN tenant_id TEXT NOT NULL DEFAULT 'default';
 CREATE INDEX IF NOT EXISTS idx_erpnext_mappings_tenant_id ON erpnext_mappings(tenant_id);
 ALTER TABLE erpnext_product_sync ADD COLUMN tenant_id TEXT NOT NULL DEFAULT 'default';
 CREATE INDEX IF NOT EXISTS idx_erpnext_product_sync_tenant_id ON erpnext_product_sync(tenant_id);
@@ -56,13 +54,11 @@ ALTER TABLE ingredients ADD COLUMN tenant_id TEXT NOT NULL DEFAULT 'default';
 CREATE INDEX IF NOT EXISTS idx_ingredients_tenant_id ON ingredients(tenant_id);
 ALTER TABLE inventory_snapshots ADD COLUMN tenant_id TEXT NOT NULL DEFAULT 'default';
 CREATE INDEX IF NOT EXISTS idx_inventory_snapshots_tenant_id ON inventory_snapshots(tenant_id);
-ALTER TABLE inventory_transactions ADD COLUMN tenant_id TEXT NOT NULL DEFAULT 'default';
 CREATE INDEX IF NOT EXISTS idx_inventory_transactions_tenant_id ON inventory_transactions(tenant_id);
 ALTER TABLE kitchen_stations ADD COLUMN tenant_id TEXT NOT NULL DEFAULT 'default';
 CREATE INDEX IF NOT EXISTS idx_kitchen_stations_tenant_id ON kitchen_stations(tenant_id);
 ALTER TABLE loyalty_accounts ADD COLUMN tenant_id TEXT NOT NULL DEFAULT 'default';
 CREATE INDEX IF NOT EXISTS idx_loyalty_accounts_tenant_id ON loyalty_accounts(tenant_id);
-ALTER TABLE loyalty_point_logs ADD COLUMN tenant_id TEXT NOT NULL DEFAULT 'default';
 CREATE INDEX IF NOT EXISTS idx_loyalty_point_logs_tenant_id ON loyalty_point_logs(tenant_id);
 ALTER TABLE loyalty_redemptions ADD COLUMN tenant_id TEXT NOT NULL DEFAULT 'default';
 CREATE INDEX IF NOT EXISTS idx_loyalty_redemptions_tenant_id ON loyalty_redemptions(tenant_id);
@@ -72,7 +68,6 @@ ALTER TABLE loyalty_tier_configs ADD COLUMN tenant_id TEXT NOT NULL DEFAULT 'def
 CREATE INDEX IF NOT EXISTS idx_loyalty_tier_configs_tenant_id ON loyalty_tier_configs(tenant_id);
 ALTER TABLE loyalty_tiers ADD COLUMN tenant_id TEXT NOT NULL DEFAULT 'default';
 CREATE INDEX IF NOT EXISTS idx_loyalty_tiers_tenant_id ON loyalty_tiers(tenant_id);
-ALTER TABLE loyalty_transactions ADD COLUMN tenant_id TEXT NOT NULL DEFAULT 'default';
 CREATE INDEX IF NOT EXISTS idx_loyalty_transactions_tenant_id ON loyalty_transactions(tenant_id);
 ALTER TABLE menu_items ADD COLUMN tenant_id TEXT NOT NULL DEFAULT 'default';
 CREATE INDEX IF NOT EXISTS idx_menu_items_tenant_id ON menu_items(tenant_id);
@@ -116,15 +111,12 @@ ALTER TABLE reviews ADD COLUMN tenant_id TEXT NOT NULL DEFAULT 'default';
 CREATE INDEX IF NOT EXISTS idx_reviews_tenant_id ON reviews(tenant_id);
 ALTER TABLE rewards ADD COLUMN tenant_id TEXT NOT NULL DEFAULT 'default';
 CREATE INDEX IF NOT EXISTS idx_rewards_tenant_id ON rewards(tenant_id);
-ALTER TABLE sessions ADD COLUMN tenant_id TEXT NOT NULL DEFAULT 'default';
 CREATE INDEX IF NOT EXISTS idx_sessions_tenant_id ON sessions(tenant_id);
 ALTER TABLE shift_reconciliations ADD COLUMN tenant_id TEXT NOT NULL DEFAULT 'default';
 CREATE INDEX IF NOT EXISTS idx_shift_reconciliations_tenant_id ON shift_reconciliations(tenant_id);
-ALTER TABLE staff_devices ADD COLUMN tenant_id TEXT NOT NULL DEFAULT 'default';
 CREATE INDEX IF NOT EXISTS idx_staff_devices_tenant_id ON staff_devices(tenant_id);
 ALTER TABLE staff_login_identities ADD COLUMN tenant_id TEXT NOT NULL DEFAULT 'default';
 CREATE INDEX IF NOT EXISTS idx_staff_login_identities_tenant_id ON staff_login_identities(tenant_id);
-ALTER TABLE stock_movements ADD COLUMN tenant_id TEXT NOT NULL DEFAULT 'default';
 CREATE INDEX IF NOT EXISTS idx_stock_movements_tenant_id ON stock_movements(tenant_id);
 ALTER TABLE subscription_invoices ADD COLUMN tenant_id TEXT NOT NULL DEFAULT 'default';
 CREATE INDEX IF NOT EXISTS idx_subscription_invoices_tenant_id ON subscription_invoices(tenant_id);
@@ -136,7 +128,6 @@ ALTER TABLE suppliers ADD COLUMN tenant_id TEXT NOT NULL DEFAULT 'default';
 CREATE INDEX IF NOT EXISTS idx_suppliers_tenant_id ON suppliers(tenant_id);
 ALTER TABLE table_qr_codes ADD COLUMN tenant_id TEXT NOT NULL DEFAULT 'default';
 CREATE INDEX IF NOT EXISTS idx_table_qr_codes_tenant_id ON table_qr_codes(tenant_id);
-ALTER TABLE table_sessions ADD COLUMN tenant_id TEXT NOT NULL DEFAULT 'default';
 CREATE INDEX IF NOT EXISTS idx_table_sessions_tenant_id ON table_sessions(tenant_id);
 ALTER TABLE ti_menu_cache ADD COLUMN tenant_id TEXT NOT NULL DEFAULT 'default';
 CREATE INDEX IF NOT EXISTS idx_ti_menu_cache_tenant_id ON ti_menu_cache(tenant_id);

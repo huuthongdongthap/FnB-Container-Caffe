@@ -1,9 +1,11 @@
 import type { Hono } from 'hono';
 import type { Env } from '../../types/env';
+import { getAuthToken } from '../../lib/jwt';
 import { authenticateRequest } from '../../middleware/auth';
 import {
   getOrdersInRange,
   formatCsvRows,
+  maskPhoneForCsv,
   getDailyRevenueInRange,
   formatDailyRevenueCsvRows,
 } from '../../tree/analytics/csv-export';
@@ -17,7 +19,7 @@ export function registerExportHandlers(router: Hono<{ Bindings: Env }>): void {
   // GET /api/analytics/export?start=YYYY-MM-DD&end=YYYY-MM-DD
   router.get('/export', async (c) => {
     let user = (c as unknown as { get?: (k: string) => { id?: string; role?: string; tenantId?: string; tenant_id?: string } | undefined }).get?.('user');
-    if (!user && c.req?.raw && c.env?.JWT_SECRET && (c.req.header('Authorization') || c.req.header('authorization'))) {
+    if (!user && c.req?.raw && c.env?.JWT_SECRET && getAuthToken(c.req.raw)) {
       const session = await authenticateRequest(c.req.raw, c.env, { optional: true }).catch(() => null);
       if (session && 'payload' in session) {
         user = {
@@ -74,8 +76,37 @@ export function registerExportHandlers(router: Hono<{ Bindings: Env }>): void {
       });
     }
 
-    const rows = await getOrdersInRange(c.env.AURA_DB, start, end, tenantId);
+    const maskPii = c.req.query('mask_pii') === '1' || c.req.query('mask_pii') === 'true';
+    const rawRows = await getOrdersInRange(c.env.AURA_DB, start, end, tenantId, { alignIct: true, maskPii });
+    const rows = maskPii
+      ? rawRows.map((row) => ({
+          ...row,
+          customer_name: row.customer_name ? `${row.customer_name.slice(0, 1)}***` : '',
+          customer_phone: maskPhoneForCsv(row.customer_phone),
+        }))
+      : rawRows;
     const csv = formatCsvRows(rows);
+
+    const actorId = String(user?.id || 'unknown');
+    const auditDetails = JSON.stringify({ route: 'analytics.export', actor_role: role, start, end, row_count: rows.length, mask_pii: maskPii });
+    try {
+      await c.env.AURA_DB?.prepare(
+        `INSERT INTO audit_logs (actor, actor_id, action, resource_type, resource_id, details, tenant_id, status, created_at)
+         VALUES (?, ?, 'export_csv', 'orders', ?, ?, ?, 'success', datetime('now'))`
+      )
+        .bind(actorId, actorId, `${start}..${end}`, auditDetails, tenantId || 'default')
+        .run()
+        .catch(() =>
+          c.env.AURA_DB?.prepare(
+            `INSERT INTO audit_logs (id, actor_id, actor_role, action, resource_type, resource_id, details, tenant_id, status, created_at)
+             VALUES (?, ?, ?, 'export_csv', 'orders', ?, ?, ?, 'success', datetime('now'))`
+          )
+            .bind(`aud_exp_${crypto.randomUUID()}`, actorId, role, `${start}..${end}`, auditDetails, tenantId || 'default')
+            .run()
+        );
+    } catch {
+      // Best-effort audit persistence for minimal test mocks
+    }
 
     return c.newResponse(csv, 200, {
       'Content-Type': 'text/csv; charset=utf-8',

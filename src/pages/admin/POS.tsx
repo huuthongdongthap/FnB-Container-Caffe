@@ -17,6 +17,7 @@ import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { useMenu } from '@/hooks/use-menu';
 import { useCheckout, useProcessPayOS } from '@/hooks/use-checkout';
+import { useOfflineSync } from '@/hooks/use-offline-sync';
 import { useAuthStore } from '@/hooks/stores/use-auth-store';
 import { CheckCircle2, AlertCircle, X, ExternalLink } from 'lucide-react';
 import type { PaymentMethod } from '@/lib/validators';
@@ -56,6 +57,7 @@ export default function AdminPOSPage() {
 
   const checkoutMutation = useCheckout();
   const payOSMutation = useProcessPayOS();
+  const { quarantinedCount } = useOfflineSync();
   const activeTenant = useAuthStore((s) => s.user?.tenantId) || 'default';
   const sessionVersion = useAuthStore((s) => s.sessionVersion);
   const { t } = useTranslation();
@@ -247,6 +249,23 @@ export default function AdminPOSPage() {
         onOpenSchedule={() => navigate('/admin/staff')}
         onEndShift={() => navigate('/admin/staff')}
       />
+
+      {/* ── Quarantined Offline Orders Alert (MD3 Strict) ──────────────── */}
+      {quarantinedCount > 0 && (
+        <div
+          role="alert"
+          data-testid="pos-quarantined-banner"
+          className="fixed bottom-4 right-4 z-[95] flex items-center gap-3 px-4 py-3 shadow-lg rounded-[var(--md-sys-shape-corner-medium)] bg-[var(--md-sys-color-error-container)] text-[var(--md-sys-color-on-error-container)]"
+        >
+          <AlertCircle className="w-4 h-4 shrink-0 text-[var(--md-sys-color-primary)]" />
+          <span className="m3-body-medium text-sm font-medium">
+            {t('adminPOS.quarantinedOrdersAlert', {
+              count: quarantinedCount,
+              defaultValue: `${quarantinedCount} đơn offline cần kiểm tra thủ công`,
+            })}
+          </span>
+        </div>
+      )}
 
       {/* ── Success Banner Overlay ─────────────────────────────────────── */}
       {checkoutSuccess && (

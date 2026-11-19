@@ -4,6 +4,7 @@
 
 import { pruneOldMetrics } from './lib/metrics-collector';
 import { dispatchAlerts } from './lib/alert-dispatcher';
+import { withPrimarySession } from './lib/db';
 import type { Env } from './types/env';
 import {
   checkOverdueOrders,
@@ -28,31 +29,34 @@ export async function handleScheduled(
   env: Env,
   ctx: ExecutionContext
 ): Promise<void> {
+  const primaryDb = env.AURA_DB ? withPrimarySession(env.AURA_DB) : env.AURA_DB;
+  const primaryEnv: Env = env.AURA_DB ? { ...env, AURA_DB: primaryDb } : env;
+
   const safeWait = (promise: Promise<unknown>) => {
     ctx.waitUntil(promise.catch(() => {}));
   };
 
-  safeWait(checkOverdueOrders(env as unknown as Record<string, unknown>));
-  safeWait(runPaymentReconciliation(env as unknown as Record<string, unknown>));
-  safeWait(pruneOldMetrics(env.AURA_DB, 7));
-  safeWait(processErpnextRetryQueue(env as unknown as Record<string, unknown>));
-  safeWait(processErpnextProductSync(env as unknown as Record<string, unknown>));
+  safeWait(checkOverdueOrders(primaryEnv as unknown as Record<string, unknown>));
+  safeWait(runPaymentReconciliation(primaryEnv as unknown as Record<string, unknown>));
+  safeWait(pruneOldMetrics(primaryDb, 7));
+  safeWait(processErpnextRetryQueue(primaryEnv as unknown as Record<string, unknown>));
+  safeWait(processErpnextProductSync(primaryEnv as unknown as Record<string, unknown>));
   safeWait((async () => {
     try {
-      await syncMauticContacts(env as unknown as Record<string, unknown>);
+      await syncMauticContacts(primaryEnv as unknown as Record<string, unknown>);
     } catch {
       // Non-blocking scheduled sync
     }
     await Promise.allSettled([
-      detectWinbackCandidates(env as unknown as Record<string, unknown>),
-      detectBirthdayCandidates(env as unknown as Record<string, unknown>),
+      detectWinbackCandidates(primaryEnv as unknown as Record<string, unknown>),
+      detectBirthdayCandidates(primaryEnv as unknown as Record<string, unknown>),
     ]);
   })());
-  safeWait(autoPostDailySpecials(env as unknown as Record<string, unknown>));
-  safeWait(autoPostNewPromotions(env as unknown as Record<string, unknown>));
-  safeWait(autoPostWeeklyHighlights(env as unknown as Record<string, unknown>));
-  safeWait(runCampaignTriggers(env as unknown as Record<string, unknown>));
-  safeWait(runSopReminders(env as unknown as Record<string, unknown>));
-  safeWait(sendShiftReminders(env as unknown as Record<string, unknown>));
-  safeWait(dispatchAlerts(env));
+  safeWait(autoPostDailySpecials(primaryEnv as unknown as Record<string, unknown>));
+  safeWait(autoPostNewPromotions(primaryEnv as unknown as Record<string, unknown>));
+  safeWait(autoPostWeeklyHighlights(primaryEnv as unknown as Record<string, unknown>));
+  safeWait(runCampaignTriggers(primaryEnv as unknown as Record<string, unknown>));
+  safeWait(runSopReminders(primaryEnv as unknown as Record<string, unknown>));
+  safeWait(sendShiftReminders(primaryEnv as unknown as Record<string, unknown>));
+  safeWait(dispatchAlerts(primaryEnv));
 }

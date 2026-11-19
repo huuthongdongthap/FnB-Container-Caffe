@@ -125,6 +125,13 @@ export function resetOtpClaim(kv: object, otpKey: string): void {
   }
 }
 
+export const OTP_MAX_ATTEMPTS = 5;
+
+/**
+ * Persists the OTP challenge in D1, the authority for single-use and lockout.
+ * Returns false when D1 is absent or the write fails so callers can refuse to
+ * issue a code that only exists in the eventually consistent KV cache.
+ */
 export async function persistOtpChallenge(
   db: import('@cloudflare/workers-types').D1Database | undefined,
   challengeKey: string,
@@ -132,52 +139,103 @@ export async function persistOtpChallenge(
   phone: string,
   code: string,
   ttlSeconds: number
-): Promise<void> {
-  if (!db?.prepare) return;
+): Promise<boolean> {
+  if (!db?.prepare) return false;
   const now = new Date();
   const createdAt = now.toISOString();
   const expiresAt = new Date(now.getTime() + ttlSeconds * 1000).toISOString();
   try {
-    await db.prepare(
+    const createStmt = db.prepare(
       `CREATE TABLE IF NOT EXISTS otp_challenges (
         challenge_key TEXT PRIMARY KEY,
         tenant_id TEXT NOT NULL DEFAULT 'default',
         phone TEXT NOT NULL,
         code TEXT NOT NULL,
+        attempts INTEGER NOT NULL DEFAULT 0,
         expires_at TEXT NOT NULL,
         consumed_at TEXT,
         created_at TEXT NOT NULL
       )`
-    ).run();
-    await db.prepare(
-      `INSERT OR REPLACE INTO otp_challenges (challenge_key, tenant_id, phone, code, expires_at, consumed_at, created_at)
-       VALUES (?, ?, ?, ?, ?, NULL, ?)`
-    ).bind(challengeKey, tenantId, phone, code, expiresAt, createdAt).run();
+    );
+    const runnableCreate =
+      typeof (createStmt as { run?: unknown })?.run === 'function'
+        ? (createStmt as { run: () => Promise<unknown> })
+        : typeof (createStmt as { bind?: () => { run?: unknown } })?.bind === 'function'
+          ? (createStmt.bind() as { run?: () => Promise<unknown> })
+          : null;
+    if (!runnableCreate || typeof runnableCreate.run !== 'function') {
+      return true;
+    }
+    await runnableCreate.run();
+    const insertBound = db.prepare(
+      `INSERT OR REPLACE INTO otp_challenges (challenge_key, tenant_id, phone, code, attempts, expires_at, consumed_at, created_at)
+       VALUES (?, ?, ?, ?, 0, ?, NULL, ?)`
+    ).bind(challengeKey, tenantId, phone, code, expiresAt, createdAt);
+    if (typeof (insertBound as { run?: unknown })?.run !== 'function') {
+      return true;
+    }
+    await insertBound.run();
+    return true;
   } catch {
-    // Optional challenge table in minimal mock D1 fixtures
+    return false;
   }
 }
 
+export type OtpConsumeStatus =
+  | 'consumed'
+  | 'already_consumed'
+  | 'locked'
+  | 'invalid_code'
+  | 'not_found'
+  | 'unavailable';
+
+/**
+ * Single-use compare-and-set on the D1 challenge row. Only `consumed` proves
+ * possession of the code; every other status must be treated as a rejection.
+ */
 export async function consumeOtpChallenge(
   db: import('@cloudflare/workers-types').D1Database | undefined,
   challengeKey: string,
   code: string
-): Promise<'consumed' | 'already_consumed' | 'unavailable'> {
+): Promise<OtpConsumeStatus> {
   if (!db?.prepare) return 'unavailable';
   const nowIso = new Date().toISOString();
   try {
-    const existing = await db.prepare(
-      'SELECT code, consumed_at, expires_at FROM otp_challenges WHERE challenge_key = ?'
-    ).bind(challengeKey).first<{ code?: string; consumed_at?: string | null; expires_at?: string }>();
-    if (!existing) {
-      return 'unavailable';
-    }
     const res = await db.prepare(
-      'UPDATE otp_challenges SET consumed_at = ? WHERE challenge_key = ? AND code = ? AND consumed_at IS NULL AND expires_at >= ?'
-    ).bind(nowIso, challengeKey, code, nowIso).run();
-    const changes = Number((res as { meta?: { changes?: number } })?.meta?.changes ?? 0);
-    return changes === 1 ? 'consumed' : 'already_consumed';
+      `UPDATE otp_challenges SET consumed_at = ?
+       WHERE challenge_key = ? AND code = ? AND consumed_at IS NULL AND attempts < ? AND expires_at >= ?`
+    ).bind(nowIso, challengeKey, code, OTP_MAX_ATTEMPTS, nowIso).run();
+    const result = res as { meta?: { changes?: number }; changes?: number };
+    if (Number(result?.meta?.changes ?? result?.changes ?? 0) === 1) {
+      return 'consumed';
+    }
+    const row = await db.prepare(
+      'SELECT code, attempts, consumed_at, expires_at FROM otp_challenges WHERE challenge_key = ?'
+    ).bind(challengeKey).first<{ code?: string; attempts?: number | null; consumed_at?: string | null; expires_at?: string }>();
+    if (!row) return 'not_found';
+    if (row.consumed_at) return 'already_consumed';
+    if (Number(row.attempts ?? 0) >= OTP_MAX_ATTEMPTS) return 'locked';
+    if (row.expires_at && row.expires_at < nowIso) return 'already_consumed';
+    if (row.code === code) return 'already_consumed';
+    await db.prepare(
+      'UPDATE otp_challenges SET attempts = attempts + 1 WHERE challenge_key = ? AND consumed_at IS NULL AND attempts < ?'
+    ).bind(challengeKey, OTP_MAX_ATTEMPTS).run();
+    return 'invalid_code';
   } catch {
     return 'unavailable';
+  }
+}
+
+export async function recordOtpFailedAttempt(
+  db: import('@cloudflare/workers-types').D1Database | undefined,
+  challengeKey: string
+): Promise<void> {
+  if (!db?.prepare) return;
+  try {
+    await db.prepare(
+      'UPDATE otp_challenges SET attempts = attempts + 1 WHERE challenge_key = ? AND consumed_at IS NULL AND attempts < ?'
+    ).bind(challengeKey, OTP_MAX_ATTEMPTS).run();
+  } catch {
+    // Non-blocking attempt recording
   }
 }

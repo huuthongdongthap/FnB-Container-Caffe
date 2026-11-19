@@ -281,7 +281,7 @@ export async function updateTableStatus(
     if (requestedStatus === 'free') {
       try {
         const orderStmt = context.env.AURA_DB.prepare(
-          "SELECT id, table_id, status, payment_status, tenant_id FROM orders WHERE table_id = ? AND LOWER(COALESCE(status, 'pending')) NOT IN ('completed', 'cancelled', 'rejected', 'failed', 'expired', 'refunded') AND LOWER(COALESCE(payment_status, 'unpaid')) NOT IN ('paid', 'refunded') AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ? LIMIT 5"
+          "SELECT id, table_id, status, payment_status, tenant_id FROM orders WHERE table_id = ? AND LOWER(COALESCE(status, 'pending')) NOT IN ('completed', 'cancelled', 'canceled', 'rejected', 'failed', 'expired', 'refunded') AND LOWER(COALESCE(payment_status, 'unpaid')) NOT IN ('paid', 'completed', 'refunded', 'cancelled', 'canceled') AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ? LIMIT 5"
         );
         const orderRes = await (typeof orderStmt.bind === 'function'
           ? orderStmt.bind(tableId, effectiveTableTenant)
@@ -292,8 +292,8 @@ export async function updateTableStatus(
           if (!matchesTenantRow(o, effectiveTableTenant)) return false;
           const st = String(o.status ?? 'pending').trim().toLowerCase();
           const pay = String(o.payment_status ?? 'unpaid').trim().toLowerCase();
-          if (['completed', 'cancelled', 'rejected', 'failed', 'expired', 'refunded'].includes(st)) return false;
-          if (['paid', 'refunded'].includes(pay)) return false;
+          if (['completed', 'cancelled', 'canceled', 'rejected', 'failed', 'expired', 'refunded'].includes(st)) return false;
+          if (['paid', 'completed', 'refunded', 'cancelled', 'canceled'].includes(pay)) return false;
           return true;
         });
         if (activeOrders.length > 0) {

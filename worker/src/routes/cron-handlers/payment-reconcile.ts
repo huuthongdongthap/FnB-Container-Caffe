@@ -117,7 +117,7 @@ export async function runPaymentReconciliation(
        WHERE p.method = 'payos'
          AND p.status IN ('pending', 'completed')
          AND COALESCE(p.refund_status, '') != 'completed'
-         AND o.payment_status NOT IN ('paid', 'refunded')
+         AND o.payment_status NOT IN ('paid', 'completed', 'refunded')
          AND NOT (p.status = 'completed' AND LOWER(COALESCE(o.status, '')) IN ('cancelled', 'canceled', 'rejected', 'failed', 'expired', 'refunded'))
          AND (j.last_outcome IS NULL OR j.last_outcome NOT IN ('settled', 'already_settled', 'requires_review'))
          AND (j.next_attempt_at IS NULL OR CAST(j.next_attempt_at AS INTEGER) <= CAST(? AS INTEGER))
@@ -140,7 +140,7 @@ export async function runPaymentReconciliation(
          WHERE p.method = 'payos'
            AND p.status IN ('pending', 'completed')
            AND COALESCE(p.refund_status, '') != 'completed'
-           AND o.payment_status NOT IN ('paid', 'refunded')
+           AND o.payment_status NOT IN ('paid', 'completed', 'refunded')
            AND NOT (p.status = 'completed' AND LOWER(COALESCE(o.status, '')) IN ('cancelled', 'canceled', 'rejected', 'failed', 'expired', 'refunded'))
            AND (j.last_outcome IS NULL OR j.last_outcome NOT IN ('settled', 'already_settled', 'requires_review'))
            AND (j.next_attempt_at IS NULL OR CAST(j.next_attempt_at AS INTEGER) <= CAST(? AS INTEGER))
@@ -162,7 +162,7 @@ export async function runPaymentReconciliation(
            LEFT JOIN payment_reconciliation_jobs j ON j.payment_id = p.id
            WHERE p.method = 'payos'
              AND p.status IN ('pending', 'completed')
-             AND o.payment_status NOT IN ('paid', 'refunded')
+             AND o.payment_status NOT IN ('paid', 'completed', 'refunded')
              AND NOT (p.status = 'completed' AND LOWER(COALESCE(o.status, '')) IN ('cancelled', 'canceled', 'rejected', 'failed', 'expired', 'refunded'))
              AND (j.last_outcome IS NULL OR j.last_outcome NOT IN ('settled', 'already_settled', 'requires_review'))
              AND (j.next_attempt_at IS NULL OR CAST(j.next_attempt_at AS INTEGER) <= CAST(? AS INTEGER))
@@ -183,7 +183,7 @@ export async function runPaymentReconciliation(
            JOIN orders o ON o.id = p.order_id
            WHERE p.method = 'payos'
              AND p.status IN ('pending', 'completed')
-             AND o.payment_status NOT IN ('paid', 'refunded')
+             AND o.payment_status NOT IN ('paid', 'completed', 'refunded')
              AND NOT (p.status = 'completed' AND LOWER(COALESCE(o.status, '')) IN ('cancelled', 'canceled', 'rejected', 'failed', 'expired', 'refunded'))
              AND (? = '*' OR COALESCE(NULLIF(TRIM(o.tenant_id), ''), 'default') = ?)
            ORDER BY p.created_at ASC
@@ -198,7 +198,7 @@ export async function runPaymentReconciliation(
              JOIN orders o ON o.id = p.order_id
              WHERE p.method = 'payos'
                AND p.status IN ('pending', 'completed')
-               AND o.payment_status NOT IN ('paid', 'refunded')
+               AND o.payment_status NOT IN ('paid', 'completed', 'refunded')
                AND NOT (p.status = 'completed' AND LOWER(COALESCE(o.status, '')) IN ('cancelled', 'canceled', 'rejected', 'failed', 'expired', 'refunded'))
              ORDER BY p.created_at ASC
              LIMIT 25`
@@ -271,6 +271,7 @@ export async function runPaymentReconciliation(
         const res = await reconcilePayOSPayment({
           db,
           kv,
+          env,
           paymentId: candidate.payment_id,
           tenantId: candidateTenant,
           clientId,

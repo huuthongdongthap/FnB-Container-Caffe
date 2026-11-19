@@ -1,7 +1,7 @@
 export interface KDSOrder {
   id: string;
   table: string;
-  status: 'pending' | 'confirmed' | 'preparing' | 'ready' | 'served';
+  status: 'pending' | 'confirmed' | 'preparing' | 'ready' | 'served' | 'cancelled';
   items: Array<{
     name: string;
     quantity: number;

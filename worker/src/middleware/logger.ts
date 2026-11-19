@@ -34,8 +34,16 @@ export interface Logger {
 
 // Field names whose values must never reach logs verbatim — secrets, auth
 // material, and customer PII. Values are replaced by a fixed marker.
-const REDACTED_KEYS = /^(signature|checksum|token|secret|password|authorization|api_key|apikey|payment_payload|customer_phone|customer_email|phone|email|to|recipient)$/i;
+const REDACTED_KEYS = /^(signature|checksum|token|order_token|device_token|raw_device_token|otp_code|verification_code|secret|password|authorization|api_key|apikey|payment_payload|customer_name|customer_phone|customer_email|delivery_address|shipping_address|address|phone|email|to|recipient)$/i;
 const REDACTED = '[REDACTED]';
+
+function redactStringValue(value: string): string {
+  const trimmed = value.trim();
+  if (/^(?:\+?84|0)\d{9,10}$/.test(trimmed)) {
+    return REDACTED;
+  }
+  return value.replace(/([?&](?:token|order_token|access_token)=)[^&\s]+/gi, `$1${REDACTED}`);
+}
 
 /**
  * Recursively masks sensitive fields in log payloads. Arrays are walked but
@@ -55,9 +63,8 @@ export function redact(value: unknown, depth = 0): unknown {
     }
     return out;
   }
-  if (typeof value === 'string' && /^0\d{9}$/.test(value)) {
-    // Bare VN phone numbers passed as unnamed values (e.g. message args)
-    return REDACTED;
+  if (typeof value === 'string') {
+    return redactStringValue(value);
   }
   return value;
 }
@@ -71,7 +78,7 @@ function emit(level: string, base: LoggerContext, msg: string, extra?: Record<st
     level,
     ts: nowIso(),
     ...(redact(base) as Record<string, unknown>),
-    msg: typeof msg === 'string' && /^0\d{9}$/.test(msg) ? REDACTED : msg,
+    msg: typeof msg === 'string' ? redactStringValue(msg) : msg,
     ...(extra && typeof extra === 'object' ? (redact(extra) as Record<string, unknown>) : {})
   };
   const line = JSON.stringify(record);
@@ -160,16 +167,19 @@ export function requestMetricsMiddleware(): MiddlewareHandler<{ Bindings: Env }>
       ctx.waitUntil(
         (async() => {
           try {
-            recordMetric(c.env.AURA_DB, 'request_duration_ms', duration, { tenant_id: resolvedTenant });
-            recordMetric(c.env.AURA_DB, 'request_count', 1, {
-              method,
-              path,
-              status_code: String(status),
-              tenant_id: resolvedTenant,
-            });
+            const writes: Promise<void>[] = [
+              recordMetric(c.env.AURA_DB, 'request_duration_ms', duration, { tenant_id: resolvedTenant }),
+              recordMetric(c.env.AURA_DB, 'request_count', 1, {
+                method,
+                path,
+                status_code: String(status),
+                tenant_id: resolvedTenant,
+              }),
+            ];
             if (status >= 500) {
-              recordMetric(c.env.AURA_DB, 'request_5xx', 1, { tenant_id: resolvedTenant });
+              writes.push(recordMetric(c.env.AURA_DB, 'request_5xx', 1, { tenant_id: resolvedTenant }));
             }
+            await Promise.all(writes);
           } catch (err: unknown) {
             const errMsg = err instanceof Error ? err.message : String(err);
             createLogger({ route: 'request-metrics' }).error('metrics_recording_failed', { error: errMsg });

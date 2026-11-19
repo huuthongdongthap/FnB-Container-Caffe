@@ -2,6 +2,10 @@ import { useState, useEffect, useCallback } from 'react';
 import { useAuthStore } from '@/hooks/stores/use-auth-store';
 import { apiFetch } from '@/lib/api-client';
 import { isSameSessionSnapshot, readSessionSnapshot, useClientSessionScope } from '@/lib/client-session';
+import {
+  listClaimableGuestOrderTokens,
+  markGuestOrderTokenClaimed,
+} from '@/lib/guest-order-token';
 import type { CustomerOrder } from '@/hooks/stores/order-store-types';
 
 export interface CustomerProfile {
@@ -87,6 +91,27 @@ export function useAccount() {
     const snap = readSessionSnapshot();
     setOrdersError(null);
     try {
+      if (user.role === 'customer') {
+        const claimable = listClaimableGuestOrderTokens();
+        for (const item of claimable) {
+          if (useAuthStore.getState().user?.id !== user.id || !isSameSessionSnapshot(snap, readSessionSnapshot())) {
+            return;
+          }
+          try {
+            await apiFetch(`/api/orders/${encodeURIComponent(item.orderId)}/claim`, {
+              method: 'POST',
+              headers: { 'X-Order-Token': item.token },
+              body: JSON.stringify({ order_token: item.token }),
+            });
+            markGuestOrderTokenClaimed(item.orderId);
+          } catch (claimErr) {
+            const status = (claimErr as { status?: number } | null)?.status;
+            if (status === 403 || status === 404 || status === 409) {
+              markGuestOrderTokenClaimed(item.orderId);
+            }
+          }
+        }
+      }
       const ordersData = await apiFetch<OrdersListResponse>('/api/orders?limit=50&sort=created_at&order=desc');
       if (useAuthStore.getState().user?.id !== user.id || !isSameSessionSnapshot(snap, readSessionSnapshot())) return;
       const resolvedOrders = Array.isArray(ordersData.data?.orders)

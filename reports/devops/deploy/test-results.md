@@ -1,37 +1,21 @@
-# Smoke Test & Verification Results — AURA OS
+# Smoke Test Results — Lượt 9 Post-Deployment Verification (`2026-11-18T09:57:19Z`)
 
-## Verification Summary: 🟢 100% PASS
+## 1. Live Production Smoke Probes
+| Endpoint | HTTP | Verified Payload | Status |
+|---|---|---|---|
+| `GET https://aura-space-worker.sadec-marketing-hub.workers.dev/api/health` | `200` | `{"status":"ok","version":"8bbc93c8","liveness":true,"readiness":true}` | PASS |
+| `GET https://aura-space-worker.sadec-marketing-hub.workers.dev/api/health?ready=1` | `200` | `{"status":"ok","version":"8bbc93c8","d1":"connected","dependencies":{"d1_database":{"status":"healthy","latencyMs":24}}}` | PASS |
+| `GET https://aura-space-worker.sadec-marketing-hub.workers.dev/api/version` | `200` | `{"shortSha":"8bbc93c8","fullSha":"8bbc93c8417b1572b2a471eb0fd12488a6ff7d2c","environment":"production"}` | PASS |
+| `GET https://aura-space-worker.sadec-marketing-hub.workers.dev/api/menu` | `200` | Menu catalog JSON payload | PASS |
+| `GET https://auraspace.cafe/version.json` | `200` | `{"sha":"8bbc93c8417b1572b2a471eb0fd12488a6ff7d2c","shortSha":"8bbc93c8","buildTime":"2026-11-18T09:56:21Z","deployScript":"deploy-cloudflare.sh"}` | PASS |
 
-- **Deployment Version**: `a8190d5a`
-- **Deployment Timestamp**: 2026-10-16T02:14:23Z
-- **Worker Version ID**: `62239ad0-a40e-4a33-8c44-b6a4fbfbfb4c`
-- **Pages Deployment**: `https://50e54168.fnb-caffe-container.pages.dev` / `https://auraspace.cafe`
-- **Total Test Suites**: 441 passed (441)
-- **Total Tests**: 4,017 passed (4,017)
-- **Playwright WebKit / Mobile Safari & Chrome E2E**: 6 passed (6)
-- **Live Smoke Probes**: 6/6 passed
+## 2. Pre-Deploy Local Gate Summary
+- `npm run lint` → PASS
+- `npm run lint:migrations` → PASS (60 forward / 18 down in `worker/db/migrations`)
+- `npm run check:contrast` → PASS (11/11 WCAG AA pairs)
+- `npm run typecheck:all` → PASS
+- `npx vitest run` → PASS (577 files, 5,763 tests)
+- `node scripts/local-payment-flow/run.mjs --api-only` → PASS (58/58 checks)
 
----
-
-## 1. Automated Test Suite Breakdown
-
-| Test Category | Target File / Suite | Count | Result |
-| :--- | :--- | :--- | :--- |
-| **Playwright Safari E2E** | `tests/playwright/admin-safari-audit.spec.ts` | 6 tests | ✅ PASS |
-| **Playwright Debug Specs** | `tests/playwright/debug_errors.spec.ts` | 2 tests | ✅ PASS |
-| **Domain Contracts** | `worker/src/__tests__/integrations/*-contract.test.ts` | 68 tests | ✅ PASS |
-| **Full Vitest Suite** | `packages/`, `src/`, `worker/` | 4,017 tests | ✅ PASS |
-
----
-
-## 2. Live Edge Endpoint Smoke Probes
-
-| Endpoint | Target URL | Expected | Actual Result | Status |
-| :--- | :--- | :--- | :--- | :--- |
-| **Worker Health** | `/api/health` | HTTP 200 `status: ok` | `HTTP 200 {"status":"ok","version":"a8190d5a"}` | ✅ PASS |
-| **Worker Version** | `/api/version` | HTTP 200 `shortSha: a8190d5a` | `HTTP 200 {"shortSha":"a8190d5a"}` | ✅ PASS |
-| **Pages Version Fingerprint**| `https://auraspace.cafe/version.json` | SHA `a8190d5a` | `{"shortSha":"a8190d5a","buildTime":"2026-10-16T02:14:23Z"}` | ✅ PASS |
-| **Service Worker Cache** | `https://auraspace.cafe/sw.js` | `aura-static-v4` | `const CACHE_VERSION = 'aura-v4';` | ✅ PASS |
-| **CSP Header Fonts** | `https://auraspace.cafe` | Whitelisted Google Fonts | `style-src ... fonts.googleapis.com; font-src ... fonts.gstatic.com` | ✅ PASS |
-| **Short Admin Route SPA** | `https://auraspace.cafe/admin/menu` | HTTP 200 SPA rewrite | HTTP 200 OK | ✅ PASS |
-| **Bearer Auth Edge Guard**| `/api/auth/me` with Bearer header | Proper auth validation | HTTP 401 JSON invalid signature / expiry | ✅ PASS |
+## Unresolved Questions
+- None.

@@ -19,9 +19,11 @@ export default function TrackOrderPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const orderId = searchParams.get('id') || searchParams.get('order_id');
+  const queryOrderToken = searchParams.get('order_token');
 
   const { matchedOrder, loading, error, refresh } = useOrderObservation(orderId, {
     timeoutMs: POLL_TIMEOUT_MS,
+    orderToken: queryOrderToken,
   });
 
   const handleTrackMap = useCallback(() => {

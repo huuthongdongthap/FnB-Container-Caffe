@@ -3,6 +3,7 @@
  */
 
 import { Hono } from 'hono';
+import { verifyGuestOrderToken } from '../../../packages/domain/customer/policies/order-ownership-policy';
 import { resolvePilotStore } from '../lib/pilot-store';
 import { createReviewSchema } from '../lib/validators';
 import { optionalAuth } from '../middleware/auth';
@@ -238,38 +239,84 @@ reviewsRouter.post('/', optionalAuth(), async(c) => {
       if (orderRow.customer_id && !isStaff && (!auth?.id || orderRow.customer_id !== auth.id)) {
         return c.json({ success: false, error: 'Forbidden: not your order' }, 403);
       }
-      if (!orderRow.customer_id && !isStaff && orderRow.customer_phone) {
-        let suppliedPhone = String(
-          (body.customer_phone ?? body.phone ?? (auth as { phone?: string } | undefined)?.phone ?? '') || ''
+      if (!orderRow.customer_id && !isStaff) {
+        const suppliedOrderToken = String(
+          c.req.header('X-Order-Token') ||
+            c.req.header('x-order-token') ||
+            c.req.query('order_token') ||
+            body.order_token ||
+            body.orderToken ||
+            '',
         ).trim();
-        if (!suppliedPhone && auth?.id) {
-          const custPhoneRow = await db
-            .prepare('SELECT phone FROM customers WHERE id = ?')
-            .bind(auth.id)
-            .first<{ phone?: string | null }>()
-            .catch(() => null);
-          suppliedPhone = String(custPhoneRow?.phone ?? '').trim();
-        }
-        const normalizePhoneDigits = (raw: string): string => {
-          const digits = raw.replace(/\D/g, '');
-          if (digits.startsWith('84') && digits.length >= 10) {
-            return '0' + digits.slice(2);
+        let guestTokenVerified = false;
+        if (suppliedOrderToken) {
+          const tokenRow = await db
+            .prepare('SELECT guest_token_hash, order_token FROM orders WHERE id = ?')
+            .bind(data.order_id)
+            .first<{ guest_token_hash?: string | null; order_token?: string | null }>()
+            .catch(() =>
+              db
+                .prepare('SELECT guest_token_hash FROM orders WHERE id = ?')
+                .bind(data.order_id)
+                .first<{ guest_token_hash?: string | null; order_token?: string | null }>()
+                .catch(() =>
+                  db
+                    .prepare('SELECT order_token FROM orders WHERE id = ?')
+                    .bind(data.order_id)
+                    .first<{ guest_token_hash?: string | null; order_token?: string | null }>()
+                    .catch(() => null),
+                ),
+            );
+          const storedHash = typeof tokenRow?.guest_token_hash === 'string' ? tokenRow.guest_token_hash.trim() : '';
+          const storedPlainToken = typeof tokenRow?.order_token === 'string' ? tokenRow.order_token.trim() : '';
+          if (storedHash) {
+            guestTokenVerified = await verifyGuestOrderToken(storedHash, suppliedOrderToken);
+          } else if (storedPlainToken && storedPlainToken.length === suppliedOrderToken.length) {
+            let diff = 0;
+            for (let i = 0; i < storedPlainToken.length; i += 1) {
+              diff |= storedPlainToken.charCodeAt(i) ^ suppliedOrderToken.charCodeAt(i);
+            }
+            guestTokenVerified = diff === 0;
           }
-          return digits;
-        };
-        const orderPhoneNorm = normalizePhoneDigits(String(orderRow.customer_phone));
-        const suppliedPhoneNorm = normalizePhoneDigits(suppliedPhone);
-        if (!suppliedPhoneNorm || suppliedPhoneNorm !== orderPhoneNorm) {
-          return c.json(
-            { success: false, error: 'Forbidden: customer phone verification required to review guest order' },
-            403
-          );
+          if (!guestTokenVerified) {
+            return c.json({ success: false, error: 'Forbidden: invalid guest order token' }, 403);
+          }
         }
-      } else if (!orderRow.customer_id && !isStaff && !orderRow.customer_phone && !auth?.id && 'customer_phone' in orderRow) {
-        return c.json(
-          { success: false, error: 'Forbidden: customer phone verification required to review guest order' },
-          403
-        );
+        if (!guestTokenVerified) {
+          if (orderRow.customer_phone) {
+            let suppliedPhone = String(
+              (body.customer_phone ?? body.phone ?? (auth as { phone?: string } | undefined)?.phone ?? '') || '',
+            ).trim();
+            if (!suppliedPhone && auth?.id) {
+              const custPhoneRow = await db
+                .prepare('SELECT phone FROM customers WHERE id = ?')
+                .bind(auth.id)
+                .first<{ phone?: string | null }>()
+                .catch(() => null);
+              suppliedPhone = String(custPhoneRow?.phone ?? '').trim();
+            }
+            const normalizePhoneDigits = (raw: string): string => {
+              const digits = raw.replace(/\D/g, '');
+              if (digits.startsWith('84') && digits.length >= 10) {
+                return '0' + digits.slice(2);
+              }
+              return digits;
+            };
+            const orderPhoneNorm = normalizePhoneDigits(String(orderRow.customer_phone));
+            const suppliedPhoneNorm = normalizePhoneDigits(suppliedPhone);
+            if (!orderPhoneNorm || /^0+$/.test(orderPhoneNorm) || !suppliedPhoneNorm || suppliedPhoneNorm !== orderPhoneNorm) {
+              return c.json(
+                { success: false, error: 'Forbidden: customer phone verification required to review guest order' },
+                403,
+              );
+            }
+          } else if (!auth?.id && 'customer_phone' in orderRow) {
+            return c.json(
+              { success: false, error: 'Forbidden: customer phone verification required to review guest order' },
+              403,
+            );
+          }
+        }
       }
     }
 

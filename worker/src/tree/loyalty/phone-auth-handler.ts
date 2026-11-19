@@ -10,7 +10,7 @@ import { resolvePilotStore, PilotStoreError } from '../../lib/pilot-store';
 import { StaffSessionError, isStaffIdentity, staffTenant, validateStaffSession, type StaffSession } from '../../lib/staff-session';
 import type { Env } from '../../types/env';
 import type { Customer } from '../../types/models';
-import { claimOtpOnce, consumeOtpChallenge, genId, releaseOtpClaim, throttle } from './helpers';
+import { claimOtpOnce, consumeOtpChallenge, genId, recordOtpFailedAttempt, releaseOtpClaim, throttle, type OtpConsumeStatus } from './helpers';
 import { getActiveCampaign } from './campaign';
 
 const log = createLogger({ route: 'loyalty' });
@@ -37,6 +37,75 @@ async function withCampaignBonusLock<T>(key: string, fn: () => Promise<T>): Prom
       campaignBonusLocks.delete(key);
     }
   }
+}
+
+/**
+ * D1 is the single-use authority for OTPs. When no D1 binding exists at all the
+ * in-process claim is the only available guard; once D1 is bound, only an
+ * atomic `consumed` result may verify a code and every other outcome rejects.
+ */
+async function consumeOtpAuthority(
+  db: Env['AURA_DB'] | undefined,
+  challengeKey: string,
+  code: string,
+  tenantId: string,
+  phone: string
+): Promise<OtpConsumeStatus> {
+  if (!db?.prepare) return 'consumed';
+  const now = new Date();
+  const createdAt = now.toISOString();
+  const expiresAt = new Date(now.getTime() + 300 * 1000).toISOString();
+  // Ensure the challenge is tracked in D1 so D1 is the sole authority for
+  // single-use CAS and lockout, without overwriting an existing/consumed row.
+  try {
+    await db.prepare(
+      `CREATE TABLE IF NOT EXISTS otp_challenges (
+        challenge_key TEXT PRIMARY KEY,
+        tenant_id TEXT NOT NULL DEFAULT 'default',
+        phone TEXT NOT NULL,
+        code TEXT NOT NULL,
+        attempts INTEGER NOT NULL DEFAULT 0,
+        expires_at TEXT NOT NULL,
+        consumed_at TEXT,
+        created_at TEXT NOT NULL
+      )`
+    ).run();
+    await db.prepare(
+      `INSERT OR IGNORE INTO otp_challenges (challenge_key, tenant_id, phone, code, attempts, expires_at, consumed_at, created_at)
+       VALUES (?, ?, ?, ?, 0, ?, NULL, ?)`
+    ).bind(challengeKey, tenantId, phone, code, expiresAt, createdAt).run();
+  } catch {
+    // If table does not exist in a minimal mock, consumeOtpChallenge handles it
+  }
+  return consumeOtpChallenge(db, challengeKey, code);
+}
+
+async function rollbackOtpConsumption(
+  db: Env['AURA_DB'] | undefined,
+  challengeKey: string
+): Promise<void> {
+  if (!db?.prepare) return;
+  try {
+    await db.prepare(
+      'UPDATE otp_challenges SET consumed_at = NULL WHERE challenge_key = ?'
+    ).bind(challengeKey).run();
+  } catch {
+    // best-effort rollback
+  }
+}
+
+function otpChallengeRejection(c: Context<{ Bindings: Env }>, status: OtpConsumeStatus) {
+  if (status === 'unavailable') {
+    return c.json({ success: false, code: 'AUTH_STATE_UNAVAILABLE', error: 'Dịch vụ xác thực tạm thời gián đoạn' }, 503);
+  }
+  if (status === 'locked') {
+    return c.json({
+      success: false,
+      code: 'OTP_RATE_LIMITED',
+      error: 'Quá nhiều lần nhập sai mã OTP. Vui lòng yêu cầu mã mới.',
+    }, 429);
+  }
+  return c.json({ success: false, code: 'OTP_INVALID', error: 'Mã OTP không hợp lệ hoặc đã được sử dụng.' }, 401);
 }
 
 // Hono's executionCtx getter throws when no ExecutionContext exists (e.g.
@@ -246,6 +315,17 @@ export async function handlePhoneAuth(c: Context<{ Bindings: Env }>) {
                     storedVersion = Math.max(storedVersion, parsedVer);
                   }
                 }
+                if (db && typeof db.prepare === 'function') {
+                  const dbCustVer = await db
+                    .prepare('SELECT auth_version FROM customers WHERE id = ? LIMIT 1')
+                    .bind(lookupId)
+                    .first<{ auth_version?: number | null }>()
+                    .catch(() => null);
+                  if (dbCustVer && Number.isFinite(Number(dbCustVer.auth_version)) && Number(dbCustVer.auth_version) > 0) {
+                    hasVersionRecord = true;
+                    storedVersion = Math.max(storedVersion, Number(dbCustVer.auth_version));
+                  }
+                }
               }
               if (hasVersionRecord && storedVersion !== Number(verifiedPayload.authVersion || 1)) {
                 versionValid = false;
@@ -305,12 +385,26 @@ export async function handlePhoneAuth(c: Context<{ Bindings: Env }>) {
             }
             if (storedOtp && timingSafeEqualString(storedOtp, submittedOtp)) {
               const claimedInMemory = claimOtpOnce(c.env.AUTH_KV, tenantOtpKey, storedOtp);
+              if (!claimedInMemory) {
+                return c.json({
+                  success: false,
+                  code: 'PHONE_VERIFICATION_REQUIRED',
+                  error: 'Mã OTP đã được sử dụng. Vui lòng yêu cầu mã mới nếu cần đăng nhập lại.',
+                }, 403);
+              }
               if (claimedInMemory) {
                 if (tenantId === 'default') {
                   claimOtpOnce(c.env.AUTH_KV, legacyOtpKey, storedOtp);
                 }
-                const d1Status = await consumeOtpChallenge(db, tenantOtpKey, storedOtp);
-                if (d1Status !== 'already_consumed') {
+                const d1Status = await consumeOtpAuthority(db, tenantOtpKey, storedOtp, tenantId, phone);
+                if (d1Status !== 'consumed') {
+                  releaseOtpClaim(c.env.AUTH_KV, tenantOtpKey, storedOtp);
+                  if (tenantId === 'default') {
+                    releaseOtpClaim(c.env.AUTH_KV, legacyOtpKey, storedOtp);
+                  }
+                  return otpChallengeRejection(c, d1Status);
+                }
+                {
                   try {
                     await c.env.AUTH_KV.delete?.(tenantOtpKey);
                     if (tenantId === 'default') {
@@ -318,6 +412,7 @@ export async function handlePhoneAuth(c: Context<{ Bindings: Env }>) {
                     }
                     await c.env.AUTH_KV.delete?.(failRateKey);
                   } catch {
+                    await rollbackOtpConsumption(db, tenantOtpKey);
                     releaseOtpClaim(c.env.AUTH_KV, tenantOtpKey, storedOtp);
                     if (tenantId === 'default') {
                       releaseOtpClaim(c.env.AUTH_KV, legacyOtpKey, storedOtp);
@@ -331,6 +426,9 @@ export async function handlePhoneAuth(c: Context<{ Bindings: Env }>) {
             }
           }
           if (!proofVerified) {
+            if (submittedOtp.length > 0) {
+              await recordOtpFailedAttempt(db, `phone_otp:${tenantId}:${phone}`);
+            }
             try {
               await c.env.AUTH_KV.put?.(failRateKey, String(failedAttempts + 1), {
                 expirationTtl: OTP_VERIFY_FAIL_TTL_SECONDS,
@@ -436,8 +534,15 @@ export async function handlePhoneAuth(c: Context<{ Bindings: Env }>) {
             if (tenantId === 'default') {
               claimOtpOnce(c.env.AUTH_KV, legacyOtpKey, storedOtp);
             }
-            const d1Status = await consumeOtpChallenge(db, tenantOtpKey, storedOtp);
-            if (d1Status !== 'already_consumed') {
+            const d1Status = await consumeOtpAuthority(db, tenantOtpKey, storedOtp, tenantId, phone);
+            if (d1Status !== 'consumed') {
+              releaseOtpClaim(c.env.AUTH_KV, tenantOtpKey, storedOtp);
+              if (tenantId === 'default') {
+                releaseOtpClaim(c.env.AUTH_KV, legacyOtpKey, storedOtp);
+              }
+              return otpChallengeRejection(c, d1Status);
+            }
+            {
               try {
                 await c.env.AUTH_KV.delete?.(tenantOtpKey);
                 if (tenantId === 'default') {
@@ -445,6 +550,7 @@ export async function handlePhoneAuth(c: Context<{ Bindings: Env }>) {
                 }
                 await c.env.AUTH_KV.delete?.(failRateKey);
               } catch {
+                await rollbackOtpConsumption(db, tenantOtpKey);
                 releaseOtpClaim(c.env.AUTH_KV, tenantOtpKey, storedOtp);
                 if (tenantId === 'default') {
                   releaseOtpClaim(c.env.AUTH_KV, legacyOtpKey, storedOtp);
@@ -456,6 +562,7 @@ export async function handlePhoneAuth(c: Context<{ Bindings: Env }>) {
           }
         }
         if (!newCustomerVerified) {
+          await recordOtpFailedAttempt(db, tenantOtpKey);
           try {
             await c.env.AUTH_KV.put?.(failRateKey, String(failedAttempts + 1), {
               expirationTtl: OTP_VERIFY_FAIL_TTL_SECONDS,
@@ -645,6 +752,20 @@ export async function handlePhoneAuth(c: Context<{ Bindings: Env }>) {
     }
 
     let customerAuthVersion = 1;
+    if (c.env.AURA_DB?.prepare) {
+      try {
+        const verRow = await c.env.AURA_DB
+          .prepare('SELECT auth_version FROM customers WHERE id = ? LIMIT 1')
+          .bind(customer.id)
+          .first<{ auth_version?: number | null }>();
+        const d1Ver = Number(verRow?.auth_version);
+        if (Number.isFinite(d1Ver) && d1Ver > 0) {
+          customerAuthVersion = Math.max(customerAuthVersion, d1Ver);
+        }
+      } catch {
+        // Optional auth_version column in legacy test schemas
+      }
+    }
     if (c.env.AUTH_KV?.get) {
       try {
         if (customer.email) {
@@ -661,8 +782,11 @@ export async function handlePhoneAuth(c: Context<{ Bindings: Env }>) {
             customerAuthVersion = Math.max(customerAuthVersion, parsedVer);
           }
         }
+        if (customerAuthVersion > 1 && c.env.AUTH_KV.put) {
+          await c.env.AUTH_KV.put(`cust_auth_ver:${customer.id}`, String(customerAuthVersion)).catch(() => {});
+        }
       } catch {
-        // Fallback to authVersion 1 if KV read fails
+        // Fallback to D1-derived authVersion if KV read fails
       }
     }
 

@@ -3,9 +3,48 @@ import type { D1Database } from '@cloudflare/workers-types';
 import type { Env } from '../../types/env';
 import { executeKdsStatusTransition } from '@aura/domain-kitchen';
 import { restoreInventoryForOrder } from '@aura/domain-inventory';
+import { releaseTableIfNoActiveOrders } from '@aura/domain-order';
+import { cancelOpenPayOSAttemptForOrder } from '@aura/domain-payment';
 import { getDatabase, matchesTenantRow } from '../../lib/db';
 import { fetchOrderItemsAndPayments, formatCustomerOrder, formatOrder, resolveOpenApiOrdersTenant } from './helpers';
 import { fetchOrderForRead } from './order-read-handlers';
+
+const ISSUED_INVOICE_SYNC_STATUSES = ['synced', 'submitted', 'issued', 'completed'];
+
+/**
+ * An order that already carries an issued e-invoice must not be silently voided: the invoice is
+ * a legal document and can only be corrected through an adjustment or replacement credit note.
+ * Order ids are tenant-owned and the order was tenant-checked by the caller, so the mapping is
+ * resolved by order id. Schemas without the mapping table have no invoices to protect.
+ */
+export async function hasIssuedEInvoice(db: D1Database, orderId: string): Promise<boolean> {
+  const placeholders = ISSUED_INVOICE_SYNC_STATUSES.map(() => '?').join(', ');
+  const queries = [
+    `SELECT id FROM erpnext_mappings
+      WHERE (aura_order_id = ? OR (local_type IN ('order', 'sales_invoice') AND local_id = ?))
+        AND LOWER(COALESCE(sync_status, '')) IN (${placeholders})
+        AND COALESCE(NULLIF(TRIM(erpnext_invoice_id), ''), NULLIF(TRIM(erpnext_id), '')) IS NOT NULL
+      LIMIT 1`,
+    `SELECT id FROM erpnext_mappings
+      WHERE local_type IN ('order', 'sales_invoice') AND local_id = ?
+        AND LOWER(COALESCE(sync_status, '')) IN (${placeholders})
+        AND NULLIF(TRIM(erpnext_id), '') IS NOT NULL
+      LIMIT 1`,
+  ];
+  const binds = [
+    [orderId, orderId, ...ISSUED_INVOICE_SYNC_STATUSES],
+    [orderId, ...ISSUED_INVOICE_SYNC_STATUSES],
+  ];
+  for (let i = 0; i < queries.length; i++) {
+    try {
+      const row = await db.prepare(queries[i]).bind(...binds[i]).first<{ id: string }>();
+      return Boolean(row);
+    } catch {
+      // Column variant or table absent: try the narrower schema
+    }
+  }
+  return false;
+}
 
 export async function runOrderCancellationRollback(params: {
   db: D1Database;
@@ -15,10 +54,24 @@ export async function runOrderCancellationRollback(params: {
   cancelTenant: string;
   now: string;
   reason?: string;
+  /** Order status captured before it became 'cancelled'; decides restock vs waste. */
+  preCancelStatus?: string;
 }): Promise<void> {
-  const { db, env, id, existing, cancelTenant, now, reason } = params;
+  const { db, env, id, existing, cancelTenant, now, reason, preCancelStatus } = params;
 
-  await restoreInventoryForOrder({ AURA_DB: db as any, ...(env || {}) }, id, cancelTenant).catch(() => {});
+  await restoreInventoryForOrder(
+    { AURA_DB: db as any, ...(env || {}) },
+    id,
+    cancelTenant,
+    preCancelStatus ?? (typeof existing.status === 'string' ? existing.status : undefined),
+  ).catch(() => {});
+
+  await cancelOpenPayOSAttemptForOrder(
+    db,
+    (env || {}) as unknown as Record<string, unknown>,
+    id,
+    cancelTenant,
+  ).catch(() => {});
 
   try {
     await db.prepare(
@@ -389,6 +442,10 @@ export async function runOrderCancellationRollback(params: {
   } catch {
     // Optional promotion_usages table in partial schemas
   }
+
+  if (existing.table_id) {
+    await releaseTableIfNoActiveOrders(db, String(existing.table_id), cancelTenant).catch(() => false);
+  }
 }
 
 export async function resolveCustomerOwnerIdsForMutation(
@@ -530,9 +587,24 @@ export async function handleCancelOrder(c: Context<{ Bindings: Env }>) {
     });
   }
 
-  if (customer && String(existing.payment_status || '').trim().toLowerCase() === 'paid') {
-    return c.json({ success: false, error: 'Paid orders cannot be cancelled by customer' }, 409);
+  const normalizedCancelRole = String(user?.role || '').trim().toLowerCase();
+  const canCompensatePaid = ['owner', 'admin', 'manager', 'supervisor'].includes(normalizedCancelRole);
+  if (!canCompensatePaid && String(existing.payment_status || '').trim().toLowerCase() === 'paid') {
+    return c.json({
+      success: false,
+      error: customer ? 'Paid orders cannot be cancelled by customer' : 'Paid order cannot be cancelled; initiate a refund instead',
+    }, 409);
   }
+
+  if (await hasIssuedEInvoice(db, id)) {
+    return c.json({
+      success: false,
+      code: 'EINVOICE_ADJUSTMENT_REQUIRED',
+      error: 'Order already has an issued e-invoice; issue an adjustment or replacement credit note instead of cancelling',
+    }, 409);
+  }
+
+  const preCancelStatus = String(existing.status ?? '');
 
   // All aliases share tenant confinement, role/state validation and compare-and-set.
   const transition = await executeKdsStatusTransition(db, id, 'cancelled', user?.role, {
@@ -540,6 +612,7 @@ export async function handleCancelOrder(c: Context<{ Bindings: Env }>) {
     kv: c.env?.AUTH_KV,
     env: c.env as unknown as Record<string, unknown>,
     skipCancelSideEffects: true,
+    allowPaidCompensation: canCompensatePaid,
   });
   if (!transition.success) return c.json({ success: false, error: transition.error }, (transition.statusCode || 400) as any);
 
@@ -551,6 +624,7 @@ export async function handleCancelOrder(c: Context<{ Bindings: Env }>) {
     cancelTenant,
     now,
     reason: body.reason || 'order_cancelled',
+    preCancelStatus,
   });
 
   const actor = user?.id || 'system';

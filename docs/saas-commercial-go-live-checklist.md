@@ -24,7 +24,7 @@ openssl rand -hex 32 | npx wrangler secret put TENANT_SECRETS_KEY
 
 ---
 
-## 2. Backup D1 & Chạy Migration `20261119_01_saas_commercial_v3.sql`
+## 2. Backup D1 & Chạy Migration `20261119_02_saas_commercial_v3.sql`
 
 > **Quy tắc bắt buộc:** Luôn export bản sao lưu D1 trước khi apply migration lên Staging/Production.
 
@@ -37,10 +37,10 @@ npx wrangler d1 export aura-space-db --remote --output=../backups/d1-pre-saas-v3
 ### Bước 2.2 — Apply Migration (Staging trước, Production sau)
 ```bash
 # Staging
-npx wrangler d1 execute aura-space-db-staging --remote --file=db/migrations/20261119_01_saas_commercial_v3.sql
+npx wrangler d1 execute aura-space-db-staging --remote --file=db/migrations/20261119_02_saas_commercial_v3.sql
 
 # Production (chỉ chạy sau khi pass Smoke Test mục 5 trên Staging)
-npx wrangler d1 execute aura-space-db --remote --file=db/migrations/20261119_01_saas_commercial_v3.sql
+npx wrangler d1 execute aura-space-db --remote --file=db/migrations/20261119_02_saas_commercial_v3.sql
 ```
 
 ### Bước 2.3 — Xác minh bảng mới
@@ -61,7 +61,7 @@ WHERE type='table' AND name IN (
 
 ### Rollback (nếu cần)
 ```bash
-npx wrangler d1 execute aura-space-db --remote --file=db/migrations/20261119_01_saas_commercial_v3.down.sql
+npx wrangler d1 execute aura-space-db --remote --file=db/migrations/20261119_02_saas_commercial_v3.down.sql
 ```
 
 ---
