@@ -13,20 +13,47 @@ Disallow: /success/
 Disallow: /failure/
 Disallow: /mobile/
 
-# Explicitly welcome AI search & retrieval crawlers
+# Explicitly welcome AI search & retrieval crawlers (mirror private Disallow rules per RFC 9309)
 User-agent: OAI-SearchBot
 Allow: /
 Disallow: /admin/
 Disallow: /kds
+Disallow: /kds/
+Disallow: /kitchen-display/
+Disallow: /auth/
+Disallow: /portal/
+Disallow: /dashboard/
+Disallow: /checkout
+Disallow: /success/
+Disallow: /failure/
+Disallow: /mobile/
 
 User-agent: Claude-SearchBot
 Allow: /
 Disallow: /admin/
 Disallow: /kds
+Disallow: /kds/
+Disallow: /kitchen-display/
+Disallow: /auth/
+Disallow: /portal/
+Disallow: /dashboard/
+Disallow: /checkout
+Disallow: /success/
+Disallow: /failure/
+Disallow: /mobile/
 
 User-agent: PerplexityBot
 Allow: /
 Disallow: /admin/
 Disallow: /kds
+Disallow: /kds/
+Disallow: /kitchen-display/
+Disallow: /auth/
+Disallow: /portal/
+Disallow: /dashboard/
+Disallow: /checkout
+Disallow: /success/
+Disallow: /failure/
+Disallow: /mobile/
 
 Sitemap: https://auraspace.cafe/sitemap.xml

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { MD3Button, MD3Card } from '@/components/md3';
 import { buildStorefrontVietQrUrl } from '@/lib/vietqr';
+import { sanitizePayosCheckoutUrl } from './storefront-helpers';
 
 export type StorefrontPaymentMethod = 'cod' | 'vietqr' | 'payos';
 
@@ -57,10 +58,7 @@ export function StorefrontPaymentCard({
     amountVnd: order.total,
     description: transferMemo,
   });
-  const safePayosUrl =
-    typeof order.payosCheckoutUrl === 'string' && /^https?:\/\//i.test(order.payosCheckoutUrl.trim())
-      ? order.payosCheckoutUrl.trim()
-      : null;
+  const safePayosUrl = sanitizePayosCheckoutUrl(order.payosCheckoutUrl);
   const showVietQr =
     Boolean(vietQrUrl) && (order.method === 'vietqr' || (order.method === 'payos' && !safePayosUrl));
 
@@ -102,7 +100,7 @@ export function StorefrontPaymentCard({
             — <strong className="text-[var(--md-sys-color-on-surface)]">{order.tableLabel}</strong>
           </div>
         </div>
-        <MD3Button type="button" variant="outlined" size="compact" onClick={onDismiss}>
+        <MD3Button type="button" variant="outlined" size="compact" className="min-w-[44px]" onClick={onDismiss}>
           Đóng
         </MD3Button>
       </div>
@@ -116,7 +114,7 @@ export function StorefrontPaymentCard({
             href={safePayosUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center justify-center rounded-[var(--md-sys-shape-corner-full)] px-5 py-2.5 m3-label-large text-[var(--md-sys-color-on-primary)] bg-[var(--md-sys-color-primary)]"
+            className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-[var(--md-sys-shape-corner-full)] px-5 py-2.5 m3-label-large text-[var(--md-sys-color-on-primary)] bg-[var(--md-sys-color-primary)]"
             style={accentColor ? { backgroundColor: accentColor } : undefined}
           >
             Mở cổng thanh toán PayOS →
@@ -152,7 +150,7 @@ export function StorefrontPaymentCard({
                 <span>
                   Số TK: <strong className="font-mono text-[var(--md-sys-color-on-surface)] tabular-nums">{payment.bankAccountNo}</strong>
                 </span>
-                <MD3Button type="button" variant="tonal" size="compact" onClick={() => void copyValue(payment.bankAccountNo || '', 'account')}>
+                <MD3Button type="button" variant="tonal" size="compact" className="min-w-[44px]" onClick={() => void copyValue(payment.bankAccountNo || '', 'account')}>
                   {copiedField === 'account' ? 'Đã sao chép' : 'Sao chép'}
                 </MD3Button>
               </div>
@@ -161,7 +159,7 @@ export function StorefrontPaymentCard({
               <span>
                 Nội dung CK: <strong className="font-mono text-[var(--md-sys-color-on-surface)]">{transferMemo}</strong>
               </span>
-              <MD3Button type="button" variant="tonal" size="compact" onClick={() => void copyValue(transferMemo, 'memo')}>
+              <MD3Button type="button" variant="tonal" size="compact" className="min-w-[44px]" onClick={() => void copyValue(transferMemo, 'memo')}>
                 {copiedField === 'memo' ? 'Đã sao chép' : 'Sao chép'}
               </MD3Button>
             </div>

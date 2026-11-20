@@ -41,6 +41,7 @@ export default function CartBottomBar() {
 
   if (
     count === 0 ||
+    location.pathname.startsWith('/s/') ||
     location.pathname.startsWith('/checkout') ||
     location.pathname.startsWith('/order-success') ||
     location.pathname.startsWith('/order')

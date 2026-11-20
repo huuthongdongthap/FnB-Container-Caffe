@@ -412,9 +412,15 @@ describe('Phase 44 Slice AQ1 — Birthday Loyalty, POS Customer Lookup, Admin QR
           is_active INTEGER DEFAULT 1,
           auth_version INTEGER DEFAULT 1
         );
+        CREATE TABLE saas_tenants (
+          id TEXT PRIMARY KEY,
+          slug TEXT UNIQUE NOT NULL,
+          status TEXT DEFAULT 'active'
+        );
         CREATE TABLE cafe_tables (
           id TEXT PRIMARY KEY,
           table_number TEXT NOT NULL,
+          code TEXT,
           zone TEXT DEFAULT 'indoor',
           capacity INTEGER DEFAULT 4,
           status TEXT DEFAULT 'Available',
@@ -424,21 +430,24 @@ describe('Phase 44 Slice AQ1 — Birthday Loyalty, POS Customer Lookup, Admin QR
           id INTEGER PRIMARY KEY AUTOINCREMENT,
           table_id TEXT UNIQUE,
           slug TEXT,
+          tenant_id TEXT DEFAULT 'default',
           updated_at TEXT
         );
       `);
 
+      sqlite.prepare('INSERT INTO saas_tenants (id, slug, status) VALUES (?, ?, ?)').run('store-a', 'store-a', 'active');
+      sqlite.prepare('INSERT INTO saas_tenants (id, slug, status) VALUES (?, ?, ?)').run('store-b', 'store-b', 'active');
       sqlite.prepare('INSERT INTO users (id, name, role, tenant_id, is_active, auth_version) VALUES (?, ?, ?, ?, 1, 1)')
         .run('mgr-b', 'Manager B', 'manager', 'store-b');
-      sqlite.prepare('INSERT INTO cafe_tables (id, table_number, zone, status, tenant_id) VALUES (?, ?, ?, ?, ?)')
-        .run('tbl-a-1', 'T01', 'indoor', 'Available', 'store-a');
-      sqlite.prepare('INSERT INTO cafe_tables (id, table_number, zone, status, tenant_id) VALUES (?, ?, ?, ?, ?)')
-        .run('tbl-b-1', 'T01', 'indoor', 'Available', 'store-b');
+      sqlite.prepare('INSERT INTO cafe_tables (id, table_number, code, zone, status, tenant_id) VALUES (?, ?, ?, ?, ?, ?)')
+        .run('tbl-a-1', 'T01', 'T01', 'indoor', 'Available', 'store-a');
+      sqlite.prepare('INSERT INTO cafe_tables (id, table_number, code, zone, status, tenant_id) VALUES (?, ?, ?, ?, ?, ?)')
+        .run('tbl-b-1', 'T01', 'T01', 'indoor', 'Available', 'store-b');
 
       // Both tenants have colliding slug 'shared-t01' in table_qr_codes
-      sqlite.prepare('INSERT INTO table_qr_codes (table_id, slug) VALUES (?, ?)').run('tbl-a-1', 'shared-t01');
-      sqlite.prepare('INSERT INTO table_qr_codes (table_id, slug) VALUES (?, ?)').run('tbl-b-1', 'shared-t01');
-      sqlite.prepare('INSERT INTO table_qr_codes (table_id, slug) VALUES (?, ?)').run('tbl-a-only', 'only-store-a');
+      sqlite.prepare('INSERT INTO table_qr_codes (table_id, slug, tenant_id) VALUES (?, ?, ?)').run('tbl-a-1', 'shared-t01', 'store-a');
+      sqlite.prepare('INSERT INTO table_qr_codes (table_id, slug, tenant_id) VALUES (?, ?, ?)').run('tbl-b-1', 'shared-t01', 'store-b');
+      sqlite.prepare('INSERT INTO table_qr_codes (table_id, slug, tenant_id) VALUES (?, ?, ?)').run('tbl-a-only', 'only-store-a', 'store-a');
 
       const db = createSqliteD1Adapter(sqlite);
       const env = createMockEnv({

@@ -52,6 +52,7 @@ import {
   verifyPayosSignature,
 } from '../lib/tenant-secrets';
 import { buildVietQrImageUrl, resolveMerchantPaymentConfig } from '../lib/merchant-payment';
+import { buildMerchantPayosWebhookUrls } from '../lib/saas-webhook-url';
 
 const PAYOS_API_URL = 'https://api-merchant.payos.vn/v2/payment-requests';
 const PENDING_DOMAIN_CLAIM_TTL_MS = 24 * 60 * 60 * 1000;
@@ -763,6 +764,7 @@ export function createSaasCommercialRoutes() {
       .first<{ slug: string }>();
 
     const webhookSlug = tenantRow?.slug || tenantId;
+    const { webhookUrl, webhookUrlPath } = buildMerchantPayosWebhookUrls(c.env, webhookSlug);
     return c.json({
       success: true,
       data: {
@@ -775,7 +777,8 @@ export function createSaasCommercialRoutes() {
         bankAccountNo: row?.bank_account_no || '',
         bankAccountName: row?.bank_account_name || '',
         bankName: row?.bank_name || '',
-        webhookUrlPath: `/api/webhook/payos/${webhookSlug}`,
+        webhookUrl,
+        webhookUrlPath,
         updatedAt: row?.updated_at || null,
       },
     });

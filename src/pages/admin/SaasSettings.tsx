@@ -1,6 +1,8 @@
-import { useEffect, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { apiFetch } from '@/lib/api-client';
+import { API_BASE, apiFetch } from '@/lib/api-client';
+import { MD3Button } from '@/components/md3/md3-button';
+import { merchantWebhookUrl, safePayosCheckoutUrl, safeVietQrPreviewUrl } from './saas-settings-urls';
 
 interface MePayload {
   tenantId: string;
@@ -41,6 +43,7 @@ interface PaymentConfigPayload {
   bankAccountNo: string;
   bankAccountName: string;
   bankName: string;
+  webhookUrl?: string;
   webhookUrlPath: string;
 }
 
@@ -70,7 +73,31 @@ export default function AdminSaasSettingsPage(): ReactNode {
   const [payment, setPayment] = useState<PaymentConfigPayload | null>(null);
   const [invoices, setInvoices] = useState<BillingInvoice[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [retrying, setRetrying] = useState(false);
+  const [busyAction, setBusyAction] = useState<string | null>(null);
+  const [sampleQrUrl, setSampleQrUrl] = useState<string | null>(null);
+  const [webhookCopied, setWebhookCopied] = useState(false);
+  const [webhookCopyError, setWebhookCopyError] = useState<string | null>(null);
   const [notice, setNotice] = useState<{ type: 'ok' | 'err'; text: string } | null>(null);
+
+  const mountedRef = useRef(true);
+  const loadRequestIdRef = useRef(0);
+  const loadInFlightRef = useRef(false);
+  const actionInFlightRef = useRef<string | null>(null);
+  const brandingDirtyRef = useRef(false);
+  const paymentDirtyRef = useRef(false);
+  const copyResetTimerRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      if (copyResetTimerRef.current !== null) {
+        window.clearTimeout(copyResetTimerRef.current);
+      }
+    };
+  }, []);
 
   useEffect(() => {
     const statusParam = searchParams.get('status');
@@ -113,201 +140,358 @@ export default function AdminSaasSettingsPage(): ReactNode {
   // Domain state
   const [newDomain, setNewDomain] = useState('');
 
-  async function loadAll() {
-    setLoading(true);
-    try {
-      const [meRes, payRes, billRes] = await Promise.all([
-        apiFetch<{ success: boolean; data?: MePayload }>('/api/saas/me', { silent: true }),
-        apiFetch<{ success: boolean; data?: PaymentConfigPayload }>('/api/saas/payment-config', { silent: true }),
-        apiFetch<{ success: boolean; data?: { invoices: BillingInvoice[] } }>('/api/saas/billing/status', {
-          silent: true,
-        }),
-      ]);
-      if (meRes.data) {
-        setMe(meRes.data);
-        setDisplayName(meRes.data.branding?.display_name || meRes.data.tenant.name || '');
-        setTagline(meRes.data.branding?.tagline || '');
-        setLogoUrl(meRes.data.branding?.logo_url || '');
-        setPrimaryColor(meRes.data.branding?.primary_color || '#1F2937');
-        setAccentColor(meRes.data.branding?.accent_color || '#D97706');
-        setAddress(meRes.data.branding?.address || '');
-        setPhone(meRes.data.branding?.phone || '');
-        setReceiptFooter(meRes.data.branding?.receipt_footer || '');
+  const loadAll = useCallback(
+    async (options?: { isRetry?: boolean; dedupe?: boolean }) => {
+      if (options?.dedupe && loadInFlightRef.current) return;
+      loadInFlightRef.current = true;
+      const requestId = ++loadRequestIdRef.current;
+
+      if (options?.isRetry) setRetrying(true);
+
+      try {
+        const [meResult, payResult, billResult] = await Promise.allSettled([
+          apiFetch<{ success: boolean; error?: string; data?: MePayload }>('/api/saas/me', { silent: true }),
+          apiFetch<{ success: boolean; error?: string; data?: PaymentConfigPayload }>('/api/saas/payment-config', {
+            silent: true,
+          }),
+          apiFetch<{ success: boolean; error?: string; data?: { invoices: BillingInvoice[] } }>(
+            '/api/saas/billing/status',
+            { silent: true },
+          ),
+        ]);
+
+        if (!mountedRef.current || requestId !== loadRequestIdRef.current) return;
+
+        const errors: string[] = [];
+
+        if (meResult.status === 'fulfilled' && meResult.value.success && meResult.value.data) {
+          const meData = meResult.value.data;
+          setMe(meData);
+          if (!brandingDirtyRef.current) {
+            setDisplayName(meData.branding?.display_name || meData.tenant.name || '');
+            setTagline(meData.branding?.tagline || '');
+            setLogoUrl(meData.branding?.logo_url || '');
+            setPrimaryColor(meData.branding?.primary_color || '#1F2937');
+            setAccentColor(meData.branding?.accent_color || '#D97706');
+            setAddress(meData.branding?.address || '');
+            setPhone(meData.branding?.phone || '');
+            setReceiptFooter(meData.branding?.receipt_footer || '');
+            brandingDirtyRef.current = false;
+          }
+        } else {
+          const msg =
+            meResult.status === 'rejected'
+              ? meResult.reason instanceof Error
+                ? meResult.reason.message
+                : 'Không thể tải thông tin cửa hàng.'
+              : meResult.value.error || 'Không thể tải thông tin cửa hàng.';
+          errors.push(msg);
+        }
+
+        if (payResult.status === 'fulfilled' && payResult.value.success && payResult.value.data) {
+          const payData = payResult.value.data;
+          setPayment(payData);
+          if (!paymentDirtyRef.current) {
+            setProvider(payData.provider === 'payos' ? 'payos' : 'vietqr');
+            setBankBin(payData.bankBin || '');
+            setBankAccountNo(payData.bankAccountNo || '');
+            setBankAccountName(payData.bankAccountName || '');
+            setBankName(payData.bankName || '');
+            paymentDirtyRef.current = false;
+          }
+        } else {
+          const msg =
+            payResult.status === 'rejected'
+              ? payResult.reason instanceof Error
+                ? payResult.reason.message
+                : 'Không thể tải cấu hình thanh toán.'
+              : payResult.value.error || 'Không thể tải cấu hình thanh toán.';
+          errors.push(msg);
+        }
+
+        if (billResult.status === 'fulfilled' && billResult.value.success && billResult.value.data?.invoices) {
+          setInvoices(billResult.value.data.invoices);
+        } else {
+          const msg =
+            billResult.status === 'rejected'
+              ? billResult.reason instanceof Error
+                ? billResult.reason.message
+                : 'Không thể tải lịch sử hóa đơn.'
+              : billResult.value.error || 'Không thể tải lịch sử hóa đơn.';
+          errors.push(msg);
+        }
+
+        if (errors.length > 0) {
+          const uniqueErrors = Array.from(new Set(errors));
+          setLoadError(uniqueErrors.join(' '));
+        } else {
+          setLoadError(null);
+        }
+      } catch (err) {
+        if (!mountedRef.current || requestId !== loadRequestIdRef.current) return;
+        setLoadError(err instanceof Error ? err.message : 'Không thể tải cấu hình SaaS.');
+      } finally {
+        if (requestId === loadRequestIdRef.current) {
+          loadInFlightRef.current = false;
+          if (mountedRef.current) {
+            setLoading(false);
+            setRetrying(false);
+          }
+        }
       }
-      if (payRes.data) {
-        setPayment(payRes.data);
-        setProvider(payRes.data.provider === 'payos' ? 'payos' : 'vietqr');
-        setBankBin(payRes.data.bankBin || '');
-        setBankAccountNo(payRes.data.bankAccountNo || '');
-        setBankAccountName(payRes.data.bankAccountName || '');
-        setBankName(payRes.data.bankName || '');
-      }
-      if (billRes.data?.invoices) {
-        setInvoices(billRes.data.invoices);
-      }
-    } finally {
-      setLoading(false);
-    }
-  }
+    },
+    [],
+  );
 
   useEffect(() => {
     void loadAll();
-  }, []);
+  }, [loadAll]);
+
+  async function runAction(actionKey: string, task: () => Promise<void>) {
+    if (actionInFlightRef.current !== null || loadInFlightRef.current) return;
+    actionInFlightRef.current = actionKey;
+    setBusyAction(actionKey);
+    try {
+      await task();
+    } finally {
+      actionInFlightRef.current = null;
+      if (mountedRef.current) {
+        setBusyAction(null);
+      }
+    }
+  }
 
   async function handleCheckout(planId: 'starter' | 'pro' | 'chain', billingCycle: 'monthly' | 'annual') {
-    setNotice(null);
-    try {
-      const res = await apiFetch<{
-        success: boolean;
-        error?: string;
-        data?: { checkoutUrl?: string | null; amountVnd: number; payosOrderCode: string };
-      }>('/api/saas/billing/checkout', {
-        method: 'POST',
-        body: JSON.stringify({ planId, billingCycle }),
-      });
-      if (!res.success || !res.data) {
-        setNotice({ type: 'err', text: res.error || 'Không thể tạo hóa đơn thanh toán.' });
-        return;
+    await runAction(`checkout:${planId}:${billingCycle}`, async () => {
+      setNotice(null);
+      try {
+        const res = await apiFetch<{
+          success: boolean;
+          error?: string;
+          data?: { checkoutUrl?: string | null; amountVnd: number; payosOrderCode: string };
+        }>('/api/saas/billing/checkout', {
+          method: 'POST',
+          body: JSON.stringify({ planId, billingCycle }),
+        });
+        if (!res.success || !res.data) {
+          setNotice({ type: 'err', text: res.error || 'Không thể tạo hóa đơn thanh toán.' });
+          return;
+        }
+        const safeCheckoutUrl = safePayosCheckoutUrl(res.data.checkoutUrl);
+        if (safeCheckoutUrl) {
+          window.open(safeCheckoutUrl, '_blank', 'noopener,noreferrer');
+        }
+        const invalidCheckoutSuffix =
+          res.data.checkoutUrl && !safeCheckoutUrl
+            ? ' Liên kết thanh toán chưa hợp lệ nên không tự mở trình duyệt.'
+            : '';
+        setNotice({
+          type: 'ok',
+          text: `Đã tạo hóa đơn #${res.data.payosOrderCode} (${res.data.amountVnd.toLocaleString('vi-VN')}đ).${invalidCheckoutSuffix}`,
+        });
+        await loadAll();
+      } catch (err) {
+        setNotice({ type: 'err', text: err instanceof Error ? err.message : 'Lỗi tạo hóa đơn.' });
       }
-      if (res.data.checkoutUrl) {
-        window.open(res.data.checkoutUrl, '_blank', 'noopener,noreferrer');
-      }
-      setNotice({
-        type: 'ok',
-        text: `Đã tạo hóa đơn #${res.data.payosOrderCode} (${res.data.amountVnd.toLocaleString('vi-VN')}đ).`,
-      });
-      await loadAll();
-    } catch (err) {
-      setNotice({ type: 'err', text: err instanceof Error ? err.message : 'Lỗi tạo hóa đơn.' });
-    }
+    });
   }
 
   async function handleSavePayment(e: React.FormEvent) {
     e.preventDefault();
-    setNotice(null);
-    try {
-      const res = await apiFetch<{ success: boolean; error?: string }>('/api/saas/payment-config', {
-        method: 'PUT',
-        body: JSON.stringify({
-          provider,
-          bankBin,
-          bankAccountNo,
-          bankAccountName,
-          bankName,
-          ...(payosClientId ? { payosClientId, payosApiKey, payosChecksumKey } : {}),
-        }),
-      });
-      if (!res.success) {
-        setNotice({ type: 'err', text: res.error || 'Không thể lưu cấu hình thanh toán.' });
-        return;
+    await runAction('savePayment', async () => {
+      setNotice(null);
+      const hasAnyPayosInput = Boolean(payosClientId || payosApiKey || payosChecksumKey);
+      try {
+        const res = await apiFetch<{ success: boolean; error?: string }>('/api/saas/payment-config', {
+          method: 'PUT',
+          body: JSON.stringify({
+            provider,
+            bankBin,
+            bankAccountNo,
+            bankAccountName,
+            bankName,
+            ...(hasAnyPayosInput ? { payosClientId, payosApiKey, payosChecksumKey } : {}),
+          }),
+        });
+        if (!res.success) {
+          setNotice({ type: 'err', text: res.error || 'Không thể lưu cấu hình thanh toán.' });
+          return;
+        }
+        setPayosClientId('');
+        setPayosApiKey('');
+        setPayosChecksumKey('');
+        setNotice({ type: 'ok', text: 'Đã lưu & mã hóa cấu hình thanh toán trực tiếp cho quán.' });
+        await loadAll();
+      } catch (err) {
+        setNotice({ type: 'err', text: err instanceof Error ? err.message : 'Lỗi lưu cấu hình.' });
       }
-      setPayosClientId('');
-      setPayosApiKey('');
-      setPayosChecksumKey('');
-      setNotice({ type: 'ok', text: 'Đã lưu & mã hóa cấu hình thanh toán trực tiếp cho quán.' });
-      await loadAll();
-    } catch (err) {
-      setNotice({ type: 'err', text: err instanceof Error ? err.message : 'Lỗi lưu cấu hình.' });
-    }
+    });
   }
 
   async function handleTestPayment() {
-    setNotice(null);
-    try {
-      const res = await apiFetch<{ success: boolean; error?: string; data?: { message: string } }>(
-        '/api/saas/payment-config/test',
-        { method: 'POST' }
-      );
-      setNotice({
-        type: res.success ? 'ok' : 'err',
-        text: res.data?.message || res.error || 'Đã kiểm tra kết nối.',
-      });
-    } catch (err) {
-      setNotice({ type: 'err', text: err instanceof Error ? err.message : 'Kiểm tra thất bại.' });
-    }
+    await runAction('testPayment', async () => {
+      setNotice(null);
+      try {
+        const res = await apiFetch<{
+          success: boolean;
+          error?: string;
+          data?: { message: string; sampleQrUrl?: string | null; provider?: string };
+        }>('/api/saas/payment-config/test', { method: 'POST' });
+        const validatedSampleQr = res.success ? safeVietQrPreviewUrl(res.data?.sampleQrUrl) : null;
+        setSampleQrUrl(validatedSampleQr);
+        setNotice({
+          type: res.success ? 'ok' : 'err',
+          text: res.data?.message || res.error || 'Đã kiểm tra kết nối.',
+        });
+      } catch (err) {
+        setSampleQrUrl(null);
+        setNotice({ type: 'err', text: err instanceof Error ? err.message : 'Kiểm tra thất bại.' });
+      }
+    });
   }
 
   async function handleSaveBranding(e: React.FormEvent) {
     e.preventDefault();
-    setNotice(null);
-    try {
-      const res = await apiFetch<{ success: boolean; error?: string }>('/api/saas/branding', {
-        method: 'PATCH',
-        body: JSON.stringify({
-          displayName,
-          tagline,
-          logoUrl,
-          primaryColor,
-          accentColor,
-          address,
-          phone,
-          receiptFooter,
-        }),
-      });
-      if (!res.success) {
-        setNotice({ type: 'err', text: res.error || 'Lưu thương hiệu thất bại.' });
-        return;
+    await runAction('saveBranding', async () => {
+      setNotice(null);
+      try {
+        const res = await apiFetch<{ success: boolean; error?: string }>('/api/saas/branding', {
+          method: 'PATCH',
+          body: JSON.stringify({
+            displayName,
+            tagline,
+            logoUrl,
+            primaryColor,
+            accentColor,
+            address,
+            phone,
+            receiptFooter,
+          }),
+        });
+        if (!res.success) {
+          setNotice({ type: 'err', text: res.error || 'Lưu thương hiệu thất bại.' });
+          return;
+        }
+        setNotice({ type: 'ok', text: 'Đã cập nhật thương hiệu trang đặt món của quán.' });
+        await loadAll();
+      } catch (err) {
+        setNotice({ type: 'err', text: err instanceof Error ? err.message : 'Lỗi lưu thương hiệu.' });
       }
-      setNotice({ type: 'ok', text: 'Đã cập nhật thương hiệu trang đặt món của quán.' });
-      await loadAll();
-    } catch (err) {
-      setNotice({ type: 'err', text: err instanceof Error ? err.message : 'Lỗi lưu thương hiệu.' });
-    }
+    });
   }
 
   async function handleAddDomain(e: React.FormEvent) {
     e.preventDefault();
-    setNotice(null);
-    try {
-      const res = await apiFetch<{ success: boolean; error?: string }>('/api/saas/domains', {
-        method: 'POST',
-        body: JSON.stringify({ domain: newDomain }),
-      });
-      if (!res.success) {
-        setNotice({ type: 'err', text: res.error || 'Không thể thêm tên miền.' });
-        return;
+    await runAction('addDomain', async () => {
+      setNotice(null);
+      try {
+        const res = await apiFetch<{ success: boolean; error?: string }>('/api/saas/domains', {
+          method: 'POST',
+          body: JSON.stringify({ domain: newDomain }),
+        });
+        if (!res.success) {
+          setNotice({ type: 'err', text: res.error || 'Không thể thêm tên miền.' });
+          return;
+        }
+        setNewDomain('');
+        setNotice({ type: 'ok', text: 'Đã thêm tên miền. Vui lòng trỏ bản ghi TXT để xác minh.' });
+        await loadAll();
+      } catch (err) {
+        setNotice({ type: 'err', text: err instanceof Error ? err.message : 'Lỗi thêm tên miền.' });
       }
-      setNewDomain('');
-      setNotice({ type: 'ok', text: 'Đã thêm tên miền. Vui lòng trỏ bản ghi TXT để xác minh.' });
-      await loadAll();
-    } catch (err) {
-      setNotice({ type: 'err', text: err instanceof Error ? err.message : 'Lỗi thêm tên miền.' });
-    }
+    });
   }
 
   async function handleVerifyDomain(id: string) {
-    setNotice(null);
-    try {
-      const res = await apiFetch<{ success: boolean; error?: string }>(`/api/saas/domains/${id}/verify`, {
-        method: 'POST',
-      });
-      setNotice({
-        type: res.success ? 'ok' : 'err',
-        text: res.success ? 'Tên miền đã được xác minh thành công!' : res.error || 'Chưa tìm thấy bản ghi TXT.',
-      });
-      await loadAll();
-    } catch (err) {
-      setNotice({ type: 'err', text: err instanceof Error ? err.message : 'Xác minh DNS thất bại.' });
-    }
+    await runAction(`verifyDomain:${id}`, async () => {
+      setNotice(null);
+      try {
+        const res = await apiFetch<{ success: boolean; error?: string }>(`/api/saas/domains/${id}/verify`, {
+          method: 'POST',
+        });
+        setNotice({
+          type: res.success ? 'ok' : 'err',
+          text: res.success ? 'Tên miền đã được xác minh thành công!' : res.error || 'Chưa tìm thấy bản ghi TXT.',
+        });
+        await loadAll();
+      } catch (err) {
+        setNotice({ type: 'err', text: err instanceof Error ? err.message : 'Xác minh DNS thất bại.' });
+      }
+    });
   }
 
   async function handleExportData() {
+    await runAction('exportData', async () => {
+      try {
+        const data = await apiFetch<Record<string, unknown>>('/api/saas/export');
+        const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `aura-export-${me?.tenant.slug || 'store'}.json`;
+        a.click();
+        URL.revokeObjectURL(url);
+      } catch (err) {
+        setNotice({ type: 'err', text: err instanceof Error ? err.message : 'Xuất dữ liệu thất bại.' });
+      }
+    });
+  }
+
+  const safeWebhookUrl = merchantWebhookUrl(payment, API_BASE, import.meta.env.DEV);
+
+  async function handleCopyWebhookUrl() {
+    if (!safeWebhookUrl) return;
+    setWebhookCopyError(null);
     try {
-      const data = await apiFetch<Record<string, unknown>>('/api/saas/export');
-      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `aura-export-${me?.tenant.slug || 'store'}.json`;
-      a.click();
-      URL.revokeObjectURL(url);
-    } catch (err) {
-      setNotice({ type: 'err', text: err instanceof Error ? err.message : 'Xuất dữ liệu thất bại.' });
+      if (!navigator.clipboard || typeof navigator.clipboard.writeText !== 'function') {
+        throw new Error('Clipboard API unavailable');
+      }
+      await navigator.clipboard.writeText(safeWebhookUrl);
+      if (!mountedRef.current) return;
+      setWebhookCopied(true);
+      if (copyResetTimerRef.current !== null) {
+        window.clearTimeout(copyResetTimerRef.current);
+      }
+      copyResetTimerRef.current = window.setTimeout(() => {
+        if (mountedRef.current) {
+          setWebhookCopied(false);
+        }
+      }, 2500);
+    } catch {
+      if (!mountedRef.current) return;
+      setWebhookCopied(false);
+      setWebhookCopyError('Không thể tự động sao chép. Vui lòng chọn và sao chép Webhook URL thủ công.');
     }
   }
 
-  if (loading) {
+  const isBusy = busyAction !== null || retrying || loading;
+
+  if (loading && !me && !loadError) {
     return <div className="p-6 text-slate-400">Đang tải cấu hình SaaS...</div>;
+  }
+
+  if (!me && loadError) {
+    return (
+      <div className="p-4 sm:p-6 max-w-3xl mx-auto">
+        <div
+          role="alert"
+          className="rounded-[var(--md-sys-shape-corner-large)] border border-[var(--md-sys-color-error)]/40 bg-[var(--md-sys-color-error-container)]/20 p-6 space-y-4 text-[var(--md-sys-color-on-surface)]"
+        >
+          <div className="space-y-1">
+            <h1 className="m3-headline-small">Không thể tải cấu hình SaaS</h1>
+            <p className="m3-body-large">{loadError}</p>
+          </div>
+          <MD3Button
+            type="button"
+            variant="filled"
+            disabled={retrying}
+            onClick={() => void loadAll({ isRetry: true, dedupe: true })}
+          >
+            {retrying ? 'Đang thử lại...' : 'Thử lại'}
+          </MD3Button>
+        </div>
+      </div>
+    );
   }
 
   const ent = me?.entitlement;
@@ -327,11 +511,22 @@ export default function AdminSaasSettingsPage(): ReactNode {
         <button
           type="button"
           onClick={handleExportData}
+          disabled={isBusy}
           className="rounded-xl border border-slate-700 bg-slate-800 px-4 py-2 text-xs font-semibold text-white hover:bg-slate-700"
         >
           Xuất toàn bộ dữ liệu (.JSON)
         </button>
       </div>
+
+      {loadError && (
+        <div role="alert" className="rounded-[var(--md-sys-shape-corner-medium)] bg-[var(--md-sys-color-error-container)] p-4 text-[var(--md-sys-color-on-error-container)] space-y-2">
+          <p className="m3-body-large">Không thể tải đầy đủ cấu hình SaaS. {loadError}</p>
+          <MD3Button type="button" variant="outlined" disabled={isBusy}
+            onClick={() => void loadAll({ isRetry: true, dedupe: true })}>
+            {retrying ? 'Đang thử lại...' : 'Thử lại'}
+          </MD3Button>
+        </div>
+      )}
 
       {/* Trial / Grace / Readonly Banner */}
       {ent && (
@@ -419,6 +614,7 @@ export default function AdminSaasSettingsPage(): ReactNode {
                   <button
                     type="button"
                     onClick={() => handleCheckout(p.id, 'monthly')}
+                    disabled={isBusy}
                     className="min-h-[44px] rounded-lg bg-slate-800 px-3 py-2 text-xs font-semibold text-white hover:bg-slate-700"
                   >
                     Thanh toán 1 tháng ({p.monthly.toLocaleString('vi-VN')}đ)
@@ -426,6 +622,7 @@ export default function AdminSaasSettingsPage(): ReactNode {
                   <button
                     type="button"
                     onClick={() => handleCheckout(p.id, 'annual')}
+                    disabled={isBusy}
                     className="min-h-[44px] rounded-lg bg-amber-500 px-3 py-2 text-xs font-bold text-slate-950 hover:bg-amber-400"
                   >
                     Thanh toán 1 năm (-20%: {p.annual.toLocaleString('vi-VN')}đ)
@@ -452,15 +649,26 @@ export default function AdminSaasSettingsPage(): ReactNode {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-800/70">
-                    {invoices.map((inv) => (
-                      <tr key={inv.id}>
-                        <td className="py-2 font-mono">{inv.id}</td>
-                        <td className="py-2 uppercase">{inv.tier}</td>
-                        <td className="py-2">{inv.billing_cycle}</td>
-                        <td className="py-2 font-semibold">{Number(inv.amount_vnd).toLocaleString('vi-VN')}đ</td>
-                        <td className="py-2">{inv.status}</td>
-                      </tr>
-                    ))}
+                    {invoices.map((inv) => {
+                      const checkoutUrl = inv.status === 'pending' ? safePayosCheckoutUrl(inv.checkout_url) : null;
+                      return (
+                        <tr key={inv.id}>
+                          <td className="py-2 font-mono">{inv.id}</td>
+                          <td className="py-2 uppercase">{inv.tier}</td>
+                          <td className="py-2">{inv.billing_cycle}</td>
+                          <td className="py-2 font-semibold">{Number(inv.amount_vnd).toLocaleString('vi-VN')}đ</td>
+                          <td className="py-2">
+                            {inv.status}
+                            {checkoutUrl && (
+                              <a href={checkoutUrl} target="_blank" rel="noopener noreferrer"
+                                className="ml-3 inline-flex min-h-12 items-center rounded-[var(--md-sys-shape-corner-full)] px-4 text-[var(--md-sys-color-primary)] underline focus-visible:outline focus-visible:outline-2">
+                                Thanh toán ngay
+                              </a>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
@@ -471,7 +679,8 @@ export default function AdminSaasSettingsPage(): ReactNode {
 
       {/* TAB 2: DIRECT MERCHANT PAYMENT */}
       {tab === 'payment' && (
-        <form onSubmit={handleSavePayment} className="rounded-xl border border-slate-800 bg-slate-900 p-6 space-y-5">
+        <form onSubmit={handleSavePayment} onChangeCapture={() => { paymentDirtyRef.current = true; setSampleQrUrl(null); }} className="rounded-xl border border-slate-800 bg-slate-900 p-6 space-y-5">
+          <fieldset disabled={isBusy || !payment} className="min-w-0 space-y-5">
           <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-3 text-xs text-emerald-200">
             Tiền bán đồ uống chuyển <strong>trực tiếp</strong> vào tài khoản ngân hàng / PayOS của quán bạn. Nền tảng không giữ hộ tiền và thu 0% phí giao dịch.
           </div>
@@ -481,7 +690,7 @@ export default function AdminSaasSettingsPage(): ReactNode {
             <div className="flex gap-3">
               <button
                 type="button"
-                onClick={() => setProvider('vietqr')}
+                onClick={() => { paymentDirtyRef.current = true; setSampleQrUrl(null); setProvider('vietqr'); }}
                 className={`px-4 py-2 rounded-lg text-xs font-semibold border ${
                   provider === 'vietqr' ? 'border-amber-500 bg-amber-500/15 text-amber-300' : 'border-slate-700 text-slate-300'
                 }`}
@@ -490,7 +699,7 @@ export default function AdminSaasSettingsPage(): ReactNode {
               </button>
               <button
                 type="button"
-                onClick={() => setProvider('payos')}
+                onClick={() => { paymentDirtyRef.current = true; setSampleQrUrl(null); setProvider('payos'); }}
                 className={`px-4 py-2 rounded-lg text-xs font-semibold border ${
                   provider === 'payos' ? 'border-amber-500 bg-amber-500/15 text-amber-300' : 'border-slate-700 text-slate-300'
                 }`}
@@ -572,13 +781,14 @@ export default function AdminSaasSettingsPage(): ReactNode {
                   className="rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-xs text-white"
                 />
               </div>
-              {payment?.webhookUrlPath && (
-                <div className="text-xs text-slate-400">
-                  Webhook URL dán vào PayOS Dashboard:{' '}
-                  <code className="text-amber-300 font-mono">
-                    {window.location.origin}
-                    {payment.webhookUrlPath}
-                  </code>
+              {safeWebhookUrl && (
+                <div className="m3-body-large space-y-2 text-[var(--md-sys-color-on-surface-variant)]">
+                  <p>Webhook URL dán vào PayOS Dashboard:</p>
+                  <code className="block break-all select-all text-[var(--md-sys-color-primary)]">{safeWebhookUrl}</code>
+                  <MD3Button type="button" variant="outlined" onClick={() => void handleCopyWebhookUrl()}>
+                    {webhookCopied ? 'Đã sao chép' : 'Sao chép Webhook URL'}
+                  </MD3Button>
+                  {webhookCopyError && <p role="alert">{webhookCopyError}</p>}
                 </div>
               )}
             </div>
@@ -599,12 +809,21 @@ export default function AdminSaasSettingsPage(): ReactNode {
               Kiểm tra kết nối
             </button>
           </div>
+          {sampleQrUrl && (
+            <figure className="space-y-2 text-[var(--md-sys-color-on-surface-variant)]">
+              <img src={sampleQrUrl} alt="Mã VietQR kiểm tra kết nối" width={240} height={240}
+                referrerPolicy="no-referrer" className="max-w-full rounded-[var(--md-sys-shape-corner-medium)]" />
+              <figcaption className="m3-body-large">Mã QR mẫu để kiểm tra cấu hình đã lưu, không phải hóa đơn thanh toán.</figcaption>
+            </figure>
+          )}
+          </fieldset>
         </form>
       )}
 
       {/* TAB 3: BRANDING */}
       {tab === 'branding' && (
-        <form onSubmit={handleSaveBranding} className="rounded-xl border border-slate-800 bg-slate-900 p-6 space-y-4">
+        <form onSubmit={handleSaveBranding} onChangeCapture={() => { brandingDirtyRef.current = true; }} className="rounded-xl border border-slate-800 bg-slate-900 p-6 space-y-4">
+          <fieldset disabled={isBusy} className="min-w-0 space-y-4">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-xs text-slate-400 mb-1">Tên hiển thị quán</label>
@@ -687,6 +906,7 @@ export default function AdminSaasSettingsPage(): ReactNode {
           >
             Lưu thương hiệu
           </button>
+          </fieldset>
         </form>
       )}
 
@@ -695,6 +915,7 @@ export default function AdminSaasSettingsPage(): ReactNode {
         <div className="rounded-xl border border-slate-800 bg-slate-900 p-6 space-y-5">
           <form onSubmit={handleAddDomain} className="flex flex-col sm:flex-row gap-3">
             <input
+              disabled={isBusy}
               type="text"
               required
               value={newDomain}
@@ -704,6 +925,7 @@ export default function AdminSaasSettingsPage(): ReactNode {
             />
             <button
               type="submit"
+              disabled={isBusy}
               className="rounded-lg bg-amber-500 px-5 py-2 text-xs font-bold text-slate-950"
             >
               + Thêm tên miền (Pro+)
@@ -740,6 +962,7 @@ export default function AdminSaasSettingsPage(): ReactNode {
                   <button
                     type="button"
                     onClick={() => handleVerifyDomain(d.id)}
+                    disabled={isBusy}
                     className="rounded-lg bg-emerald-500 px-3.5 py-2 text-xs font-bold text-slate-950"
                   >
                     Xác minh DNS

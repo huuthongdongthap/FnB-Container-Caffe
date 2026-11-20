@@ -23,8 +23,12 @@ export const MD3_SHELL_CONFIG: ShellRouteConfig[] = [
   { match: '/reviews', title: 'Đánh giá khách hàng', variant: 'small', showNav: false, showTop: false },
   { match: '/contact', title: 'Liên hệ', variant: 'small', showNav: false, showTop: false },
 
+  // Tenant storefronts are white-label and must not inherit flagship chrome.
+  { match: '/s/', title: '', variant: 'small', showNav: false, showTop: false },
+
   // Functional customer pages — TopAppBar only, KHÔNG Bottom Nav
   { match: '/checkout', title: 'Thanh toán đơn hàng', variant: 'small', showNav: false, showTop: true },
+
   { match: '/order-success', title: 'Đặt hàng thành công', variant: 'small', showNav: false, showTop: false },
   { match: '/order-failure', title: 'Thanh toán chưa hoàn tất', variant: 'small', showNav: false, showTop: true },
   { match: '/order', title: 'Gọi món tại bàn', variant: 'small', showNav: false, showTop: false },

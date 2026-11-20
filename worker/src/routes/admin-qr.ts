@@ -3,14 +3,17 @@
  * Requires owner or staff role.
  */
 
-import { Hono } from 'hono';
+import { Hono, type Context } from 'hono';
 import { requireAuth } from '../middleware/auth';
 import { getTenantId, isHQSuperAdmin } from '../middleware/tenant';
-import { matchesTenantRow } from '../lib/db';
-import { bulkGenerateSlugs } from '../tree/qr/generator';
-import { signQRUrl } from '../tree/qr/signer';
+import { generatePNG, generateSlug } from '../tree/qr/generator';
+import {
+  isQrRowAlignedWithTableTenant,
+  resolveActualTableTenant,
+  resolveAdminQrPayload,
+  resolveVerifiedTenantSlugs,
+} from '../lib/admin-qr-payload';
 import type { Env } from '../types/env';
-import type { CafeTable, QrCodeRow } from '@aura/domain-table';
 
 function resolveSafeBaseUrl(c: { req: { header: (name: string) => string | undefined }; env: Env }): string {
   const configured = typeof (c.env as unknown as Record<string, unknown>).PUBLIC_URL === 'string'
@@ -131,173 +134,417 @@ adminQRRouter.use('*', async (c, next) => {
   return next();
 });
 
+type AdminQrTableRecord = {
+  id: number | string;
+  table_number: number | string;
+  code?: string | null;
+  name?: string | null;
+  zone: string;
+  status: string;
+  tenant_id?: string | null;
+  [key: string]: unknown;
+};
+
+type AdminQrCodeRow = {
+  table_id: number | string;
+  slug: string;
+  tenant_id?: string | null;
+};
+
+function isTableVisibleInScope(table: AdminQrTableRecord, requestScope: string): boolean {
+  const actualTenant = resolveActualTableTenant(table);
+  if (!actualTenant) return false;
+  return requestScope === '*' || actualTenant === requestScope;
+}
+
+function buildTenantQrSlug(
+  table: AdminQrTableRecord,
+  actualTableTenant: string,
+  tenantSlugMap: Map<string, string | null>,
+): string {
+  const verifiedSlug = tenantSlugMap.get(actualTableTenant);
+  const cleanCode = typeof table.code === 'string'
+    ? table.code.trim().toLowerCase().replace(/[^a-z0-9]+/g, '')
+    : '';
+  if (actualTableTenant !== 'default' && verifiedSlug && cleanCode) {
+    return `${verifiedSlug}-${cleanCode}`;
+  }
+  const baseSlug = generateSlug(table.table_number, table.zone);
+  if (actualTableTenant === 'default') return baseSlug;
+  const tenantPrefix = `${actualTableTenant.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-`;
+  return `${tenantPrefix}${baseSlug}`;
+}
+
+async function fetchScopedTables(
+  db: Env['AURA_DB'],
+  tenantId: string,
+  ordered: boolean,
+): Promise<AdminQrTableRecord[]> {
+  let allTables: AdminQrTableRecord[] = [];
+  const orderSuffix = ordered ? ' ORDER BY zone, table_number' : '';
+  try {
+    const res = await db
+      .prepare(`SELECT * FROM cafe_tables WHERE (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?)${orderSuffix}`)
+      .bind(tenantId, tenantId)
+      .all<AdminQrTableRecord>();
+    allTables = res.results || [];
+  } catch {
+    if (tenantId !== 'default' && tenantId !== '*') {
+      return [];
+    }
+    try {
+      const res = await db
+        .prepare(`SELECT * FROM cafe_tables${orderSuffix}`)
+        .all<AdminQrTableRecord>();
+      allTables = res.results || [];
+    } catch {
+      const res = await db
+        .prepare(ordered ? 'SELECT * FROM cafe_tables ORDER BY table_number' : 'SELECT * FROM cafe_tables')
+        .all<AdminQrTableRecord>();
+      allTables = res.results || [];
+    }
+  }
+  return allTables.filter((table) => isTableVisibleInScope(table, tenantId));
+}
+
+async function fetchAlignedQrRows(
+  db: Env['AURA_DB'],
+  tables: AdminQrTableRecord[],
+  requestScope: string,
+): Promise<AdminQrCodeRow[]> {
+  if (tables.length === 0) return [];
+  const tableById = new Map<string, AdminQrTableRecord>();
+  tables.forEach((t) => tableById.set(String(t.id), t));
+
+  const filterAligned = (rows: AdminQrCodeRow[]): AdminQrCodeRow[] =>
+    rows.filter((row) => {
+      const table = tableById.get(String(row.table_id));
+      if (!table) return false;
+      const actualTenant = resolveActualTableTenant(table);
+      if (!actualTenant) return false;
+      return isQrRowAlignedWithTableTenant(row as unknown as Record<string, unknown>, actualTenant, requestScope);
+    });
+
+  let rows: AdminQrCodeRow[] = [];
+  if (requestScope === '*') {
+    try {
+      const res = await db
+        .prepare('SELECT table_id, slug, tenant_id FROM table_qr_codes')
+        .all<AdminQrCodeRow>();
+      rows = res.results || [];
+    } catch {
+      try {
+        const res = await db
+          .prepare('SELECT table_id, slug FROM table_qr_codes')
+          .all<AdminQrCodeRow>();
+        rows = res.results || [];
+      } catch {
+        rows = [];
+      }
+    }
+    return filterAligned(rows);
+  }
+
+  const placeholders = tables.map(() => '?').join(', ');
+  const tableIds = tables.map((t) => t.id);
+  try {
+    const scopedRes = await db
+      .prepare(
+        `SELECT table_id, slug, tenant_id FROM table_qr_codes WHERE table_id IN (${placeholders}) AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?`
+      )
+      .bind(...tableIds, requestScope)
+      .all<AdminQrCodeRow>();
+    rows = scopedRes.results || [];
+  } catch {
+    if (requestScope === 'default') {
+      try {
+        const res = await db
+          .prepare(`SELECT table_id, slug FROM table_qr_codes WHERE table_id IN (${placeholders})`)
+          .bind(...tableIds)
+          .all<AdminQrCodeRow>();
+        rows = res.results || [];
+      } catch {
+        rows = [];
+      }
+    }
+  }
+  return filterAligned(rows);
+}
+
+async function upsertTenantTableQrRows(
+  db: Env['AURA_DB'],
+  tables: AdminQrTableRecord[],
+  tenantSlugMap: Map<string, string | null>,
+): Promise<Map<string, string>> {
+  const generated = new Map<string, string>();
+  if (tables.length === 0) return generated;
+
+  const entries: Array<{ idKey: number | string; rawId: string; slug: string; tenantId: string }> = [];
+  const usedSlugs = new Set<string>();
+  for (const table of tables) {
+    const actualTenant = resolveActualTableTenant(table);
+    if (!actualTenant) continue;
+    const rawId = String(table.id);
+    const idKey: number | string = typeof table.id === 'number'
+      ? table.id
+      : (/^\d+$/.test(rawId) ? parseInt(rawId, 10) : rawId);
+    const baseSlug = buildTenantQrSlug(table, actualTenant, tenantSlugMap);
+    let slug = baseSlug;
+    if (usedSlugs.has(slug)) {
+      const idSuffix = rawId.toLowerCase().replace(/[^a-z0-9]+/g, '') || String(entries.length + 1);
+      slug = `${baseSlug}-${idSuffix}`;
+    }
+    usedSlugs.add(slug);
+    entries.push({ idKey, rawId, slug, tenantId: actualTenant });
+    generated.set(rawId, slug);
+  }
+  if (entries.length === 0) return generated;
+
+  const insertWithTenant = (item: { idKey: number | string; slug: string; tenantId: string }) =>
+    db
+      .prepare(
+        `INSERT INTO table_qr_codes (table_id, slug, tenant_id, updated_at)
+         VALUES (?, ?, ?, datetime('now'))
+         ON CONFLICT(table_id) DO UPDATE SET
+           slug = excluded.slug,
+           tenant_id = excluded.tenant_id,
+           updated_at = excluded.updated_at`
+      )
+      .bind(item.idKey, item.slug, item.tenantId);
+
+  try {
+    if (typeof db.batch === 'function') {
+      await db.batch(entries.map(insertWithTenant));
+    } else {
+      for (const item of entries) {
+        await insertWithTenant(item).run();
+      }
+    }
+    return generated;
+  } catch (err) {
+    const msg = String((err as Error)?.message || '').toLowerCase();
+    if (msg.includes('no such table')) return generated;
+    if (!msg.includes('column')) throw err;
+  }
+
+  for (const item of entries) {
+    try {
+      await db
+        .prepare(
+          `INSERT INTO table_qr_codes (table_id, slug, tenant_id, created_at)
+           VALUES (?, ?, ?, datetime('now'))
+           ON CONFLICT(table_id) DO UPDATE SET slug = excluded.slug, tenant_id = excluded.tenant_id`
+        )
+        .bind(item.idKey, item.slug, item.tenantId)
+        .run();
+    } catch {
+      if (item.tenantId === 'default') {
+        await db
+          .prepare(
+            `INSERT INTO table_qr_codes (table_id, slug, created_at)
+             VALUES (?, ?, datetime('now'))
+             ON CONFLICT(table_id) DO UPDATE SET slug = excluded.slug`
+          )
+          .bind(item.idKey, item.slug)
+          .run()
+          .catch(() => {});
+      }
+    }
+  }
+  return generated;
+}
+
+async function resolveScopedQrTableBySlug(
+  db: Env['AURA_DB'],
+  slug: string,
+  tenantId: string,
+): Promise<{ table: AdminQrTableRecord; actualTableTenant: string; tableId: number | string } | null> {
+  let joinedLookupResolved = false;
+
+  try {
+    const joined = await db
+      .prepare(
+        `SELECT q.table_id, q.slug, q.tenant_id AS qr_tenant_id, t.*
+         FROM table_qr_codes q
+         JOIN cafe_tables t ON t.id = q.table_id
+         WHERE q.slug = ?
+           AND (? = '*' OR COALESCE(NULLIF(TRIM(t.tenant_id), ''), 'default') = ?)
+           AND (? = '*' OR COALESCE(NULLIF(TRIM(q.tenant_id), ''), 'default') = ?)`
+      )
+      .bind(slug, tenantId, tenantId, tenantId, tenantId)
+      .first<Record<string, unknown>>();
+    if (joined && joined.table_id !== undefined && ('table_number' in joined || 'id' in joined)) {
+      const actualTableTenant = resolveActualTableTenant(joined);
+      if (!actualTableTenant || !isQrRowAlignedWithTableTenant(joined, actualTableTenant, tenantId)) {
+        return null;
+      }
+      joinedLookupResolved = true;
+      return {
+        table: joined as AdminQrTableRecord,
+        actualTableTenant,
+        tableId: joined.table_id as number | string,
+      };
+    }
+  } catch {
+    try {
+      const joined = await db
+        .prepare(
+          `SELECT q.table_id, q.slug, t.*
+           FROM table_qr_codes q
+           JOIN cafe_tables t ON t.id = q.table_id
+           WHERE q.slug = ? AND (? = '*' OR COALESCE(NULLIF(TRIM(t.tenant_id), ''), 'default') = ?)`
+        )
+        .bind(slug, tenantId, tenantId)
+        .first<Record<string, unknown>>();
+      if (joined && joined.table_id !== undefined && ('table_number' in joined || 'id' in joined)) {
+        const actualTableTenant = resolveActualTableTenant(joined);
+        if (!actualTableTenant || !isQrRowAlignedWithTableTenant(joined, actualTableTenant, tenantId)) {
+          return null;
+        }
+        joinedLookupResolved = true;
+        return {
+          table: joined as AdminQrTableRecord,
+          actualTableTenant,
+          tableId: joined.table_id as number | string,
+        };
+      }
+    } catch {
+      // Fall back to two-step lookup when join or tenant_id column is unsupported
+    }
+  }
+
+  if (joinedLookupResolved) return null;
+
+  let qrRowRaw: unknown = null;
+  try {
+    qrRowRaw = await db
+      .prepare('SELECT table_id, slug, tenant_id FROM table_qr_codes WHERE slug = ?')
+      .bind(slug)
+      .first();
+  } catch {
+    try {
+      qrRowRaw = await db
+        .prepare('SELECT table_id, tenant_id FROM table_qr_codes WHERE qr_slug = ?')
+        .bind(slug)
+        .first();
+    } catch {
+      if (tenantId === 'default' || tenantId === '*') {
+        try {
+          qrRowRaw = await db
+            .prepare('SELECT table_id, slug FROM table_qr_codes WHERE slug = ?')
+            .bind(slug)
+            .first();
+        } catch {
+          qrRowRaw = null;
+        }
+      }
+    }
+  }
+
+  const qrRow = qrRowRaw as { table_id: number | string; tenant_id?: string | null } | null;
+  if (!qrRow) return null;
+
+  try {
+    const tbl = await db
+      .prepare('SELECT * FROM cafe_tables WHERE id = ?')
+      .bind(qrRow.table_id)
+      .first<AdminQrTableRecord>();
+    if (!tbl) return null;
+    const actualTableTenant = resolveActualTableTenant(tbl);
+    if (!actualTableTenant || !isQrRowAlignedWithTableTenant(qrRow as unknown as Record<string, unknown>, actualTableTenant, tenantId)) {
+      return null;
+    }
+    return {
+      table: tbl,
+      actualTableTenant,
+      tableId: qrRow.table_id,
+    };
+  } catch {
+    return null;
+  }
+}
+
 // ── GET /api/admin/qr/tables — list all tables with QR data ──────
 adminQRRouter.get('/tables', async(c) => {
   const db = c.env.AURA_DB;
-  const secret = c.env.QR_SIGNING_SECRET as string | undefined;
-  if (!secret) {
+  const baseUrl = resolveSafeBaseUrl(c);
+  const tenantId = resolveAdminQrTenantId(c);
+
+  const tables = await fetchScopedTables(db, tenantId, true);
+  const concreteTenants = tables
+    .map((table) => resolveActualTableTenant(table))
+    .filter((id): id is string => Boolean(id));
+
+  const includesFlagship =
+    tenantId === 'default' ||
+    concreteTenants.includes('default');
+  if (includesFlagship && !c.env.QR_SIGNING_SECRET) {
     return c.json(
       { success: false, error: 'QR_SIGNING_SECRET not configured' },
       503
     );
   }
 
-  const baseUrl = resolveSafeBaseUrl(c);
+  const tenantSlugMap = await resolveVerifiedTenantSlugs(db, concreteTenants);
 
-  // Fetch all tables scoped to current tenant
-  const tenantId = resolveAdminQrTenantId(c);
-  let allTables: CafeTable[] = [];
-  try {
-    const res = await db
-      .prepare("SELECT * FROM cafe_tables WHERE (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?) ORDER BY zone, table_number")
-      .bind(tenantId, tenantId)
-      .all<CafeTable>();
-    allTables = res.results || [];
-  } catch {
-    try {
-      const res = await db
-        .prepare('SELECT * FROM cafe_tables ORDER BY zone, table_number')
-        .all<CafeTable>();
-      allTables = res.results || [];
-    } catch {
-      const res = await db
-        .prepare('SELECT * FROM cafe_tables ORDER BY table_number')
-        .all<CafeTable>();
-      allTables = res.results || [];
-    }
-  }
-  const tables = allTables.filter((t) => matchesTenantRow(t as unknown as Record<string, unknown>, tenantId));
-
-  // Fetch existing QR codes scoped to current tenant's tables
-  let qrRows: QrCodeRow[] = [];
-  if (tables.length > 0) {
-    try {
-      if (tenantId === '*') {
-        const res = await db
-          .prepare('SELECT table_id, slug FROM table_qr_codes')
-          .all<QrCodeRow>();
-        qrRows = res.results || [];
-      } else {
-        const placeholders = tables.map(() => '?').join(', ');
-        const tableIds = tables.map((t) => t.id);
-        try {
-          const scopedRes = await db
-            .prepare(
-              `SELECT table_id, slug FROM table_qr_codes WHERE table_id IN (${placeholders}) AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?`
-            )
-            .bind(...tableIds, tenantId)
-            .all<QrCodeRow>();
-          qrRows = scopedRes.results || [];
-        } catch {
-          qrRows = [];
-        }
-        if (qrRows.length === 0) {
-          const res = await db
-            .prepare(`SELECT table_id, slug FROM table_qr_codes WHERE table_id IN (${placeholders})`)
-            .bind(...tableIds)
-            .all<QrCodeRow>();
-          qrRows = (res.results || []).filter((r) => matchesTenantRow(r as unknown as Record<string, unknown>, tenantId));
-        }
-      }
-    } catch {
-      try {
-        const res = await db
-          .prepare('SELECT table_id, slug FROM table_qr_codes')
-          .all<QrCodeRow>();
-        qrRows = (res.results || []).filter((r) => matchesTenantRow(r as unknown as Record<string, unknown>, tenantId));
-      } catch {
-        qrRows = [];
-      }
-    }
-  }
-
-  const slugMap = new Map<string | number, string>();
+  // Fetch existing QR codes strictly aligned with each table's owning tenant
+  const qrRows = await fetchAlignedQrRows(db, tables, tenantId);
+  const slugMap = new Map<string, string>();
   qrRows.forEach((r) => {
-    slugMap.set(r.table_id, r.slug);
     slugMap.set(String(r.table_id), r.slug);
-    const n = Number(r.table_id);
-    if (!Number.isNaN(n)) slugMap.set(n, r.slug);
   });
 
-  // Auto-generate slugs for tables missing them
-  if (tables.some((t) => !(slugMap.get(String(t.id)) ?? slugMap.get(Number(t.id))))) {
-    const generated = await bulkGenerateSlugs(db, tables);
-    generated.forEach((v, k) => slugMap.set(k, v));
-    if (tables.length > 0) {
-      try {
-        if (tenantId !== '*') {
-          const placeholders = tables.map(() => '?').join(', ');
-          const tableIds = tables.map((t) => t.id);
-          await db
-            .prepare(
-              `UPDATE table_qr_codes SET tenant_id = ? WHERE table_id IN (${placeholders}) AND (tenant_id IS NULL OR TRIM(tenant_id) = '' OR tenant_id = ?)`
-            )
-            .bind(tenantId, ...tableIds, tenantId)
-            .run();
-        } else {
-          for (const t of tables) {
-            const rawTblTenant = String((t as unknown as { tenant_id?: string | null }).tenant_id ?? '').trim();
-            const tblTenant = rawTblTenant && rawTblTenant !== '*' && rawTblTenant.toLowerCase() !== 'hq' ? rawTblTenant : 'default';
-            await db
-              .prepare(
-                "UPDATE table_qr_codes SET tenant_id = ? WHERE table_id = ? AND (tenant_id IS NULL OR TRIM(tenant_id) = '' OR tenant_id = '*')"
-              )
-              .bind(tblTenant, t.id)
-              .run();
-          }
-        }
-      } catch {
-        // tenant_id column optional in legacy/mock schemas
-      }
-    }
-    // Re-fetch after upsert
-    try {
-      const placeholders = tables.map(() => '?').join(', ');
-      const tableIds = tables.map((t) => t.id);
-      const { results: updatedQR } = tenantId === '*'
-        ? await db.prepare('SELECT table_id, slug FROM table_qr_codes').all<QrCodeRow>()
-        : await db
-            .prepare(`SELECT table_id, slug FROM table_qr_codes WHERE table_id IN (${placeholders})`)
-            .bind(...tableIds)
-            .all<QrCodeRow>();
-      (updatedQR || [])
-        .filter((r) => matchesTenantRow(r as unknown as Record<string, unknown>, tenantId))
-        .forEach((r) => {
-          slugMap.set(r.table_id, r.slug);
-          slugMap.set(String(r.table_id), r.slug);
-          const n = Number(r.table_id);
-          if (!Number.isNaN(n)) slugMap.set(n, r.slug);
-        });
-    } catch {
-      // table_qr_codes optional in fallback mode
-    }
-  } else if (tenantId === '*' && tables.length > 0) {
-    try {
-      for (const t of tables) {
-        const rawTblTenant = String((t as unknown as { tenant_id?: string | null }).tenant_id ?? '').trim();
-        const tblTenant = rawTblTenant && rawTblTenant !== '*' && rawTblTenant.toLowerCase() !== 'hq' ? rawTblTenant : 'default';
-        await db
-          .prepare(
-            "UPDATE table_qr_codes SET tenant_id = ? WHERE table_id = ? AND (tenant_id IS NULL OR TRIM(tenant_id) = '' OR tenant_id = '*')"
-          )
-          .bind(tblTenant, t.id)
-          .run();
-      }
-    } catch {
-      // tenant_id column optional in legacy/mock schemas
-    }
+  // Backfill missing QR rows only for tables that do not yet have an aligned QR row
+  const missingTables = tables.filter((t) => !slugMap.has(String(t.id)));
+  if (missingTables.length > 0) {
+    const generated = await upsertTenantTableQrRows(db, missingTables, tenantSlugMap);
+    generated.forEach((slugValue, tableIdKey) => {
+      slugMap.set(tableIdKey, slugValue);
+    });
+    const refreshedRows = await fetchAlignedQrRows(db, tables, tenantId);
+    refreshedRows.forEach((r) => {
+      slugMap.set(String(r.table_id), r.slug);
+    });
   }
 
   const tableList = await Promise.all(tables.map(async (t) => {
-    const slug = slugMap.get(String(t.id)) ?? slugMap.get(Number(t.id));
-    const signedUrl = slug ? await signQRUrl(slug, secret, baseUrl) : null;
+    const slug = slugMap.get(String(t.id));
+    const actualTableTenant = resolveActualTableTenant(t);
+    const payload = slug
+      ? await resolveAdminQrPayload({
+          actualTableTenant,
+          qrSlug: slug,
+          table: t,
+          tenantSlug: actualTableTenant ? tenantSlugMap.get(actualTableTenant) ?? null : null,
+          env: c.env,
+          flagshipBaseUrl: baseUrl,
+        })
+      : null;
+
+    if (payload && !payload.ok) {
+      return {
+        id: t.id,
+        table_number: t.table_number,
+        code: t.code ?? null,
+        zone: t.zone,
+        status: t.status,
+        slug,
+        signed_url: null,
+        qr_mode: null,
+        qr_error_code: payload.code,
+        qr_error: payload.error,
+      };
+    }
+
     return {
       id: t.id,
       table_number: t.table_number,
+      code: t.code ?? null,
       zone: t.zone,
       status: t.status,
       slug,
-      signed_url: signedUrl
+      signed_url: payload?.ok ? payload.url : null,
+      qr_mode: payload?.ok ? payload.mode : null,
     };
   }));
 
@@ -315,22 +562,8 @@ adminQRRouter.post('/regenerate', requireAuth(['owner', 'manager', 'supervisor',
   if (tenantId === '*') {
     return c.json({ success: false, error: 'Explicit store tenant context required to regenerate QR codes' }, 400);
   }
-  let allTables: CafeTable[] = [];
-  try {
-    const res = await db
-      .prepare("SELECT * FROM cafe_tables WHERE (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?)")
-      .bind(tenantId, tenantId)
-      .all<CafeTable>();
-    allTables = res.results || [];
-  } catch {
-    if (tenantId === 'default') {
-      const res = await db
-        .prepare('SELECT * FROM cafe_tables')
-        .all<CafeTable>();
-      allTables = res.results || [];
-    }
-  }
-  const tables = (allTables || []).filter((t) => matchesTenantRow(t as unknown as Record<string, unknown>, tenantId));
+  const tables = await fetchScopedTables(db, tenantId, false);
+  const tenantSlugMap = await resolveVerifiedTenantSlugs(db, [tenantId]);
   try {
     if (tables.length > 0) {
       try {
@@ -367,131 +600,83 @@ adminQRRouter.post('/regenerate', requireAuth(['owner', 'manager', 'supervisor',
   } catch {
     // ignore if table_qr_codes is missing
   }
-  await bulkGenerateSlugs(db, tables);
-  if (tables.length > 0) {
-    try {
-      const placeholders = tables.map(() => '?').join(', ');
-      const tableIds = tables.map((t) => t.id);
-      await db
-        .prepare(
-          `UPDATE table_qr_codes SET tenant_id = ? WHERE table_id IN (${placeholders}) AND (tenant_id IS NULL OR TRIM(tenant_id) = '' OR tenant_id = ?)`
-        )
-        .bind(tenantId, ...tableIds, tenantId)
-        .run();
-    } catch {
-      // tenant_id column optional in legacy/mock schemas
-    }
-  }
+  await upsertTenantTableQrRows(db, tables, tenantSlugMap);
   return c.json({ success: true, message: 'All QR codes regenerated' });
 });
 
-// ── GET /api/admin/qr/:slug/download — PNG download ──────────────
-adminQRRouter.get('/:slug/download', async(c) => {
+async function renderScopedQrPngResponse(
+  c: Context<{ Bindings: Env }>,
+  mode: 'download' | 'inline',
+): Promise<Response> {
   const db = c.env.AURA_DB;
   const tenantId = resolveAdminQrTenantId(c);
-  const secret = c.env.QR_SIGNING_SECRET as string | undefined;
-  if (!secret) {
-    return c.json({ success: false, error: 'Not configured' }, 503);
+  const slug = (c.req.param('slug') || '').trim();
+  if (!slug) {
+    return c.json({ success: false, error: mode === 'download' ? 'Not found' : 'Table not found' }, 404);
+  }
+  const safeSlug = slug.replace(/[^A-Za-z0-9._-]/g, '_');
+
+  const resolved = await resolveScopedQrTableBySlug(db, slug, tenantId);
+  if (!resolved) {
+    return c.json({ success: false, error: mode === 'download' ? 'Not found' : 'Table not found' }, 404);
   }
 
-  const slug = c.req.param('slug');
-  const safeSlug = String(slug || '').replace(/[^A-Za-z0-9._-]/g, '_');
-
-  // Verify slug exists and belongs to a table in the current tenant
-  let resolvedTableId: number | string | null = null;
-  let joinedLookupResolved = false;
-  try {
-    const joined = await db
-      .prepare(
-        `SELECT q.table_id, q.slug, q.tenant_id AS qr_tenant_id, t.*
-         FROM table_qr_codes q
-         JOIN cafe_tables t ON t.id = q.table_id
-         WHERE q.slug = ?
-           AND (? = '*' OR COALESCE(NULLIF(TRIM(t.tenant_id), ''), 'default') = ?)
-           AND (? = '*' OR COALESCE(NULLIF(TRIM(q.tenant_id), ''), 'default') = ?)`
-      )
-      .bind(slug, tenantId, tenantId, tenantId, tenantId)
-      .first<Record<string, unknown>>();
-    if (joined && joined.table_id !== undefined && 'table_number' in joined) {
-      if (!matchesTenantRow(joined, tenantId)) {
-        return c.json({ success: false, error: 'Not found' }, 404);
-      }
-      if (joined.qr_tenant_id !== undefined && joined.qr_tenant_id !== null && !matchesTenantRow({ tenant_id: joined.qr_tenant_id }, tenantId)) {
-        return c.json({ success: false, error: 'Not found' }, 404);
-      }
-      resolvedTableId = joined.table_id as number | string;
-      joinedLookupResolved = true;
-    }
-  } catch {
-    try {
-      const joined = await db
-        .prepare(
-          `SELECT q.table_id, q.slug, t.*
-           FROM table_qr_codes q
-           JOIN cafe_tables t ON t.id = q.table_id
-           WHERE q.slug = ? AND (? = '*' OR COALESCE(NULLIF(TRIM(t.tenant_id), ''), 'default') = ?)`
-        )
-        .bind(slug, tenantId, tenantId)
-        .first<Record<string, unknown>>();
-      if (joined && joined.table_id !== undefined && 'table_number' in joined) {
-        if (!matchesTenantRow(joined, tenantId)) {
-          return c.json({ success: false, error: 'Not found' }, 404);
-        }
-        resolvedTableId = joined.table_id as number | string;
-        joinedLookupResolved = true;
-      }
-    } catch {
-      // Fall back to two-step lookup when join or tenant_id column is unsupported
-    }
-  }
-
-  if (!joinedLookupResolved) {
-    let qrRowRaw: unknown = null;
-    try {
-      qrRowRaw = await db
-        .prepare('SELECT table_id, tenant_id FROM table_qr_codes WHERE slug = ?')
-        .bind(slug)
-        .first();
-    } catch {
-      try {
-        qrRowRaw = await db
-          .prepare('SELECT table_id, tenant_id FROM table_qr_codes WHERE qr_slug = ?')
-          .bind(slug)
-          .first();
-      } catch {
-        try {
-          qrRowRaw = await db
-            .prepare('SELECT table_id FROM table_qr_codes WHERE slug = ?')
-            .bind(slug)
-            .first();
-        } catch {
-          qrRowRaw = null;
-        }
-      }
-    }
-    const qrRow = qrRowRaw as { table_id: number | string; tenant_id?: string | null } | null;
-    if (!qrRow) {
-      return c.json({ success: false, error: 'Not found' }, 404);
-    }
-    if ('tenant_id' in qrRow && qrRow.tenant_id !== undefined && qrRow.tenant_id !== null && !matchesTenantRow(qrRow as unknown as Record<string, unknown>, tenantId)) {
-      return c.json({ success: false, error: 'Not found' }, 404);
-    }
-    try {
-      const tbl = await db.prepare('SELECT * FROM cafe_tables WHERE id = ?').bind(qrRow.table_id).first();
-      if (!tbl || !matchesTenantRow(tbl as Record<string, unknown>, tenantId)) {
-        return c.json({ success: false, error: 'Not found' }, 404);
-      }
-      resolvedTableId = qrRow.table_id;
-    } catch {
-      return c.json({ success: false, error: 'Not found' }, 404);
-    }
-  }
-
+  const tenantSlugMap = await resolveVerifiedTenantSlugs(db, [resolved.actualTableTenant]);
   const baseUrl = resolveSafeBaseUrl(c);
-  const signedDownloadUrl = await signQRUrl(slug, secret, baseUrl);
+  const payload = await resolveAdminQrPayload({
+    actualTableTenant: resolved.actualTableTenant,
+    qrSlug: slug,
+    table: resolved.table,
+    tenantSlug: tenantSlugMap.get(resolved.actualTableTenant) ?? null,
+    env: c.env,
+    flagshipBaseUrl: baseUrl,
+  });
 
-  const { generatePNG } = await import('../tree/qr/generator');
-  const pngBuffer = await generatePNG(slug, baseUrl, signedDownloadUrl);
+  if (!payload.ok) {
+    return c.json({ success: false, code: payload.code, error: payload.error }, payload.status);
+  }
+
+  const pngBuffer = await generatePNG(slug, baseUrl, payload.url);
+
+  if (mode === 'inline') {
+    const updatePngTimestamp = async () => {
+      try {
+        await db
+          .prepare(
+            "UPDATE table_qr_codes SET updated_at = datetime('now') WHERE slug = ? AND table_id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
+          )
+          .bind(slug, resolved.tableId, resolved.actualTableTenant)
+          .run();
+      } catch {
+        if (resolved.actualTableTenant === 'default') {
+          await db
+            .prepare("UPDATE table_qr_codes SET updated_at = datetime('now') WHERE slug = ? AND table_id = ?")
+            .bind(slug, resolved.tableId)
+            .run()
+            .catch(() => {});
+        }
+      }
+    };
+
+    try {
+      if (c.executionCtx?.waitUntil) {
+        c.executionCtx.waitUntil(updatePngTimestamp());
+      }
+    } catch {
+      // executionCtx unavailable
+    }
+
+    return new Response(pngBuffer as unknown as BodyInit, {
+      status: 200,
+      headers: {
+        'Content-Type': 'image/png',
+        'Cache-Control': 'no-store',
+        'X-Table-ID': String(resolved.tableId),
+        'X-Slug': safeSlug,
+        'X-QR-Mode': payload.mode,
+      },
+    });
+  }
 
   return new Response(pngBuffer as unknown as BodyInit, {
     status: 200,
@@ -499,154 +684,17 @@ adminQRRouter.get('/:slug/download', async(c) => {
       'Content-Type': 'image/png',
       'Content-Disposition': `attachment; filename="qr-${safeSlug}.png"`,
       'X-Slug': safeSlug,
-      'X-Table-ID': String(resolvedTableId)
-    }
+      'X-Table-ID': String(resolved.tableId),
+      'X-QR-Mode': payload.mode,
+    },
   });
-});
+}
+
+// ── GET /api/admin/qr/:slug/download — PNG download ──────────────
+adminQRRouter.get('/:slug/download', async(c) => renderScopedQrPngResponse(c, 'download'));
 
 // ── GET /api/admin/qr/:slug/png — inline PNG for browser/img tag ─
-adminQRRouter.get('/:slug/png', async(c) => {
-  const db = c.env.AURA_DB;
-  const secret = c.env.QR_SIGNING_SECRET as string | undefined;
-  if (!secret) {
-    return c.json({ success: false, error: 'Not configured' }, 503);
-  }
-
-  const slug = c.req.param('slug');
-  const safeSlug = String(slug || '').replace(/[^A-Za-z0-9._-]/g, '_');
-  const tenantId = getTenantId(c);
-
-  let table: CafeTable | null = null;
-  let joinedPngResolved = false;
-  try {
-    const joined = await db
-      .prepare(
-        `SELECT q.table_id, q.slug, q.tenant_id AS qr_tenant_id, t.*
-         FROM table_qr_codes q
-         JOIN cafe_tables t ON t.id = q.table_id
-         WHERE q.slug = ?
-           AND (? = '*' OR COALESCE(NULLIF(TRIM(t.tenant_id), ''), 'default') = ?)
-           AND (? = '*' OR COALESCE(NULLIF(TRIM(q.tenant_id), ''), 'default') = ?)`
-      )
-      .bind(slug, tenantId, tenantId, tenantId, tenantId)
-      .first<Record<string, unknown>>();
-    if (joined && joined.id !== undefined && 'table_number' in joined) {
-      if (!matchesTenantRow(joined, tenantId)) {
-        return c.json({ success: false, error: 'Table not found' }, 404);
-      }
-      if (joined.qr_tenant_id !== undefined && joined.qr_tenant_id !== null && !matchesTenantRow({ tenant_id: joined.qr_tenant_id }, tenantId)) {
-        return c.json({ success: false, error: 'Table not found' }, 404);
-      }
-      table = joined as unknown as CafeTable;
-      joinedPngResolved = true;
-    }
-  } catch {
-    try {
-      const joined = await db
-        .prepare(
-          `SELECT q.table_id, q.slug, t.*
-           FROM table_qr_codes q
-           JOIN cafe_tables t ON t.id = q.table_id
-           WHERE q.slug = ? AND (? = '*' OR COALESCE(NULLIF(TRIM(t.tenant_id), ''), 'default') = ?)`
-        )
-        .bind(slug, tenantId, tenantId)
-        .first<Record<string, unknown>>();
-      if (joined && joined.id !== undefined && 'table_number' in joined) {
-        if (!matchesTenantRow(joined, tenantId)) {
-          return c.json({ success: false, error: 'Table not found' }, 404);
-        }
-        table = joined as unknown as CafeTable;
-        joinedPngResolved = true;
-      }
-    } catch {
-      // Fall back to two-step lookup when join or tenant_id column is unsupported
-    }
-  }
-
-  if (!joinedPngResolved) {
-    let qrRow: { table_id: number | string; tenant_id?: string | null } | null = null;
-    try {
-      qrRow = await db
-        .prepare('SELECT table_id, slug, tenant_id FROM table_qr_codes WHERE slug = ?')
-        .bind(slug)
-        .first<{ table_id: number | string; tenant_id?: string | null }>();
-    } catch {
-      if (tenantId === 'default' || tenantId === '*') {
-        try {
-          qrRow = await db
-            .prepare('SELECT table_id, slug FROM table_qr_codes WHERE slug = ?')
-            .bind(slug)
-            .first<{ table_id: number | string }>();
-        } catch {
-          qrRow = null;
-        }
-      }
-    }
-    if (!qrRow) {
-      return c.json({ success: false, error: 'Not found' }, 404);
-    }
-    if ('tenant_id' in qrRow && qrRow.tenant_id !== undefined && qrRow.tenant_id !== null && !matchesTenantRow(qrRow as unknown as Record<string, unknown>, tenantId)) {
-      return c.json({ success: false, error: 'Table not found' }, 404);
-    }
-
-    const tableRow = await db
-      .prepare('SELECT * FROM cafe_tables WHERE id = ?')
-      .bind(qrRow.table_id)
-      .first<CafeTable>();
-    table = tableRow ?? null;
-    if (!table || !matchesTenantRow(table as unknown as Record<string, unknown>, tenantId)) {
-      return c.json({ success: false, error: 'Table not found' }, 404);
-    }
-  }
-
-  // QR payload: signed deep link to public QR scan / ordering endpoint for that table/slug.
-  const baseUrl = resolveSafeBaseUrl(c);
-  const signedPngUrl = await signQRUrl(slug, secret, baseUrl);
-  const { generatePNG } = await import('../tree/qr/generator');
-  const pngBuffer = await generatePNG(slug, baseUrl, signedPngUrl);
-
-  const resolvedTableTenant =
-    (typeof (table as unknown as Record<string, unknown>)?.tenant_id === 'string' &&
-      String((table as unknown as Record<string, unknown>).tenant_id).trim()) ||
-    (tenantId !== '*' ? tenantId : 'default');
-
-  const updatePngTimestamp = async () => {
-    try {
-      await db
-        .prepare(
-          "UPDATE table_qr_codes SET updated_at = datetime('now') WHERE slug = ? AND table_id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
-        )
-        .bind(slug, table!.id, resolvedTableTenant)
-        .run();
-    } catch {
-      if (resolvedTableTenant === 'default') {
-        await db
-          .prepare("UPDATE table_qr_codes SET updated_at = datetime('now') WHERE slug = ? AND table_id = ?")
-          .bind(slug, table!.id)
-          .run()
-          .catch(() => {});
-      }
-    }
-  };
-
-  try {
-    if (c.executionCtx?.waitUntil) {
-      c.executionCtx.waitUntil(updatePngTimestamp());
-    }
-  } catch {
-    // executionCtx unavailable
-  }
-
-  return new Response(pngBuffer as unknown as BodyInit, {
-    status: 200,
-    headers: {
-      'Content-Type': 'image/png',
-      'Cache-Control': 'no-store',
-      'X-Table-ID': String(table!.id),
-      'X-Slug': safeSlug
-    }
-  });
-});
+adminQRRouter.get('/:slug/png', async(c) => renderScopedQrPngResponse(c, 'inline'));
 
 export const adminQrRouter = adminQRRouter;
 export default adminQRRouter;

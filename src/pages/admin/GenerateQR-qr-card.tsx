@@ -4,12 +4,6 @@ import { getAuthHeaders } from '@/hooks/stores/admin/admin-utils';
 import { TABLE_STATUS_STYLES, STATUS_LABEL_KEY } from './GenerateQR-constants';
 import type { QrCardProps } from './GenerateQR-types';
 
-function buildInlineQrSvgDataUrl(label: string): string {
-	const safeLabel = label.replace(/[<>&"']/g, '').slice(0, 24);
-	const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="200" height="200"><rect width="200" height="200" rx="12" fill="#ffffff"/><rect x="16" y="16" width="52" height="52" fill="none" stroke="#111827" stroke-width="8"/><rect x="30" y="30" width="24" height="24" fill="#111827"/><rect x="132" y="16" width="52" height="52" fill="none" stroke="#111827" stroke-width="8"/><rect x="146" y="30" width="24" height="24" fill="#111827"/><rect x="16" y="132" width="52" height="52" fill="none" stroke="#111827" stroke-width="8"/><rect x="30" y="146" width="24" height="24" fill="#111827"/><rect x="84" y="84" width="32" height="32" fill="#111827"/><text x="100" y="192" text-anchor="middle" font-family="monospace" font-size="10" fill="#374151">${safeLabel}</text></svg>`;
-	return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
-}
-
 export function QrCard({
 	tableNumber,
 	zoneName,
@@ -27,11 +21,13 @@ export function QrCard({
 	const { t } = useTranslation();
 	const statusLabel = t(statusKey ?? 'qrCodes.status.available');
 	const [resolvedSrc, setResolvedSrc] = useState<string | null>(qrPngUrl);
+	const [loadFailed, setLoadFailed] = useState(false);
 	const retriedRef = useRef(false);
 	const objectUrlRef = useRef<string | null>(null);
 
 	useEffect(() => {
 		retriedRef.current = false;
+		setLoadFailed(false);
 		if (objectUrlRef.current) {
 			URL.revokeObjectURL(objectUrlRef.current);
 			objectUrlRef.current = null;
@@ -45,32 +41,51 @@ export function QrCard({
 		};
 	}, [qrPngUrl]);
 
+	const fetchAuthenticatedPng = async () => {
+		if (!qrPngUrl) {
+			setLoadFailed(true);
+			return;
+		}
+		try {
+			const res = await fetch(qrPngUrl, {
+				credentials: 'include',
+				headers: getAuthHeaders(),
+			});
+			if (res?.ok && typeof res.blob === 'function') {
+				const blob = await res.blob();
+				if (objectUrlRef.current) {
+					URL.revokeObjectURL(objectUrlRef.current);
+				}
+				const objUrl = URL.createObjectURL(blob);
+				objectUrlRef.current = objUrl;
+				setLoadFailed(false);
+				setResolvedSrc(objUrl);
+				return;
+			}
+		} catch {
+			// Surface explicit error state instead of rendering a non-scannable SVG placeholder
+		}
+		setResolvedSrc(null);
+		setLoadFailed(true);
+	};
+
 	const handleImgError = async () => {
 		if (qrPngUrl && !retriedRef.current) {
 			retriedRef.current = true;
-			try {
-				const res = await fetch(qrPngUrl, {
-					credentials: 'include',
-					headers: getAuthHeaders(),
-				});
-				if (res?.ok && typeof res.blob === 'function') {
-					const blob = await res.blob();
-					if (objectUrlRef.current) {
-						URL.revokeObjectURL(objectUrlRef.current);
-					}
-					const objUrl = URL.createObjectURL(blob);
-					objectUrlRef.current = objUrl;
-					setResolvedSrc(objUrl);
-					return;
-				}
-			} catch {
-				// Fall through to inline SVG fallback
-			}
+			await fetchAuthenticatedPng();
+			return;
 		}
-		setResolvedSrc(buildInlineQrSvgDataUrl(slug || `T-${tableNumber}`));
+		setResolvedSrc(null);
+		setLoadFailed(true);
 	};
 
-	const imgSrc = resolvedSrc || (slug ? buildInlineQrSvgDataUrl(slug) : null);
+	const handleRetry = () => {
+		retriedRef.current = true;
+		setLoadFailed(false);
+		void fetchAuthenticatedPng();
+	};
+
+	const imgSrc = loadFailed ? null : resolvedSrc;
 
 	return (
 		<div
@@ -79,6 +94,7 @@ export function QrCard({
 			data-table-number={String(tableNumber)}
 			data-status={normalizedStatus}
 			data-slug={slug ?? undefined}
+			data-qr-error={loadFailed ? 'true' : undefined}
 		>
 			<div className="text-xs font-semibold text-muted uppercase tracking-wider mb-1">
 				{zoneName}
@@ -95,6 +111,20 @@ export function QrCard({
 					width={200}
 					height={200}
 				/>
+			) : loadFailed ? (
+				<div
+					role="status"
+					className="w-[200px] h-[200px] flex flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-amber-500/40 bg-amber-500/5 p-3 text-xs text-amber-200 print:hidden"
+				>
+					<span>Không tải được ảnh QR</span>
+					<button
+						type="button"
+						onClick={handleRetry}
+						className="min-h-[44px] min-w-[44px] px-3 py-1.5 rounded border border-amber-500/40 text-amber-100 hover:bg-amber-500/15"
+					>
+						{t('qrCodes.retry')}
+					</button>
+				</div>
 			) : (
 				<div className="w-[200px] h-[200px] flex items-center justify-center rounded-lg border border-dashed border-border text-xs text-muted">
 					{t('qrCodes.noQR')}

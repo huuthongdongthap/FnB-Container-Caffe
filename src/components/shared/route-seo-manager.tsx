@@ -1,5 +1,7 @@
-import { useEffect } from 'react';
+import { useEffect, useLayoutEffect } from 'react';
 import { useLocation } from 'react-router-dom';
+import { manageRouteBreadcrumb } from './route-breadcrumb-seo';
+import { isReactManagedHeadNode, suspendFlagshipHead } from './tenant-head-boundary';
 
 const SITE_ORIGIN = 'https://auraspace.cafe';
 
@@ -92,33 +94,112 @@ const NOINDEX_PREFIXES = [
   '/mobile',
 ];
 
-function setMeta(selector: string, attrName: 'name' | 'property', attrValue: string, content: string): void {
-  let el = document.head.querySelector<HTMLMetaElement>(selector);
+const ROUTE_MANAGED_META_SELECTORS = [
+  'meta[name="description"]',
+  'meta[name="robots"]',
+  'meta[property="og:title"]',
+  'meta[property="og:description"]',
+  'meta[property="og:url"]',
+  'meta[property="og:image"]',
+  'meta[property="og:type"]',
+  'meta[property="og:site_name"]',
+  'meta[property="og:locale"]',
+  'meta[name="twitter:card"]',
+  'meta[name="twitter:title"]',
+  'meta[name="twitter:description"]',
+  'meta[name="twitter:image"]',
+  'link[rel="canonical"]',
+] as const;
+
+function dedupeManagedHeadTags(): void {
+  for (const selector of ROUTE_MANAGED_META_SELECTORS) {
+    const matches = Array.from(document.head.querySelectorAll(selector));
+    if (matches.length <= 1) continue;
+    if (matches.some(isReactManagedHeadNode)) {
+      matches.forEach((node) => {
+        if (!isReactManagedHeadNode(node)) node.remove();
+      });
+    } else {
+      matches.slice(1).forEach((node) => node.remove());
+    }
+  }
+}
+
+function setMeta(
+  selector: string,
+  attrName: 'name' | 'property',
+  attrValue: string,
+  content: string,
+): void {
+  const matches = Array.from(document.head.querySelectorAll<HTMLMetaElement>(selector));
+  if (matches.some(isReactManagedHeadNode)) {
+    matches.forEach((node) => {
+      if (!isReactManagedHeadNode(node)) node.remove();
+    });
+    return;
+  }
+
+  let el = matches[0];
+  matches.slice(1).forEach((node) => node.remove());
   if (!el) {
     el = document.createElement('meta');
     el.setAttribute(attrName, attrValue);
+    el.setAttribute('data-route-seo', 'true');
     document.head.appendChild(el);
   }
   el.setAttribute('content', content);
 }
 
+function setCanonical(canonicalUrl: string): void {
+  const matches = Array.from(document.head.querySelectorAll<HTMLLinkElement>('link[rel="canonical"]'));
+  if (matches.some(isReactManagedHeadNode)) {
+    matches.forEach((node) => {
+      if (!isReactManagedHeadNode(node)) node.remove();
+    });
+    return;
+  }
+
+  let canonical = matches[0];
+  matches.slice(1).forEach((node) => node.remove());
+  if (!canonical) {
+    canonical = document.createElement('link');
+    canonical.setAttribute('rel', 'canonical');
+    canonical.setAttribute('data-route-seo', 'true');
+    document.head.appendChild(canonical);
+  }
+  canonical.setAttribute('href', canonicalUrl);
+}
+
 export function RouteSeoManager(): null {
   const { pathname } = useLocation();
+  const isStorefront = /^\/s\//i.test(pathname);
+
+  useLayoutEffect(() => {
+    if (isStorefront) return suspendFlagshipHead();
+  }, [isStorefront]);
 
   useEffect(() => {
-    const normalized = pathname === '/' ? '/' : pathname.replace(/\/+$/, '');
+    const normalized = pathname.replace(/\/+$/, '') || '/';
+    const entry = ROUTE_SEO[normalized];
+    const markdownSelector = 'link[rel="alternate"][type="text/markdown"]';
+    if (!entry?.markdownHref) {
+      document.head.querySelectorAll(markdownSelector).forEach((node) => node.remove());
+    }
+    // The tenant route owns its head, including the loading and error states.
+    if (/^\/s\//i.test(normalized)) return;
+
     const isNoindex = NOINDEX_PREFIXES.some(
       (prefix) => normalized === prefix || normalized.startsWith(`${prefix}/`),
     );
-
-    const entry = ROUTE_SEO[normalized];
     const title = entry?.title ?? 'AURA CAFE — Container Caffe Sa Đéc & AURA SPACE';
     const description =
       entry?.description ??
       'AURA CAFE Sa Đéc — không gian cà phê container bản địa & nền tảng vận hành quán F&B AURA SPACE.';
     const canonicalUrl = `${SITE_ORIGIN}${normalized === '/' ? '/' : normalized}`;
 
-    document.title = title;
+    if (!Array.from(document.head.querySelectorAll('title')).some(isReactManagedHeadNode)) {
+      document.title = title;
+    }
     setMeta('meta[name="description"]', 'name', 'description', description);
     setMeta(
       'meta[name="robots"]',
@@ -131,25 +212,36 @@ export function RouteSeoManager(): null {
     setMeta('meta[property="og:url"]', 'property', 'og:url', canonicalUrl);
     setMeta('meta[name="twitter:title"]', 'name', 'twitter:title', title);
     setMeta('meta[name="twitter:description"]', 'name', 'twitter:description', description);
-
-    let canonical = document.head.querySelector<HTMLLinkElement>('link[rel="canonical"]');
-    if (!canonical) {
-      canonical = document.createElement('link');
-      canonical.setAttribute('rel', 'canonical');
-      document.head.appendChild(canonical);
-    }
-    canonical.setAttribute('href', canonicalUrl);
+    setCanonical(canonicalUrl);
 
     if (entry?.markdownHref) {
-      let mdAlt = document.head.querySelector<HTMLLinkElement>('link[rel="alternate"][type="text/markdown"]');
+      const altMatches = Array.from(document.head.querySelectorAll<HTMLLinkElement>(markdownSelector));
+      let mdAlt = altMatches[0];
+      altMatches.slice(1).forEach((node) => node.remove());
       if (!mdAlt) {
         mdAlt = document.createElement('link');
         mdAlt.setAttribute('rel', 'alternate');
         mdAlt.setAttribute('type', 'text/markdown');
+        mdAlt.setAttribute('data-route-seo', 'true');
         document.head.appendChild(mdAlt);
       }
       mdAlt.setAttribute('href', entry.markdownHref);
     }
+
+    // Deduplicate if a lazy route mounts HelmetHead after RouteSeoManager runs.
+    const headObserver = new MutationObserver(dedupeManagedHeadTags);
+    headObserver.observe(document.head, { childList: true });
+    dedupeManagedHeadTags();
+
+    const cleanupBreadcrumb =
+      entry && normalized !== '/' && !isNoindex && !entry.noindex
+        ? manageRouteBreadcrumb(title.split(' — ')[0] ?? title, canonicalUrl, SITE_ORIGIN)
+        : undefined;
+
+    return () => {
+      headObserver.disconnect();
+      cleanupBreadcrumb?.();
+    };
   }, [pathname]);
 
   return null;

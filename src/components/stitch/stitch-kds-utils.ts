@@ -13,14 +13,7 @@ export function formatTime(seconds: number): string {
   return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
 }
 
-/**
- * Status badge visual configuration.
- * Matches original HTML status badges:
- *  PREPARING: bg-[var(--aura-chrome-mid)] text-[var(--aura-chrome-light)] with pulse dot
- *  PENDING:   bg-[var(--st-surface-container-highest)] text-[var(--aura-chrome-soft)]
- *  READY:     bg-[var(--aura-noir-deep)] text-[var(--aura-chrome-mid)]
- *  OVERDUE:   bg-[var(--aura-surface-dim)] text-[var(--aura-error)]
- */
+/** Status badge visual configuration. */
 export const STATUS_BADGE_CONFIG: Record<TicketStatus, StatusBadgeConfig> = {
   preparing: {
     tKey: 'kds.preparing',
@@ -35,7 +28,7 @@ export const STATUS_BADGE_CONFIG: Record<TicketStatus, StatusBadgeConfig> = {
   },
   ready: {
     tKey: 'kds.ready',
-    bg: 'bg-[var(--md-sys-color-secondary-container)] border border-[var(--aura-border-chrome)]',
+    bg: 'bg-[var(--aura-noir-deep)] border border-[var(--aura-success)]/40',
     text: 'text-[var(--aura-success)]',
   },
   overdue: {

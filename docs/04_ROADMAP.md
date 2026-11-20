@@ -252,6 +252,14 @@ status: stable
 - ⏳ Explicit user confirmation required before setting CF secrets (`TENANT_SECRETS_KEY`, `SAAS_PAYOS_*`), applying `20261119_02_saas_commercial_v3.sql` remotely, rolling out Worker/Pages, and closing `#79`/`#82` (see `docs/saas-commercial-go-live-checklist.md`)
 - ⏳ Deferred to v3.2: custom-domain root SPA routing and dynamic custom-domain CORS
 
+### SaaS v3.1.1 — Pilot Readiness (2026-11-20)
+
+**Status:** Implemented locally on `feat/saas-v3-1-1-pilot-readiness`; not released.
+
+- Permanent tenant storefront QR codes, isolated PayOS cancellation, and protection against disabling the last login-capable owner.
+- Tenant storefront branding and payment-return verification, SaaS admin setup, and crawler rules and KDS contrast fixes for [#79](https://github.com/huuthongdongthap/FnB-Container-Caffe/issues/79).
+- Pilot rollout is gated on the [v3.1 PR](https://github.com/huuthongdongthap/FnB-Container-Caffe/pull/85), the [Cloudflare setup checklist](saas-commercial-go-live-checklist.md), and approval to publish v3.1.1. Keep #79 open until live verification and remaining `/order` and `/mobile/*` checks are complete.
+
 ---
 
 ## Dependencies & Blockers
