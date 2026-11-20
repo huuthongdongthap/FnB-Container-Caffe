@@ -237,6 +237,23 @@ status: stable
 
 ---
 
+### Phase 8: SaaS Commercial v3 & v3.1 Activation, Payments & Lifecycle Telemetry (2026-11-19)
+
+**Status:** 🟢 LOCAL VERIFIED (`feat/saas-v3-1-activation-payment-telemetry`) — lint, all-project typecheck, frontend build, Worker dry-run, and serial CI coverage run passed (588 files / 5,826 tests; targeted SaaS v3.1 + VietQR: 19 tests). Final read-only review reported no open findings in the inspected scope. Production rollout, Cloudflare secrets, remote D1 migration (`20261119_02_saas_commercial_v3.sql`), and closing GitHub issues `#79`/`#82` have **not** run and require explicit confirmation.
+
+**Bounded Local Deliverables (v3.1):**
+- ✅ Worker environment parity (`worker/wrangler.toml` `[vars]` `SAAS_PLATFORM_DOMAIN` / `FE_BASE_URL`) and production Worker URL sync in `README.md`
+- ✅ Storefront `/s/:slug` payment isolation (`worker/src/routes/saas-commercial.ts`, `src/lib/vietqr.ts`, `src/pages/saas/storefront.tsx`, `src/pages/saas/storefront-payment-card.tsx`): public VietQR metadata + `hasPayos` flag, clean unauthenticated guest `fetch` with `X-Order-Token` (`POST /api/payment/create-link`), and VietQR QuickLink fallback
+- ✅ HQ SaaS control (`worker/src/routes/hq-saas.ts`, `src/pages/admin/HqSaasAdmin.tsx`, `src/pages/admin/hq-saas-telemetry-panels.tsx`): `rawStatus === 'suspended'` unsuspend fix, 7-day activation funnel (`>=5` available products & `>=3` orders in days `0..7`), `utmBreakdown` / UTM filters, and `GET /api/hq/saas/audit-logs`
+- ✅ 5-minute lifecycle & dunning cron (`worker/src/lib/saas-lifecycle-cron.ts`, `worker/src/scheduled.ts`): expires `>=24h` stale `pending` `tenant_invoices` / `saas_billing_transactions` and sends retryable Telegram alerts (24h unactivated nudge, Trial D-3/D-1, Grace D-1) via deterministic `saas_audit_logs.id` claims
+- ✅ Audit & migration hygiene: `audit_logs` CSV export column alignment (`worker/src/routes/reports-handlers/export-handlers.ts`, `worker/src/routes/analytics-handlers/export-handlers.ts`) and fail-fast `break` on remote failure in `worker/scripts/apply-migrations.sh`
+
+**Pending Production Gate & Deferred Scope:**
+- ⏳ Explicit user confirmation required before setting CF secrets (`TENANT_SECRETS_KEY`, `SAAS_PAYOS_*`), applying `20261119_02_saas_commercial_v3.sql` remotely, rolling out Worker/Pages, and closing `#79`/`#82` (see `docs/saas-commercial-go-live-checklist.md`)
+- ⏳ Deferred to v3.2: custom-domain root SPA routing and dynamic custom-domain CORS
+
+---
+
 ## Dependencies & Blockers
 
 ### External Dependencies

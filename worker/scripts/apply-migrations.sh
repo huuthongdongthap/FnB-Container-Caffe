@@ -185,6 +185,8 @@ for name in "${SELECTED_FILES[@]}"; do
     echo "  ✗ ${name} FAILED" >&2
     echo "$output" | tail -10 >&2
     FAIL_COUNT=$((FAIL_COUNT + 1))
+    echo "Stopping remaining migrations after failure in ${name}." >&2
+    break
   fi
 done
 

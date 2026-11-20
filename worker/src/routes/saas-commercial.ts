@@ -303,10 +303,25 @@ export function createSaasCommercialRoutes() {
         .bind(tenantId)
         .all(),
       db
-        .prepare('SELECT provider, bank_bin, bank_account_no, bank_account_name, bank_name FROM tenant_payment_configs WHERE tenant_id = ? AND COALESCE(is_active, 1) = 1 LIMIT 1')
+        .prepare(
+          `SELECT provider, bank_bin, bank_account_no, bank_account_name, bank_name,
+                  CASE
+                    WHEN provider = 'payos'
+                      AND payos_client_id_enc IS NOT NULL
+                      AND payos_api_key_enc IS NOT NULL
+                      AND payos_checksum_key_enc IS NOT NULL
+                    THEN 1 ELSE 0
+                  END AS has_payos_credentials
+           FROM tenant_payment_configs
+           WHERE tenant_id = ? AND COALESCE(is_active, 1) = 1
+           LIMIT 1`
+        )
         .bind(tenantId)
         .first<Record<string, unknown>>(),
     ]);
+
+    const hasBankTransfer = Boolean(paymentConfig?.bank_bin && paymentConfig?.bank_account_no);
+    const hasPayos = Boolean(Number(paymentConfig?.has_payos_credentials || 0) === 1);
 
     return c.json({
       success: true,
@@ -330,9 +345,15 @@ export function createSaasCommercialRoutes() {
           receiptFooter: String(branding?.receipt_footer || ''),
         },
         payment: {
-          provider: paymentConfig?.provider || 'vietqr',
-          hasBankTransfer: Boolean(paymentConfig?.bank_bin && paymentConfig?.bank_account_no),
-          bankName: paymentConfig?.bank_name || null,
+          provider: hasPayos ? 'payos' : 'vietqr',
+          hasPayos,
+          hasBankTransfer,
+          bankName: paymentConfig?.bank_name ? String(paymentConfig.bank_name) : null,
+          bankBin: hasBankTransfer ? String(paymentConfig?.bank_bin) : null,
+          bankAccountNo: hasBankTransfer ? String(paymentConfig?.bank_account_no) : null,
+          bankAccountName: hasBankTransfer && paymentConfig?.bank_account_name
+            ? String(paymentConfig.bank_account_name)
+            : null,
         },
         categories: categoriesRes.results || [],
         products: productsRes.results || [],

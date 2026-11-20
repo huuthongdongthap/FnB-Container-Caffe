@@ -1,6 +1,12 @@
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
-import { apiFetch } from '@/lib/api-client';
+import { API_BASE, apiFetch } from '@/lib/api-client';
+import {
+  StorefrontPaymentCard,
+  type StorefrontOrderResult,
+  type StorefrontPaymentConfig,
+  type StorefrontPaymentMethod,
+} from './storefront-payment-card';
 
 interface StorefrontCategory {
   id: string;
@@ -43,11 +49,7 @@ interface StorefrontPayload {
     phone: string;
     receiptFooter: string;
   };
-  payment: {
-    provider: string;
-    hasBankTransfer: boolean;
-    bankName: string | null;
-  };
+  payment: StorefrontPaymentConfig;
   categories: StorefrontCategory[];
   products: StorefrontProduct[];
   tables: StorefrontTable[];
@@ -58,6 +60,8 @@ interface CartItem {
   quantity: number;
 }
 
+const GUEST_FALLBACK_PHONE = '0000000000';
+
 export default function TenantStorefrontPage(): ReactNode {
   const { slug } = useParams<{ slug: string }>();
   const [searchParams] = useSearchParams();
@@ -67,36 +71,97 @@ export default function TenantStorefrontPage(): ReactNode {
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
   const [activeCategory, setActiveCategory] = useState<string>('all');
-  const [selectedTable, setSelectedTable] = useState<string>(initialTable);
+  const [selectedTableId, setSelectedTableId] = useState<string>('');
   const [cart, setCart] = useState<CartItem[]>([]);
   const [customerName, setCustomerName] = useState('');
-  const [paymentMethod, setPaymentMethod] = useState<'cash' | 'payos'>('cash');
+  const [customerPhone, setCustomerPhone] = useState('');
+  const [paymentMethod, setPaymentMethod] = useState<StorefrontPaymentMethod>('cod');
   const [submitting, setSubmitting] = useState(false);
-  const [orderResult, setOrderResult] = useState<{ orderId: string; orderNumber: string; total: number } | null>(
-    null
-  );
+  const [orderResult, setOrderResult] = useState<StorefrontOrderResult | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  const activeSlugRef = useRef<string | undefined>(slug);
+  const prevSlugRef = useRef<string | undefined>(slug);
+  const submitGenerationRef = useRef(0);
+  const submittingRef = useRef(false);
+  const mountedRef = useRef(true);
+
   useEffect(() => {
-    if (!slug) return;
+    mountedRef.current = true;
+    const slugChanged = prevSlugRef.current !== slug;
+    prevSlugRef.current = slug;
+    activeSlugRef.current = slug;
+
+    if (slugChanged) {
+      submitGenerationRef.current += 1;
+      submittingRef.current = false;
+      setSubmitting(false);
+      setData(null);
+      setCart([]);
+      setOrderResult(null);
+      setError(null);
+      setActiveCategory('all');
+      setSelectedTableId('');
+      setPaymentMethod('cod');
+    }
+
+    if (!slug) {
+      setData(null);
+      setLoading(false);
+      setNotFound(true);
+      return () => {
+        mountedRef.current = false;
+      };
+    }
+
+    let cancelled = false;
+    const controller = new AbortController();
     setLoading(true);
     setNotFound(false);
     void apiFetch<{ success: boolean; data?: StorefrontPayload }>(
       `/api/saas/storefront/${encodeURIComponent(slug)}`,
-      { silent: true }
+      { silent: true, signal: controller.signal }
     )
       .then((res) => {
+        if (cancelled || activeSlugRef.current !== slug) return;
         if (res.success && res.data) {
           setData(res.data);
-          if (!initialTable && res.data.tables[0]) {
-            setSelectedTable(res.data.tables[0].code);
+          const matchedTable = initialTable
+            ? res.data.tables.find(
+                (t) =>
+                  t.id === initialTable ||
+                  String(t.code || '').toLowerCase() === initialTable.toLowerCase()
+              )
+            : res.data.tables[0];
+          setSelectedTableId(matchedTable ? matchedTable.id : '');
+
+          if (res.data.payment.hasPayos) {
+            setPaymentMethod('payos');
+          } else if (res.data.payment.hasBankTransfer) {
+            setPaymentMethod('vietqr');
+          } else {
+            setPaymentMethod('cod');
           }
         } else {
+          setData(null);
           setNotFound(true);
         }
       })
-      .catch(() => setNotFound(true))
-      .finally(() => setLoading(false));
+      .catch(() => {
+        if (cancelled || activeSlugRef.current !== slug) return;
+        setData(null);
+        setNotFound(true);
+      })
+      .finally(() => {
+        if (cancelled || activeSlugRef.current !== slug) return;
+        setLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+      controller.abort();
+      mountedRef.current = false;
+    };
   }, [slug, initialTable]);
 
   const filteredProducts = useMemo(() => {
@@ -108,6 +173,11 @@ export default function TenantStorefrontPage(): ReactNode {
   const cartTotal = useMemo(
     () => cart.reduce((sum, item) => sum + item.product.price * item.quantity, 0),
     [cart]
+  );
+
+  const selectedTableObj = useMemo(
+    () => data?.tables.find((t) => t.id === selectedTableId) ?? null,
+    [data, selectedTableId]
   );
 
   function addToCart(product: StorefrontProduct) {
@@ -131,46 +201,180 @@ export default function TenantStorefrontPage(): ReactNode {
   }
 
   async function placeOrder() {
-    if (!data || cart.length === 0) return;
+    if (!data || data.tenant.isReadOnly || cart.length === 0 || submitting || submittingRef.current) return;
+    const requestTenant = data.tenant;
+    const requestSlug = slug;
+    const requestGeneration = submitGenerationRef.current;
+    const requestMethod = paymentMethod;
+    const requestCart = [...cart];
+    const requestCartTotal = cartTotal;
+    const requestTableId = selectedTableId;
+    const requestTableLabel = selectedTableObj ? selectedTableObj.name : 'Mang đi / Tại quầy';
+    const isStaleSubmit = () =>
+      !mountedRef.current ||
+      submitGenerationRef.current !== requestGeneration ||
+      activeSlugRef.current !== requestSlug;
+
+    submittingRef.current = true;
     setError(null);
     setSubmitting(true);
     try {
-      const res = await apiFetch<{
-        success: boolean;
-        error?: string;
-        data?: { id?: string; order_id?: string; order_number?: string; total?: number };
-        order?: { id?: string; order_number?: string; total?: number };
-      }>(`/api/orders?store=${encodeURIComponent(data.tenant.slug)}`, {
-        method: 'POST',
-        headers: {
-          'X-Tenant-Slug': data.tenant.slug,
-          'X-Tenant-ID': data.tenant.id,
-        },
-        body: JSON.stringify({
-          table_number: selectedTable || 'TAKEAWAY',
-          customer_name: customerName.trim() || 'Khách tại bàn',
-          payment_method: paymentMethod,
-          items: cart.map((i) => ({
-            product_id: i.product.id,
-            name: i.product.name,
-            price: i.product.price,
-            quantity: i.quantity,
-          })),
-        }),
-      });
+      const cleanPhone = customerPhone.replace(/\s+/g, '').trim();
+      const effectivePhone = cleanPhone.length >= 8 ? cleanPhone.slice(0, 15) : GUEST_FALLBACK_PHONE;
+      const effectiveName = customerName.trim() || 'Khách tại bàn';
+      const backendMethod: 'cod' | 'payos' = requestMethod === 'payos' ? 'payos' : 'cod';
 
-      const orderId = res.data?.id || res.data?.order_id || res.order?.id || '';
-      const orderNumber = res.data?.order_number || res.order?.order_number || orderId.slice(0, 8);
-      if (!res.success && !orderId) {
+      // Use clean guest fetch without session cookies or unrelated localStorage staff Bearer tokens
+      const orderResp = await fetch(
+        `${API_BASE}/api/orders?store=${encodeURIComponent(requestTenant.slug)}`,
+        {
+          method: 'POST',
+          credentials: 'omit',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Tenant-Slug': requestTenant.slug,
+            'X-Tenant-ID': requestTenant.id,
+          },
+          body: JSON.stringify({
+            total: requestCartTotal,
+            customer_name: effectiveName,
+            customer_phone: effectivePhone,
+            payment_method: backendMethod,
+            order_type: requestTableId ? 'dine_in' : 'takeaway',
+            ...(requestTableId ? { table_id: requestTableId } : {}),
+            ...(requestMethod === 'vietqr' ? { notes: 'Chuyển khoản VietQR tại bàn' } : {}),
+            items: requestCart.map((i) => ({
+              product_id: i.product.id,
+              name: i.product.name,
+              price: i.product.price,
+              quantity: i.quantity,
+            })),
+          }),
+        }
+      );
+
+      const res = (await orderResp.json().catch(() => ({}))) as {
+        success?: boolean;
+        error?: string;
+        order_token?: string;
+        data?: {
+          id?: string;
+          order_id?: string;
+          order_number?: string;
+          total?: number;
+          order_token?: string;
+        };
+        order?: { id?: string; order_number?: string; total?: number };
+      };
+
+      if (isStaleSubmit()) return;
+
+      const rawOrderId = res.data?.id ?? res.data?.order_id ?? res.order?.id;
+      const orderId =
+        typeof rawOrderId === 'string'
+          ? rawOrderId.trim()
+          : typeof rawOrderId === 'number' && Number.isFinite(rawOrderId)
+            ? String(rawOrderId)
+            : '';
+      const rawOrderNumber = res.data?.order_number ?? res.order?.order_number;
+      const parsedOrderNumber =
+        typeof rawOrderNumber === 'string'
+          ? rawOrderNumber.trim()
+          : typeof rawOrderNumber === 'number' && Number.isFinite(rawOrderNumber)
+            ? String(rawOrderNumber)
+            : '';
+      const orderNumber = parsedOrderNumber || orderId.slice(-8) || orderId.slice(0, 8);
+      const parsedTotal = Number(res.data?.total ?? res.order?.total ?? requestCartTotal);
+      const serverTotal = Number.isFinite(parsedTotal) && parsedTotal >= 0 ? parsedTotal : requestCartTotal;
+      const rawOrderToken = res.order_token ?? res.data?.order_token ?? '';
+      const orderToken = typeof rawOrderToken === 'string' ? rawOrderToken.trim() : '';
+
+      if (!orderResp.ok || res.success === false || !orderId) {
         setError(res.error || 'Không thể gửi đơn hàng lúc này.');
         return;
       }
-      setOrderResult({ orderId, orderNumber, total: cartTotal });
+
+      let payosCheckoutUrl: string | null = null;
+      let payosOrderCode: number | null = null;
+      let paymentError: string | null = null;
+
+      if (requestMethod === 'payos') {
+        try {
+          const payResp = await fetch(`${API_BASE}/api/payment/create-link`, {
+            method: 'POST',
+            credentials: 'omit',
+            headers: {
+              'Content-Type': 'application/json',
+              'X-Tenant-Slug': requestTenant.slug,
+              'X-Tenant-ID': requestTenant.id,
+              ...(orderToken ? { 'X-Order-Token': orderToken } : {}),
+            },
+            body: JSON.stringify({
+              order_id: orderId,
+              amount: serverTotal,
+              description: `DH ${orderNumber}`.slice(0, 25),
+              customer_name: effectiveName,
+            }),
+          });
+          const payJson = (await payResp.json().catch(() => ({}))) as {
+            success?: boolean;
+            checkoutUrl?: string;
+            checkout_url?: string;
+            orderCode?: number;
+            error?: string;
+            data?: {
+              paymentUrl?: string;
+              checkoutUrl?: string;
+              checkout_url?: string;
+              orderCode?: number;
+            };
+          };
+          const resolvedCheckoutUrl = String(
+            payJson.checkoutUrl ||
+              payJson.checkout_url ||
+              payJson.data?.checkoutUrl ||
+              payJson.data?.checkout_url ||
+              payJson.data?.paymentUrl ||
+              ''
+          ).trim();
+          if (payResp.ok && payJson.success !== false && resolvedCheckoutUrl) {
+            payosCheckoutUrl = resolvedCheckoutUrl;
+            const codeCandidate = payJson.orderCode ?? payJson.data?.orderCode;
+            payosOrderCode =
+              typeof codeCandidate === 'number' && Number.isFinite(codeCandidate) ? codeCandidate : null;
+          } else {
+            paymentError =
+              payJson.error ||
+              'Chưa tạo được link PayOS. Vui lòng quét mã VietQR bên dưới hoặc thanh toán tại quầy.';
+          }
+        } catch {
+          paymentError =
+            'Không kết nối được cổng PayOS. Vui lòng quét mã VietQR bên dưới hoặc thanh toán tại quầy.';
+        }
+      }
+
+      if (isStaleSubmit()) return;
+
+      setOrderResult({
+        orderId,
+        orderNumber,
+        total: serverTotal,
+        tableLabel: requestTableLabel,
+        method: requestMethod,
+        payosCheckoutUrl,
+        payosOrderCode,
+        paymentError,
+      });
       setCart([]);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Lỗi gửi đơn hàng.');
+      if (!isStaleSubmit()) {
+        setError(err instanceof Error ? err.message : 'Lỗi gửi đơn hàng.');
+      }
     } finally {
-      setSubmitting(false);
+      if (!isStaleSubmit()) {
+        submittingRef.current = false;
+        setSubmitting(false);
+      }
     }
   }
 
@@ -229,12 +433,15 @@ export default function TenantStorefrontPage(): ReactNode {
 
           {data.tables.length > 0 && (
             <select
-              value={selectedTable}
-              onChange={(e) => setSelectedTable(e.target.value)}
+              value={selectedTableId}
+              onChange={(e) => setSelectedTableId(e.target.value)}
               className="rounded-lg bg-black/30 border border-white/20 px-3 py-2 text-xs text-white"
             >
+              <option value="" className="bg-slate-900">
+                Mang đi / Tại quầy
+              </option>
               {data.tables.map((t) => (
-                <option key={t.id} value={t.code} className="bg-slate-900">
+                <option key={t.id} value={t.id} className="bg-slate-900">
                   {t.name}
                 </option>
               ))}
@@ -251,15 +458,12 @@ export default function TenantStorefrontPage(): ReactNode {
         )}
 
         {orderResult && (
-          <div className="rounded-xl border border-emerald-500/40 bg-emerald-500/10 p-4 space-y-1">
-            <div className="text-sm font-bold text-emerald-300">
-              ✓ Đã gửi đơn #{orderResult.orderNumber} thành công!
-            </div>
-            <div className="text-xs text-slate-300">
-              Tổng cộng: <strong>{orderResult.total.toLocaleString('vi-VN')}đ</strong> — Bàn{' '}
-              <strong>{selectedTable || 'Tại quầy'}</strong>.
-            </div>
-          </div>
+          <StorefrontPaymentCard
+            order={orderResult}
+            payment={data.payment}
+            accentColor={branding.accentColor || '#D97706'}
+            onDismiss={() => setOrderResult(null)}
+          />
         )}
 
         {error && (
@@ -361,7 +565,7 @@ export default function TenantStorefrontPage(): ReactNode {
       {cart.length > 0 && !tenant.isReadOnly && (
         <div className="fixed bottom-0 inset-x-0 border-t border-slate-800 bg-slate-900/95 backdrop-blur p-4">
           <div className="max-w-4xl mx-auto flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <div className="flex items-center gap-3 flex-wrap">
+            <div className="flex items-center gap-2.5 flex-wrap">
               <input
                 type="text"
                 value={customerName}
@@ -369,13 +573,25 @@ export default function TenantStorefrontPage(): ReactNode {
                 placeholder="Tên của bạn (tùy chọn)"
                 className="rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-xs text-white"
               />
+              <input
+                type="tel"
+                value={customerPhone}
+                onChange={(e) => setCustomerPhone(e.target.value)}
+                placeholder="Số ĐT (tùy chọn)"
+                className="rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-xs text-white w-36"
+              />
               <select
                 value={paymentMethod}
-                onChange={(e) => setPaymentMethod(e.target.value as 'cash' | 'payos')}
+                onChange={(e) => setPaymentMethod(e.target.value as StorefrontPaymentMethod)}
                 className="rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-xs text-white"
               >
-                <option value="cash">Tiền mặt / Chuyển khoản tại quầy</option>
-                {data.payment.provider === 'payos' && <option value="payos">Thanh toán QR PayOS</option>}
+                <option value="cod">Tiền mặt tại quầy</option>
+                {data.payment.hasBankTransfer && (
+                  <option value="vietqr">
+                    Chuyển khoản VietQR{data.payment.bankName ? ` (${data.payment.bankName})` : ''}
+                  </option>
+                )}
+                {data.payment.hasPayos && <option value="payos">Thanh toán tự động PayOS</option>}
               </select>
             </div>
             <button

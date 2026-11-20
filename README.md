@@ -60,7 +60,7 @@ npx playwright test --config=playwright.config.prod.ts  # E2E on production
 |----------|-----|
 | Production | `https://auraspace.cafe` |
 | Frontend | `https://fnb-caffe-container.pages.dev` |
-| API | `https://aura-space-worker.agencyos-openclaw.workers.dev` |
+| API | `https://aura-space-worker.sadec-marketing-hub.workers.dev` |
 | API Health | `GET /api/health` |
 | Admin Login | `/admin/login` |
 | Menu | `/menu` |
