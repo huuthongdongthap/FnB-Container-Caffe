@@ -23,6 +23,7 @@ import {
   autoPostWeeklyHighlights,
 } from './routes/mixpost';
 import { sendShiftReminders } from './routes/reminders/shifts/route';
+import { runSaasLifecycleCron } from './lib/saas-lifecycle-cron';
 
 export async function handleScheduled(
   _controller: ScheduledController,
@@ -58,5 +59,6 @@ export async function handleScheduled(
   safeWait(runCampaignTriggers(primaryEnv as unknown as Record<string, unknown>));
   safeWait(runSopReminders(primaryEnv as unknown as Record<string, unknown>));
   safeWait(sendShiftReminders(primaryEnv as unknown as Record<string, unknown>));
+  safeWait(runSaasLifecycleCron(primaryEnv));
   safeWait(dispatchAlerts(primaryEnv));
 }

@@ -67,16 +67,51 @@ export function registerExportHandlers(router: Hono<{ Bindings: Env }>): void {
       return c.json({ success: false, error: 'Date range cannot exceed 366 days' }, 400);
     }
 
+    const exportType = type === 'revenue' ? 'revenue' : 'orders';
+    const maskPii = c.req.query('mask_pii') === '1' || c.req.query('mask_pii') === 'true';
+    const effectiveTenantId = tenantId || 'default';
+    const recordExportAudit = async (rowCount: number) => {
+      const actorId = String(user?.id || 'unknown');
+      const auditDetails = JSON.stringify({
+        route: 'analytics.export',
+        actor_role: role,
+        type: exportType,
+        start,
+        end,
+        row_count: rowCount,
+        mask_pii: maskPii,
+        tenant_id: effectiveTenantId,
+      });
+      try {
+        await c.env.AURA_DB?.prepare(
+          `INSERT INTO audit_logs (actor, actor_id, action, resource_type, resource_id, details, tenant_id, status, created_at)
+           VALUES (?, ?, 'export_csv', ?, ?, ?, ?, 'success', datetime('now'))`
+        )
+          .bind(actorId, actorId, exportType, `${start}..${end}`, auditDetails, effectiveTenantId)
+          .run()
+          .catch(() =>
+            c.env.AURA_DB?.prepare(
+              `INSERT INTO audit_logs (actor_id, action, resource_type, resource_id, details, tenant_id, created_at)
+               VALUES (?, 'export_csv', ?, ?, ?, ?, datetime('now'))`
+            )
+              .bind(actorId, exportType, `${start}..${end}`, auditDetails, effectiveTenantId)
+              .run()
+          );
+      } catch {
+        // Best-effort audit persistence for minimal test mocks
+      }
+    };
+
     if (type === 'revenue') {
       const revenueRows = await getDailyRevenueInRange(c.env.AURA_DB, start, end, tenantId);
       const revenueCsv = formatDailyRevenueCsvRows(revenueRows);
+      await recordExportAudit(revenueRows.length);
       return c.newResponse(revenueCsv, 200, {
         'Content-Type': 'text/csv; charset=utf-8',
         'Content-Disposition': `attachment; filename="revenue-export-${start}-to-${end}.csv"`,
       });
     }
 
-    const maskPii = c.req.query('mask_pii') === '1' || c.req.query('mask_pii') === 'true';
     const rawRows = await getOrdersInRange(c.env.AURA_DB, start, end, tenantId, { alignIct: true, maskPii });
     const rows = maskPii
       ? rawRows.map((row) => ({
@@ -86,27 +121,7 @@ export function registerExportHandlers(router: Hono<{ Bindings: Env }>): void {
         }))
       : rawRows;
     const csv = formatCsvRows(rows);
-
-    const actorId = String(user?.id || 'unknown');
-    const auditDetails = JSON.stringify({ route: 'analytics.export', actor_role: role, start, end, row_count: rows.length, mask_pii: maskPii });
-    try {
-      await c.env.AURA_DB?.prepare(
-        `INSERT INTO audit_logs (actor, actor_id, action, resource_type, resource_id, details, tenant_id, status, created_at)
-         VALUES (?, ?, 'export_csv', 'orders', ?, ?, ?, 'success', datetime('now'))`
-      )
-        .bind(actorId, actorId, `${start}..${end}`, auditDetails, tenantId || 'default')
-        .run()
-        .catch(() =>
-          c.env.AURA_DB?.prepare(
-            `INSERT INTO audit_logs (id, actor_id, actor_role, action, resource_type, resource_id, details, tenant_id, status, created_at)
-             VALUES (?, ?, ?, 'export_csv', 'orders', ?, ?, ?, 'success', datetime('now'))`
-          )
-            .bind(`aud_exp_${crypto.randomUUID()}`, actorId, role, `${start}..${end}`, auditDetails, tenantId || 'default')
-            .run()
-        );
-    } catch {
-      // Best-effort audit persistence for minimal test mocks
-    }
+    await recordExportAudit(rows.length);
 
     return c.newResponse(csv, 200, {
       'Content-Type': 'text/csv; charset=utf-8',

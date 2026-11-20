@@ -168,8 +168,7 @@ export const handleCreateLink = async (c: any, input?: unknown, openApi = false)
     if (parsed.data.amount !== undefined && parsed.data.amount !== amount) {
       return c.json({ success: false, error: 'Tampered amount: does not match order total' }, 400);
     }
-    const orderTenantId = String(order.tenant_id || 'default').trim() || 'default';
-    const merchantConfig = await resolveMerchantPaymentConfig(db, c.env as any, orderTenantId);
+    const merchantConfig = await resolveMerchantPaymentConfig(db, c.env as any, orderTenant);
     const clientId = merchantConfig.payos?.clientId;
     const apiKey = merchantConfig.payos?.apiKey;
     const checksumKey = merchantConfig.payos?.checksumKey;
@@ -179,18 +178,52 @@ export const handleCreateLink = async (c: any, input?: unknown, openApi = false)
           success: false,
           code: 'merchant_payos_not_configured',
           error:
-            orderTenantId === 'default'
+            orderTenant === 'default'
               ? errMsg.payos_not_configured[locale]
               : 'Quán chưa cấu hình cổng thanh toán PayOS riêng. Vui lòng thiết lập PayOS trong Cài đặt Thanh toán hoặc dùng VietQR.',
         },
-        orderTenantId === 'default' ? 500 : 400
+        orderTenant === 'default' ? 500 : 400
       );
     }
     const baseUrl = c.env.FE_BASE_URL || 'https://auraspace.cafe';
+    // Resolve a trusted storefront slug for non-default tenants so redirect URLs never
+    // leak flagship or cross-tenant paths. Default tenant keeps flagship URLs unchanged.
+    let returnUrl: string;
+    let cancelUrl: string;
+    if (orderTenant === 'default') {
+      returnUrl = `${baseUrl}/order-success?order_id=${encodeURIComponent(order_id)}`;
+      cancelUrl = `${baseUrl}/checkout?cancelled=true&order_id=${encodeURIComponent(order_id)}`;
+    } else {
+      let slug: string | null = null;
+      try {
+        const row = await db
+          .prepare(`SELECT slug FROM saas_tenants WHERE id = ? LIMIT 1`)
+          .bind(orderTenant)
+          .first<{ slug: string }>();
+        const candidate = typeof row?.slug === 'string' ? row.slug.trim().toLowerCase() : '';
+        slug = /^[a-z0-9][a-z0-9-]*[a-z0-9]$/.test(candidate) ? candidate : null;
+      } catch {
+        slug = null;
+      }
+      if (!slug) {
+        return c.json(
+          {
+            success: false,
+            code: 'tenant_slug_not_found',
+            error: 'Không tìm thấy slug cửa hàng để quay lại sau thanh toán.',
+          },
+          404
+        );
+      }
+      const normalizedBaseUrl = String(baseUrl).replace(/\/+$/, '');
+      const orderIdParam = encodeURIComponent(order_id);
+      returnUrl = `${normalizedBaseUrl}/s/${encodeURIComponent(slug)}?order_id=${orderIdParam}&payment=success`;
+      cancelUrl = `${normalizedBaseUrl}/s/${encodeURIComponent(slug)}?order_id=${orderIdParam}&payment=cancelled`;
+    }
     const result = await getOrCreatePayOSAttempt({ db, kv: c.env.AUTH_KV ?? null, env: c.env as unknown as Record<string, unknown>, orderId: order_id, amount, clientId, apiKey, checksumKey,
       description: (description || `Order #${order_id}`).slice(0, 25), buyerName: customer_name || 'Khách hàng',
-      returnUrl: `${baseUrl}/order-success?order_id=${encodeURIComponent(order_id)}`,
-      cancelUrl: `${baseUrl}/checkout?cancelled=true&order_id=${encodeURIComponent(order_id)}`,
+      returnUrl,
+      cancelUrl,
       tenantId: orderTenant,
     });
     if (result.ok === false) {

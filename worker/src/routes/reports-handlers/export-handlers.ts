@@ -150,18 +150,18 @@ export function registerExportHandlers(app: Hono<{ Bindings: Env }>) {
     };
     const recordExportAudit = async (rowCount: number) => {
       try {
+        const actorId = String(user?.id || 'unknown');
         await db
           ?.prepare(
-            `INSERT INTO audit_logs (id, actor_id, actor_role, action, resource_type, resource_id, details, tenant_id, status, created_at)
-             VALUES (?, ?, ?, 'export_csv', ?, ?, ?, ?, 'success', datetime('now'))`
+            `INSERT INTO audit_logs (actor, actor_id, action, resource_type, resource_id, details, tenant_id, status, created_at)
+             VALUES (?, ?, 'export_csv', ?, ?, ?, ?, 'success', datetime('now'))`
           )
           .bind(
-            `aud_rep_exp_${crypto.randomUUID()}`,
-            String(user?.id || 'unknown'),
-            role,
+            actorId,
+            actorId,
             type,
             `${from}..${to}`,
-            JSON.stringify({ route: 'reports.export', type, from, to, row_count: rowCount, mask_pii: maskPii }),
+            JSON.stringify({ route: 'reports.export', actor_role: role, type, from, to, row_count: rowCount, mask_pii: maskPii }),
             tenantId || 'default'
           )
           .run();

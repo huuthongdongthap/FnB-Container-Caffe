@@ -20,6 +20,8 @@ id = "789e7cf1894e4d4c9e8f8cd51b2dbe16"
 ENVIRONMENT = "production"
 PILOT_TENANT_ID = "default"
 CORS_ORIGIN = "https://auraspace.cafe"
+SAAS_PLATFORM_DOMAIN = "auraspace.cafe"
+FE_BASE_URL = "https://auraspace.cafe"
 # JWT token lifetime (seconds). Default 604800 = 7 days.
 JWT_EXPIRY_SECONDS = "604800"
 # Git commit SHA is injected at deploy time via `--var GIT_COMMIT_SHA:<sha>`
