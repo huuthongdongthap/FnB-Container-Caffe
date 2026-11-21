@@ -562,4 +562,70 @@ describe('CRM phone normalization (#99), walk-in anonymity (#98), and guest refu
     expect(failedAudits[0].resource_id).toBe('pay_fail_rev');
     expect(failedAudits[0].details).toContain('cust_deleted_ghost');
   });
+
+  it('#97: fails closed with ambiguous_accrual_recipient and audit log when multiple customers accrued on the same order', async () => {
+    const sqlite = createCrmSqlite();
+    const db = createSqliteD1(sqlite);
+
+    sqlite.exec(`
+      INSERT INTO customers (id, name, phone, loyalty_points, lifetime_points, tenant_id)
+      VALUES
+        ('cust_amb_a', 'Guest A', '0911000222', 100, 100, 'sadec'),
+        ('cust_amb_b', 'Guest B', '0911000333', 100, 100, 'sadec');
+      INSERT INTO orders (id, customer_id, customer_name, customer_phone, total, total_amount, status, payment_method, payment_status, points_earned, tenant_id)
+      VALUES ('ord_amb_rev', 'cust_amb_a', 'Ambiguous', '0911000222', 100000, 100000, 'confirmed', 'payos', 'paid', 100, 'sadec');
+      INSERT INTO loyalty_point_logs (id, customer_id, order_id, points_change, reason, balance_after, tenant_id)
+      VALUES
+        ('ptl_amb_1', 'cust_amb_a', 'ord_amb_rev', 50, 'order_earned', 100, 'sadec'),
+        ('ptl_amb_2', 'cust_amb_b', 'ord_amb_rev', 50, 'order_earned', 100, 'sadec');
+      INSERT INTO payments (id, order_id, amount, method, status, transaction_id, tenant_id)
+      VALUES ('pay_amb_rev', 'ord_amb_rev', 100000, 'payos', 'paid', '55667788', 'sadec');
+    `);
+
+    const app = new Hono<{ Bindings: Env }>();
+    app.post('/refund', async (c) => {
+      c.set('user' as never, { id: 'mgr_1', name: 'Manager', role: 'manager', tenantId: 'sadec' } as never);
+      return handleRefund(c);
+    });
+
+    const res = await app.fetch(
+      new Request('https://test.aura/refund', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          paymentId: 'pay_amb_rev',
+          amount: 100000,
+          reason: 'Full refund',
+          manualTransferRef: 'VCB-AMB-REV-1',
+        }),
+      }),
+      { AURA_DB: db } as unknown as Env,
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      data: { loyalty_reversal: { status: string; retryable?: boolean; reason?: string } };
+    };
+    expect(body.data.loyalty_reversal).toEqual({
+      status: 'failed',
+      reason: 'ambiguous_accrual_recipient',
+      retryable: true,
+    });
+
+    const failedAudits = sqlite
+      .prepare(`SELECT action, resource_id, details FROM audit_logs WHERE action = 'loyalty_reversal_failed'`)
+      .all() as Array<{ action: string; resource_id: string; details: string }>;
+    expect(failedAudits).toHaveLength(1);
+    expect(failedAudits[0].resource_id).toBe('pay_amb_rev');
+    expect(failedAudits[0].details).toContain('ambiguous_accrual_recipient');
+    expect(failedAudits[0].details).toContain('cust_amb_a');
+    expect(failedAudits[0].details).toContain('cust_amb_b');
+
+    const balances = sqlite
+      .prepare(`SELECT id, loyalty_points FROM customers WHERE id IN ('cust_amb_a', 'cust_amb_b') ORDER BY id`)
+      .all() as Array<{ id: string; loyalty_points: number }>;
+    expect(balances).toEqual([
+      { id: 'cust_amb_a', loyalty_points: 100 },
+      { id: 'cust_amb_b', loyalty_points: 100 },
+    ]);
+  });
 });

@@ -268,43 +268,53 @@ export async function handleRefund(c: Context<{ Bindings: Env }>, openApi = fals
         retryable?: boolean;
       };
       let loyaltyReversal: LoyaltyReversalOutcome = { status: 'skipped' };
+      let ambiguousCandidates: string[] | undefined;
       try {
         const { loadPolicy, reverseAccrual, resolveAccrualRecipient } = await import('@aura/domain-crm');
         const ledgerRecipient = await resolveAccrualRecipient(db, payment.order_id, effectivePaymentTenant);
-        const orderOwnerId =
-          typeof payment.customer_id === 'string' && payment.customer_id.trim() !== '' && payment.customer_id !== 'guest'
-            ? payment.customer_id.trim()
-            : null;
-        const targetCustomerId = ledgerRecipient.customerId ?? orderOwnerId;
+        if (ledgerRecipient.ambiguous) {
+          ambiguousCandidates = ledgerRecipient.candidates;
+          loyaltyReversal = {
+            status: 'failed',
+            reason: 'ambiguous_accrual_recipient',
+            retryable: true,
+          };
+        } else {
+          const orderOwnerId =
+            typeof payment.customer_id === 'string' && payment.customer_id.trim() !== '' && payment.customer_id !== 'guest'
+              ? payment.customer_id.trim()
+              : null;
+          const targetCustomerId = ledgerRecipient.customerId ?? orderOwnerId;
 
-        if (targetCustomerId) {
-          const policy = await loadPolicy(db, c.env?.AUTH_KV, new Date(), effectivePaymentTenant).catch(() => null);
-          if (!policy) {
-            loyaltyReversal = { status: 'failed', customerId: targetCustomerId, reason: 'policy_load_failed', retryable: true };
-          } else {
-            const revResult = await reverseAccrual(db, policy, {
-              orderId: payment.order_id,
-              customerId: targetCustomerId,
-              refundAmountVnd: amount,
-              tenantId: effectivePaymentTenant,
-              reason: refundReason,
-              verifiedLedgerRecipient: ledgerRecipient.fromLedger,
-            });
-            if (revResult.ok) {
-              loyaltyReversal = {
-                status: 'reversed',
-                customerId: targetCustomerId,
-                pointsDeducted: revResult.pointsDeducted,
-              };
-            } else if (revResult.reason === 'no_points_to_reverse' || revResult.reason === 'already_reversed') {
-              loyaltyReversal = { status: 'skipped', customerId: targetCustomerId, reason: revResult.reason };
+          if (targetCustomerId) {
+            const policy = await loadPolicy(db, c.env?.AUTH_KV, new Date(), effectivePaymentTenant).catch(() => null);
+            if (!policy) {
+              loyaltyReversal = { status: 'failed', customerId: targetCustomerId, reason: 'policy_load_failed', retryable: true };
             } else {
-              loyaltyReversal = {
-                status: 'failed',
+              const revResult = await reverseAccrual(db, policy, {
+                orderId: payment.order_id,
                 customerId: targetCustomerId,
-                reason: revResult.reason,
-                retryable: true,
-              };
+                refundAmountVnd: amount,
+                tenantId: effectivePaymentTenant,
+                reason: refundReason,
+                verifiedLedgerRecipient: ledgerRecipient.fromLedger,
+              });
+              if (revResult.ok) {
+                loyaltyReversal = {
+                  status: 'reversed',
+                  customerId: targetCustomerId,
+                  pointsDeducted: revResult.pointsDeducted,
+                };
+              } else if (revResult.reason === 'no_points_to_reverse' || revResult.reason === 'already_reversed') {
+                loyaltyReversal = { status: 'skipped', customerId: targetCustomerId, reason: revResult.reason };
+              } else {
+                loyaltyReversal = {
+                  status: 'failed',
+                  customerId: targetCustomerId,
+                  reason: revResult.reason,
+                  retryable: true,
+                };
+              }
             }
           }
         }
@@ -329,6 +339,7 @@ export async function handleRefund(c: Context<{ Bindings: Env }>, openApi = fals
             JSON.stringify({
               order_id: payment.order_id,
               customer_id: loyaltyReversal.customerId ?? null,
+              candidates: ambiguousCandidates,
               refund_amount: amount,
               manual_transfer_ref: manualTransferRef,
               reason: loyaltyReversal.reason,

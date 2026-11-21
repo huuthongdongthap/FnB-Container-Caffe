@@ -30,7 +30,7 @@ export async function resolveAccrualRecipient(
   db: D1Database,
   orderId: string,
   tenantId?: string | null,
-): Promise<{ customerId: string | null; fromLedger: boolean }> {
+): Promise<{ customerId: string | null; fromLedger: boolean; ambiguous: boolean; candidates?: string[] }> {
   const rawTenant = tenantId ? tenantId.trim() : '';
   const effectiveTenant =
     rawTenant && rawTenant !== '*' && rawTenant.toLowerCase() !== 'hq' ? rawTenant : 'default';
@@ -92,9 +92,12 @@ export async function resolveAccrualRecipient(
   );
 
   if (candidates.size === 1) {
-    return { customerId: [...candidates][0], fromLedger: true };
+    return { customerId: [...candidates][0], fromLedger: true, ambiguous: false };
   }
-  return { customerId: null, fromLedger: false };
+  if (candidates.size > 1) {
+    return { customerId: null, fromLedger: false, ambiguous: true, candidates: [...candidates] };
+  }
+  return { customerId: null, fromLedger: false, ambiguous: false };
 }
 
 export interface ReversalSuccess {

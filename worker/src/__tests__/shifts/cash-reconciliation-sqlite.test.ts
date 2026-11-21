@@ -133,4 +133,46 @@ describe('cash reconciliation SQLite contracts', () => {
     );
     expect(sqlite.prepare('SELECT COUNT(*) AS n FROM shift_reconciliations').get()?.n).toBe(0);
   });
+  it('surfaces a critical error instead of swallowing rollback failure when post-insert verification and rollback both fail', async () => {
+    const { db } = fixture();
+    let paymentReads = 0;
+    const wrappedDb = {
+      ...db,
+      prepare(sql: string) {
+        const stmt = db.prepare(sql);
+        if (/FROM payments p/i.test(sql) && /cash_payment_attributions/i.test(sql)) {
+          return {
+            bind(...args: unknown[]) {
+              const bound = stmt.bind(...args);
+              return {
+                ...bound,
+                async all() {
+                  paymentReads += 1;
+                  if (paymentReads === 2) {
+                    throw new Error('simulated post-insert verification failure');
+                  }
+                  return bound.all();
+                },
+              };
+            },
+          };
+        }
+        if (/DELETE FROM shift_reconciliations/i.test(sql)) {
+          return {
+            bind() {
+              return {
+                async run() {
+                  throw new Error('simulated rollback delete failure');
+                },
+              };
+            },
+          };
+        }
+        return stmt;
+      },
+    } as unknown as D1Database;
+    await expect(reconcileShiftCash(wrappedDb, input('1', 200000, 200000), 'operator', 'store')).rejects.toThrow(
+      /CRITICAL: shift reconciliation verification failed.*simulated post-insert verification failure.*rollback failed.*simulated rollback delete failure/,
+    );
+  });
 });

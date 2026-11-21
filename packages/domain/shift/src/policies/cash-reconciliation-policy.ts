@@ -471,7 +471,25 @@ export async function reconcileShiftCash(
     verifiedCashPayments = await getCashPaymentsForShift(db, input.shift_id, effectiveReconTenant, new Date().toISOString());
     verifiedCashPayouts = await getCashPayoutsForShift(db, input.shift_id, effectiveReconTenant);
   } catch (verifyErr) {
-    await deleteReconciliation().catch(() => {});
+    let rollbackErr: unknown = null;
+    let rollbackChanges: number | undefined;
+    try {
+      const rollback = await deleteReconciliation();
+      if (rollback.meta && typeof rollback.meta.changes === 'number') {
+        rollbackChanges = rollback.meta.changes;
+      }
+    } catch (err) {
+      rollbackErr = err;
+    }
+    if (rollbackErr || rollbackChanges === 0) {
+      const verifyMsg = verifyErr instanceof Error ? verifyErr.message : String(verifyErr);
+      const rbMsg = rollbackErr
+        ? (rollbackErr instanceof Error ? rollbackErr.message : String(rollbackErr))
+        : 'no reconciliation row deleted';
+      throw new Error(
+        `CRITICAL: shift reconciliation verification failed (${verifyMsg}) and rollback failed for reconciliation ${reconciliation.id} (${rbMsg})`,
+      );
+    }
     throw verifyErr;
   }
   if (verifiedCashPayments !== cashPayments || verifiedCashPayouts !== cashPayouts) {
