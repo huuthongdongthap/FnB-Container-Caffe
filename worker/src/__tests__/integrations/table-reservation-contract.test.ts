@@ -1,3 +1,4 @@
+// @vitest-environment node
 /**
  * Canonical Table & Reservation Contract Integration Tests
  * Flow: TABLE → RESERVATION → SEATING → ORDER → CHECKOUT → TABLE RELEASE
@@ -12,6 +13,92 @@ import {
   releaseTable,
   validateOrderTable,
 } from '@aura/domain-table';
+import { releaseTableIfNoActiveOrders, type TableOccupancyDb } from '@aura/domain-order/policies/table-occupancy-release';
+import { orderCreationFixture } from './order-creation-fixture';
+
+it.each([
+  ['new order', `INSERT INTO orders (id, table_id, items, total, customer_name, customer_phone, payment_method, tenant_id)
+                 VALUES ('order-race', 'table-a', '[]', 20000, 'Guest', '0900000010', 'cod', 'cafe-a')`],
+  ['open session', `INSERT INTO table_sessions (id, table_id, tenant_id) VALUES ('session-race', 'table-a', 'cafe-a')`],
+  ['active reservation', `INSERT INTO reservations (id, table_id, customer_name, customer_phone, date, time, zone, tenant_id)
+                          VALUES ('reservation-race', 'table-a', 'Guest', '0900000010', DATE('now', '+7 hours'), '18:00', 'A', 'cafe-a')`],
+])('keeps an occupied table when a %s appears immediately before release', async (_holder, insert) => {
+  const { sqlite, env } = orderCreationFixture();
+  try {
+    sqlite.exec("UPDATE cafe_tables SET status = 'Occupied' WHERE id = 'table-a'");
+    let injections = 0;
+    const holderTable = { 'new order': 'orders', 'open session': 'table_sessions', 'active reservation': 'reservations' }[_holder]!;
+    const db: TableOccupancyDb = {
+      prepare(sql) {
+        return {
+          bind(...args) {
+            const stmt = env.AURA_DB.prepare(sql).bind(...args);
+            return {
+              first: () => stmt.first(),
+              async run() {
+                if (injections === 0) {
+                  sqlite.exec(insert);
+                  injections++;
+                }
+                return stmt.run();
+              },
+            };
+          },
+        };
+      },
+    };
+    expect(await releaseTableIfNoActiveOrders(db, 'A1', 'cafe-a')).toBe(false);
+    expect(injections).toBe(1);
+    expect(sqlite.prepare(`SELECT COUNT(*) count FROM ${holderTable} WHERE table_id = 'table-a' AND tenant_id = 'cafe-a'`).get()?.count).toBe(1);
+    expect(sqlite.prepare("SELECT status FROM cafe_tables WHERE id = 'table-a'").get()?.status).toBe('Occupied');
+  } finally {
+    sqlite.close();
+  }
+});
+
+it.each(['date', 'reservation_date'])('preserves reservation guards with only %s in SQLite', async (column) => {
+  const { sqlite, env } = orderCreationFixture();
+  try {
+    sqlite.exec(`DROP TABLE reservations;
+      CREATE TABLE reservations (id TEXT PRIMARY KEY, table_id TEXT, customer_name TEXT, customer_phone TEXT,
+        ${column} TEXT, time TEXT, zone TEXT, tenant_id TEXT, status TEXT DEFAULT 'confirmed')`);
+    expect(sqlite.prepare('PRAGMA table_info(reservations)').all().map(row => row.name))
+      .not.toContain(column === 'date' ? 'reservation_date' : 'date');
+    sqlite.exec(`UPDATE cafe_tables SET status = 'Occupied' WHERE id = 'table-a';
+      INSERT INTO reservations (id, table_id, customer_name, customer_phone, ${column}, time, zone, tenant_id)
+      VALUES ('legacy-holder', 'table-a', 'Guest', '0900000010', DATE('now', '+7 hours'), '18:00', 'A', 'cafe-a')`);
+    expect(await releaseTableIfNoActiveOrders(env.AURA_DB, 'A1', 'cafe-a')).toBe(false);
+    expect(sqlite.prepare("SELECT status FROM cafe_tables WHERE id = 'table-a'").get()?.status).toBe('Occupied');
+    sqlite.exec("UPDATE reservations SET status = 'cancelled' WHERE id = 'legacy-holder'");
+    expect(await releaseTableIfNoActiveOrders(env.AURA_DB, 'A1', 'cafe-a')).toBe(true);
+    expect(sqlite.prepare("SELECT status FROM cafe_tables WHERE id = 'table-a'").get()?.status).toBe('Available');
+  } finally { sqlite.close(); }
+});
+
+it.each(['orders', 'table_sessions', 'reservations'])('fails closed when guard table %s is missing', async (table) => {
+  const { sqlite, env } = orderCreationFixture();
+  try {
+    sqlite.exec(`UPDATE cafe_tables SET status = 'Occupied' WHERE id = 'table-a'; DROP TABLE ${table}`);
+    expect(await releaseTableIfNoActiveOrders(env.AURA_DB, 'A1', 'cafe-a')).toBe(false);
+    expect(sqlite.prepare("SELECT status FROM cafe_tables WHERE id = 'table-a'").get()?.status).toBe('Occupied');
+  } finally { sqlite.close(); }
+});
+
+it('releases a table with only terminal orders and another tenant’s same-number session', async () => {
+  const { sqlite, env } = orderCreationFixture();
+  try {
+    sqlite.exec(`UPDATE cafe_tables SET status = 'Occupied' WHERE id = 'table-a';
+      INSERT INTO table_sessions (id, table_id, status, tenant_id)
+      VALUES ('other-store', 'A1', 'active', 'cafe-b'), ('closed-local', 'table-a', 'closed', 'cafe-a');
+      INSERT INTO orders (id, table_id, items, total, customer_name, customer_phone, payment_method, status, tenant_id)
+      VALUES ('finished', 'table-a', '[]', 20000, 'Guest', '0900000010', 'cod', 'completed', 'cafe-a');`);
+    expect(await releaseTableIfNoActiveOrders(env.AURA_DB, 'A1', 'cafe-a')).toBe(true);
+    expect(sqlite.prepare("SELECT status FROM cafe_tables WHERE id = 'table-a'").get()?.status).toBe('Available');
+    expect(await releaseTableIfNoActiveOrders(env.AURA_DB, 'A1', 'cafe-a')).toBe(false);
+  } finally {
+    sqlite.close();
+  }
+});
 
 describe('Table / Reservation Contract', () => {
   function createMockDb() {
