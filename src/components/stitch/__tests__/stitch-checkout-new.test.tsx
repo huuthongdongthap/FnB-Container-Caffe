@@ -54,15 +54,20 @@ describe('StitchCheckoutNew', () => {
   it('renders payment method options', () => {
     renderWithProviders(<StitchCheckoutNew {...defaultProps} />);
     expect(screen.getByText('PayOS')).toBeInTheDocument();
-    expect(screen.getByText('Cash on Delivery')).toBeInTheDocument();
+    expect(screen.getByText('Cash')).toBeInTheDocument();
+    expect(screen.queryByText('Cash on Delivery')).not.toBeInTheDocument();
   });
 
-  it('toggles payment method on click', async () => {
+  it('toggles payment method on click and keyboard', async () => {
     const user = userEvent.setup();
     renderWithProviders(<StitchCheckoutNew {...defaultProps} />);
     const codRadio = screen.getByDisplayValue('cod');
     await user.click(codRadio);
     expect(codRadio).toBeChecked();
+    const payosRadio = screen.getByDisplayValue('payos');
+    payosRadio.focus();
+    await user.keyboard(' ');
+    expect(payosRadio).toBeChecked();
   });
 
   it('displays order summary items', () => {
@@ -176,17 +181,18 @@ describe('StitchCheckoutNew', () => {
     expect(screen.queryByTestId('table-error')).not.toBeInTheDocument();
   });
 
-  it('submits with orderType when form is valid', async () => {
+  it.each(['payos', 'cod'] as const)('submits a valid takeaway order with %s', async (paymentMethod) => {
     const user = userEvent.setup();
     const onPlaceOrder = vi.fn().mockResolvedValue(undefined);
     renderWithProviders(<StitchCheckoutNew {...defaultProps} onPlaceOrder={onPlaceOrder} />);
     await user.click(screen.getByRole('button', { name: /mang đi/i }));
     await user.type(screen.getByPlaceholderText('Ví dụ: Nguyễn Văn A'), 'Trần Thị B');
     await user.type(screen.getByPlaceholderText('0901 234 567'), '0901234567');
+    await user.click(screen.getByDisplayValue(paymentMethod));
     fireEvent.submit(screen.getByPlaceholderText('0901 234 567').closest('form')!);
     await waitFor(() => {
       expect(onPlaceOrder).toHaveBeenCalledWith(
-        expect.objectContaining({ orderType: 'takeaway', phone: '0901234567', paymentMethod: 'payos' })
+        expect.objectContaining({ orderType: 'takeaway', phone: '0901234567', paymentMethod })
       );
     });
   });

@@ -19,6 +19,7 @@ export interface Ticket {
   type: 'DINE IN' | 'TOGO' | 'DELIVERY';
   status: TicketStatus;
   rawStatus?: string;
+  isOverdue?: boolean;
   items: TicketItem[];
   notes?: string;
   elapsedSeconds: number;
@@ -34,6 +35,8 @@ export interface StitchKDSNewProps {
   avgPrepTime?: string;
   isLoading?: boolean;
   error?: string | null;
+  pendingOrders?: Record<string, boolean>;
+  mutationErrors?: Record<string, string>;
   onCompleteTicket?: (id: string) => void;
   onStartPrep?: (id: string) => void;
   onPickupOrder?: (id: string) => void;

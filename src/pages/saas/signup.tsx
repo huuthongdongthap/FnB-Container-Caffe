@@ -360,7 +360,7 @@ export default function SaasSignupPage(): ReactNode {
               key={s.num}
               type="button"
               onClick={() => setStep(s.num as 1 | 2 | 3)}
-              className={`rounded-xl px-3 py-2.5 text-xs font-semibold border transition ${
+              className={`min-h-[44px] rounded-xl px-3 py-2.5 text-xs font-semibold border transition ${
                 step === s.num
                   ? 'border-amber-500 bg-amber-500/15 text-amber-300'
                   : step > s.num

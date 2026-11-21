@@ -1,4 +1,12 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { useReservations } from '@/hooks/use-reservations';
+vi.mock('@/hooks/use-reservations', () => ({ useReservations: vi.fn() }));
+const createBooking = vi.fn();
+beforeEach(() => {
+  vi.clearAllMocks();
+  createBooking.mockResolvedValue({ success: true, data: { id: 'rsv-saved', table_number: '5' } });
+  vi.mocked(useReservations).mockReturnValue({ tables: [{ id: 'tbl5', table_number: '5', available: true, zone: 'Indoor' }], isLoadingTables: false, availabilityError: null, createReservation: vi.fn(), createReservationAsync: createBooking, isCreating: false, createError: null, refetchAvailability: vi.fn() });
+});
 import { renderWithProviders, screen, fireEvent } from '@/test-utils';
 import ReservationNewPage from '../index';
 
@@ -23,7 +31,7 @@ describe('ReservationNewPage', () => {
     fireEvent.click(rooftopZone);
   });
 
-  it('submits booking form and displays booking confirmation card', () => {
+  it('submits booking form and displays booking confirmation card', async () => {
     renderWithProviders(<ReservationNewPage />);
     const nameInput = screen.getByLabelText(/HỌ VÀ TÊN/i);
     const phoneInput = screen.getByLabelText(/SỐ ĐIỆN THOẠI/i);
@@ -33,8 +41,25 @@ describe('ReservationNewPage', () => {
     fireEvent.change(phoneInput, { target: { value: '0946013633' } });
     fireEvent.click(submitBtn);
 
-    expect(screen.getByText('ĐẶT BÀN THÀNH CÔNG')).toBeInTheDocument();
+    expect(await screen.findByText('ĐẶT BÀN THÀNH CÔNG')).toBeInTheDocument();
     expect(screen.getByText('Cảm Ơn Quý Khách!')).toBeInTheDocument();
-    expect(screen.getByText(/(AURA|DEMO)-\d{4}/)).toBeInTheDocument();
+    expect(screen.getByText('rsv-saved')).toBeInTheDocument();
   });
+  it.each(['no tables', 'loading', 'availability error', '400', '409', 'network', 'invalid response'])('fails closed for %s', async (reason) => {
+    const state = vi.mocked(useReservations)('', '');
+    if (reason === 'no tables') state.tables = [];
+    else if (reason === 'loading') state.isLoadingTables = true;
+    else if (reason === 'availability error') state.availabilityError = new Error('offline');
+    else if (reason === 'invalid response') createBooking.mockResolvedValue({ success: false });
+    else createBooking.mockRejectedValue(new Error(reason));
+    renderWithProviders(<ReservationNewPage />);
+    fireEvent.change(screen.getByLabelText(/HỌ VÀ TÊN/i), { target: { value: 'Guest' } });
+    fireEvent.change(screen.getByLabelText(/SỐ ĐIỆN THOẠI/i), { target: { value: '0946013633' } });
+    fireEvent.click(screen.getByRole('button', { name: /Xác Nhận Đặt Bàn Ngay/i }));
+    if (reason !== 'loading') expect(await screen.findByRole('alert')).toBeInTheDocument();
+    expect(screen.queryByText('ĐẶT BÀN THÀNH CÔNG')).not.toBeInTheDocument();
+    expect(screen.queryByText(/DEMO-/)).not.toBeInTheDocument();
+    expect(screen.getByLabelText(/HỌ VÀ TÊN/i)).toHaveValue('Guest');
+  });
+
 });

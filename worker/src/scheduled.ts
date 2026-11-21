@@ -26,9 +26,10 @@ import { sendShiftReminders } from './routes/reminders/shifts/route';
 import { runSaasLifecycleCron } from './lib/saas-lifecycle-cron';
 
 export async function handleScheduled(
-  _controller: ScheduledController,
+  controller: ScheduledController,
   env: Env,
-  ctx: ExecutionContext
+  ctx: ExecutionContext,
+  now = Number.isFinite(controller.scheduledTime) ? new Date(controller.scheduledTime) : new Date(),
 ): Promise<void> {
   const primaryDb = env.AURA_DB ? withPrimarySession(env.AURA_DB) : env.AURA_DB;
   const primaryEnv: Env = env.AURA_DB ? { ...env, AURA_DB: primaryDb } : env;
@@ -53,9 +54,9 @@ export async function handleScheduled(
       detectBirthdayCandidates(primaryEnv as unknown as Record<string, unknown>),
     ]);
   })());
-  safeWait(autoPostDailySpecials(primaryEnv as unknown as Record<string, unknown>));
-  safeWait(autoPostNewPromotions(primaryEnv as unknown as Record<string, unknown>));
-  safeWait(autoPostWeeklyHighlights(primaryEnv as unknown as Record<string, unknown>));
+  safeWait(autoPostDailySpecials(primaryEnv as unknown as Record<string, unknown>, undefined, now));
+  safeWait(autoPostNewPromotions(primaryEnv as unknown as Record<string, unknown>, undefined, now));
+  safeWait(autoPostWeeklyHighlights(primaryEnv as unknown as Record<string, unknown>, undefined, now));
   safeWait(runCampaignTriggers(primaryEnv as unknown as Record<string, unknown>));
   safeWait(runSopReminders(primaryEnv as unknown as Record<string, unknown>));
   safeWait(sendShiftReminders(primaryEnv as unknown as Record<string, unknown>));

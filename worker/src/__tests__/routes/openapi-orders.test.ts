@@ -562,6 +562,7 @@ describe('M4-C Phase 04: OpenAPI Orders Contract & Customer Security', () => {
           }),
           first: async () => ({ count: 1, mrr: 1500000 }),
         }),
+        batch: async (stmts: Array<{ run: () => Promise<unknown> }>) => Promise.all(stmts.map((stmt) => stmt.run())),
       } as any;
 
       const scope = {

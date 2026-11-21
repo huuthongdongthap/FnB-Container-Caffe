@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { Badge } from '@/components/ui/badge';
 import type { AdminCustomer } from '@/hooks/use-admin';
-import { Edit2, Trash2 } from 'lucide-react';
+import { Edit2, Eye, Trash2 } from 'lucide-react';
 
 interface CustomerTableProps {
   customers: AdminCustomer[];
@@ -9,6 +9,7 @@ interface CustomerTableProps {
   tierFilter?: string;
   searchQuery?: string;
   className?: string;
+  onViewDetail?: (customer: AdminCustomer) => void;
   onEdit?: (customer: AdminCustomer) => void;
   onDelete?: (customer: AdminCustomer) => void;
 }
@@ -19,6 +20,7 @@ export function CustomerTable({
   tierFilter,
   searchQuery = '',
   className,
+  onViewDetail,
   onEdit,
   onDelete,
 }: CustomerTableProps) {
@@ -63,7 +65,7 @@ export function CustomerTable({
               <th className="text-right py-2.5 px-3 font-medium text-muted uppercase text-xs tracking-wider">Tổng chi</th>
               <th className="text-center py-2.5 px-3 font-medium text-muted uppercase text-xs tracking-wider">Hạng</th>
               <th className="text-center py-2.5 px-3 font-medium text-muted uppercase text-xs tracking-wider">Gần nhất</th>
-              {(onEdit || onDelete) && (
+              {(onViewDetail || onEdit || onDelete) && (
                 <th className="text-center py-2.5 px-3 font-medium text-muted uppercase text-xs tracking-wider">Thao tác</th>
               )}
             </tr>
@@ -95,9 +97,19 @@ export function CustomerTable({
                     ? new Date(customer.lastVisit).toLocaleDateString('vi-VN')
                     : '-'}
                 </td>
-                {(onEdit || onDelete) && (
+                {(onViewDetail || onEdit || onDelete) && (
                   <td className="py-2.5 px-3 text-center">
                     <div className="flex items-center justify-center gap-1.5">
+                      {onViewDetail && (
+                        <button
+                          type="button"
+                          onClick={() => onViewDetail(customer)}
+                          aria-label={`Xem hồ sơ khách ${customer.name}`}
+                          className="p-1.5 rounded-md hover:bg-muted/30 text-muted hover:text-foreground transition-colors cursor-pointer"
+                        >
+                          <Eye className="w-3.5 h-3.5" />
+                        </button>
+                      )}
                       {onEdit && (
                         <button
                           type="button"

@@ -2,7 +2,7 @@
  * Mixpost API Client — reusable HTTP client for Mixpost REST API
  *
  * Creates a client with methods for posts, media, and accounts.
- * Handles Bearer token auth, 5xx retry (once, 2s delay), and 401 warnings.
+ * Handles Bearer token auth, 5xx retry (except post creation), and 401 warnings.
  *
  * Usage:
  *   import { createMixpostClient } from '../lib/mixpost-client';
@@ -71,7 +71,8 @@ export function createMixpostClient(apiUrl: string, apiToken: string, options: M
       throw new MixpostApiError(401, text, endpoint);
     }
 
-    if (res.status >= 500) {
+    // Creating a post is not idempotent: a 5xx can arrive after creation.
+    if (res.status >= 500 && !(method === 'POST' && endpoint === '/api/mixpost/posts')) {
       await new Promise((resolve) => setTimeout(resolve, retryDelay));
       res = await fetch(url, opts);
       if (res.status >= 500) {

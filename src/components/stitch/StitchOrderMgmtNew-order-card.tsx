@@ -114,6 +114,8 @@ export function OrderCard({ order, onAction, onViewDetails }: Readonly<OrderCard
           </span>
         </div>
 
+        {order.additionalActions}
+
         {/* Actions */}
         {isCancelled ? (
           <button type="button"

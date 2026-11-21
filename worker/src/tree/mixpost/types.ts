@@ -16,7 +16,7 @@ export interface MixpostPostInput {
 }
 
 export interface PromotionRow {
-  id: string;
+  id: string | null;
   code: string;
   percent: number;
   is_active: number;

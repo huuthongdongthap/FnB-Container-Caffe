@@ -1,6 +1,7 @@
 // @vitest-environment node
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { DatabaseSync } from 'node:sqlite';
+import { readFileSync } from 'node:fs';
 import { createHmac } from 'node:crypto';
 import type { D1Database, D1PreparedStatement } from '@cloudflare/workers-types';
 
@@ -15,6 +16,7 @@ import { handleRefund } from '../worker/src/routes/refunds-handlers/mutation-han
 
 function createTestSqliteDb() {
   const sqlite = new DatabaseSync(':memory:');
+  sqlite.exec(readFileSync(new URL('../worker/db/migrations/20261121_01_refund_manual_transfer_ledger.sql', import.meta.url), 'utf8'));
   const runStatement = new WeakMap<object, () => any>();
 
   sqlite.exec(`

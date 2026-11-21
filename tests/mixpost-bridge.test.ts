@@ -52,6 +52,7 @@ function createMockD1(seedData: Record<string, any[]> = {}) {
     return fromMatch ? fromMatch[1] : null;
   }
 
+  const claimedIds = new Set<string>();
   const db = {
     prepare: vi.fn((q: string) => {
       const stmt: any = {
@@ -72,6 +73,15 @@ function createMockD1(seedData: Record<string, any[]> = {}) {
           if (!parsed || !tables[parsed.table]) return { results: [...rows] };
           const matched = rows.filter(r => matchRow(r, parsed.conditions, this._bindValues));
           return { results: matched };
+        }),
+        run: vi.fn(async function (this: any) {
+          if (/INSERT\s+OR\s+IGNORE\s+INTO\s+cron_runs/i.test(q)) {
+            const id = String(this._bindValues[0] ?? '');
+            if (claimedIds.has(id)) return { meta: { changes: 0 } };
+            claimedIds.add(id);
+            return { meta: { changes: 1 } };
+          }
+          return { meta: { changes: 1 } };
         }),
       };
       return stmt;
@@ -174,16 +184,22 @@ describe('MixpostClient', () => {
     expect(opts.headers!['Authorization' as keyof HeadersInit] || (opts.headers as Record<string, string>).Authorization).toBe('Bearer my-secret-token');
   });
 
-  test('retries once on 5xx response', async () => {
+  test('retries once on 5xx response for idempotent GET requests and does not retry POST createPost', async () => {
     mockFetchError(503, 'Service Unavailable');
 
     const { createMixpostClient, MixpostApiError } = await import('../worker/src/lib/mixpost-client.ts');
     // Use short retry delay so test completes quickly
     const client = createMixpostClient(env.MIXPOST_API_URL, env.MIXPOST_API_TOKEN, { retryDelay: 10 });
 
-    const err = await client.createPost({ accounts: [1], content: 'Test' }).catch(e => e);
-    expect(err).toBeInstanceOf(MixpostApiError);
+    const getErr = await client.listAccounts().catch(e => e);
+    expect(getErr).toBeInstanceOf(MixpostApiError);
     expect(mockFetch).toHaveBeenCalledTimes(2);
+
+    mockFetch.mockClear();
+    mockFetchError(503, 'Service Unavailable');
+    const postErr = await client.createPost({ accounts: [1], content: 'Test' }).catch(e => e);
+    expect(postErr).toBeInstanceOf(MixpostApiError);
+    expect(mockFetch).toHaveBeenCalledTimes(1);
   }, 10000);
 
   test('throws MixpostApiError on 401', async () => {
@@ -550,7 +566,7 @@ describe('autoPostDailySpecials', () => {
   test('generates post from available products with Vietnamese content', async () => {
     mockFetchResponse({ id: 101 });
     const { autoPostDailySpecials } = await loadModule();
-    await autoPostDailySpecials(env);
+    await autoPostDailySpecials(env, undefined, new Date('2026-11-23T00:00:00.000Z'));
 
     expect(mockFetch).toHaveBeenCalledTimes(1);
     const [, opts] = mockFetch.mock.calls[0] as [string, RequestInit];
@@ -564,7 +580,7 @@ describe('autoPostDailySpecials', () => {
   test('skips when no products available', async () => {
     env.AURA_DB = createMockD1({ products: [] });
     const { autoPostDailySpecials } = await loadModule();
-    await autoPostDailySpecials(env);
+    await autoPostDailySpecials(env, undefined, new Date('2026-11-23T00:00:00.000Z'));
 
     expect(mockFetch).not.toHaveBeenCalled();
   });
@@ -572,7 +588,7 @@ describe('autoPostDailySpecials', () => {
   test('skips when MIXPOST_API_URL not set', async () => {
     env.MIXPOST_API_URL = undefined;
     const { autoPostDailySpecials } = await loadModule();
-    await autoPostDailySpecials(env);
+    await autoPostDailySpecials(env, undefined, new Date('2026-11-23T00:00:00.000Z'));
 
     expect(mockFetch).not.toHaveBeenCalled();
   });
@@ -580,7 +596,7 @@ describe('autoPostDailySpecials', () => {
   test('uses accounts from MIXPOST_ACCOUNTS env var', async () => {
     mockFetchResponse({ id: 102 });
     const { autoPostDailySpecials } = await loadModule();
-    await autoPostDailySpecials(env);
+    await autoPostDailySpecials(env, undefined, new Date('2026-11-23T00:00:00.000Z'));
 
     const [, opts] = mockFetch.mock.calls[0] as [string, RequestInit];
     const body = JSON.parse(opts.body as string);
@@ -591,7 +607,7 @@ describe('autoPostDailySpecials', () => {
     mockFetchResponse({ id: 103 });
     env.MIXPOST_ACCOUNTS = undefined;
     const { autoPostDailySpecials } = await loadModule();
-    await autoPostDailySpecials(env);
+    await autoPostDailySpecials(env, undefined, new Date('2026-11-23T00:00:00.000Z'));
 
     // No fetch call should be made — function returns early with no_accounts skip
     expect(mockFetch).not.toHaveBeenCalled();
@@ -617,7 +633,7 @@ describe('autoPostNewPromotions', () => {
       .mockResolvedValueOnce(new Response(JSON.stringify({ id: 202 }), { status: 200, headers: { 'Content-Type': 'application/json' } }));
 
     const { autoPostNewPromotions } = await loadModule();
-    await autoPostNewPromotions(env);
+    await autoPostNewPromotions(env, undefined, new Date('2026-11-23T01:00:00.000Z'));
 
     expect(mockFetch).toHaveBeenCalledTimes(2);
 
@@ -641,7 +657,7 @@ describe('autoPostNewPromotions', () => {
       .mockResolvedValueOnce(new Response(JSON.stringify({ id: 202 }), { status: 200, headers: { 'Content-Type': 'application/json' } }));
 
     const { autoPostNewPromotions } = await loadModule();
-    await autoPostNewPromotions(env);
+    await autoPostNewPromotions(env, undefined, new Date('2026-11-23T01:00:00.000Z'));
 
     // Only 2 calls for active promotions, not 3
     expect(mockFetch).toHaveBeenCalledTimes(2);
@@ -654,7 +670,7 @@ describe('autoPostNewPromotions', () => {
   test('skips when no active promotions', async () => {
     env.AURA_DB = createMockD1({ promotions: inactivePromotions });
     const { autoPostNewPromotions } = await loadModule();
-    await autoPostNewPromotions(env);
+    await autoPostNewPromotions(env, undefined, new Date('2026-11-23T01:00:00.000Z'));
 
     expect(mockFetch).not.toHaveBeenCalled();
   });
@@ -662,7 +678,7 @@ describe('autoPostNewPromotions', () => {
   test('skips when Mixpost not configured', async () => {
     env.MIXPOST_API_URL = undefined;
     const { autoPostNewPromotions } = await loadModule();
-    await autoPostNewPromotions(env);
+    await autoPostNewPromotions(env, undefined, new Date('2026-11-23T01:00:00.000Z'));
 
     expect(mockFetch).not.toHaveBeenCalled();
   });
@@ -684,7 +700,7 @@ describe('autoPostWeeklyHighlights', () => {
   test('generates post with product ranking and prices', async () => {
     mockFetchResponse({ id: 301 });
     const { autoPostWeeklyHighlights } = await loadModule();
-    await autoPostWeeklyHighlights(env);
+    await autoPostWeeklyHighlights(env, undefined, new Date('2026-11-23T02:00:00.000Z'));
 
     expect(mockFetch).toHaveBeenCalledTimes(1);
     const [, opts] = mockFetch.mock.calls[0] as [string, RequestInit];
@@ -700,7 +716,7 @@ describe('autoPostWeeklyHighlights', () => {
   test('skips when no products', async () => {
     env.AURA_DB = createMockD1({ products: [] });
     const { autoPostWeeklyHighlights } = await loadModule();
-    await autoPostWeeklyHighlights(env);
+    await autoPostWeeklyHighlights(env, undefined, new Date('2026-11-23T02:00:00.000Z'));
 
     expect(mockFetch).not.toHaveBeenCalled();
   });
@@ -708,7 +724,7 @@ describe('autoPostWeeklyHighlights', () => {
   test('skips when Mixpost not configured', async () => {
     env.MIXPOST_API_URL = undefined;
     const { autoPostWeeklyHighlights } = await loadModule();
-    await autoPostWeeklyHighlights(env);
+    await autoPostWeeklyHighlights(env, undefined, new Date('2026-11-23T02:00:00.000Z'));
 
     expect(mockFetch).not.toHaveBeenCalled();
   });

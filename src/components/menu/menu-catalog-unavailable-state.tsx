@@ -24,9 +24,10 @@ export function MenuTableBanner({ tableNumber }: MenuTableBannerProps) {
         </div>
         <a
           href="/order"
+          title="Đơn hiện có vẫn ở bàn ban đầu. Nhờ nhân viên chuyển bàn đang phục vụ."
           className="text-[11px] font-semibold text-[var(--aura-chrome-mid)] hover:text-white uppercase tracking-wider"
         >
-          Đổi bàn
+          Chọn bàn cho đơn mới
         </a>
       </div>
     </aside>

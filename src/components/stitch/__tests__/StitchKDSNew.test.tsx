@@ -53,12 +53,53 @@ describe('StitchKDSNew', () => {
     expect(screen.getByText('HEARTH & STEEL KDS')).toBeTruthy();
   });
 
-  it('renders filter buttons', () => {
+  it('renders filter buttons visible on small screens', () => {
     renderWithProviders(<StitchKDSNew />);
+    const filterNav = screen.getByRole('navigation', { name: 'Filter tickets' });
+    expect(filterNav.className).not.toContain('hidden');
+    expect(filterNav.className).toContain('flex');
     expect(screen.getByText('ALL')).toBeTruthy();
     expect(screen.getByText('PRIORITY')).toBeTruthy();
     expect(screen.getByText('PREPARING')).toBeTruthy();
     expect(screen.getByText('READY')).toBeTruthy();
+  });
+
+  it('keeps overdue preparing tickets in PREPARING with active counts and correct action', () => {
+    const complete = vi.fn();
+    renderWithProviders(<StitchKDSNew activeFilter="preparing" onCompleteTicket={complete} tickets={[{
+      id: '#LATE', table: '01', type: 'DINE IN', status: 'overdue', rawStatus: 'preparing',
+      items: [{ name: 'Coffee', quantity: 1 }], elapsedSeconds: 1000,
+    }]} />);
+    expect(screen.getByText('#LATE')).toBeInTheDocument();
+    expect(screen.getByText(/ACTIVE ORDERS.*1/)).toBeInTheDocument();
+    _fireEvent.click(screen.getByRole('button', { name: 'PRIORITY COMPLETE' }));
+    expect(complete).toHaveBeenCalledWith('#LATE');
+  });
+
+  it('shows ticket-specific mutation errors with retry and disables its pending action', () => {
+    const startPrep = vi.fn();
+    renderWithProviders(<StitchKDSNew onStartPrep={startPrep} pendingOrders={{ '#9843': true }} mutationErrors={{ '#9843': '409 conflict' }} />);
+    expect(screen.getByRole('alert')).toHaveTextContent('409 conflict');
+    expect(screen.getByRole('status')).toHaveTextContent('Đang cập nhật');
+    expect(screen.getAllByRole('button', { name: 'START PREP' }).some(button => button.hasAttribute('disabled'))).toBe(true);
+    expect(screen.getByRole('button', { name: 'Thử lại' })).toBeDisabled();
+  });
+
+  it('invokes retry action when clicking retry on a failed ticket', () => {
+    const complete = vi.fn();
+    renderWithProviders(
+      <StitchKDSNew
+        activeFilter="preparing"
+        onCompleteTicket={complete}
+        mutationErrors={{ '#LATE': '409 conflict' }}
+        tickets={[{
+          id: '#LATE', table: '01', type: 'DINE IN', status: 'overdue', rawStatus: 'preparing', isOverdue: true,
+          items: [{ name: 'Coffee', quantity: 1 }], elapsedSeconds: 1000,
+        }]}
+      />,
+    );
+    _fireEvent.click(screen.getByRole('button', { name: 'Thử lại' }));
+    expect(complete).toHaveBeenCalledWith('#LATE');
   });
 
   it('renders default tickets', () => {

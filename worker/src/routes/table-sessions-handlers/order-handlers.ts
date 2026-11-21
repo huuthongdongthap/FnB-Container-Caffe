@@ -78,49 +78,10 @@ export function registerOrderHandlers(router: Hono<{ Bindings: Env }>): void {
         payment_status?: string | null;
         table_id?: string | null;
         tenant_id?: string | null;
+        session_id?: string | null;
       };
-      let order: OrderLookupRow | null = null;
-      try {
-        order = await db.prepare(
-          'SELECT id, COALESCE(total_amount, total, 0) AS total, status, payment_status, table_id, session_id, tenant_id FROM orders WHERE id = ?'
-        ).bind(orderId).first<OrderLookupRow>();
-      } catch {
-        try {
-          order = await db.prepare(
-            'SELECT id, COALESCE(total_amount, total, 0) AS total, status, payment_status, table_id, tenant_id FROM orders WHERE id = ?'
-          ).bind(orderId).first<OrderLookupRow>();
-        } catch {
-          order = null;
-        }
-      }
-      if (!order) {
-        try {
-          order = await db.prepare(
-            'SELECT id, COALESCE(total_amount, total, 0) AS total, status, table_id, tenant_id FROM orders WHERE id = ?'
-          ).bind(orderId).first<OrderLookupRow>();
-        } catch {
-          order = null;
-        }
-      }
-      if (!order) {
-        try {
-          order = await db.prepare(
-            'SELECT id, total, status, table_id, tenant_id FROM orders WHERE id = ?'
-          ).bind(orderId).first<OrderLookupRow>();
-        } catch {
-          try {
-            order = await db.prepare(
-              'SELECT id, total, status, tenant_id FROM orders WHERE id = ?'
-            ).bind(orderId).first<OrderLookupRow>();
-          } catch {
-            if (tenantId === 'default' || tenantId === '*') {
-              order = await db.prepare(
-                'SELECT id, total, status, table_id FROM orders WHERE id = ?'
-              ).bind(orderId).first<OrderLookupRow>();
-            }
-          }
-        }
-      }
+      const order = await db.prepare('SELECT * FROM orders WHERE id = ?')
+        .bind(orderId).first<OrderLookupRow>();
       if (
         !order ||
         !matchesTenantRow(order as unknown as Record<string, unknown>, tenantId) ||
@@ -153,8 +114,8 @@ export function registerOrderHandlers(router: Hono<{ Bindings: Env }>): void {
       if (!sameTable) {
         return c.json({ success: false, error: 'Order already attached to another table' }, 409);
       }
-      const orderHasSessionIdCol = 'session_id' in (order as unknown as Record<string, unknown>);
-      const orderSessionId = (order as unknown as { session_id?: string | null }).session_id;
+      const orderHasSessionIdCol = 'session_id' in order;
+      const orderSessionId = order.session_id;
       if (orderSessionId && String(orderSessionId).trim() !== '' && String(orderSessionId) !== String(id)) {
         return c.json({ success: false, error: 'Order already attached to another session' }, 409);
       }
@@ -165,179 +126,84 @@ export function registerOrderHandlers(router: Hono<{ Bindings: Env }>): void {
         (Boolean(order.table_id) &&
           sameTable &&
           (!orderHasSessionIdCol || orderSessionId === undefined) &&
-          Number((session as unknown as { order_count?: number }).order_count ?? 0) > 0 &&
+          Number(sessionRow?.order_count ?? sessionRow?.orders_count ?? 0) > 0 &&
           Number((session as unknown as { total_amount?: number }).total_amount ?? 0) >= orderTotal);
+      const alreadyAttached = () => c.json({
+        success: true,
+        idempotent: true,
+        already_attached: true,
+        data: {
+          ...session,
+          session_id: id,
+          order_id: orderId,
+          table_id: session?.table_id,
+          order_total: orderTotal,
+          already_attached: true,
+        },
+      });
       if (
         (orderSessionId && String(orderSessionId) === String(id)) ||
         (order.table_id && sameTable && alreadyLinkedToThisSession)
-      ) {
-        return c.json({
-          success: true,
-          idempotent: true,
-          already_attached: true,
-          data: {
-            ...session,
-            session_id: id,
-            order_id: orderId,
-            table_id: session.table_id,
-            order_total: orderTotal,
-            already_attached: true,
-          },
-        });
-      }
+      ) return alreadyAttached();
 
       const now = new Date().toISOString();
-      const allowUnscopedOrderFallback = effectiveSessionTenant === 'default' || tenantId === '*';
-      const allowUnscopedSessionFallback = effectiveSessionTenant === 'default' || tenantId === '*';
-      let attachResult: any = null;
-      if (!order.table_id) {
-        try {
-          attachResult = await db.prepare(
-            "UPDATE orders SET table_id = ?, updated_at = ? WHERE id = ? AND (table_id IS NULL OR table_id = '') AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
-          ).bind(session.table_id, now, orderId, effectiveSessionTenant).run();
-        } catch {
-          if (!allowUnscopedOrderFallback) {
-            return c.json({ success: false, error: 'Failed to attach order to session' }, 500);
-          }
-          attachResult = await db.prepare(
-            'UPDATE orders SET table_id = ?, updated_at = ? WHERE id = ? AND (table_id IS NULL OR table_id = \'\')'
-          ).bind(session.table_id, now, orderId).run();
-        }
-        if (attachResult?.meta && typeof attachResult.meta.changes === 'number' && attachResult.meta.changes === 0) {
-          return c.json({ success: false, error: 'Order already attached to another table' }, 409);
-        }
+      const tenantScope = " AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?";
+      const orderScope = 'tenant_id' in order ? tenantScope : '';
+      const sessionScope = sessionRow && 'tenant_id' in sessionRow ? tenantScope : '';
+      if ((!orderScope || !sessionScope) && effectiveSessionTenant !== 'default' && tenantId !== '*') {
+        return c.json({ success: false, error: 'Failed to attach order to session' }, 500);
       }
-      if (orderHasSessionIdCol) {
-        let sessionClaimResult: { meta?: { changes?: number } } | null = null;
-        let sessionClaimSucceeded = false;
-        try {
-          sessionClaimResult = (await db
-            .prepare(
-              "UPDATE orders SET session_id = ?, updated_at = ? WHERE id = ? AND (session_id IS NULL OR session_id = '') AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?",
-            )
-            .bind(id, now, orderId, effectiveSessionTenant)
-            .run()) as { meta?: { changes?: number } } | null;
-          sessionClaimSucceeded = true;
-        } catch {
-          if (allowUnscopedOrderFallback) {
-            sessionClaimResult = (await db
-              .prepare(
-                "UPDATE orders SET session_id = ? WHERE id = ? AND (session_id IS NULL OR session_id = '')",
-              )
-              .bind(id, orderId)
-              .run()
-              .catch(() => null)) as { meta?: { changes?: number } } | null;
-            sessionClaimSucceeded = sessionClaimResult !== null;
-          }
-        }
-        if (
-          sessionClaimSucceeded &&
-          sessionClaimResult?.meta &&
-          typeof sessionClaimResult.meta.changes === 'number' &&
-          sessionClaimResult.meta.changes === 0
-        ) {
-          const latestOrder = await db
-            .prepare('SELECT session_id FROM orders WHERE id = ?')
-            .bind(orderId)
-            .first<{ session_id?: string | null }>()
-            .catch(() => null);
-          const latestSessionId = latestOrder?.session_id ? String(latestOrder.session_id).trim() : '';
-          if (latestSessionId && latestSessionId === String(id)) {
-            return c.json({
-              success: true,
-              idempotent: true,
-              already_attached: true,
-              data: {
-                ...session,
-                session_id: id,
-                order_id: orderId,
-                table_id: session.table_id,
-                order_total: orderTotal,
-                already_attached: true,
-              },
-            });
-          }
-          return c.json({ success: false, error: 'Order already attached to another session' }, 409);
-        }
-      } else {
-        await db
-          .prepare("UPDATE orders SET session_id = ? WHERE id = ? AND (session_id IS NULL OR session_id = '')")
-          .bind(id, orderId)
-          .run()
-          .catch(() => {});
-      }
-
+      const sessionWhere = `id = ? AND table_id IS ? AND status IN ('active', 'ordering')${sessionScope}`;
+      const sessionArgs = [id, session.table_id, ...(sessionScope ? [effectiveSessionTenant] : [])];
+      const variant = sessionRow && 'order_count' in sessionRow
+        ? { counter: 'order_count', value: sessionRow.order_count }
+        : sessionRow && 'orders_count' in sessionRow
+          ? { counter: 'orders_count', value: sessionRow.orders_count }
+          : null;
+      const billSet = variant
+        ? `${variant.counter} = COALESCE(${variant.counter}, 0) + 1, total_amount = COALESCE(total_amount, 0) + ?, status = 'ordering', updated_at = ?`
+        : "current_order_id = ?, status = 'ordering'";
+      const billArgs = variant ? [orderTotal, now] : [orderId];
+      // With no order-side session column, serialize preassigned orders against the
+      // bill snapshot used by the legacy idempotency check.
+      const legacyGuard = !orderHasSessionIdCol && order.table_id
+        ? ` AND ${variant?.counter ?? 'current_order_id'} IS ?`
+        : '';
+      const guardArgs = legacyGuard ? [variant ? variant.value : sessionRow?.current_order_id ?? null] : [];
       try {
-        await db.prepare(
-          `UPDATE table_sessions
-           SET order_count = COALESCE(order_count, 0) + 1,
-               total_amount = COALESCE(total_amount, 0) + ?,
-               status = 'ordering',
-               updated_at = ?
-           WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?`
-        ).bind(orderTotal, now, id, effectiveSessionTenant).run();
+        // The claim requires an eligible session, and only this batch's claim can
+        // increment the bill. A statement error rolls both changes back in D1.
+        const [, bill] = await db.batch([
+          db.prepare(
+            `UPDATE orders SET ${orderHasSessionIdCol ? 'session_id = ?, ' : ''}table_id = ?, updated_at = ?
+             WHERE id = ? AND table_id IS ? AND status IS ?${orderScope}
+               ${'payment_status' in order ? 'AND payment_status IS ?' : ''}
+               ${orderHasSessionIdCol ? "AND (session_id IS NULL OR session_id = '')" : ''}
+               AND EXISTS (SELECT 1 FROM table_sessions WHERE ${sessionWhere}${legacyGuard})`,
+          ).bind(...(orderHasSessionIdCol ? [id] : []), order.table_id || session.table_id, now,
+            orderId, order.table_id ?? null, order.status,
+            ...(orderScope ? [effectiveSessionTenant] : []),
+            ...('payment_status' in order ? [order.payment_status ?? null] : []), ...sessionArgs, ...guardArgs),
+          db.prepare(`UPDATE table_sessions SET ${billSet} WHERE ${sessionWhere}${legacyGuard} AND changes() = 1`)
+            .bind(...billArgs, ...sessionArgs, ...guardArgs),
+        ]);
+        if (!bill || !bill.success) {
+          return c.json({ success: false, error: 'Failed to update table session' }, 500);
+        }
+        if (bill.meta.changes === 0) {
+          const latest = await db.prepare(`SELECT * FROM orders WHERE id = ?${orderScope}`)
+            .bind(orderId, ...(orderScope ? [effectiveSessionTenant] : [])).first<OrderLookupRow>();
+          if (latest?.session_id === id) return alreadyAttached();
+          if (latest?.session_id) {
+            return c.json({ success: false, error: 'Order already attached to another session' }, 409);
+          }
+          if (latest?.table_id && latest.table_id !== (order.table_id || session.table_id)) {
+            return c.json({ success: false, error: 'Order already attached to another table' }, 409);
+          }
+          return c.json({ success: false, error: 'Session is not accepting orders' }, 409);
+        }
       } catch {
-        let updatedCurrentOrder = false;
-        try {
-          await db.prepare(
-            `UPDATE table_sessions
-             SET orders_count = COALESCE(orders_count, 0) + 1,
-                 total_amount = COALESCE(total_amount, 0) + ?,
-                 status = 'ordering',
-                 updated_at = ?
-             WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?`
-          ).bind(orderTotal, now, id, effectiveSessionTenant).run();
-          updatedCurrentOrder = true;
-        } catch {
-          try {
-            await db.prepare(
-              `UPDATE table_sessions
-               SET current_order_id = ?,
-                   status = 'ordering'
-               WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?`
-            ).bind(orderId, id, effectiveSessionTenant).run();
-            updatedCurrentOrder = true;
-          } catch {
-            updatedCurrentOrder = false;
-          }
-        }
-        if (!updatedCurrentOrder) {
-          if (!allowUnscopedSessionFallback) {
-            return c.json({ success: false, error: 'Failed to update table session' }, 500);
-          }
-          try {
-            await db.prepare(
-              `UPDATE table_sessions
-               SET order_count = COALESCE(order_count, 0) + 1,
-                   total_amount = COALESCE(total_amount, 0) + ?,
-                   status = 'ordering',
-                   updated_at = ?
-               WHERE id = ?`
-            ).bind(orderTotal, now, id).run();
-          } catch {
-            try {
-              await db.prepare(
-                `UPDATE table_sessions
-                 SET orders_count = COALESCE(orders_count, 0) + 1,
-                     total_amount = COALESCE(total_amount, 0) + ?,
-                     status = 'ordering',
-                     updated_at = ?
-                 WHERE id = ?`
-              ).bind(orderTotal, now, id).run();
-            } catch {
-              try {
-                await db.prepare(
-                  `UPDATE table_sessions
-                   SET current_order_id = ?,
-                       status = 'ordering'
-                   WHERE id = ?`
-                ).bind(orderId, id).run();
-              } catch {
-                // table_sessions schema variation
-              }
-            }
-          }
-        }
+        return c.json({ success: false, error: 'Failed to update table session' }, 500);
       }
 
       if (c.env?.AUTH_KV) {

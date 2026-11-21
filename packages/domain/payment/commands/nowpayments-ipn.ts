@@ -35,14 +35,19 @@ function constantTimeEqual(a: string, b: string): boolean {
   return diff === 0;
 }
 
-type DbBinding = {
-  prepare(_sql: string): {
-    bind(..._a: unknown[]): {
-      run(): Promise<{ rowCount?: number; meta?: { changes?: number } }>;
-      first<T = Record<string, unknown>>(): Promise<T | null>;
-    };
-  };
+type WriteResult = { meta?: { changes?: number } };
+type BoundStatement = {
+  run(): Promise<WriteResult>;
+  first<T = Record<string, unknown>>(): Promise<T | null>;
 };
+type DbBinding = {
+  prepare(_sql: string): { bind(..._a: unknown[]): BoundStatement };
+  batch(_statements: BoundStatement[]): Promise<WriteResult[]>;
+};
+
+function missingColumn(error: unknown): boolean {
+  return error instanceof Error && /no such column/i.test(error.message);
+}
 
 type InvoiceRow = {
   id: string;
@@ -60,36 +65,8 @@ async function fetchInvoiceByColumn(
   column: 'payment_ref' | 'id',
   value: string
 ): Promise<InvoiceRow | null> {
-  try {
-    return await db
-      .prepare(
-        `SELECT id, subscription_id, status, amount_vnd, payment_ref, tenant_id, period_start, period_end FROM subscription_invoices WHERE ${column} = ? LIMIT 1`
-      )
-      .bind(value)
-      .first<InvoiceRow>();
-  } catch {
-    try {
-      return await db
-        .prepare(
-          `SELECT id, subscription_id, status, amount_vnd, payment_ref, tenant_id FROM subscription_invoices WHERE ${column} = ? LIMIT 1`
-        )
-        .bind(value)
-        .first<InvoiceRow>();
-    } catch {
-      try {
-        return await db
-          .prepare(`SELECT id, subscription_id, status, amount_vnd FROM subscription_invoices WHERE ${column} = ? LIMIT 1`)
-          .bind(value)
-          .first<InvoiceRow>();
-      } catch {
-        return await db
-          .prepare(`SELECT id, subscription_id, status FROM subscription_invoices WHERE ${column} = ? LIMIT 1`)
-          .bind(value)
-          .first<InvoiceRow>()
-          .catch(() => null);
-      }
-    }
-  }
+  return db.prepare(`SELECT * FROM subscription_invoices WHERE ${column} = ? LIMIT 1`)
+    .bind(value).first<InvoiceRow>();
 }
 
 export async function processNowPaymentsIpn(
@@ -220,43 +197,14 @@ export async function processNowPaymentsIpn(
       }
     }
 
+    if (!sub || !sub.current_period_end || !/^\d{4}-\d{2}-\d{2}/.test(sub.current_period_end)) {
+      return { ok: false, error: 'Subscription unavailable for settlement', status: 500 };
+    }
+    if (typeof db.batch !== 'function') {
+      return { ok: false, error: 'Atomic settlement unavailable', status: 500 };
+    }
     const now = new Date().toISOString();
     const paymentRef = paymentId || inv.payment_ref || '';
-    let updateRes: { rowCount?: number; meta?: { changes?: number } } | undefined;
-    try {
-      updateRes = await db
-        .prepare(
-          "UPDATE subscription_invoices SET status = 'paid', paid_at = ?, payment_method = 'crypto', payment_ref = ? WHERE id = ? AND status NOT IN ('paid', 'cancelled') AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
-        )
-        .bind(now, paymentRef, inv.id, invTenant)
-        .run();
-    } catch {
-      if (invTenant !== 'default') {
-        return { ok: false, error: 'Tenant-scoped invoice update failed', status: 500 };
-      }
-      try {
-        updateRes = await db
-          .prepare(
-            "UPDATE subscription_invoices SET status = 'paid', paid_at = ?, payment_method = 'crypto', payment_ref = ? WHERE id = ? AND status NOT IN ('paid', 'cancelled')"
-          )
-          .bind(now, paymentRef, inv.id)
-          .run();
-      } catch {
-        updateRes = await db
-          .prepare(
-            "UPDATE subscription_invoices SET status = 'paid', paid_at = ?, updated_at = ? WHERE id = ? AND status NOT IN ('paid', 'cancelled')"
-          )
-          .bind(now, now, inv.id)
-          .run();
-      }
-    }
-
-    const changes = updateRes?.meta?.changes;
-    const wasUpdated = inv.status !== 'paid' && (typeof changes === 'number' ? changes !== 0 : true);
-    if (!wasUpdated) {
-      return { ok: true, idempotent: true, status: 200 };
-    }
-
     if (inv.subscription_id) {
       try {
         const effectiveSubTenant = subTenant || invTenant || 'default';
@@ -291,19 +239,19 @@ export async function processNowPaymentsIpn(
                 )
                 .bind(inv.subscription_id, inv.id, effectiveSubTenant)
                 .first<{ count?: number }>()
-                .catch(() =>
-                  effectiveSubTenant === 'default'
+                .catch((error: unknown) =>
+                  missingColumn(error) && effectiveSubTenant === 'default'
                     ? db
                         .prepare(
                           "SELECT COUNT(*) as count FROM subscription_invoices WHERE subscription_id = ? AND id != ? AND status IN ('paid', 'manual')"
                         )
                         .bind(inv.subscription_id, inv.id)
                         .first<{ count?: number }>()
-                    : Promise.resolve(null)
+                    : Promise.reject(error)
                 );
               hasPriorPaidInvoice = Number(priorRow?.count ?? 0) > 0;
             } catch {
-              hasPriorPaidInvoice = false;
+              return { ok: false, error: 'Subscription billing history unavailable', status: 500 };
             }
           }
 
@@ -323,38 +271,43 @@ export async function processNowPaymentsIpn(
             ? sub.current_period_end
             : addMonths(sub.current_period_end, months);
 
+          const settle = async (legacy: boolean) => {
+            const invoiceScope = legacy ? '' : " AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?";
+            const subScope = legacy ? '' : " AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?";
+            const invoiceArgs = legacy ? [] : [rawInvTenantValue || 'default'];
+            const subArgs = legacy ? [] : [typeof sub.tenant_id === 'string' ? sub.tenant_id.trim() || 'default' : 'default'];
+            // D1 batch is transactional. The second write can settle only the subscription
+            // changed by the immediately preceding statement in this same transaction.
+            return db.batch([
+              db.prepare(
+                "UPDATE subscriptions SET status = 'active', current_period_start = ?, current_period_end = ?, next_billing_date = ?, updated_at = ? WHERE id = ?" + subScope +
+                " AND current_period_end = ? AND EXISTS (SELECT 1 FROM subscription_invoices WHERE id = ? AND subscription_id = ? AND status = ? AND COALESCE(payment_ref, '') = ?" + invoiceScope + ")"
+              ).bind(nextStart, newEnd, newEnd, now, inv.subscription_id, ...subArgs,
+                sub.current_period_end, inv.id, inv.subscription_id, inv.status, inv.payment_ref || '', ...invoiceArgs),
+              db.prepare(
+                "UPDATE subscription_invoices SET status = 'paid', paid_at = ?, payment_method = 'crypto', payment_ref = ? WHERE id = ? AND status = ? AND changes() = 1" + invoiceScope
+              ).bind(now, paymentRef, inv.id, inv.status, ...invoiceArgs),
+            ]);
+          };
+          let results: WriteResult[];
           try {
-            await db
-              .prepare(
-                "UPDATE subscriptions SET status = 'active', current_period_start = ?, current_period_end = ?, next_billing_date = ?, updated_at = ? WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
-              )
-              .bind(nextStart, newEnd, newEnd, now, inv.subscription_id, effectiveSubTenant)
-              .run();
-          } catch {
-            if (effectiveSubTenant === 'default') {
-              try {
-                await db
-                  .prepare(
-                    "UPDATE subscriptions SET status = 'active', current_period_start = ?, current_period_end = ?, next_billing_date = ?, updated_at = ? WHERE id = ?"
-                  )
-                  .bind(nextStart, newEnd, newEnd, now, inv.subscription_id)
-                  .run();
-              } catch {
-                await db
-                  .prepare('UPDATE subscriptions SET current_period_end = ?, updated_at = ? WHERE id = ?')
-                  .bind(newEnd, now, inv.subscription_id)
-                  .run();
-              }
-            }
+            results = await settle(false);
+          } catch (error) {
+            if (!missingColumn(error) || invTenant !== 'default' || effectiveSubTenant !== 'default') throw error;
+            // Only schemas predating tenant columns may use unscoped writes.
+            if ('tenant_id' in inv || 'tenant_id' in sub) throw error;
+            results = await settle(true);
           }
-        } else if (effectiveSubTenant === 'default') {
-          await db
-            .prepare("UPDATE subscriptions SET current_period_end = datetime(current_period_end, '+1 month'), updated_at = ? WHERE id = ?")
-            .bind(now, inv.subscription_id)
-            .run();
+          if (results[0]?.meta?.changes !== 1 || results[1]?.meta?.changes !== 1) {
+            const current = await fetchInvoiceByColumn(db, 'id', inv.id);
+            if (current?.status === 'paid' && current.payment_ref === paymentRef) {
+              return { ok: true, idempotent: true, status: 200 };
+            }
+            return { ok: false, error: 'Settlement state changed; retry required', status: 500 };
+          }
         }
       } catch {
-        log.warn('IPN: subscription period extension failed', { subscriptionId: inv.subscription_id });
+        return { ok: false, error: 'Subscription settlement failed', status: 500 };
       }
     }
 
@@ -415,60 +368,49 @@ export async function processNowPaymentsIpn(
       return { ok: true, status: 200 };
     }
     const now = new Date().toISOString();
+    let effectiveRefundTenant = invTenant;
     try {
-      await db
-        .prepare(
-          "UPDATE subscription_invoices SET status = 'refunded', updated_at = ? WHERE id = ? AND status = 'paid' AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
-        )
-        .bind(now, inv.id, invTenant)
-        .run();
-    } catch {
-      if (invTenant !== 'default') {
+      const sub = inv.subscription_id
+        ? await db.prepare('SELECT * FROM subscriptions WHERE id = ?')
+            .bind(inv.subscription_id).first<{ tenant_id?: string | null }>()
+        : null;
+      if (inv.subscription_id && !sub) {
+        return { ok: false, error: 'Subscription unavailable for refund', status: 500 };
+      }
+      const subTenant = sub?.tenant_id?.trim() || 'default';
+      const refundSubTenant = subTenant !== '*' && subTenant.toLowerCase() !== 'hq' ? subTenant : 'default';
+      effectiveRefundTenant = invTenant !== 'default' ? invTenant : refundSubTenant;
+      if (sub && refundSubTenant !== effectiveRefundTenant) {
+        return { ok: false, error: 'Invoice and subscription tenant mismatch', status: 400 };
+      }
+      const tenantScope = " AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?";
+      const invoiceScope = 'tenant_id' in inv ? tenantScope : '';
+      const subScope = sub && 'tenant_id' in sub ? tenantScope : '';
+      if (effectiveRefundTenant !== 'default' && !subScope) {
         return { ok: false, error: 'Tenant-scoped invoice refund update failed', status: 500 };
       }
-      await db
-        .prepare("UPDATE subscription_invoices SET status = 'refunded', updated_at = ? WHERE id = ? AND status = 'paid'")
-        .bind(now, inv.id)
-        .run();
-    }
-    let refundSubTenant = '';
-    if (inv.subscription_id) {
-      try {
-        const subRow = await db
-          .prepare('SELECT tenant_id FROM subscriptions WHERE id = ?')
-          .bind(inv.subscription_id)
-          .first<{ tenant_id?: string | null }>()
-          .catch(() => null);
-        if (subRow && typeof subRow.tenant_id === 'string') {
-          const trimmedRefundSubTenant = subRow.tenant_id.trim();
-          refundSubTenant =
-            trimmedRefundSubTenant && trimmedRefundSubTenant !== '*' && trimmedRefundSubTenant.toLowerCase() !== 'hq'
-              ? trimmedRefundSubTenant
-              : '';
+      const subArgs = [inv.subscription_id, ...(subScope ? [subTenant] : [])];
+      // A cancellation error rolls back the invoice transition so delivery can
+      // retry. A duplicate invoice transition must not cancel a subscription again.
+      const [invoiceResult] = await db.batch([
+        db.prepare(
+          "UPDATE subscription_invoices SET status = 'refunded', updated_at = ? WHERE id = ? AND status = 'paid' AND COALESCE(payment_ref, '') = ?" +
+          invoiceScope + (sub ? ` AND subscription_id = ? AND EXISTS (SELECT 1 FROM subscriptions WHERE id = ?${subScope})` : ''),
+        ).bind(now, inv.id, inv.payment_ref ?? '', ...(invoiceScope ? [rawInvTenantValue || 'default'] : []),
+          ...(sub ? [inv.subscription_id, ...subArgs] : [])),
+        ...(sub ? [db.prepare(
+          "UPDATE subscriptions SET status = 'cancelled', updated_at = ? WHERE id = ? AND status IN ('active', 'past_due') AND changes() = 1" + subScope,
+        ).bind(now, ...subArgs)] : []),
+      ]);
+      if (invoiceResult?.meta?.changes !== 1) {
+        const current = await fetchInvoiceByColumn(db, 'id', inv.id);
+        if (current?.status === 'refunded' && current.payment_ref === inv.payment_ref) {
+          return { ok: true, idempotent: true, status: 200 };
         }
-      } catch {
-        // Optional tenant_id column on subscriptions in minimal schemas
+        return { ok: false, error: 'Refund state changed; retry required', status: 500 };
       }
-    }
-    const effectiveRefundTenant =
-      (invTenant !== 'default' ? invTenant : '') || refundSubTenant || invTenant || 'default';
-    if (inv.subscription_id) {
-      try {
-        await db
-          .prepare(
-            "UPDATE subscriptions SET status = 'cancelled', updated_at = ? WHERE id = ? AND status IN ('active', 'past_due') AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
-          )
-          .bind(now, inv.subscription_id, effectiveRefundTenant)
-          .run();
-      } catch {
-        if (effectiveRefundTenant === 'default') {
-          await db
-            .prepare("UPDATE subscriptions SET status = 'cancelled', updated_at = ? WHERE id = ? AND status = 'active'")
-            .bind(now, inv.subscription_id)
-            .run()
-            .catch(() => null);
-        }
-      }
+    } catch {
+      return { ok: false, error: 'Subscription refund failed', status: 500 };
     }
     try {
       await db
@@ -546,6 +488,6 @@ export async function nowPaymentsIPN(request: Request, env: Record<string, unkno
     return jsonResponse({ ok: true }, 200);
   } catch (error) {
     log.error('IPN error:', { message: (error as Error).message });
-    return jsonResponse({ ok: true }, 200); // always ack to prevent NowPayments retry storms
+    return jsonResponse({ ok: false, error: 'Payment processing failed' }, 500);
   }
 }

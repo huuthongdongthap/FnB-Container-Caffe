@@ -11233,20 +11233,20 @@ describe('Multi-Tenant & Franchise Preparation Integration', () => {
         defEnv
       );
       expect(linkOrdRes.status).toBe(200);
-      expect(
-        executedSqls.some(
-          (q) =>
-            /UPDATE orders SET table_id = \?, updated_at = \? WHERE id = \?[\s\S]*COALESCE\(NULLIF\(TRIM\(tenant_id\), ''\), 'default'\) = \?/i.test(q.sql) &&
-            q.args[3] === 'default'
-        )
-      ).toBe(true);
-      expect(
-        executedSqls.some(
-          (q) =>
-            /UPDATE table_sessions[\s\S]*WHERE id = \? AND COALESCE\(NULLIF\(TRIM\(tenant_id\), ''\), 'default'\) = \?/i.test(q.sql) &&
-            q.args[3] === 'default'
-        )
-      ).toBe(true);
+      const claimWrite = executedSqls.find((q) => /UPDATE orders SET table_id = \?, updated_at = \?/i.test(q.sql));
+      expect(claimWrite).toBeDefined();
+      expect(claimWrite?.sql).toMatch(/WHERE id = \? AND table_id IS \? AND status IS \? AND COALESCE\(NULLIF\(TRIM\(tenant_id\), ''\), 'default'\) = \?/i);
+      expect(claimWrite?.args.slice(2, 6)).toEqual(['ord_ac1_1', null, 'pending', 'default']);
+      expect(claimWrite?.sql).toContain('EXISTS (SELECT 1 FROM table_sessions');
+      const billWrite = executedSqls.find((q) => /UPDATE table_sessions SET/i.test(q.sql));
+      expect(billWrite).toBeDefined();
+      expect(billWrite?.sql).toMatch(/WHERE id = \? AND table_id IS \? AND status IN \('active', 'ordering'\) AND COALESCE\(NULLIF\(TRIM\(tenant_id\), ''\), 'default'\) = \?/i);
+      expect(billWrite?.args.slice(2, 5)).toEqual(['tsess_def_ac1', 'tbl_ac1', 'default']);
+      expect(billWrite?.sql).toContain('AND changes() = 1');
+      expect(mockDb.batch).toHaveBeenCalledWith(expect.arrayContaining([
+        expect.objectContaining({ sql: claimWrite?.sql }),
+        expect.objectContaining({ sql: billWrite?.sql }),
+      ]));
 
       // 2. AC2: syncProductToMenuProjection propagates products.tenant_id into menu_items
       await syncProductToMenuProjection(mockDb as any, 'prod_sadec_ac2');
@@ -22292,6 +22292,9 @@ describe('Multi-Tenant & Franchise Preparation Integration', () => {
               };
             },
           };
+        },
+        async batch(stmts: Array<{ run: () => Promise<unknown> }>) {
+          return Promise.all(stmts.map((stmt) => stmt.run()));
         },
       };
 

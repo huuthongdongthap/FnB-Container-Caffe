@@ -47,6 +47,9 @@ export function buildSplitOrders(
   return splits.map((split) => ({
     items: split.items.map((i) => ({
       id: i.id,
+      productId: i.productId || i.id,
+      modifiers: i.modifiers ?? [],
+      notes: i.notes,
       name: i.name,
       price: i.price,
       quantity: i.quantity,

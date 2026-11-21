@@ -30,7 +30,21 @@ function createSqliteD1(sqlite: DatabaseSync): D1Database {
     };
     return stmt;
   };
-  return { prepare, batch: async (stmts: Array<{ run: () => Promise<unknown> }>) => Promise.all(stmts.map((s) => s.run())) } as unknown as D1Database;
+  return {
+    prepare,
+    batch: async (stmts: Array<{ run: () => Promise<unknown> }>) => {
+      sqlite.exec('BEGIN');
+      try {
+        const results: unknown[] = [];
+        for (const s of stmts) results.push(await s.run());
+        sqlite.exec('COMMIT');
+        return results;
+      } catch (err) {
+        sqlite.exec('ROLLBACK');
+        throw err;
+      }
+    },
+  } as unknown as D1Database;
 }
 
 describe('Split-order concurrency & BOM conservation, manual refund fanout & voucher clawback, shift CAS/dedup & analytics hygiene', () => {
@@ -101,6 +115,7 @@ describe('Split-order concurrency & BOM conservation, manual refund fanout & vou
     sqlite.exec(`
       CREATE TABLE orders (id TEXT PRIMARY KEY, status TEXT, payment_status TEXT, total INTEGER, points_earned INTEGER DEFAULT 0, cashback_earned REAL DEFAULT 0, customer_id TEXT, guest_token_hash TEXT, updated_at TEXT, tenant_id TEXT);
       CREATE TABLE payments (id TEXT PRIMARY KEY, order_id TEXT, method TEXT, amount INTEGER, status TEXT, transaction_id TEXT, refund_status TEXT, refund_amount INTEGER, refund_reason TEXT, refunded_at TEXT, updated_at TEXT);
+      CREATE TABLE payment_refund_transfers (id INTEGER PRIMARY KEY AUTOINCREMENT, tenant_id TEXT NOT NULL, manual_transfer_ref TEXT NOT NULL CHECK (length(trim(manual_transfer_ref)) BETWEEN 1 AND 200), payment_id TEXT NOT NULL, amount INTEGER NOT NULL CHECK (amount > 0), reason TEXT NOT NULL, actor_id TEXT NOT NULL, created_at TEXT NOT NULL, UNIQUE (tenant_id, manual_transfer_ref));
       CREATE TABLE customers (id TEXT PRIMARY KEY, loyalty_points INTEGER, lifetime_points INTEGER DEFAULT 0, loyalty_tier TEXT DEFAULT 'member', total_spent INTEGER, tier TEXT, updated_at TEXT, tenant_id TEXT);
       CREATE TABLE loyalty_settings (key TEXT PRIMARY KEY, value TEXT);
       CREATE TABLE loyalty_point_logs (id TEXT PRIMARY KEY, customer_id TEXT, order_id TEXT, points_change INTEGER, reason TEXT, balance_after INTEGER, description TEXT, created_at TEXT, tenant_id TEXT);

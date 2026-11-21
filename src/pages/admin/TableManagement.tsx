@@ -4,15 +4,53 @@ import { useEffect, useState, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { apiFetch } from '@/lib/api-client';
 import { HelmetHead } from '@/components/seo/HelmetHead';
-import type { CafeTableRow, OrderRow } from './TableManagement-types';
+import { isSameAccountScope, readSessionSnapshot, useClientSessionScope, type SessionSnapshot } from '@/lib/client-session';
+import type { CafeTableRow, OrderRow, TableTransferFeedback } from './TableManagement-types';
 import { STATUS_KEYS_MAP, STATUS_OPTIONS as _STATUS_OPTIONS, ACTIVE_ORDER_STATUSES } from './TableManagement-constants';
 import { TableCard } from './TableManagement-card';
 import { TableFilters } from './TableManagement-filters';
+import { TableTransferDialog } from './table-transfer-dialog';
+
+const TRANSFER_ROLES = new Set(['owner', 'admin', 'manager', 'supervisor', 'staff', 'waiter', 'cashier']);
 
 export type { CafeTableRow, OrderRow };
 
 export default function TableManagementPage() {
-	const { t } = useTranslation();
+	const session = useClientSessionScope();
+	const canTransfer = Boolean(session.token && session.role && TRANSFER_ROLES.has(session.role));
+	const scope = JSON.stringify([session.tenantId, session.userScope, session.role]);
+	const feedbackKey = canTransfer && session.userId ? `aura:table-transfer:${scope}` : null;
+	return <ScopedTableManagement key={JSON.stringify([scope, canTransfer])} {...{ session, canTransfer, feedbackKey }} />;
+}
+
+function ScopedTableManagement({ session, canTransfer, feedbackKey }: {
+	session: SessionSnapshot;
+	canTransfer: boolean;
+	feedbackKey: string | null;
+}) {
+	const { t, i18n } = useTranslation();
+	const [source, setSource] = useState<CafeTableRow | null>(null);
+	const [feedback, setFeedback] = useState<TableTransferFeedback | null>(() => {
+		if (!feedbackKey) return null;
+		try {
+			const raw = sessionStorage.getItem(feedbackKey);
+			const saved = raw ? JSON.parse(raw) as Partial<TableTransferFeedback> | null : null;
+			return saved && (saved.kind === 'success' || saved.kind === 'error') && typeof saved.message === 'string'
+				? { kind: saved.kind, message: saved.message } : null;
+		} catch { return null; }
+	});
+
+	const recordFeedback = (next: TableTransferFeedback | null) => {
+		const current = readSessionSnapshot();
+		if (!current.token || !isSameAccountScope(current, session)) return;
+		setFeedback(next);
+		if (feedbackKey) {
+			try {
+				if (next) sessionStorage.setItem(feedbackKey, JSON.stringify(next));
+				else sessionStorage.removeItem(feedbackKey);
+			} catch { /* Feedback remains visible when browser storage is unavailable. */ }
+		}
+	};
 	const statusLabel = (status: CafeTableRow['status']) =>
 		t(`admin.tableManagement.${STATUS_KEYS_MAP[status]}`, { defaultValue: status, fallback: status });
 
@@ -163,6 +201,15 @@ export default function TableManagementPage() {
 						</div>
 					)}
 
+					{feedback && (
+						<div className="mb-4 flex flex-wrap items-center gap-3 rounded-lg border border-border bg-surface p-3 text-sm">
+							<p role={feedback.kind === 'error' ? 'alert' : 'status'} className="min-w-0 break-words">{feedback.message}</p>
+							<button type="button" className="underline" onClick={() => recordFeedback(null)}>
+								{i18n.language?.startsWith('vi') ? 'Đóng thông báo' : 'Dismiss notice'}
+							</button>
+						</div>
+					)}
+
 					<TableFilters filterZone={filterZone} filterStatus={filterStatus} zones={zones}
 						onZoneChange={setFilterZone} onStatusChange={setFilterStatus} statusLabel={statusLabel} />
 
@@ -180,7 +227,8 @@ export default function TableManagementPage() {
 											<TableCard key={table.id} table={table} zone={zone}
 												activeCount={activeOrderCounts[table.id] || 0}
 												isUpdating={updating === table.id}
-												onSetStatus={setStatus} onRelease={releaseTable} />
+												onSetStatus={setStatus} onRelease={releaseTable}
+												onTransfer={canTransfer ? setSource : undefined} />
 										))}
 									</div>
 								</section>
@@ -189,6 +237,17 @@ export default function TableManagementPage() {
 					)}
 				</div>
 			</div>
+			{source && (
+				<TableTransferDialog source={source} session={session} onClose={() => setSource(null)}
+					onResult={(result) => {
+						recordFeedback(result);
+						if (result.kind === 'success') {
+							setSource(null);
+							void loadTables();
+							void loadActiveOrders();
+						}
+					}} />
+			)}
 		</>
 	);
 }

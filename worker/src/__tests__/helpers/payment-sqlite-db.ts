@@ -13,7 +13,11 @@ export function paymentSqliteDB(options: { canonicalStaff?: boolean; authVersion
     notes TEXT, is_cod INTEGER DEFAULT 0, created_at TEXT, updated_at TEXT);
     CREATE TABLE payments (id TEXT PRIMARY KEY, order_id TEXT NOT NULL, method TEXT, amount INTEGER, status TEXT,
     transaction_id TEXT UNIQUE, payment_url TEXT, created_at TEXT, updated_at TEXT,
-    refund_status TEXT, refund_amount INTEGER, refund_reason TEXT);
+    refund_status TEXT, refund_amount INTEGER, refund_reason TEXT, refunded_at TEXT);
+    CREATE TABLE payment_refund_transfers (id INTEGER PRIMARY KEY AUTOINCREMENT, tenant_id TEXT NOT NULL,
+      manual_transfer_ref TEXT NOT NULL CHECK (length(trim(manual_transfer_ref)) BETWEEN 1 AND 200),
+      payment_id TEXT NOT NULL, amount INTEGER NOT NULL CHECK (amount > 0), reason TEXT NOT NULL,
+      actor_id TEXT NOT NULL, created_at TEXT NOT NULL, UNIQUE (tenant_id, manual_transfer_ref));
     -- Mirrors 005_audit_logs.sql: the canonical audit writer tries the wide
     -- schema first and this older shape last, so a narrower table here would
     -- make every audit assertion fail for a reason that exists only in the test.

@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo } from 'react';
 import { PartySizeSelector } from './party-size-selector';
 import { DateTimePicker } from './date-time-picker';
 import { ZoneSelector } from './zone-selector';
@@ -45,28 +45,27 @@ export default function ReservationNew() {
 
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [bookingCode, setBookingCode] = useState('');
-  const [apiOffline, setApiOffline] = useState(false);
+  const [savedBooking, setSavedBooking] = useState<{ reservationId: string; tableId: string; tableNumber: string } | null>(null);
+  const [submissionError, setSubmissionError] = useState('');
 
   const currentZoneObj = ZONES.find((z) => z.id === selectedZone) ?? ZONES[0]!;
 
   // Real API hook — fetches available tables for selected date/time
-  const { tables, createReservation, createReservationAsync, isCreating, createError } = useReservations(
+  const { tables, isLoadingTables, availabilityError, createReservationAsync, isCreating } = useReservations(
     parseDateToISO(selectedDate),
     selectedTime,
   );
 
-  // Show success when API returns a booking id
-  // We track submission ourselves via isSubmitted flag
-  useEffect(() => {
-    if (createError) {
-      // API error — set offline flag so user knows it's a demo code
-      setApiOffline(true);
-    }
-  }, [createError]);
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    if (!fullName || !phone) return;
+    if (!fullName.trim() || !phone.trim() || isCreating || isLoadingTables) return;
+
+    // Availability or submission failures must fail closed: never present an unlinked demo booking.
+    if (availabilityError) {
+      setSubmissionError('Không thể tải bàn trống. Vui lòng thử lại sau.');
+      return;
+    }
 
     // Find a table matching the selected zone (prefer available ones)
     const zoneLabel = currentZoneObj.name.toLowerCase();
@@ -85,26 +84,21 @@ export default function ReservationNew() {
         notes: note.trim() || undefined,
       };
       try {
-        if (createReservationAsync) {
-          const result = await createReservationAsync(reservationPayload);
-          const resolvedNumber = result?.data?.table_number ?? matchedTable.table_number;
-          setBookingCode(resolvedNumber
-            ? `AURA-${String(resolvedNumber).padStart(4, '0')}`
-            : `AURA-${(result?.data?.id || matchedTable.id).slice(-4).toUpperCase()}`);
-        } else {
-          createReservation(reservationPayload);
-          setBookingCode(matchedTable.table_number
-            ? `AURA-${String(matchedTable.table_number).padStart(4, '0')}`
-            : `AURA-${matchedTable.id.slice(-4).toUpperCase()}`);
+        const result = await createReservationAsync(reservationPayload);
+        if (result?.success !== true || typeof result.data?.id !== 'string' || !result.data.id.trim()) {
+          throw new Error(result?.error || 'Không thể xác nhận đặt bàn. Vui lòng thử lại.');
         }
-      } catch {
-        setApiOffline(true);
-        setBookingCode(`DEMO-${Math.floor(1000 + Math.random() * 9000)}`);
+        const tableNumber = String(result.data.table_number ?? matchedTable.table_number);
+        setSavedBooking({ reservationId: result.data.id, tableId: matchedTable.id, tableNumber });
+        setBookingCode(result.data.id);
+        setSubmissionError('');
+      } catch (error) {
+        setSubmissionError(error instanceof Error ? error.message : 'Lỗi kết nối. Vui lòng thử lại.');
+        return;
       }
     } else {
-      // Graceful fallback: offline / no availability — generate demo booking code
-      setApiOffline(true);
-      setBookingCode(`DEMO-${Math.floor(1000 + Math.random() * 9000)}`);
+      setSubmissionError('Không còn bàn trống. Vui lòng chọn giờ khác hoặc thử lại.');
+      return;
     }
 
     setIsSubmitted(true);
@@ -115,7 +109,8 @@ export default function ReservationNew() {
 
   const handleReset = () => {
     setIsSubmitted(false);
-    setApiOffline(false);
+    setSubmissionError('');
+    setSavedBooking(null);
     setFullName('');
     setPhone('');
     setNote('');
@@ -147,11 +142,7 @@ export default function ReservationNew() {
             <p className="text-[var(--aura-chrome-soft)] text-sm max-w-md mx-auto mb-4 font-light leading-relaxed">
               Yêu cầu đặt bàn của quý khách đã được ghi nhận. Đội ngũ AURA CAFE sẽ liên hệ qua điện thoại để xác nhận trong ít phút.
             </p>
-            {apiOffline && (
-              <p className="text-amber-400/80 text-xs max-w-sm mx-auto mb-6 font-light">
-                ⚠ Hệ thống đặt bàn tự động tạm thời không khả dụng. Nhân viên sẽ xác nhận thủ công khi liên hệ quý khách.
-              </p>
-            )}
+
 
             {/* Booking Details Card */}
             <div className="bg-black/30 border border-white/10 rounded-2xl p-6 text-left space-y-3 mb-8">
@@ -190,10 +181,13 @@ export default function ReservationNew() {
               <button
                 type="button"
                 onClick={() => {
+                  if (!savedBooking) return;
                   const bookingData = {
+                    reservationId: savedBooking.reservationId,
+                    tableId: savedBooking.tableId,
                     fullName,
                     phone,
-                    tableNumber: bookingCode,
+                    tableNumber: savedBooking.tableNumber,
                     zone: currentZoneObj.name,
                     time: `${selectedTime} • ${selectedDate}`,
                     guestCount: selectedParty,
@@ -205,7 +199,7 @@ export default function ReservationNew() {
                   } catch {
                     /* ignore storage errors */
                   }
-                  window.location.href = `/menu?table=${encodeURIComponent(bookingCode)}`;
+                  window.location.href = `/menu?table=${encodeURIComponent(savedBooking.tableNumber)}`;
                 }}
                 className="px-6 py-3.5 min-h-[44px] rounded-full bg-[var(--aura-chrome-bright)] text-[#0A1A2E] text-xs font-bold uppercase tracking-wider inline-flex items-center justify-center gap-2 hover:opacity-90 active:scale-95 transition-all cursor-pointer shadow-lg"
               >
@@ -236,6 +230,7 @@ export default function ReservationNew() {
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-12">
+              {submissionError && <p role="alert" className="text-amber-400">{submissionError}</p>}
               <PartySizeSelector
                 selectedParty={selectedParty}
                 onSelect={setSelectedParty}
@@ -274,7 +269,7 @@ export default function ReservationNew() {
 
                 <button
                   type="submit"
-                  disabled={isCreating}
+                  disabled={isCreating || isLoadingTables}
                   className="w-full sm:w-auto px-10 py-4 min-h-[44px] rounded-full bg-[var(--aura-chrome-bright)] text-[#0A1A2E] text-xs font-bold uppercase tracking-wider inline-flex items-center justify-center gap-2 hover:opacity-90 active:scale-95 transition-all cursor-pointer shadow-xl disabled:opacity-60 disabled:cursor-not-allowed"
                 >
                   {isCreating ? (

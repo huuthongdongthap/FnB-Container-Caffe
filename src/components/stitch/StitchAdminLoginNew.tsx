@@ -74,10 +74,10 @@ export function StitchAdminLoginNew({
             onErrorChange={setInternalError}
           />
 
-          <div className="w-full mt-6 text-center">
+          <div className="w-full mt-4 text-center">
             <a
               href="#"
-              className="font-label-caps text-label-caps text-on-surface-variant hover:text-primary transition-colors duration-300 uppercase"
+              className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center px-2 font-label-caps text-label-caps text-on-surface-variant hover:text-primary transition-colors duration-300 uppercase"
               onClick={(e) => e.preventDefault()}
               aria-label={t('adminLogin.forgotPasswordAriaLabel')}
             >
@@ -85,9 +85,9 @@ export function StitchAdminLoginNew({
             </a>
           </div>
 
-          <div className="w-full chrome-line-login-new my-10" aria-hidden="true" />
+          <div className="w-full chrome-line-login-new my-8" aria-hidden="true" />
 
-          <div className="flex flex-col gap-4 w-full text-center">
+          <div className="flex flex-col gap-3 w-full text-center">
             {onGuestLogin && (
               <button
                 type="button"
@@ -99,8 +99,8 @@ export function StitchAdminLoginNew({
               </button>
             )}
             <button
-             type="button"
-              className="font-label-caps text-label-caps text-outline hover:text-on-surface transition-all tracking-[0.2em] uppercase cursor-pointer"
+              type="button"
+              className="inline-flex min-h-[44px] w-full items-center justify-center font-label-caps text-label-caps text-outline hover:text-on-surface transition-all tracking-[0.2em] uppercase cursor-pointer"
               aria-label={t('adminLogin.contactSupportAriaLabel')}
             >
               {t('adminLogin.contactSupport')}

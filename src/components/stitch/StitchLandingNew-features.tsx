@@ -114,7 +114,7 @@ export function FeaturesSection() {
               </p>
               <a
                 href={f.href}
-                className="group-hover:underline flex items-center gap-2"
+                className="group-hover:underline inline-flex min-h-[44px] items-center gap-2"
                 style={linkStyle}
               >
                 {t(f.linkKey, f.linkFallback)}
