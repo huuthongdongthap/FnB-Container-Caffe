@@ -6,9 +6,10 @@ import { Card, CardBody } from '@/components/ui/card';
 import { HelmetHead } from '@/components/seo/HelmetHead';
 import { useAdminReservationsStore, type AdminReservation } from '@/hooks/stores/admin/use-admin-reservations-store';
 
-type FilterValue = 'all' | 'pending' | 'confirmed' | 'cancelled' | 'completed';
+type FilterValue = 'all' | 'pending' | 'confirmed' | 'cancelled' | 'completed' | 'seated';
 
 const FILTER_KEYS: Record<FilterValue, string> = {
+  seated: 'Đã đón khách / Seated',
   all: 'adminReservations.filterAll',
   pending: 'adminReservations.filterPending',
   confirmed: 'adminReservations.filterConfirmed',
@@ -28,12 +29,16 @@ function ReservationCard({
   processing,
   onApprove,
   onReject,
+  onStatus,
+  onEdit,
   t,
 }: {
   reservation: AdminReservation;
   processing: boolean;
   onApprove: () => void;
   onReject: () => void;
+  onStatus: (status: string) => void;
+  onEdit: () => void;
   t: (key: string) => string;
 }) {
   return (
@@ -52,6 +57,14 @@ function ReservationCard({
           </Badge>
         </div>
 
+        <p className="text-sm text-muted">{r.customerPhone} · {r.zone} · {r.id}</p>
+        {r.notes && <p className="text-sm text-muted">{r.notes}</p>}
+        {["pending", "confirmed", "approved"].includes(r.status) && <Button size="sm" variant="secondary" disabled={processing} onClick={onEdit}>Sửa / Edit</Button>}
+        {["confirmed", "approved", "seated"].includes(r.status) && <div className="flex gap-2 mt-4">
+          {r.status !== "seated" && <Button size="sm" disabled={processing} onClick={() => onStatus("seated")}>Đón khách / Seat</Button>}
+          <Button size="sm" disabled={processing} onClick={() => onStatus("completed")}>Hoàn tất / Finish</Button>
+          <Button size="sm" variant="secondary" disabled={processing} onClick={() => onStatus("cancelled")}>Hủy / Cancel</Button>
+        </div>}
         {r.status === 'pending' && (
           <div className="flex gap-2 mt-4">
             <Button size="sm" className="bg-green-600 hover:bg-green-700 text-white" disabled={processing} onClick={onApprove}>
@@ -69,13 +82,15 @@ function ReservationCard({
 
 export default function AdminReservationsPage() {
   const { t } = useTranslation();
-  const { reservations, loading, error, fetchReservations, approveReservation, rejectReservation } = useAdminReservationsStore();
+  const { reservations, loading, error, fetchReservations, approveReservation, rejectReservation, updateReservation, changeStatus, offset = 0, hasNext = false } = useAdminReservationsStore();
   const [filter, setFilter] = useState<FilterValue>('all');
+  const [date, setDate] = useState('');
+  const [editing, setEditing] = useState<AdminReservation | null>(null);
   const [processingId, setProcessingId] = useState<string | null>(null);
 
   useEffect(() => {
-    fetchReservations();
-  }, [fetchReservations]);
+    void fetchReservations({ offset: 0, date, status: filter });
+  }, [fetchReservations, date, filter]);
 
   const filtered = filter === 'all'
     ? reservations
@@ -91,7 +106,12 @@ export default function AdminReservationsPage() {
     try { await rejectReservation(id); } finally { setProcessingId(null); }
   };
 
-  const filterValues: FilterValue[] = ['all', 'pending', 'confirmed', 'cancelled', 'completed'];
+  const handleStatus = async (id: string, status: string) => {
+    if (['cancelled', 'completed'].includes(status) && !window.confirm('Xác nhận thao tác? / Confirm action?')) return;
+    setProcessingId(id);
+    try { await changeStatus(id, status); } finally { setProcessingId(null); }
+  };
+  const filterValues: FilterValue[] = ['all', 'pending', 'confirmed', 'seated', 'cancelled', 'completed'];
 
   return (
     <>
@@ -118,6 +138,34 @@ export default function AdminReservationsPage() {
             </div>
           </div>
 
+          <label>Ngày / Date <input type="date" value={date} onChange={e => setDate(e.target.value)} /></label>
+          {editing && <form onSubmit={async e => {
+            e.preventDefault();
+            const data = new FormData(e.currentTarget);
+            setProcessingId(editing.id);
+            try {
+              if (await updateReservation(editing.id, {
+                customer_name: String(data.get('name')), customer_phone: String(data.get('phone')), notes: String(data.get('notes')),
+                date: String(data.get('date')), time: String(data.get('time')),
+                guest_count: Number(data.get('guests')), table_id: String(data.get('table')),
+              })) setEditing(null);
+            } finally { setProcessingId(null); }
+          }} className="space-y-3 my-4">
+            <label>Họ tên / Name<input required maxLength={100} name="name" defaultValue={editing.customerName} /></label>
+            <label>Điện thoại / Phone<input required minLength={8} maxLength={20} name="phone" defaultValue={editing.customerPhone} /></label>
+            <label>Ghi chú / Notes<textarea maxLength={500} name="notes" defaultValue={editing.notes} /></label>
+            <label>Ngày / Date<input required name="date" type="date" defaultValue={editing.date} /></label>
+            <label>Giờ / Time<input required name="time" type="time" defaultValue={editing.time} /></label>
+            <label>Số khách / Guests<input required name="guests" type="number" min="1" max="200" defaultValue={editing.guests} /></label>
+            <label>Bàn / Table<input required name="table" defaultValue={editing.tableId || editing.tableNumber} /></label>
+            <button type="submit" disabled={processingId !== null}>Lưu / Save</button>
+            <button type="button" onClick={() => setEditing(null)}>Đóng / Close</button>
+          </form>}
+          <div className="flex gap-2 my-4">
+            <Button disabled={loading || offset === 0} onClick={() => fetchReservations({ offset: Math.max(0, offset - 50), date, status: filter })}>Trước / Previous</Button>
+            <span>{Math.floor(offset / 50) + 1}</span>
+            <Button disabled={loading || !hasNext} onClick={() => fetchReservations({ offset: offset + 50, date, status: filter })}>Tiếp / Next</Button>
+          </div>
           {loading && (
             <div className="text-center py-12">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4" />
@@ -151,6 +199,8 @@ export default function AdminReservationsPage() {
                   processing={processingId === r.id}
                   onApprove={() => handleApprove(r.id)}
                   onReject={() => handleReject(r.id)}
+                  onStatus={status => handleStatus(r.id, status)}
+                  onEdit={() => setEditing(r)}
                   t={t}
                 />
               ))}
