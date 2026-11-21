@@ -1,25 +1,40 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardBody, CardHeader } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
+import { ShiftHandoverModal } from '@/components/admin/ShiftHandoverModal';
+import { useAuthStore } from '@/hooks/stores/use-auth-store';
 import { useAdminStaffStore } from '@/hooks/stores/admin/use-admin-staff-store';
 import { useAdminShiftsStore, type ShiftRecord } from '@/hooks/stores/admin/use-admin-shifts-store';
 import { formatTime, formatDate, formatHours } from './staff-utils';
+
+const MANAGER_ROLES = new Set(['owner', 'manager', 'supervisor', 'admin']);
+
+function vietnamBusinessDate(now = new Date()): string {
+  return new Date(now.getTime() + 7 * 3_600_000).toISOString().slice(0, 10);
+}
+
+function formatVnd(amount: number): string {
+  return `${Math.round(amount).toLocaleString('vi-VN')} ₫`;
+}
 
 function ActiveStaffRow({
   staff,
   todayShifts,
   t,
+  onStartHandover,
 }: {
   staff: { id: string; name: string }[];
   todayShifts: ShiftRecord[];
   t: (key: string) => string;
+  onStartHandover: (shiftId: string) => void;
 }) {
-  const activeShifts = todayShifts.filter((s) => !s.clock_out);
+  const activeShifts = todayShifts.filter((s) => Boolean(s.clock_in) && !s.clock_out);
+  const todayBizDate = vietnamBusinessDate();
 
-  if (staff.length === 0) return null;
+  if (staff.length === 0 && activeShifts.length === 0) return null;
 
   return (
     <Card className="mb-6">
@@ -31,15 +46,36 @@ function ActiveStaffRow({
           <p className="text-sm text-muted">{t('adminStaff.noActive')}</p>
         ) : (
           <div className="space-y-2">
-            {activeShifts.map((s) => (
-              <div key={s.id} className="flex items-center justify-between p-3 rounded-lg bg-surface border border-border">
-                <div>
-                  <p className="font-medium">{staff.find((m) => m.id === s.staff_id)?.name || s.staff_id}</p>
-                  <p className="text-xs text-muted">{t('adminStaff.clockedIn')} {formatTime(s.clock_in)}</p>
+            {activeShifts.map((s) => {
+              const isOvernight = Boolean(s.date && s.date < todayBizDate);
+              return (
+                <div
+                  key={s.id}
+                  className="flex flex-wrap items-center justify-between gap-3 p-3 rounded-lg bg-surface border border-border"
+                >
+                  <div>
+                    <p className="font-medium">{staff.find((m) => m.id === s.staff_id)?.name || s.staff_name || s.staff_id}</p>
+                    <p className="text-xs text-muted">
+                      {t('adminStaff.clockedIn')} {formatTime(s.clock_in || '')}
+                      {isOvernight ? ` (${s.date})` : ''}
+                      {typeof s.opening_cash === 'number' ? ` · Float: ${formatVnd(s.opening_cash)}` : ''}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {isOvernight && <Badge color="warning">Ca qua đêm / Overnight</Badge>}
+                    <Badge color="success">{t('adminStaff.active')}</Badge>
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      onClick={() => onStartHandover(s.id)}
+                      data-testid={`end-shift-btn-${s.id}`}
+                    >
+                      Bàn giao &amp; Kết ca / End Shift
+                    </Button>
+                  </div>
                 </div>
-                <Badge color="success">{t('adminStaff.active')}</Badge>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </CardBody>
@@ -49,14 +85,61 @@ function ActiveStaffRow({
 
 export function ShiftsTab() {
   const { t } = useTranslation();
+  const user = useAuthStore((s) => s.user);
+  const canManage = MANAGER_ROLES.has(user?.role || '');
   const { staff, fetchStaff } = useAdminStaffStore();
-  const { todayShifts, historyShifts, loading, error, fetchToday, fetchHistory } = useAdminShiftsStore();
+  const { todayShifts, historyShifts, loading, error, fetchToday, fetchHistory, clockIn } = useAdminShiftsStore();
+
+  const [selectedStaffId, setSelectedStaffId] = useState<string>('');
+  const [selectedScheduledId, setSelectedScheduledId] = useState<string>('');
+  const [openingCashInput, setOpeningCashInput] = useState<string>('0');
+  const [clockInNotes, setClockInNotes] = useState<string>('');
+  const [formError, setFormError] = useState<string | null>(null);
+
+  const [handoverShiftId, setHandoverShiftId] = useState<string | undefined>(undefined);
+  const [handoverOpen, setHandoverOpen] = useState(false);
 
   useEffect(() => {
     fetchStaff();
     fetchToday();
     fetchHistory();
   }, [fetchStaff, fetchToday, fetchHistory]);
+
+  const defaultManageStaffId =
+    (user?.id && staff.some((m) => m.id === user.id) ? user.id : staff[0]?.id) || user?.id || '';
+  const effectiveStaffId = canManage ? selectedStaffId || defaultManageStaffId : user?.id || '';
+  const scheduledShifts = todayShifts.filter(
+    (s) => !s.clock_in && !s.clock_out && (s.attendance_state === 'scheduled' || s.status === 'scheduled'),
+  );
+  const matchingScheduledShifts = scheduledShifts.filter(
+    (s) => !effectiveStaffId || s.staff_id === effectiveStaffId,
+  );
+
+  const handleClockIn = async () => {
+    setFormError(null);
+    const parsedOpening = Number(openingCashInput);
+    if (!Number.isFinite(parsedOpening) || parsedOpening < 0) {
+      setFormError('Tiền đầu ca phải là số không âm. / Opening cash must be a non-negative number.');
+      return;
+    }
+    const scheduled = scheduledShifts.find((s) => s.id === selectedScheduledId);
+    const targetStaffId = scheduled?.staff_id || effectiveStaffId;
+    if (!targetStaffId) {
+      setFormError('Vui lòng chọn nhân viên để mở ca. / Select a staff member to clock in.');
+      return;
+    }
+    const staffName = staff.find((m) => m.id === targetStaffId)?.name || user?.name || targetStaffId;
+    const created = await clockIn(targetStaffId, staffName, {
+      openingCash: parsedOpening,
+      scheduledShiftId: selectedScheduledId || undefined,
+      notes: clockInNotes.trim() || undefined,
+    });
+    if (created) {
+      setSelectedScheduledId('');
+      setClockInNotes('');
+      setOpeningCashInput('0');
+    }
+  };
 
   if (loading.today || loading.history) {
     return (
@@ -93,7 +176,110 @@ export function ShiftsTab() {
 
   return (
     <>
-      <ActiveStaffRow staff={staff} todayShifts={todayShifts} t={t} />
+      <ActiveStaffRow
+        staff={staff}
+        todayShifts={todayShifts}
+        t={t}
+        onStartHandover={(shiftId) => {
+          setHandoverShiftId(shiftId);
+          setHandoverOpen(true);
+        }}
+      />
+
+      <Card className="mb-6">
+        <CardHeader>
+          <h2 className="text-lg font-semibold">Mở ca / Clock In</h2>
+        </CardHeader>
+        <CardBody>
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-3 items-end">
+            {canManage && staff.length > 0 && (
+              <div>
+                <label htmlFor="shifts-tab-staff" className="block text-xs font-medium text-muted mb-1">
+                  Nhân viên / Staff
+                </label>
+                <select
+                  id="shifts-tab-staff"
+                  value={effectiveStaffId}
+                  onChange={(e) => {
+                    setSelectedStaffId(e.target.value);
+                    setSelectedScheduledId('');
+                  }}
+                  className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm"
+                >
+                  {staff.map((m) => (
+                    <option key={m.id} value={m.id}>
+                      {m.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            <div>
+              <label htmlFor="shifts-tab-scheduled" className="block text-xs font-medium text-muted mb-1">
+                Ca đã lên lịch / Scheduled Shift
+              </label>
+              <select
+                id="shifts-tab-scheduled"
+                value={selectedScheduledId}
+                onChange={(e) => setSelectedScheduledId(e.target.value)}
+                className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm"
+              >
+                <option value="">Ca ngoài lịch / Ad-hoc</option>
+                {matchingScheduledShifts.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    #{s.id} ({s.start_time || s.date})
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label htmlFor="shifts-tab-opening-cash" className="block text-xs font-medium text-muted mb-1">
+                Quỹ đầu ca (VND) / Opening Cash
+              </label>
+              <input
+                id="shifts-tab-opening-cash"
+                type="number"
+                min={0}
+                step={1000}
+                value={openingCashInput}
+                onChange={(e) => setOpeningCashInput(e.target.value)}
+                className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm"
+              />
+            </div>
+
+            <div>
+              <Button
+                className="w-full"
+                disabled={loading.clockIn}
+                onClick={() => void handleClockIn()}
+                data-testid="shifts-tab-clock-in-btn"
+              >
+                {loading.clockIn ? 'Đang mở ca...' : 'Mở ca / Clock In'}
+              </Button>
+            </div>
+          </div>
+
+          <div className="mt-3">
+            <input
+              type="text"
+              maxLength={500}
+              value={clockInNotes}
+              onChange={(e) => setClockInNotes(e.target.value)}
+              placeholder="Ghi chú mở ca (tùy chọn) / Optional clock-in notes"
+              aria-label="Clock-in notes"
+              className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm"
+            />
+          </div>
+
+          {formError && (
+            <p className="mt-2 text-xs text-destructive" role="alert">
+              {formError}
+            </p>
+          )}
+        </CardBody>
+      </Card>
 
       <Card className="mb-6">
         <CardHeader>
@@ -129,9 +315,10 @@ export function ShiftsTab() {
               {historyShifts.slice(0, 50).map((s) => (
                 <div key={s.id} className="flex items-center justify-between p-3 rounded-lg bg-surface border border-border">
                   <div>
-                    <p className="font-medium">{staff.find((m) => m.id === s.staff_id)?.name || s.staff_id}</p>
+                    <p className="font-medium">{staff.find((m) => m.id === s.staff_id)?.name || s.staff_name || s.staff_id}</p>
                     <p className="text-xs text-muted">
-                      {formatDate(s.date)} | {formatTime(s.clock_in)} {s.clock_out ? `- ${formatTime(s.clock_out)}` : `(${t('adminStaff.active')})`}
+                      {formatDate(s.date)} | {s.clock_in ? formatTime(s.clock_in) : '--:--'}{' '}
+                      {s.clock_out ? `- ${formatTime(s.clock_out)}` : s.clock_in ? `(${t('adminStaff.active')})` : '(Scheduled)'}
                     </p>
                   </div>
                   <Badge>{s.hours_worked ? formatHours(s.hours_worked) : '--'}</Badge>
@@ -141,6 +328,19 @@ export function ShiftsTab() {
           )}
         </CardBody>
       </Card>
+
+      <ShiftHandoverModal
+        isOpen={handoverOpen}
+        initialShiftId={handoverShiftId}
+        onClose={() => {
+          setHandoverOpen(false);
+          setHandoverShiftId(undefined);
+        }}
+        onCompleted={() => {
+          void fetchToday();
+          void fetchHistory();
+        }}
+      />
     </>
   );
 }
