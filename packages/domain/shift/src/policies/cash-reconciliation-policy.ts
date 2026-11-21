@@ -229,10 +229,10 @@ async function getCashPayoutsForShift(
       .bind(shiftId, tenant).first<{ total: number }>();
     return result?.total || 0;
   } catch (err) {
-    if (tenant !== 'default' || !/no such column:.*tenant_id/i.test(String(err))) {
-      if (tenant !== 'default') return 0;
+    if (!/no such column:.*tenant_id/i.test(String(err))) {
       throw err;
     }
+    if (tenant !== 'default') return 0;
     const fallback = await db.prepare(`SELECT COALESCE(SUM(amount), 0) AS total FROM cash_payouts
       WHERE shift_id = ? AND status = 'completed'`)
       .bind(shiftId).first<{ total: number }>();
@@ -332,12 +332,14 @@ export async function reconcileShiftCash(
       throw new ShiftContractError('Forbidden cross-tenant or inactive reconciliation actor', 403);
     }
   } else if (hasRealActorRow && actor) {
-    if (actor.is_active !== 1) {
+    if (actor.is_active !== 1 || (actorRole !== undefined && actor.role !== actorRole)) {
       throw new ShiftContractError('Forbidden cross-tenant or inactive reconciliation actor', 403);
     }
-    const effectiveActorRole = actorRole ?? actor.role;
+    if (!['staff', 'cashier', 'waiter', 'supervisor', 'manager', 'owner', 'admin'].includes(actor.role)) {
+      throw new ShiftContractError('Forbidden reconciliation actor', 403);
+    }
     const actorTenant = (actor.tenant_id?.trim() || 'default').toLowerCase();
-    const isHqActor = ['owner', 'admin'].includes(effectiveActorRole) && (actorTenant === 'hq' || actorTenant === '*');
+    const isHqActor = ['owner', 'admin'].includes(actor.role) && (actorTenant === 'hq' || actorTenant === '*');
     if (!isHqActor && (actor.tenant_id?.trim() || 'default') !== effectiveReconTenant) {
       throw new ShiftContractError('Forbidden cross-tenant or inactive reconciliation actor', 403);
     }
@@ -444,6 +446,23 @@ export async function reconcileShiftCash(
     }
   }
 
+  const deleteReconciliation = async () => {
+    try {
+      return await db
+        .prepare('DELETE FROM shift_reconciliations WHERE id = ? AND tenant_id = ?')
+        .bind(reconciliation.id, effectiveReconTenant)
+        .run();
+    } catch (delErr) {
+      if (effectiveReconTenant === 'default' && /no such column:.*tenant_id/i.test(String(delErr))) {
+        return await db
+          .prepare('DELETE FROM shift_reconciliations WHERE id = ?')
+          .bind(reconciliation.id)
+          .run();
+      }
+      throw delErr;
+    }
+  };
+
   // Re-verify cash ledger (payments & payouts) after locking the reconciliation row so a concurrent
   // COD collection or payout between the read and insert cannot be silently omitted from handover.
   let verifiedCashPayments: number;
@@ -452,18 +471,11 @@ export async function reconcileShiftCash(
     verifiedCashPayments = await getCashPaymentsForShift(db, input.shift_id, effectiveReconTenant, new Date().toISOString());
     verifiedCashPayouts = await getCashPayoutsForShift(db, input.shift_id, effectiveReconTenant);
   } catch (verifyErr) {
-    await db
-      .prepare('DELETE FROM shift_reconciliations WHERE id = ? AND tenant_id = ?')
-      .bind(reconciliation.id, effectiveReconTenant)
-      .run()
-      .catch(() => {});
+    await deleteReconciliation().catch(() => {});
     throw verifyErr;
   }
   if (verifiedCashPayments !== cashPayments || verifiedCashPayouts !== cashPayouts) {
-    const rollback = await db
-      .prepare('DELETE FROM shift_reconciliations WHERE id = ? AND tenant_id = ?')
-      .bind(reconciliation.id, effectiveReconTenant)
-      .run();
+    const rollback = await deleteReconciliation();
     if (rollback.meta && typeof rollback.meta.changes === 'number' && rollback.meta.changes === 0) {
       throw new Error('Failed to roll back concurrent shift reconciliation');
     }

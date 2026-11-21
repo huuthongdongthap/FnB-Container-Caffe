@@ -111,9 +111,6 @@ posCustomerRouter.get('/', requireStaff(['owner', 'manager', 'supervisor', 'staf
       if (rows.length === 1) {
         return rows[0] ?? null;
       }
-      if ((res?.results ?? []).length === 0 && typeof stmt.first === 'function') {
-        return (await stmt.first<PosCustomerRow>()) ?? null;
-      }
       if (typeof stmt.first === 'function') {
         return (await stmt.first<PosCustomerRow>()) ?? null;
       }
