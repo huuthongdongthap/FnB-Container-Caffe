@@ -13,10 +13,6 @@ export interface TableOccupancyDb {
   };
 }
 
-function getTodayVietnamDate(): string {
-  return new Date(Date.now() + 7 * 3600_000).toISOString().slice(0, 10);
-}
-
 export async function releaseTableIfNoActiveOrders(
   db: TableOccupancyDb | null | undefined,
   tableId: string | null | undefined,
@@ -30,174 +26,52 @@ export async function releaseTableIfNoActiveOrders(
   const normTenant =
     rawTenant && rawTenant !== '*' && rawTenant.toLowerCase() !== 'hq' ? rawTenant : 'default';
 
-  let tbl: {
-    id?: string | null;
-    table_number?: string | number | null;
-    status?: string | null;
-  } | null = null;
+  // Resolve just the table identity here. Eligibility must be evaluated in the write,
+  // since a new order, session, or reservation can appear after this lookup.
   try {
-    tbl = await db
-      .prepare(
-        "SELECT id, table_number, status FROM cafe_tables WHERE (id = ? OR CAST(table_number AS TEXT) = ?) AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ? LIMIT 1",
-      )
-      .bind(rawTableId, rawTableId, normTenant)
-      .first();
-  } catch {
-    if (normTenant === 'default') {
-      tbl = await db
-        .prepare(
-          'SELECT id, table_number, status FROM cafe_tables WHERE id = ? OR CAST(table_number AS TEXT) = ? LIMIT 1',
-        )
-        .bind(rawTableId, rawTableId)
-        .first<{ id?: string | null; table_number?: string | number | null; status?: string | null }>()
-        .catch(() => null);
-    }
-  }
+    const table = await db.prepare(
+      `SELECT id FROM cafe_tables
+       WHERE (id = ? OR CAST(table_number AS TEXT) = ?)
+         AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?
+       ORDER BY CASE WHEN id = ? THEN 0 ELSE 1 END, id LIMIT 1`,
+    ).bind(rawTableId, rawTableId, normTenant, rawTableId).first<{ id: string }>();
+    if (!table?.id) return false;
 
-  const canonicalId = typeof tbl?.id === 'string' ? tbl.id.trim() : '';
-  if (!canonicalId) return false;
-  if (String(tbl?.status ?? '').trim().toLowerCase() !== 'occupied') return false;
+    const sameTable = `(table_id = cafe_tables.id OR CAST(table_id AS TEXT) = TRIM(CAST(cafe_tables.table_number AS TEXT)))`;
+    const sameTenant = (alias: string) => `COALESCE(NULLIF(TRIM(${alias}.tenant_id), ''), 'default') = ?`;
+    const release = (reservationDate: string) => db.prepare(
+      `UPDATE cafe_tables SET status = 'Available'
+       WHERE id = ? AND LOWER(TRIM(COALESCE(status, ''))) = 'occupied'
+         AND ${sameTenant('cafe_tables')}
+         AND NOT EXISTS (
+           SELECT 1 FROM orders o WHERE ${sameTable} AND ${sameTenant('o')}
+             AND LOWER(COALESCE(o.status, 'pending')) NOT IN ('completed', 'cancelled', 'canceled', 'rejected', 'failed', 'expired', 'refunded')
+         )
+         AND NOT EXISTS (
+           SELECT 1 FROM table_sessions s WHERE ${sameTable} AND ${sameTenant('s')}
+             AND LOWER(COALESCE(s.status, 'active')) NOT IN ('closed', 'completed', 'no_show', 'abandoned', 'cancelled', 'canceled')
+         )
+         AND NOT EXISTS (
+           SELECT 1 FROM reservations r WHERE ${sameTable} AND ${sameTenant('r')}
+             AND ${reservationDate} = DATE('now', '+7 hours')
+             AND LOWER(COALESCE(r.status, 'pending')) IN ('pending', 'confirmed', 'approved', 'seated')
+         )`,
+    ).bind(table.id, normTenant, normTenant, normTenant, normTenant).run();
 
-  const tableNumber =
-    tbl?.table_number !== undefined && tbl?.table_number !== null && String(tbl.table_number).trim()
-      ? String(tbl.table_number).trim()
-      : canonicalId;
-
-  let activeOrder: { id?: string | null } | null = null;
-  try {
-    activeOrder = await db
-      .prepare(
-        `SELECT id FROM orders
-         WHERE (table_id = ? OR CAST(table_id AS TEXT) = ?)
-           AND LOWER(COALESCE(status, 'pending')) NOT IN ('completed', 'cancelled', 'canceled', 'rejected', 'failed', 'expired', 'refunded')
-           AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?
-         LIMIT 1`,
-      )
-      .bind(canonicalId, tableNumber, normTenant)
-      .first();
-  } catch {
-    if (normTenant === 'default') {
-      activeOrder = await db
-        .prepare(
-          `SELECT id FROM orders
-           WHERE (table_id = ? OR CAST(table_id AS TEXT) = ?)
-             AND LOWER(COALESCE(status, 'pending')) NOT IN ('completed', 'cancelled', 'canceled', 'rejected', 'failed', 'expired', 'refunded')
-           LIMIT 1`,
-        )
-        .bind(canonicalId, tableNumber)
-        .first<{ id?: string | null }>()
-        .catch(() => null);
-    }
-  }
-  if (activeOrder && typeof activeOrder.id === 'string' && activeOrder.id.trim()) return false;
-
-  let openSession: { id?: string | null } | null = null;
-  try {
-    openSession = await db
-      .prepare(
-        `SELECT id FROM table_sessions
-         WHERE (table_id = ? OR CAST(table_id AS TEXT) = ?)
-           AND LOWER(COALESCE(status, 'active')) NOT IN ('closed', 'completed', 'no_show', 'abandoned', 'cancelled', 'canceled')
-           AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?
-         LIMIT 1`,
-      )
-      .bind(canonicalId, tableNumber, normTenant)
-      .first();
-  } catch {
-    if (normTenant === 'default') {
-      openSession = await db
-        .prepare(
-          `SELECT id FROM table_sessions
-           WHERE (table_id = ? OR CAST(table_id AS TEXT) = ?)
-             AND LOWER(COALESCE(status, 'active')) NOT IN ('closed', 'completed', 'no_show', 'abandoned', 'cancelled', 'canceled')
-           LIMIT 1`,
-        )
-        .bind(canonicalId, tableNumber)
-        .first<{ id?: string | null }>()
-        .catch(() => null);
-    }
-  }
-  if (openSession && typeof openSession.id === 'string' && openSession.id.trim()) return false;
-
-  const today = getTodayVietnamDate();
-  let activeReservation: { id?: string | null } | null = null;
-  try {
-    activeReservation = await db
-      .prepare(
-        `SELECT id FROM reservations
-         WHERE (table_id = ? OR CAST(table_id AS TEXT) = ?)
-           AND date = ?
-           AND LOWER(COALESCE(status, 'pending')) IN ('pending', 'confirmed', 'approved', 'seated')
-           AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?
-         LIMIT 1`,
-      )
-      .bind(canonicalId, tableNumber, today, normTenant)
-      .first();
-  } catch {
+    let result: unknown;
     try {
-      activeReservation = await db
-        .prepare(
-          `SELECT id FROM reservations
-           WHERE (table_id = ? OR CAST(table_id AS TEXT) = ?)
-             AND reservation_date = ?
-             AND LOWER(COALESCE(status, 'pending')) IN ('pending', 'confirmed', 'approved', 'seated')
-             AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?
-           LIMIT 1`,
-        )
-        .bind(canonicalId, tableNumber, today, normTenant)
-        .first();
-    } catch {
-      if (normTenant === 'default') {
-        activeReservation = await db
-          .prepare(
-            `SELECT id FROM reservations
-             WHERE (table_id = ? OR CAST(table_id AS TEXT) = ?)
-               AND date = ?
-               AND LOWER(COALESCE(status, 'pending')) IN ('pending', 'confirmed', 'approved', 'seated')
-             LIMIT 1`,
-          )
-          .bind(canonicalId, tableNumber, today)
-          .first<{ id?: string | null }>()
-          .catch(() =>
-            db
-              .prepare(
-                `SELECT id FROM reservations
-                 WHERE (table_id = ? OR CAST(table_id AS TEXT) = ?)
-                   AND reservation_date = ?
-                   AND LOWER(COALESCE(status, 'pending')) IN ('pending', 'confirmed', 'approved', 'seated')
-                 LIMIT 1`,
-              )
-              .bind(canonicalId, tableNumber, today)
-              .first<{ id?: string | null }>()
-              .catch(() => null),
-          );
-      }
+      result = await release("COALESCE(NULLIF(TRIM(r.date), ''), r.reservation_date)");
+    } catch (error) {
+      // Some schemas expose only one of the two date columns. Never remove guards.
+      const message = String(error);
+      if (/no such column:\s*r\.reservation_date\b/i.test(message)) result = await release('r.date');
+      else if (/no such column:\s*r\.date\b/i.test(message)) result = await release('r.reservation_date');
+      else throw error;
     }
-  }
-  if (activeReservation && typeof activeReservation.id === 'string' && activeReservation.id.trim()) {
+    const write = result as { meta?: { changes?: number }; changes?: number } | null;
+    return (write?.meta?.changes ?? write?.changes ?? 0) > 0;
+  } catch {
+    // Without a complete tenant-scoped eligibility check the table must stay occupied.
     return false;
   }
-
-  let released: unknown = null;
-  try {
-    released = await db
-      .prepare(
-        "UPDATE cafe_tables SET status = 'Available' WHERE id = ? AND LOWER(COALESCE(status, '')) = 'occupied' AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?",
-      )
-      .bind(canonicalId, normTenant)
-      .run();
-  } catch {
-    if (normTenant === 'default') {
-      released = await db
-        .prepare("UPDATE cafe_tables SET status = 'Available' WHERE id = ? AND LOWER(COALESCE(status, '')) = 'occupied'")
-        .bind(canonicalId)
-        .run()
-        .catch(() => null);
-    }
-  }
-  const changes =
-    (released as { meta?: { changes?: number }; changes?: number } | null)?.meta?.changes ??
-    (released as { changes?: number } | null)?.changes ??
-    0;
-  return Number(changes) > 0;
 }

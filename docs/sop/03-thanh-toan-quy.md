@@ -1,9 +1,9 @@
 # SOP 03 — Thanh Toan & Quy
 
 > **Ap dung:** AURA CAFE — Container Space, Sa Dec
-> **Phu trach:** Waiter, Staff, Manager, Owner
+> **Phu trach:** Waiter, Staff, Cashier, Manager, Supervisor, Owner, Admin
 > **Muc do bao mat:** CAO — lien quan den tien te
-> **Cap nhat:** 2026-08-15
+> **Cap nhat:** 2026-11-20
 
 ---
 
@@ -50,10 +50,12 @@
 ## C. THANH TOAN COD
 
 ### C1. Quy trinh
-1. Don dat thanh cong → hien "COD" tren KDS
-2. Waiter mang mon → thu tien mat
-3. Xac nhan "Da thu tien" tren mobile/KDS
-4. He thong cap nhat `payment_status = paid`
+1. Don dat thanh cong → hien "COD" tren KDS.
+2. Waiter/Staff co the nhan tien mat; thu tien truoc khi giao mon va dem ky truoc mat khach.
+3. Cashier, Owner, Manager, Supervisor hoac Admin xac nhan da thu tien; xac nhan chi sau khi tien da nhan du va kiem dem.
+4. He thong cap nhat `payment_status = paid` sau khi thu tien duoc xac nhan.
+5. Phuc vu xong khong dong hoa don: chi chuyen don sang `completed` sau khi da xac nhan thanh toan. Neu con no tien COD/tien mat, viec hoan tat bi tu choi (409) cho den khi thu du va tai thu.
+6. Truoc khi xem ban la trong, doi chieu don dang hoat dong, phien ban mo va dat cho trong ngay; khong tu y bo qua cac yeu to dang giu ban.
 
 ### C2. Quy tac tien mat
 - **Nhan tien truoc** khi giao mon

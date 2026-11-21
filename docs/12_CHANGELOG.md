@@ -4,6 +4,16 @@ Tất cả các thay đổi đáng kể của dự án F&B Caffe Container đư�
 
 ## [Unreleased]
 
+### Runtime router and collection-validation security updates (2026-11-21)
+
+- **fix(security-deps)** — Update Hono to 4.13.19 and Zod to 4.6.6 in the independent root/Worker dependency locks; preserve the Worker's exact Hono pin. Add actual-application authentication, tenant-boundary, encoded-path and global-header regressions, plus bounded validation tests that reject oversized collections before parsing invalid elements. Local dependency remediation only; no production deployment or exploitability claim.
+
+### Order settlement, reconciliation & table occupancy guards (2026-11-20)
+
+- **fix(order-settlement)** — Cash/COD orders cannot transition to `completed` until payment is persisted as paid; otherwise the request returns 409. Serving/fulfillment does not close the bill.
+- **fix(reconciliation)** — `digital_payments` includes settled non-cash/COD orders only, grouped by the order's creation-date window in ICT (+07:00); payment-method breakdown and revenue remain order-based, not bank settlement-date statements.
+- **fix(table-occupancy)** — Table release atomically checks tenant-scoped active orders, open sessions, and active same-day reservations. If eligibility cannot be verified because of schema/query errors, the table remains occupied.
+
 ### 💳 PayOS Reconciliation, DLQ Auto-Recovery & Customer Phone Auth Hardening (2026-10-29)
 
 - **feat(payment-reconcile)** — Triển khai bộ đối soát thanh toán PayOS tự động và thủ công (`packages/domain/payment/commands/payos-provider-verify.ts`, `payos-reconcile-lease.ts`, `payos-reconcile.ts`, migration `20261029_02_payment_reconciliation_jobs.sql`). Xác minh chữ ký HMAC-SHA256 và đối chiếu `orderCode`, `amount`, `linkId`, `amountPaid`, `amountRemaining` trực tiếp với `GET /v2/payment-requests/{orderCode}` trước khi gọi `settlePayOS` (single-writer CAS).
