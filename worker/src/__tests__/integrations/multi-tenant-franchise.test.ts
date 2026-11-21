@@ -3481,7 +3481,7 @@ describe('Multi-Tenant & Franchise Preparation Integration', () => {
       await creditLoyaltyIfEligible(mockDb as any, env as any, 'ord-sadec-guest');
       const loyaltyCustQuery = executedQueries.find((q) => /FROM customers WHERE/i.test(q.sql));
       expect(loyaltyCustQuery).toBeDefined();
-      expect(loyaltyCustQuery!.sql).toContain("COALESCE(NULLIF(tenant_id, ''), 'default') = ?");
+      expect(loyaltyCustQuery!.sql).toMatch(/COALESCE\(NULLIF\((?:TRIM\()?tenant_id\)?,\s*''\),\s*'default'\)\s*=\s*\?/);
       expect(loyaltyCustQuery!.args).toContain('tenant_sadec_02');
       // Because 'cust-default-only' belongs to 'default', the lookup for 'ord-sadec-guest' returns null and skips cross-tenant accrual
       expect(executedQueries.some((q) => /INSERT INTO cashback_transactions/i.test(q.sql))).toBe(false);
@@ -3502,7 +3502,7 @@ describe('Multi-Tenant & Franchise Preparation Integration', () => {
       const visitCustQueries = executedQueries.filter((q) => /FROM customers WHERE/i.test(q.sql));
       expect(visitCustQueries.length).toBeGreaterThan(0);
       for (const q of visitCustQueries) {
-        expect(q.sql).toContain("COALESCE(NULLIF(tenant_id, ''), 'default') = ?");
+        expect(q.sql).toMatch(/COALESCE\(NULLIF\((?:TRIM\()?tenant_id\)?,\s*''\),\s*'default'\)\s*=\s*\?/);
       }
     });
   });
@@ -9778,7 +9778,7 @@ describe('Multi-Tenant & Franchise Preparation Integration', () => {
             return { total };
           }
           if (/SELECT COALESCE\(SUM\(amount\), 0\) as total FROM cash_payouts/i.test(sql)) {
-            const tid = /TRIM\(tenant_id\)/i.test(sql) ? String(args[2]) : undefined;
+            const tid = /TRIM\(tenant_id\)/i.test(sql) ? String(args[args.length - 1]) : undefined;
             const total = cashPayouts
               .filter((p) => !tid || String(p.tenant_id || 'default').trim() === tid)
               .reduce((sum, p) => sum + Number(p.amount || 0), 0);
@@ -20134,6 +20134,9 @@ describe('Multi-Tenant & Franchise Preparation Integration', () => {
                       total_sales: 150000,
                       order_count: 2,
                     };
+                  }
+                  if (/FROM users WHERE id = \?/i.test(sql)) {
+                    return { id: String(args[0]), role: 'cashier', tenant_id: 'sadec', is_active: 1 };
                   }
                   if (/FROM shift_reconciliations WHERE shift_id = \?/i.test(sql)) {
                     if (reconInserts.length === 0) return null;

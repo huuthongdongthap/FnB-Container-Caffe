@@ -172,7 +172,7 @@ export async function collectCodPayment(db: D1Database, id: string, tenantId: st
     ]);
   };
   let results;
-  let timestamp = true, withAttribution = true;
+  let timestamp = true, withAttribution = Boolean((staffId || '').trim());
   for (let attempt = 0; attempt < 4; attempt++) {
     try { results = await commit(timestamp, hasPaymentsTenantColumn, withAttribution); break; }
     catch (error) {

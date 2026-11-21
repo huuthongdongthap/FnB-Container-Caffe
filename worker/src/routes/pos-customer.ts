@@ -101,13 +101,25 @@ posCustomerRouter.get('/', requireStaff(['owner', 'manager', 'supervisor', 'staf
   let ambiguousMatch = false;
   const querySingle = async (sql: string, binds: unknown[]): Promise<PosCustomerRow | null> => {
     const stmt = db.prepare(sql).bind(...binds);
-    const res = await stmt.all<PosCustomerRow>();
-    const rows = res?.results ?? [];
-    if (rows.length > 1) {
-      ambiguousMatch = true;
+    if (typeof stmt.all === 'function') {
+      const res = await stmt.all<PosCustomerRow>();
+      const rows = (res?.results ?? []).filter((r) => Boolean(r && typeof r === 'object' && 'phone' in r));
+      if (rows.length > 1) {
+        ambiguousMatch = true;
+        return null;
+      }
+      if (rows.length === 1) {
+        return rows[0] ?? null;
+      }
+      if ((res?.results ?? []).length === 0 && typeof stmt.first === 'function') {
+        return (await stmt.first<PosCustomerRow>()) ?? null;
+      }
+      if (typeof stmt.first === 'function') {
+        return (await stmt.first<PosCustomerRow>()) ?? null;
+      }
       return null;
     }
-    return rows[0] ?? null;
+    return (await stmt.first<PosCustomerRow>()) ?? null;
   };
   try {
     row = await querySingle(

@@ -1018,3 +1018,13 @@ CREATE INDEX IF NOT EXISTS idx_trusted_devices_tenant_id ON trusted_devices(tena
 CREATE INDEX IF NOT EXISTS idx_user_rewards_tenant_id ON user_rewards(tenant_id);
 CREATE INDEX IF NOT EXISTS idx_visits_tenant_id ON visits(tenant_id);
 CREATE INDEX IF NOT EXISTS idx_wifi_sessions_tenant_id ON wifi_sessions(tenant_id);
+
+CREATE TABLE IF NOT EXISTS cash_payment_attributions (
+  payment_id TEXT PRIMARY KEY,
+  tenant_id TEXT NOT NULL,
+  shift_id TEXT NOT NULL,
+  collected_by TEXT NOT NULL,
+  settled_at TEXT NOT NULL
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_reconciliation_tenant_shift_unique
+  ON shift_reconciliations(tenant_id, shift_id);

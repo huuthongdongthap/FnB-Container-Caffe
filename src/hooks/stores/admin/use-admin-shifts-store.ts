@@ -82,11 +82,14 @@ export const useAdminShiftsStore = create<AdminShiftsState>((set, get) => ({
   clockIn: async (staffId: string, _staffName: string, options?: ClockInOptions): Promise<ShiftRecord | null> => {
     set({ loading: { ...get().loading, clockIn: true }, error: null });
     try {
-      const openingCash = options?.openingCash ?? 0;
       const payload: Record<string, unknown> = {
         staff_id: staffId,
-        opening_cash: openingCash,
       };
+      if (options?.openingCash !== undefined) {
+        payload.opening_cash = options.openingCash;
+      } else if (!options?.scheduledShiftId) {
+        payload.opening_cash = 0;
+      }
       if (options?.scheduledShiftId) payload.scheduled_shift_id = options.scheduledShiftId;
       if (options?.notes?.trim()) payload.notes = options.notes.trim();
 
