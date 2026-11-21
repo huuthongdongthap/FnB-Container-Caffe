@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import {
   reconcileShiftCash,
   getReconciliationForShift,
+  ShiftContractError,
   type ReconciliationInput,
 } from '@aura/domain-shift';
 import type { Env } from '../types/env';
@@ -112,9 +113,12 @@ shiftReconciliationRouter.post('/:id/reconcile', async (c) => {
   };
 
   try {
-    const result = await reconcileShiftCash(c.env, input, staffId, scope.tenantId);
+    const result = await reconcileShiftCash(c.env, input, staffId, scope.tenantId, String(user.role || ''));
     return c.json({ success: true, data: result }, 201);
   } catch (err) {
+    if (err instanceof ShiftContractError) {
+      return c.json({ success: false, error: err.message }, err.status);
+    }
     const msg = err instanceof Error ? err.message : 'Failed to reconcile shift cash';
     if (msg.includes('already been reconciled')) {
       return c.json({ success: false, error: msg }, 409);

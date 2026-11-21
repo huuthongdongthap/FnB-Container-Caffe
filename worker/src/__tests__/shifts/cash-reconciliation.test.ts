@@ -13,9 +13,10 @@ interface Denomination {
 }
 
 function makeReconciliationMockDB(opts: {
-  shift: { clock_in: string; clock_out: string | null } | null;
+  shift: { clock_in: string; clock_out: string | null; staff_id?: string; opening_cash?: number; tenant_id?: string } | null;
   cashPayments?: number;
   cashPayouts?: number;
+  openingCash?: number;
 }) {
   const db = createMockDB();
 
@@ -28,8 +29,17 @@ function makeReconciliationMockDB(opts: {
         return this;
       },
       first: async () => {
-        if (sql.includes('SELECT clock_in, clock_out FROM shifts')) {
-          return opts.shift;
+        if (sql.includes('FROM staff_shifts') || sql.includes('SELECT clock_in, clock_out FROM shifts')) {
+          if (!opts.shift) return null;
+          return {
+            staff_id: 'staff_1',
+            tenant_id: 'default',
+            opening_cash: opts.openingCash ?? opts.shift.opening_cash ?? 100_000,
+            ...opts.shift,
+          };
+        }
+        if (sql.includes('FROM users WHERE id = ?')) {
+          return { tenant_id: 'default', role: 'staff', is_active: 1 };
         }
         if (sql.includes('FROM payments') && sql.includes("payment_method = 'cash'")) {
           return { total: opts.cashPayments ?? 0 };
@@ -42,7 +52,17 @@ function makeReconciliationMockDB(opts: {
         }
         return null;
       },
-      all: async () => ({ results: [], success: true }),
+      all: async () => {
+        if (sql.includes('FROM payments p LEFT JOIN cash_payment_attributions')) {
+          return {
+            results: opts.cashPayments
+              ? [{ id: 'pay_mock_1', amount: opts.cashPayments, shift_id: null, candidates: 1 }]
+              : [],
+            success: true,
+          };
+        }
+        return { results: [], success: true };
+      },
       run: async () => ({ success: true, changes: 1, lastRowId: 0 }),
       raw: async () => [],
     };
@@ -106,6 +126,7 @@ describe('cash reconciliation', () => {
 
   it('detects shortage when actual < expected', async () => {
     const shift = {
+      staff_id: 'staff_2',
       clock_in: '2026-09-15T08:00:00Z',
       clock_out: '2026-09-15T16:00:00Z',
     };
@@ -143,6 +164,7 @@ describe('cash reconciliation', () => {
 
   it('detects overage when actual > expected', async () => {
     const shift = {
+      staff_id: 'staff_3',
       clock_in: '2026-09-15T08:00:00Z',
       clock_out: '2026-09-15T16:00:00Z',
     };
@@ -190,6 +212,7 @@ describe('cash reconciliation', () => {
 
   it('uses current time when shift has not clocked out', async () => {
     const shift = {
+      staff_id: 'staff_4',
       clock_in: '2026-09-15T08:00:00Z',
       clock_out: null,
     };

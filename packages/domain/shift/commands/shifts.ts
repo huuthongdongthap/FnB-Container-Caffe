@@ -32,10 +32,21 @@ shiftsRouter.onError((error, c) => {
   return staffSessionErrorResponse(error) || c.json({ success: false, error: 'Attendance unavailable' }, 500);
 });
 shiftsRouter.post('/clock-in', async (c) => {
-  const parsed = clockInSchema.safeParse(await c.req.json().catch(() => null));
+  const body: unknown = await c.req.json().catch(() => null);
+  const parsed = clockInSchema.safeParse(body);
+  const rawBody = body && typeof body === 'object' ? (body as Record<string, unknown>) : null;
+  const openingCash = rawBody && 'opening_cash' in rawBody ? rawBody.opening_cash : 0;
+  if (typeof openingCash !== 'number' || !Number.isFinite(openingCash) || openingCash < 0) return c.json({ success: false, error: 'Invalid opening_cash' }, 400);
+  const rawScheduledId = rawBody?.scheduled_shift_id ?? rawBody?.shift_id;
+  if (rawScheduledId !== undefined && rawScheduledId !== null && typeof rawScheduledId !== 'string' && typeof rawScheduledId !== 'number') {
+    return c.json({ success: false, error: 'Invalid scheduled_shift_id' }, 400);
+  }
+  const scheduledShiftId = rawScheduledId !== undefined && rawScheduledId !== null && String(rawScheduledId).trim() !== ''
+    ? String(rawScheduledId).trim()
+    : undefined;
   if (!parsed.success) return c.json({ success: false, error: parsed.error.issues[0].message }, 400);
   const scope = await shiftScope(c.env, c.get('user'), reqTenant(c));
-  return c.json({ success: true, data: shiftDto(await clockIn(scope, parsed.data.staff_id, parsed.data.notes)) }, 201);
+  return c.json({ success: true, data: shiftDto(await clockIn(scope, parsed.data.staff_id, parsed.data.notes, scheduledShiftId, openingCash)) }, 201);
 });
 shiftsRouter.post('/clock-out', async (c) => {
   const rawBody = await c.req.json().catch(() => null);

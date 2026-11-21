@@ -1,4 +1,6 @@
 import type { Hono } from 'hono';
+import type { Env } from 'worker/src/types/env';
+import { ShiftContractError } from '../../commands/shift-access';
 import { reconcileShiftCash, getReconciliationForShift } from '../policies/cash-reconciliation-policy';
 import type { ReconciliationInput } from '../model/reconciliation-types';
 
@@ -79,7 +81,7 @@ function resolveReconciliationTenant(
   return { tenantId: target.toLowerCase() === 'hq' ? '*' : target };
 }
 
-export function reconciliationRoutes(app: Hono<any>) {
+export function reconciliationRoutes(app: Hono<{ Bindings: Env; Variables: { user: Record<string, unknown>; tenantId: string } }>) {
   app.post('/api/shifts/:id/reconcile', async (c) => {
     const user = c.get('user') as unknown as Record<string, unknown> | undefined;
     if (!user) return c.json({ error: 'Unauthorized' }, 401);
@@ -119,6 +121,7 @@ export function reconciliationRoutes(app: Hono<any>) {
       return c.json({ success: false, error: 'Invalid JSON payload' }, 400);
     }
 
+    if (!body || typeof body !== 'object' || Array.isArray(body)) return c.json({ success: false, error: 'Invalid payload' }, 400);
     const shiftId = c.req.param('id');
     const staffId = String(user.sub || user.id || '');
     const denominations: ReconciliationInput['denominations'] = Array.isArray(body.denominations)
@@ -136,9 +139,10 @@ export function reconciliationRoutes(app: Hono<any>) {
     };
 
     try {
-      const result = await reconcileShiftCash(c.env, input, staffId, scope.tenantId);
+      const result = await reconcileShiftCash(c.env, input, staffId, scope.tenantId, String(user.role || ''));
       return c.json({ success: true, data: result }, 201);
     } catch (err) {
+      if (err instanceof ShiftContractError) return c.json({ success: false, error: err.message }, err.status);
       const msg = err instanceof Error ? err.message : 'Failed to reconcile shift cash';
       if (msg.includes('already been reconciled')) {
         return c.json({ success: false, error: msg }, 409);
