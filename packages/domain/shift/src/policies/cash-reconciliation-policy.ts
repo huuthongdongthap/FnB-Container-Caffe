@@ -258,7 +258,7 @@ export async function reconcileShiftCash(
   const normTenant = hasExplicitTenant ? (rawTenant === 'hq' ? '*' : rawTenant) : 'default';
 
   if (typeof input.opening_float !== 'number' || !Number.isFinite(input.opening_float) || input.opening_float < 0) {
-    throw new Error('Invalid opening_float: must be a non-negative number');
+    throw new ShiftContractError('Invalid opening_float: must be a non-negative number', 400);
   }
   const rawActualCounted =
     (input as unknown as Record<string, unknown>).actual_cash_counted ??
@@ -269,7 +269,7 @@ export async function reconcileShiftCash(
     rawActualCounted !== undefined &&
     (typeof rawActualCounted !== 'number' || !Number.isFinite(rawActualCounted) || rawActualCounted < 0)
   ) {
-    throw new Error('Invalid actual_cash_counted: must be a non-negative number');
+    throw new ShiftContractError('Invalid actual_cash_counted: must be a non-negative number', 400);
   }
   if (Array.isArray(input.denominations?.denominations)) {
     for (const d of input.denominations.denominations) {
@@ -281,7 +281,7 @@ export async function reconcileShiftCash(
         !Number.isFinite(d.count) ||
         d.count < 0
       ) {
-        throw new Error('Invalid cash denomination or count: must be non-negative numbers');
+        throw new ShiftContractError('Invalid cash denomination or count: must be non-negative numbers', 400);
       }
     }
   }

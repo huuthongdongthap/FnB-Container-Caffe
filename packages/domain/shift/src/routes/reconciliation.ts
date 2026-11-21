@@ -1,8 +1,11 @@
 import type { Hono } from 'hono';
 import type { Env } from 'worker/src/types/env';
+import { createLogger } from 'worker/src/middleware/logger';
 import { ShiftContractError } from '../../commands/shift-access';
 import { reconcileShiftCash, getReconciliationForShift } from '../policies/cash-reconciliation-policy';
 import type { ReconciliationInput } from '../model/reconciliation-types';
+
+const log = createLogger({ route: 'shift-reconciliation' });
 
 const RECONCILIATION_ROLES = new Set([
   'owner',
@@ -143,14 +146,11 @@ export function reconciliationRoutes(app: Hono<{ Bindings: Env; Variables: { use
       return c.json({ success: true, data: result }, 201);
     } catch (err) {
       if (err instanceof ShiftContractError) return c.json({ success: false, error: err.message }, err.status);
-      const msg = err instanceof Error ? err.message : 'Failed to reconcile shift cash';
-      if (msg.includes('already been reconciled')) {
-        return c.json({ success: false, error: msg }, 409);
-      }
-      if (msg.includes('not found')) {
-        return c.json({ success: false, error: msg }, 404);
-      }
-      return c.json({ success: false, error: msg }, 400);
+      log.error('Unexpected shift reconciliation error', {
+        shiftId,
+        message: err instanceof Error ? err.message : String(err),
+      });
+      return c.json({ success: false, error: 'Failed to reconcile shift cash' }, 500);
     }
   });
 

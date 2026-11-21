@@ -7,7 +7,9 @@ import {
 } from '@aura/domain-shift';
 import type { Env } from '../types/env';
 import { authenticateRequest } from '../middleware/auth';
+import { createLogger } from '../middleware/logger';
 
+const log = createLogger({ route: 'shift-reconciliation' });
 const shiftReconciliationRouter = new Hono<{ Bindings: Env }>();
 
 const RECONCILIATION_ROLES = new Set([
@@ -92,7 +94,11 @@ shiftReconciliationRouter.post('/:id/reconcile', async (c) => {
 
   let body: Record<string, unknown>;
   try {
-    body = (await c.req.json()) as Record<string, unknown>;
+    const parsed = await c.req.json();
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+      return c.json({ success: false, error: 'Invalid payload' }, 400);
+    }
+    body = parsed as Record<string, unknown>;
   } catch {
     return c.json({ success: false, error: 'Invalid JSON payload' }, 400);
   }
@@ -119,14 +125,11 @@ shiftReconciliationRouter.post('/:id/reconcile', async (c) => {
     if (err instanceof ShiftContractError) {
       return c.json({ success: false, error: err.message }, err.status);
     }
-    const msg = err instanceof Error ? err.message : 'Failed to reconcile shift cash';
-    if (msg.includes('already been reconciled')) {
-      return c.json({ success: false, error: msg }, 409);
-    }
-    if (msg.includes('not found')) {
-      return c.json({ success: false, error: msg }, 404);
-    }
-    return c.json({ success: false, error: msg }, 400);
+    log.error('Unexpected shift reconciliation error', {
+      shiftId,
+      message: err instanceof Error ? err.message : String(err),
+    });
+    return c.json({ success: false, error: 'Failed to reconcile shift cash' }, 500);
   }
 });
 
