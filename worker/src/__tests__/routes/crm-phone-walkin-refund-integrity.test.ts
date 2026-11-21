@@ -145,17 +145,6 @@ function createCrmSqlite(): DatabaseSync {
       created_at TEXT DEFAULT CURRENT_TIMESTAMP,
       updated_at TEXT DEFAULT CURRENT_TIMESTAMP
     );
-    CREATE TABLE payment_refund_transfers (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      tenant_id TEXT NOT NULL,
-      manual_transfer_ref TEXT NOT NULL,
-      payment_id TEXT NOT NULL,
-      amount INTEGER NOT NULL,
-      reason TEXT,
-      actor_id TEXT,
-      created_at TEXT NOT NULL,
-      UNIQUE(tenant_id, manual_transfer_ref)
-    );
     CREATE TABLE loyalty_point_logs (
       id TEXT PRIMARY KEY,
       customer_id TEXT NOT NULL,
@@ -503,7 +492,7 @@ describe('CRM phone normalization (#99), walk-in anonymity (#98), and guest refu
     };
     expect(orderAfterRefund.customer_id).toBeNull();
 
-    // Repeat call with same ref is rejected (idempotency) and does not double-reverse
+    // Repeat call on already-refunded payment is rejected and does not double-reverse
     const resRepeat = await app.fetch(
       new Request('https://test.aura/refund', {
         method: 'POST',
@@ -517,7 +506,12 @@ describe('CRM phone normalization (#99), walk-in anonymity (#98), and guest refu
       }),
       env,
     );
-    expect(resRepeat.status).toBe(409);
+    expect([400, 409]).toContain(resRepeat.status);
+    const custAfterRepeat = sqlite
+      .prepare(`SELECT loyalty_points, lifetime_points FROM customers WHERE id = 'cust_guest_match'`)
+      .get() as { loyalty_points: number; lifetime_points: number };
+    expect(custAfterRepeat.loyalty_points).toBe(0);
+    expect(custAfterRepeat.lifetime_points).toBe(0);
   });
 
   it('#97: records auditable retryable failure when refund succeeds but loyalty reversal fails', async () => {
