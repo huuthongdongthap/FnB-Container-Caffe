@@ -51,7 +51,7 @@ export function Header({
 
   return (
     <header
-      className="fixed left-0 top-0 z-50 flex w-full items-center justify-between gap-4 border-b border-[var(--aura-chrome-dim)]/20 bg-[var(--aura-noir-void,#051424)]/85 px-4 py-3 backdrop-blur-md md:px-8 md:py-4"
+      className="fixed left-0 top-0 z-50 flex w-full flex-wrap items-center justify-between gap-4 border-b border-[var(--aura-chrome-dim)]/20 bg-[var(--aura-noir-void,#051424)]/85 px-4 py-3 backdrop-blur-md md:px-8 md:py-4"
       aria-label={t('kds.header', 'KDS Header')}
     >
       <div className="flex min-w-0 items-center gap-3 md:gap-5">
@@ -88,7 +88,7 @@ export function Header({
 
       {/* Filter navigation */}
       <nav
-        className="hidden items-center gap-2 lg:flex"
+        className="order-last flex w-full items-center gap-2 overflow-x-auto lg:order-none lg:w-auto"
         aria-label={t('kds.filterNav', 'Filter tickets')}
         style={{ fontFamily: 'var(--aura-font-body)' }}
       >
@@ -100,7 +100,7 @@ export function Header({
               type="button"
               onClick={() => onFilterChange?.(f.key)}
               className={cn(
-                'min-h-[40px] rounded-lg px-3.5 py-2 text-xs font-semibold tracking-wider uppercase transition-colors',
+                'min-h-[40px] shrink-0 whitespace-nowrap rounded-lg px-3.5 py-2 text-xs font-semibold tracking-wider uppercase transition-colors',
                 isActive
                   ? 'border border-[#efbd8a]/50 bg-[#efbd8a]/20 text-[#f8d7b2]'
                   : 'text-[var(--aura-chrome-soft)] hover:bg-[var(--st-surface-container-highest,#273647)]/40 hover:text-[var(--aura-chrome-bright)]',
@@ -108,7 +108,7 @@ export function Header({
               aria-current={isActive ? 'page' : undefined}
               aria-label={t(f.tKey, f.label)}
             >
-              {f.label}
+              {t(f.tKey, f.label)}
             </button>
           );
         })}

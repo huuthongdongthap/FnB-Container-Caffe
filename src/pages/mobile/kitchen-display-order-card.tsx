@@ -9,6 +9,8 @@ import {
 interface Props {
   order: KitchenOrder;
   updatingId: string | null;
+  mutationError?: string;
+  onRetry?: () => void;
   onStatusChange: (orderId: string, status: KitchenOrder['status']) => void;
 }
 
@@ -20,7 +22,13 @@ const STATUS_LABEL: Record<string, string> = {
   served: 'Đã phục vụ',
 };
 
-export default function KitchenOrderCard({ order, updatingId, onStatusChange }: Props) {
+export default function KitchenOrderCard({
+  order,
+  updatingId,
+  mutationError,
+  onRetry,
+  onStatusChange,
+}: Props) {
   const isUpdating = updatingId === order.id;
 
   return (
@@ -49,7 +57,7 @@ export default function KitchenOrderCard({ order, updatingId, onStatusChange }: 
               {item.modifiers && item.modifiers.length > 0 && (
                 <div style={itemModifier}>
                   {item.modifiers
-                    .map((m: any) => (typeof m === 'string' ? m : m?.name || ''))
+                    .map((m: string | { name?: string }) => (typeof m === 'string' ? m : m?.name || ''))
                     .filter(Boolean)
                     .join(', ')}
                 </div>
@@ -58,6 +66,46 @@ export default function KitchenOrderCard({ order, updatingId, onStatusChange }: 
           </div>
         );
       })}
+
+      {mutationError && (
+        <div
+          role="alert"
+          style={{
+            marginTop: 8,
+            padding: '8px 10px',
+            borderRadius: 8,
+            background: 'rgba(239, 83, 80, 0.15)',
+            border: '1px solid rgba(239, 83, 80, 0.4)',
+            color: '#FFB4AB',
+            fontSize: 12,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: 8,
+          }}
+        >
+          <span>Cập nhật thất bại: {mutationError}</span>
+          {onRetry && (
+            <button
+              type="button"
+              disabled={isUpdating}
+              onClick={onRetry}
+              style={{
+                padding: '4px 10px',
+                borderRadius: 6,
+                border: '1px solid rgba(255, 180, 171, 0.5)',
+                background: 'transparent',
+                color: '#FFB4AB',
+                fontSize: 12,
+                fontWeight: 600,
+                cursor: isUpdating ? 'not-allowed' : 'pointer',
+              }}
+            >
+              Thử lại
+            </button>
+          )}
+        </div>
+      )}
 
       {(order.status === 'pending' || order.status === 'confirmed') && (
         <div style={actions}>

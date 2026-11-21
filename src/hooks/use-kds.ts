@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiFetch } from '@/lib/api-client';
 import { useAuthStore } from './stores/use-auth-store';
@@ -14,6 +14,8 @@ interface KDSResult {
   completeOrder: (orderId: string) => void;
   updateStatus: (orderId: string, status: KDSOrder['status']) => void;
   isCompleting: boolean;
+  pendingOrders: Record<string, boolean>;
+  mutationErrors: Record<string, string>;
 }
 
 const POLL_INTERVAL = 5_000;
@@ -25,6 +27,14 @@ export function useKDS(station: string = 'all'): KDSResult {
   const identity = `${sessionVersion}:${user?.id ?? ''}:${user?.tenantId ?? 'default'}:${user?.role ?? ''}`;
   const queryKey = ['kds-orders', identity, station];
   const enabled = Boolean(user);
+  const inFlight = useRef(new Set<string>());
+  const [pendingOrders, setPendingOrders] = useState<Record<string, boolean>>({});
+  const [mutationErrors, setMutationErrors] = useState<Record<string, string>>({});
+  useEffect(() => {
+    inFlight.current.clear();
+    setPendingOrders({});
+    setMutationErrors({});
+  }, [identity, station]);
   const { data = [], isLoading, isError, error } = useQuery<KDSOrder[]>({
     queryKey,
     enabled,
@@ -58,54 +68,52 @@ export function useKDS(station: string = 'all'): KDSResult {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [identity, enabled, station, queryClient]);
 
-  const completeMutation = useMutation({
-    mutationFn: async (orderId: string) => {
-      const cached = queryClient.getQueryData<KDSOrder[]>(queryKey) ?? [];
-      const current = cached.find((o) => o.id === orderId);
-      const nextStatus: KDSOrder['status'] =
-        current?.status === 'pending' || current?.status === 'confirmed'
-          ? 'preparing'
-          : 'ready';
-      await apiFetch(`/api/orders/${orderId}/status`, {
-        method: 'PATCH',
-        body: JSON.stringify({ status: nextStatus }),
-      });
-      return nextStatus;
-    },
-    onSuccess: (nextStatus, orderId) => {
-      if (useAuthStore.getState().sessionVersion !== sessionVersion) return;
-      queryClient.setQueryData<KDSOrder[]>(queryKey, (prev = []) =>
-        prev.map((o) => (o.id === orderId ? { ...o, status: nextStatus } : o))
-      );
-      queryClient.invalidateQueries({ queryKey: ['kds-orders'] });
-    },
-  });
-
   const statusMutation = useMutation({
     mutationFn: ({ orderId, status }: { orderId: string; status: KDSOrder['status'] }) =>
       apiFetch(`/api/orders/${orderId}/status`, {
         method: 'PATCH',
         body: JSON.stringify({ status }),
       }),
-    onSuccess: (_data, { orderId, status }) => {
+    onSuccess: async (_data, { orderId, status }) => {
       if (useAuthStore.getState().sessionVersion !== sessionVersion) return;
       queryClient.setQueryData<KDSOrder[]>(queryKey, (prev = []) =>
         status === 'served'
           ? prev.filter((o) => o.id !== orderId)
           : prev.map((o) => (o.id === orderId ? { ...o, status } : o))
       );
-      queryClient.invalidateQueries({ queryKey: ['kds-orders'] });
+      await queryClient.invalidateQueries({ queryKey: ['kds-orders'] });
+    },
+    onError: (failure, { orderId }) => {
+      if (useAuthStore.getState().sessionVersion !== sessionVersion) return;
+      setMutationErrors(prev => ({ ...prev, [orderId]: failure.message }));
+    },
+    onSettled: (_data, _error, { orderId }) => {
+      if (useAuthStore.getState().sessionVersion !== sessionVersion) return;
+      inFlight.current.delete(orderId);
+      setPendingOrders(prev => ({ ...prev, [orderId]: false }));
     },
   });
+
+  const updateStatus = (orderId: string, status: KDSOrder['status']) => {
+    if (!enabled || inFlight.current.has(orderId)) return;
+    inFlight.current.add(orderId);
+    setPendingOrders(prev => ({ ...prev, [orderId]: true }));
+    setMutationErrors(prev => { const next = { ...prev }; delete next[orderId]; return next; });
+    statusMutation.mutate({ orderId, status });
+  };
 
   return {
     orders: enabled ? data : [],
     isLoading,
     isError,
     error: error as Error | null,
-    completeOrder: (orderId: string) => completeMutation.mutate(orderId),
-    updateStatus: (orderId: string, status: KDSOrder['status']) =>
-      statusMutation.mutate({ orderId, status }),
-    isCompleting: completeMutation.isPending,
+    completeOrder: (orderId: string) => {
+      const current = data.find(order => order.id === orderId);
+      updateStatus(orderId, current?.status === 'pending' || current?.status === 'confirmed' ? 'preparing' : 'ready');
+    },
+    updateStatus,
+    pendingOrders,
+    mutationErrors,
+    isCompleting: Object.values(pendingOrders).some(Boolean),
   };
 }

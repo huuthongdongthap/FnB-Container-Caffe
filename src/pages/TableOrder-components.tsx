@@ -91,6 +91,14 @@ export function GuestInfoForm({
         />
       </div>
 
+      <p
+        className="mt-2 text-[12px] font-body text-[var(--aura-chrome-bright)]"
+        data-testid="table-order-payment-method"
+      >
+        {t('tableOrder.paymentMethodLabel', {
+          defaultValue: 'Phương thức thanh toán: Tiền mặt tại quán',
+        })}
+      </p>
       {submitError && (
         <p
           className="mt-2 text-[12px] text-[#ffb4ab] font-body"
