@@ -116,6 +116,29 @@ export async function handleRefund(c: Context<{ Bindings: Env }>, openApi = fals
     if (rawPaymentId && rawOrderId && String(payment.order_id) !== rawOrderId) {
       return c.json({ success: false, error: 'paymentId does not belong to the specified orderId' }, 400);
     }
+    const manualTransferRef = typeof body.manual_transfer_ref === 'string'
+      ? body.manual_transfer_ref.trim()
+      : (typeof body.manualTransferRef === 'string' ? body.manualTransferRef.trim() : '');
+    const user = c.get('user');
+    const userRole = String(user?.role || '').trim().toLowerCase();
+    const canManualRefund = ['owner', 'manager', 'admin'].includes(userRole);
+    const effectivePaymentTenant = (payment.tenant_id && String(payment.tenant_id).trim()) || 'default';
+
+    if (manualTransferRef) {
+      if (!canManualRefund) {
+        return c.json({ success: false, error: 'Only owner or manager can confirm manual bank-transfer refund' }, 403);
+      }
+      if (manualTransferRef.length > 200) {
+        return c.json({ success: false, error: 'Transfer reference must be 200 characters or fewer' }, 400);
+      }
+      const existingTransfer = await db.prepare(
+        `SELECT payment_id FROM payment_refund_transfers WHERE tenant_id = ? AND manual_transfer_ref = ? LIMIT 1`
+      ).bind(effectivePaymentTenant, manualTransferRef).first<{ payment_id: string }>();
+      if (existingTransfer) {
+        return c.json({ success: false, error: 'Transfer reference already recorded' }, 409);
+      }
+    }
+
     // Partial refunds accumulate; each tranche is capped at the still-unrefunded balance.
     const priorRefunded = payment.refund_status === 'partial' ? Math.max(0, Number(payment.refund_amount) || 0) : 0;
     const refundableBalance = Math.max(0, Number(payment.amount) - priorRefunded);
@@ -123,8 +146,7 @@ export async function handleRefund(c: Context<{ Bindings: Env }>, openApi = fals
     if (!parsed.success) return c.json({ success: false, error: parsed.error.issues[0].message }, 400);
     const amount = parsed.data.amount ?? refundableBalance;
     if (!['paid', 'completed'].includes(payment.status)) return c.json(ERRORS.PAYMENT_NOT_PAID, 400);
-    const hasManualTransferRef = typeof (body.manual_transfer_ref ?? body.manualTransferRef) === 'string'
-      && String(body.manual_transfer_ref ?? body.manualTransferRef).trim() !== '';
+    const hasManualTransferRef = manualTransferRef.length > 0;
     // Only a manually settled bank transfer may add a tranche on top of an existing partial refund.
     if (payment.refund_status && !(payment.refund_status === 'partial' && hasManualTransferRef)) return c.json({ ...ERRORS.PAYMENT_ALREADY_REFUNDED,
       error: 'Refund already submitted or pending reconciliation' }, 409);
@@ -133,27 +155,16 @@ export async function handleRefund(c: Context<{ Bindings: Env }>, openApi = fals
       return c.json({ success: false, error: 'Only verified PayOS payments support this refund operation' }, 409);
     }
 
-    const manualTransferRef = typeof body.manual_transfer_ref === 'string'
-      ? body.manual_transfer_ref.trim()
-      : (typeof body.manualTransferRef === 'string' ? body.manualTransferRef.trim() : '');
-    const user = c.get('user') as Record<string, any> | undefined;
-    const userRole = String(user?.role || '').trim().toLowerCase();
-    const canManualRefund = ['owner', 'manager', 'admin'].includes(userRole);
-
     if (manualTransferRef) {
-      if (!canManualRefund) {
-        return c.json({ success: false, error: 'Only owner or manager can confirm manual bank-transfer refund' }, 403);
-      }
       const now = new Date().toISOString();
       const refundReason = parsed.data.reason || 'Manual bank-transfer refund';
-      const effectivePaymentTenant = (payment.tenant_id && String(payment.tenant_id).trim()) || 'default';
 
       const cumulativeRefunded = priorRefunded + amount;
       const fullRefund = cumulativeRefunded >= Number(payment.amount);
       const refundStatus = fullRefund ? 'completed' : 'partial';
       // CAS on refund_status + prior refund_amount: concurrent tranches settle exactly once
       // and cannot jointly exceed the captured payment amount.
-      const settled = await db.prepare(`
+      const updatePayment = db.prepare(`
         UPDATE payments
         SET refund_status = ?,
             refund_amount = ?,
@@ -165,7 +176,24 @@ export async function handleRefund(c: Context<{ Bindings: Env }>, openApi = fals
           AND (refund_status IS NULL OR refund_status IN ('', 'partial'))
           AND COALESCE(refund_amount, 0) = ?
           AND ? <= amount
-      `).bind(refundStatus, cumulativeRefunded, refundReason, now, fullRefund ? 1 : 0, now, payment.id, priorRefunded, cumulativeRefunded).run();
+      `).bind(refundStatus, cumulativeRefunded, refundReason, now, fullRefund ? 1 : 0, now, payment.id, priorRefunded, cumulativeRefunded);
+      let settlement;
+      try {
+        // D1 batches are transactional: a duplicate reference rolls the CAS back.
+        settlement = await db.batch([
+          updatePayment,
+          db.prepare(`INSERT INTO payment_refund_transfers
+            (tenant_id, manual_transfer_ref, payment_id, amount, reason, actor_id, created_at)
+            SELECT ?, ?, ?, ?, ?, ?, ? WHERE changes() > 0`)
+            .bind(effectivePaymentTenant, manualTransferRef, payment.id, amount, refundReason, String(user?.id || 'system'), now),
+        ]);
+      } catch (failure) {
+        if (/UNIQUE constraint failed: payment_refund_transfers\./i.test(String(failure))) {
+          return c.json({ success: false, error: 'Transfer reference already recorded' }, 409);
+        }
+        throw failure;
+      }
+      const settled = settlement[0];
       const settledChanges = (settled as { meta?: { changes?: number } })?.meta?.changes ?? 0;
       if (settledChanges < 1) {
         return c.json({ ...ERRORS.PAYMENT_ALREADY_REFUNDED,

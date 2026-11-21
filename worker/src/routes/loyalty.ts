@@ -3,7 +3,9 @@
  * Thin Hono router — handler bodies extracted to tree/loyalty/.
  */
 
-import { Hono } from 'hono';
+import { Hono, type Context } from 'hono';
+import { getAuthToken, verifyJWT } from '../lib/jwt';
+import { isStaffRole } from '../lib/staff-session';
 import { redeemRewardSchema, zodErrorResponse } from '../lib/validators';
 import { resolvePilotStore } from '../lib/pilot-store';
 import { getTenantId, matchesTenantRow } from '../middleware/tenant';
@@ -36,15 +38,42 @@ const LEGACY_LOYALTY_PATHS = new Set([
   '/tiers',
 ]);
 
+async function shouldDelegateRewardsListToOpenApi(c: Context<{ Bindings: Env }>): Promise<boolean> {
+  const token = getAuthToken(c.req.raw);
+  if (!token || !c.env.JWT_SECRET || c.env.JWT_SECRET.length < 16) {
+    return false;
+  }
+  const hasJwtClaimsConfig = c.env.JWT_AUDIENCE !== undefined || c.env.JWT_ISSUER !== undefined;
+  const payload = hasJwtClaimsConfig
+    ? await verifyJWT(token, c.env.JWT_SECRET, {
+        expectedAudience: c.env.JWT_AUDIENCE,
+        expectedIssuer: c.env.JWT_ISSUER,
+      })
+    : await verifyJWT(token, c.env.JWT_SECRET);
+  if (!payload) {
+    return false;
+  }
+  const rawClaims = payload as unknown as { sessionType?: string };
+  return (
+    isStaffRole(payload.role) ||
+    Boolean(rawClaims.sessionType) ||
+    Boolean(payload.role && payload.role !== 'customer')
+  );
+}
+
 loyaltyRouter.use('/*', async (c, next) => {
   const pathSegments = c.req.path.split('/').filter(Boolean);
   const relPath = pathSegments[0] === 'api' && pathSegments[1] === 'loyalty'
     ? `/${pathSegments.slice(2).join('/')}`
     : `/${pathSegments.join('/')}`;
-  const isLegacyRoute =
-    LEGACY_LOYALTY_PATHS.has(relPath) ||
-    (relPath === '/rewards' && c.req.method === 'GET');
-  if (!isLegacyRoute) {
+  if (relPath === '/rewards' && c.req.method === 'GET') {
+    if (await shouldDelegateRewardsListToOpenApi(c)) {
+      await next();
+      return;
+    }
+    return authCustomer(c, next);
+  }
+  if (!LEGACY_LOYALTY_PATHS.has(relPath)) {
     await next();
     return;
   }
@@ -247,8 +276,12 @@ loyaltyRouter.get('/cashback', async(c) => {
   return c.json({ success: true, data: results });
 });
 
-loyaltyRouter.get('/rewards', async(c) => {
-  const cust = c.get('customer') as unknown as Customer;
+loyaltyRouter.get('/rewards', async(c, next) => {
+  const cust = c.get('customer') as unknown as Customer | undefined;
+  if (!cust) {
+    await next();
+    return;
+  }
   const custRecord = cust as unknown as Record<string, unknown>;
   const rawCustTenant = String(custRecord?.tenant_id ?? custRecord?.tenantId ?? '').trim();
   const storeTenant = c.env.PILOT_TENANT_ID

@@ -79,6 +79,43 @@ describe('POST /api/payments/refund', () => {
   });
 });
 
+describe('manual refund transfer ledger', () => {
+  it('accumulates distinct partial tranches and rejects trimmed replay references', async () => {
+    const { app, env, sqlite } = fixture();
+    const auth = await headers();
+    const first = { ...valid, amount: 5000, manual_transfer_ref: ' BANK-1 ' };
+    expect((await app.fetch(req(first, auth), env)).status).toBe(200);
+    expect((await app.fetch(req({ ...first, manual_transfer_ref: 'BANK-1' }, auth), env)).status).toBe(409);
+    expect(sqlite.prepare('SELECT refund_amount FROM payments').get()?.refund_amount).toBe(5000);
+    expect((await app.fetch(req({ ...valid, amount: 16000, manual_transfer_ref: 'BANK-2' }, auth), env)).status).toBe(400);
+    expect((await app.fetch(req({ ...valid, amount: 15000, manual_transfer_ref: 'BANK-2' }, auth), env)).status).toBe(200);
+    expect(sqlite.prepare('SELECT refund_amount, status FROM payments').get()).toMatchObject({ refund_amount: 20000, status: 'refunded' });
+    expect((await app.fetch(req(first, auth), env)).status).toBe(409);
+    expect(sqlite.prepare('SELECT count(*) AS n FROM payment_refund_transfers').get()?.n).toBe(2);
+  });
+
+  it('does not record a financial write when durable ledger storage is unavailable', async () => {
+    const { app, env, sqlite } = fixture();
+    sqlite.exec('DROP TABLE payment_refund_transfers');
+    expect((await app.fetch(req({ ...valid, manual_transfer_ref: 'BANK-1' }, await headers()), env)).status).toBe(500);
+    expect(sqlite.prepare('SELECT refund_amount FROM payments').get()?.refund_amount).toBeNull();
+  });
+
+  it('rolls back payment CAS when ledger insertion fails', async () => {
+    const { app, env, sqlite } = fixture();
+    sqlite.exec("CREATE TRIGGER reject_transfer BEFORE INSERT ON payment_refund_transfers BEGIN SELECT RAISE(ABORT, 'ledger unavailable'); END");
+    expect((await app.fetch(req({ ...valid, manual_transfer_ref: 'BANK-1' }, await headers()), env)).status).toBe(500);
+    expect(sqlite.prepare('SELECT refund_amount FROM payments').get()?.refund_amount).toBeNull();
+    expect(sqlite.prepare('SELECT count(*) AS n FROM payment_refund_transfers').get()?.n).toBe(0);
+  });
+
+  it('rejects oversized transfer references without updating paid funds', async () => {
+    const { app, env, sqlite } = fixture();
+    expect((await app.fetch(req({ ...valid, manual_transfer_ref: 'x'.repeat(201) }, await headers()), env)).status).toBe(400);
+    expect(sqlite.prepare('SELECT refund_amount FROM payments').get()?.refund_amount).toBeNull();
+  });
+});
+
 describe('GET /api/payments/refunds/:paymentId', () => {
   it('preserves historical partial refund details', async () => {
     const { app, env, sqlite } = fixture(); sqlite.exec("UPDATE payments SET refund_status = 'partial', refund_amount = 10000, refund_reason = 'Historical'");
