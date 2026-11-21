@@ -173,8 +173,13 @@ export async function reconcileShiftCash(
     .bind(input.shift_id, effectiveReconTenant || 'default').first();
   if (existingRecon) throw new ShiftContractError(`Shift ${input.shift_id} has already been reconciled`, 409);
 
-  const actualCash = typeof rawActualCounted === 'number' ? rawActualCounted : Array.isArray(input.denominations?.denominations)
-    ? calculateTotalCash(input.denominations.denominations)
+  const hasDenominations = Array.isArray(input.denominations?.denominations) && input.denominations.denominations.length > 0;
+  const calculatedFromDenominations = hasDenominations ? calculateTotalCash(input.denominations.denominations) : null;
+  if (hasDenominations && typeof rawActualCounted === 'number' && rawActualCounted !== calculatedFromDenominations) {
+    throw new ShiftContractError('actual_cash_counted does not match denomination breakdown', 400);
+  }
+  const actualCash = calculatedFromDenominations !== null
+    ? calculatedFromDenominations
     : typeof rawActualCounted === 'number'
       ? rawActualCounted
       : 0;
@@ -225,11 +230,18 @@ export async function reconcileShiftCash(
     throw err;
   }
 
-  // Re-verify cash ledger after locking the reconciliation row so a concurrent COD collection
-  // settled between the read and insert cannot be silently omitted from the handover total.
+  // Re-verify cash ledger (payments & payouts) after locking the reconciliation row so a concurrent
+  // COD collection or payout between the read and insert cannot be silently omitted from handover.
   const verifiedCashPayments = await getCashPaymentsForShift(db, input.shift_id, normTenant, new Date().toISOString());
-  if (verifiedCashPayments !== cashPayments) {
-    await db.prepare('DELETE FROM shift_reconciliations WHERE id = ?').bind(reconciliation.id).run().catch(() => {});
+  const verifiedCashPayouts = await getCashPayoutsForShift(db, input.shift_id, normTenant);
+  if (verifiedCashPayments !== cashPayments || verifiedCashPayouts !== cashPayouts) {
+    const rollback = await db
+      .prepare('DELETE FROM shift_reconciliations WHERE id = ? AND tenant_id = ?')
+      .bind(reconciliation.id, effectiveReconTenant || 'default')
+      .run();
+    if (rollback.meta && typeof rollback.meta.changes === 'number' && rollback.meta.changes === 0) {
+      throw new Error('Failed to roll back concurrent shift reconciliation');
+    }
     throw new ShiftContractError('Shift cash ledger changed concurrently; refresh and retry reconciliation', 409);
   }
 

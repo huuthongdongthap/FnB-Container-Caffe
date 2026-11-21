@@ -23,6 +23,7 @@ import { CheckCircle2, AlertCircle, X, ExternalLink } from 'lucide-react';
 import type { PaymentMethod } from '@/lib/validators';
 import { brandConfig } from '@/config/brand-types';
 import { StitchPOSNew } from '@/components/stitch/StitchPOSNew';
+import { ShiftHandoverModal } from '@/components/admin/ShiftHandoverModal';
 import type { POSNewMenuItem, POSNewCartItem, POSNewAddOn } from '@/components/stitch/StitchPOSNew-types';
 
 const VND_POS_ADDONS: POSNewAddOn[] = [
@@ -68,6 +69,7 @@ export default function AdminPOSPage() {
   const [customer, setCustomer] = useState<POSCustomer | null>(null);
   const [selectedTableId, _setSelectedTableId] = useState<string | undefined>(undefined);
   const [checkoutSuccess, setCheckoutSuccess] = useState(false);
+  const [shiftHandoverOpen, setShiftHandoverOpen] = useState(false);
   const [checkoutError, setCheckoutError] = useState<string | null>(null);
   const [paymentUrl, setPaymentUrl] = useState<string | null>(null);
   const [paymentQrDataUrl, setPaymentQrDataUrl] = useState<string | null>(null);
@@ -247,7 +249,12 @@ export default function AdminPOSPage() {
         onCustomerFound={setCustomer}
         onClearCustomer={() => setCustomer(null)}
         onOpenSchedule={() => navigate('/admin/staff')}
-        onEndShift={() => navigate('/admin/staff')}
+        onEndShift={() => setShiftHandoverOpen(true)}
+      />
+
+      <ShiftHandoverModal
+        isOpen={shiftHandoverOpen}
+        onClose={() => setShiftHandoverOpen(false)}
       />
 
       {/* ── Quarantined Offline Orders Alert (MD3 Strict) ──────────────── */}
