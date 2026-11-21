@@ -7,6 +7,7 @@ export interface SessionSnapshot {
   userId: string | null;
   tenantId: string;
   userScope: string;
+  role?: string;
 }
 const EVENT = 'aura:session-change';
 let revision = 0;
@@ -59,8 +60,9 @@ function publish(error: string | null = null) {
 export function saveClientSession(token: string, user: ClientSessionUser, deviceToken?: string | null) {
   revision++;
   try {
-    const previous = readClientSession().user;
-    if (previous?.id !== user.id || previous?.tenantId !== user.tenantId || previous?.role !== user.role) {
+    const previous = readSessionSnapshot();
+    const next = readSessionSnapshot({ token, user, deviceToken: null, error: null });
+    if (!isSameAccountScope(previous, next)) {
       accountScopedKeys.forEach(key => localStorage.removeItem(key));
       try { sessionStorage.removeItem('aura_checkout_intent_v1'); } catch { /* ignore */ }
       void offlineDb.clearCachesAndSynced().catch(() => {});
@@ -136,14 +138,17 @@ export function readSessionSnapshot(sessionInput?: ReturnType<typeof readClientS
     userId,
     tenantId,
     userScope,
+    ...(typeof rawUser?.role === 'string' ? { role: rawUser.role } : {}),
   };
+}
+export function isSameAccountScope(a: SessionSnapshot, b: SessionSnapshot): boolean {
+  return a.userId === b.userId && a.tenantId === b.tenantId &&
+    a.userScope === b.userScope && a.role === b.role;
 }
 export function isSameSessionSnapshot(a: SessionSnapshot, b: SessionSnapshot): boolean {
   return (
     a.token === b.token &&
-    a.userId === b.userId &&
-    a.tenantId === b.tenantId &&
-    a.userScope === b.userScope
+    isSameAccountScope(a, b)
   );
 }
 export function subscribeSessionChange(

@@ -7894,7 +7894,10 @@ describe('Phase 44 (AQ1..AQ4) — Birthday, POS Lookup, QR, Signage, Table Sessi
 
     expect(tsRoutesSrc).toContain('STAFF_SESSION_ROLES');
     expect(tsSessionSrc).toContain('matchesSessionTenant');
-    expect(tsOrderSrc).toContain('SELECT id, COALESCE(total_amount, total, 0) AS total, status, table_id, tenant_id FROM orders WHERE id = ?');
+    expect(tsOrderSrc).toContain('SELECT * FROM orders WHERE id = ?');
+    expect(tsOrderSrc).toContain('Number(order.total_amount ?? order.total ?? 0)');
+    expect(tsOrderSrc).toContain('const [, bill] = await db.batch([');
+    expect(tsOrderSrc).toContain('AND changes() = 1');
     expect(tableCrudSrc).toContain("LEFT JOIN table_zones z ON COALESCE(t.zone_id, LOWER(t.zone)) = z.id AND COALESCE(NULLIF(TRIM(z.tenant_id), ''), 'default') = COALESCE(NULLIF(TRIM(t.tenant_id), ''), 'default')");
     expect(tableHelpersSrc).toContain('writeTableAuditLog');
     expect(staffHandlersSrc).toContain('Phone number already exists');

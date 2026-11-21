@@ -46,7 +46,7 @@ export function validateGeneratedArtifacts(
         const parsed = JSON.parse(content) as {
           brand?: { name?: string; domain?: string };
         };
-        const expectedDomain = `${answers.domainSlug}.pages.dev`;
+        const expectedDomain = `aura-cafe-${answers.domainSlug}.pages.dev`;
         if (parsed.brand?.domain !== expectedDomain) {
           errors.push(
             `brandJson domain "${parsed.brand?.domain ?? ''}" does not match expected "${expectedDomain}"`,
@@ -121,7 +121,7 @@ export async function deployToCloudflare(
 
   return {
     projectName,
-    pagesUrl: `https://${answers.domainSlug}.pages.dev`,
-    apiUrl: `https://${answers.domainSlug}.pages.dev/api`,
+    pagesUrl: `https://${projectName}.pages.dev`,
+    apiUrl: `https://${projectName}.pages.dev/api`,
   };
 }

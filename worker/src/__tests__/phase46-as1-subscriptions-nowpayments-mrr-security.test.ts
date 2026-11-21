@@ -119,6 +119,11 @@ describe('Phase 46 Slice AS1 — Subscriptions, NowPayments IPN, MRR/ARR, Plan C
       let updatedSubArgs: unknown[] = [];
 
       const db = {
+        batch: async (statements: { run(): Promise<{ meta: { changes: number } }> }[]) => {
+          const results = [];
+          for (const statement of statements) results.push(await statement.run());
+          return results;
+        },
         prepare: vi.fn((sql: string) => ({
           bind: (...args: unknown[]) => ({
             first: async () => {
@@ -182,6 +187,11 @@ describe('Phase 46 Slice AS1 — Subscriptions, NowPayments IPN, MRR/ARR, Plan C
       let updatedSubArgs: unknown[] = [];
 
       const db = {
+        batch: async (statements: { run(): Promise<{ meta: { changes: number } }> }[]) => {
+          const results = [];
+          for (const statement of statements) results.push(await statement.run());
+          return results;
+        },
         prepare: vi.fn((sql: string) => ({
           bind: (...args: unknown[]) => ({
             first: async () => {
@@ -249,8 +259,11 @@ describe('Phase 46 Slice AS1 — Subscriptions, NowPayments IPN, MRR/ARR, Plan C
                   amount_vnd: 10_000_000,
                   payment_ref: 'pay_bound_1',
                   tenant_id: 'tenant_franchise_1',
-                };
+                  batch: async (statements: { run(): Promise<{ meta: { changes: number } }> }[]) =>
+          Promise.all(statements.map(statement => statement.run())),
+      };
               }
+              if (sql.includes('FROM subscriptions WHERE id = ?')) return { tenant_id: 'tenant_franchise_1' };
               return null;
             },
             run: async () => {
@@ -259,6 +272,8 @@ describe('Phase 46 Slice AS1 — Subscriptions, NowPayments IPN, MRR/ARR, Plan C
             },
           }),
         })),
+        batch: async (statements: { run(): Promise<{ meta: { changes: number } }> }[]) =>
+          Promise.all(statements.map(statement => statement.run())),
       };
 
       const mismatch = await processNowPaymentsIpn(db, {
