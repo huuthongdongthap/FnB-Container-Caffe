@@ -152,7 +152,7 @@ export default function AdminPOSPage() {
           })),
           total: Math.round(total),
           customer_name: customer?.name || t('adminPOS.customerDefaultName'),
-          customer_phone: customer?.phone || '0900000000',
+          customer_phone: customer?.phone || '',
           customer_id: customer?.id,
           customer_email: undefined,
           customer_address: t('adminPOS.customerDefaultAddress'),
