@@ -67,7 +67,7 @@ export function LandingNav() {
         className="fixed top-0 w-full z-50 flex justify-between items-center px-4 sm:px-8 lg:px-16 py-4 backdrop-blur-[12px] border-b border-[var(--aura-chrome-dim)]/30 bg-[#0A1A2E]/80"
       >
         {/* Logo */}
-        <a href="/" className="flex items-center gap-3 group" onClick={closeDrawer}>
+        <a href="/" className="flex min-h-[44px] items-center gap-3 group" onClick={closeDrawer}>
           <img
             src="/images/aura-emblem.png"
             alt="AURA CAFE Logo"
@@ -96,12 +96,12 @@ export function LandingNav() {
         </a>
 
         {/* Desktop links */}
-        <div className="hidden md:flex items-center gap-6">
+        <div className="hidden md:flex items-center gap-3 lg:gap-6">
           {navLinks.map((link) => (
             <a
               key={link.href}
               href={link.href}
-              className={`inline-flex min-h-[44px] items-center px-1 text-base transition-all font-display ${
+              className={`inline-flex min-h-[44px] min-w-[44px] items-center justify-center px-1.5 text-base transition-all font-display ${
                 isActive(link.href)
                   ? 'border-b-2 border-[var(--aura-chrome-bright)] text-[var(--aura-chrome-bright)] font-semibold'
                   : 'text-[var(--aura-chrome-soft)] hover:text-[var(--aura-chrome-bright)] font-medium'
