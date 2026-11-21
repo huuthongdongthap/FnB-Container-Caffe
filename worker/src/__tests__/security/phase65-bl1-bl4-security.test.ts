@@ -891,6 +891,7 @@ describe('Phase 65 Security & Operational Regression Suite (BL1-BL4)', () => {
           role TEXT,
           date TEXT NOT NULL,
           shift TEXT DEFAULT 'scheduled',
+          opening_cash REAL DEFAULT 0,
           start_time TEXT,
           end_time TEXT,
           clock_in TEXT,

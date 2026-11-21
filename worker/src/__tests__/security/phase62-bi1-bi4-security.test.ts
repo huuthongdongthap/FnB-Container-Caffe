@@ -505,7 +505,9 @@ describe('Phase 62 Security Regression Suite (BI1-BI4)', () => {
       const mockDb = {
         prepare: (sql: string) => ({
           bind: () => ({
+            all: async () => ({ results: [{ id: 'payment-1', amount: 200000, shift_id: 'shift_bi4_1', candidates: 1 }] }),
             first: async () => {
+              if (sql.includes('FROM users')) return { tenant_id: 'store-a', role: 'staff', is_active: 1 };
               if (sql.includes('FROM staff_shifts')) {
                 return {
                   clock_in: '2026-11-04T08:00:00.000Z',
@@ -542,13 +544,13 @@ describe('Phase 62 Security Regression Suite (BI1-BI4)', () => {
           'other_cashier',
           'store-a'
         )
-      ).rejects.toThrow(/Shift operator mismatch/);
+      ).rejects.toThrow(/Forbidden/);
 
       const recon = await reconcileShiftCash(
         { AURA_DB: mockDb } as never,
         {
           shift_id: 'shift_bi4_1',
-          opening_float: 0, // Spoofed 0 opening float; server shift has 500,000 + 200,000 cash sales = 700,000
+          opening_float: 500000, // Recorded opening float plus settled cash sales.
           denominations: { denominations: [{ denomination: 200000, count: 1 }] },
         },
         'cashier_owner',

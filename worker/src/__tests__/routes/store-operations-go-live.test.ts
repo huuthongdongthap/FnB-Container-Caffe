@@ -183,10 +183,18 @@ export function createStoreMockDb() {  const customers = new Map<string, { id: s
                 const tx = loyaltyTx.find((t) => t.order_id === ordId && t.type === 'refund_redeem');
                 return (tx ? { id: tx.id } : null) as T | null;
               }
-              if (sql.includes('FROM shifts WHERE id = ?') || sql.includes('FROM staff_shifts WHERE id = ?')) {
+              if (
+                sql.includes('FROM shifts WHERE id = ?') ||
+                sql.includes('FROM staff_shifts WHERE id = ?') ||
+                sql.includes('FROM staff_shifts')
+              ) {
                 const id = String(args[0]);
                 const s = shifts.get(id);
                 return (s ? { ...s } : null) as T | null;
+              }
+              if (sql.includes('FROM users WHERE id = ?')) {
+                const u = users.get(String(args[0]));
+                return (u ? { is_active: 1, ...u } : null) as T | null;
               }
               if (sql.includes('FROM purchase_orders WHERE id = ?')) {
                 const po = purchaseOrders.get(String(args[0]));
@@ -246,6 +254,13 @@ export function createStoreMockDb() {  const customers = new Map<string, { id: s
               return { changes: 1, meta: { last_row_id: 1 } };
             },
             async all<T = Record<string, unknown>>(): Promise<{ results: T[] }> {
+              if (sql.includes('FROM payments p LEFT JOIN cash_payment_attributions')) {
+                return {
+                  results: [
+                    { id: 'pay_evening_cash_1', amount: 350000, shift_id: 'shift_evening_1', candidates: 1 },
+                  ] as unknown as T[],
+                };
+              }
               if (sql.includes('FROM products WHERE id IN') || sql.includes('FROM menu_items WHERE id IN')) {
                 return {
                   results: [
@@ -537,15 +552,21 @@ export function createStoreMockDb() {  const customers = new Map<string, { id: s
                   id: args[0],
                   shift_id: args[1],
                   staff_id: args[2],
-                  opening_float: args[3],
-                  expected_cash: args[4],
-                  actual_cash: args[5],
-                  variance: args[6],
-                  variance_status: args[7],
-                  denominations: args[8],
-                  cash_payment_total: args[9],
-                  cash_payout_total: args[10],
-                  tenant_id: 'default',
+                  reconciled_by: args[3],
+                  tenant_id: args[4] ?? 'default',
+                  opening_float: args[5],
+                  opening_cash: args[6],
+                  expected_cash: args[7],
+                  actual_cash: args[8],
+                  variance: args[9],
+                  variance_amount: args[10],
+                  variance_status: args[11],
+                  status: args[12],
+                  denominations: args[13],
+                  cash_payment_total: args[14],
+                  cash_sales: args[15],
+                  cash_payout_total: args[16],
+                  notes: args[17],
                   created_at: '2026-11-18T15:45:00.000Z',
                 });
                 return { meta: { changes: 1 } };
