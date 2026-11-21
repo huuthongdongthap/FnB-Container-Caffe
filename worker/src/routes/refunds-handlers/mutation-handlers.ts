@@ -260,22 +260,90 @@ export async function handleRefund(c: Context<{ Bindings: Env }>, openApi = fals
         // Fallback for minimal audit_logs schema
       }
 
-      const customerId = payment.customer_id;
-      if (customerId && customerId !== 'guest') {
-        try {
-          const { loadPolicy, reverseAccrual } = await import('@aura/domain-crm');
+      type LoyaltyReversalOutcome = {
+        status: 'reversed' | 'skipped' | 'failed';
+        customerId?: string;
+        pointsDeducted?: number;
+        reason?: string;
+        retryable?: boolean;
+      };
+      let loyaltyReversal: LoyaltyReversalOutcome = { status: 'skipped' };
+      try {
+        const { loadPolicy, reverseAccrual, resolveAccrualRecipient } = await import('@aura/domain-crm');
+        const ledgerRecipient = await resolveAccrualRecipient(db, payment.order_id, effectivePaymentTenant);
+        const orderOwnerId =
+          typeof payment.customer_id === 'string' && payment.customer_id.trim() !== '' && payment.customer_id !== 'guest'
+            ? payment.customer_id.trim()
+            : null;
+        const targetCustomerId = ledgerRecipient.customerId ?? orderOwnerId;
+
+        if (targetCustomerId) {
           const policy = await loadPolicy(db, c.env?.AUTH_KV, new Date(), effectivePaymentTenant).catch(() => null);
-          if (policy) {
-            await reverseAccrual(db, policy, {
+          if (!policy) {
+            loyaltyReversal = { status: 'failed', customerId: targetCustomerId, reason: 'policy_load_failed', retryable: true };
+          } else {
+            const revResult = await reverseAccrual(db, policy, {
               orderId: payment.order_id,
-              customerId,
+              customerId: targetCustomerId,
               refundAmountVnd: amount,
               tenantId: effectivePaymentTenant,
               reason: refundReason,
-            }).catch(() => {});
+              verifiedLedgerRecipient: ledgerRecipient.fromLedger,
+            });
+            if (revResult.ok) {
+              loyaltyReversal = {
+                status: 'reversed',
+                customerId: targetCustomerId,
+                pointsDeducted: revResult.pointsDeducted,
+              };
+            } else if (revResult.reason === 'no_points_to_reverse' || revResult.reason === 'already_reversed') {
+              loyaltyReversal = { status: 'skipped', customerId: targetCustomerId, reason: revResult.reason };
+            } else {
+              loyaltyReversal = {
+                status: 'failed',
+                customerId: targetCustomerId,
+                reason: revResult.reason,
+                retryable: true,
+              };
+            }
           }
+        }
+      } catch (revErr) {
+        loyaltyReversal = {
+          status: 'failed',
+          reason: revErr instanceof Error ? revErr.message : 'reversal_exception',
+          retryable: true,
+        };
+      }
+
+      if (loyaltyReversal.status === 'failed') {
+        try {
+          await db.prepare(`
+            INSERT INTO audit_logs (actor_id, actor_name, user_id, action, resource_type, resource_id, details, metadata, tenant_id, created_at)
+            VALUES (?, ?, ?, 'loyalty_reversal_failed', 'payment', ?, ?, ?, ?, ?)
+          `).bind(
+            user?.id || 'system',
+            user?.name || user?.email || 'manager',
+            user?.id || null,
+            payment.id,
+            JSON.stringify({
+              order_id: payment.order_id,
+              customer_id: loyaltyReversal.customerId ?? null,
+              refund_amount: amount,
+              manual_transfer_ref: manualTransferRef,
+              reason: loyaltyReversal.reason,
+              retryable: true,
+            }),
+            JSON.stringify({
+              order_id: payment.order_id,
+              customer_id: loyaltyReversal.customerId ?? null,
+              retryable: true,
+            }),
+            effectivePaymentTenant,
+            now,
+          ).run();
         } catch {
-          // Non-blocking on reverseAccrual
+          // Minimal audit_logs schema fallback
         }
       }
 
@@ -287,6 +355,7 @@ export async function handleRefund(c: Context<{ Bindings: Env }>, openApi = fals
           amount,
           refund_status: refundStatus,
           manual_transfer_ref: manualTransferRef,
+          loyalty_reversal: loyaltyReversal,
         },
       }, 200);
     }

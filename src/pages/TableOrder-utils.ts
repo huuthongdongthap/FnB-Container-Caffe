@@ -1,7 +1,8 @@
+import { canonicalPhone } from '../../packages/domain/customer/phone';
 const TABLE_SLUG_RE = /^[a-zA-Z0-9_-]+$/;
 
 export function normalizePhone(raw: string): string {
-  return raw.replace(/\D/g, '');
+  return canonicalPhone(raw) ?? '';
 }
 
 export function isTableIdValid(raw: string | null): raw is string {
