@@ -5,6 +5,7 @@ import { LogOut } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { useAuthStore } from '@/hooks/stores/use-auth-store';
 import { SECTIONS } from './StitchAdminTerminalNew-constants';
+import { filterAdminNavSections } from './admin-nav-visibility';
 import type { NavSectionData } from './StitchAdminTerminalNew-types';
 
 interface SidebarProps {
@@ -21,6 +22,9 @@ function isActivePath(pathname: string, to: string): boolean {
   if (to === '/admin') {
     return pathname === '/admin' || pathname === '/admin/dashboard';
   }
+  if (to === '/admin/hq-saas') {
+    return pathname.startsWith('/admin/hq-saas') || pathname.startsWith('/admin/hq/tenants');
+  }
   return pathname.startsWith(to);
 }
 
@@ -32,8 +36,10 @@ export const Sidebar = forwardRef<HTMLElement, SidebarProps>(
     const { t } = useTranslation();
     const location = useLocation();
     const navigate = useNavigate();
+    const user = useAuthStore((s) => s.user);
+    const visibleSections = filterAdminNavSections(SECTIONS, user);
     const isPosRoute = location.pathname.startsWith('/admin/pos');
-    const tNav = (key: string) => t(`nav.${key}`);
+    const tNav = (key: string, fallback: string) => t(`nav.${key}`, { defaultValue: fallback });
     const tTerminal = (key: string) => t(`terminal.${key}`);
 
     return (
@@ -58,7 +64,7 @@ export const Sidebar = forwardRef<HTMLElement, SidebarProps>(
 
         {/* Navigation */}
         <nav className="flex-1 overflow-y-auto px-3" aria-label={tTerminal('mainNavigation')}>
-          {SECTIONS.map((section: NavSectionData, si: number) => (
+          {visibleSections.map((section: NavSectionData, si: number) => (
             <div key={si} className="mb-4">
               {section.title && (
                 <p className="mb-2 px-3 text-[10px] font-semibold uppercase tracking-widest text-[var(--aura-text-secondary, #a0a8b0)]">
@@ -80,7 +86,7 @@ export const Sidebar = forwardRef<HTMLElement, SidebarProps>(
                         : 'text-[var(--aura-text-secondary, #a0a8b0)] hover:bg-[var(--st-surface-container-highest, #273a55)]/30 hover:text-[var(--aura-text-primary, #e8e8e8)]',
                     )}
                     aria-current={active ? 'page' : undefined}
-                    aria-label={tNav(item.to)}
+                    aria-label={tNav(item.to, item.label)}
                   >
                     <Icon size={20} />
                     <span>{item.label}</span>

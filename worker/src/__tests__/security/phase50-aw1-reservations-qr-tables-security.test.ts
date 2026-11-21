@@ -610,14 +610,14 @@ describe('Phase 50 Slice AW1 — Reservations, QR Codes, Table Sessions, OpenAPI
       sqlite
         .prepare(
           `INSERT INTO cafe_tables (id, number, name, zone, capacity, status, is_active, tenant_id)
-           VALUES ('tbl-qr-dl', 20, 'Table 20', 'Indoor', 4, 'available', 1, 'store-a')`
+           VALUES ('tbl-qr-dl', 20, 'Table 20', 'Indoor', 4, 'available', 1, 'default')`
         )
         .run();
 
       sqlite
         .prepare(
           `INSERT INTO table_qr_codes (id, table_id, table_number, zone, qr_slug, qr_url, status, tenant_id)
-           VALUES ('qr-20', 'tbl-qr-dl', 20, 'Indoor', 'slug-dl-20', 'https://order.containers.vn/order/slug-dl-20', 'active', 'store-a')`
+           VALUES ('qr-20', 'tbl-qr-dl', 20, 'Indoor', 'slug-dl-20', 'https://order.containers.vn/order/slug-dl-20', 'active', 'default')`
         )
         .run();
 
@@ -630,8 +630,8 @@ describe('Phase 50 Slice AW1 — Reservations, QR Codes, Table Sessions, OpenAPI
 
       const app = new Hono<{ Bindings: Env }>();
       app.use('*', async (c, next) => {
-        c.set('tenantId' as never, 'store-a' as never);
-        c.set('user' as never, { sub: 'mgr-1', role: 'manager', tenant_id: 'store-a' } as never);
+        c.set('tenantId' as never, 'default' as never);
+        c.set('user' as never, { sub: 'mgr-1', role: 'manager', tenant_id: 'default' } as never);
         await next();
       });
       app.route('/api/admin/qr', adminQrRouter);

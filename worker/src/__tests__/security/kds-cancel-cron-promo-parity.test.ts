@@ -8,6 +8,7 @@ import { isHeldOutOfKds } from '../../../../packages/domain/kitchen/policies/kds
 import { updateOrder } from '../../../../packages/domain/order/commands/update-order';
 import { hashOrderToken } from '../../../../packages/domain/customer/policies/order-ownership-policy';
 import { reconcilePayOSPayment } from '../../../../packages/domain/payment/commands/payos-reconcile';
+import { encryptTenantSecret } from '../../lib/tenant-secrets';
 import { mapSseEventToOrder } from '../../../../src/hooks/stores/order-store-utils';
 import { promotionsRouter } from '../../routes/promotions';
 import { reviewsRouter } from '../../routes/reviews';
@@ -77,10 +78,23 @@ describe('KDS payment hold, cancellation parity, cron session pinning, promotion
       CREATE TABLE payments (id TEXT PRIMARY KEY, order_id TEXT, method TEXT, amount INTEGER, status TEXT, transaction_id TEXT, payment_url TEXT, tenant_id TEXT, created_at TEXT, updated_at TEXT);
       CREATE TABLE table_sessions (id TEXT PRIMARY KEY, table_id TEXT, status TEXT, tenant_id TEXT);
       CREATE TABLE reservations (id TEXT PRIMARY KEY, table_id TEXT, date TEXT, status TEXT, tenant_id TEXT);
+      CREATE TABLE tenant_payment_configs (tenant_id TEXT PRIMARY KEY, provider TEXT, payos_client_id_enc TEXT, payos_api_key_enc TEXT, payos_checksum_key_enc TEXT, key_version INTEGER, bank_bin TEXT, bank_account_no TEXT, bank_account_name TEXT, bank_name TEXT, is_active INTEGER, updated_at TEXT);
       INSERT INTO cafe_tables VALUES ('tbl_5', '5', 'Occupied', 'sadec');
       INSERT INTO orders VALUES ('ord_cancel_1', 'pending', 'payos', 'unpaid', '5', '[{"id":"p1","name":"Latte","quantity":1,"price":45000}]', 45000, NULL, NULL, 'Guest', '0901234567', 'sadec', '2026-11-17T00:00:00Z', '2026-11-17T00:00:00Z');
       INSERT INTO payments VALUES ('pay_open_1', 'ord_cancel_1', 'payos', 45000, 'pending', '123456', 'https://pay.payos.vn/web/link_abc', 'sadec', '2026-11-17T00:00:00Z', '2026-11-17T00:00:00Z');
     `);
+    const tenantSecretsKey = '11'.repeat(32);
+    const merchantClientId = 'sadec-test-client';
+    const merchantApiKey = 'sadec-test-api-key';
+    const encryptedCredentials = await Promise.all([
+      encryptTenantSecret(merchantClientId, tenantSecretsKey, 1, 'sadec:payos_client_id'),
+      encryptTenantSecret(merchantApiKey, tenantSecretsKey, 1, 'sadec:payos_api_key'),
+      encryptTenantSecret('sadec-test-checksum', tenantSecretsKey, 1, 'sadec:payos_checksum_key'),
+    ]);
+    sqlite.prepare(`
+      INSERT INTO tenant_payment_configs (tenant_id, provider, payos_client_id_enc, payos_api_key_enc, payos_checksum_key_enc, key_version, is_active)
+      VALUES ('sadec', 'payos', ?, ?, ?, 1, 1)
+    `).run(...encryptedCredentials);
     const db = createSqliteD1(sqlite);
     const kvStore = new Map<string, string>();
     const kv = { put: vi.fn(async (k: string, v: string) => { kvStore.set(k, v); }), get: vi.fn(async (k: string) => kvStore.get(k) ?? null) };
@@ -91,8 +105,10 @@ describe('KDS payment hold, cancellation parity, cron session pinning, promotion
       const env = {
         AURA_DB: db,
         AUTH_KV: kv,
-        PAYOS_CLIENT_ID: 'cid',
-        PAYOS_API_KEY: 'akey',
+        TENANT_SECRETS_KEY: tenantSecretsKey,
+        PAYOS_CLIENT_ID: 'flagship-test-client',
+        PAYOS_API_KEY: 'flagship-test-api-key',
+        PAYOS_CHECKSUM_KEY: 'flagship-test-checksum',
         ORDER_BROADCASTER: { idFromName: (n: string) => n, get: () => ({ broadcast: broadcastSpy }) },
       };
       const req = new Request('https://test.aura/api/orders/ord_cancel_1', {
@@ -102,7 +118,14 @@ describe('KDS payment hold, cancellation parity, cron session pinning, promotion
       });
       const res = await updateOrder(req, env as never, 'ord_cancel_1', 'manager', 'sadec');
       expect(res.status).toBe(200);
-      expect(fetchMock).toHaveBeenCalledWith(expect.stringContaining('/v2/payment-requests/'), expect.objectContaining({ method: 'POST' }));
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      expect(fetchMock).toHaveBeenCalledWith(
+        expect.stringMatching(/\/v2\/payment-requests\/link_abc\/cancel$/),
+        expect.objectContaining({
+          method: 'POST',
+          headers: expect.objectContaining({ 'x-client-id': merchantClientId, 'x-api-key': merchantApiKey }),
+        }),
+      );
       const tbl = sqlite.prepare('SELECT status FROM cafe_tables WHERE id = ?').get('tbl_5') as { status: string };
       expect(tbl.status).toBe('Available');
       expect(kvStore.has('order_event:sadec:ord_cancel_1')).toBe(true);

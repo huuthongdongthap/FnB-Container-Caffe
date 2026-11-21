@@ -1,6 +1,13 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
-import { API_BASE, apiFetch } from '@/lib/api-client';
+import { API_BASE, ApiClientError, apiFetch } from '@/lib/api-client';
+import { MD3Button, MD3Card } from '@/components/md3';
+import { useStorefrontSeo } from './storefront-seo';
+import {
+  rememberStorefrontOrderToken,
+  sanitizeStorefrontMediaUrl,
+} from './storefront-helpers';
+import { StorefrontPaymentReturn } from './storefront-payment-return';
 import {
   StorefrontPaymentCard,
   type StorefrontOrderResult,
@@ -64,12 +71,17 @@ const GUEST_FALLBACK_PHONE = '0000000000';
 
 export default function TenantStorefrontPage(): ReactNode {
   const { slug } = useParams<{ slug: string }>();
+  return <Storefront key={slug} slug={slug} />;
+}
+
+function Storefront({ slug }: { slug?: string }) {
   const [searchParams] = useSearchParams();
   const initialTable = searchParams.get('table') || '';
 
   const [data, setData] = useState<StorefrontPayload | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [notFound, setNotFound] = useState(false);
+  const [loadState, setLoadState] = useState<'loading' | 'ready' | 'not_found' | 'error'>('loading');
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [retry, setRetry] = useState(0);
   const [activeCategory, setActiveCategory] = useState<string>('all');
   const [selectedTableId, setSelectedTableId] = useState<string>('');
   const [cart, setCart] = useState<CartItem[]>([]);
@@ -81,34 +93,29 @@ export default function TenantStorefrontPage(): ReactNode {
   const [error, setError] = useState<string | null>(null);
 
   const activeSlugRef = useRef<string | undefined>(slug);
-  const prevSlugRef = useRef<string | undefined>(slug);
+  const initialTableRef = useRef(initialTable);
+  initialTableRef.current = initialTable;
   const submitGenerationRef = useRef(0);
   const submittingRef = useRef(false);
   const mountedRef = useRef(true);
 
+  useStorefrontSeo({
+    slug,
+    state: loadState,
+    displayName: data?.branding.displayName,
+    tagline: data?.branding.tagline,
+    address: data?.branding.address,
+    logoUrl: data?.branding.logoUrl,
+  });
+
   useEffect(() => {
     mountedRef.current = true;
-    const slugChanged = prevSlugRef.current !== slug;
-    prevSlugRef.current = slug;
     activeSlugRef.current = slug;
-
-    if (slugChanged) {
-      submitGenerationRef.current += 1;
-      submittingRef.current = false;
-      setSubmitting(false);
-      setData(null);
-      setCart([]);
-      setOrderResult(null);
-      setError(null);
-      setActiveCategory('all');
-      setSelectedTableId('');
-      setPaymentMethod('cod');
-    }
 
     if (!slug) {
       setData(null);
-      setLoading(false);
-      setNotFound(true);
+      setLoadError(null);
+      setLoadState('not_found');
       return () => {
         mountedRef.current = false;
       };
@@ -116,9 +123,10 @@ export default function TenantStorefrontPage(): ReactNode {
 
     let cancelled = false;
     const controller = new AbortController();
-    setLoading(true);
-    setNotFound(false);
-    void apiFetch<{ success: boolean; data?: StorefrontPayload }>(
+    setLoadState('loading');
+    setLoadError(null);
+
+    void apiFetch<{ success: boolean; data?: StorefrontPayload; error?: string }>(
       `/api/saas/storefront/${encodeURIComponent(slug)}`,
       { silent: true, signal: controller.signal }
     )
@@ -126,11 +134,13 @@ export default function TenantStorefrontPage(): ReactNode {
         if (cancelled || activeSlugRef.current !== slug) return;
         if (res.success && res.data) {
           setData(res.data);
-          const matchedTable = initialTable
+          setLoadState('ready');
+          const tableParam = initialTableRef.current;
+          const matchedTable = tableParam
             ? res.data.tables.find(
                 (t) =>
-                  t.id === initialTable ||
-                  String(t.code || '').toLowerCase() === initialTable.toLowerCase()
+                  t.id === tableParam ||
+                  String(t.code || '').toLowerCase() === tableParam.toLowerCase()
               )
             : res.data.tables[0];
           setSelectedTableId(matchedTable ? matchedTable.id : '');
@@ -144,17 +154,32 @@ export default function TenantStorefrontPage(): ReactNode {
           }
         } else {
           setData(null);
-          setNotFound(true);
+          setLoadState('not_found');
         }
       })
-      .catch(() => {
+      .catch((err: unknown) => {
         if (cancelled || activeSlugRef.current !== slug) return;
+        if (
+          (err instanceof DOMException && err.name === 'AbortError') ||
+          (err instanceof Error && err.name === 'AbortError')
+        ) {
+          return;
+        }
         setData(null);
-        setNotFound(true);
-      })
-      .finally(() => {
-        if (cancelled || activeSlugRef.current !== slug) return;
-        setLoading(false);
+        const isNotFound =
+          err instanceof ApiClientError &&
+          (err.status === 404 || err.code === 'store_not_found');
+        if (isNotFound) {
+          setLoadState('not_found');
+          setLoadError(null);
+        } else {
+          setLoadState('error');
+          setLoadError(
+            err instanceof Error && err.message
+              ? err.message
+              : 'Không thể kết nối máy chủ thực đơn lúc này. Vui lòng thử lại.'
+          );
+        }
       });
 
     return () => {
@@ -162,7 +187,19 @@ export default function TenantStorefrontPage(): ReactNode {
       controller.abort();
       mountedRef.current = false;
     };
-  }, [slug, initialTable]);
+  }, [slug, retry]);
+
+  useEffect(() => {
+    if (!data || !initialTable) return;
+    const matchedTable = data.tables.find(
+      (t) =>
+        t.id === initialTable ||
+        String(t.code || '').toLowerCase() === initialTable.toLowerCase()
+    );
+    if (matchedTable) {
+      setSelectedTableId(matchedTable.id);
+    }
+  }, [data, initialTable]);
 
   const filteredProducts = useMemo(() => {
     if (!data) return [];
@@ -294,6 +331,10 @@ export default function TenantStorefrontPage(): ReactNode {
         return;
       }
 
+      if (orderToken) {
+        rememberStorefrontOrderToken(requestTenant.id, requestTenant.slug, orderId, orderToken);
+      }
+
       let payosCheckoutUrl: string | null = null;
       let payosOrderCode: number | null = null;
       let paymentError: string | null = null;
@@ -378,31 +419,70 @@ export default function TenantStorefrontPage(): ReactNode {
     }
   }
 
-  if (loading) {
+  if (loadState === 'loading') {
     return (
-      <div className="min-h-screen bg-slate-950 text-slate-300 flex items-center justify-center">
+      <div className="min-h-screen bg-slate-950 text-slate-300 flex items-center justify-center p-6">
         Đang tải thực đơn cửa hàng...
       </div>
     );
   }
 
-  if (notFound || !data) {
+  if (loadState === 'error') {
     return (
       <div className="min-h-screen bg-slate-950 text-slate-100 flex items-center justify-center p-6">
-        <div className="max-w-md text-center space-y-3 rounded-2xl border border-slate-800 bg-slate-900 p-8">
-          <h1 className="text-xl font-bold">Không tìm thấy cửa hàng</h1>
-          <p className="text-sm text-slate-400">
+        <MD3Card
+          variant="outlined"
+          role="alert"
+          className="max-w-md w-full text-center space-y-4 p-8 bg-[var(--md-sys-color-surface-container-low)] text-[var(--md-sys-color-on-surface)]"
+        >
+          <h1 className="m3-headline-small text-[var(--md-sys-color-on-surface)]">
+            Không thể tải thực đơn
+          </h1>
+          <p className="m3-body-medium text-[var(--md-sys-color-on-surface-variant)]">
+            {loadError || 'Kết nối tạm thời bị gián đoạn. Vui lòng thử lại.'}
+          </p>
+          <div className="pt-1 flex justify-center">
+            <MD3Button
+              type="button"
+              variant="filled"
+              className="min-w-[44px]"
+              onClick={() => setRetry((n) => n + 1)}
+            >
+              Thử lại
+            </MD3Button>
+          </div>
+        </MD3Card>
+      </div>
+    );
+  }
+
+  if (loadState === 'not_found' || !data) {
+    return (
+      <div className="min-h-screen bg-slate-950 text-slate-100 flex items-center justify-center p-6">
+        <MD3Card
+          variant="outlined"
+          className="max-w-md w-full text-center space-y-3 p-8 bg-[var(--md-sys-color-surface-container-low)] text-[var(--md-sys-color-on-surface)]"
+        >
+          <h1 className="m3-headline-small text-[var(--md-sys-color-on-surface)]">
+            Không tìm thấy cửa hàng
+          </h1>
+          <p className="m3-body-medium text-[var(--md-sys-color-on-surface-variant)]">
             Đường dẫn <span className="font-mono text-amber-400">/s/{slug}</span> không tồn tại hoặc đã thay đổi.
           </p>
-        </div>
+        </MD3Card>
       </div>
     );
   }
 
   const { branding, tenant } = data;
+  const safeLogoUrl = sanitizeStorefrontMediaUrl(branding.logoUrl);
+  const hasActiveCartBar = cart.length > 0 && !tenant.isReadOnly;
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 pb-28">
+    <div
+      data-storefront-shell={hasActiveCartBar ? 'cart-active' : 'cart-idle'}
+      className={`min-h-screen bg-slate-950 text-slate-100 ${hasActiveCartBar ? 'pb-40' : 'pb-12'}`}
+    >
       {/* Tenant-branded header */}
       <header
         className="border-b border-white/10 px-4 py-6"
@@ -410,15 +490,15 @@ export default function TenantStorefrontPage(): ReactNode {
       >
         <div className="max-w-4xl mx-auto flex items-center justify-between gap-4">
           <div className="flex items-center gap-3">
-            {branding.logoUrl ? (
+            {safeLogoUrl ? (
               <img
-                src={branding.logoUrl}
+                src={safeLogoUrl}
                 alt={branding.displayName}
-                className="h-12 w-12 rounded-xl object-cover border border-white/20"
+                className="h-12 w-12 rounded-xl object-cover border border-white/20 shrink-0"
               />
             ) : (
               <div
-                className="h-12 w-12 rounded-xl flex items-center justify-center font-bold text-lg text-slate-950"
+                className="h-12 w-12 rounded-xl flex items-center justify-center font-bold text-lg text-slate-950 shrink-0"
                 style={{ backgroundColor: branding.accentColor || '#D97706' }}
               >
                 {branding.displayName.slice(0, 1).toUpperCase()}
@@ -433,9 +513,10 @@ export default function TenantStorefrontPage(): ReactNode {
 
           {data.tables.length > 0 && (
             <select
+              aria-label="Chọn bàn"
               value={selectedTableId}
               onChange={(e) => setSelectedTableId(e.target.value)}
-              className="rounded-lg bg-black/30 border border-white/20 px-3 py-2 text-xs text-white"
+              className="min-h-[44px] min-w-[44px] rounded-lg bg-black/30 border border-white/20 px-3 py-2 text-xs text-white"
             >
               <option value="" className="bg-slate-900">
                 Mang đi / Tại quầy
@@ -457,6 +538,8 @@ export default function TenantStorefrontPage(): ReactNode {
           </div>
         )}
 
+        <StorefrontPaymentReturn tenant={{ id: tenant.id, slug: tenant.slug }} />
+
         {orderResult && (
           <StorefrontPaymentCard
             order={orderResult}
@@ -467,123 +550,179 @@ export default function TenantStorefrontPage(): ReactNode {
         )}
 
         {error && (
-          <div className="rounded-xl border border-rose-500/40 bg-rose-500/10 px-4 py-3 text-sm text-rose-200">
+          <div role="alert" className="rounded-xl border border-rose-500/40 bg-rose-500/10 px-4 py-3 text-sm text-rose-200">
             {error}
           </div>
         )}
 
         {/* Categories */}
-        <div className="flex gap-2 overflow-x-auto pb-1">
-          <button
-            type="button"
-            onClick={() => setActiveCategory('all')}
-            className={`px-4 py-2 rounded-full text-xs font-semibold whitespace-nowrap border transition ${
-              activeCategory === 'all'
-                ? 'text-slate-950 border-transparent'
-                : 'border-slate-800 bg-slate-900 text-slate-300'
-            }`}
-            style={activeCategory === 'all' ? { backgroundColor: branding.accentColor || '#D97706' } : undefined}
-          >
-            Tất cả ({data.products.length})
-          </button>
-          {data.categories.map((cat) => (
+        {data.products.length > 0 && (
+          <div className="flex gap-2 overflow-x-auto pb-1">
             <button
-              key={cat.id}
               type="button"
-              onClick={() => setActiveCategory(cat.id)}
-              className={`px-4 py-2 rounded-full text-xs font-semibold whitespace-nowrap border transition ${
-                activeCategory === cat.id
+              onClick={() => setActiveCategory('all')}
+              className={`min-h-[44px] min-w-[44px] px-4 py-2 rounded-full text-xs font-semibold whitespace-nowrap border transition ${
+                activeCategory === 'all'
                   ? 'text-slate-950 border-transparent'
                   : 'border-slate-800 bg-slate-900 text-slate-300'
               }`}
-              style={activeCategory === cat.id ? { backgroundColor: branding.accentColor || '#D97706' } : undefined}
+              style={activeCategory === 'all' ? { backgroundColor: branding.accentColor || '#D97706' } : undefined}
             >
-              {cat.name}
+              Tất cả ({data.products.length})
             </button>
-          ))}
-        </div>
-
-        {/* Products Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          {filteredProducts.map((product) => {
-            const inCart = cart.find((i) => i.product.id === product.id);
-            return (
-              <div
-                key={product.id}
-                className="rounded-xl border border-slate-800 bg-slate-900/80 p-4 flex items-center justify-between gap-3"
+            {data.categories.map((cat) => (
+              <button
+                key={cat.id}
+                type="button"
+                onClick={() => setActiveCategory(cat.id)}
+                className={`min-h-[44px] min-w-[44px] px-4 py-2 rounded-full text-xs font-semibold whitespace-nowrap border transition ${
+                  activeCategory === cat.id
+                    ? 'text-slate-950 border-transparent'
+                    : 'border-slate-800 bg-slate-900 text-slate-300'
+                }`}
+                style={activeCategory === cat.id ? { backgroundColor: branding.accentColor || '#D97706' } : undefined}
               >
-                <div className="space-y-1">
-                  <h3 className="font-semibold text-white text-sm">{product.name}</h3>
-                  {product.description && (
-                    <p className="text-xs text-slate-400 line-clamp-2">{product.description}</p>
-                  )}
-                  <div className="text-sm font-bold" style={{ color: branding.accentColor || '#F59E0B' }}>
-                    {Number(product.price).toLocaleString('vi-VN')}đ
-                  </div>
-                </div>
+                {cat.name}
+              </button>
+            ))}
+          </div>
+        )}
 
-                {!tenant.isReadOnly && (
-                  <div className="flex items-center gap-2">
-                    {inCart ? (
-                      <>
+        {/* Products Grid or Empty States */}
+        {data.products.length === 0 ? (
+          <MD3Card
+            variant="outlined"
+            className="p-8 text-center space-y-2 bg-[var(--md-sys-color-surface-container-low)] text-[var(--md-sys-color-on-surface)]"
+          >
+            <h2 className="m3-title-medium text-[var(--md-sys-color-on-surface)]">
+              Thực đơn đang được cập nhật
+            </h2>
+            <p className="m3-body-medium text-[var(--md-sys-color-on-surface-variant)]">
+              Cửa hàng chưa có món nào mở bán trực tuyến. Vui lòng quay lại sau hoặc đặt trực tiếp tại quầy.
+            </p>
+          </MD3Card>
+        ) : filteredProducts.length === 0 ? (
+          <MD3Card
+            variant="outlined"
+            className="p-8 text-center space-y-3 bg-[var(--md-sys-color-surface-container-low)] text-[var(--md-sys-color-on-surface)]"
+          >
+            <h2 className="m3-title-medium text-[var(--md-sys-color-on-surface)]">
+              Chưa có món trong danh mục này
+            </h2>
+            <p className="m3-body-medium text-[var(--md-sys-color-on-surface-variant)]">
+              Vui lòng chọn danh mục khác hoặc xem toàn bộ thực đơn hiện có.
+            </p>
+            <div className="pt-1 flex justify-center">
+              <MD3Button
+                type="button"
+                variant="tonal"
+                className="min-w-[44px]"
+                onClick={() => setActiveCategory('all')}
+              >
+                Xem tất cả món
+              </MD3Button>
+            </div>
+          </MD3Card>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {filteredProducts.map((product) => {
+              const inCart = cart.find((i) => i.product.id === product.id);
+              const safeImageUrl = sanitizeStorefrontMediaUrl(product.image_url);
+              return (
+                <div
+                  key={product.id}
+                  className="rounded-xl border border-slate-800 bg-slate-900/80 p-4 flex items-center justify-between gap-3"
+                >
+                  <div className="flex items-center gap-3 min-w-0">
+                    {safeImageUrl && (
+                      <img
+                        src={safeImageUrl}
+                        alt={product.name}
+                        loading="lazy"
+                        className="h-20 w-20 rounded-xl object-cover shrink-0 border border-slate-800"
+                      />
+                    )}
+                    <div className="space-y-1 min-w-0">
+                      <h3 className="font-semibold text-white text-sm">{product.name}</h3>
+                      {product.description && (
+                        <p className="text-xs text-slate-400 line-clamp-2">{product.description}</p>
+                      )}
+                      <div className="text-sm font-bold" style={{ color: branding.accentColor || '#F59E0B' }}>
+                        {Number(product.price).toLocaleString('vi-VN')}đ
+                      </div>
+                    </div>
+                  </div>
+
+                  {!tenant.isReadOnly && (
+                    <div className="flex items-center gap-2 shrink-0">
+                      {inCart ? (
+                        <>
+                          <button
+                            type="button"
+                            aria-label={`Giảm số lượng ${product.name}`}
+                            onClick={() => updateQty(product.id, -1)}
+                            className="h-11 w-11 min-h-[44px] min-w-[44px] rounded-lg bg-slate-800 text-white font-bold flex items-center justify-center"
+                          >
+                            -
+                          </button>
+                          <span className="w-6 text-center text-sm font-semibold tabular-nums">
+                            {inCart.quantity}
+                          </span>
+                          <button
+                            type="button"
+                            aria-label={`Tăng số lượng ${product.name}`}
+                            onClick={() => updateQty(product.id, 1)}
+                            className="h-11 w-11 min-h-[44px] min-w-[44px] rounded-lg text-slate-950 font-bold flex items-center justify-center"
+                            style={{ backgroundColor: branding.accentColor || '#D97706' }}
+                          >
+                            +
+                          </button>
+                        </>
+                      ) : (
                         <button
                           type="button"
-                          onClick={() => updateQty(product.id, -1)}
-                          className="h-8 w-8 rounded-lg bg-slate-800 text-white font-bold"
-                        >
-                          -
-                        </button>
-                        <span className="w-5 text-center text-sm font-semibold">{inCart.quantity}</span>
-                        <button
-                          type="button"
-                          onClick={() => updateQty(product.id, 1)}
-                          className="h-8 w-8 rounded-lg text-slate-950 font-bold"
+                          onClick={() => addToCart(product)}
+                          className="min-h-[44px] min-w-[44px] rounded-lg px-4 py-2.5 text-xs font-bold text-slate-950"
                           style={{ backgroundColor: branding.accentColor || '#D97706' }}
                         >
-                          +
+                          + Chọn
                         </button>
-                      </>
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={() => addToCart(product)}
-                        className="rounded-lg px-3.5 py-2 text-xs font-bold text-slate-950"
-                        style={{ backgroundColor: branding.accentColor || '#D97706' }}
-                      >
-                        + Chọn
-                      </button>
-                    )}
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
       </main>
 
       {/* Bottom Cart Bar */}
-      {cart.length > 0 && !tenant.isReadOnly && (
-        <div className="fixed bottom-0 inset-x-0 border-t border-slate-800 bg-slate-900/95 backdrop-blur p-4">
+      {hasActiveCartBar && (
+        <div className="fixed bottom-0 inset-x-0 border-t border-slate-800 bg-slate-900/95 backdrop-blur px-4 pt-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
           <div className="max-w-4xl mx-auto flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div className="flex items-center gap-2.5 flex-wrap">
               <input
                 type="text"
+                aria-label="Tên của bạn"
                 value={customerName}
                 onChange={(e) => setCustomerName(e.target.value)}
                 placeholder="Tên của bạn (tùy chọn)"
-                className="rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-xs text-white"
+                className="min-h-[44px] rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-xs text-white"
               />
               <input
                 type="tel"
+                aria-label="Số điện thoại"
                 value={customerPhone}
                 onChange={(e) => setCustomerPhone(e.target.value)}
                 placeholder="Số ĐT (tùy chọn)"
-                className="rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-xs text-white w-36"
+                className="min-h-[44px] rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-xs text-white w-36"
               />
               <select
+                aria-label="Phương thức thanh toán"
                 value={paymentMethod}
                 onChange={(e) => setPaymentMethod(e.target.value as StorefrontPaymentMethod)}
-                className="rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-xs text-white"
+                className="min-h-[44px] min-w-[44px] rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-xs text-white"
               >
                 <option value="cod">Tiền mặt tại quầy</option>
                 {data.payment.hasBankTransfer && (
@@ -598,7 +737,7 @@ export default function TenantStorefrontPage(): ReactNode {
               type="button"
               disabled={submitting}
               onClick={placeOrder}
-              className="rounded-xl px-6 py-3 text-sm font-bold text-slate-950 disabled:opacity-50"
+              className="min-h-[44px] min-w-[44px] rounded-xl px-6 py-3 text-sm font-bold text-slate-950 disabled:opacity-50"
               style={{ backgroundColor: branding.accentColor || '#D97706' }}
             >
               {submitting

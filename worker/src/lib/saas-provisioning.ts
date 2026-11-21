@@ -436,10 +436,11 @@ export async function provisionSelfServeTenant(
     }
   });
 
-  // 9. Seed Cafe Tables (namespaced table_number to avoid global UNIQUE collisions)
+  // 9. Seed Cafe Tables + initial Table QR codes atomically in the same batch
   template.tables.forEach((tbl, idx) => {
     const tblId = `tbl_${slug}_${tbl.code.toLowerCase()}`;
     const uniqueTableNumber = `${slug}-${tbl.code}`;
+    const qrSlug = `${slug}-${tbl.code.toLowerCase()}`;
     statements.push(
       db
         .prepare(
@@ -448,6 +449,15 @@ export async function provisionSelfServeTenant(
           ) VALUES (?, ?, ?, ?, ?, ?, ?, 1, 'Available', ?, ?, ?)`
         )
         .bind(tblId, uniqueTableNumber, tbl.code, tbl.name, tbl.capacity, tbl.zone, idx + 1, tenantId, nowIso, nowIso)
+    );
+    statements.push(
+      db
+        .prepare(
+          `INSERT INTO table_qr_codes (
+            table_id, slug, tenant_id, created_at, updated_at
+          ) VALUES (?, ?, ?, ?, ?)`
+        )
+        .bind(tblId, qrSlug, tenantId, nowIso, nowIso)
     );
   });
 

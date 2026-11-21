@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { staffSessionFixture, STAFF_PASSWORD } from '../helpers/staff-session-fixture';
+import { staffSessionFixture, STAFF_HASH, STAFF_PASSWORD } from '../helpers/staff-session-fixture';
 import { staffMutationGuard } from '../../lib/staff-account-mutation';
 import { requireStaffAccount } from '../../lib/staff-session';
 import { paymentSqliteDB } from '../helpers/payment-sqlite-db';
@@ -136,7 +136,7 @@ describe('durable Staff revocation and scope', () => {
   it('protects the last owner at SQL write time, including two competing demotions', async () => {
     const owner = await f.token('owner');
     expect((await f.request('/api/staff/owner', owner, 'PATCH', { isActive: false })).status).toBe(409);
-    f.sqlite.prepare("INSERT INTO users (id, name, role, tenant_id) VALUES ('owner-2', 'Second', 'owner', 'cafe-a')").run();
+    f.sqlite.prepare("INSERT INTO users (id, name, role, tenant_id, password_hash) VALUES ('owner-2', 'Second', 'owner', 'cafe-a', ?)").run(STAFF_HASH);
     const first = staffMutationGuard(await requireStaffAccount(f.db, 'owner'), true);
     const second = staffMutationGuard(await requireStaffAccount(f.db, 'owner-2'), true);
     const results = await f.db.batch([first, second].map(guard => f.db.prepare(

@@ -737,32 +737,55 @@ describe('analyticsRouter (Hono routes)', () => {
     expect(metricsRes.status).toBe(200);
     expect(franchiseBinds.some((b) => b[0] === 'tenant_sadec_02')).toBe(true);
 
+    const qrQueries: Array<{ sql: string; args: unknown[] }> = [];
     const qrDb = {
       prepare: (sql: string) => ({
-        bind: () => ({
-          first: async () => (/FROM users WHERE id = \?/i.test(sql)
+        bind: (...args: unknown[]) => ({
+          first: async () => (/FROM users WHERE id = \?/i.test(sql) && args[0] === 'm_sadec'
             ? { id: 'm_sadec', name: 'Manager Sa Dec', role: 'manager', tenant_id: 'tenant_sadec_02', is_active: 1, auth_version: 1 }
             : null),
-          run: async () => ({ success: true }),
-        }),
-        all: async () => ({
-          results: /FROM cafe_tables/i.test(sql)
-            ? [
-                { id: 1, table_number: 1, zone: 'Indoor', status: 'available', tenant_id: '  tenant_sadec_02  ' },
-                { id: 2, table_number: 2, zone: 'Outdoor', status: 'available', tenant_id: 'tenant_other' },
-              ]
-            : [{ table_id: 1, slug: 'tbl-1' }, { table_id: 2, slug: 'tbl-2' }],
+          all: async () => {
+            qrQueries.push({ sql, args });
+            // Include foreign rows to exercise the route's own tenant checks too.
+            if (/FROM cafe_tables/i.test(sql)) {
+              return { results: [
+                { id: 1, table_number: 1, code: 'SD01', zone: 'Indoor', status: 'available', tenant_id: '  tenant_sadec_02  ' },
+                { id: 2, table_number: 2, code: 'OT02', zone: 'Outdoor', status: 'available', tenant_id: 'tenant_other' },
+              ] };
+            }
+            if (/FROM saas_tenants/i.test(sql)) {
+              return { results: [{ id: 'tenant_sadec_02', slug: 'sadec-02' }] };
+            }
+            if (/FROM table_qr_codes/i.test(sql)) {
+              return { results: [
+                { table_id: 1, slug: 'tbl-1', tenant_id: '  tenant_sadec_02  ' },
+                { table_id: 1, slug: 'foreign-code', tenant_id: 'tenant_other' },
+                { table_id: 2, slug: 'tbl-2', tenant_id: 'tenant_other' },
+              ] };
+            }
+            throw new Error(`Unexpected QR query: ${sql}`);
+          },
         }),
       }),
     } as unknown as import('@cloudflare/workers-types').D1Database;
 
     const qrRes = await adminQRRouter.fetch(
       new Request('https://test.aura/tables', { headers: { Authorization: sadecToken } }),
-      createMockEnv({ AURA_DB: qrDb, QR_SIGNING_SECRET: 'qr-secret-key-at-least-16-chars' })
+      createMockEnv({ AURA_DB: qrDb, QR_SIGNING_SECRET: undefined })
     );
     expect(qrRes.status).toBe(200);
     const qrJson = await qrRes.json() as { data: Array<{ id: number }> };
     expect(qrJson.data.map((t) => t.id)).toEqual([1]);
+    expect(qrJson.data[0]).toMatchObject({
+      slug: 'tbl-1',
+      qr_mode: 'tenant_permanent',
+      signed_url: 'https://test.aura/s/sadec-02?table=SD01',
+    });
+    expect(qrQueries).toEqual([
+      { sql: expect.stringMatching(/FROM cafe_tables WHERE .*TRIM\(tenant_id\)/i), args: ['tenant_sadec_02', 'tenant_sadec_02'] },
+      { sql: expect.stringMatching(/FROM saas_tenants WHERE id IN/i), args: ['tenant_sadec_02'] },
+      { sql: expect.stringMatching(/FROM table_qr_codes WHERE .*TRIM\(tenant_id\)/i), args: [1, 'tenant_sadec_02'] },
+    ]);
   });
 });
 

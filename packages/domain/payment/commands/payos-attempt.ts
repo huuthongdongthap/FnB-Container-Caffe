@@ -3,6 +3,8 @@ import { buildPayOSSignature, generateOrderCode, PAYOS_API } from './payos-helpe
 import { verifyPayOSSignature } from '../policies/payos-signature';
 import { buildCheckoutUrl, extractPayOSLinkId, verifyPayOSPaymentRequest } from './payos-provider-verify';
 import { reconcilePayOSPayment } from './payos-reconcile';
+import { resolveMerchantPaymentConfig } from '../../../../worker/src/lib/merchant-payment';
+import type { Env } from 'worker/src/types/env';
 
 export interface PayOSAttempt {
   id: string; order_id: string; amount: number; transaction_id: string;
@@ -208,6 +210,34 @@ export async function getOrCreatePayOSAttempt(input: AttemptInput): Promise<Atte
   }
 }
 
+async function resolveCancelCredentials(
+  db: D1Database,
+  env: Record<string, unknown>,
+  tenant: string,
+): Promise<{ clientId: string; apiKey: string } | null> {
+  if (tenant === 'default') {
+    const merchant = await resolveMerchantPaymentConfig(db, env as unknown as Env, 'default').catch(() => null);
+    if (merchant?.provider === 'payos' && merchant.payos?.clientId && merchant.payos?.apiKey) {
+      return { clientId: merchant.payos.clientId, apiKey: merchant.payos.apiKey };
+    }
+    const clientId = typeof env.PAYOS_CLIENT_ID === 'string' ? env.PAYOS_CLIENT_ID.trim() : '';
+    const apiKey = typeof env.PAYOS_API_KEY === 'string' ? env.PAYOS_API_KEY.trim() : '';
+    return clientId && apiKey ? { clientId, apiKey } : null;
+  }
+
+  // Non-default tenants must authenticate upstream cancels strictly with their own decrypted
+  // merchant credentials and never fall back to flagship PAYOS_* or platform SAAS_PAYOS_*.
+  try {
+    const merchant = await resolveMerchantPaymentConfig(db, env as unknown as Env, tenant);
+    if (merchant.provider === 'payos' && merchant.payos?.clientId && merchant.payos?.apiKey) {
+      return { clientId: merchant.payos.clientId, apiKey: merchant.payos.apiKey };
+    }
+  } catch {
+    // Missing TENANT_SECRETS_KEY or decryption failure: local row stays closed; skip upstream cancel.
+  }
+  return null;
+}
+
 /**
  * Closes any still-payable PayOS attempt of an order that is being cancelled or replaced.
  * Local state is closed first (a late paid webhook can still settle a cancelled row), then the provider
@@ -221,11 +251,11 @@ export async function cancelOpenPayOSAttemptForOrder(
 ): Promise<{ cancelled: number; providerNotified: number }> {
   const rawTenant = tenantId && tenantId.trim() ? tenantId.trim() : '';
   const tenant = rawTenant && rawTenant !== '*' && rawTenant.toLowerCase() !== 'hq' ? rawTenant : 'default';
-  type OpenRow = { id: string; transaction_id: string; payment_url: string | null };
+  type OpenRow = { id: string; transaction_id: string; payment_url: string | null; tenant_id?: string | null };
   let rows: OpenRow[] = [];
   try {
     const found = await db.prepare(
-      "SELECT id, transaction_id, payment_url FROM payments WHERE order_id = ? AND method = 'payos' AND status = 'pending' AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
+      "SELECT id, transaction_id, payment_url, tenant_id FROM payments WHERE order_id = ? AND method = 'payos' AND status = 'pending' AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
     ).bind(orderId, tenant).all<OpenRow>();
     rows = found.results ?? [];
   } catch {
@@ -235,8 +265,7 @@ export async function cancelOpenPayOSAttemptForOrder(
     ).bind(orderId).all<OpenRow>().catch(() => ({ results: [] as OpenRow[] }));
     rows = found.results ?? [];
   }
-  const clientId = typeof env.PAYOS_CLIENT_ID === 'string' ? env.PAYOS_CLIENT_ID : '';
-  const apiKey = typeof env.PAYOS_API_KEY === 'string' ? env.PAYOS_API_KEY : '';
+  const credsByTenant = new Map<string, { clientId: string; apiKey: string } | null>();
   let cancelled = 0;
   let providerNotified = 0;
   for (const row of rows) {
@@ -245,13 +274,24 @@ export async function cancelOpenPayOSAttemptForOrder(
     ).bind(new Date().toISOString(), row.id).run().catch(() => null);
     if (!((closed?.meta?.changes ?? 0) > 0)) continue;
     cancelled += 1;
-    if (!clientId || !apiKey) continue;
+
+    const rawRowTenant = typeof row.tenant_id === 'string' ? row.tenant_id.trim() : '';
+    const effectiveTenant =
+      rawRowTenant && rawRowTenant !== '*' && rawRowTenant.toLowerCase() !== 'hq'
+        ? rawRowTenant
+        : tenant;
+    if (!credsByTenant.has(effectiveTenant)) {
+      credsByTenant.set(effectiveTenant, await resolveCancelCredentials(db, env, effectiveTenant));
+    }
+    const creds = credsByTenant.get(effectiveTenant);
+    if (!creds) continue;
+
     const reference = extractPayOSLinkId(row.payment_url) ?? (/^\d+$/.test(row.transaction_id) ? row.transaction_id : null);
     if (!reference) continue;
     try {
       const res = await fetch(`${PAYOS_API}/${reference}/cancel`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-client-id': clientId, 'x-api-key': apiKey },
+        headers: { 'Content-Type': 'application/json', 'x-client-id': creds.clientId, 'x-api-key': creds.apiKey },
         body: JSON.stringify({ cancellationReason: 'order_closed' }),
         signal: AbortSignal.timeout(5000),
       });

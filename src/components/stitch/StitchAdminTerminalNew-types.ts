@@ -4,6 +4,7 @@ export interface NavItemData {
   label: string;
   labelEn: string;
   to: string;
+  access?: 'merchantAdmin' | 'hqAdmin';
   icon: React.ComponentType<{ size?: number; className?: string }>;
 }
 

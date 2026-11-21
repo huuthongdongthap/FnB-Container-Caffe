@@ -21,6 +21,7 @@ export function staffMutationGuard(account: StaffAccount, protectLastOwner = fal
   // pass a pre-read count and leave the store without an active owner.
   const ownerGuard = ` AND (role != 'owner' OR is_active != 1 OR EXISTS (
     SELECT 1 FROM users AS other WHERE other.id != users.id AND other.role = 'owner' AND other.is_active = 1
+      AND NULLIF(TRIM(other.password_hash), '') IS NOT NULL
       AND COALESCE(NULLIF(TRIM(other.tenant_id), ''), 'default') = COALESCE(NULLIF(TRIM(users.tenant_id), ''), 'default'))) `;
   return { sql: sql + (protectLastOwner ? ownerGuard : ''), values: [account.id, account.auth_version, staffTenant(account)] };
 }

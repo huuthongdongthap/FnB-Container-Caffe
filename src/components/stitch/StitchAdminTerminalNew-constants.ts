@@ -22,6 +22,7 @@ import {
   TabletSmartphone,
   LayoutGrid,
   Package,
+  Settings,
   TrendingUp,
   DollarSign,
 } from 'lucide-react';
@@ -73,10 +74,24 @@ export const SECTIONS: NavSectionData[] = [
   {
     title: 'Hệ thống / System',
     items: [
+      {
+        label: 'Cài đặt cửa hàng & SaaS',
+        labelEn: 'Store & SaaS Settings',
+        to: '/admin/saas-settings',
+        access: 'merchantAdmin',
+        icon: Settings,
+      },
+      {
+        label: 'HQ Quản trị SaaS',
+        labelEn: 'HQ SaaS Admin',
+        to: '/admin/hq-saas',
+        access: 'hqAdmin',
+        icon: LayoutGrid,
+      },
       { label: 'Nhật ký', labelEn: 'Audit Logs', to: '/admin/audit-logs', icon: ScrollText },
       { label: 'Duyệt Check-in', labelEn: 'Check-in Approve', to: '/admin/checkin-approve', icon: ClipboardCheck },
       { label: 'Đồng bộ ERPNext', labelEn: 'ERPNext Sync', to: '/admin/erpnext-sync', icon: RefreshCw },
-      { label: 'Gói thuê bao', labelEn: 'Subscriptions', to: '/admin/subscriptions', icon: Gem },
+      { label: 'Gói hội viên tại quán', labelEn: 'In-Store Memberships', to: '/admin/subscriptions', icon: Gem },
       { label: 'Hóa đơn', labelEn: 'Invoices', to: '/admin/invoice-history', icon: Receipt },
       { label: 'QR Code', labelEn: 'QR Codes', to: '/admin/generate-qr', icon: QrCode },
       { label: 'Sinh nhật', labelEn: 'Birthday Config', to: '/admin/birthday-config', icon: Cake },
