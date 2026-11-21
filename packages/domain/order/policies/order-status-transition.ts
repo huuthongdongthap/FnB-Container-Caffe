@@ -242,12 +242,32 @@ export async function transitionOrderStatus(
     return { success: true, idempotent: true, order: { id: orderId, status: targetStatus, previous_status: order.status } };
   }
   const additions = fields.map(([key]) => `, ${key} = ?`).join('');
-  const result = await db.prepare(
-    `UPDATE orders SET status = ?, updated_at = ?${additions} WHERE id = ? AND status = ?${writeTenantClause}`,
+  const updateStatus = (guard = '') => db.prepare(
+    `UPDATE orders SET status = ?, updated_at = ?${additions} WHERE id = ? AND status = ?${writeTenantClause}${guard}`,
   ).bind(targetStatus, new Date().toISOString(), ...fields.map(([, value]) => value), orderId, order.status, ...writeTenantBinds).run();
+  const closingOrder = targetStatus === 'completed' && !isNoOp;
+  let result: unknown;
+  if (closingOrder) {
+    // Check persisted settlement in the same write that would close the order.
+    const paid = "LOWER(TRIM(COALESCE(payment_status, ''))) = 'paid'";
+    try {
+      result = await updateStatus(` AND (LOWER(TRIM(COALESCE(payment_method, ''))) NOT IN ('cash', 'cod') OR ${paid})`);
+    } catch (error) {
+      if (!/no such column:\s*payment_method\b/i.test(String(error))) throw error;
+      result = await updateStatus(` AND (COALESCE(is_cod, 0) <> 1 OR ${paid})`);
+    }
+  } else {
+    result = await updateStatus();
+  }
   // D1 changes includes timestamp/audit trigger writes; this PK-scoped CAS still matches at most one order.
   if (changedRows(result) < 1) {
-    return { success: false, error: 'Order changed concurrently; refresh and retry', statusCode: 409 };
+    return {
+      success: false,
+      error: closingOrder
+        ? 'Cannot complete order: collect any outstanding cash payment, then refresh and retry'
+        : 'Order changed concurrently; refresh and retry',
+      statusCode: 409,
+    };
   }
   return { success: true, order: { id: orderId, status: targetStatus, previous_status: order.status } };
 }

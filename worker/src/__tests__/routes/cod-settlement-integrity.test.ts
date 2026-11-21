@@ -1,5 +1,6 @@
 // @vitest-environment node
 import { afterEach, describe, expect, it } from 'vitest';
+import { transitionOrderStatus } from '@aura/domain-order/policies/order-status-transition';
 import { app } from '../../index';
 import { generateJWT } from '../../lib/jwt';
 import { TEST_JWT_SECRET } from '../test-utils';
@@ -62,6 +63,33 @@ describe('atomic COD ledger and guarded legacy aliases (real SQLite)', () => {
     const { sqlite, env } = fixture('pending', 'unpaid', 'cafe-b');
     expect((await app.fetch(await request('/api/orders/COD_LOCAL/cancel', 'POST', 'staff'), env)).status).toBe(404);
     expect(sqlite.prepare('SELECT status FROM orders').get()?.status).toBe('pending');
+  });
+  it.each(['cod', 'cash'])('requires %s collection before completing a served order', async (method) => {
+    const { sqlite, env } = fixture('served');
+    sqlite.prepare('UPDATE orders SET payment_method = ? WHERE id = ?').run(method, 'COD_LOCAL');
+    const complete = () => request('/api/admin/orders/COD_LOCAL/complete', 'POST', 'staff');
+
+    const blocked = await app.fetch(await complete(), env);
+    expect(blocked.status).toBe(409);
+    expect(sqlite.prepare('SELECT status,payment_status FROM orders').get()).toMatchObject({ status: 'served', payment_status: 'unpaid' });
+
+    expect((await app.fetch(await request(), env)).status).toBe(200);
+    expect((await app.fetch(await complete(), env)).status).toBe(200);
+    expect(sqlite.prepare('SELECT status,payment_status FROM orders').get()).toMatchObject({ status: 'completed', payment_status: 'paid' });
+    expect(sqlite.prepare('SELECT status FROM payments').get()?.status).toBe('completed');
+  });
+  it.each(['cash', 'cod', 'legacy is_cod'])('uses persisted settlement despite stale paid input for %s', async (method) => {
+    const { sqlite, env } = fixture('served');
+    sqlite.prepare('UPDATE orders SET payment_method = ?, is_cod = 1').run(method === 'legacy is_cod' ? 'cod' : method);
+    if (method === 'legacy is_cod') sqlite.exec('ALTER TABLE orders DROP COLUMN payment_method');
+    const complete = () => transitionOrderStatus(env.AURA_DB, 'COD_LOCAL', 'completed', 'staff', {
+      tenantId: 'cafe-a', currentOrder: { id: 'COD_LOCAL', status: 'served', payment_status: 'paid' }, paymentStatus: 'paid',
+    });
+    expect(await complete()).toMatchObject({ success: false, statusCode: 409 });
+    expect(sqlite.prepare('SELECT status,payment_status FROM orders').get()).toMatchObject({ status: 'served', payment_status: 'unpaid' });
+    sqlite.exec("UPDATE orders SET payment_status = 'paid'");
+    expect(await complete()).toMatchObject({ success: true });
+    expect(sqlite.prepare('SELECT status FROM orders').get()?.status).toBe('completed');
   });
   it('allows complete alias from served, preserving state machine rules', async () => {
     const { sqlite, env } = fixture('served', 'paid');

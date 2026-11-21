@@ -129,23 +129,25 @@ export function registerReconciliationHandlers(app: Hono<{ Bindings: Env }>) {
       .prepare(
         `SELECT COALESCE(NULLIF(TRIM(payment_method), ''), 'cash') as method,
                 COUNT(*) as count,
-                COALESCE(SUM(total), 0) as total
+                COALESCE(SUM(total), 0) as total,
+                COALESCE(SUM(CASE WHEN LOWER(COALESCE(payment_status, '')) IN ('paid', 'completed') THEN total ELSE 0 END), 0) as settled_total
          FROM orders
          WHERE DATE(datetime(created_at, '+7 hours')) BETWEEN ? AND ? AND ${VALID_REVENUE_ORDER_SQL}${tf.and}
          GROUP BY method ORDER BY total DESC`
       )
       .bind(from, to, ...tf.binds)
-      .all<PaymentMethodSummary>();
+      .all<PaymentMethodSummary & { settled_total: number }>();
 
-    const paymentMethods = pmRows || [];
+    const paymentRows = pmRows || [];
+    const paymentMethods = paymentRows.map(({ method, count, total }) => ({ method, count, total }));
     const totalRevenue = paymentMethods.reduce((acc, p) => acc + Number(p.total || 0), 0);
     const totalOrders = paymentMethods.reduce((acc, p) => acc + Number(p.count || 0), 0);
+    const digitalPayments = paymentRows.reduce((acc, p) => {
+      const method = p.method.toLowerCase();
+      return method === 'cash' || method === 'cod' ? acc : acc + Number(p.settled_total || 0);
+    }, 0);
     const cashExpected = shifts.reduce((acc, s) => acc + s.expected_cash, 0);
     const cashActual = shifts.reduce((acc, s) => acc + (s.actual_cash ?? 0), 0);
-
-    const digitalPayments = paymentMethods
-      .filter((m) => m.method !== 'cash' && m.method !== 'cod')
-      .reduce((acc, m) => acc + Number(m.total || 0), 0);
 
     const report: DailyReconciliationReport = {
       from,
