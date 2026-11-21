@@ -306,9 +306,10 @@ export function TableOrder(): ReactNode {
           <button
             type="button"
             onClick={() => navigate('/pos/table/select')}
+            title="Chọn bàn để tạo đơn mới. Đơn hiện có vẫn giữ nguyên ở bàn ban đầu."
             className="text-xs text-[var(--aura-chrome-mid)] hover:underline uppercase tracking-wider"
           >
-            Đổi bàn
+            Chọn bàn cho đơn mới
           </button>
         </header>
       ) : (

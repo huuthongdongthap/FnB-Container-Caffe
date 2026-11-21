@@ -3,6 +3,7 @@ import type { Env } from '../../types/env';
 import { requireAuth } from '../../middleware/auth';
 import { registerSessionHandlers } from './session-handlers';
 import { registerOrderHandlers } from './order-handlers';
+import { registerTransferHandler } from './transfer-handler';
 
 const STAFF_SESSION_ROLES = [
   'owner',
@@ -19,7 +20,7 @@ const STAFF_SESSION_ROLES = [
 
 export const tableSessionsRouter = new Hono<{ Bindings: Env }>();
 tableSessionsRouter.use('*', async (c, next) => {
-  const existingUser = c.get('user' as any) as { role?: string } | undefined;
+  const existingUser = c.get('user') as { role?: string } | undefined;
   if (existingUser) {
     if (!existingUser.role || !(STAFF_SESSION_ROLES as readonly string[]).includes(existingUser.role)) {
       return c.json({ success: false, error: 'Insufficient permissions' }, 403);
@@ -33,6 +34,7 @@ tableSessionsRouter.use('*', async (c, next) => {
   await next();
 });
 
+registerTransferHandler(tableSessionsRouter);
 registerSessionHandlers(tableSessionsRouter);
 registerOrderHandlers(tableSessionsRouter);
 

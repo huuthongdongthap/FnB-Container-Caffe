@@ -8,11 +8,13 @@ interface TableCardProps {
 	activeCount: number;
 	isUpdating: boolean;
 	onSetStatus: (id: string, status: CafeTableRow['status']) => void;
+	onTransfer?: (table: CafeTableRow) => void;
 	onRelease: (table: CafeTableRow) => void;
 }
 
-export function TableCard({ table, zone, activeCount, isUpdating, onSetStatus, onRelease }: TableCardProps) {
-	const { t } = useTranslation();
+export function TableCard({ table, zone, activeCount, isUpdating, onSetStatus, onRelease, onTransfer }: TableCardProps) {
+	const { t, i18n } = useTranslation();
+	const vi = i18n.language?.startsWith('vi');
 
 	const statusLabel = (status: CafeTableRow['status']) =>
 		t(`admin.tableManagement.${STATUS_KEYS_MAP[status]}`, { defaultValue: status, fallback: status });
@@ -84,6 +86,13 @@ export function TableCard({ table, zone, activeCount, isUpdating, onSetStatus, o
 					🍳 KDS
 				</button>
 			</div>
+
+			{onTransfer && ['occupied', 'overdue'].includes(table.status.toLowerCase()) && (
+				<button type="button" disabled={isUpdating} onClick={() => onTransfer(table)}
+					className="mt-2 px-3 py-2 text-xs rounded-md border border-border hover:bg-muted/20 disabled:opacity-50">
+					{vi ? 'Chuyển bàn' : 'Transfer table'}
+				</button>
+			)}
 
 			{/* Manual release button on Occupied tables */}
 			{table.status === 'Occupied' && (
