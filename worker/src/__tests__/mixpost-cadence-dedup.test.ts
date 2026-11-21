@@ -1,3 +1,4 @@
+// @vitest-environment node
 import { DatabaseSync, type SQLInputValue } from 'node:sqlite';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createMixpostClient } from '../lib/mixpost-client';

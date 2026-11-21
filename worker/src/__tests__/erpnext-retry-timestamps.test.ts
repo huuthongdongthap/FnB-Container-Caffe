@@ -1,3 +1,4 @@
+// @vitest-environment node
 import { DatabaseSync, type SQLInputValue } from 'node:sqlite';
 import { describe, expect, it } from 'vitest';
 import { processErpnextRetryQueue } from '../routes/cron-handlers/erpnext-sync';
