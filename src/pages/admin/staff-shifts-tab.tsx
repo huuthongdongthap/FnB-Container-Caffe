@@ -209,6 +209,7 @@ export function ShiftsTab() {
                   onChange={(e) => {
                     setSelectedStaffId(e.target.value);
                     setSelectedScheduledId('');
+                    setOpeningCashInput('0');
                   }}
                   className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm"
                 >
