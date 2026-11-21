@@ -115,22 +115,28 @@ export function ShiftsTab() {
     (s) => !effectiveStaffId || s.staff_id === effectiveStaffId,
   );
 
+  const selectedScheduled = scheduledShifts.find((s) => s.id === selectedScheduledId);
+  const presetScheduledFloat =
+    typeof selectedScheduled?.opening_cash === 'number' && Number.isFinite(selectedScheduled.opening_cash)
+      ? selectedScheduled.opening_cash
+      : 0;
+  const openingCashLocked = !canManage && Boolean(selectedScheduled) && presetScheduledFloat > 0;
+
   const handleClockIn = async () => {
     setFormError(null);
     const parsedOpening = Number(openingCashInput);
-    if (!Number.isFinite(parsedOpening) || parsedOpening < 0) {
+    if (!openingCashLocked && (!Number.isFinite(parsedOpening) || parsedOpening < 0)) {
       setFormError('Tiền đầu ca phải là số không âm. / Opening cash must be a non-negative number.');
       return;
     }
-    const scheduled = scheduledShifts.find((s) => s.id === selectedScheduledId);
-    const targetStaffId = scheduled?.staff_id || effectiveStaffId;
+    const targetStaffId = selectedScheduled?.staff_id || effectiveStaffId;
     if (!targetStaffId) {
       setFormError('Vui lòng chọn nhân viên để mở ca. / Select a staff member to clock in.');
       return;
     }
     const staffName = staff.find((m) => m.id === targetStaffId)?.name || user?.name || targetStaffId;
     const created = await clockIn(targetStaffId, staffName, {
-      openingCash: parsedOpening,
+      openingCash: openingCashLocked ? undefined : parsedOpening,
       scheduledShiftId: selectedScheduledId || undefined,
       notes: clockInNotes.trim() || undefined,
     });
@@ -222,7 +228,16 @@ export function ShiftsTab() {
               <select
                 id="shifts-tab-scheduled"
                 value={selectedScheduledId}
-                onChange={(e) => setSelectedScheduledId(e.target.value)}
+                onChange={(e) => {
+                  const nextId = e.target.value;
+                  setSelectedScheduledId(nextId);
+                  const nextScheduled = scheduledShifts.find((s) => s.id === nextId);
+                  setOpeningCashInput(
+                    typeof nextScheduled?.opening_cash === 'number' && Number.isFinite(nextScheduled.opening_cash)
+                      ? String(nextScheduled.opening_cash)
+                      : '0',
+                  );
+                }}
                 className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm"
               >
                 <option value="">Ca ngoài lịch / Ad-hoc</option>
@@ -244,8 +259,9 @@ export function ShiftsTab() {
                 min={0}
                 step={1000}
                 value={openingCashInput}
+                disabled={openingCashLocked}
                 onChange={(e) => setOpeningCashInput(e.target.value)}
-                className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm"
+                className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm disabled:opacity-60"
               />
             </div>
 

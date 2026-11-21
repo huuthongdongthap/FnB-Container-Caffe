@@ -458,4 +458,56 @@ describe('Shift Handover Flow (#102)', () => {
       expect(screen.getByTestId('shift-handover-modal')).toBeTruthy();
     });
   });
+
+  it('syncs preset opening_cash and locks override for non-manager selecting a scheduled shift', async () => {
+    mockActor = { id: 'staff_1', name: 'Alice', role: 'cashier', tenantId: 'default' };
+    const scheduledRow = {
+      id: '92',
+      staff_id: 'staff_1',
+      staff_name: 'Alice',
+      clock_in: null,
+      clock_out: null,
+      hours_worked: null,
+      date: '2026-11-21',
+      opening_cash: 300_000,
+      notes: null,
+      attendance_state: 'scheduled',
+      start_time: '08:00',
+    };
+
+    mockApiFetch.mockImplementation(async (path: string, opts?: RequestInit) => {
+      if (path === '/api/shifts/today') return { success: true, data: [scheduledRow] };
+      if (path.startsWith('/api/shifts?')) return { success: true, data: [scheduledRow] };
+      if (path === '/api/shifts/clock-in' && opts?.method === 'POST') {
+        return { success: true, data: { ...scheduledRow, clock_in: '2026-11-21T01:00:00.000Z' } };
+      }
+      return { success: true, data: [] };
+    });
+
+    renderWithProviders(<ShiftsTab />);
+
+    await waitFor(() => {
+      expect(screen.getByLabelText(/Scheduled Shift/i)).toBeTruthy();
+    });
+
+    fireEvent.change(screen.getByLabelText(/Scheduled Shift/i), { target: { value: '92' } });
+    const openingInput = screen.getByLabelText(/Opening Cash/i) as HTMLInputElement;
+    expect(openingInput.value).toBe('300000');
+    expect(openingInput.disabled).toBe(true);
+
+    fireEvent.click(screen.getByTestId('shifts-tab-clock-in-btn'));
+
+    await waitFor(() => {
+      expect(mockApiFetch).toHaveBeenCalledWith(
+        '/api/shifts/clock-in',
+        expect.objectContaining({
+          method: 'POST',
+          body: JSON.stringify({
+            staff_id: 'staff_1',
+            scheduled_shift_id: '92',
+          }),
+        }),
+      );
+    });
+  });
 });

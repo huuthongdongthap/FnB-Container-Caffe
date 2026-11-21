@@ -89,4 +89,48 @@ describe('cash reconciliation SQLite contracts', () => {
     await expect(reconcileShiftCash(db, input(), 'operator', 'store')).rejects.toThrow('already been reconciled');
     expect(sqlite.prepare('SELECT COUNT(*) AS n FROM shift_reconciliations').get()?.n).toBe(1);
   });
+  it('allows HQ owner/admin and store supervisor to reconcile a store shift', async () => {
+    const { sqlite, db } = fixture();
+    sqlite.exec(`INSERT INTO users (id, name, role, tenant_id) VALUES
+      ('hq-owner', 'HQ Owner', 'owner', 'hq'),
+      ('sup-1', 'Supervisor', 'supervisor', 'store');
+      INSERT INTO staff_shifts (id, tenant_id, staff_id, staff_name, date, shift, clock_in, opening_cash)
+      VALUES (2, 'store', 'other', 'Other', '2026-11-21', 'afternoon', '2026-11-21T09:00:00Z', 100000);`);
+    const hqRes = await reconcileShiftCash(db, input('1', 200000, 200000), 'hq-owner', 'store', 'owner');
+    expect(hqRes.staff_id).toBe('operator');
+    const supRes = await reconcileShiftCash(db, input('2', 100000, 100000), 'sup-1', 'store', 'supervisor');
+    expect(supRes.staff_id).toBe('other');
+  });
+  it('rolls back inserted reconciliation if post-insert verification throws', async () => {
+    const { sqlite, db } = fixture();
+    let paymentReads = 0;
+    const wrappedDb = {
+      ...db,
+      prepare(sql: string) {
+        const stmt = db.prepare(sql);
+        if (/FROM payments p/i.test(sql) && /cash_payment_attributions/i.test(sql)) {
+          return {
+            bind(...args: unknown[]) {
+              const bound = stmt.bind(...args);
+              return {
+                ...bound,
+                async all() {
+                  paymentReads += 1;
+                  if (paymentReads === 2) {
+                    throw new Error('simulated post-insert verification failure');
+                  }
+                  return bound.all();
+                },
+              };
+            },
+          };
+        }
+        return stmt;
+      },
+    } as unknown as D1Database;
+    await expect(reconcileShiftCash(wrappedDb, input('1', 200000, 200000), 'operator', 'store')).rejects.toThrow(
+      'simulated post-insert verification failure',
+    );
+    expect(sqlite.prepare('SELECT COUNT(*) AS n FROM shift_reconciliations').get()?.n).toBe(0);
+  });
 });

@@ -548,27 +548,14 @@ export function createStoreMockDb() {  const customers = new Map<string, { id: s
                 return { meta: { changes: 1 } };
               }
               if (sql.includes('INSERT INTO shift_reconciliations')) {
-                shiftReconciliations.push({
-                  id: args[0],
-                  shift_id: args[1],
-                  staff_id: args[2],
-                  reconciled_by: args[3],
-                  tenant_id: args[4] ?? 'default',
-                  opening_float: args[5],
-                  opening_cash: args[6],
-                  expected_cash: args[7],
-                  actual_cash: args[8],
-                  variance: args[9],
-                  variance_amount: args[10],
-                  variance_status: args[11],
-                  status: args[12],
-                  denominations: args[13],
-                  cash_payment_total: args[14],
-                  cash_sales: args[15],
-                  cash_payout_total: args[16],
-                  notes: args[17],
-                  created_at: '2026-11-18T15:45:00.000Z',
+                const colMatch = sql.match(/INSERT INTO shift_reconciliations\s*\(([^)]+)\)/i);
+                const cols = colMatch ? colMatch[1].split(',').map((c) => c.trim()) : [];
+                const row: Record<string, unknown> = { tenant_id: 'default' };
+                cols.forEach((col, i) => {
+                  row[col] = args[i];
                 });
+                row.created_at = '2026-11-18T15:45:00.000Z';
+                shiftReconciliations.push(row);
                 return { meta: { changes: 1 } };
               }
               return { meta: { changes: 1 } };

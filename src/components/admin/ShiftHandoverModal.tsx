@@ -179,6 +179,11 @@ export function ShiftHandoverModal({
         setSelectedShiftId('');
         const ownScheduled = visibleScheduled.find((s) => s.staff_id === user?.id) ?? visibleScheduled[0];
         setSelectedScheduledId(ownScheduled?.id ?? '');
+        setOpeningCashInput(
+          typeof ownScheduled?.opening_cash === 'number' && Number.isFinite(ownScheduled.opening_cash)
+            ? String(ownScheduled.opening_cash)
+            : '0',
+        );
       }
     } catch (err) {
       const info = getErrorInfo(err, 'Không thể tải thông tin ca làm việc.');
@@ -216,6 +221,11 @@ export function ShiftHandoverModal({
 
     const scheduledTarget = scheduledShifts.find((s) => s.id === selectedScheduledId);
     const targetStaffId = scheduledTarget?.staff_id || user.id;
+    const presetOpeningCash =
+      typeof scheduledTarget?.opening_cash === 'number' && Number.isFinite(scheduledTarget.opening_cash)
+        ? scheduledTarget.opening_cash
+        : 0;
+    const lockPresetOpeningCash = !canManage && Boolean(scheduledTarget) && presetOpeningCash > 0;
 
     submittingRef.current = true;
     setSubmitting(true);
@@ -223,8 +233,10 @@ export function ShiftHandoverModal({
     try {
       const payload: Record<string, unknown> = {
         staff_id: targetStaffId,
-        opening_cash: parsedOpening,
       };
+      if (!lockPresetOpeningCash) {
+        payload.opening_cash = parsedOpening;
+      }
       if (selectedScheduledId) payload.scheduled_shift_id = selectedScheduledId;
       if (clockInNotes.trim()) payload.notes = clockInNotes.trim();
 
@@ -431,7 +443,16 @@ export function ShiftHandoverModal({
                   <select
                     id="handover-scheduled-shift"
                     value={selectedScheduledId}
-                    onChange={(e) => setSelectedScheduledId(e.target.value)}
+                    onChange={(e) => {
+                      const nextId = e.target.value;
+                      setSelectedScheduledId(nextId);
+                      const nextScheduled = scheduledShifts.find((s) => s.id === nextId);
+                      setOpeningCashInput(
+                        typeof nextScheduled?.opening_cash === 'number' && Number.isFinite(nextScheduled.opening_cash)
+                          ? String(nextScheduled.opening_cash)
+                          : '0',
+                      );
+                    }}
                     className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm"
                   >
                     <option value="">Mở ca ngoài lịch / Ad-hoc shift</option>
@@ -444,20 +465,31 @@ export function ShiftHandoverModal({
                 </div>
               )}
 
-              <div className="space-y-1.5">
-                <label htmlFor="handover-opening-cash" className="block text-xs font-medium text-muted">
-                  Tiền đầu ca (VND) / Opening Cash Float
-                </label>
-                <input
-                  id="handover-opening-cash"
-                  type="number"
-                  min={0}
-                  step={1000}
-                  value={openingCashInput}
-                  onChange={(e) => setOpeningCashInput(e.target.value)}
-                  className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm"
-                />
-              </div>
+              {(() => {
+                const selectedScheduled = scheduledShifts.find((s) => s.id === selectedScheduledId);
+                const presetFloat =
+                  typeof selectedScheduled?.opening_cash === 'number' && Number.isFinite(selectedScheduled.opening_cash)
+                    ? selectedScheduled.opening_cash
+                    : 0;
+                const openingCashLocked = !canManage && Boolean(selectedScheduled) && presetFloat > 0;
+                return (
+                  <div className="space-y-1.5">
+                    <label htmlFor="handover-opening-cash" className="block text-xs font-medium text-muted">
+                      Tiền đầu ca (VND) / Opening Cash Float
+                    </label>
+                    <input
+                      id="handover-opening-cash"
+                      type="number"
+                      min={0}
+                      step={1000}
+                      value={openingCashInput}
+                      disabled={openingCashLocked}
+                      onChange={(e) => setOpeningCashInput(e.target.value)}
+                      className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm disabled:opacity-60"
+                    />
+                  </div>
+                );
+              })()}
 
               <div className="space-y-1.5">
                 <label htmlFor="handover-clockin-notes" className="block text-xs font-medium text-muted">
