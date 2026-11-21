@@ -18,6 +18,86 @@ export interface ReversalInput {
   refundAmountVnd: number;
   tenantId?: string;
   reason?: string;
+  /** True when customerId was resolved directly from the original accrual ledger for this order/tenant. */
+  verifiedLedgerRecipient?: boolean;
+}
+
+/**
+ * Resolve the customer who originally accrued loyalty points or cashback for an order
+ * within a tenant. Reads the accrual ledger directly without mutating orders.customer_id.
+ */
+export async function resolveAccrualRecipient(
+  db: D1Database,
+  orderId: string,
+  tenantId?: string | null,
+): Promise<{ customerId: string | null; fromLedger: boolean; ambiguous: boolean; candidates?: string[] }> {
+  const rawTenant = tenantId ? tenantId.trim() : '';
+  const effectiveTenant =
+    rawTenant && rawTenant !== '*' && rawTenant.toLowerCase() !== 'hq' ? rawTenant : 'default';
+
+  const candidates = new Set<string>();
+  const collectIds = async (sqlScoped: string, sqlFallback: string) => {
+    try {
+      const res = await db
+        .prepare(sqlScoped)
+        .bind(orderId, effectiveTenant, effectiveTenant)
+        .all<{ customer_id?: string | null }>();
+      for (const r of res?.results ?? []) {
+        const id = typeof r?.customer_id === 'string' ? r.customer_id.trim() : '';
+        if (id && id !== 'guest') candidates.add(id);
+      }
+    } catch {
+      if (effectiveTenant === 'default') {
+        const res = await db
+          .prepare(sqlFallback)
+          .bind(orderId)
+          .all<{ customer_id?: string | null }>()
+          .catch(() => ({ results: [] as Array<{ customer_id?: string | null }> }));
+        for (const r of res?.results ?? []) {
+          const id = typeof r?.customer_id === 'string' ? r.customer_id.trim() : '';
+          if (id && id !== 'guest') candidates.add(id);
+        }
+      }
+    }
+  };
+
+  await collectIds(
+    `SELECT DISTINCT l.customer_id
+     FROM loyalty_point_logs l
+     LEFT JOIN customers c ON c.id = l.customer_id
+     WHERE l.order_id = ? AND l.points_change > 0
+       AND (
+         (c.id IS NOT NULL AND COALESCE(NULLIF(TRIM(c.tenant_id), ''), 'default') = ?)
+         OR (c.id IS NULL AND COALESCE(NULLIF(TRIM(l.tenant_id), ''), 'default') = ?)
+       )
+     LIMIT 2`,
+    `SELECT DISTINCT customer_id FROM loyalty_point_logs
+     WHERE order_id = ? AND points_change > 0
+     LIMIT 2`,
+  );
+
+  await collectIds(
+    `SELECT DISTINCT t.customer_id
+     FROM cashback_transactions t
+     LEFT JOIN customers c ON c.id = t.customer_id
+     WHERE t.order_id = ? AND t.type IN ('earn', 'credit') AND t.amount > 0
+       AND (
+         (c.id IS NOT NULL AND COALESCE(NULLIF(TRIM(c.tenant_id), ''), 'default') = ?)
+         OR (c.id IS NULL AND COALESCE(NULLIF(TRIM(t.tenant_id), ''), 'default') = ?)
+       )
+     LIMIT 2`,
+    `SELECT DISTINCT customer_id FROM cashback_transactions
+     WHERE order_id = ? AND type IN ('earn', 'credit') AND amount > 0
+     LIMIT 2`,
+  );
+
+  if (candidates.size === 1) {
+    return { customerId: [...candidates][0], fromLedger: true, ambiguous: false };
+  }
+  if (candidates.size > 1) {
+    return { customerId: null, fromLedger: false, ambiguous: true, candidates: [...candidates] };
+  }
+  return { customerId: null, fromLedger: false, ambiguous: false };
 }
 
 export interface ReversalSuccess {
@@ -93,6 +173,7 @@ export async function reverseAccrual(
 
   if (order) {
     if (
+      !input.verifiedLedgerRecipient &&
       typeof order.customer_id === 'string' &&
       order.customer_id.trim() !== '' &&
       order.customer_id !== 'guest' &&

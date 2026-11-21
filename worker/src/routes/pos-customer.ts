@@ -8,6 +8,7 @@ import type { Env } from '../types/env';
 import { jsonResponse, errorResponse } from '../middleware/cors';
 import { requireStaff } from '../middleware/staff-auth';
 import { isHQSuperAdmin } from '../middleware/tenant';
+import { canonicalPhone, phoneVariants } from '../../../packages/domain/customer/phone';
 
 export const posCustomerRouter = new Hono<{ Bindings: Env }>();
 
@@ -17,18 +18,17 @@ posCustomerRouter.get('/', requireStaff(['owner', 'manager', 'supervisor', 'staf
   if (!phone) {
     return errorResponse('Thiếu số điện thoại', 400);
   }
-  // Normalize phone: remove spaces, dashes, ensure starts with 0
-  const normalizedPhone = phone.replace(/[\s-]/g, '').replace(/^\+84/, '0');
-  if (!/^0\d{9}$/.test(normalizedPhone)) {
+  const normalizedPhone = canonicalPhone(phone);
+  if (!normalizedPhone) {
     return errorResponse('Số điện thoại không hợp lệ (định dạng: 09xxxxxxxx)', 400);
   }
 
   const db = c.env.AURA_DB;
-  const staff = c.get('staff' as any) as { tenantId?: string; tenant_id?: string; role?: string } | undefined;
-  const user = c.get('user' as any) as { tenantId?: string; tenant_id?: string; role?: string } | undefined;
+  const staff = c.get('staff' as never) as { tenantId?: string; tenant_id?: string; role?: string } | undefined;
+  const user = c.get('user' as never) as { tenantId?: string; tenant_id?: string; role?: string } | undefined;
   const actorRole = String(staff?.role || user?.role || '').toLowerCase();
   const actorTenant = String(staff?.tenantId ?? staff?.tenant_id ?? user?.tenantId ?? user?.tenant_id ?? '').trim();
-  const ctxTenant = String((c.get('tenantId' as any) as string | undefined) || '').trim();
+  const ctxTenant = String((c.get('tenantId' as never) as string | undefined) || '').trim();
   const baseTenant = actorTenant || (ctxTenant && ctxTenant !== '*' && ctxTenant.toLowerCase() !== 'hq' ? ctxTenant : '') || (typeof c.env.PILOT_TENANT_ID === 'string' && c.env.PILOT_TENANT_ID.trim() ? c.env.PILOT_TENANT_ID.trim() : 'default');
   const candidateOverrides = [
     c.req.query('tenant_id'),
@@ -95,10 +95,32 @@ posCustomerRouter.get('/', requireStaff(['owner', 'manager', 'supervisor', 'staf
     visit_count: number;
     tenant_id?: string | null;
   };
+  const variants = phoneVariants(normalizedPhone);
+  const phoneInClause = variants.map(() => '?').join(', ');
   let row: PosCustomerRow | null = null;
+  let ambiguousMatch = false;
+  const querySingle = async (sql: string, binds: unknown[]): Promise<PosCustomerRow | null> => {
+    const stmt = db.prepare(sql).bind(...binds);
+    if (typeof stmt.all === 'function') {
+      const res = await stmt.all<PosCustomerRow>();
+      const rows = (res?.results ?? []).filter((r) => Boolean(r && typeof r === 'object' && 'phone' in r));
+      if (rows.length > 1) {
+        ambiguousMatch = true;
+        return null;
+      }
+      if (rows.length === 1) {
+        return rows[0] ?? null;
+      }
+      if (typeof stmt.first === 'function') {
+        return (await stmt.first<PosCustomerRow>()) ?? null;
+      }
+      return null;
+    }
+    return (await stmt.first<PosCustomerRow>()) ?? null;
+  };
   try {
-    row = await db
-      .prepare(`
+    row = await querySingle(
+      `
         SELECT c.id, c.name, c.phone, c.email,
                c.loyalty_tier, c.loyalty_points, c.lifetime_points,
                c.created_at, c.tenant_id,
@@ -108,10 +130,11 @@ posCustomerRouter.get('/', requireStaff(['owner', 'manager', 'supervisor', 'staf
                (SELECT COUNT(*) FROM orders o WHERE (o.customer_phone = c.phone OR o.customer_id = c.id) AND LOWER(TRIM(COALESCE(o.status, ''))) NOT IN ('cancelled', 'failed', 'rejected', 'expired', 'refunded') AND LOWER(TRIM(COALESCE(o.payment_status, ''))) != 'refunded' AND (? = '*' OR CASE WHEN o.tenant_id = '' THEN 'default' ELSE COALESCE(NULLIF(TRIM(o.tenant_id), ''), 'default') END = ?)) AS visit_count
         FROM customers c
         LEFT JOIN cashback_wallets cw ON cw.customer_id = c.id AND (? = '*' OR COALESCE(NULLIF(TRIM(cw.tenant_id), ''), 'default') = ?)
-        WHERE c.phone = ? AND (? = '*' OR CASE WHEN c.tenant_id = '' THEN 'default' ELSE COALESCE(NULLIF(TRIM(c.tenant_id), ''), 'default') END = ?)
-      `)
-      .bind(tenantId, tenantId, tenantId, tenantId, normalizedPhone, tenantId, tenantId)
-      .first<PosCustomerRow>();
+        WHERE c.phone IN (${phoneInClause}) AND (? = '*' OR CASE WHEN c.tenant_id = '' THEN 'default' ELSE COALESCE(NULLIF(TRIM(c.tenant_id), ''), 'default') END = ?)
+        LIMIT 2
+      `,
+      [tenantId, tenantId, tenantId, tenantId, ...variants, tenantId, tenantId],
+    );
   } catch (err) {
     const errMsg = err instanceof Error ? err.message : String(err);
     const isNonDefaultTenant = tenantId !== 'default' && tenantId !== '*';
@@ -441,6 +464,10 @@ posCustomerRouter.get('/', requireStaff(['owner', 'manager', 'supervisor', 'staf
     : 'default';
   if (tenantId !== '*' && row && resolvedRowTenant !== tenantId) {
     row = null;
+  }
+
+  if (ambiguousMatch) {
+    return errorResponse('Phát hiện nhiều hồ sơ trùng số điện thoại; cần đối soát thủ công', 409);
   }
 
   if (!row) {

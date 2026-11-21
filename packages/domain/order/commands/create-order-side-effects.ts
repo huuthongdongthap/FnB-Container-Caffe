@@ -1,3 +1,4 @@
+import { findContactCustomer } from '../../customer/phone';
 /**
  * Orders — Post-order side effects
  * Loyalty, notifications, inventory, analytics, ERPNext sync.
@@ -64,7 +65,18 @@ export async function runPostOrderSideEffects(params: PostOrderParams): Promise<
     data.customer_phone,
     data.customer_email,
   );
-  if (validEmail) {
+  let ambiguousContact = false;
+  let matchedCustomer: { id: string } | null = null;
+  if (!customerIdForCapture && (validPhone || validEmail)) {
+    try {
+      matchedCustomer = await findContactCustomer(db, effectiveTenant, validPhone, validEmail);
+    } catch {
+      ambiguousContact = true;
+    }
+  }
+  if (matchedCustomer) {
+    customerIdForCapture = matchedCustomer.id;
+  } else if (!customerIdForCapture && !ambiguousContact && validEmail) {
     const newCustId = generateId('CUST_');
     try {
       await db.prepare(`
@@ -92,7 +104,7 @@ export async function runPostOrderSideEffects(params: PostOrderParams): Promise<
       }
     }
     if (linkedCust) customerIdForCapture = linkedCust.id;
-  } else if (validPhone) {
+  } else if (!customerIdForCapture && !ambiguousContact && validPhone) {
     const digits = validPhone;
     if (digits.length >= 9 && digits.length <= 15) {
       let existing: { id: string } | null = null;

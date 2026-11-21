@@ -1,3 +1,4 @@
+import { canonicalPhone, findContactCustomer } from '../../customer/phone';
 /**
  * loyalty-trigger.ts
  *
@@ -21,9 +22,7 @@ export function sanitizeCustomerIdentity(
   phone?: string | null,
   email?: string | null,
 ): { normalizedPhone: string | null; email: string | null } {
-  const digits = String(phone ?? '').replace(/\D/g, '');
-  const normalizedPhone =
-    digits.length >= 9 && digits.length <= 15 && !/^0+$/.test(digits) ? digits : null;
+  const normalizedPhone = canonicalPhone(phone);
   const trimmedEmail = typeof email === 'string' ? email.trim() : '';
   const validEmail = trimmedEmail.length > 0 && trimmedEmail.includes('@') ? trimmedEmail : null;
   return { normalizedPhone, email: validEmail };
@@ -118,20 +117,13 @@ export async function creditLoyaltyIfEligible(
   );
   let customerId = orderRow.customer_id ? String(orderRow.customer_id).trim() || null : null;
   if (!customerId && (normalizedPhone || sanitizedEmail)) {
-    const orderTenant = orderTenantForAccrual;
-    let cust: { id: string } | null = null;
     try {
-      cust = await db.prepare(
-        "SELECT id FROM customers WHERE ((email = ? AND email IS NOT NULL) OR (phone = ? AND phone IS NOT NULL)) AND (? = '*' OR COALESCE(NULLIF(tenant_id, ''), 'default') = ? OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?) LIMIT 1"
-      ).bind(sanitizedEmail, normalizedPhone, orderTenant, orderTenant, orderTenant).first<{ id: string }>();
+      const cust = await findContactCustomer(db, orderTenantForAccrual, normalizedPhone, sanitizedEmail);
+      customerId = cust?.id ?? null;
     } catch {
-      if (orderTenant === 'default' || orderTenant === '*') {
-        cust = await db.prepare(
-          'SELECT id FROM customers WHERE (email = ? AND email IS NOT NULL) OR (phone = ? AND phone IS NOT NULL) LIMIT 1'
-        ).bind(sanitizedEmail, normalizedPhone).first<{ id: string }>().catch(() => null);
-      }
+      // Ambiguous contact in tenant — do not credit an arbitrary profile
+      customerId = null;
     }
-    customerId = cust?.id ?? null;
   }
 
   if (!customerId) {

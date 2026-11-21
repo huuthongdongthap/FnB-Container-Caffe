@@ -137,10 +137,20 @@ export async function collectCodPayment(db: D1Database, id: string, tenantId: st
     return { success: true, status: order.status };
   }
   const effectivePaymentTenant = effectiveOrderTenant;
-  const commit = (timestamp: boolean, withPaymentTenant: boolean) => {
+  const commit = (timestamp: boolean, withPaymentTenant: boolean, withAttribution: boolean) => {
     const payTenantClause = withPaymentTenant ? paymentTenantClause : '';
     const payTenantBinds = withPaymentTenant ? paymentLookupBinds : [];
     return db.batch([
+      ...(withAttribution ? [db.prepare(`INSERT OR IGNORE INTO cash_payment_attributions (payment_id, tenant_id, shift_id, collected_by, settled_at)
+        SELECT COALESCE((SELECT id FROM payments WHERE order_id = ? AND method IN ('cod', 'cash')${payTenantClause} LIMIT 1), ?),
+          ?, CAST(s.id AS TEXT), ?, ? FROM staff_shifts s
+        WHERE s.staff_id = ? AND COALESCE(NULLIF(TRIM(s.tenant_id), ''), 'default') = ?
+          AND s.clock_in IS NOT NULL AND s.clock_out IS NULL
+          AND NOT EXISTS (SELECT 1 FROM shift_reconciliations r WHERE r.shift_id = CAST(s.id AS TEXT) AND r.tenant_id = ?)
+          AND EXISTS (SELECT 1 FROM orders WHERE id = ? AND status = ? AND payment_status = ?${effectiveOrderClause})
+        ORDER BY s.clock_in DESC LIMIT 1`)
+        .bind(id, ...payTenantBinds, `cod:${id}`, effectivePaymentTenant, staffId || '', now, staffId || '', effectivePaymentTenant,
+          effectivePaymentTenant, id, order!.status, order!.payment_status, ...effectiveOrderBinds)] : []),
       db.prepare(`UPDATE orders SET payment_status = 'paid', ${timestamp ? 'cod_paid_at = COALESCE(cod_paid_at, ?), ' : ''}updated_at = ?
         WHERE id = ? AND status = ? AND payment_status = ?${effectiveOrderClause}`)
         .bind(...(timestamp ? [now] : []), now, id, order!.status, order!.payment_status, ...effectiveOrderBinds),
@@ -162,34 +172,19 @@ export async function collectCodPayment(db: D1Database, id: string, tenantId: st
     ]);
   };
   let results;
-  try {
-    results = await commit(true, hasPaymentsTenantColumn);
-  } catch (error) {
-    const errText = String(error);
-    if (/no such column:.*tenant_id/i.test(errText) && effectiveOrderTenant === 'default') {
-      hasPaymentsTenantColumn = false;
-      try {
-        results = await commit(true, false);
-      } catch (innerError) {
-        if (!/no such column:.*cod_paid_at/i.test(String(innerError))) throw innerError;
-        results = await commit(false, false);
-      }
-    } else if (/no such column:.*cod_paid_at/i.test(errText)) {
-      try {
-        results = await commit(false, hasPaymentsTenantColumn);
-      } catch (innerError) {
-        if (/no such column:.*tenant_id/i.test(String(innerError)) && effectiveOrderTenant === 'default') {
-          results = await commit(false, false);
-        } else {
-          throw innerError;
-        }
-      }
-    } else {
-      throw error;
+  let timestamp = true, withAttribution = Boolean((staffId || '').trim());
+  for (let attempt = 0; attempt < 4; attempt++) {
+    try { results = await commit(timestamp, hasPaymentsTenantColumn, withAttribution); break; }
+    catch (error) {
+      const message = String(error);
+      if (withAttribution && /no such table:.*\b(cash_payment_attributions|staff_shifts|shift_reconciliations)\b/i.test(message)) withAttribution = false;
+      else if (timestamp && /no such column:.*cod_paid_at/i.test(message)) timestamp = false;
+      else if (hasPaymentsTenantColumn && effectiveOrderTenant === 'default' && /no such column:.*tenant_id/i.test(message)) hasPaymentsTenantColumn = false;
+      else throw error;
     }
   }
-  if (results.length !== 3 || results.some(result => !result.success)) throw new Error('COD settlement transaction failed');
-  if (!(results[0]!.meta?.changes > 0)) {
+  if (!results || results.length !== (withAttribution ? 4 : 3) || results.some(result => !result.success)) throw new Error('COD settlement transaction failed');
+  if (!(results[withAttribution ? 1 : 0]!.meta?.changes > 0)) {
     return { success: false, statusCode: 409, error: 'Order changed concurrently; refresh and retry' };
   }
   await attributeCashToOpenShift(db, staffId, effectiveOrderTenant, amount);
