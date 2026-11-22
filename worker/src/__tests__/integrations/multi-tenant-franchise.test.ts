@@ -1,3 +1,4 @@
+// @vitest-environment node
 /**
  * Integration Test: Multi-Tenant & Franchise Preparation (Q2 2027)
  *
@@ -3481,7 +3482,7 @@ describe('Multi-Tenant & Franchise Preparation Integration', () => {
       await creditLoyaltyIfEligible(mockDb as any, env as any, 'ord-sadec-guest');
       const loyaltyCustQuery = executedQueries.find((q) => /FROM customers WHERE/i.test(q.sql));
       expect(loyaltyCustQuery).toBeDefined();
-      expect(loyaltyCustQuery!.sql).toContain("COALESCE(NULLIF(tenant_id, ''), 'default') = ?");
+      expect(loyaltyCustQuery!.sql).toMatch(/COALESCE\(NULLIF\((?:TRIM\()?tenant_id\)?,\s*''\),\s*'default'\)\s*=\s*\?/);
       expect(loyaltyCustQuery!.args).toContain('tenant_sadec_02');
       // Because 'cust-default-only' belongs to 'default', the lookup for 'ord-sadec-guest' returns null and skips cross-tenant accrual
       expect(executedQueries.some((q) => /INSERT INTO cashback_transactions/i.test(q.sql))).toBe(false);
@@ -3502,7 +3503,7 @@ describe('Multi-Tenant & Franchise Preparation Integration', () => {
       const visitCustQueries = executedQueries.filter((q) => /FROM customers WHERE/i.test(q.sql));
       expect(visitCustQueries.length).toBeGreaterThan(0);
       for (const q of visitCustQueries) {
-        expect(q.sql).toContain("COALESCE(NULLIF(tenant_id, ''), 'default') = ?");
+        expect(q.sql).toMatch(/COALESCE\(NULLIF\((?:TRIM\()?tenant_id\)?,\s*''\),\s*'default'\)\s*=\s*\?/);
       }
     });
   });
@@ -5864,16 +5865,19 @@ describe('Multi-Tenant & Franchise Preparation Integration', () => {
           return null;
         }),
         all: vi.fn(async () => {
+          if (/^PRAGMA table_info\((cashback_transactions|loyalty_point_logs|loyalty_audit_log)\)/i.test(sql)) {
+            return { success: true, results: [{ name: 'id', type: 'TEXT' }, { name: 'tenant_id', type: 'TEXT' }] };
+          }
           if (/FROM cashback_transactions WHERE wallet_id = \?/i.test(sql)) {
-            return { results: cashbackTxs.filter((tx) => tx.wallet_id === args[0]) };
+            return { success: true, results: cashbackTxs.filter((tx) => tx.wallet_id === args[0]) };
           }
           if (/SELECT \* FROM rewards ORDER BY point_cost ASC/i.test(sql)) {
-            return { results: rewards };
+            return { success: true, results: rewards };
           }
           if (/SELECT \* FROM mrr_snapshots/i.test(sql)) {
-            return { results: [] };
+            return { success: true, results: [] };
           }
-          return { results: [] };
+          return { success: true, results: [] };
         }),
         run: vi.fn(async () => {
           if (/INSERT INTO cashback_wallets \(id, customer_id, balance, total_earned, total_spent, created_at, updated_at, tenant_id\)/i.test(sql)) {
@@ -6294,12 +6298,16 @@ describe('Multi-Tenant & Franchise Preparation Integration', () => {
         }),
         all: vi.fn(async () => {
           executedSqls.push(sql);
+          if (/^PRAGMA table_info\((cashback_transactions|loyalty_point_logs|loyalty_audit_log)\)/i.test(sql)) {
+            return { success: true, results: [{ name: 'id', type: 'TEXT' }, { name: 'tenant_id', type: 'TEXT' }] };
+          }
           if (/FROM orders/i.test(sql) && /COALESCE\(NULLIF\(TRIM\((?:o\.)?tenant_id\), ''\), 'default'\)/i.test(sql)) {
             return {
+              success: true,
               results: orders.filter((o) => ((String(o.tenant_id ?? '').trim()) || 'default') === 'default'),
             };
           }
-          return { results: [] };
+          return { success: true, results: [] };
         }),
         run: vi.fn(async () => {
           executedSqls.push(sql);
@@ -6768,8 +6776,11 @@ describe('Multi-Tenant & Franchise Preparation Integration', () => {
         }),
         all: vi.fn(async () => {
           executedSqls.push(sql);
+          if (/^PRAGMA table_info\((cashback_transactions|loyalty_point_logs|loyalty_audit_log)\)/i.test(sql)) {
+            return { success: true, results: [{ name: 'id', type: 'TEXT' }, { name: 'tenant_id', type: 'TEXT' }] };
+          }
           if (/FROM inventory_transactions\s+WHERE reference_id = \? AND reference_type = 'order' AND type (?:= 'reserve'|IN \('reserve', 'sale'\))/i.test(sql)) {
-            return { results: inventoryTxs.filter((tx) => tx.reference_id === args[0] && tx.type === 'reserve') };
+            return { success: true, results: inventoryTxs.filter((tx) => tx.reference_id === args[0] && tx.type === 'reserve') };
           }
           if (/FROM recipe_items ri/i.test(sql)) {
             const rid = String(args[0] ?? '');
@@ -6785,9 +6796,9 @@ describe('Multi-Tenant & Franchise Preparation Integration', () => {
                   cost_per_unit: ing?.cost_per_unit ?? 0,
                 };
               });
-            return { results: items };
+            return { success: true, results: items };
           }
-          return { results: [] };
+          return { success: true, results: [] };
         }),
         run: vi.fn(async () => {
           executedSqls.push(sql);
@@ -7283,9 +7294,29 @@ describe('Multi-Tenant & Franchise Preparation Integration', () => {
       const stockMovements: Array<Record<string, unknown>> = [];
       const inventoryTransactions: Array<Record<string, unknown>> = [];
 
+      const tableColumns: Record<string, string[]> = {
+        customers: ['id', 'loyalty_points', 'tenant_id', 'updated_at'],
+        loyalty_accounts: [],
+        loyalty_rewards: ['id', 'name', 'points_cost', 'current_redemptions', 'max_redemptions', 'is_active', 'tenant_id'],
+        rewards: ['id', 'title', 'point_cost', 'is_active', 'tenant_id'],
+        loyalty_transactions: [
+          'id', 'account_id', 'customer_id', 'type', 'points', 'order_id', 'reward_id',
+          'description', 'reason', 'idempotency_key', 'created_by', 'created_at', 'tenant_id', 'balance_after',
+        ],
+        loyalty_point_logs: [
+          'id', 'customer_id', 'order_id', 'points_change', 'reason', 'description', 'created_at', 'tenant_id', 'balance_after',
+        ],
+        loyalty_redemptions: [
+          'id', 'customer_id', 'reward_id', 'code', 'points_spent', 'order_id', 'status', 'expires_at', 'redeemed_at', 'created_at', 'tenant_id',
+        ],
+        user_rewards: ['id', 'customer_id', 'reward_id', 'code', 'status', 'expires_at', 'created_at', 'tenant_id'],
+      };
+
       const mockDb = {
         prepare: vi.fn((sql: string) => {
           const makeStmt = (args: unknown[]) => ({
+            sql,
+            args,
             bind: (...b: unknown[]) => makeStmt(b),
             first: async () => {
               if (/FROM customers WHERE id = \?/i.test(sql)) {
@@ -7309,6 +7340,14 @@ describe('Multi-Tenant & Franchise Preparation Integration', () => {
                   point_cost: r.points_cost,
                   ...(sql.includes('tenant_id') ? { tenant_id: r.tenant_id } : {}),
                 };
+              }
+              if (/SELECT balance_after FROM loyalty_transactions WHERE id = \?/i.test(sql)) {
+                const txId = String(args[0]);
+                const tid = args[1] ? String(args[1]) : undefined;
+                const tx = loyaltyTransactions.find(
+                  (t) => t.id === txId && (!tid || String(t.tenant_id || 'default').trim() === tid)
+                );
+                return tx ? { balance_after: tx.balance_after } : null;
               }
               if (/FROM cashback_wallets WHERE customer_id = \?/i.test(sql)) {
                 return { id: 'wal_fran_v1', customer_id: args[0], balance: 25000, total_earned: 25000, total_spent: 0, tenant_id: 'tenant_sadec_02' };
@@ -7353,11 +7392,17 @@ describe('Multi-Tenant & Franchise Preparation Integration', () => {
               return null;
             },
             all: async () => {
+              const pragmaMatch = sql.match(/^PRAGMA table_info\((\w+)\)/i);
+              if (pragmaMatch) {
+                const cols = tableColumns[pragmaMatch[1]] ?? [];
+                return { success: true, results: cols.map((name) => ({ name })) };
+              }
               if (/FROM rewards ORDER BY/i.test(sql)) {
-                return { results: [] };
+                return { success: true, results: [] };
               }
               if (/FROM loyalty_rewards WHERE is_active = 1/i.test(sql)) {
                 return {
+                  success: true,
                   results: loyaltyRewards.map((r) => ({
                     id: r.id,
                     title: r.name,
@@ -7370,17 +7415,50 @@ describe('Multi-Tenant & Franchise Preparation Integration', () => {
                   })),
                 };
               }
+              if (/FROM user_rewards[\s\S]*UNION[\s\S]*FROM loyalty_redemptions/i.test(sql)) {
+                if (/\bvoucher_code\b/i.test(sql) && !(tableColumns.loyalty_redemptions || []).includes('voucher_code')) {
+                  throw new Error('no such column: voucher_code');
+                }
+                const hasTenantScope = /tenant_id/i.test(sql);
+                const urCid = String(args[0]);
+                const urTid = hasTenantScope ? String(args[1] ?? '') : undefined;
+                const lrCid = String(hasTenantScope ? args[2] : args[1]);
+                const lrTid = hasTenantScope ? String(args[3] ?? '') : undefined;
+                const keys = new Set<string>();
+                for (const ur of userRewards) {
+                  if (
+                    ur.customer_id === urCid &&
+                    (ur.status === 'active' || ur.status === 'pending') &&
+                    (!urTid || String(ur.tenant_id || 'default').trim() === urTid)
+                  ) {
+                    const code = String(ur.code ?? '').trim();
+                    keys.add(code || `ur:${String(ur.id)}`);
+                  }
+                }
+                for (const lr of loyaltyRedemptions) {
+                  if (
+                    lr.customer_id === lrCid &&
+                    (lr.status === 'active' || lr.status === 'pending') &&
+                    (!lrTid || String(lr.tenant_id || 'default').trim() === lrTid)
+                  ) {
+                    const code = String(lr.code ?? '').trim();
+                    keys.add(code || `lr:${String(lr.id)}`);
+                  }
+                }
+                return { success: true, results: [{ cnt: keys.size }] };
+              }
               if (/SELECT COUNT\(\*\) as cnt FROM user_rewards/i.test(sql)) {
                 const cid = String(args[0]);
                 const tid = args[1] ? String(args[1]) : undefined;
                 const cnt = userRewards.filter(
                   (ur) => ur.customer_id === cid && ur.status === 'active' && (!tid || String(ur.tenant_id || 'default').trim() === tid)
                 ).length;
-                return { results: [{ cnt }] };
+                return { success: true, results: [{ cnt }] };
               }
               if (/FROM user_rewards ur LEFT JOIN rewards r/i.test(sql)) {
                 const cid = String(args[0]);
                 return {
+                  success: true,
                   results: userRewards
                     .filter((ur) => ur.customer_id === cid)
                     .map((ur) => {
@@ -7396,9 +7474,29 @@ describe('Multi-Tenant & Franchise Preparation Integration', () => {
                     }),
                 };
               }
+              if (/FROM loyalty_redemptions lr LEFT JOIN loyalty_rewards r/i.test(sql)) {
+                const cid = String(args[0]);
+                const tid = args[1] ? String(args[1]) : undefined;
+                return {
+                  success: true,
+                  results: loyaltyRedemptions
+                    .filter((row) => row.customer_id === cid && (!tid || String(row.tenant_id || 'default').trim() === tid))
+                    .map((row) => {
+                      const rw = loyaltyRewards.find((item) => item.id === row.reward_id);
+                      return {
+                        ...row,
+                        title: rw?.name || 'Reward',
+                        discount_type: rw?.type || 'free_item',
+                        discount_value: rw?.value || 0,
+                        r_tenant_id: rw?.tenant_id ?? null,
+                        rw_tenant_id: null,
+                      };
+                    }),
+                };
+              }
               if (/FROM loyalty_point_logs WHERE customer_id = \?/i.test(sql)) {
                 const cid = String(args[0]);
-                return { results: loyaltyPointLogs.filter((l) => l.customer_id === cid) };
+                return { success: true, results: loyaltyPointLogs.filter((l) => l.customer_id === cid) };
               }
               if (/SELECT COUNT\(\*\) as cnt FROM referrals WHERE referrer_id = \?/i.test(sql)) {
                 const cid = String(args[0]);
@@ -7406,7 +7504,7 @@ describe('Multi-Tenant & Franchise Preparation Integration', () => {
                 const cnt = referrals.filter(
                   (r) => r.referrer_id === cid && (!tid || String(r.tenant_id || 'default').trim() === tid)
                 ).length;
-                return { results: [{ cnt }] };
+                return { success: true, results: [{ cnt }] };
               }
               if (/SELECT COALESCE\(SUM\(cashback_awarded_vnd\), 0\) as total FROM referrals/i.test(sql)) {
                 const cid = String(args[0]);
@@ -7415,22 +7513,33 @@ describe('Multi-Tenant & Franchise Preparation Integration', () => {
                 const total = referrals
                   .filter((r) => r.referrer_id === cid && r.status === st && (!tid || String(r.tenant_id || 'default').trim() === tid))
                   .reduce((sum, r) => sum + Number(r.cashback_awarded_vnd || 0), 0);
-                return { results: [{ total }] };
+                return { success: true, results: [{ total }] };
               }
               if (/FROM referrals r LEFT JOIN customers c/i.test(sql)) {
                 const cid = String(args[0]);
                 return {
+                  success: true,
                   results: referrals
                     .filter((r) => r.referrer_id === cid)
                     .map((r) => ({ ...r, referred_name: 'Friend', referred_phone: '0988777666' })),
                 };
               }
               if (/FROM purchase_order_items WHERE purchase_order_id = \?/i.test(sql)) {
-                return { results: [] };
+                return { success: true, results: [] };
               }
-              return { results: [] };
+              return { success: true, results: [] };
             },
             run: async () => {
+              if (/UPDATE loyalty_rewards SET/i.test(sql)) {
+                const rid = String(args[0]);
+                const tid = args[1] ? String(args[1]) : undefined;
+                const rw = loyaltyRewards.find(
+                  (r) => r.id === rid && Number(r.is_active) === 1 && (!tid || String(r.tenant_id || 'default').trim() === tid)
+                );
+                if (!rw) return { success: true, meta: { changes: 0 } };
+                rw.current_redemptions = Number(rw.current_redemptions || 0) + 1;
+                return { success: true, meta: { changes: 1 } };
+              }
               if (/UPDATE customers SET loyalty_points = loyalty_points - \?/i.test(sql)) {
                 const cost = Number(args[0]);
                 const cid = String(args[2]);
@@ -7442,6 +7551,24 @@ describe('Multi-Tenant & Franchise Preparation Integration', () => {
                 cust.loyalty_points = Number(cust.loyalty_points) - cost;
                 return { success: true, meta: { changes: 1 } };
               }
+              if (/INSERT INTO loyalty_point_logs[\s\S]*SELECT/i.test(sql)) {
+                const cid = String(args[1]);
+                const tid = String(args[7] ?? 'default');
+                const cust = customers.find((c) => c.id === cid && String(c.tenant_id || 'default').trim() === tid);
+                if (!cust) return { success: true, meta: { changes: 0 } };
+                loyaltyPointLogs.push({
+                  id: args[0],
+                  customer_id: cid,
+                  order_id: args[2],
+                  points_change: args[3],
+                  reason: args[4],
+                  description: args[5],
+                  created_at: args[6],
+                  tenant_id: tid,
+                  balance_after: cust.loyalty_points,
+                });
+                return { success: true, meta: { changes: 1 } };
+              }
               if (/INSERT INTO loyalty_point_logs/i.test(sql)) {
                 loyaltyPointLogs.push({ id: args[0], customer_id: args[1], points_change: args[2], reason: args[3], tenant_id: 'default' });
                 return { success: true, meta: { changes: 1 } };
@@ -7449,6 +7576,19 @@ describe('Multi-Tenant & Franchise Preparation Integration', () => {
               if (/UPDATE loyalty_point_logs SET tenant_id = \? WHERE id = \?/i.test(sql)) {
                 const row = loyaltyPointLogs.find((l) => l.id === args[1]);
                 if (row) row.tenant_id = args[0];
+                return { success: true, meta: { changes: 1 } };
+              }
+              if (/INSERT INTO loyalty_transactions[\s\S]*SELECT/i.test(sql)) {
+                const cid = String(args[2]);
+                const tid = String(args[12] ?? 'default');
+                const cust = customers.find((c) => c.id === cid && String(c.tenant_id || 'default').trim() === tid);
+                if (!cust) return { success: true, meta: { changes: 0 } };
+                loyaltyTransactions.push({
+                  id: args[0],
+                  customer_id: cid,
+                  tenant_id: tid,
+                  balance_after: Number(cust.loyalty_points),
+                });
                 return { success: true, meta: { changes: 1 } };
               }
               if (/INSERT OR IGNORE INTO loyalty_transactions/i.test(sql)) {
@@ -7461,7 +7601,7 @@ describe('Multi-Tenant & Franchise Preparation Integration', () => {
                 return { success: true, meta: { changes: 1 } };
               }
               if (/INSERT INTO user_rewards/i.test(sql)) {
-                userRewards.push({ id: args[0], customer_id: args[1], reward_id: args[2], code: args[3], status: 'active', tenant_id: 'default' });
+                userRewards.push({ id: args[0], customer_id: args[1], reward_id: args[2], code: args[3], status: 'active', tenant_id: args[7] ?? 'default' });
                 return { success: true, meta: { changes: 1 } };
               }
               if (/UPDATE user_rewards SET tenant_id = \? WHERE id = \?/i.test(sql)) {
@@ -7469,8 +7609,20 @@ describe('Multi-Tenant & Franchise Preparation Integration', () => {
                 if (row) row.tenant_id = args[0];
                 return { success: true, meta: { changes: 1 } };
               }
-              if (/INSERT OR IGNORE INTO loyalty_redemptions/i.test(sql)) {
-                loyaltyRedemptions.push({ id: args[0], customer_id: args[1], reward_id: args[2], code: args[3], tenant_id: 'default' });
+              if (/INSERT (?:OR IGNORE )?INTO loyalty_redemptions/i.test(sql)) {
+                loyaltyRedemptions.push({
+                  id: args[0],
+                  customer_id: args[1],
+                  reward_id: args[2],
+                  code: args[3],
+                  points_spent: args[4],
+                  order_id: args[5],
+                  status: args[6] ?? 'active',
+                  expires_at: args[7],
+                  redeemed_at: args[8],
+                  created_at: args[9],
+                  tenant_id: args[10] ?? 'default',
+                });
                 return { success: true, meta: { changes: 1 } };
               }
               if (/UPDATE loyalty_redemptions SET tenant_id = \? WHERE id = \?/i.test(sql)) {
@@ -7552,6 +7704,21 @@ describe('Multi-Tenant & Franchise Preparation Integration', () => {
           });
           return makeStmt([]);
         }),
+        batch: vi.fn(async (stmts: Array<{ sql: string; run: () => Promise<{ success: boolean; meta: { changes: number } }> }>) => {
+          const results: unknown[] = [];
+          let lastChanges = 0;
+          for (const stmt of stmts) {
+            if (/SELECT CASE WHEN changes\(\) = 1[\s\S]*abs\(-9223372036854775808\)/i.test(stmt.sql)) {
+              if (lastChanges !== 1) throw new Error('integer overflow');
+              results.push({ success: true, results: [{ redemption_guard: 1 }], meta: { changes: 0 } });
+              continue;
+            }
+            const res = await stmt.run();
+            lastChanges = res.meta?.changes ?? 0;
+            results.push(res);
+          }
+          return results;
+        }),
       };
 
       const franEnv = createMockEnv({
@@ -7596,7 +7763,7 @@ describe('Multi-Tenant & Franchise Preparation Integration', () => {
       );
       expect(validRedeemRes.status).toBe(200);
       expect(customers.find((c) => c.id === 'cust_fran_v1')?.loyalty_points).toBe(350);
-      expect(userRewards.find((u) => u.reward_id === 'lr_fran_v1')?.tenant_id).toBe('tenant_sadec_02');
+      expect(userRewards.find((u) => u.reward_id === 'lr_fran_v1')).toBeUndefined();
       expect(loyaltyRedemptions.find((r) => r.reward_id === 'lr_fran_v1')?.tenant_id).toBe('tenant_sadec_02');
       expect(loyaltyPointLogs.find((l) => l.reason === 'redeem')?.tenant_id).toBe('tenant_sadec_02');
 
@@ -9778,7 +9945,7 @@ describe('Multi-Tenant & Franchise Preparation Integration', () => {
             return { total };
           }
           if (/SELECT COALESCE\(SUM\(amount\), 0\) as total FROM cash_payouts/i.test(sql)) {
-            const tid = /TRIM\(tenant_id\)/i.test(sql) ? String(args[2]) : undefined;
+            const tid = /TRIM\(tenant_id\)/i.test(sql) ? String(args[args.length - 1]) : undefined;
             const total = cashPayouts
               .filter((p) => !tid || String(p.tenant_id || 'default').trim() === tid)
               .reduce((sum, p) => sum + Number(p.amount || 0), 0);
@@ -11233,20 +11400,20 @@ describe('Multi-Tenant & Franchise Preparation Integration', () => {
         defEnv
       );
       expect(linkOrdRes.status).toBe(200);
-      expect(
-        executedSqls.some(
-          (q) =>
-            /UPDATE orders SET table_id = \?, updated_at = \? WHERE id = \?[\s\S]*COALESCE\(NULLIF\(TRIM\(tenant_id\), ''\), 'default'\) = \?/i.test(q.sql) &&
-            q.args[3] === 'default'
-        )
-      ).toBe(true);
-      expect(
-        executedSqls.some(
-          (q) =>
-            /UPDATE table_sessions[\s\S]*WHERE id = \? AND COALESCE\(NULLIF\(TRIM\(tenant_id\), ''\), 'default'\) = \?/i.test(q.sql) &&
-            q.args[3] === 'default'
-        )
-      ).toBe(true);
+      const claimWrite = executedSqls.find((q) => /UPDATE orders SET table_id = \?, updated_at = \?/i.test(q.sql));
+      expect(claimWrite).toBeDefined();
+      expect(claimWrite?.sql).toMatch(/WHERE id = \? AND table_id IS \? AND status IS \? AND COALESCE\(NULLIF\(TRIM\(tenant_id\), ''\), 'default'\) = \?/i);
+      expect(claimWrite?.args.slice(2, 6)).toEqual(['ord_ac1_1', null, 'pending', 'default']);
+      expect(claimWrite?.sql).toContain('EXISTS (SELECT 1 FROM table_sessions');
+      const billWrite = executedSqls.find((q) => /UPDATE table_sessions SET/i.test(q.sql));
+      expect(billWrite).toBeDefined();
+      expect(billWrite?.sql).toMatch(/WHERE id = \? AND table_id IS \? AND status IN \('active', 'ordering'\) AND COALESCE\(NULLIF\(TRIM\(tenant_id\), ''\), 'default'\) = \?/i);
+      expect(billWrite?.args.slice(2, 5)).toEqual(['tsess_def_ac1', 'tbl_ac1', 'default']);
+      expect(billWrite?.sql).toContain('AND changes() = 1');
+      expect(mockDb.batch).toHaveBeenCalledWith(expect.arrayContaining([
+        expect.objectContaining({ sql: claimWrite?.sql }),
+        expect.objectContaining({ sql: billWrite?.sql }),
+      ]));
 
       // 2. AC2: syncProductToMenuProjection propagates products.tenant_id into menu_items
       await syncProductToMenuProjection(mockDb as any, 'prod_sadec_ac2');
@@ -13776,8 +13943,15 @@ describe('Multi-Tenant & Franchise Preparation Integration', () => {
                 return null;
               },
               async all<T>() {
+                if (/^PRAGMA table_info\((cashback_transactions|loyalty_point_logs|loyalty_audit_log)\)/i.test(sql)) {
+                  return {
+                    success: true,
+                    results: [{ name: 'id', type: 'TEXT' }, { name: 'tenant_id', type: 'TEXT' }],
+                  } as unknown as D1Result<T>;
+                }
                 if (/FROM products/i.test(sql) || /FROM menu_items/i.test(sql)) {
                   return {
+                    success: true,
                     results: [
                       {
                         id: 'prod_sadec_1',
@@ -13792,9 +13966,9 @@ describe('Multi-Tenant & Franchise Preparation Integration', () => {
                   } as unknown as D1Result<T>;
                 }
                 if (/FROM audit_logs/i.test(sql)) {
-                  return { results: [] } as unknown as D1Result<T>;
+                  return { success: true, results: [] } as unknown as D1Result<T>;
                 }
-                return { results: [] } as unknown as D1Result<T>;
+                return { success: true, results: [] } as unknown as D1Result<T>;
               },
               async run() {
                 return { success: true, meta: { changes: 1 } } as unknown as D1Result;
@@ -16209,23 +16383,35 @@ describe('Multi-Tenant & Franchise Preparation Integration', () => {
       expect(JSON.parse(String(patchAudit?.args[9])).tenant_id).toBe('sadec');
 
       // 2. POST redeem under HQ wildcard with matching sadec account -> inherits 'sadec'
-      const redeemRes = await rewardHqApp.request(
-        '/api/loyalty/rewards/redeem',
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            rewardId: '00000000-0000-4000-8000-000000000001',
-            idempotencyKey: 'idemp-hq-redeem-1',
-          }),
-        },
-        { AURA_DB: mockLoyaltyDb } as unknown as Env
-      );
-      expect(redeemRes.status).toBe(200);
-      const redeemAudit = loyaltyAuditInserts.find((i) => i.args.includes('loyalty_reward_redeem'));
-      expect(redeemAudit).toBeDefined();
-      expect(redeemAudit?.args[10]).toBe('sadec');
-      expect(JSON.parse(String(redeemAudit?.args[9])).tenant_id).toBe('sadec');
+      const { orderCreationFixture } = await import('./order-creation-fixture');
+      const redemption = orderCreationFixture();
+      try {
+        redemption.sqlite.exec(`INSERT INTO customers (id,tenant_id,loyalty_points) VALUES ('hq-superadmin','sadec',500);
+          INSERT INTO loyalty_accounts (id,customer_id,tenant_id,current_points)
+            VALUES ('acc-sadec-1','hq-superadmin','sadec',500);
+          INSERT INTO loyalty_rewards (id,tenant_id,name,points_cost)
+            VALUES ('00000000-0000-4000-8000-000000000001','sadec','Free Drink Sadec',100);`);
+        const redeemRes = await rewardHqApp.request(
+          '/api/loyalty/rewards/redeem',
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              rewardId: '00000000-0000-4000-8000-000000000001',
+              idempotencyKey: 'idemp-hq-redeem-1',
+            }),
+          },
+          redemption.env
+        );
+        expect(redeemRes.status).toBe(200);
+        const redeemAudit = redemption.sqlite.prepare("SELECT tenant_id,metadata FROM audit_logs WHERE action = 'loyalty_reward_redeem'").get();
+        expect(redeemAudit).toMatchObject({ tenant_id: 'sadec' });
+        expect(JSON.parse(String(redeemAudit?.metadata)).tenant_id).toBe('sadec');
+        expect(redemption.sqlite.prepare('SELECT tenant_id,customer_id,code FROM loyalty_redemptions').get())
+          .toMatchObject({ tenant_id: 'sadec', customer_id: 'hq-superadmin', code: expect.any(String) });
+      } finally {
+        redemption.sqlite.close();
+      }
 
       // 3. Cross-tenant redemption boundary guard: sadec reward vs hanoi customer under HQ -> 404
       const hanoiApp = new OpenAPIHono<{ Bindings: Env }>();
@@ -18087,8 +18273,11 @@ describe('Multi-Tenant & Franchise Preparation Integration', () => {
       expect(ledgerQueries[0]?.args).toEqual(['ord-sadec-cod-1', 'sadec', 'sadec']);
 
       // Batch INSERT INTO payments stamps 'sadec' (not 'default') even when caller is HQ (*)
-      expect(batchStatements).toHaveLength(3);
-      expect(batchStatements[2]?.args[2]).toBe('sadec');
+      expect(batchStatements).toHaveLength(4);
+      expect(batchStatements[1]?.sql).toContain('changes() = 1');
+      expect(batchStatements[2]?.sql).toContain('INSERT INTO payments');
+      expect(batchStatements[2]?.args[3]).toBe('sadec');
+      expect(batchStatements[3]?.sql).toContain('changes() = 1');
     });
 
     it('AZ2: inventoryTransactions blocks default-store owner cross-tenant spoofing (403) and scopes GET /:id/transactions & GET /:id/snapshots to item.tenant_id under HQ (*)', async () => {
@@ -19008,86 +19197,22 @@ describe('Multi-Tenant & Franchise Preparation Integration', () => {
       const { loadPolicy } = await import('../../../../packages/domain/crm/commands/loyalty-policy');
       const { transitionOrderStatus } = await import('../../../../packages/domain/order/policies/order-status-transition');
 
-      const walletInsertBinds: unknown[][] = [];
-      const pointLogTenantUpdates: unknown[][] = [];
-
-      const accrualDb = {
-        prepare(sql: string) {
-          return {
-            sql,
-            args: [] as unknown[],
-            bind(...args: unknown[]) {
-              return {
-                sql,
-                args,
-                async first() {
-                  if (/FROM orders WHERE id = \?/i.test(sql)) {
-                    return {
-                      id: 'ord-sadec-acc-1',
-                      total: 100000,
-                      cashback_used: 0,
-                      customer_id: 'cust-sadec-acc-1',
-                      tenant_id: 'sadec',
-                      status: 'completed',
-                      payment_status: 'paid',
-                    };
-                  }
-                  if (/FROM cashback_transactions WHERE order_id = \?/i.test(sql)) {
-                    return null;
-                  }
-                  if (/FROM loyalty_point_logs WHERE order_id = \?/i.test(sql)) {
-                    return null;
-                  }
-                  if (/FROM customers WHERE id = \?/i.test(sql)) {
-                    if (args[1] && args[1] !== 'sadec') return null;
-                    return {
-                      id: 'cust-sadec-acc-1',
-                      loyalty_points: 10,
-                      lifetime_points: 10,
-                      loyalty_tier: 'bronze',
-                      tenant_id: 'sadec',
-                    };
-                  }
-                  if (/FROM cashback_wallets WHERE customer_id = \?/i.test(sql)) {
-                    return null;
-                  }
-                  return null;
-                },
-                async run() {
-                  if (/INSERT INTO cashback_wallets/i.test(sql)) {
-                    walletInsertBinds.push(args);
-                  }
-                  if (/UPDATE loyalty_point_logs SET tenant_id = \?/i.test(sql)) {
-                    pointLogTenantUpdates.push(args);
-                  }
-                  return { success: true, meta: { changes: 1 } };
-                },
-              };
-            },
-          };
-        },
-        async batch(stmts: Array<{ sql: string; args: unknown[] }>) {
-          for (const s of stmts) {
-            if (/UPDATE loyalty_point_logs SET tenant_id = \?/i.test(s.sql)) {
-              pointLogTenantUpdates.push(s.args);
-            }
-          }
-          return stmts.map(() => ({ success: true, meta: { changes: 1 } }));
-        },
-      };
-
-      const policy = await loadPolicy(accrualDb as never);
-      const accRes = await applyAccrual(accrualDb as never, policy, {
-        orderId: 'ord-sadec-acc-1',
-        customerId: 'cust-sadec-acc-1',
-        orderTotalVnd: 100000,
-        tenantId: '*',
-      });
-      expect(accRes.ok).toBe(true);
-      expect(walletInsertBinds).toHaveLength(1);
-      expect(walletInsertBinds[0][4]).toBe('sadec');
-      expect(pointLogTenantUpdates).toHaveLength(1);
-      expect(pointLogTenantUpdates[0][0]).toBe('sadec');
+      const { orderCreationFixture } = await import('./order-creation-fixture');
+      const { sqlite, env } = orderCreationFixture();
+      try {
+        sqlite.exec(`INSERT INTO customers (id,tenant_id,loyalty_points,lifetime_points)
+            VALUES ('cust-sadec-acc-1','sadec',10,10);
+          INSERT INTO orders (id,items,total,status,payment_status,payment_method,customer_id,customer_name,customer_phone,tenant_id)
+            VALUES ('ord-sadec-acc-1','[]',100000,'completed','paid','cash','cust-sadec-acc-1','Guest','0900000001','sadec');`);
+        const policy = await loadPolicy(env.AURA_DB);
+        expect(await applyAccrual(env.AURA_DB, policy, {
+          orderId: 'ord-sadec-acc-1', customerId: 'cust-sadec-acc-1', orderTotalVnd: 100000, tenantId: '*',
+        })).toMatchObject({ ok: true });
+        expect(sqlite.prepare('SELECT tenant_id FROM cashback_wallets').all()).toEqual([{ tenant_id: 'sadec' }]);
+        expect(sqlite.prepare('SELECT tenant_id FROM loyalty_point_logs').all()).toEqual([{ tenant_id: 'sadec' }]);
+      } finally {
+        sqlite.close();
+      }
 
       const statusUpdateSqls: Array<{ sql: string; args: unknown[] }> = [];
       const transDb = {
@@ -19919,6 +20044,8 @@ describe('Multi-Tenant & Franchise Preparation Integration', () => {
       const codDb = {
         prepare(sql: string) {
           return {
+            sql,
+            args: [],
             bind(...args: unknown[]) {
               return {
                 sql,
@@ -19948,17 +20075,15 @@ describe('Multi-Tenant & Franchise Preparation Integration', () => {
         },
         async batch(ops: Array<{ sql: string; args: unknown[] }>) {
           batchedOps.push(...ops);
-          return [
-            { success: true, meta: { changes: 1 } },
-            { success: true, meta: { changes: 0 } },
-            { success: true, meta: { changes: 1 } },
-          ];
+          return ops.map(() => ({ success: true, meta: { changes: 1 } }));
         },
       };
 
       const res = await collectCodPayment(codDb as never, 'ord-sd-cod-1', 'hq');
       expect(res).toEqual({ success: true, status: 'ready' });
-      expect(batchedOps).toHaveLength(3);
+      expect(batchedOps).toHaveLength(4);
+      expect(batchedOps[1].sql).toContain('changes() = 1');
+      expect(batchedOps[3].sql).toContain('changes() = 1');
       expect(batchedOps[0].args).toContain('sadec');
       expect(batchedOps[2].args).toContain('sadec');
     });
@@ -20135,6 +20260,9 @@ describe('Multi-Tenant & Franchise Preparation Integration', () => {
                       order_count: 2,
                     };
                   }
+                  if (/FROM users WHERE id = \?/i.test(sql)) {
+                    return { id: String(args[0]), role: 'cashier', tenant_id: 'sadec', is_active: 1 };
+                  }
                   if (/FROM shift_reconciliations WHERE shift_id = \?/i.test(sql)) {
                     if (reconInserts.length === 0) return null;
                     if (args.includes('hq')) return null;
@@ -20198,27 +20326,33 @@ describe('Multi-Tenant & Franchise Preparation Integration', () => {
       expect(closeRes.ok).toBe(true);
       expect(shiftUpdates[1].args).toContain('sadec');
 
-      const recon = await reconcileShiftCash(
-        shiftDb as never,
-        {
-          shift_id: 'shift-sd-1',
-          opening_float: 500000,
-          denominations: {
-            denominations: [
-              { denomination: 500000, count: 1 },
-              { denomination: 50000, count: 3 },
-            ],
-          },
-        },
-        'staff-sd-1',
-        'hq'
-      );
-      expect(recon.expected_cash).toBe(650000);
-      expect(reconInserts).toHaveLength(1);
-      expect(reconInserts[0].args).toContain('sadec');
-
-      const fetchedRecon = await getReconciliationForShift(shiftDb as never, 'shift-sd-1', 'hq');
-      expect(fetchedRecon?.shift_id).toBe('shift-sd-1');
+      const { orderCreationFixture } = await import('./order-creation-fixture');
+      const reconciliationFixture = orderCreationFixture();
+      try {
+        reconciliationFixture.sqlite.exec(`
+          INSERT INTO users (id,name,role,tenant_id) VALUES ('staff-sd-1','Collector','cashier','sadec');
+          INSERT INTO staff_shifts (id,tenant_id,staff_id,staff_name,date,shift,clock_in,clock_out,opening_cash)
+            VALUES (1,'sadec','staff-sd-1','Collector','2026-11-05','attendance',
+              '2026-11-05T07:00:00.000Z','2026-11-05T15:00:00.000Z',500000);
+          INSERT INTO orders (id,items,total,status,payment_status,payment_method,customer_name,customer_phone,tenant_id)
+            VALUES ('hq-recon-sale','[]',150000,'ready','paid','cash','Guest','0900000000','sadec');
+          INSERT INTO payments (id,order_id,tenant_id,method,amount,status,created_at,updated_at)
+            VALUES ('hq-recon-payment','hq-recon-sale','sadec','cash',150000,'completed',
+              '2026-11-05T08:00:00.000Z','2026-11-05T08:00:00.000Z');
+        `);
+        const recon = await reconcileShiftCash(reconciliationFixture.env.AURA_DB,
+          { shift_id: '1', opening_float: 500000,
+            denominations: { denominations: [{ denomination: 500000, count: 1 }, { denomination: 50000, count: 3 }] } },
+          'staff-sd-1', 'hq');
+        expect(recon.expected_cash).toBe(650000);
+        expect(reconciliationFixture.sqlite.prepare('SELECT tenant_id,cash_payment_total FROM shift_reconciliations').get())
+          .toMatchObject({ tenant_id: 'sadec', cash_payment_total: 150000 });
+        const fetchedRecon = await getReconciliationForShift(reconciliationFixture.env.AURA_DB, '1', 'hq');
+        expect(fetchedRecon?.shift_id).toBe('1');
+        expect(await getReconciliationForShift(reconciliationFixture.env.AURA_DB, '1', 'cantho')).toBeNull();
+      } finally {
+        reconciliationFixture.sqlite.close();
+      }
     });
   });
 
@@ -22292,6 +22426,9 @@ describe('Multi-Tenant & Franchise Preparation Integration', () => {
               };
             },
           };
+        },
+        async batch(stmts: Array<{ run: () => Promise<unknown> }>) {
+          return Promise.all(stmts.map((stmt) => stmt.run()));
         },
       };
 

@@ -98,12 +98,12 @@ export function LoginForm({
             required
             aria-required="true"
             aria-label={t('adminLogin.passwordAriaLabel')}
-            className="w-full bg-[var(--aura-noir-void, #050D1A)] border-0 border-b-[0.5px] border-white/20 text-on-surface px-4 py-4 font-body-sm tracking-widest placeholder:text-outline/40 transition-all focus:border-primary focus:outline-none focus:shadow-input pr-10"
+            className="w-full bg-[var(--aura-noir-void, #050D1A)] border-0 border-b-[0.5px] border-white/20 text-on-surface px-4 py-4 font-body-sm tracking-widest placeholder:text-outline/40 transition-all focus:border-primary focus:outline-none focus:shadow-input pr-12"
           />
           <button
            type="button"
             onClick={() => setShowPassword(!showPassword)}
-            className="absolute right-4 top-1/2 -translate-y-1/2 text-on-surface-variant hover:text-primary transition-colors"
+            className="absolute right-1 top-1/2 -translate-y-1/2 inline-flex min-h-[44px] min-w-[44px] items-center justify-center text-on-surface-variant hover:text-primary transition-colors"
             tabIndex={-1}
             aria-label={
               showPassword

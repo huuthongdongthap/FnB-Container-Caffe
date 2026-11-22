@@ -49,6 +49,7 @@ function createTestEnv() {
       async first() { return sql.prepare(query).get(...(values as any[])) ?? null; },
       async all() { return { success: true, results: sql.prepare(query).all(...(values as any[])) }; },
       async run() {
+        if (/^\s*SELECT\b/i.test(query)) return { success: true, results: sql.prepare(query).all(...(values as any[])), meta: { changes: 0 } };
         const r = sql.prepare(query).run(...(values as any[]));
         return { success: true, meta: { changes: Number(r.changes), last_row_id: Number(r.lastInsertRowid) } };
       },
@@ -67,7 +68,15 @@ function createTestEnv() {
       return { keys, list_complete: true };
     },
   };
-  const db: any = { prepare: statement, async batch(stmts: any[]) { return Promise.all(stmts.map(s => s.run())); } };
+  const db: any = { prepare: statement, async batch(stmts: any[]) {
+    sql.exec("BEGIN");
+    try {
+      const results = [];
+      for (const stmt of stmts) results.push(await stmt.run());
+      sql.exec("COMMIT");
+      return results;
+    } catch (error) { sql.exec("ROLLBACK"); throw error; }
+  } };
   const env: any = {
     AURA_DB: db,
     DB: db,
@@ -772,8 +781,9 @@ describe('Full Security Audit Acceptance — KDS Surfaces & Collection Guards', 
         CREATE TABLE loyalty_rewards (id TEXT PRIMARY KEY, name TEXT, points_cost INTEGER, type TEXT,
           value INTEGER, min_tier TEXT DEFAULT 'bronze', is_active INTEGER DEFAULT 1, active INTEGER DEFAULT 1,
           stock INTEGER, max_redemptions INTEGER, current_redemptions INTEGER DEFAULT 0, redeemed_count INTEGER DEFAULT 0);
-        CREATE TABLE reward_redemptions (id TEXT PRIMARY KEY, account_id TEXT, reward_id TEXT, points_spent INTEGER,
-          voucher_code TEXT, status TEXT, expires_at TEXT);
+        CREATE TABLE customers (id TEXT PRIMARY KEY, tenant_id TEXT, loyalty_points INTEGER, updated_at TEXT);
+        CREATE TABLE loyalty_redemptions (id TEXT PRIMARY KEY, tenant_id TEXT, customer_id TEXT, reward_id TEXT,
+          code TEXT, points_spent INTEGER, order_id TEXT, status TEXT, expires_at TEXT, redeemed_at TEXT, created_at TEXT);
         CREATE TABLE loyalty_transactions (id TEXT PRIMARY KEY, account_id TEXT, customer_id TEXT, type TEXT, points INTEGER,
           balance_after INTEGER, description TEXT, reason TEXT, reference_id TEXT, reward_id TEXT, order_id TEXT,
           idempotency_key TEXT, created_by TEXT, created_at TEXT);
@@ -796,6 +806,7 @@ describe('Full Security Audit Acceptance — KDS Surfaces & Collection Guards', 
           tenant_id TEXT, created_at TEXT, updated_at TEXT);
         INSERT INTO users(id,name,role,tenant_id,is_active,auth_version,created_at)
           VALUES('owner-1','Owner Default','owner','default',1,1,'${now}');
+        INSERT INTO customers VALUES ('owner-1','default',100,'${now}');
         INSERT INTO loyalty_accounts(id,customer_id,current_points,lifetime_points,tier,tenant_id,updated_at)
           VALUES('la-1','owner-1',100,100,'bronze','default','${now}'),
                 ('la-for','cust-for',500,500,'gold','other-store','${now}');
@@ -865,6 +876,8 @@ describe('Full Security Audit Acceptance — KDS Surfaces & Collection Guards', 
         env
       );
       expect(redeem1.status).toBe(200);
+      expect(sql.prepare("SELECT customer_id,code,status FROM loyalty_redemptions").get())
+        .toMatchObject({ customer_id: 'owner-1', code: expect.stringMatching(/.+/), status: 'active' });
       const redeem1Body: any = await redeem1.json();
       expect(redeem1Body.data.newBalance).toBe(0);
 
@@ -3274,6 +3287,10 @@ describe('Full Security Audit Acceptance — KDS Surfaces & Collection Guards', 
         `INSERT INTO loyalty_accounts (id, customer_id, current_points, lifetime_points, tier, tenant_id, created_at, updated_at)
          VALUES ('la_y26_1', ?, 500, 500, 'silver', 'default', ?, ?)`
       ).run(custDef1Id, nowIso, nowIso);
+      sql.exec(`CREATE TABLE IF NOT EXISTS customers (id TEXT PRIMARY KEY, tenant_id TEXT, loyalty_points INTEGER, updated_at TEXT);
+        CREATE TABLE IF NOT EXISTS loyalty_redemptions (id TEXT PRIMARY KEY, tenant_id TEXT, customer_id TEXT,
+          reward_id TEXT, code TEXT, points_spent INTEGER, order_id TEXT, status TEXT, expires_at TEXT, redeemed_at TEXT, created_at TEXT);`);
+      sql.prepare("INSERT INTO customers (id, tenant_id, loyalty_points) VALUES (?, 'default', 500)").run(custDef1Id);
 
       sql.prepare(
         `INSERT INTO orders (id, order_number, customer_id, status, payment_status, total, customer_name, tenant_id)
@@ -6827,23 +6844,16 @@ describe('Full Security Audit Acceptance — KDS Surfaces & Collection Guards', 
 // ---------------------------------------------------------------------------
 describe('Phase 35 acceptance (AH1..AH4)', () => {
   it('AH1: reward redemption uses atomic balance deduction, not stale overwrite', async () => {
-    // The handler now uses:
-    //   UPDATE loyalty_accounts SET points_balance = points_balance - ?
-    //   UPDATE customers SET loyalty_points = COALESCE(loyalty_points, 0) - ?
-    // Then reads back authoritative balance from D1.
-    // Verified structurally: the code no longer contains newBalance overwrites.
-    const src = await import('fs').then(fs =>
-      fs.readFileSync(
-        require('path').resolve(__dirname, '../../routes/openapi-loyalty-handlers/reward-handlers.ts'),
-        'utf8'
-      )
-    );
-    // Must NOT have stale newBalance overwrite in UPDATE customers
-    expect(src).not.toMatch(/UPDATE customers SET loyalty_points = \?[^C]/);
-    // Must have atomic decrement
-    expect(src).toMatch(/COALESCE\(loyalty_points,\s*0\)\s*-\s*\?/);
-    // Must read-back authoritative balance
-    expect(src).toContain('authoritativeBalance');
+    const fs = await import('node:fs');
+    const dir = require('path').resolve(__dirname, '../../routes/openapi-loyalty-handlers');
+    const src = fs.readFileSync(`${dir}/atomic-reward-redemption.ts`, 'utf8');
+    const handler = fs.readFileSync(`${dir}/reward-handlers.ts`, 'utf8');
+    expect(src).not.toMatch(/UPDATE customers SET loyalty_points = \?/);
+    expect(src).toMatch(/UPDATE customers SET loyalty_points = loyalty_points - \?/);
+    expect(src).toMatch(/SET \$\{balanceColumn\} = \$\{balanceColumn\} - \?/);
+    expect(src).toMatch(/await db\.batch\(statements\);\s*const transaction = await db\.prepare\(`SELECT balance_after FROM loyalty_transactions WHERE id = \?/);
+    expect(src).toContain('return Number(transaction.balance_after)');
+    expect(handler).toContain('newBalance: authoritativeBalance');
   });
 
   it('AH2: birthday POST /redeem enforces window check', async () => {
@@ -7894,7 +7904,10 @@ describe('Phase 44 (AQ1..AQ4) — Birthday, POS Lookup, QR, Signage, Table Sessi
 
     expect(tsRoutesSrc).toContain('STAFF_SESSION_ROLES');
     expect(tsSessionSrc).toContain('matchesSessionTenant');
-    expect(tsOrderSrc).toContain('SELECT id, COALESCE(total_amount, total, 0) AS total, status, table_id, tenant_id FROM orders WHERE id = ?');
+    expect(tsOrderSrc).toContain('SELECT * FROM orders WHERE id = ?');
+    expect(tsOrderSrc).toContain('Number(order.total_amount ?? order.total ?? 0)');
+    expect(tsOrderSrc).toContain('const [, bill] = await db.batch([');
+    expect(tsOrderSrc).toContain('AND changes() = 1');
     expect(tableCrudSrc).toContain("LEFT JOIN table_zones z ON COALESCE(t.zone_id, LOWER(t.zone)) = z.id AND COALESCE(NULLIF(TRIM(z.tenant_id), ''), 'default') = COALESCE(NULLIF(TRIM(t.tenant_id), ''), 'default')");
     expect(tableHelpersSrc).toContain('writeTableAuditLog');
     expect(staffHandlersSrc).toContain('Phone number already exists');
@@ -8687,13 +8700,21 @@ describe('Phase 49 (AV1..AV4) — Loyalty/Referrals, Mobile POS/Checkin/Admin Me
       path.resolve(__dirname, '../../routes/openapi-loyalty-handlers/loyalty-db-helpers.ts'),
       'utf8'
     );
+    const atomicRedeemSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../routes/openapi-loyalty-handlers/atomic-reward-redemption.ts'),
+      'utf8'
+    );
     const { getVietnamMonthAndYear } = await import(
       '../../routes/openapi-loyalty-handlers/loyalty-db-helpers'
     );
 
-    expect(loyaltySrc).toContain(
-      "UPDATE loyalty_accounts SET current_points = COALESCE(current_points, 0) + ?, updated_at = ? WHERE (customer_id = ? OR id = ?) AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
-    );
+    // Customer redemption now debits customers/loyalty_accounts and reserves stock
+    // inside one guarded D1 batch, rolling back atomically on quota/stock CAS loss
+    // instead of applying a separate post-debit compensating refund update.
+    expect(loyaltySrc).toContain('redeemRewardAtomically(db, {');
+    expect(atomicRedeemSrc).toContain('await db.batch(statements);');
+    expect(atomicRedeemSrc).toContain('UPDATE loyalty_accounts SET current_points =');
+    expect(atomicRedeemSrc).toContain('SELECT CASE WHEN changes() = 1 THEN 1 ELSE abs(-9223372036854775808) END AS redemption_guard');
     expect(spendCashbackSrc).toContain("paymentStatus === 'paid'");
     expect(spendCashbackSrc).toContain(
       "SELECT id FROM cashback_transactions WHERE order_id = ? AND type = 'spend' AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ? LIMIT 1"

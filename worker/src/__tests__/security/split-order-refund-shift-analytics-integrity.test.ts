@@ -1,4 +1,5 @@
 // @vitest-environment node
+import { readFileSync } from 'node:fs';
 import { DatabaseSync } from 'node:sqlite';
 import type { D1Database } from '@cloudflare/workers-types';
 import { Hono } from 'hono';
@@ -30,7 +31,21 @@ function createSqliteD1(sqlite: DatabaseSync): D1Database {
     };
     return stmt;
   };
-  return { prepare, batch: async (stmts: Array<{ run: () => Promise<unknown> }>) => Promise.all(stmts.map((s) => s.run())) } as unknown as D1Database;
+  return {
+    prepare,
+    batch: async (stmts: Array<{ run: () => Promise<unknown> }>) => {
+      sqlite.exec('BEGIN');
+      try {
+        const results: unknown[] = [];
+        for (const s of stmts) results.push(await s.run());
+        sqlite.exec('COMMIT');
+        return results;
+      } catch (err) {
+        sqlite.exec('ROLLBACK');
+        throw err;
+      }
+    },
+  } as unknown as D1Database;
 }
 
 describe('Split-order concurrency & BOM conservation, manual refund fanout & voucher clawback, shift CAS/dedup & analytics hygiene', () => {
@@ -101,10 +116,11 @@ describe('Split-order concurrency & BOM conservation, manual refund fanout & vou
     sqlite.exec(`
       CREATE TABLE orders (id TEXT PRIMARY KEY, status TEXT, payment_status TEXT, total INTEGER, points_earned INTEGER DEFAULT 0, cashback_earned REAL DEFAULT 0, customer_id TEXT, guest_token_hash TEXT, updated_at TEXT, tenant_id TEXT);
       CREATE TABLE payments (id TEXT PRIMARY KEY, order_id TEXT, method TEXT, amount INTEGER, status TEXT, transaction_id TEXT, refund_status TEXT, refund_amount INTEGER, refund_reason TEXT, refunded_at TEXT, updated_at TEXT);
+      CREATE TABLE payment_refund_transfers (id INTEGER PRIMARY KEY AUTOINCREMENT, tenant_id TEXT NOT NULL, manual_transfer_ref TEXT NOT NULL CHECK (length(trim(manual_transfer_ref)) BETWEEN 1 AND 200), payment_id TEXT NOT NULL, amount INTEGER NOT NULL CHECK (amount > 0), reason TEXT NOT NULL, actor_id TEXT NOT NULL, created_at TEXT NOT NULL, UNIQUE (tenant_id, manual_transfer_ref));
       CREATE TABLE customers (id TEXT PRIMARY KEY, loyalty_points INTEGER, lifetime_points INTEGER DEFAULT 0, loyalty_tier TEXT DEFAULT 'member', total_spent INTEGER, tier TEXT, updated_at TEXT, tenant_id TEXT);
       CREATE TABLE loyalty_settings (key TEXT PRIMARY KEY, value TEXT);
       CREATE TABLE loyalty_point_logs (id TEXT PRIMARY KEY, customer_id TEXT, order_id TEXT, points_change INTEGER, reason TEXT, balance_after INTEGER, description TEXT, created_at TEXT, tenant_id TEXT);
-      CREATE TABLE loyalty_audit_log (id INTEGER PRIMARY KEY AUTOINCREMENT, customer_id TEXT, action TEXT, amount_vnd INTEGER, order_id TEXT, metadata TEXT, created_at TEXT, tenant_id TEXT);
+      CREATE TABLE loyalty_audit_log (id TEXT PRIMARY KEY, customer_id TEXT, action TEXT, amount_vnd INTEGER, order_id TEXT, metadata TEXT, created_at TEXT, tenant_id TEXT);
       CREATE TABLE loyalty_redemptions (id TEXT PRIMARY KEY, customer_id TEXT, points_spent INTEGER, code TEXT, voucher_code TEXT, status TEXT, used_at TEXT, redeemed_at TEXT, created_at TEXT, tenant_id TEXT);
       CREATE TABLE user_rewards (id TEXT PRIMARY KEY, customer_id TEXT, code TEXT, status TEXT, tenant_id TEXT);
       CREATE TABLE audit_logs (actor_id TEXT, actor_name TEXT, user_id TEXT, action TEXT, resource_type TEXT, resource_id TEXT, details TEXT, metadata TEXT, tenant_id TEXT, created_at TEXT);
@@ -117,6 +133,10 @@ describe('Split-order concurrency & BOM conservation, manual refund fanout & vou
       INSERT INTO user_rewards VALUES ('rew_sadec', 'cust_loy_1', 'VCH-SADEC', 'active', 'sadec');
       INSERT INTO user_rewards VALUES ('rew_other', 'cust_loy_1', 'VCH-OTHER', 'active', 'caolanh');
     `);
+    sqlite.exec(readFileSync(new URL('../../../db/migrations/20261121_03_refund_atomicity_and_loyalty_work.sql', import.meta.url), 'utf8'));
+    sqlite.exec(`INSERT INTO refund_tenant_readiness VALUES ('sadec', datetime('now'), 'local-test', 'fresh test DB');
+      CREATE TABLE loyalty_accounts (customer_id TEXT, tenant_id TEXT, current_points INTEGER DEFAULT 0, lifetime_points INTEGER DEFAULT 0, tier TEXT, updated_at TEXT);
+      CREATE TABLE cashback_transactions (id TEXT, customer_id TEXT, order_id TEXT, type TEXT, amount INTEGER, tenant_id TEXT);`);
     const db = createSqliteD1(sqlite);
     const kvDel = vi.fn(async () => {});
     const kvPut = vi.fn(async () => {});

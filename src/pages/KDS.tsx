@@ -46,7 +46,7 @@ export default function KDSPage() {
     'all' | 'priority' | 'preparing' | 'ready'
   >('all');
 
-  const { orders, isLoading, isError, error, updateStatus } = useKDS('all');
+  const { orders, isLoading, isError, error, updateStatus, pendingOrders = {}, mutationErrors = {} } = useKDS('all');
 
   // A new order beeps through WebAudio: no static asset to 404, and no
   // <audio> element whose failed load looks like a silent feature.
@@ -116,17 +116,19 @@ export default function KDSPage() {
         const normalizedRawStatus =
           (o.status as string) === 'confirmed' ? 'pending' : o.status;
         const elapsedSeconds = calcElapsedSeconds(o.createdAt);
-        const status: TicketStatus =
+        const isOverdue =
           (normalizedRawStatus === 'pending' || normalizedRawStatus === 'preparing') &&
-          elapsedSeconds >= OVERDUE_THRESHOLD_MIN * 60
-            ? 'overdue'
-            : (normalizedRawStatus as TicketStatus);
+          elapsedSeconds >= OVERDUE_THRESHOLD_MIN * 60;
+        const status: TicketStatus = isOverdue
+          ? 'overdue'
+          : (normalizedRawStatus as TicketStatus);
         return {
           id: ticketId,
           table: o.table ? `TABLE ${o.table}` : 'TAKEAWAY',
           type: o.table ? ('DINE IN' as const) : ('TOGO' as const),
           status,
           rawStatus: normalizedRawStatus,
+          isOverdue,
           items: o.items.map((item) => ({
             name: item.name,
             quantity: item.quantity,
@@ -194,6 +196,8 @@ export default function KDSPage() {
         )}
         <StitchKDSNew
           tickets={tickets}
+          pendingOrders={Object.fromEntries([...orderIdMap].map(([displayId, id]) => [displayId, pendingOrders[id] ?? false]))}
+          mutationErrors={Object.fromEntries([...orderIdMap].filter(([, id]) => mutationErrors[id]).map(([displayId, id]) => [displayId, mutationErrors[id]!]))}
           stationName="KITCHEN STATION"
           stationLabel="STATION 01"
           stationLocation="MAIN KITCHEN"

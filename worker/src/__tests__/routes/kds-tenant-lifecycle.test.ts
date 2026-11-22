@@ -1,3 +1,5 @@
+// @vitest-environment node
+import { paymentSqliteDB } from '../helpers/payment-sqlite-db';
 import { describe, it, expect, vi } from 'vitest';
 import { app } from '../../index';
 import { generateJWT } from '../../lib/jwt';
@@ -88,9 +90,27 @@ describe('KDS canonical lifecycle and tenant writes', () => {
     expect(writes[0]).not.toContain("status = 'completed'");
   });
   it('does not collect COD over a concurrent cancellation', async () => {
-    const { env, row } = fixtures('cafe-a', 'preparing', value => { value.status = 'cancelled'; });
-    const response = await app.fetch(await request('/api/orders/ORD_TEST/mark-cod-paid', 'PATCH', 'cashier'), env);
-    expect(response.status).toBe(409); expect(row.payment_status).toBe('unpaid'); expect(row.status).toBe('cancelled');
+    const { db, sqlite } = paymentSqliteDB({ authVersion: true });
+    try {
+      sqlite.exec(`INSERT INTO users (id,name,role,tenant_id,is_active,auth_version)
+          VALUES ('actor-cashier','Cashier','cashier','cafe-a',1,1);
+        INSERT INTO orders (id,tenant_id,status,payment_status,payment_method,total)
+          VALUES ('ORD_TEST','cafe-a','preparing','unpaid','cod',20000);
+        ALTER TABLE payments ADD COLUMN tenant_id TEXT NOT NULL DEFAULT 'default';`);
+      const batch = db.batch.bind(db);
+      db.batch = (statements) => {
+        sqlite.prepare("UPDATE orders SET status = 'cancelled' WHERE id = ?").run('ORD_TEST');
+        return batch(statements);
+      };
+      const env = createMockEnv({ AURA_DB: db });
+      const response = await app.fetch(await request('/api/orders/ORD_TEST/mark-cod-paid', 'PATCH', 'cashier'), env);
+      expect(response.status).toBe(409);
+      expect(sqlite.prepare('SELECT payment_status,status FROM orders WHERE id = ?').get('ORD_TEST'))
+        .toMatchObject({ payment_status: 'unpaid', status: 'cancelled' });
+      expect(sqlite.prepare('SELECT id FROM payments WHERE order_id = ?').all('ORD_TEST')).toHaveLength(0);
+    } finally {
+      sqlite.close();
+    }
   });
   for (const role of ['cashier', 'waiter', 'kitchen', 'staff']) it(`allows legitimate ${role} KDS queue and authenticated stream`, async () => {
     const { env } = fixtures();

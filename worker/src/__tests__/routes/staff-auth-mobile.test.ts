@@ -350,22 +350,28 @@ describe('staffTokenRefresh', () => {
   });
 
   it('returns 200 with new token for valid device', async () => {
-    const ctx: any = mockContext({
-      body: { device_token: 'tok_known' },
-      deviceByToken: deviceWithPin(''),
-      sessionBearer: await mobileSessionBearer(),
-    });
-    const res = await staffTokenRefresh(ctx);
-    expect(res.status).toBe(200);
-    const body = await res.json();
-    expect(body.success).toBe(true);
-    expect(body.token).toBeTruthy();
-    expect(typeof body.token).toBe('string');
-    // Staff sessions are capped at the absolute staff TTL, not the generic
-    // JWT expiry, so a device left unlocked cannot carry authority into the
-    // next shift.
-    expect(body.expires_in).toBe(28800);
-    expect((await verifyJWT(body.token, TEST_JWT_SECRET))?.tenantId).toBe('cafe-a');
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-11-21T12:00:00.000Z'));
+    try {
+      const ctx: any = mockContext({
+        body: { device_token: 'tok_known' },
+        deviceByToken: deviceWithPin(''),
+        sessionBearer: await mobileSessionBearer(),
+      });
+      const res = await staffTokenRefresh(ctx);
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      expect(body.success).toBe(true);
+      expect(body.token).toBeTruthy();
+      expect(typeof body.token).toBe('string');
+      // Staff sessions are capped at the absolute staff TTL, not the generic
+      // JWT expiry, so a device left unlocked cannot carry authority into the
+      // next shift.
+      expect(body.expires_in).toBe(28800);
+      expect((await verifyJWT(body.token, TEST_JWT_SECRET))?.tenantId).toBe('cafe-a');
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('returns 429 when device_token is currently locked out', async () => {

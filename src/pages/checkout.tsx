@@ -91,13 +91,14 @@ export function CheckoutPage() {
     const numMatch = rawTable.match(/(?:^|\b|[tT])0*([1-9]|1[0-2])(?:\b|-|$)/);
     const validTableNumber = numMatch ? numMatch[1] : null;
 
-    // Dine-in invariant: backend requires table_id to resolve to an actual cafe_tables table_number (1-12).
-    // If user has a booking code like DEMO-6678 (no direct 1-12 table mapped),
-    // we preserve the booking code in customer_address & notes, and use takeaway or a valid mapped table.
-    const isRealDineIn = formData.orderType === 'dine_in' && Boolean(validTableNumber);
-    const effectiveOrderType: 'dine_in' | 'takeaway' | 'delivery' = formData.orderType === 'dine_in'
-      ? (validTableNumber ? 'dine_in' : 'takeaway')
-      : (formData.orderType || 'delivery');
+    // Never silently change a requested dine-in order into takeaway.
+    if (formData.orderType === 'dine_in' && !validTableNumber) {
+      setPayosError('Bàn không hợp lệ. Vui lòng chọn lại bàn trước khi đặt món. / Invalid table. Please select a valid table.');
+      submittingRef.current = false;
+      return;
+    }
+    const isRealDineIn = formData.orderType === 'dine_in';
+    const effectiveOrderType: 'dine_in' | 'takeaway' | 'delivery' = formData.orderType || 'delivery';
 
     const effectiveShippingFee = effectiveOrderType === 'delivery'
       ? (totalItems >= 2 ? 0 : 15_000)

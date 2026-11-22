@@ -30,6 +30,9 @@ export function orderCreationFixture() {
         async first() { return sqlite.prepare(sql).get(...binds) || null; },
         async all() { return { results: sqlite.prepare(sql).all(...binds), success: true }; },
         async run() {
+          if (/^\s*SELECT\b/i.test(sql)) {
+            return { success: true, results: sqlite.prepare(sql).all(...binds), meta: { changes: 0 } };
+          }
           const before = Number(sqlite.prepare('SELECT total_changes() changes').get()?.changes);
           const result = sqlite.prepare(sql).run(...binds);
           // D1 counts writes from triggers too; SQLite statement.changes alone does not.

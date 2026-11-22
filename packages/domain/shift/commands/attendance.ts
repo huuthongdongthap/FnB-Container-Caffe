@@ -2,7 +2,10 @@ import type { ShiftRow } from '../model/shift-types';
 import { businessDate, shiftTarget, ShiftContractError, type ShiftScope } from './shift-access';
 import { ACTIVE_ATTENDANCE_SQL, getShift } from './shift-repository';
 
-export async function clockIn(scope: ShiftScope, staffId?: string, notes?: string, scheduledId?: string): Promise<ShiftRow> {
+export async function clockIn(scope: ShiftScope, staffId?: string, notes?: string, scheduledId?: string, openingCash?: number): Promise<ShiftRow> {
+  if (openingCash !== undefined && (!Number.isFinite(openingCash) || openingCash < 0)) {
+    throw new ShiftContractError('Invalid opening_cash', 400);
+  }
   const staff = await shiftTarget(scope, staffId), db = scope.env.AURA_DB;
   const targetTenant = (typeof staff.tenant_id === 'string' && staff.tenant_id.trim()) || (scope.tenantId === '*' ? 'default' : scope.tenantId);
   const targetScope: ShiftScope = { ...scope, tenantId: targetTenant };
@@ -17,16 +20,47 @@ export async function clockIn(scope: ShiftScope, staffId?: string, notes?: strin
       if (scheduled.staff_id !== staff.id || scheduled.date !== businessDate() || scheduled.attendance_state !== 'scheduled') {
         throw new ShiftContractError('Scheduled shift is unavailable', 409);
       }
-      const saved = await db.prepare(`UPDATE staff_shifts SET clock_in = ?, attendance_state = 'active', notes = COALESCE(?, notes)
-        WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ? AND staff_id = ? AND clock_in IS NULL AND clock_out IS NULL AND attendance_state = 'scheduled'`)
-        .bind(now, notes ?? null, scheduled.id, targetTenant, staff.id).run();
+      const presetOpeningCash = typeof scheduled.opening_cash === 'number' && Number.isFinite(scheduled.opening_cash)
+        ? scheduled.opening_cash
+        : 0;
+      if (!scope.canManage && presetOpeningCash > 0 && openingCash !== undefined && openingCash !== presetOpeningCash) {
+        throw new ShiftContractError('Only managers can override a scheduled opening cash float', 403);
+      }
+      const resolvedOpeningCash = openingCash !== undefined ? openingCash : presetOpeningCash;
+      let saved;
+      try {
+        saved = await db.prepare(`UPDATE staff_shifts SET clock_in = ?, opening_cash = ?, attendance_state = 'active', notes = COALESCE(?, notes)
+          WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ? AND staff_id = ? AND clock_in IS NULL AND clock_out IS NULL AND attendance_state = 'scheduled'`)
+          .bind(now, resolvedOpeningCash, notes ?? null, scheduled.id, targetTenant, staff.id).run();
+      } catch (err) {
+        if (resolvedOpeningCash === 0 && /no such column:\s*opening_cash|has no column named\s+opening_cash/i.test(String(err))) {
+          saved = await db.prepare(`UPDATE staff_shifts SET clock_in = ?, attendance_state = 'active', notes = COALESCE(?, notes)
+            WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ? AND staff_id = ? AND clock_in IS NULL AND clock_out IS NULL AND attendance_state = 'scheduled'`)
+            .bind(now, notes ?? null, scheduled.id, targetTenant, staff.id).run();
+        } else {
+          throw err;
+        }
+      }
       if (!saved.meta.changes) throw new ShiftContractError('Shift changed; reload attendance', 409);
       id = String(scheduled.id);
     } else {
-      const result = await db.prepare(`INSERT INTO staff_shifts
-        (tenant_id, staff_id, staff_name, role, date, shift, clock_in, attendance_state, notes)
-        VALUES (?, ?, ?, ?, ?, 'attendance', ?, 'active', ?)`)
-        .bind(targetTenant, staff.id, staff.name, staff.role, businessDate(), now, notes ?? null).run();
+      const resolvedOpeningCash = openingCash ?? 0;
+      let result;
+      try {
+        result = await db.prepare(`INSERT INTO staff_shifts
+          (tenant_id, staff_id, staff_name, role, date, shift, clock_in, attendance_state, notes, opening_cash)
+          VALUES (?, ?, ?, ?, ?, 'attendance', ?, 'active', ?, ?)`)
+          .bind(targetTenant, staff.id, staff.name, staff.role, businessDate(), now, notes ?? null, resolvedOpeningCash).run();
+      } catch (err) {
+        if (resolvedOpeningCash === 0 && /no such column:\s*opening_cash|has no column named\s+opening_cash/i.test(String(err))) {
+          result = await db.prepare(`INSERT INTO staff_shifts
+            (tenant_id, staff_id, staff_name, role, date, shift, clock_in, attendance_state, notes)
+            VALUES (?, ?, ?, ?, ?, 'attendance', ?, 'active', ?)`)
+            .bind(targetTenant, staff.id, staff.name, staff.role, businessDate(), now, notes ?? null).run();
+        } else {
+          throw err;
+        }
+      }
       id = String(result.meta.last_row_id);
     }
   } catch (error) {

@@ -130,7 +130,7 @@ export function RecommendationSection({
                 <button
                   type="button"
                   onClick={() => handleAddToCart(item)}
-                  className="w-7 h-7 rounded-full bg-[var(--aura-chrome-mid)]/20 flex items-center justify-center
+                  className="min-w-[44px] min-h-[44px] w-11 h-11 rounded-full bg-[var(--aura-chrome-mid)]/20 flex items-center justify-center
                     text-[var(--aura-chrome-bright)] hover:bg-[var(--aura-chrome-mid)]/30 transition-colors active:scale-90"
                   aria-label={`Thêm ${item.name}`}
                 >

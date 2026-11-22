@@ -3,7 +3,7 @@ import { readFileSync, existsSync } from 'node:fs';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { createLocalRuntime, ROOT, verificationDir } from './local-runtime.mjs';
+import { createLocalRuntime, ROOT, verificationDir, runtimeVersions } from './local-runtime.mjs';
 import { runApiFlow } from './local-flow-api.mjs';
 import { runSecurityChecks } from './local-flow-security.mjs';
 import { runBrowserFlow } from './local-flow-browser.mjs';
@@ -32,7 +32,7 @@ report.baseline = {
   head: revParse('HEAD'),
   originMain: revParse('origin/main'),
   sourceDiffSha256: sourceHash(),
-  miniflare: '4.20260515.0', workerd: '1.20260515.1', compatibilityDate: '2025-01-01',
+  ...runtimeVersions, compatibilityDate: '2025-01-01',
   schema: 'fresh worker/schema.sql including additive operational contracts; no remote migration or production snapshot',
 };
 const check = (id, pass, expected, actual) => {

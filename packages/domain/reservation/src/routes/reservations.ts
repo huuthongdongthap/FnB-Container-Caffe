@@ -537,6 +537,10 @@ reservationsRouter.get('/', requireReservationStaff() as any, async (c) => {
   const db = c.env.AURA_DB;
   const tenantId = resolveRequestTenantId(c);
   const date = c.req.query('date');
+  const status = c.req.query('status');
+  if (status && !new Set([...ACTIVE_RESERVATION_STATUSES, ...TERMINAL_RESERVATION_STATUSES]).has(status)) {
+    return c.json({ success: false, error: 'Invalid reservation status' }, 400);
+  }
   const rawLimit = parseInt(c.req.query('limit') || '50', 10);
   const limit = Number.isFinite(rawLimit) && rawLimit > 0 ? Math.min(rawLimit, 200) : 50;
   const rawOffset = parseInt(c.req.query('offset') || '0', 10);
@@ -558,6 +562,7 @@ reservationsRouter.get('/', requireReservationStaff() as any, async (c) => {
     if (date) {
       query += ' AND r.date = ?'; params.push(date);
     }
+    if (status) { query += ' AND r.status = ?'; params.push(status); }
     query += ' ORDER BY r.date DESC, r.time ASC LIMIT ? OFFSET ?';
     params.push(limit, offset);
 
@@ -578,6 +583,7 @@ reservationsRouter.get('/', requireReservationStaff() as any, async (c) => {
         if (date) {
           query += ' AND r.date = ?'; params.push(date);
         }
+        if (status) { query += ' AND r.status = ?'; params.push(status); }
         query += ' ORDER BY r.date DESC, r.time ASC LIMIT ? OFFSET ?';
         params.push(fetchLimit, fetchOffset);
 
@@ -594,6 +600,7 @@ reservationsRouter.get('/', requireReservationStaff() as any, async (c) => {
         if (date) {
           fallbackQuery += ' AND r.reservation_date = ?'; params.push(date);
         }
+        if (status) { fallbackQuery += ' AND r.status = ?'; params.push(status); }
         fallbackQuery += ' ORDER BY r.reservation_date DESC, r.reservation_time ASC LIMIT ? OFFSET ?';
         params.push(fetchLimit, fetchOffset);
 
@@ -612,6 +619,7 @@ reservationsRouter.get('/', requireReservationStaff() as any, async (c) => {
         if (date) {
           fallbackQuery += ' AND r.reservation_date = ?'; params.push(date);
         }
+        if (status) { fallbackQuery += ' AND r.status = ?'; params.push(status); }
         fallbackQuery += ' ORDER BY r.reservation_date DESC, r.reservation_time ASC LIMIT ? OFFSET ?';
         params.push(limit, offset);
         const res = await db.prepare(fallbackQuery).bind(...params).all().catch(() => ({ results: [] }));
@@ -897,6 +905,16 @@ reservationsRouter.patch('/:id', optionalAuth() as any, requireReservationStaff(
 
   const currentStatus = String(rsv.status ?? '').trim().toLowerCase();
   const body = await c.req.json().catch(() => ({})) as Record<string, unknown>;
+  const customerFields = ['customer_name', 'customer_phone', 'notes'] as const;
+  for (const field of customerFields) {
+    if (body[field] === undefined) continue;
+    const value = body[field];
+    const max = field === 'notes' ? 500 : field === 'customer_phone' ? 20 : 100;
+    const min = field === 'notes' ? 0 : field === 'customer_phone' ? 8 : 1;
+    if (typeof value !== 'string' || value.trim().length < min || value.length > max) {
+      return c.json({ success: false, error: `Invalid ${field}` }, 400);
+    }
+  }
   const nextStatus = body.status !== undefined ? String(body.status).trim().toLowerCase() : undefined;
   const hasCancelledAtColumn = 'cancelled_at' in rsv;
   const isReopeningCancelled =
@@ -1040,6 +1058,11 @@ reservationsRouter.patch('/:id', optionalAuth() as any, requireReservationStaff(
   const hasPartySizeUpdate = body.party_size !== undefined || body.guest_count !== undefined;
   const hasDateUpdate = body.date !== undefined || body.reservation_date !== undefined || body.reserved_date !== undefined;
   const hasTimeUpdate = body.time !== undefined || body.reservation_time !== undefined || body.reserved_time !== undefined;
+  const customerEdits = customerFields.filter(field => body[field] !== undefined);
+  const hasTenantColumn = 'tenant_id' in rsv;
+  if (customerEdits.length && !(rsvTenant && hasTenantColumn) && !(!hasTenantColumn && (!rsvTenant || rsvTenant === 'default'))) {
+    throw new Error('Reservation tenant scope required for customer update');
+  }
   if (rsvTenant) {
     try {
       if (hasPartySizeUpdate || hasDateUpdate || hasTimeUpdate) {
@@ -1098,6 +1121,24 @@ reservationsRouter.patch('/:id', optionalAuth() as any, requireReservationStaff(
     }
   } else {
     await db.prepare('UPDATE reservations SET status = ?, updated_at = ? WHERE id = ?').bind(effectiveStatus, now, id).run();
+  }
+  // Keep tenant-scoped customer edits separate from legacy slot-column fallbacks.
+  if (customerEdits.length) {
+    const assignments = customerEdits.map(field => `${field} = ?`).join(', ');
+    const values = customerEdits.map(field => String(body[field]).trim());
+    if (rsvTenant && hasTenantColumn) {
+      await db
+        .prepare(`UPDATE reservations SET ${assignments} WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?`)
+        .bind(...values, id, rsvTenant)
+        .run();
+    } else if (!hasTenantColumn && (!rsvTenant || rsvTenant === 'default')) {
+      await db
+        .prepare(`UPDATE reservations SET ${assignments} WHERE id = ?`)
+        .bind(...values, id)
+        .run();
+    } else {
+      throw new Error('Reservation tenant scope required for customer update');
+    }
   }
   if (isReopeningCancelled) {
     await db

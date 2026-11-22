@@ -34,9 +34,10 @@ describe('CheckoutPage — PayOS flow', () => {
     expect(screen.getByText(/Đặt hàng|Place Order/)).toBeInTheDocument();
   });
 
-  it('shows COD as default payment method', () => {
+  it('shows COD as Vietnamese Tiền mặt payment method without English hardcode', () => {
     render(<CheckoutPage />);
-    expect(screen.getByText('Cash on Delivery')).toBeInTheDocument();
+    expect(screen.getByText('Tiền mặt')).toBeInTheDocument();
+    expect(screen.queryByText('Cash on Delivery')).not.toBeInTheDocument();
   });
 
   it('shows PayOS payment option', () => {
@@ -44,12 +45,13 @@ describe('CheckoutPage — PayOS flow', () => {
     expect(screen.getByText('PayOS')).toBeInTheDocument();
   });
 
-  it('shows both payment methods enabled', () => {
+  it('shows both payment methods enabled and allows selecting Tiền mặt', () => {
     render(<CheckoutPage />);
-    const codButton = screen.getByRole('radio', { name: /cash on delivery/i });
+    const codButton = screen.getByRole('radio', { name: /tiền mặt/i });
     const payosButton = screen.getByRole('radio', { name: /payos/i });
     expect(codButton).not.toBeDisabled();
     expect(payosButton).not.toBeDisabled();
+    expect(codButton).toHaveAttribute('value', 'cod');
   });
 
   it('has submit button for placing order', () => {

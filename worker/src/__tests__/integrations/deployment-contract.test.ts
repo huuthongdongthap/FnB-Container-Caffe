@@ -467,8 +467,8 @@ describe('Environment & Deployment Contract — Canonical Invariants', () => {
       const cfResult = await deployToCloudflare(generated, validAnswers, () => true);
       expect(cfResult).toEqual({
         projectName: 'aura-cafe-aura-sadec',
-        pagesUrl: 'https://aura-sadec.pages.dev',
-        apiUrl: 'https://aura-sadec.pages.dev/api',
+        pagesUrl: 'https://aura-cafe-aura-sadec.pages.dev',
+        apiUrl: 'https://aura-cafe-aura-sadec.pages.dev/api',
       });
 
       await expect(

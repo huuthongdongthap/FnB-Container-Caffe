@@ -138,7 +138,7 @@ export async function processErpnextRetryQueue(
              FROM erpnext_sync_queue q
              LEFT JOIN orders o ON q.entity_type = 'order' AND o.id = q.entity_id
              WHERE q.status = 'pending'
-               AND (q.next_retry_at IS NULL OR q.next_retry_at <= datetime('now'))
+               AND (q.next_retry_at IS NULL OR datetime(q.next_retry_at) <= datetime('now'))
                AND COALESCE(NULLIF(TRIM(q.tenant_id), ''), COALESCE(NULLIF(TRIM(o.tenant_id), ''), 'default')) = ?
              ORDER BY q.created_at ASC
              LIMIT 50`
@@ -153,7 +153,7 @@ export async function processErpnextRetryQueue(
               `SELECT id, entity_type, entity_id, action, payload, attempts, next_retry_at, tenant_id
                FROM erpnext_sync_queue
                WHERE status = 'pending'
-                 AND (next_retry_at IS NULL OR next_retry_at <= datetime('now'))
+                 AND (next_retry_at IS NULL OR datetime(next_retry_at) <= datetime('now'))
                  AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?
                ORDER BY created_at ASC
                LIMIT 50`
@@ -167,7 +167,7 @@ export async function processErpnextRetryQueue(
               `SELECT id, entity_type, entity_id, action, payload, attempts, next_retry_at
                FROM erpnext_sync_queue
                WHERE status = 'pending'
-                 AND (next_retry_at IS NULL OR next_retry_at <= datetime('now'))
+                 AND (next_retry_at IS NULL OR datetime(next_retry_at) <= datetime('now'))
                ORDER BY created_at ASC
                LIMIT 50`
             )
@@ -184,7 +184,7 @@ export async function processErpnextRetryQueue(
              FROM erpnext_sync_queue q
              LEFT JOIN orders o ON q.entity_type = 'order' AND o.id = q.entity_id
              WHERE q.status = 'pending'
-               AND (q.next_retry_at IS NULL OR q.next_retry_at <= datetime('now'))
+               AND (q.next_retry_at IS NULL OR datetime(q.next_retry_at) <= datetime('now'))
              ORDER BY q.created_at ASC
              LIMIT 50`
           )
@@ -197,7 +197,7 @@ export async function processErpnextRetryQueue(
               `SELECT id, entity_type, entity_id, action, payload, attempts, next_retry_at, tenant_id
                FROM erpnext_sync_queue
                WHERE status = 'pending'
-                 AND (next_retry_at IS NULL OR next_retry_at <= datetime('now'))
+                 AND (next_retry_at IS NULL OR datetime(next_retry_at) <= datetime('now'))
                ORDER BY created_at ASC
                LIMIT 50`
             )
@@ -209,7 +209,7 @@ export async function processErpnextRetryQueue(
               `SELECT id, entity_type, entity_id, action, payload, attempts, next_retry_at
                FROM erpnext_sync_queue
                WHERE status = 'pending'
-                 AND (next_retry_at IS NULL OR next_retry_at <= datetime('now'))
+                 AND (next_retry_at IS NULL OR datetime(next_retry_at) <= datetime('now'))
                ORDER BY created_at ASC
                LIMIT 50`
             )

@@ -17,7 +17,7 @@ function mockError(message: string) {
 
 describe('useAdminReservationsStore', () => {
   beforeEach(() => {
-    useAdminReservationsStore.setState({ reservations: [], loading: false, error: null });
+    useAdminReservationsStore.setState({ reservations: [], loading: false, error: null, offset: 0, filters: {}, hasNext: false });
     vi.restoreAllMocks();
     mockApiFetch.mockReset();
   });
@@ -108,4 +108,33 @@ describe('useAdminReservationsStore', () => {
       method: 'PATCH',
     });
   });
+  it('paginates past fifty records and sends date/status filters to the server', async () => {
+    const rows = Array.from({ length: 51 }, (_, i) => ({ id: `r${i}`, status: 'confirmed' }));
+    mockApiFetch.mockImplementation(async (url: string) => {
+      const offset = Number(new URL(url, 'https://example.test').searchParams.get('offset'));
+      return { success: true, data: rows.slice(offset, offset + 50) };
+    });
+    await useAdminReservationsStore.getState().fetchReservations({ offset: 0, date: '2026-12-01', status: 'confirmed' });
+    expect(useAdminReservationsStore.getState().hasNext).toBe(true);
+    await useAdminReservationsStore.getState().fetchReservations({ offset: 50, date: '2026-12-01', status: 'confirmed' });
+    expect(mockApiFetch).toHaveBeenLastCalledWith('/api/reservations?limit=50&offset=50&date=2026-12-01&status=confirmed');
+    expect(useAdminReservationsStore.getState().reservations[0]?.id).toBe('r50');
+    expect(useAdminReservationsStore.getState().hasNext).toBe(false);
+  });
+
+  it.each(['seated', 'completed', 'cancelled'])('uses the existing lifecycle API for %s', async status => {
+    mockApiFetch.mockResolvedValue({ success: true, data: [] });
+    expect(await useAdminReservationsStore.getState().changeStatus('confirmed-id', status)).toBe(true);
+    expect(mockApiFetch).toHaveBeenCalledWith(`/api/reservations/confirmed-id/${status === 'cancelled' ? 'cancel' : 'status'}`, {
+      method: status === 'cancelled' ? 'POST' : 'PATCH', ...(status === 'cancelled' ? {} : { body: JSON.stringify({ status }) }),
+    });
+  });
+
+  it('keeps the saved row and reports insufficient permissions without refetching', async () => {
+    mockApiFetch.mockRejectedValue(new Error('Insufficient permissions'));
+    expect(await useAdminReservationsStore.getState().changeStatus('r1', 'completed')).toBe(false);
+    expect(useAdminReservationsStore.getState().error).toBe('Insufficient permissions');
+    expect(mockApiFetch).toHaveBeenCalledTimes(1);
+  });
+
 });

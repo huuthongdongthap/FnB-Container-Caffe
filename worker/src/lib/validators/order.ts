@@ -18,7 +18,7 @@ export const createOrderSchema = z.object({
     'Tổng tiền tối thiểu 1,000đ'
   ),
   customer_name: nameSchema,
-  customer_phone: z.string().min(8, 'Số điện thoại không hợp lệ').max(15),
+  customer_phone: z.string().min(8, 'Số điện thoại không hợp lệ').max(20).or(z.literal('')),
   customer_email: emailSchema.optional().or(z.literal('')),
   customer_address: z.string().max(500).optional(),
   payment_method: paymentMethodSchema,

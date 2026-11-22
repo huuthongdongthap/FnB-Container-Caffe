@@ -8,6 +8,7 @@
  * - Guard rails against marking cancelled or non-COD orders as paid
  */
 
+import { paymentSqliteDB } from '../helpers/payment-sqlite-db';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import {
   makeCodTestEnv,
@@ -44,32 +45,25 @@ describe('Payment COD Lifecycle Contract', () => {
   });
 
   it('COD collection marks payment paid without completing kitchen work and syncs ledger', async () => {
-    const { kdsApp, env, executedStatements } = makeCodTestEnv({
-      id: 'ORD_COD_2',
-      total: 70000,
-      status: 'preparing',
-      payment_status: 'cod_pending',
-      is_cod: 1,
-    });
-
-    const res = await kdsApp.fetch(
-      new Request('https://test.aura/ORD_COD_2/mark-cod-paid', {
+    const { kdsApp, env } = makeCodTestEnv(null);
+    const { db, sqlite } = paymentSqliteDB();
+    try {
+      sqlite.exec(`INSERT INTO orders (id,total,status,payment_status,payment_method,is_cod)
+          VALUES ('ORD_COD_2',70000,'preparing','cod_pending','cod',1);
+        INSERT INTO payments (id,order_id,method,amount,status)
+          VALUES ('COD_LEDGER','ORD_COD_2','cod',70000,'pending');`);
+      const res = await kdsApp.fetch(new Request('https://test.aura/ORD_COD_2/mark-cod-paid', {
         method: 'PATCH',
-      }),
-      env
-    );
-
-    expect(res.status).toBe(200);
-    const body = await res.json() as { success: boolean; message: string };
-    expect(body.success).toBe(true);
-    expect(body.message).toBe('Marked as paid');
-
-    const orderUpdate = executedStatements.find(s => s.sql.includes("UPDATE orders SET payment_status = 'paid'"));
-    expect(orderUpdate).toBeDefined();
-    expect(orderUpdate?.sql).not.toContain("status = 'completed'");
-    const payUpdate = executedStatements.find(s => s.sql.includes('UPDATE payments SET status = \'completed\''));
-    expect(payUpdate).toBeDefined();
-    expect(payUpdate?.binds[1]).toBe('ORD_COD_2');
+      }), { ...env, AURA_DB: db });
+      expect(res.status).toBe(200);
+      expect(await res.json()).toMatchObject({ success: true, message: 'Marked as paid' });
+      expect(sqlite.prepare('SELECT status,payment_status FROM orders WHERE id = ?').get('ORD_COD_2'))
+        .toMatchObject({ status: 'preparing', payment_status: 'paid' });
+      expect(sqlite.prepare('SELECT id,status,amount FROM payments WHERE order_id = ?').all('ORD_COD_2'))
+        .toEqual([{ id: 'COD_LEDGER', status: 'completed', amount: 70000 }]);
+    } finally {
+      sqlite.close();
+    }
   });
 
   it('collects a canonical COD order without relying on the legacy is_cod flag', async () => {

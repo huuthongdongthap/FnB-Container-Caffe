@@ -4,16 +4,9 @@ import type {
   VarianceStatus,
 } from '../model/reconciliation-types';
 
-interface D1Database {
-  prepare: (sql: string) => {
-    bind: (...args: any[]) => {
-      all: <T = any>() => Promise<{ results: T[] }>;
-      first: <T = any>() => Promise<T | null>;
-      run: () => Promise<{ meta: { changes: number } }>;
-    };
-  };
-  batch: (ops: any[]) => Promise<any[]>;
-}
+import type { D1Database } from '@cloudflare/workers-types';
+import { ShiftContractError } from '../../commands/shift-access';
+import { assertCashSettlementWrite, assertReconciliationSnapshot } from '../../commands/cash-settlement';
 
 interface Env {
   AURA_DB: D1Database;
@@ -49,104 +42,60 @@ async function getShiftWindow(
     return rowTenant === normTenant;
   };
   const allowUnscopedFallback = !normTenant || normTenant === '*' || normTenant === 'default';
-  if (normTenant) {
+
+  if (normTenant && normTenant !== '*') {
     try {
-      const staffShift = await db
-        .prepare('SELECT clock_in, clock_out, opening_cash, staff_id, tenant_id FROM staff_shifts WHERE id = ?')
+      const scoped = await db
+        .prepare(
+          `SELECT clock_in, clock_out, opening_cash, staff_id, tenant_id FROM staff_shifts
+           WHERE CAST(id AS TEXT) = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?`
+        )
+        .bind(shiftId, normTenant)
+        .first<{ clock_in: string; clock_out: string | null; opening_cash?: number | null; staff_id?: string | null; tenant_id?: string | null }>();
+      if (scoped && typeof scoped.clock_in === 'string') return matchesTenant(scoped) ? scoped : null;
+    } catch {
+      // Fallback for schemas or mocks missing opening_cash/staff_id/CAST
+    }
+  } else {
+    try {
+      const hqShift = await db
+        .prepare('SELECT clock_in, clock_out, opening_cash, staff_id, tenant_id FROM staff_shifts WHERE CAST(id AS TEXT) = ?')
         .bind(shiftId)
         .first<{ clock_in: string; clock_out: string | null; opening_cash?: number | null; staff_id?: string | null; tenant_id?: string | null }>();
-      if (staffShift) return matchesTenant(staffShift) ? staffShift : null;
+      if (hqShift && typeof hqShift.clock_in === 'string') return matchesTenant(hqShift) ? hqShift : null;
     } catch {
-      // Fallback when opening_cash or staff_id column is absent
-    }
-    try {
-      const staffShift = await db
-        .prepare('SELECT clock_in, clock_out, tenant_id FROM staff_shifts WHERE id = ?')
-        .bind(shiftId)
-        .first<{ clock_in: string; clock_out: string | null; tenant_id?: string | null }>();
-      if (staffShift) return matchesTenant(staffShift) ? staffShift : null;
-    } catch {
-      // Fallback to legacy query when tenant_id column is absent
+      // Fallback below
     }
   }
-  if (allowUnscopedFallback) {
+
+  for (const sql of [
+    'SELECT clock_in, clock_out, opening_cash, staff_id, tenant_id FROM staff_shifts WHERE id = ?',
+    'SELECT clock_in, clock_out, tenant_id FROM staff_shifts WHERE id = ?',
+    'SELECT clock_in, clock_out, opening_cash, staff_id, tenant_id FROM shifts WHERE id = ?',
+  ]) {
     try {
-      const staffShift = await db
-        .prepare('SELECT clock_in, clock_out, opening_cash, staff_id FROM staff_shifts WHERE id = ?')
+      const row = await db
+        .prepare(sql)
         .bind(shiftId)
         .first<{ clock_in: string; clock_out: string | null; opening_cash?: number | null; staff_id?: string | null; tenant_id?: string | null }>();
-      if (staffShift) return matchesTenant(staffShift) ? staffShift : null;
+      if (row && typeof row.clock_in === 'string') return matchesTenant(row) ? row : null;
     } catch {
-      // Fallback when opening_cash or staff_id column is absent
-    }
-    try {
-      const staffShift = await db
-        .prepare('SELECT clock_in, clock_out FROM staff_shifts WHERE id = ?')
-        .bind(shiftId)
-        .first<{ clock_in: string; clock_out: string | null; tenant_id?: string | null }>();
-      if (staffShift) return matchesTenant(staffShift) ? staffShift : null;
-    } catch {
-      // Fallback to legacy shifts table when staff_shifts is absent in unit test mocks
+      // Try next fallback
     }
   }
-  if (normTenant) {
-    try {
-      const row = await db
-        .prepare('SELECT clock_in, clock_out, opening_cash, staff_id, tenant_id FROM shifts WHERE id = ?')
-        .bind(shiftId)
-        .first<{ clock_in: string; clock_out: string | null; opening_cash?: number | null; staff_id?: string | null; tenant_id?: string | null }>();
-      if (row) return matchesTenant(row) ? row : null;
-    } catch {
-      // Fallback when opening_cash or staff_id column is absent
-    }
-    try {
-      const row = await db
-        .prepare('SELECT clock_in, clock_out, tenant_id FROM shifts WHERE id = ?')
-        .bind(shiftId)
-        .first<{ clock_in: string; clock_out: string | null; tenant_id?: string | null }>();
-      if (row) return matchesTenant(row) ? row : null;
-    } catch {
-      // Fallback to legacy query when tenant_id column is absent
-    }
-    try {
-      const row = await db
-        .prepare('SELECT COALESCE(actual_start, start_time) AS clock_in, actual_end AS clock_out, tenant_id FROM shifts WHERE id = ?')
-        .bind(shiftId)
-        .first<{ clock_in: string; clock_out: string | null; tenant_id?: string | null }>();
-      if (row) return matchesTenant(row) ? row : null;
-    } catch {
-      // Fallback when actual_start/start_time/tenant_id columns are absent
-    }
-  }
-  if (!allowUnscopedFallback) {
-    return null;
-  }
+
+  if (!allowUnscopedFallback) return null;
+
   try {
     const row = await db
-      .prepare('SELECT clock_in, clock_out, opening_cash, staff_id FROM shifts WHERE id = ?')
+      .prepare('SELECT clock_in, clock_out, opening_cash, staff_id FROM staff_shifts WHERE id = ?')
       .bind(shiftId)
       .first<{ clock_in: string; clock_out: string | null; opening_cash?: number | null; staff_id?: string | null; tenant_id?: string | null }>();
-    if (row) return matchesTenant(row) ? row : null;
-  } catch {
-    // Fallback when opening_cash or staff_id column is absent
-  }
-  try {
-    const row = await db
-      .prepare('SELECT clock_in, clock_out FROM shifts WHERE id = ?')
-      .bind(shiftId)
-      .first<{ clock_in: string; clock_out: string | null; tenant_id?: string | null }>();
-    if (row) return matchesTenant(row) ? row : null;
-  } catch {
-    // Fallback to shifts with actual_start/start_time
-  }
-  try {
-    return await db
-      .prepare('SELECT COALESCE(actual_start, start_time) AS clock_in, actual_end AS clock_out FROM shifts WHERE id = ?')
-      .bind(shiftId)
-      .first<{ clock_in: string; clock_out: string | null }>();
+    if (row && typeof row.clock_in === 'string') return matchesTenant(row) ? row : null;
   } catch {
     return null;
   }
+  return null;
 }
 
 function resolveShiftTenant(
@@ -168,90 +117,98 @@ function resolveShiftTenant(
 async function getCashPaymentsForShift(
   db: D1Database,
   shiftId: string,
-  tenantId?: string
+  tenantId?: string,
+  asOf?: string
 ): Promise<number> {
   const shift = await getShiftWindow(db, shiftId, tenantId);
-
-  if (!shift) return 0;
-
-  const endTime = shift.clock_out || new Date().toISOString();
-  const effectiveTenant = resolveShiftTenant(shift, tenantId);
-
-  if (effectiveTenant) {
-    try {
-      const scopedResult = await db
-        .prepare(
-          `SELECT COALESCE(SUM(amount), 0) as total FROM payments
-           WHERE method IN ('cash', 'cod')
-           AND created_at >= ? AND created_at <= ?
-           AND status = 'completed'
-           AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?`
-        )
-        .bind(shift.clock_in, endTime, effectiveTenant)
-        .first<{ total: number }>();
-
-      if (scopedResult && typeof scopedResult.total === 'number') {
-        return scopedResult.total;
+  if (!shift?.clock_in) throw new ShiftContractError('Shift not found', 404);
+  const tenant = resolveShiftTenant(shift, tenantId) || 'default';
+  const now = asOf || new Date().toISOString();
+  const endTime = shift.clock_out || now;
+  try {
+    const rows = await db.prepare(`SELECT p.id, p.amount, a.shift_id,
+        (SELECT COUNT(*) FROM staff_shifts s
+         WHERE COALESCE(NULLIF(TRIM(s.tenant_id), ''), 'default') = ?
+         AND julianday(COALESCE(a.settled_at, p.updated_at, p.created_at)) >= julianday(s.clock_in)
+         AND julianday(COALESCE(a.settled_at, p.updated_at, p.created_at)) <= julianday(COALESCE(s.clock_out, ?))) AS candidates
+      FROM payments p LEFT JOIN cash_payment_attributions a ON a.payment_id = p.id AND a.tenant_id = COALESCE(NULLIF(TRIM(p.tenant_id), ''), 'default')
+      WHERE p.method IN ('cash', 'cod') AND p.status = 'completed'
+      AND COALESCE(NULLIF(TRIM(p.tenant_id), ''), 'default') = ?
+      AND julianday(COALESCE(a.settled_at, p.updated_at, p.created_at)) >= julianday(?)
+      AND julianday(COALESCE(a.settled_at, p.updated_at, p.created_at)) <= julianday(?)`)
+      .bind(tenant, now, tenant, shift.clock_in, endTime)
+      .all<{ id: string; amount: number; shift_id: string | null; candidates: number }>();
+    if (Array.isArray(rows?.results) && (rows.results.length > 0 || Boolean(shift.staff_id))) {
+      let total = 0;
+      for (const row of rows.results) {
+        if (row.shift_id !== null && row.shift_id !== undefined) {
+          if (String(row.shift_id) === String(shiftId)) total += row.amount;
+        } else {
+          if (row.candidates !== 1) throw new ShiftContractError('Ambiguous cash payment responsibility; assign collecting shift before reconciliation', 409);
+          total += row.amount;
+        }
       }
-    } catch {
-      // Fallback to joining orders when payments.tenant_id is absent
+      return total;
     }
-
-    try {
-      const joinedResult = await db
-        .prepare(
-          `SELECT COALESCE(SUM(p.amount), 0) as total FROM payments p
-           LEFT JOIN orders o ON o.id = p.order_id
-           WHERE p.method IN ('cash', 'cod')
-           AND p.created_at >= ? AND p.created_at <= ?
-           AND p.status = 'completed'
-           AND COALESCE(NULLIF(TRIM(o.tenant_id), ''), 'default') = ?`
-        )
-        .bind(shift.clock_in, endTime, effectiveTenant)
-        .first<{ total: number }>();
-
-      if (joinedResult && typeof joinedResult.total === 'number') {
-        return joinedResult.total;
-      }
-    } catch {
-      // Fallback only for default tenant
-    }
-
-    if (effectiveTenant !== 'default') {
-      return 0;
+  } catch (err) {
+    if (err instanceof ShiftContractError) throw err;
+    const msg = String(err);
+    if (!/no such table:.*cash_payment_attributions|no such column:.*tenant_id|not a function/i.test(msg)) {
+      throw err;
     }
   }
 
+  // Legacy pre-attribution schema fallback (tenant-scoped; never falls back across non-default tenants)
   try {
-    const result = await db
+    const scopedResult = await db
       .prepare(
-        `SELECT COALESCE(SUM(amount), 0) as total FROM payments
+        `SELECT COALESCE(SUM(amount), 0) AS total FROM payments
+         WHERE method IN ('cash', 'cod')
+         AND COALESCE(updated_at, created_at) >= ? AND COALESCE(updated_at, created_at) <= ?
+         AND status = 'completed'
+         AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?`
+      )
+      .bind(shift.clock_in, endTime, tenant)
+      .first<{ total: number }>();
+    if (scopedResult && typeof scopedResult.total === 'number') {
+      return scopedResult.total;
+    }
+  } catch {
+    // Fallback to joining orders when payments.tenant_id is absent
+  }
+
+  try {
+    const joinedResult = await db
+      .prepare(
+        `SELECT COALESCE(SUM(p.amount), 0) AS total FROM payments p
+         LEFT JOIN orders o ON o.id = p.order_id
+         WHERE p.method IN ('cash', 'cod')
+         AND p.created_at >= ? AND p.created_at <= ?
+         AND p.status = 'completed'
+         AND COALESCE(NULLIF(TRIM(o.tenant_id), ''), 'default') = ?`
+      )
+      .bind(shift.clock_in, endTime, tenant)
+      .first<{ total: number }>();
+    if (joinedResult && typeof joinedResult.total === 'number') {
+      return joinedResult.total;
+    }
+  } catch {
+    // Non-default tenant must fail closed to 0 rather than querying unscoped payments
+  }
+
+  if (tenant !== 'default') return 0;
+
+  try {
+    const defaultOnly = await db
+      .prepare(
+        `SELECT COALESCE(SUM(amount), 0) AS total FROM payments
          WHERE method IN ('cash', 'cod')
          AND created_at >= ? AND created_at <= ?
          AND status = 'completed'`
       )
       .bind(shift.clock_in, endTime)
       .first<{ total: number }>();
-
-    if (result && typeof result.total === 'number') {
-      return result.total;
-    }
-  } catch {
-    // Fallback for legacy schema/mocks using payment_method column
-  }
-
-  try {
-    const legacyResult = await db
-      .prepare(
-        `SELECT COALESCE(SUM(amount), 0) as total FROM payments
-         WHERE payment_method = 'cash'
-         AND created_at >= ? AND created_at <= ?
-         AND status = 'completed'`
-      )
-      .bind(shift.clock_in, endTime)
-      .first<{ total: number }>();
-
-    return legacyResult?.total ?? 0;
+    return defaultOnly?.total || 0;
   } catch {
     return 0;
   }
@@ -265,69 +222,22 @@ async function getCashPayoutsForShift(
   shiftId: string,
   tenantId?: string
 ): Promise<number> {
-  const shift = await getShiftWindow(db, shiftId, tenantId);
-
-  if (!shift) return 0;
-
-  const endTime = shift.clock_out || new Date().toISOString();
-  const effectiveTenant = resolveShiftTenant(shift, tenantId);
-
-  if (effectiveTenant) {
-    try {
-      const scopedResult = await db
-        .prepare(
-          `SELECT COALESCE(SUM(amount), 0) as total FROM cash_payouts
-           WHERE created_at >= ? AND created_at <= ?
-           AND status = 'completed'
-           AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?`
-        )
-        .bind(shift.clock_in, endTime, effectiveTenant)
-        .first<{ total: number }>();
-
-      if (scopedResult && typeof scopedResult.total === 'number') {
-        return scopedResult.total;
-      }
-    } catch {
-      // Fallback to joining orders when cash_payouts.tenant_id is absent
-    }
-
-    try {
-      const joinedResult = await db
-        .prepare(
-          `SELECT COALESCE(SUM(p.amount), 0) as total FROM cash_payouts p
-           LEFT JOIN orders o ON o.id = p.order_id
-           WHERE p.created_at >= ? AND p.created_at <= ?
-           AND p.status = 'completed'
-           AND COALESCE(NULLIF(TRIM(o.tenant_id), ''), 'default') = ?`
-        )
-        .bind(shift.clock_in, endTime, effectiveTenant)
-        .first<{ total: number }>();
-
-      if (joinedResult && typeof joinedResult.total === 'number') {
-        return joinedResult.total;
-      }
-    } catch {
-      // Fallback only for default tenant
-    }
-
-    if (effectiveTenant !== 'default') {
-      return 0;
-    }
-  }
-
+  const tenant = tenantId?.trim() || 'default';
   try {
-    const result = await db
-      .prepare(
-        `SELECT COALESCE(SUM(amount), 0) as total FROM cash_payouts
-         WHERE created_at >= ? AND created_at <= ?
-         AND status = 'completed'`
-      )
-      .bind(shift.clock_in, endTime)
-      .first<{ total: number }>();
-
-    return result?.total ?? 0;
-  } catch {
-    return 0;
+    const result = await db.prepare(`SELECT COALESCE(SUM(amount), 0) AS total FROM cash_payouts
+      WHERE shift_id = ? AND status = 'completed'
+        AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?`)
+      .bind(shiftId, tenant).first<{ total: number }>();
+    return result?.total || 0;
+  } catch (err) {
+    if (!/no such column:.*tenant_id/i.test(String(err))) {
+      throw err;
+    }
+    if (tenant !== 'default') return 0;
+    const fallback = await db.prepare(`SELECT COALESCE(SUM(amount), 0) AS total FROM cash_payouts
+      WHERE shift_id = ? AND status = 'completed'`)
+      .bind(shiftId).first<{ total: number }>();
+    return fallback?.total || 0;
   }
 }
 
@@ -340,7 +250,8 @@ export async function reconcileShiftCash(
   env: Env | D1Database,
   input: ReconciliationInput,
   staffId: string,
-  tenantId?: string
+  tenantId?: string,
+  actorRole?: string
 ): Promise<ShiftReconciliation> {
   const db = (env as Env)?.AURA_DB ?? (env as D1Database);
   const rawTenant = tenantId ? tenantId.trim() : '';
@@ -348,7 +259,7 @@ export async function reconcileShiftCash(
   const normTenant = hasExplicitTenant ? (rawTenant === 'hq' ? '*' : rawTenant) : 'default';
 
   if (typeof input.opening_float !== 'number' || !Number.isFinite(input.opening_float) || input.opening_float < 0) {
-    throw new Error('Invalid opening_float: must be a non-negative number');
+    throw new ShiftContractError('Invalid opening_float: must be a non-negative number', 400);
   }
   const rawActualCounted =
     (input as unknown as Record<string, unknown>).actual_cash_counted ??
@@ -359,7 +270,7 @@ export async function reconcileShiftCash(
     rawActualCounted !== undefined &&
     (typeof rawActualCounted !== 'number' || !Number.isFinite(rawActualCounted) || rawActualCounted < 0)
   ) {
-    throw new Error('Invalid actual_cash_counted: must be a non-negative number');
+    throw new ShiftContractError('Invalid actual_cash_counted: must be a non-negative number', 400);
   }
   if (Array.isArray(input.denominations?.denominations)) {
     for (const d of input.denominations.denominations) {
@@ -371,84 +282,111 @@ export async function reconcileShiftCash(
         !Number.isFinite(d.count) ||
         d.count < 0
       ) {
-        throw new Error('Invalid cash denomination or count: must be non-negative numbers');
+        throw new ShiftContractError('Invalid cash denomination or count: must be non-negative numbers', 400);
       }
     }
   }
 
   const shiftWindow = await getShiftWindow(db, input.shift_id, normTenant);
   if (hasExplicitTenant && normTenant !== '*' && !shiftWindow) {
-    throw new Error('Shift not found or belongs to another tenant');
+    throw new ShiftContractError('Shift not found or belongs to another tenant', 404);
   }
-  const candidateStaffId = (input as { staff_id?: string }).staff_id ?? staffId;
-  if (
-    shiftWindow?.staff_id &&
-    typeof shiftWindow.staff_id === 'string' &&
-    shiftWindow.staff_id.trim() !== '' &&
-    typeof candidateStaffId === 'string' &&
-    candidateStaffId.trim() !== '' &&
-    shiftWindow.staff_id.trim() !== candidateStaffId.trim()
-  ) {
-    throw new Error("Shift operator mismatch: cannot reconcile another staff member's shift");
+  if (!shiftWindow?.clock_in) throw new ShiftContractError('Shift not found', 404);
+
+  const effectiveReconTenant =
+    normTenant && normTenant !== '*'
+      ? normTenant
+      : resolveShiftTenant(shiftWindow, normTenant);
+  if (!effectiveReconTenant || effectiveReconTenant === '*') {
+    throw new ShiftContractError('Concrete tenant required', 403);
   }
 
-  let effectiveReconTenant = normTenant && normTenant !== '*' ? normTenant : undefined;
-  if (!effectiveReconTenant && shiftWindow) {
-    effectiveReconTenant = resolveShiftTenant(shiftWindow, normTenant);
-  }
-
-  // Prevent duplicate reconciliation for the same shift within the tenant
+  let actor: { tenant_id?: string | null; role: string; is_active: number } | null = null;
   try {
-    let existingRecon: Record<string, unknown> | null = null;
-    if (effectiveReconTenant && effectiveReconTenant !== '*') {
-      try {
-        existingRecon = await db
-          .prepare(
-            "SELECT id, shift_id, tenant_id FROM shift_reconciliations WHERE shift_id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ? LIMIT 1"
-          )
-          .bind(input.shift_id, effectiveReconTenant)
-          .first<Record<string, unknown>>();
-      } catch {
-        if (effectiveReconTenant === 'default' || normTenant === '*') {
-          existingRecon = await db
-            .prepare('SELECT id, shift_id FROM shift_reconciliations WHERE shift_id = ? LIMIT 1')
-            .bind(input.shift_id)
-            .first<Record<string, unknown>>();
-        }
-      }
-    } else {
-      existingRecon = await db
-        .prepare('SELECT id, shift_id FROM shift_reconciliations WHERE shift_id = ? LIMIT 1')
-        .bind(input.shift_id)
-        .first<Record<string, unknown>>();
-    }
-    if (
-      existingRecon &&
-      (existingRecon.shift_id === input.shift_id || String(existingRecon.id || '').startsWith('recon_'))
-    ) {
-      throw new Error(`Shift ${input.shift_id} has already been reconciled`);
-    }
+    actor = await db.prepare('SELECT tenant_id, role, is_active FROM users WHERE id = ?').bind(staffId)
+      .first<{ tenant_id: string | null; role: string; is_active: number }>();
   } catch (err) {
-    if ((err as Error)?.message?.includes('already been reconciled')) {
+    if (/no such column:.*tenant_id/i.test(String(err))) {
+      const legacyActor = await db.prepare('SELECT role, is_active FROM users WHERE id = ?').bind(staffId)
+        .first<{ role: string; is_active: number }>();
+      actor = legacyActor ? { ...legacyActor, tenant_id: 'default' } : null;
+    } else {
       throw err;
     }
   }
+  const hasRealActorRow = Boolean(actor && typeof actor.is_active === 'number' && typeof actor.role === 'string');
+  if (shiftWindow.staff_id) {
+    if (!hasRealActorRow || !actor || actor.is_active !== 1) {
+      throw new ShiftContractError('Forbidden cross-tenant or inactive reconciliation actor', 403);
+    }
+    const effectiveActorRole = actorRole ?? actor.role;
+    if (actorRole !== undefined && actor.role !== actorRole) {
+      throw new ShiftContractError('Forbidden cross-tenant or inactive reconciliation actor', 403);
+    }
+    if (!['staff', 'cashier', 'waiter', 'supervisor', 'manager', 'owner', 'admin'].includes(effectiveActorRole) ||
+        (shiftWindow.staff_id !== staffId && !['supervisor', 'manager', 'owner', 'admin'].includes(effectiveActorRole))) {
+      throw new ShiftContractError('Forbidden reconciliation actor', 403);
+    }
+    const actorTenant = (actor.tenant_id?.trim() || 'default').toLowerCase();
+    const isHqActor = ['owner', 'admin'].includes(effectiveActorRole) && (actorTenant === 'hq' || actorTenant === '*');
+    if (!isHqActor && (actor.tenant_id?.trim() || 'default') !== effectiveReconTenant) {
+      throw new ShiftContractError('Forbidden cross-tenant or inactive reconciliation actor', 403);
+    }
+  } else if (hasRealActorRow && actor) {
+    if (actor.is_active !== 1 || (actorRole !== undefined && actor.role !== actorRole)) {
+      throw new ShiftContractError('Forbidden cross-tenant or inactive reconciliation actor', 403);
+    }
+    if (!['staff', 'cashier', 'waiter', 'supervisor', 'manager', 'owner', 'admin'].includes(actor.role)) {
+      throw new ShiftContractError('Forbidden reconciliation actor', 403);
+    }
+    const actorTenant = (actor.tenant_id?.trim() || 'default').toLowerCase();
+    const isHqActor = ['owner', 'admin'].includes(actor.role) && (actorTenant === 'hq' || actorTenant === '*');
+    if (!isHqActor && (actor.tenant_id?.trim() || 'default') !== effectiveReconTenant) {
+      throw new ShiftContractError('Forbidden cross-tenant or inactive reconciliation actor', 403);
+    }
+  }
 
-  const actualCash = Array.isArray(input.denominations?.denominations)
-    ? calculateTotalCash(input.denominations.denominations)
+  let existingRecon: unknown = null;
+  try {
+    existingRecon = await db.prepare(
+      "SELECT id, shift_id, tenant_id FROM shift_reconciliations WHERE shift_id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ? LIMIT 1"
+    ).bind(input.shift_id, effectiveReconTenant).first();
+  } catch (err) {
+    if (effectiveReconTenant === 'default' && /no such column:.*tenant_id/i.test(String(err))) {
+      existingRecon = await db.prepare(
+        'SELECT id, shift_id FROM shift_reconciliations WHERE shift_id = ? LIMIT 1'
+      ).bind(input.shift_id).first();
+    } else {
+      throw err;
+    }
+  }
+  if (existingRecon) throw new ShiftContractError(`Shift ${input.shift_id} has already been reconciled`, 409);
+
+  const hasDenominations = Array.isArray(input.denominations?.denominations) && input.denominations.denominations.length > 0;
+  const calculatedFromDenominations = hasDenominations ? calculateTotalCash(input.denominations.denominations) : null;
+  if (hasDenominations && typeof rawActualCounted === 'number' && rawActualCounted !== calculatedFromDenominations) {
+    throw new ShiftContractError('actual_cash_counted does not match denomination breakdown', 400);
+  }
+  const actualCash = calculatedFromDenominations !== null
+    ? calculatedFromDenominations
     : typeof rawActualCounted === 'number'
       ? rawActualCounted
       : 0;
-  const authoritativeOpeningFloat =
-    shiftWindow &&
-    shiftWindow.opening_cash !== undefined &&
-    shiftWindow.opening_cash !== null &&
-    Number.isFinite(Number(shiftWindow.opening_cash)) &&
-    Number(shiftWindow.opening_cash) >= 0
-      ? Number(shiftWindow.opening_cash)
-      : input.opening_float;
-  const cashPayments = await getCashPaymentsForShift(db, input.shift_id, normTenant);
-  const cashPayouts = await getCashPayoutsForShift(db, input.shift_id, normTenant);
+  let authoritativeOpeningFloat: number;
+  if (shiftWindow.opening_cash !== undefined && shiftWindow.opening_cash !== null) {
+    if (typeof shiftWindow.opening_cash !== 'number' || !Number.isFinite(shiftWindow.opening_cash) || shiftWindow.opening_cash < 0) {
+      throw new ShiftContractError('Invalid recorded opening_cash', 409);
+    }
+    authoritativeOpeningFloat = shiftWindow.opening_cash;
+    if (authoritativeOpeningFloat !== input.opening_float) {
+      throw new ShiftContractError('Opening float does not match recorded opening_cash', 409);
+    }
+  } else {
+    authoritativeOpeningFloat = input.opening_float;
+  }
+  const reconciliationTime = new Date().toISOString();
+  const cashPayments = await getCashPaymentsForShift(db, input.shift_id, effectiveReconTenant, reconciliationTime);
+  const cashPayouts = await getCashPayoutsForShift(db, input.shift_id, effectiveReconTenant);
   const expectedCash = authoritativeOpeningFloat + cashPayments - cashPayouts;
   const variance = actualCash - expectedCash;
   const varianceStatus = determineVarianceStatus(variance);
@@ -456,8 +394,8 @@ export async function reconcileShiftCash(
   const reconciliation: ShiftReconciliation = {
     id: `recon_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`,
     shift_id: input.shift_id,
-    staff_id: staffId,
-    opening_float: input.opening_float,
+    staff_id: shiftWindow.staff_id || staffId,
+    opening_float: authoritativeOpeningFloat,
     expected_cash: expectedCash,
     actual_cash: actualCash,
     variance,
@@ -466,60 +404,116 @@ export async function reconcileShiftCash(
     cash_payment_total: cashPayments,
     cash_payout_total: cashPayouts,
     notes: input.notes ?? null,
-    created_at: new Date().toISOString(),
+    created_at: reconciliationTime,
   };
 
-  if (effectiveReconTenant && effectiveReconTenant !== '*') {
-    try {
-      await db.prepare(
-        `INSERT INTO shift_reconciliations (
-          id, shift_id, staff_id, opening_float, expected_cash, actual_cash,
-          variance, variance_status, denominations, cash_payment_total,
-          cash_payout_total, notes, tenant_id, created_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-      ).bind(
-        reconciliation.id,
-        reconciliation.shift_id,
-        reconciliation.staff_id,
-        reconciliation.opening_float,
-        reconciliation.expected_cash,
-        reconciliation.actual_cash,
-        reconciliation.variance,
-        reconciliation.variance_status,
-        JSON.stringify(reconciliation.denominations),
-        reconciliation.cash_payment_total,
-        reconciliation.cash_payout_total,
-        reconciliation.notes,
-        effectiveReconTenant,
-        reconciliation.created_at
-      ).run();
-      return reconciliation;
-    } catch (err) {
-      if (effectiveReconTenant !== 'default') throw err;
+  try {
+    const insert = db.prepare(`INSERT INTO shift_reconciliations (
+        id, shift_id, staff_id, opening_float, expected_cash, actual_cash,
+        variance, variance_status, denominations, cash_payment_total,
+        cash_payout_total, notes, tenant_id, created_at,
+        reconciled_by, opening_cash, variance_amount, status, cash_sales
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+      .bind(
+        reconciliation.id, input.shift_id, reconciliation.staff_id, authoritativeOpeningFloat,
+        expectedCash, actualCash, variance, varianceStatus, JSON.stringify(input.denominations),
+        cashPayments, cashPayouts, reconciliation.notes, effectiveReconTenant, reconciliation.created_at,
+        staffId, authoritativeOpeningFloat, variance, varianceStatus, cashPayments
+      );
+    if (shiftWindow.staff_id) {
+      // Publish the cutoff only with the exact ledger snapshot it freezes. A later
+      // compensating delete alone leaves a window where clock-out can observe stale totals.
+      await db.batch([insert, assertCashSettlementWrite(db), assertReconciliationSnapshot(db, input.shift_id, effectiveReconTenant,
+        shiftWindow.clock_in, cashPayments, cashPayouts)]);
+    } else {
+      await insert.run();
+    }
+  } catch (err) {
+    if (/integer overflow/i.test(String(err))) {
+      throw new ShiftContractError('Shift cash ledger changed concurrently; refresh and retry reconciliation', 409);
+    }
+    if (/UNIQUE|constraint/i.test(String(err))) {
+      throw new ShiftContractError(`Shift ${input.shift_id} has already been reconciled`, 409);
+    }
+    if (shiftWindow.staff_id && /no such table|no such column|has no column named/i.test(String(err))) {
+      throw new ShiftContractError('Cash reconciliation schema upgrade required before handover', 503);
+    }
+    if (!shiftWindow.staff_id && effectiveReconTenant === 'default' && /no such column|has no column named/i.test(String(err))) {
+      try {
+        await db.prepare(`INSERT INTO shift_reconciliations (
+            id, shift_id, staff_id, opening_float, expected_cash, actual_cash,
+            variance, variance_status, denominations, cash_payment_total,
+            cash_payout_total, notes, created_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+          .bind(
+            reconciliation.id, input.shift_id, reconciliation.staff_id, authoritativeOpeningFloat,
+            expectedCash, actualCash, variance, varianceStatus, JSON.stringify(input.denominations),
+            cashPayments, cashPayouts, reconciliation.notes, reconciliation.created_at
+          ).run();
+      } catch (legacyErr) {
+        if (/UNIQUE|constraint/i.test(String(legacyErr))) {
+          throw new ShiftContractError(`Shift ${input.shift_id} has already been reconciled`, 409);
+        }
+        throw legacyErr;
+      }
+    } else {
+      throw err;
     }
   }
 
-  await db.prepare(
-    `INSERT INTO shift_reconciliations (
-      id, shift_id, staff_id, opening_float, expected_cash, actual_cash,
-      variance, variance_status, denominations, cash_payment_total,
-      cash_payout_total, notes, created_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-  ).bind(
-    reconciliation.id,
-    reconciliation.shift_id,
-    reconciliation.staff_id,
-    reconciliation.opening_float,
-    reconciliation.expected_cash,
-    reconciliation.actual_cash,
-    reconciliation.variance,
-    reconciliation.variance_status,
-    JSON.stringify(reconciliation.denominations),
-    reconciliation.cash_payment_total,
-    reconciliation.cash_payout_total,
-    reconciliation.notes,
-    reconciliation.created_at
-  ).run();
+  const deleteReconciliation = async () => {
+    try {
+      return await db
+        .prepare('DELETE FROM shift_reconciliations WHERE id = ? AND tenant_id = ?')
+        .bind(reconciliation.id, effectiveReconTenant)
+        .run();
+    } catch (delErr) {
+      if (effectiveReconTenant === 'default' && /no such column:.*tenant_id/i.test(String(delErr))) {
+        return await db
+          .prepare('DELETE FROM shift_reconciliations WHERE id = ?')
+          .bind(reconciliation.id)
+          .run();
+      }
+      throw delErr;
+    }
+  };
+
+  // Re-verify cash ledger (payments & payouts) after locking the reconciliation row so a concurrent
+  // COD collection or payout between the read and insert cannot be silently omitted from handover.
+  let verifiedCashPayments: number;
+  let verifiedCashPayouts: number;
+  try {
+    verifiedCashPayments = await getCashPaymentsForShift(db, input.shift_id, effectiveReconTenant, new Date().toISOString());
+    verifiedCashPayouts = await getCashPayoutsForShift(db, input.shift_id, effectiveReconTenant);
+  } catch (verifyErr) {
+    let rollbackErr: unknown = null;
+    let rollbackChanges: number | undefined;
+    try {
+      const rollback = await deleteReconciliation();
+      if (rollback.meta && typeof rollback.meta.changes === 'number') {
+        rollbackChanges = rollback.meta.changes;
+      }
+    } catch (err) {
+      rollbackErr = err;
+    }
+    if (rollbackErr || rollbackChanges === 0) {
+      const verifyMsg = verifyErr instanceof Error ? verifyErr.message : String(verifyErr);
+      const rbMsg = rollbackErr
+        ? (rollbackErr instanceof Error ? rollbackErr.message : String(rollbackErr))
+        : 'no reconciliation row deleted';
+      throw new Error(
+        `CRITICAL: shift reconciliation verification failed (${verifyMsg}) and rollback failed for reconciliation ${reconciliation.id} (${rbMsg})`,
+      );
+    }
+    throw verifyErr;
+  }
+  if (verifiedCashPayments !== cashPayments || verifiedCashPayouts !== cashPayouts) {
+    const rollback = await deleteReconciliation();
+    if (rollback.meta && typeof rollback.meta.changes === 'number' && rollback.meta.changes === 0) {
+      throw new Error('Failed to roll back concurrent shift reconciliation');
+    }
+    throw new ShiftContractError('Shift cash ledger changed concurrently; refresh and retry reconciliation', 409);
+  }
 
   return reconciliation;
 }

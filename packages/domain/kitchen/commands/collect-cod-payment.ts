@@ -1,36 +1,12 @@
 import type { D1Database } from '@cloudflare/workers-types';
 import { isTerminal } from '../../order/model/order-state-machine';
+import { assertCashSettlementWrite, resolveCashCollectingShift } from '../../shift/commands/cash-settlement';
 
 type CollectionResult = { success: true; status: string; idempotent?: boolean }
   | { success: false; statusCode: 404 | 409; error: string };
 type Order = { total?: number; total_amount?: number; status: string; payment_status: string; payment_method?: string; is_cod?: number; tenant_id?: string | null };
 
 /** Cash collection is one ledger transaction and never changes kitchen fulfillment. */
-/**
- * Credit a settled cash sale to the collecting staff member's open attendance shift in one
- * statement so concurrent collections never lose an increment. Absent table/columns (minimal
- * schemas) or no open shift leave the settlement itself untouched.
- */
-async function attributeCashToOpenShift(db: D1Database, staffId: string | undefined, tenant: string, amount: number): Promise<void> {
-  const staff = (staffId || '').trim();
-  if (!staff || !Number.isFinite(amount) || amount <= 0) return;
-  try {
-    await db.prepare(
-      `UPDATE staff_shifts
-          SET cash_sales = COALESCE(cash_sales, 0) + ?,
-              total_sales = COALESCE(total_sales, 0) + ?,
-              order_count = COALESCE(order_count, 0) + 1
-        WHERE id = (
-          SELECT id FROM staff_shifts
-           WHERE staff_id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?
-             AND clock_in IS NOT NULL AND clock_out IS NULL
-           ORDER BY clock_in DESC LIMIT 1)`
-    ).bind(amount, amount, staff, tenant).run();
-  } catch {
-    // staff_shifts or its sales columns are optional in minimal schemas
-  }
-}
-
 export async function collectCodPayment(db: D1Database, id: string, tenantId: string, staffId?: string): Promise<CollectionResult> {
   const rawTenant = (tenantId || '').trim() || 'default';
   const normTenant = rawTenant.toLowerCase() === 'hq' ? '*' : rawTenant;
@@ -126,73 +102,82 @@ export async function collectCodPayment(db: D1Database, id: string, tenantId: st
     return { success: true, status: order.status, idempotent: true };
   }
   const now = new Date().toISOString();
-  if (!hasPaymentsTable) {
-    const res = await db.prepare(
-      `UPDATE orders SET payment_status = 'paid', updated_at = ? WHERE id = ? AND status = ? AND payment_status = ?${effectiveOrderClause}`
-    ).bind(now, id, order.status, order.payment_status, ...effectiveOrderBinds).run();
-    if (!(res.meta?.changes > 0)) {
-      return { success: false, statusCode: 409, error: 'Order changed concurrently; refresh and retry' };
-    }
-    await attributeCashToOpenShift(db, staffId, effectiveOrderTenant, amount);
-    return { success: true, status: order.status };
+  const staff = (staffId || '').trim();
+  let collecting;
+  try { collecting = await resolveCashCollectingShift(db, staff, effectiveOrderTenant); }
+  catch { return { success: false, statusCode: 409, error: 'Collecting shift schema requires reconciliation' }; }
+  const { shift, hasShifts } = collecting;
+  if (shift && (!hasPaymentsTable || !hasPaymentsTenantColumn)) {
+    return { success: false, statusCode: 409, error: 'Shift cash settlement schema unavailable' };
   }
-  const effectivePaymentTenant = effectiveOrderTenant;
-  const commit = (timestamp: boolean, withPaymentTenant: boolean) => {
-    const payTenantClause = withPaymentTenant ? paymentTenantClause : '';
-    const payTenantBinds = withPaymentTenant ? paymentLookupBinds : [];
-    return db.batch([
+  // Pin the exact attendance row: a clock-out/new clock-in must not redirect responsibility.
+  const shiftPredicate = shift
+    ? ` AND EXISTS (SELECT 1 FROM staff_shifts s WHERE CAST(s.id AS TEXT) = ? AND s.staff_id = ?
+        AND COALESCE(NULLIF(TRIM(s.tenant_id), ''), 'default') = ? AND s.clock_in = ? AND s.clock_out IS NULL
+        AND NOT EXISTS (SELECT 1 FROM shift_reconciliations r WHERE r.shift_id = CAST(s.id AS TEXT)
+          AND COALESCE(NULLIF(TRIM(r.tenant_id), ''), 'default') = ?))`
+    : hasShifts ? ` AND NOT EXISTS (SELECT 1 FROM staff_shifts s WHERE s.staff_id = ?
+        AND COALESCE(NULLIF(TRIM(s.tenant_id), ''), 'default') = ? AND s.clock_in IS NOT NULL AND s.clock_out IS NULL)` : '';
+  const shiftBinds = shift ? [shift.id, staff, effectiveOrderTenant, shift.clock_in, effectiveOrderTenant]
+    : hasShifts ? [staff, effectiveOrderTenant] : [];
+  const payTenantClause = hasPaymentsTenantColumn ? paymentTenantClause : '';
+  const payTenantBinds = hasPaymentsTenantColumn ? paymentLookupBinds : [];
+  const ledger = ledgerRows[0];
+  // Revalidate the ledger snapshot with the order CAS, before any dependent write.
+  const ledgerPredicate = !hasPaymentsTable ? '' : ledger
+    ? ` AND (SELECT COUNT(*) FROM payments WHERE order_id = ? AND method IN ('cod', 'cash')${payTenantClause}) = 1
+        AND EXISTS (SELECT 1 FROM payments WHERE id = ? AND order_id = ? AND method IN ('cod', 'cash')
+          AND status = ? AND amount = ?${payTenantClause})`
+    : ` AND NOT EXISTS (SELECT 1 FROM payments WHERE order_id = ? AND method IN ('cod', 'cash')${payTenantClause})`;
+  const ledgerBinds = !hasPaymentsTable ? [] : ledger
+    ? [id, ...payTenantBinds, ledger.id, id, ledger.status, amount, ...payTenantBinds] : [id, ...payTenantBinds];
+  const paymentId = ledger?.id || `cod:${id}`;
+  const commit = (timestamp: boolean) => {
+    const statements = [
       db.prepare(`UPDATE orders SET payment_status = 'paid', ${timestamp ? 'cod_paid_at = COALESCE(cod_paid_at, ?), ' : ''}updated_at = ?
-        WHERE id = ? AND status = ? AND payment_status = ?${effectiveOrderClause}`)
-        .bind(...(timestamp ? [now] : []), now, id, order!.status, order!.payment_status, ...effectiveOrderBinds),
-      db.prepare(`UPDATE payments SET status = 'completed', updated_at = ?
-        WHERE order_id = ? AND method IN ('cod', 'cash') AND status = 'pending'${payTenantClause}
-        AND EXISTS (SELECT 1 FROM orders WHERE id = ? AND status = ? AND payment_status = 'paid'${effectiveOrderClause})`)
-        .bind(now, id, ...payTenantBinds, id, order!.status, ...effectiveOrderBinds),
-      withPaymentTenant
-        ? db.prepare(`INSERT INTO payments (id, order_id, method, amount, status, tenant_id, created_at, updated_at)
-            SELECT ?, id, 'cod', ?, 'completed', ?, ?, ? FROM orders
-            WHERE id = ? AND status = ? AND payment_status = 'paid'${effectiveOrderClause}
-            AND NOT EXISTS (SELECT 1 FROM payments WHERE order_id = ? AND method IN ('cod', 'cash')${payTenantClause})`)
-            .bind(`cod:${id}`, amount, effectivePaymentTenant, now, now, id, order!.status, ...effectiveOrderBinds, id, ...payTenantBinds)
-        : db.prepare(`INSERT INTO payments (id, order_id, method, amount, status, created_at, updated_at)
-            SELECT ?, id, 'cod', ?, 'completed', ?, ? FROM orders
-            WHERE id = ? AND status = ? AND payment_status = 'paid'${effectiveOrderClause}
-            AND NOT EXISTS (SELECT 1 FROM payments WHERE order_id = ? AND method IN ('cod', 'cash'))`)
-            .bind(`cod:${id}`, amount, now, now, id, order!.status, ...effectiveOrderBinds, id),
-    ]);
+        WHERE id = ? AND status = ? AND payment_status = ?${effectiveOrderClause}${shiftPredicate}${ledgerPredicate}`)
+        .bind(...(timestamp ? [now] : []), now, id, order!.status, order!.payment_status, ...effectiveOrderBinds, ...shiftBinds, ...ledgerBinds),
+      assertCashSettlementWrite(db),
+    ];
+    if (hasPaymentsTable) {
+      statements.push(ledger
+        ? db.prepare(`UPDATE payments SET status = 'completed', updated_at = ? WHERE id = ? AND status = ? AND amount = ?${payTenantClause}`)
+          .bind(now, ledger.id, ledger.status, amount, ...payTenantBinds)
+        : db.prepare(`INSERT INTO payments (id, order_id, method, amount, status, ${hasPaymentsTenantColumn ? 'tenant_id, ' : ''}created_at, updated_at)
+            VALUES (?, ?, 'cod', ?, 'completed', ${hasPaymentsTenantColumn ? '?, ' : ''}?, ?)`)
+          .bind(paymentId, id, amount, ...(hasPaymentsTenantColumn ? [effectiveOrderTenant] : []), now, now),
+      assertCashSettlementWrite(db));
+    }
+    if (shift) {
+      statements.push(
+        db.prepare(`INSERT INTO cash_payment_attributions (payment_id, tenant_id, shift_id, collected_by, settled_at) VALUES (?, ?, ?, ?, ?)`)
+          .bind(paymentId, effectiveOrderTenant, shift.id, staff, now),
+        assertCashSettlementWrite(db),
+        db.prepare(`UPDATE staff_shifts SET cash_sales = COALESCE(cash_sales, 0) + ?,
+            total_sales = COALESCE(total_sales, 0) + ?, order_count = COALESCE(order_count, 0) + 1
+          WHERE CAST(id AS TEXT) = ? AND staff_id = ? AND clock_in = ? AND clock_out IS NULL
+            AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?
+            AND NOT EXISTS (SELECT 1 FROM shift_reconciliations r WHERE r.shift_id = ?
+              AND COALESCE(NULLIF(TRIM(r.tenant_id), ''), 'default') = ?)`)
+          .bind(amount, amount, shift.id, staff, shift.clock_in, effectiveOrderTenant, shift.id, effectiveOrderTenant),
+        assertCashSettlementWrite(db));
+    }
+    return db.batch(statements);
   };
   let results;
-  try {
-    results = await commit(true, hasPaymentsTenantColumn);
-  } catch (error) {
-    const errText = String(error);
-    if (/no such column:.*tenant_id/i.test(errText) && effectiveOrderTenant === 'default') {
-      hasPaymentsTenantColumn = false;
-      try {
-        results = await commit(true, false);
-      } catch (innerError) {
-        if (!/no such column:.*cod_paid_at/i.test(String(innerError))) throw innerError;
-        results = await commit(false, false);
-      }
-    } else if (/no such column:.*cod_paid_at/i.test(errText)) {
-      try {
-        results = await commit(false, hasPaymentsTenantColumn);
-      } catch (innerError) {
-        if (/no such column:.*tenant_id/i.test(String(innerError)) && effectiveOrderTenant === 'default') {
-          results = await commit(false, false);
-        } else {
-          throw innerError;
-        }
-      }
-    } else {
-      throw error;
+  let timestamp = hasPaymentsTable;
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try { results = await commit(timestamp); break; }
+    catch (error) {
+      const message = String(error);
+      if (timestamp && /no such column:.*cod_paid_at/i.test(message)) timestamp = false;
+      else if (/integer overflow/i.test(message)) return { success: false, statusCode: 409, error: 'Order, ledger or collecting shift changed; refresh and retry' };
+      else if (shift && /no such table|no such column|has no column named/i.test(message)) {
+        return { success: false, statusCode: 409, error: 'Shift cash settlement schema unavailable' };
+      } else throw error;
     }
   }
-  if (results.length !== 3 || results.some(result => !result.success)) throw new Error('COD settlement transaction failed');
-  if (!(results[0]!.meta?.changes > 0)) {
-    return { success: false, statusCode: 409, error: 'Order changed concurrently; refresh and retry' };
-  }
-  await attributeCashToOpenShift(db, staffId, effectiveOrderTenant, amount);
+  if (!results || results.some(result => !result.success)) throw new Error('COD settlement transaction failed');
   return { success: true, status: order.status };
 }
 

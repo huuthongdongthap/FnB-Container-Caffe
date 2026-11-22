@@ -1,9 +1,14 @@
 import { createMixpostClient } from '../../lib/mixpost-client';
+import { autoPostPeriod, createClaimedAutoPost } from './auto-post-claim';
 import { matchesTenantRow, resolvePilotStore } from '../../middleware/tenant';
 import type { D1Database } from '@cloudflare/workers-types';
 import type { ProductRow } from './types';
 
-export async function autoPostWeeklyHighlights(env: Record<string, unknown>, tenantOverride?: string): Promise<{ posted: number }> {
+export async function autoPostWeeklyHighlights(env: Record<string, unknown>, tenantOverride?: string, now = new Date()): Promise<{ posted: number }> {
+  const job = 'weekly-highlights';
+  const period = autoPostPeriod(job, now);
+  if (!period) return { posted: 0 };
+
   const apiUrl = env.MIXPOST_API_URL as string | undefined;
   const apiToken = env.MIXPOST_API_TOKEN as string | undefined;
   const accountsStr = env.MIXPOST_ACCOUNTS as string | undefined;
@@ -54,6 +59,8 @@ export async function autoPostWeeklyHighlights(env: Record<string, unknown>, ten
   const content = `🏆 Best Seller Tuan Nay — Aura Cafe:\n${ranking}\n#AuraCafe #BestSeller`;
 
   const client = createMixpostClient(apiUrl, apiToken);
-  await client.createPost({ accounts, content });
-  return { posted: 1 };
+  const posted = await createClaimedAutoPost(
+    db, job, tenantId, period, now, () => client.createPost({ accounts, content }),
+  );
+  return { posted: posted ? 1 : 0 };
 }

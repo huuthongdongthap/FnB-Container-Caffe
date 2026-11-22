@@ -35,8 +35,12 @@ export function TicketCard({
   onComplete,
   onStart,
   onPickup,
+  pending = false,
+  mutationError,
 }: {
   ticket: Ticket;
+  pending?: boolean;
+  mutationError?: string;
   onComplete?: (id: string) => void;
   onStart?: (id: string) => void;
   onPickup?: (id: string) => void;
@@ -59,14 +63,21 @@ export function TicketCard({
     return () => clearInterval(interval);
   }, [ticket.status, ticket.elapsedSeconds, ticket.totalTimeSeconds]);
 
-  const isReady = ticket.status === 'ready';
-  const isOverdue = ticket.status === 'overdue';
-  const isPreparing = ticket.status === 'preparing';
-  const isPending = ticket.status === 'pending' || (ticket.status as string) === 'confirmed';
-  const isOverduePreparing = isOverdue && (ticket as any).rawStatus === 'preparing';
+  const operationalStatus = ticket.rawStatus ?? ticket.status;
+  const isReady = operationalStatus === 'ready';
+  const isOverdue = Boolean(ticket.isOverdue || ticket.status === 'overdue');
+  const isPreparing = !isOverdue && operationalStatus === 'preparing';
+  const isPending = !isOverdue && (operationalStatus === 'pending' || operationalStatus === 'confirmed');
+  const isOverduePreparing = isOverdue && operationalStatus === 'preparing';
 
-  const accentColorClass = getAccentColorClass(ticket.status);
-  const timerColorClass = getTimerColorClass(ticket.status);
+  const visualStatus: Ticket['status'] = isOverdue ? 'overdue' : ticket.status;
+  const accentColorClass = getAccentColorClass(visualStatus);
+  const timerColorClass = getTimerColorClass(visualStatus);
+  const retryAction = isReady
+    ? onPickup
+    : isPreparing || isOverduePreparing
+      ? onComplete ?? onStart
+      : onStart ?? onComplete;
 
   return (
     <article
@@ -173,25 +184,51 @@ export function TicketCard({
         </div>
       </div>
 
+      {mutationError && (
+        <div
+          role="alert"
+          className="mx-6 mb-3 flex items-center justify-between gap-2 rounded-md border border-[var(--aura-error)]/40 bg-[var(--aura-error)]/10 px-3 py-2 text-xs text-[var(--aura-error)]"
+        >
+          <span>
+            {t('kds.updateFailed', 'Không thể cập nhật')}: {mutationError}
+          </span>
+          {retryAction && (
+            <button
+              type="button"
+              disabled={pending}
+              onClick={() => retryAction(ticket.id)}
+              className="shrink-0 rounded border border-[var(--aura-error)]/50 px-2 py-1 font-semibold uppercase tracking-wider transition-colors hover:bg-[var(--aura-error)]/20 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {t('common.retry', 'Thử lại')}
+            </button>
+          )}
+        </div>
+      )}
+      {pending && (
+        <p role="status" className="px-6 pb-2 text-xs text-[var(--aura-chrome-soft)]">
+          {t('kds.updating', 'Đang cập nhật…')}
+        </p>
+      )}
       {/* Action footer */}
       <div className="border-t border-[var(--aura-chrome-dim)]/10 p-6">
         {isPreparing && onComplete && (
-          <ActionButton onClick={() => onComplete(ticket.id)}>
+          <ActionButton disabled={pending} onClick={() => onComplete(ticket.id)}>
             {t('kds.completeTicket', 'COMPLETE TICKET')}
           </ActionButton>
         )}
         {isPending && onStart && (
-          <ActionButton onClick={() => onStart(ticket.id)}>
+          <ActionButton disabled={pending} onClick={() => onStart(ticket.id)}>
             {t('kds.startPrep', 'START PREP')}
           </ActionButton>
         )}
         {isReady && onPickup && (
-          <ActionButton onClick={() => onPickup(ticket.id)}>
+          <ActionButton disabled={pending} onClick={() => onPickup(ticket.id)}>
             {t('kds.orderPickedUp', 'ORDER PICKED UP')}
           </ActionButton>
         )}
         {isOverdue && (onComplete || onStart) && (
           <ActionButton
+            disabled={pending}
             onClick={() =>
               isOverduePreparing
                 ? (onComplete ? onComplete(ticket.id) : onStart?.(ticket.id))

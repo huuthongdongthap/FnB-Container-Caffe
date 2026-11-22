@@ -183,10 +183,18 @@ export function createStoreMockDb() {  const customers = new Map<string, { id: s
                 const tx = loyaltyTx.find((t) => t.order_id === ordId && t.type === 'refund_redeem');
                 return (tx ? { id: tx.id } : null) as T | null;
               }
-              if (sql.includes('FROM shifts WHERE id = ?') || sql.includes('FROM staff_shifts WHERE id = ?')) {
+              if (
+                sql.includes('FROM shifts WHERE id = ?') ||
+                sql.includes('FROM staff_shifts WHERE id = ?') ||
+                sql.includes('FROM staff_shifts')
+              ) {
                 const id = String(args[0]);
                 const s = shifts.get(id);
                 return (s ? { ...s } : null) as T | null;
+              }
+              if (sql.includes('FROM users WHERE id = ?')) {
+                const u = users.get(String(args[0]));
+                return (u ? { is_active: 1, ...u } : null) as T | null;
               }
               if (sql.includes('FROM purchase_orders WHERE id = ?')) {
                 const po = purchaseOrders.get(String(args[0]));
@@ -246,6 +254,13 @@ export function createStoreMockDb() {  const customers = new Map<string, { id: s
               return { changes: 1, meta: { last_row_id: 1 } };
             },
             async all<T = Record<string, unknown>>(): Promise<{ results: T[] }> {
+              if (sql.includes('FROM payments p LEFT JOIN cash_payment_attributions')) {
+                return {
+                  results: [
+                    { id: 'pay_evening_cash_1', amount: 350000, shift_id: 'shift_evening_1', candidates: 1 },
+                  ] as unknown as T[],
+                };
+              }
               if (sql.includes('FROM products WHERE id IN') || sql.includes('FROM menu_items WHERE id IN')) {
                 return {
                   results: [
@@ -533,21 +548,14 @@ export function createStoreMockDb() {  const customers = new Map<string, { id: s
                 return { meta: { changes: 1 } };
               }
               if (sql.includes('INSERT INTO shift_reconciliations')) {
-                shiftReconciliations.push({
-                  id: args[0],
-                  shift_id: args[1],
-                  staff_id: args[2],
-                  opening_float: args[3],
-                  expected_cash: args[4],
-                  actual_cash: args[5],
-                  variance: args[6],
-                  variance_status: args[7],
-                  denominations: args[8],
-                  cash_payment_total: args[9],
-                  cash_payout_total: args[10],
-                  tenant_id: 'default',
-                  created_at: '2026-11-18T15:45:00.000Z',
+                const colMatch = sql.match(/INSERT INTO shift_reconciliations\s*\(([^)]+)\)/i);
+                const cols = colMatch ? colMatch[1].split(',').map((c) => c.trim()) : [];
+                const row: Record<string, unknown> = { tenant_id: 'default' };
+                cols.forEach((col, i) => {
+                  row[col] = args[i];
                 });
+                row.created_at = '2026-11-18T15:45:00.000Z';
+                shiftReconciliations.push(row);
                 return { meta: { changes: 1 } };
               }
               return { meta: { changes: 1 } };

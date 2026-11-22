@@ -107,10 +107,11 @@ describe('mobile session lifecycle', () => {
     vi.mocked(fetch).mockResolvedValueOnce(reply({ error: 'Inactive', code: 'STAFF_ACCOUNT_INACTIVE' }, 403));
     await expect(apiFetch('/api/private')).rejects.toBeInstanceOf(ApiClientError);
     expect(readClientSession().token).toBeNull();
-    saveClientSession(token(3), staff);
+    const refreshed = token(3);
+    saveClientSession(refreshed, staff);
     vi.mocked(fetch).mockResolvedValueOnce(reply({ error: 'Old request', code: 'SESSION_REVOKED' }, 401));
     await expect(apiFetch('/api/private', { headers: { Authorization: `Bearer ${original}` } })).rejects.toMatchObject({ status: 401 });
-    expect(readClientSession().token).toBe(token(3));
+    expect(readClientSession().token).toBe(refreshed);
   });
   it('switches enrolled device cleanly when logging in with a new explicitDevice and admits supervisor/shipper roles', async () => {
     saveClientSession(token(1), staff, 'audit-device-staff');

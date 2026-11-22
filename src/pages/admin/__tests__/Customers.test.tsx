@@ -155,4 +155,15 @@ describe('AdminCustomersPage', () => {
     expect(screen.getByDisplayValue('Private B')).toBeTruthy();
   });
 
+  it('supports server pagination beyond 50 and exposes CRM links', () => {
+    const fetchCustomers = vi.fn();
+    setupStore({ totalCount: 120, pagination: { page: 1, limit: 50, total: 120, totalPages: 3 }, fetchCustomers });
+    renderWithProviders(<AdminCustomersPage />);
+    expect(screen.getByText('Khuyến mãi / Promotions').closest('a')).toHaveAttribute('href', '/admin/promotions');
+    expect(screen.getByText('Chiến dịch / Campaigns').closest('a')).toHaveAttribute('href', '/admin/campaigns');
+    expect(screen.getByText(/1 \/ 3/)).toBeTruthy();
+    fireEvent.click(screen.getByText(/Sau \/ Next/));
+    expect(fetchCustomers).toHaveBeenCalledWith(2, undefined, undefined);
+  });
+
 });

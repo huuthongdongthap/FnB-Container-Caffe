@@ -15,6 +15,16 @@ status: stable
 
 ---
 
+## Financial integrity & issues remediation — 2026-11-22
+
+**Status:** Combined PR `#103` + `#105` + financial-integrity remediation locally verified green (ready for consolidated PR, hosted CI, and merge to `main`; production rollout remains gated).
+
+- Atomic manual-refund settlement, tenant-wide historical transfer readiness, durable transfer-keyed loyalty reversal, late partial-refund net-entitlement accrual coordination, atomic reward redemption, tenant-scoped voucher summary/listing, and transactional COD shift cutoff all implemented and independently code-reviewed (zero CRITICAL/HIGH/MEDIUM/LOW findings).
+- Fresh local validation on the combined diff: `npm run lint` (0 errors), `npm run lint:migrations` (92 forward / 22 down), `npm run check:contrast` (11/11 WCAG AA), `node scripts/check-discovery-surfaces.mjs` (10/10), `npm run typecheck:all` (0 errors), `TZ=UTC npm run test:ci -- --maxWorkers=2` (**620/620 files, 6,248/6,248 tests passed**, 75.69% stmts / 66.31% branches / 68.57% funcs / 77.51% lines), `node scripts/local-payment-flow/run.mjs --api-only` (**59/59 passed**), `npm run build` (PASS), and Playwright `store-operations-go-live.spec.ts` (**2/2 passed**).
+- Production forward D1 migrations (`20261121_01_refund_manual_transfer_ledger.sql`, `20261121_02_cash_payment_attribution.sql`, `20261121_03_refund_atomicity_and_loyalty_work.sql`), historical manual-refund reference reconciliation, Cloudflare Worker/Pages deployment, and witnessed shop UAT remain separate gated steps.
+
+---
+
 ## Historical Milestones
 
 ### v1.0.0 — Initial Launch (March 10, 2026)

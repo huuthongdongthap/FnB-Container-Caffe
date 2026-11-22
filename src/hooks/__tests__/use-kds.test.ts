@@ -74,6 +74,36 @@ describe('useKDS authoritative session cache', () => {
     expect(result.current.orders).toHaveLength(0);
     expect(vi.mocked(consumeKdsStream).mock.calls[0]?.[0].aborted).toBe(true);
   });
+  it('reports PATCH failures per order, preserves status, and permits retry', async () => {
+    const { result } = setup();
+    await waitFor(() => expect(result.current.orders).toHaveLength(1));
+    vi.mocked(apiFetch).mockRejectedValueOnce(new Error('403 forbidden'));
+    act(() => result.current.updateStatus('ORD_1', 'served'));
+    await waitFor(() => expect(result.current.mutationErrors.ORD_1).toBe('403 forbidden'));
+    expect(result.current.orders[0]?.status).toBe('ready');
+    expect(result.current.pendingOrders.ORD_1).toBe(false);
+    vi.mocked(apiFetch).mockResolvedValue({ data: [] });
+    act(() => result.current.updateStatus('ORD_1', 'served'));
+    await waitFor(() => expect(result.current.orders).toHaveLength(0));
+    expect(result.current.mutationErrors.ORD_1).toBeUndefined();
+  });
+
+  it('blocks duplicate transitions synchronously while an order is pending', async () => {
+    const { result } = setup();
+    await waitFor(() => expect(result.current.orders).toHaveLength(1));
+    let finish!: (value: unknown) => void;
+    vi.mocked(apiFetch).mockImplementationOnce(() => new Promise(resolve => { finish = resolve; }));
+    act(() => {
+      result.current.updateStatus('ORD_1', 'served');
+      result.current.updateStatus('ORD_1', 'served');
+    });
+    await waitFor(() => expect(result.current.pendingOrders.ORD_1).toBe(true));
+    expect(vi.mocked(apiFetch).mock.calls.filter(([url]) => url.includes('/status'))).toHaveLength(1);
+    vi.mocked(apiFetch).mockResolvedValue({ data: [] });
+    await act(async () => finish({ success: true }));
+    await waitFor(() => expect(result.current.pendingOrders.ORD_1).toBe(false));
+  });
+
   it('does not complete an order after a failed ready transition', async () => {
     const { result } = setup();
     await waitFor(() => expect(result.current.orders).toHaveLength(1));

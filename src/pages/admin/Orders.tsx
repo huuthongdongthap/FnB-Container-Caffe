@@ -7,6 +7,7 @@ import type {
 } from '@/components/stitch/StitchOrderMgmtNew-types';
 import { useAdminOrdersStore } from '@/hooks/stores/admin/use-admin-orders-store';
 import type { AdminOrder } from '@/hooks/use-admin';
+import { ManualOrderRefund } from '@/components/admin/manual-order-refund';
 
 /* ─── Status mapping ───────────────────────────────────────────────────────
    StitchOrderMgmtNew supports: pending, preparing, ready, served, cancelled
@@ -122,7 +123,10 @@ export default function AdminOrdersPage() {
   }, [activeFilter, searchQuery, currentPage, fetchOrders, resolveBackendStatus]);
 
   /* ─── Derived data ──────────────────────────────────────────────────── */
-  const stitchOrders: OrderData[] = orders.map(mapAdminOrder);
+  const stitchOrders: OrderData[] = orders.map(order => ({
+    ...mapAdminOrder(order),
+    additionalActions: <ManualOrderRefund order={order} onRecorded={() => { void fetchOrders(currentPage, { status: resolveBackendStatus(activeFilter), search: searchQuery || undefined }, ADMIN_ORDERS_PAGE_SIZE); }} />,
+  }));
   const stats: StatCardData[] = computeStats(orders);
 
   /* ─── Callbacks ──────────────────────────────────────────────────────── */
