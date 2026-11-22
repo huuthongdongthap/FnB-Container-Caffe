@@ -50,7 +50,7 @@ describe('StitchPOSNew', () => {
     renderWithProviders(<StitchPOSNew menuItems={mockMenuItems} />);
     const card = screen.getByText('Espresso').closest('[role="button"]');
     if (card) await user.click(card);
-    expect(screen.getByText('$6.50')).toBeInTheDocument();
+    expect(screen.getAllByText('7₫').length).toBeGreaterThan(0);
   });
 
   it('displays brand name in header', () => {

@@ -58,10 +58,7 @@ export interface StitchPOSNewProps {
 
 /* ─── Helpers & Constants ───────────────────────────────────────────── */
 export function formatPosPrice(val: number): string {
-  if (val >= 1000) {
-    return `${Math.round(val).toLocaleString('vi-VN')}₫`;
-  }
-  return `$${val.toFixed(2)}`;
+  return `${Math.round(val).toLocaleString('vi-VN')}₫`;
 }
 
 export const MENU_CATEGORIES = ['All', 'Coffee', 'Tea', 'Signature', 'Pastries', 'Brunch', 'Merchandise'];

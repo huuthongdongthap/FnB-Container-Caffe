@@ -23,6 +23,8 @@ Options:
   --file <name.sql>       Explicit forward migration filename in worker/db/migrations/
   --migration <name.sql>  Alias for --file
   --remote                Execute against remote D1 (default; still requires --file)
+  --resume-existing       Verify schema and import only missing approved DDL (Node 22.13+)
+  --dry-run               Validate selection offline; do not inspect D1
   --help, -h              Show this usage message
 EOF
 }
@@ -34,6 +36,7 @@ fi
 
 SELECTED_FILES=()
 DRY_RUN=0
+RESUME_EXISTING=0
 
 normalize_and_validate_target() {
   local raw_target="$1"
@@ -121,6 +124,10 @@ while [[ $# -gt 0 ]]; do
       DRY_RUN=1
       shift
       ;;
+    --resume-existing)
+      RESUME_EXISTING=1
+      shift
+      ;;
     --all)
       echo "ERROR: Bulk historical migration replay (--all) is forbidden (fail-closed)." >&2
       usage
@@ -139,6 +146,15 @@ if [[ ${#SELECTED_FILES[@]} -eq 0 ]]; then
   echo "Refusing to replay all historical migrations in ${MIGRATIONS_DIR} without a verified D1 migration ledger." >&2
   usage
   exit 1
+fi
+
+if [[ "${RESUME_EXISTING}" -eq 1 ]]; then
+  RESUME_HELPER="${WRANGLER_DIR}/scripts/prepare-migration-resume.mjs"
+  resume_sources=()
+  for name in "${SELECTED_FILES[@]}"; do
+    resume_sources+=("${MIGRATIONS_DIR}/${name}")
+  done
+  node "${RESUME_HELPER}" --check "${resume_sources[@]}" || exit 1
 fi
 
 if [[ "${DRY_RUN}" -eq 1 ]]; then
@@ -168,8 +184,31 @@ FAIL_COUNT=0
 
 pushd "${WRANGLER_DIR}" >/dev/null
 
+if [[ "${RESUME_EXISTING}" -eq 1 ]]; then
+  resume_dir="$(mktemp -d "${TMPDIR:-/tmp}/aura-migration-resume.XXXXXXXX")"
+  trap 'rm -rf -- "${resume_dir}"' EXIT
+  trap 'exit 129' HUP
+  trap 'exit 130' INT
+  trap 'exit 143' TERM
+fi
+
 for name in "${SELECTED_FILES[@]}"; do
   sql_file="${MIGRATIONS_DIR}/${name}"
+  if [[ "${RESUME_EXISTING}" -eq 1 ]]; then
+    query="$(node "${RESUME_HELPER}" --query "${sql_file}")" || exit 1
+    if ! "${WRANGLER_CMD[@]}" d1 execute "${DB_NAME}" --remote --json --command "${query}" > "${resume_dir}/schema.json"; then
+      echo "ERROR: Failed to query D1 schema for ${name}; stopping." >&2
+      exit 1
+    fi
+    residual="${resume_dir}/${name}"
+    node "${RESUME_HELPER}" --prepare "${sql_file}" "${resume_dir}/schema.json" "${residual}" || exit 1
+    if [[ ! -s "${residual}" ]]; then
+      echo "  ✓ ${name}: verified no-op (schema already matches)"
+      SUCCESS_COUNT=$((SUCCESS_COUNT + 1))
+      continue
+    fi
+    sql_file="${residual}"
+  fi
   echo "Executing: ${name}"
   set +e
   output="$("${WRANGLER_CMD[@]}" d1 execute "${DB_NAME}" \

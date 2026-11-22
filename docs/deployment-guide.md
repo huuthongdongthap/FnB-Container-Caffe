@@ -169,6 +169,29 @@ cd worker
 npx wrangler d1 execute fnb-caffe-db --remote --file=db/migrations/YYYYMMDD_NN_description.sql
 ```
 
+### Explicit schema-verified resume (Node 22.13+)
+
+For an existing database only, opt in with `--resume-existing`. Supported files are strictly
+`20261115_01_tenant_unique_constraints_and_indexes.sql` and
+`20261118_01_orders_loyalty_points_redeemed.sql`; their SHA-256 checksums are pinned.
+
+```bash
+# Offline selection/checksum validation only: no authentication, remote query, or writes.
+bash worker/scripts/apply-migrations.sh --resume-existing --dry-run \
+  --file 20261115_01_tenant_unique_constraints_and_indexes.sql
+# Remove --dry-run only after operator approval to inspect and, if needed, import residual DDL.
+```
+
+Resume queries remote schema definitions and fails closed on missing base tables, query/JSON
+failures, or mismatched columns, CREATE tables, or named indexes (including unique/order/predicate).
+Matching DDL is skipped; complete schemas report a verified no-op. Missing statements retain
+original SQL bytes and are imported once per migration from a private, automatically cleaned-up
+temporary file. A failed import stops remaining migrations. No migration history is inferred or
+written. Semantically equivalent but differently expressed definitions may be rejected conservatively.
+Default execution is unchanged; rollback, wildcard, superseded, and unscoped selections remain blocked.
+Stop concurrent schema writers during inspection/import. Successful resume does not prove other
+migration/deployment prerequisites are satisfied; verify those independently before deployment.
+
 **Luu y:** Ap dung migration duoc phe duyet **truoc** khi trien khai Worker phu thuoc schema moi. Khong gia dinh Worker se bo qua bang/cot thieu; luong tai chinh phai dung an toan thay vi ghi du lieu khong du dieu kien.
 (Apply explicitly approved migrations **before** deploying the Worker that requires them. Missing financial schema must fail closed, not silently bypass integrity guards.)
 

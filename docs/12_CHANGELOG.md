@@ -4,6 +4,11 @@ Tất cả các thay đổi đáng kể của dự án F&B Caffe Container đư�
 
 ## [Unreleased]
 
+### POS currency display consistency & safe explicit D1 migration resume (2026-11-22)
+
+- **fix(pos)** — Format POS amounts consistently as VND, including empty-cart totals and amounts below 1,000; remove amount-based switching to USD (`src/components/stitch/StitchPOSNew-types.ts`). Display-only correction; checkout calculations remain unchanged.
+- **fix(migrations)** — Add opt-in `--resume-existing` (`worker/scripts/apply-migrations.sh`, `worker/scripts/prepare-migration-resume.mjs`) for two checksum-pinned additive migrations. Verify full column/table/index definitions before skipping existing DDL; reject schema drift and failed/incomplete metadata queries. Import remaining original SQL once per migration using cleaned-up private temporary files, stop on failure, and retain offline dry-run/default execution guards. Canonical migration SQL remains unchanged.
+
 ### Financial integrity & issues #79/#82/#90–#102 remediation — deployed to production (`37e9b80b`, 2026-11-22)
 
 - **fix(cod-cutoff)** — COD settlement pins and transactionally revalidates the collecting shift, reconciliation cutoff and prior payment snapshot; order/payment writes, immutable attribution and exact-shift counters roll back together on lost eligibility. Already-paid retries do not recollect or increment counters. Source-compatible collection without a shift is retained; missing known-shift financial schema fails closed.
