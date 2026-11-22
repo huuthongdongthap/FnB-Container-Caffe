@@ -148,8 +148,8 @@ posCustomerRouter.get('/', requireStaff(['owner', 'manager', 'supervisor', 'staf
         row = null;
       } else {
         try {
-          row = await db
-            .prepare(`
+          row = await querySingle(
+            `
               SELECT c.id, c.name, c.phone, c.email,
                      c.loyalty_tier, c.loyalty_points, c.lifetime_points,
                      c.created_at,
@@ -159,13 +159,14 @@ posCustomerRouter.get('/', requireStaff(['owner', 'manager', 'supervisor', 'staf
                      (SELECT COUNT(*) FROM orders o WHERE (o.customer_phone = c.phone OR o.customer_id = c.id) AND LOWER(TRIM(COALESCE(o.status, ''))) NOT IN ('cancelled', 'failed', 'rejected', 'expired', 'refunded')) AS visit_count
               FROM customers c
               LEFT JOIN cashback_wallets cw ON cw.customer_id = c.id
-              WHERE c.phone = ?
-            `)
-            .bind(normalizedPhone)
-            .first<PosCustomerRow>();
+              WHERE c.phone IN (${phoneInClause})
+              LIMIT 2
+            `,
+            [...variants],
+          );
         } catch {
-          row = await db
-            .prepare(`
+          row = await querySingle(
+            `
               SELECT c.id, c.name, c.phone, c.email,
                      c.loyalty_tier, c.loyalty_points, c.loyalty_points AS lifetime_points,
                      c.created_at,
@@ -175,17 +176,18 @@ posCustomerRouter.get('/', requireStaff(['owner', 'manager', 'supervisor', 'staf
                      (SELECT COUNT(*) FROM orders o WHERE o.customer_phone = c.phone AND LOWER(TRIM(COALESCE(o.status, ''))) NOT IN ('cancelled', 'failed', 'rejected', 'expired', 'refunded')) AS visit_count
               FROM customers c
               LEFT JOIN cashback_wallets cw ON cw.customer_id = c.id
-              WHERE c.phone = ?
-            `)
-            .bind(normalizedPhone)
-            .first<PosCustomerRow>();
+              WHERE c.phone IN (${phoneInClause})
+              LIMIT 2
+            `,
+            [...variants],
+          );
         }
       }
     } else if (missingOrderTenant) {
       if (isNonDefaultTenant) {
         try {
-          row = await db
-            .prepare(`
+          row = await querySingle(
+            `
               SELECT c.id, c.name, c.phone, c.email,
                      c.loyalty_tier, c.loyalty_points, c.lifetime_points,
                      c.created_at, c.tenant_id,
@@ -195,13 +197,14 @@ posCustomerRouter.get('/', requireStaff(['owner', 'manager', 'supervisor', 'staf
                      0 AS visit_count
               FROM customers c
               LEFT JOIN cashback_wallets cw ON cw.customer_id = c.id AND (? = '*' OR COALESCE(NULLIF(TRIM(cw.tenant_id), ''), 'default') = ?)
-              WHERE c.phone = ? AND (? = '*' OR COALESCE(NULLIF(TRIM(c.tenant_id), ''), 'default') = ?)
-            `)
-            .bind(tenantId, tenantId, normalizedPhone, tenantId, tenantId)
-            .first<PosCustomerRow>();
+              WHERE c.phone IN (${phoneInClause}) AND (? = '*' OR COALESCE(NULLIF(TRIM(c.tenant_id), ''), 'default') = ?)
+              LIMIT 2
+            `,
+            [tenantId, tenantId, ...variants, tenantId, tenantId],
+          );
         } catch {
-          row = await db
-            .prepare(`
+          row = await querySingle(
+            `
               SELECT c.id, c.name, c.phone, c.email,
                      c.loyalty_tier, c.loyalty_points, c.loyalty_points AS lifetime_points,
                      c.created_at, c.tenant_id,
@@ -210,15 +213,16 @@ posCustomerRouter.get('/', requireStaff(['owner', 'manager', 'supervisor', 'staf
                      0 AS total_spent,
                      0 AS visit_count
               FROM customers c
-              WHERE c.phone = ? AND (? = '*' OR COALESCE(NULLIF(TRIM(c.tenant_id), ''), 'default') = ?)
-            `)
-            .bind(normalizedPhone, tenantId, tenantId)
-            .first<PosCustomerRow>();
+              WHERE c.phone IN (${phoneInClause}) AND (? = '*' OR COALESCE(NULLIF(TRIM(c.tenant_id), ''), 'default') = ?)
+              LIMIT 2
+            `,
+            [...variants, tenantId, tenantId],
+          );
         }
       } else {
         try {
-          row = await db
-            .prepare(`
+          row = await querySingle(
+            `
               SELECT c.id, c.name, c.phone, c.email,
                      c.loyalty_tier, c.loyalty_points, c.lifetime_points,
                      c.created_at, c.tenant_id,
@@ -228,13 +232,14 @@ posCustomerRouter.get('/', requireStaff(['owner', 'manager', 'supervisor', 'staf
                      (SELECT COUNT(*) FROM orders o WHERE (o.customer_phone = c.phone OR o.customer_id = c.id) AND LOWER(TRIM(COALESCE(o.status, ''))) NOT IN ('cancelled', 'failed', 'rejected', 'expired', 'refunded')) AS visit_count
               FROM customers c
               LEFT JOIN cashback_wallets cw ON cw.customer_id = c.id AND (? = '*' OR COALESCE(NULLIF(TRIM(cw.tenant_id), ''), 'default') = ?)
-              WHERE c.phone = ? AND (? = '*' OR COALESCE(NULLIF(TRIM(c.tenant_id), ''), 'default') = ?)
-            `)
-            .bind(tenantId, tenantId, normalizedPhone, tenantId, tenantId)
-            .first<PosCustomerRow>();
+              WHERE c.phone IN (${phoneInClause}) AND (? = '*' OR COALESCE(NULLIF(TRIM(c.tenant_id), ''), 'default') = ?)
+              LIMIT 2
+            `,
+            [tenantId, tenantId, ...variants, tenantId, tenantId],
+          );
         } catch {
-          row = await db
-            .prepare(`
+          row = await querySingle(
+            `
               SELECT c.id, c.name, c.phone, c.email,
                      c.loyalty_tier, c.loyalty_points, c.loyalty_points AS lifetime_points,
                      c.created_at, c.tenant_id,
@@ -244,17 +249,18 @@ posCustomerRouter.get('/', requireStaff(['owner', 'manager', 'supervisor', 'staf
                      (SELECT COUNT(*) FROM orders o WHERE o.customer_phone = c.phone AND LOWER(TRIM(COALESCE(o.status, ''))) NOT IN ('cancelled', 'failed', 'rejected', 'expired', 'refunded')) AS visit_count
               FROM customers c
               LEFT JOIN cashback_wallets cw ON cw.customer_id = c.id
-              WHERE c.phone = ? AND (? = '*' OR COALESCE(NULLIF(TRIM(c.tenant_id), ''), 'default') = ?)
-            `)
-            .bind(normalizedPhone, tenantId, tenantId)
-            .first<PosCustomerRow>();
+              WHERE c.phone IN (${phoneInClause}) AND (? = '*' OR COALESCE(NULLIF(TRIM(c.tenant_id), ''), 'default') = ?)
+              LIMIT 2
+            `,
+            [...variants, tenantId, tenantId],
+          );
         }
       }
     } else if (missingWalletTenant) {
       if (isNonDefaultTenant) {
         try {
-          row = await db
-            .prepare(`
+          row = await querySingle(
+            `
               SELECT c.id, c.name, c.phone, c.email,
                      c.loyalty_tier, c.loyalty_points, c.lifetime_points,
                      c.created_at, c.tenant_id,
@@ -263,13 +269,14 @@ posCustomerRouter.get('/', requireStaff(['owner', 'manager', 'supervisor', 'staf
                      0 AS total_spent,
                      (SELECT COUNT(*) FROM orders o WHERE (o.customer_phone = c.phone OR o.customer_id = c.id) AND LOWER(TRIM(COALESCE(o.status, ''))) NOT IN ('cancelled', 'failed', 'rejected', 'expired', 'refunded') AND (? = '*' OR COALESCE(NULLIF(TRIM(o.tenant_id), ''), 'default') = ?)) AS visit_count
               FROM customers c
-              WHERE c.phone = ? AND (? = '*' OR COALESCE(NULLIF(TRIM(c.tenant_id), ''), 'default') = ?)
-            `)
-            .bind(tenantId, tenantId, normalizedPhone, tenantId, tenantId)
-            .first<PosCustomerRow>();
+              WHERE c.phone IN (${phoneInClause}) AND (? = '*' OR COALESCE(NULLIF(TRIM(c.tenant_id), ''), 'default') = ?)
+              LIMIT 2
+            `,
+            [tenantId, tenantId, ...variants, tenantId, tenantId],
+          );
         } catch {
-          row = await db
-            .prepare(`
+          row = await querySingle(
+            `
               SELECT c.id, c.name, c.phone, c.email,
                      c.loyalty_tier, c.loyalty_points, c.loyalty_points AS lifetime_points,
                      c.created_at, c.tenant_id,
@@ -278,15 +285,16 @@ posCustomerRouter.get('/', requireStaff(['owner', 'manager', 'supervisor', 'staf
                      0 AS total_spent,
                      (SELECT COUNT(*) FROM orders o WHERE o.customer_phone = c.phone AND LOWER(TRIM(COALESCE(o.status, ''))) NOT IN ('cancelled', 'failed', 'rejected', 'expired', 'refunded') AND (? = '*' OR COALESCE(NULLIF(TRIM(o.tenant_id), ''), 'default') = ?)) AS visit_count
               FROM customers c
-              WHERE c.phone = ? AND (? = '*' OR COALESCE(NULLIF(TRIM(c.tenant_id), ''), 'default') = ?)
-            `)
-            .bind(tenantId, tenantId, normalizedPhone, tenantId, tenantId)
-            .first<PosCustomerRow>();
+              WHERE c.phone IN (${phoneInClause}) AND (? = '*' OR COALESCE(NULLIF(TRIM(c.tenant_id), ''), 'default') = ?)
+              LIMIT 2
+            `,
+            [tenantId, tenantId, ...variants, tenantId, tenantId],
+          );
         }
       } else {
         try {
-          row = await db
-            .prepare(`
+          row = await querySingle(
+            `
               SELECT c.id, c.name, c.phone, c.email,
                      c.loyalty_tier, c.loyalty_points, c.lifetime_points,
                      c.created_at, c.tenant_id,
@@ -296,13 +304,14 @@ posCustomerRouter.get('/', requireStaff(['owner', 'manager', 'supervisor', 'staf
                      (SELECT COUNT(*) FROM orders o WHERE (o.customer_phone = c.phone OR o.customer_id = c.id) AND LOWER(TRIM(COALESCE(o.status, ''))) NOT IN ('cancelled', 'failed', 'rejected', 'expired', 'refunded') AND (? = '*' OR COALESCE(NULLIF(TRIM(o.tenant_id), ''), 'default') = ?)) AS visit_count
               FROM customers c
               LEFT JOIN cashback_wallets cw ON cw.customer_id = c.id
-              WHERE c.phone = ? AND (? = '*' OR COALESCE(NULLIF(TRIM(c.tenant_id), ''), 'default') = ?)
-            `)
-            .bind(tenantId, tenantId, normalizedPhone, tenantId, tenantId)
-            .first<PosCustomerRow>();
+              WHERE c.phone IN (${phoneInClause}) AND (? = '*' OR COALESCE(NULLIF(TRIM(c.tenant_id), ''), 'default') = ?)
+              LIMIT 2
+            `,
+            [tenantId, tenantId, ...variants, tenantId, tenantId],
+          );
         } catch {
-          row = await db
-            .prepare(`
+          row = await querySingle(
+            `
               SELECT c.id, c.name, c.phone, c.email,
                      c.loyalty_tier, c.loyalty_points, c.loyalty_points AS lifetime_points,
                      c.created_at, c.tenant_id,
@@ -312,16 +321,17 @@ posCustomerRouter.get('/', requireStaff(['owner', 'manager', 'supervisor', 'staf
                      (SELECT COUNT(*) FROM orders o WHERE o.customer_phone = c.phone AND LOWER(TRIM(COALESCE(o.status, ''))) NOT IN ('cancelled', 'failed', 'rejected', 'expired', 'refunded') AND (? = '*' OR COALESCE(NULLIF(TRIM(o.tenant_id), ''), 'default') = ?)) AS visit_count
               FROM customers c
               LEFT JOIN cashback_wallets cw ON cw.customer_id = c.id
-              WHERE c.phone = ? AND (? = '*' OR COALESCE(NULLIF(TRIM(c.tenant_id), ''), 'default') = ?)
-            `)
-            .bind(tenantId, tenantId, normalizedPhone, tenantId, tenantId)
-            .first<PosCustomerRow>();
+              WHERE c.phone IN (${phoneInClause}) AND (? = '*' OR COALESCE(NULLIF(TRIM(c.tenant_id), ''), 'default') = ?)
+              LIMIT 2
+            `,
+            [tenantId, tenantId, ...variants, tenantId, tenantId],
+          );
         }
       }
     } else {
       try {
-        row = await db
-          .prepare(`
+        row = await querySingle(
+          `
             SELECT c.id, c.name, c.phone, c.email,
                    c.loyalty_tier, c.loyalty_points, c.lifetime_points,
                    c.created_at, c.tenant_id,
@@ -331,14 +341,15 @@ posCustomerRouter.get('/', requireStaff(['owner', 'manager', 'supervisor', 'staf
                    (SELECT COUNT(*) FROM orders o WHERE (o.customer_phone = c.phone OR o.customer_id = c.id) AND LOWER(TRIM(COALESCE(o.status, ''))) NOT IN ('cancelled', 'failed', 'rejected', 'expired', 'refunded') AND (? = '*' OR COALESCE(NULLIF(TRIM(o.tenant_id), ''), 'default') = ?)) AS visit_count
             FROM customers c
             LEFT JOIN cashback_wallets cw ON cw.customer_id = c.id AND (? = '*' OR COALESCE(NULLIF(TRIM(cw.tenant_id), ''), 'default') = ?)
-            WHERE c.phone = ? AND (? = '*' OR COALESCE(NULLIF(TRIM(c.tenant_id), ''), 'default') = ?)
-          `)
-          .bind(tenantId, tenantId, tenantId, tenantId, normalizedPhone, tenantId, tenantId)
-          .first<PosCustomerRow>();
+            WHERE c.phone IN (${phoneInClause}) AND (? = '*' OR COALESCE(NULLIF(TRIM(c.tenant_id), ''), 'default') = ?)
+            LIMIT 2
+          `,
+          [tenantId, tenantId, tenantId, tenantId, ...variants, tenantId, tenantId],
+        );
       } catch {
         try {
-          row = await db
-            .prepare(`
+          row = await querySingle(
+            `
               SELECT c.id, c.name, c.phone, c.email,
                      c.loyalty_tier, c.loyalty_points, c.loyalty_points AS lifetime_points,
                      c.created_at, c.tenant_id,
@@ -348,14 +359,15 @@ posCustomerRouter.get('/', requireStaff(['owner', 'manager', 'supervisor', 'staf
                      (SELECT COUNT(*) FROM orders o WHERE (o.customer_phone = c.phone OR o.customer_id = c.id) AND LOWER(TRIM(COALESCE(o.status, ''))) NOT IN ('cancelled', 'failed', 'rejected', 'expired', 'refunded') AND (? = '*' OR COALESCE(NULLIF(TRIM(o.tenant_id), ''), 'default') = ?)) AS visit_count
               FROM customers c
               LEFT JOIN cashback_wallets cw ON cw.customer_id = c.id AND (? = '*' OR COALESCE(NULLIF(TRIM(cw.tenant_id), ''), 'default') = ?)
-              WHERE c.phone = ? AND (? = '*' OR COALESCE(NULLIF(TRIM(c.tenant_id), ''), 'default') = ?)
-            `)
-            .bind(tenantId, tenantId, tenantId, tenantId, normalizedPhone, tenantId, tenantId)
-            .first<PosCustomerRow>();
+              WHERE c.phone IN (${phoneInClause}) AND (? = '*' OR COALESCE(NULLIF(TRIM(c.tenant_id), ''), 'default') = ?)
+              LIMIT 2
+            `,
+            [tenantId, tenantId, tenantId, tenantId, ...variants, tenantId, tenantId],
+          );
         } catch {
           try {
-            row = await db
-              .prepare(`
+            row = await querySingle(
+              `
                 SELECT c.id, c.name, c.phone, c.email,
                        c.loyalty_tier, c.loyalty_points, c.loyalty_points AS lifetime_points,
                        c.created_at, c.tenant_id,
@@ -365,15 +377,16 @@ posCustomerRouter.get('/', requireStaff(['owner', 'manager', 'supervisor', 'staf
                        (SELECT COUNT(*) FROM orders o WHERE o.customer_phone = c.phone AND LOWER(TRIM(COALESCE(o.status, ''))) NOT IN ('cancelled', 'failed', 'rejected', 'expired', 'refunded') AND (? = '*' OR COALESCE(NULLIF(TRIM(o.tenant_id), ''), 'default') = ?)) AS visit_count
                 FROM customers c
                 LEFT JOIN cashback_wallets cw ON cw.customer_id = c.id AND (? = '*' OR COALESCE(NULLIF(TRIM(cw.tenant_id), ''), 'default') = ?)
-                WHERE c.phone = ? AND (? = '*' OR COALESCE(NULLIF(TRIM(c.tenant_id), ''), 'default') = ?)
-              `)
-              .bind(tenantId, tenantId, tenantId, tenantId, normalizedPhone, tenantId, tenantId)
-              .first<PosCustomerRow>();
+                WHERE c.phone IN (${phoneInClause}) AND (? = '*' OR COALESCE(NULLIF(TRIM(c.tenant_id), ''), 'default') = ?)
+                LIMIT 2
+              `,
+              [tenantId, tenantId, tenantId, tenantId, ...variants, tenantId, tenantId],
+            );
           } catch {
             if (isNonDefaultTenant) {
               try {
-                row = await db
-                  .prepare(`
+                row = await querySingle(
+                  `
                     SELECT c.id, c.name, c.phone, c.email,
                            c.loyalty_tier, c.loyalty_points, c.loyalty_points AS lifetime_points,
                            c.created_at, c.tenant_id,
@@ -382,13 +395,14 @@ posCustomerRouter.get('/', requireStaff(['owner', 'manager', 'supervisor', 'staf
                            0 AS total_spent,
                            (SELECT COUNT(*) FROM orders o WHERE o.customer_phone = c.phone AND LOWER(TRIM(COALESCE(o.status, ''))) NOT IN ('cancelled', 'failed', 'rejected', 'expired', 'refunded') AND (? = '*' OR COALESCE(NULLIF(TRIM(o.tenant_id), ''), 'default') = ?)) AS visit_count
                     FROM customers c
-                    WHERE c.phone = ? AND (? = '*' OR COALESCE(NULLIF(TRIM(c.tenant_id), ''), 'default') = ?)
-                  `)
-                  .bind(tenantId, tenantId, normalizedPhone, tenantId, tenantId)
-                  .first<PosCustomerRow>();
+                    WHERE c.phone IN (${phoneInClause}) AND (? = '*' OR COALESCE(NULLIF(TRIM(c.tenant_id), ''), 'default') = ?)
+                    LIMIT 2
+                  `,
+                  [tenantId, tenantId, ...variants, tenantId, tenantId],
+                );
               } catch {
-                row = await db
-                  .prepare(`
+                row = await querySingle(
+                  `
                     SELECT c.id, c.name, c.phone, c.email,
                            c.loyalty_tier, c.loyalty_points, c.loyalty_points AS lifetime_points,
                            c.created_at, c.tenant_id,
@@ -397,15 +411,16 @@ posCustomerRouter.get('/', requireStaff(['owner', 'manager', 'supervisor', 'staf
                            0 AS total_spent,
                            0 AS visit_count
                     FROM customers c
-                    WHERE c.phone = ? AND (? = '*' OR COALESCE(NULLIF(TRIM(c.tenant_id), ''), 'default') = ?)
-                  `)
-                  .bind(normalizedPhone, tenantId, tenantId)
-                  .first<PosCustomerRow>();
+                    WHERE c.phone IN (${phoneInClause}) AND (? = '*' OR COALESCE(NULLIF(TRIM(c.tenant_id), ''), 'default') = ?)
+                    LIMIT 2
+                  `,
+                  [...variants, tenantId, tenantId],
+                );
               }
             } else {
               try {
-                row = await db
-                  .prepare(`
+                row = await querySingle(
+                  `
                     SELECT c.id, c.name, c.phone, c.email,
                            c.loyalty_tier, c.loyalty_points, c.loyalty_points AS lifetime_points,
                            c.created_at, c.tenant_id,
@@ -415,14 +430,15 @@ posCustomerRouter.get('/', requireStaff(['owner', 'manager', 'supervisor', 'staf
                            (SELECT COUNT(*) FROM orders o WHERE o.customer_phone = c.phone AND LOWER(TRIM(COALESCE(o.status, ''))) NOT IN ('cancelled', 'failed', 'rejected', 'expired', 'refunded') AND (? = '*' OR COALESCE(NULLIF(TRIM(o.tenant_id), ''), 'default') = ?)) AS visit_count
                     FROM customers c
                     LEFT JOIN cashback_wallets cw ON cw.customer_id = c.id
-                    WHERE c.phone = ? AND (? = '*' OR COALESCE(NULLIF(TRIM(c.tenant_id), ''), 'default') = ?)
-                  `)
-                  .bind(tenantId, tenantId, normalizedPhone, tenantId, tenantId)
-                  .first<PosCustomerRow>();
+                    WHERE c.phone IN (${phoneInClause}) AND (? = '*' OR COALESCE(NULLIF(TRIM(c.tenant_id), ''), 'default') = ?)
+                    LIMIT 2
+                  `,
+                  [tenantId, tenantId, ...variants, tenantId, tenantId],
+                );
               } catch {
                 try {
-                  row = await db
-                    .prepare(`
+                  row = await querySingle(
+                    `
                       SELECT c.id, c.name, c.phone, c.email,
                              c.loyalty_tier, c.loyalty_points, c.loyalty_points AS lifetime_points,
                              c.created_at, c.tenant_id,
@@ -432,13 +448,14 @@ posCustomerRouter.get('/', requireStaff(['owner', 'manager', 'supervisor', 'staf
                              0 AS visit_count
                       FROM customers c
                       LEFT JOIN cashback_wallets cw ON cw.customer_id = c.id
-                      WHERE c.phone = ? AND (? = '*' OR COALESCE(NULLIF(TRIM(c.tenant_id), ''), 'default') = ?)
-                    `)
-                    .bind(normalizedPhone, tenantId, tenantId)
-                    .first<PosCustomerRow>();
+                      WHERE c.phone IN (${phoneInClause}) AND (? = '*' OR COALESCE(NULLIF(TRIM(c.tenant_id), ''), 'default') = ?)
+                      LIMIT 2
+                    `,
+                    [...variants, tenantId, tenantId],
+                  );
                 } catch {
-                  row = await db
-                    .prepare(`
+                  row = await querySingle(
+                    `
                       SELECT c.id, c.name, c.phone, c.email,
                              c.loyalty_tier, c.loyalty_points, c.loyalty_points AS lifetime_points,
                              c.created_at,
@@ -447,10 +464,11 @@ posCustomerRouter.get('/', requireStaff(['owner', 'manager', 'supervisor', 'staf
                              0 AS total_spent,
                              0 AS visit_count
                       FROM customers c
-                      WHERE c.phone = ?
-                    `)
-                    .bind(normalizedPhone)
-                    .first<PosCustomerRow>();
+                      WHERE c.phone IN (${phoneInClause})
+                      LIMIT 2
+                    `,
+                    [...variants],
+                  );
                 }
               }
             }

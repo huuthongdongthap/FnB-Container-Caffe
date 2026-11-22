@@ -142,11 +142,11 @@ export async function collectCodPayment(db: D1Database, id: string, tenantId: st
     const payTenantBinds = withPaymentTenant ? paymentLookupBinds : [];
     return db.batch([
       ...(withAttribution ? [db.prepare(`INSERT OR IGNORE INTO cash_payment_attributions (payment_id, tenant_id, shift_id, collected_by, settled_at)
-        SELECT COALESCE((SELECT id FROM payments WHERE order_id = ? AND method IN ('cod', 'cash')${payTenantClause} LIMIT 1), ?),
+        SELECT COALESCE((SELECT id FROM payments WHERE order_id = ? AND method IN ('cod', 'cash') AND status IN ('pending', 'completed', 'paid')${payTenantClause} LIMIT 1), ?),
           ?, CAST(s.id AS TEXT), ?, ? FROM staff_shifts s
         WHERE s.staff_id = ? AND COALESCE(NULLIF(TRIM(s.tenant_id), ''), 'default') = ?
           AND s.clock_in IS NOT NULL AND s.clock_out IS NULL
-          AND NOT EXISTS (SELECT 1 FROM shift_reconciliations r WHERE r.shift_id = CAST(s.id AS TEXT) AND r.tenant_id = ?)
+          AND NOT EXISTS (SELECT 1 FROM shift_reconciliations r WHERE r.shift_id = CAST(s.id AS TEXT) AND COALESCE(NULLIF(TRIM(r.tenant_id), ''), 'default') = ?)
           AND EXISTS (SELECT 1 FROM orders WHERE id = ? AND status = ? AND payment_status = ?${effectiveOrderClause})
         ORDER BY s.clock_in DESC LIMIT 1`)
         .bind(id, ...payTenantBinds, `cod:${id}`, effectivePaymentTenant, staffId || '', now, staffId || '', effectivePaymentTenant,
