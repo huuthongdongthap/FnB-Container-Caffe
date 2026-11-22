@@ -2,7 +2,7 @@
 
 Runbook triển khai thực tế để đưa **AURA SaaS Commercial Edition v3 / v3.1** lên Cloudflare Workers + D1 + Pages (Staging → Production) mà **không ảnh hưởng đến quán flagship `default` (AURA SPACE Sa Đéc)**.
 
-> **Trạng thái hiện tại (2026-11-19):** Bản cập nhật SaaS v3.1 trên nhánh local `feat/saas-v3-1-activation-payment-telemetry` đã hoàn tất kiểm định toàn bộ 6 cổng local trước deploy (`lint`, `lint:migrations`, `check:contrast` 11/11, `typecheck:all`, `local-payment-flow --api-only` 59/59, `test:ci` 588 files / 5.826 tests + targeted SaaS v3.1/VietQR 19 tests, `vite build`, Worker `--dry-run`). **Các thao tác production chưa được thực thi** (Cloudflare secrets, D1 remote migration, rollout Worker/Pages, đóng GitHub issues `#79`/`#82`) và **chỉ chạy khi có xác nhận tường minh**.
+> **Trạng thái hiện tại (2026-11-22):** Schema `20261119_02_saas_commercial_v3.sql` cùng bộ code `main` (`37e9b80b`, PR `#106`) đã được triển khai lên Production (`fnb-caffe-db`, Worker `44babe91`, Pages `32a30b2e`, issues `#79`/`#82` đã đóng) với chế độ cô lập hoàn toàn cho quán flagship `'default'`. **Không chạy lại `20261119_02_saas_commercial_v3.sql` trên Production D1.** Các bước kích hoạt SaaS thương mại còn lại (nạp secrets `TENANT_SECRETS_KEY` và `SAAS_PAYOS_*` tách biệt hoàn toàn với `PAYOS_*`, cấu hình DNS wildcard `*.auraspace.cafe`, onboard tenant pilot) hiện đang hoãn theo chủ trương ưu tiên vận hành quán Aura Café trước.
 
 ---
 
