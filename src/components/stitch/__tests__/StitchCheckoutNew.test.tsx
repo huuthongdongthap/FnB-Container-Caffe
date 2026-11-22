@@ -113,12 +113,13 @@ describe('StitchCheckoutNew', () => {
     expect(screen.getByText('Payment Method')).toBeTruthy();
   });
 
-  it('offers only PayOS and COD', () => {
+  it('offers only PayOS and COD with localized cash label', () => {
     renderWithProviders(
       <StitchCheckoutNew summary={MOCK_SUMMARY} onPlaceOrder={vi.fn()} />,
     );
     expect(screen.getByText('PayOS')).toBeTruthy();
-    expect(screen.getByText('Cash on Delivery')).toBeTruthy();
+    expect(screen.getByText('Tiền mặt')).toBeTruthy();
+    expect(screen.queryByText('Cash on Delivery')).toBeNull();
     expect(screen.getAllByRole('radio')).toHaveLength(2);
     expect(screen.queryByText(/MoMo|Apple Pay|Google Pay/i)).toBeNull();
   });

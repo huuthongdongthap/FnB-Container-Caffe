@@ -72,6 +72,8 @@ export function StitchKDSNew({
   avgPrepTime = '12M',
   isLoading = false,
   error = null,
+  pendingOrders = {},
+  mutationErrors = {},
   onCompleteTicket,
   onStartPrep,
   onPickupOrder,
@@ -90,14 +92,21 @@ export function StitchKDSNew({
     if (!tickets) return [];
     if (activeFilter === 'all') return tickets;
     if (activeFilter === 'priority')
-      return tickets.filter((tk) => tk.status === 'overdue' || tk.status === 'preparing');
-    return tickets.filter((tk) => tk.status === activeFilter);
+      return tickets.filter(
+        (tk) =>
+          Boolean(tk.isOverdue || tk.status === 'overdue') ||
+          (tk.rawStatus ?? tk.status) === 'preparing',
+      );
+    return tickets.filter((tk) => {
+      const operationalStatus = tk.rawStatus ?? tk.status;
+      return operationalStatus === activeFilter;
+    });
   }, [tickets, activeFilter]);
 
   const filtered = filteredTickets();
-  const countPreparing = tickets.filter((tk) => tk.status === 'preparing').length;
-  const countPending = tickets.filter((tk) => tk.status === 'pending' || (tk.status as string) === 'confirmed').length;
-  const countReady = tickets.filter((tk) => tk.status === 'ready').length;
+  const countPreparing = tickets.filter((tk) => (tk.rawStatus ?? tk.status) === 'preparing').length;
+  const countPending = tickets.filter((tk) => ['pending', 'confirmed'].includes(tk.rawStatus ?? tk.status)).length;
+  const countReady = tickets.filter((tk) => (tk.rawStatus ?? tk.status) === 'ready').length;
   const activeCount = countPreparing + countPending;
 
   return (
@@ -128,7 +137,7 @@ export function StitchKDSNew({
       />
 
       <main
-        className="ml-0 md:ml-64 h-screen overflow-y-auto px-4 md:px-8 pb-8 pt-24"
+        className="ml-0 md:ml-64 h-screen overflow-y-auto px-4 md:px-8 pb-8 pt-36 lg:pt-24"
         aria-label={t('kds.mainContent', 'Main order grid')}
       >
         <div className="mb-8 flex flex-wrap items-center justify-between gap-4 border-b border-[var(--aura-chrome-dim)]/10 pb-4">
@@ -157,6 +166,8 @@ export function StitchKDSNew({
               <TicketCard
                 key={ticket.id}
                 ticket={ticket}
+                pending={pendingOrders[ticket.id]}
+                mutationError={mutationErrors[ticket.id]}
                 onComplete={onCompleteTicket}
                 onStart={onStartPrep}
                 onPickup={onPickupOrder}

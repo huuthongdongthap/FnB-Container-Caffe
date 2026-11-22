@@ -57,11 +57,16 @@ function createSqliteD1Adapter(sql: DatabaseSync) {
       return prepareStmt(query);
     },
     async batch(stmts: Array<{ run: () => Promise<unknown> }>) {
-      const out: unknown[] = [];
-      for (const s of stmts) {
-        out.push(await s.run());
+      sql.exec('BEGIN');
+      try {
+        const out: unknown[] = [];
+        for (const s of stmts) out.push(await s.run());
+        sql.exec('COMMIT');
+        return out;
+      } catch (error) {
+        sql.exec('ROLLBACK');
+        throw error;
       }
-      return out;
     },
   };
 }
@@ -322,7 +327,7 @@ describe('Phase 49 Slice AV1 — Loyalty, Cashback, Referrals & Admin Loyalty Ha
     vi.restoreAllMocks();
   });
 
-  it('1. loyalty.ts: refunds both customers.loyalty_points and loyalty_accounts.current_points when reward stock/cap CAS fails on POST /redeem', async () => {
+  it('1. loyalty.ts: preserves both balances when reward stock is exhausted before the redemption transaction', async () => {
     const sql = new DatabaseSync(':memory:');
     createLoyaltyTestSchema(sql);
     const d1 = createSqliteD1Adapter(sql);
@@ -336,13 +341,10 @@ describe('Phase 49 Slice AV1 — Loyalty, Cashback, Referrals & Admin Loyalty Ha
       VALUES ('rew_race_1', 'Cold Brew Voucher', 'Cold Brew Voucher', 200, 200, 'bronze', 1, 1, 'store_a');
     `);
 
-    // Simulate concurrent stock exhaustion right after the initial reward read
-    const origPrepare = d1.prepare.bind(d1);
-    vi.spyOn(d1, 'prepare').mockImplementation((query: string) => {
-      if (query.includes('UPDATE rewards SET stock = MAX(0, stock - 1)')) {
-        sql.exec("UPDATE rewards SET stock = 0 WHERE id = 'rew_race_1'");
-      }
-      return origPrepare(query);
+    const originalBatch = d1.batch.bind(d1);
+    vi.spyOn(d1, 'batch').mockImplementationOnce(async statements => {
+      sql.exec("UPDATE rewards SET stock = 0 WHERE id = 'rew_race_1'");
+      return originalBatch(statements);
     });
 
     const token = await generateJWT(

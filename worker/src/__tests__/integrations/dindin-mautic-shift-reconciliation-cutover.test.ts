@@ -203,11 +203,12 @@ describe('DinDin, Mautic Enrollments, Shift Cash Reconciliation & Column Cutover
     expect(saleRes.ok).toBe(true);
     sqlite.prepare("INSERT INTO payments (id, order_id, method, amount, status, created_at) VALUES ('pay_s1', 'ord_s1', 'cash', 90000, 'completed', ?)").run(shift.clock_in);
     sqlite.prepare("INSERT INTO cash_payouts (id, shift_id, amount, reason, status, created_at) VALUES ('po_s1', ?, 20000, 'Mua đá', 'completed', ?)").run(shift.id, shift.clock_in);
-    const recon = await reconcileShiftCash(env, { shift_id: shift.id, opening_float: 500000, denominations: { denominations: [{ denomination: 500000, count: 1 }, { denomination: 50000, count: 1 }, { denomination: 20000, count: 1 }], total_counted: 570000 }, notes: 'Đủ tiền' }, 'USR_OWNER_001');
-    expect(recon.expected_cash).toBe(570000);
-    expect(recon.variance).toBe(0);
-    const fetchedRecon = await getReconciliationForShift(env, shift.id);
-    expect(fetchedRecon?.id).toBe(recon.id);
+    // These historical migrations predate tenant-owned attribution/cutoff tables.
+    // A default tenant alone cannot prove safe attribution or an atomic cash snapshot.
+    await expect(reconcileShiftCash(env, { shift_id: shift.id, opening_float: 500000, denominations: { denominations: [{ denomination: 500000, count: 1 }, { denomination: 50000, count: 1 }, { denomination: 20000, count: 1 }], total_counted: 570000 }, notes: 'Đủ tiền' }, 'USR_OWNER_001'))
+      .rejects.toMatchObject({ status: 503, message: 'Cash reconciliation schema upgrade required before handover' });
+    expect(sqlite.prepare('SELECT COUNT(*) AS count FROM shift_reconciliations').get()?.count).toBe(0);
+    expect(await getReconciliationForShift(env, shift.id)).toBeNull();
     const closed = await closeCanonicalShift(db, { shiftId: shift.id, actualCash: 570000, closedByStaffId: 'USR_OWNER_001', closedByRole: 'owner' });
     expect(closed.ok).toBe(true);
     expect(closed.shift?.status).toBe('closed');

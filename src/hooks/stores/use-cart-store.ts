@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { subscribeSessionChange } from '@/lib/client-session';
+import { isSameAccountScope, subscribeSessionChange } from '@/lib/client-session';
 
 /* ═══════════════════════════════════════════════════════════════════
    Cart store — Zustand with localStorage aura_cart migration.
@@ -217,7 +217,7 @@ export const useCartStore = create<CartState>((set, get) => ({
 // Reset cart state and storage whenever the active user or tenant session changes
 // so cart items, table context, and promo state never bleed across accounts.
 if (typeof window !== 'undefined') {
-  subscribeSessionChange(() => {
-    useCartStore.getState().clearCart();
+  subscribeSessionChange((next, previous) => {
+    if (!isSameAccountScope(next, previous)) useCartStore.getState().clearCart();
   });
 }

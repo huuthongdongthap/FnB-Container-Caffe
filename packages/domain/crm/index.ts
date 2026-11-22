@@ -48,7 +48,9 @@ export type { ComputedTier } from './commands/compute-tier';
 export { applyAccrual, MIN_ORDER_TO_EARN } from './commands/accrual';
 export type { AccrualInput, AccrualResult, AccrualSuccess, AccrualError } from './commands/accrual';
 
-export { reverseAccrual } from './commands/refund-reversal';
+export { reverseRefundTranche } from './commands/refund-tranche';
+export type { RefundTrancheInput, RefundTrancheResult } from './commands/refund-tranche';
+export { reverseAccrual, resolveAccrualRecipient } from './commands/refund-reversal';
 export type { ReversalInput, ReversalResult, ReversalSuccess, ReversalError } from './commands/refund-reversal';
 
 export { computeFrequencyBand, resolveBandPolicy, DEFAULT_BAND_POLICY } from './commands/frequency-band';

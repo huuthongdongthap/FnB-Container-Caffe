@@ -18,6 +18,88 @@ export interface ReversalInput {
   refundAmountVnd: number;
   tenantId?: string;
   reason?: string;
+  /** True when customerId was resolved directly from the original accrual ledger for this order/tenant. */
+  verifiedLedgerRecipient?: boolean;
+}
+
+/**
+ * Resolve the customer who originally accrued loyalty points or cashback for an order
+ * within a tenant. Reads the accrual ledger directly without mutating orders.customer_id.
+ */
+export async function resolveAccrualRecipient(
+  db: D1Database,
+  orderId: string,
+  tenantId?: string | null,
+  strict = false,
+): Promise<{ customerId: string | null; fromLedger: boolean; ambiguous: boolean; candidates?: string[] }> {
+  const rawTenant = tenantId ? tenantId.trim() : '';
+  const effectiveTenant =
+    rawTenant && rawTenant !== '*' && rawTenant.toLowerCase() !== 'hq' ? rawTenant : 'default';
+
+  const candidates = new Set<string>();
+  const collectIds = async (sqlScoped: string, sqlFallback: string) => {
+    try {
+      const res = await db
+        .prepare(sqlScoped)
+        .bind(orderId, effectiveTenant, effectiveTenant)
+        .all<{ customer_id?: string | null }>();
+      for (const r of res?.results ?? []) {
+        const id = typeof r?.customer_id === 'string' ? r.customer_id.trim() : '';
+        if (id && id !== 'guest') candidates.add(id);
+      }
+    } catch (error) {
+      if (strict) throw error;
+      if (effectiveTenant === 'default') {
+        const res = await db
+          .prepare(sqlFallback)
+          .bind(orderId)
+          .all<{ customer_id?: string | null }>()
+          .catch(() => ({ results: [] as Array<{ customer_id?: string | null }> }));
+        for (const r of res?.results ?? []) {
+          const id = typeof r?.customer_id === 'string' ? r.customer_id.trim() : '';
+          if (id && id !== 'guest') candidates.add(id);
+        }
+      }
+    }
+  };
+
+  await collectIds(
+    `SELECT DISTINCT l.customer_id
+     FROM loyalty_point_logs l
+     LEFT JOIN customers c ON c.id = l.customer_id
+     WHERE l.order_id = ? AND l.points_change > 0
+       AND (
+         (c.id IS NOT NULL AND COALESCE(NULLIF(TRIM(c.tenant_id), ''), 'default') = ?)
+         OR (c.id IS NULL AND COALESCE(NULLIF(TRIM(l.tenant_id), ''), 'default') = ?)
+       )
+     LIMIT 2`,
+    `SELECT DISTINCT customer_id FROM loyalty_point_logs
+     WHERE order_id = ? AND points_change > 0
+     LIMIT 2`,
+  );
+
+  await collectIds(
+    `SELECT DISTINCT t.customer_id
+     FROM cashback_transactions t
+     LEFT JOIN customers c ON c.id = t.customer_id
+     WHERE t.order_id = ? AND t.type IN ('earn', 'credit') AND t.amount > 0
+       AND (
+         (c.id IS NOT NULL AND COALESCE(NULLIF(TRIM(c.tenant_id), ''), 'default') = ?)
+         OR (c.id IS NULL AND COALESCE(NULLIF(TRIM(t.tenant_id), ''), 'default') = ?)
+       )
+     LIMIT 2`,
+    `SELECT DISTINCT customer_id FROM cashback_transactions
+     WHERE order_id = ? AND type IN ('earn', 'credit') AND amount > 0
+     LIMIT 2`,
+  );
+
+  if (candidates.size === 1) {
+    return { customerId: [...candidates][0], fromLedger: true, ambiguous: false };
+  }
+  if (candidates.size > 1) {
+    return { customerId: null, fromLedger: false, ambiguous: true, candidates: [...candidates] };
+  }
+  return { customerId: null, fromLedger: false, ambiguous: false };
 }
 
 export interface ReversalSuccess {
@@ -93,6 +175,7 @@ export async function reverseAccrual(
 
   if (order) {
     if (
+      !input.verifiedLedgerRecipient &&
       typeof order.customer_id === 'string' &&
       order.customer_id.trim() !== '' &&
       order.customer_id !== 'guest' &&
@@ -215,50 +298,87 @@ export async function reverseAccrual(
 
   let initialOrderPoints: number | null = null;
   let initialOrderCashback: number | null = null;
-  if (alreadyReversedPoints > 0 || alreadyReversedCashback > 0) {
+  let accrualGrossPoints: number | null = null;
+  let accrualGrossCashback: number | null = null;
+  let accrualNettedPoints = 0;
+  let accrualNettedCashback = 0;
+  if (
+    alreadyReversedPoints > 0 ||
+    alreadyReversedCashback > 0 ||
+    (order.points_earned ?? 0) > 0 ||
+    Number(order.cashback_earned ?? 0) > 0
+  ) {
     try {
-      const firstAudit = effectiveTenant
-        ? await db
-            .prepare(
-              `SELECT metadata FROM loyalty_audit_log
-               WHERE order_id = ? AND action = 'points_refund'
-                 AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?
-               ORDER BY id ASC LIMIT 1`,
-            )
-            .bind(orderId, effectiveTenant)
-            .first<{ metadata?: string | null }>()
-            .catch(() =>
-              effectiveTenant === 'default'
-                ? db
-                    .prepare(
-                      `SELECT metadata FROM loyalty_audit_log
-                       WHERE order_id = ? AND action = 'points_refund'
-                       ORDER BY id ASC LIMIT 1`,
-                    )
-                    .bind(orderId)
-                    .first<{ metadata?: string | null }>()
-                    .catch(() => null)
-                : null,
-            )
-        : await db
-            .prepare(
-              `SELECT metadata FROM loyalty_audit_log
-               WHERE order_id = ? AND action = 'points_refund'
-               ORDER BY id ASC LIMIT 1`,
-            )
-            .bind(orderId)
-            .first<{ metadata?: string | null }>()
-            .catch(() => null);
-      if (firstAudit?.metadata) {
-        const parsed = JSON.parse(firstAudit.metadata) as {
+      const queryAuditRows = async (sql: string, ...binds: unknown[]) => {
+        const stmt = db.prepare(sql).bind(...binds);
+        if (typeof stmt.all === 'function') {
+          const res = await stmt.all<{ action?: string | null; metadata?: string | null }>();
+          return res?.results ?? [];
+        }
+        const first = await stmt.first<{ action?: string | null; metadata?: string | null }>();
+        return first ? [first] : [];
+      };
+      const auditRows = effectiveTenant
+        ? await queryAuditRows(
+            `SELECT action, metadata FROM loyalty_audit_log
+             WHERE order_id = ? AND action IN ('points_refund', 'cashback_earn')
+               AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?
+             ORDER BY created_at ASC, id ASC`,
+            orderId,
+            effectiveTenant,
+          ).catch(() =>
+            effectiveTenant === 'default'
+              ? queryAuditRows(
+                  `SELECT action, metadata FROM loyalty_audit_log
+                   WHERE order_id = ? AND action IN ('points_refund', 'cashback_earn')
+                   ORDER BY created_at ASC, id ASC`,
+                  orderId,
+                ).catch(() => [])
+              : [],
+          )
+        : await queryAuditRows(
+            `SELECT action, metadata FROM loyalty_audit_log
+             WHERE order_id = ? AND action IN ('points_refund', 'cashback_earn')
+             ORDER BY created_at ASC, id ASC`,
+            orderId,
+          ).catch(() => []);
+      for (const auditRow of auditRows) {
+        if (!auditRow?.metadata) continue;
+        let parsed: {
           points_earned_on_order?: number;
           cashback_earned_on_order?: number;
+          gross_points?: number;
+          gross_cashback?: number;
+          reversed_points_at_accrual?: number;
+          reversed_cashback_at_accrual?: number;
         };
-        if (typeof parsed.points_earned_on_order === 'number') {
-          initialOrderPoints = parsed.points_earned_on_order;
+        try {
+          parsed = JSON.parse(auditRow.metadata);
+        } catch {
+          continue;
         }
-        if (typeof parsed.cashback_earned_on_order === 'number') {
-          initialOrderCashback = parsed.cashback_earned_on_order;
+        if (auditRow.action === 'cashback_earn') {
+          if (typeof parsed.gross_points === 'number' && parsed.gross_points > 0) {
+            accrualGrossPoints = parsed.gross_points;
+          }
+          if (typeof parsed.gross_cashback === 'number' && parsed.gross_cashback > 0) {
+            accrualGrossCashback = parsed.gross_cashback;
+          }
+          if (typeof parsed.reversed_points_at_accrual === 'number' && parsed.reversed_points_at_accrual > 0) {
+            accrualNettedPoints = parsed.reversed_points_at_accrual;
+          }
+          if (typeof parsed.reversed_cashback_at_accrual === 'number' && parsed.reversed_cashback_at_accrual > 0) {
+            accrualNettedCashback = parsed.reversed_cashback_at_accrual;
+          }
+        } else {
+          // Ignore zero-earned pre-accrual refund rows so they do not mask
+          // gross earned points/cashback recorded after accrual commits.
+          if (initialOrderPoints === null && typeof parsed.points_earned_on_order === 'number' && parsed.points_earned_on_order > 0) {
+            initialOrderPoints = parsed.points_earned_on_order;
+          }
+          if (initialOrderCashback === null && typeof parsed.cashback_earned_on_order === 'number' && parsed.cashback_earned_on_order > 0) {
+            initialOrderCashback = parsed.cashback_earned_on_order;
+          }
         }
       }
     } catch {
@@ -266,22 +386,28 @@ export async function reverseAccrual(
     }
   }
 
+  const totalReversedPoints = alreadyReversedPoints + accrualNettedPoints;
+  const totalReversedCashback = alreadyReversedCashback + accrualNettedCashback;
   const pointsEarned =
     initialOrderPoints !== null
       ? initialOrderPoints
-      : (order.points_earned ?? 0) + alreadyReversedPoints;
+      : accrualGrossPoints !== null
+        ? accrualGrossPoints
+        : (order.points_earned ?? 0) + totalReversedPoints;
   const cashbackEarnedOnOrder =
     initialOrderCashback !== null
       ? initialOrderCashback
-      : Number(order.cashback_earned ?? 0) + alreadyReversedCashback;
+      : accrualGrossCashback !== null
+        ? accrualGrossCashback
+        : Number(order.cashback_earned ?? 0) + totalReversedCashback;
   if (pointsEarned <= 0 && cashbackEarnedOnOrder <= 0) {
     return { ok: false, reason: 'no_points_to_reverse' };
   }
 
-  const remainingPoints = Math.max(0, pointsEarned - alreadyReversedPoints);
-  const remainingCashback = Math.max(0, cashbackEarnedOnOrder - alreadyReversedCashback);
+  const remainingPoints = Math.max(0, pointsEarned - totalReversedPoints);
+  const remainingCashback = Math.max(0, cashbackEarnedOnOrder - totalReversedCashback);
   if (
-    (alreadyReversedPoints > 0 || alreadyReversedCashback > 0) &&
+    (totalReversedPoints > 0 || totalReversedCashback > 0) &&
     remainingPoints <= 0 &&
     remainingCashback <= 0
   ) {

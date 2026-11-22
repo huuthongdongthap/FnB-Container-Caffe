@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { DatabaseSync } from 'node:sqlite';
 import { createHmac } from 'node:crypto';
 import type { D1Database, D1PreparedStatement } from '@cloudflare/workers-types';
@@ -13,7 +14,11 @@ export function paymentSqliteDB(options: { canonicalStaff?: boolean; authVersion
     notes TEXT, is_cod INTEGER DEFAULT 0, created_at TEXT, updated_at TEXT);
     CREATE TABLE payments (id TEXT PRIMARY KEY, order_id TEXT NOT NULL, method TEXT, amount INTEGER, status TEXT,
     transaction_id TEXT UNIQUE, payment_url TEXT, created_at TEXT, updated_at TEXT,
-    refund_status TEXT, refund_amount INTEGER, refund_reason TEXT);
+    refund_status TEXT, refund_amount INTEGER, refund_reason TEXT, refunded_at TEXT);
+    CREATE TABLE payment_refund_transfers (id INTEGER PRIMARY KEY AUTOINCREMENT, tenant_id TEXT NOT NULL,
+      manual_transfer_ref TEXT NOT NULL CHECK (length(trim(manual_transfer_ref)) BETWEEN 1 AND 200),
+      payment_id TEXT NOT NULL, amount INTEGER NOT NULL CHECK (amount > 0), reason TEXT NOT NULL,
+      actor_id TEXT NOT NULL, created_at TEXT NOT NULL, UNIQUE (tenant_id, manual_transfer_ref));
     -- Mirrors 005_audit_logs.sql: the canonical audit writer tries the wide
     -- schema first and this older shape last, so a narrower table here would
     -- make every audit assertion fail for a reason that exists only in the test.
@@ -28,6 +33,7 @@ export function paymentSqliteDB(options: { canonicalStaff?: boolean; authVersion
     CREATE TABLE staff_login_identities (email TEXT PRIMARY KEY, staff_id TEXT NOT NULL UNIQUE REFERENCES users(id));
     CREATE TABLE payment_reconciliation_jobs (payment_id TEXT PRIMARY KEY, next_attempt_at TEXT NOT NULL,
       lease_until TEXT, lease_owner TEXT, last_checked_at TEXT, last_outcome TEXT, attempts INTEGER NOT NULL DEFAULT 0, updated_at TEXT NOT NULL);`);
+  sqlite.exec(readFileSync(new URL('../../../db/migrations/20261121_03_refund_atomicity_and_loyalty_work.sql', import.meta.url), 'utf8'));
   function prepare(sql: string) {
     let args: any[] = [];
     const run = () => {

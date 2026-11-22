@@ -160,7 +160,12 @@ export const StaffRoutes = {
     security: [{ BearerAuth: [] }],
     request: { params: StaffIdParamsSchema },
     responses: {
-      200: { description: 'Staff details', content: { 'application/json': { schema: SuccessResponseSchema(StaffResponseSchema) } } },
+      200: { description: 'Staff details', content: { 'application/json': { schema: SuccessResponseSchema(StaffResponseSchema.extend({
+        shifts_availability: z.discriminatedUnion('available', [
+          z.object({ available: z.literal(true) }),
+          z.object({ available: z.literal(false), reason: z.enum(['pilot_restricted', 'pilot_unconfigured']) }),
+        ]).describe('Quyền chấm công của cửa hàng / Store attendance availability'),
+      })) } } },
       404: { description: 'Not found', content: { 'application/json': { schema: ErrorResponseSchema } } },
     },
   },

@@ -106,11 +106,13 @@ export async function initCommand(): Promise<void> {
 
   console.log(chalk.bold('\n  Next steps:'));
   console.log('    1. Review the generated files in the output/ directory');
-  console.log('    2. Install Wrangler CLI if not already installed:');
+  console.log('    2. In output/wrangler.toml, set the client D1 database ID and auth KV namespace ID.');
+  console.log('       Trong output/wrangler.toml, điền mã cơ sở dữ liệu D1 và mã vùng lưu trữ xác thực KV của quán.');
+  console.log('    3. Install Wrangler CLI if not already installed:');
   console.log('       npm i -g wrangler');
-  console.log('    3. Deploy to Cloudflare:');
-  console.log('       aura-deploy deploy ' + answers.domainSlug);
+  console.log('    4. Deploy to Cloudflare:');
+  console.log('       aura-deploy deploy ' + answers.domainSlug + ' --api-origin https://aura-cafe-' + answers.domainSlug + '.<account-subdomain>.workers.dev');
   console.log('');
 
-  console.log(chalk.dim('  To deploy now, run: aura-deploy deploy ' + answers.domainSlug + '\n'));
+  console.log(chalk.dim('  Use --api-origin for the client API, not the flagship API. / Dùng địa chỉ API riêng của quán, không dùng API quán chính.\n'));
 }

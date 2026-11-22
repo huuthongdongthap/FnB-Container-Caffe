@@ -1,6 +1,11 @@
 import type { Hono } from 'hono';
+import type { Env } from 'worker/src/types/env';
+import { createLogger } from 'worker/src/middleware/logger';
+import { ShiftContractError } from '../../commands/shift-access';
 import { reconcileShiftCash, getReconciliationForShift } from '../policies/cash-reconciliation-policy';
 import type { ReconciliationInput } from '../model/reconciliation-types';
+
+const log = createLogger({ route: 'shift-reconciliation' });
 
 const RECONCILIATION_ROLES = new Set([
   'owner',
@@ -79,7 +84,7 @@ function resolveReconciliationTenant(
   return { tenantId: target.toLowerCase() === 'hq' ? '*' : target };
 }
 
-export function reconciliationRoutes(app: Hono<any>) {
+export function reconciliationRoutes(app: Hono<{ Bindings: Env; Variables: { user: Record<string, unknown>; tenantId: string } }>) {
   app.post('/api/shifts/:id/reconcile', async (c) => {
     const user = c.get('user') as unknown as Record<string, unknown> | undefined;
     if (!user) return c.json({ error: 'Unauthorized' }, 401);
@@ -119,6 +124,7 @@ export function reconciliationRoutes(app: Hono<any>) {
       return c.json({ success: false, error: 'Invalid JSON payload' }, 400);
     }
 
+    if (!body || typeof body !== 'object' || Array.isArray(body)) return c.json({ success: false, error: 'Invalid payload' }, 400);
     const shiftId = c.req.param('id');
     const staffId = String(user.sub || user.id || '');
     const denominations: ReconciliationInput['denominations'] = Array.isArray(body.denominations)
@@ -136,17 +142,15 @@ export function reconciliationRoutes(app: Hono<any>) {
     };
 
     try {
-      const result = await reconcileShiftCash(c.env, input, staffId, scope.tenantId);
+      const result = await reconcileShiftCash(c.env, input, staffId, scope.tenantId, String(user.role || ''));
       return c.json({ success: true, data: result }, 201);
     } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Failed to reconcile shift cash';
-      if (msg.includes('already been reconciled')) {
-        return c.json({ success: false, error: msg }, 409);
-      }
-      if (msg.includes('not found')) {
-        return c.json({ success: false, error: msg }, 404);
-      }
-      return c.json({ success: false, error: msg }, 400);
+      if (err instanceof ShiftContractError) return c.json({ success: false, error: err.message }, err.status);
+      log.error('Unexpected shift reconciliation error', {
+        shiftId,
+        message: err instanceof Error ? err.message : String(err),
+      });
+      return c.json({ success: false, error: 'Failed to reconcile shift cash' }, 500);
     }
   });
 

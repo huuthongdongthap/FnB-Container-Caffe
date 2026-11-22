@@ -1,9 +1,14 @@
 import { createMixpostClient } from '../../lib/mixpost-client';
+import { autoPostPeriod, createClaimedAutoPost } from './auto-post-claim';
 import { matchesTenantRow, resolvePilotStore } from '../../middleware/tenant';
 import type { D1Database } from '@cloudflare/workers-types';
 import type { PromotionRow } from './types';
 
-export async function autoPostNewPromotions(env: Record<string, unknown>, tenantOverride?: string): Promise<{ posted: number }> {
+export async function autoPostNewPromotions(env: Record<string, unknown>, tenantOverride?: string, now = new Date()): Promise<{ posted: number }> {
+  const job = 'new-promotions';
+  const period = autoPostPeriod(job, now);
+  if (!period) return { posted: 0 };
+
   const apiUrl = env.MIXPOST_API_URL as string | undefined;
   const apiToken = env.MIXPOST_API_TOKEN as string | undefined;
   const accountsStr = env.MIXPOST_ACCOUNTS as string | undefined;
@@ -27,7 +32,7 @@ export async function autoPostNewPromotions(env: Record<string, unknown>, tenant
   if (tenantId !== '*') {
     try {
       const stmt = db.prepare(
-        "SELECT * FROM promotions WHERE is_active = 1 AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ? LIMIT 50"
+        "SELECT * FROM promotions WHERE is_active = 1 AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
       );
       const bound = typeof (stmt as unknown as { bind?: (...args: unknown[]) => typeof stmt }).bind === 'function'
         ? stmt.bind(tenantId)
@@ -50,16 +55,25 @@ export async function autoPostNewPromotions(env: Record<string, unknown>, tenant
     return { posted: 0 };
   }
 
+  const MAX_POSTS_PER_RUN = 50;
   let posted = 0;
+  let attempts = 0;
   const client = createMixpostClient(apiUrl, apiToken);
 
   for (const promo of promotions) {
+    if (posted >= MAX_POSTS_PER_RUN || attempts >= MAX_POSTS_PER_RUN) break;
     try {
       const content = `🔥 Khuyen Mai ${promo.code}: Giam ${promo.percent}% — Aura Cafe\n#AuraCafe #KhuyenMai`;
-      await client.createPost({ accounts, content });
-      posted++;
+      // Older rows may lack an ID; code is the legacy primary key.
+      const key = promo.id ? `id:${promo.id}` : `code:${promo.code}`;
+      if (await createClaimedAutoPost(db, job, tenantId, key, now, () => {
+        attempts++;
+        return client.createPost({ accounts, content });
+      })) {
+        posted++;
+      }
     } catch {
-      // skip failed posts
+      // Continue processing other promotions if a claim or status write fails.
     }
   }
 

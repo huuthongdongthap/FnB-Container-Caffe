@@ -37,6 +37,10 @@ const runtimePath = runtimeCandidates.find(candidate => {
 if (!runtimePath) throw new Error('An installed stable Miniflare 4 runtime is required for offline flow tests');
 const { Miniflare, Log, LogLevel } = require(runtimePath);
 const runtimeRequire = createRequire(path.join(runtimePath, 'package.json'));
+export const runtimeVersions = {
+  miniflare: require(path.join(runtimePath, 'package.json')).version,
+  workerd: runtimeRequire('workerd/package.json').version,
+};
 const { build } = (() => {
   try { return require('esbuild'); } catch { return runtimeRequire('esbuild'); }
 })();
@@ -243,6 +247,9 @@ export async function createLocalRuntime() {
       .bind('dev-sup-1', 'supervisor-default', 'Supervisor Pad', 'audit-device-supervisor', pinHash, 'supervisor').run();
     await db.prepare('INSERT INTO customers (id,email,name,phone,loyalty_points,loyalty_tier,tenant_id) VALUES (?,?,?,?,?,?,?)')
       .bind('cust-review-1', 'customer-default@local-review.test', 'Khách Kiểm Thử', '0908887776', 120, 'silver', 'default').run();
+    // Fresh ephemeral in-memory fixture DB only; never auto-seed production readiness.
+    await db.prepare('INSERT INTO refund_tenant_readiness (tenant_id, reconciled_at, reconciled_by, evidence) VALUES (?,?,?,?)')
+      .bind('default', new Date().toISOString(), 'local-test', 'fresh empty in-memory fixture').run();
     await kv.put('user:customer-default@local-review.test', JSON.stringify({
       id: 'cust-review-1', email: 'customer-default@local-review.test', name: 'Khách Kiểm Thử', role: 'customer', password,
     }));

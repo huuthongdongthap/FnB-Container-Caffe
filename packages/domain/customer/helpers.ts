@@ -1,3 +1,4 @@
+import { canonicalPhone } from './phone';
 /**
  * Customer domain — shared helpers.
  *
@@ -15,7 +16,7 @@ export function genCustomerId(prefix = 'cus_'): string {
 /** Normalize a VN phone to bare digits (keeps leading 0 / 84). */
 export function normalizePhone(raw: string | null | undefined): string {
   if (!raw) return '';
-  return String(raw).replace(/\D/g, '');
+  return canonicalPhone(raw) ?? '';
 }
 
 /** True when a digit string is a plausible VN mobile/landline length. */

@@ -18,6 +18,147 @@ function matchesSessionTenant(row: Record<string, unknown> | null | undefined, t
   return matchesTenantRow(row, tenantId);
 }
 
+const endedSessionSql = "('closed', 'completed', 'no_show', 'abandoned', 'cancelled', 'canceled', 'expired')";
+const sessionConflict = (error: unknown) => /malformed JSON|session-write-conflict/i.test(String(error));
+
+interface SessionSchemaState {
+  seatingTable: 'cafe_tables' | 'tables' | null;
+  seatingMissing: Set<string>;
+  sessionMissing: Set<string>;
+}
+
+async function resolveSeatingSchema(
+  db: D1Database,
+): Promise<{ seatingTable: 'cafe_tables' | 'tables' | null; seatingMissing: Set<string> }> {
+  const seatingMissing = new Set<string>();
+  let seatingTable: 'cafe_tables' | 'tables' | null = 'cafe_tables';
+  try {
+    await db.prepare('SELECT id FROM cafe_tables LIMIT 0').all();
+  } catch (error) {
+    if (!/no such table:\s*cafe_tables\b/i.test(String(error))) throw error;
+    try {
+      await db.prepare('SELECT id FROM tables LIMIT 0').all();
+      seatingTable = 'tables';
+    } catch (legacyError) {
+      if (/no such table:\s*tables\b/i.test(String(legacyError))) {
+        return { seatingTable: null, seatingMissing };
+      }
+      throw legacyError;
+    }
+  }
+  for (const field of ['tenant_id', 'is_active', 'current_session_id', 'current_order_id', 'updated_at']) {
+    try {
+      await db.prepare(`SELECT ${field} FROM ${seatingTable} LIMIT 0`).all();
+    } catch (error) {
+      if (/no such column:/i.test(String(error))) seatingMissing.add(field);
+      else throw error;
+    }
+  }
+  return { seatingTable, seatingMissing };
+}
+
+// Retry only missing legacy table_sessions columns; a failed claim never falls back.
+async function atomicSessionWrite(
+  db: D1Database,
+  needsSeatingTable: boolean,
+  build: (schema: SessionSchemaState) => { claim: D1PreparedStatement; after: D1PreparedStatement[] },
+): Promise<void> {
+  const seating = needsSeatingTable
+    ? await resolveSeatingSchema(db)
+    : { seatingTable: null, seatingMissing: new Set<string>() };
+  const schema: SessionSchemaState = {
+    ...seating,
+    sessionMissing: new Set<string>(),
+  };
+  for (;;) {
+    try {
+      const { claim, after } = build(schema);
+      if (typeof db.batch === 'function') {
+        await db.batch([claim, sessionClaimAssertion(db), ...after]);
+      } else {
+        const result = await claim.run();
+        if (result?.meta && typeof result.meta.changes === 'number' && result.meta.changes === 0) {
+          throw new Error('session-write-conflict');
+        }
+        for (const stmt of after) {
+          await stmt.run();
+        }
+      }
+      return;
+    } catch (error) {
+      const message = String(error);
+      const column = message.match(/(?:no such column:\s*|has no column named\s+)(?:\w+\.)?(\w+)/i)?.[1];
+      if (!column || schema.sessionMissing.has(column) || schema.sessionMissing.size >= 20) throw error;
+      schema.sessionMissing.add(column);
+    }
+  }
+}
+
+function sessionClaimAssertion(db: D1Database): D1PreparedStatement {
+  return db.prepare("SELECT CASE WHEN changes() = 1 THEN 1 ELSE json('session-write-conflict') END");
+}
+
+function sessionTableWrite(
+  db: D1Database, schema: SessionSchemaState, tableId: string, tenant: string, sessionId: string, release: boolean,
+): D1PreparedStatement | null {
+  if (!schema.seatingTable) return null;
+  const table = schema.seatingTable;
+  const tableScoped = !schema.seatingMissing.has('tenant_id');
+  const sessionScoped = !schema.sessionMissing.has('tenant_id');
+  const scope = tableScoped ? " AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?" : '';
+  const binds: unknown[] = [release ? (table === 'tables' ? 'available' : 'Available') : 'Occupied'];
+  let fields = 'status = ?';
+  if (!schema.seatingMissing.has('current_session_id')) {
+    fields += ', current_session_id = ?';
+    binds.push(release ? null : sessionId);
+  }
+  if (release && !schema.seatingMissing.has('current_order_id')) fields += ', current_order_id = NULL';
+  if (!schema.seatingMissing.has('updated_at')) {
+    fields += ', updated_at = ?';
+    binds.push(new Date().toISOString());
+  }
+  binds.push(tableId);
+  if (tableScoped) binds.push(tenant);
+  // Do not release a table that another session already occupies or owns.
+  const ownerGuard = release && !schema.seatingMissing.has('current_session_id')
+    ? " AND (current_session_id IS NULL OR current_session_id = '' OR current_session_id = ?)"
+    : '';
+  if (ownerGuard) binds.push(sessionId);
+  const guard = release ? ` AND NOT EXISTS (SELECT 1 FROM table_sessions s WHERE s.table_id = ?
+    AND LOWER(COALESCE(s.status, 'active')) NOT IN ${endedSessionSql}${sessionScoped ? " AND COALESCE(NULLIF(TRIM(s.tenant_id), ''), 'default') = ?" : ''})` : '';
+  if (release) {
+    binds.push(tableId);
+    if (sessionScoped) binds.push(tenant);
+  }
+  return db.prepare(`UPDATE ${table} SET ${fields} WHERE id = ?${scope}${ownerGuard}${guard}`).bind(...binds);
+}
+
+async function mutateSessionAtomically(
+  db: D1Database, session: TableSession, tenant: string, values: Record<string, unknown>, release: boolean,
+): Promise<void> {
+  const row = session as unknown as Record<string, unknown>;
+  await atomicSessionWrite(db, release, (schema) => {
+    if (schema.sessionMissing.has('tenant_id') && tenant !== 'default') {
+      throw new Error('Tenant isolation requires tenant_id');
+    }
+    const fields = Object.entries(values).filter(([key]) => !schema.sessionMissing.has(key));
+    if (schema.sessionMissing.has('closed_at') && values.closed_at != null && !schema.sessionMissing.has('ended_at')) {
+      fields.push(['ended_at', values.closed_at]);
+    }
+    const guard = ['id IS ?', 'table_id IS ?', 'status IS ?'];
+    const binds: unknown[] = [...fields.map(([, value]) => value), session.id, session.table_id, session.status];
+    if ('updated_at' in row && !schema.sessionMissing.has('updated_at')) { guard.push('updated_at IS ?'); binds.push(row.updated_at); }
+    if ('tenant_id' in row && !schema.sessionMissing.has('tenant_id')) {
+      guard.push("COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"); binds.push(tenant);
+    }
+    const tableStmt = release ? sessionTableWrite(db, schema, session.table_id, tenant, session.id, true) : null;
+    return {
+      claim: db.prepare(`UPDATE table_sessions SET ${fields.map(([key]) => `${key} = ?`).join(', ')} WHERE ${guard.join(' AND ')}`).bind(...binds),
+      after: tableStmt ? [tableStmt] : [],
+    };
+  });
+}
+
 export function registerSessionHandlers(router: Hono<{ Bindings: Env }>): void {
   // GET /api/table-sessions — list sessions, filterable by table / status
   router.get('/', async (c) => {
@@ -350,68 +491,52 @@ export function registerSessionHandlers(router: Hono<{ Bindings: Env }>): void {
         : 'default';
     const effectiveSessionTenant = tenantId !== '*' ? tenantId : inheritedTableTenant;
     try {
-      try {
-        await db.prepare(
-          `INSERT INTO table_sessions (id, table_id, customer_id, customer_name, customer_phone, status, notes, tenant_id, created_at, updated_at)
-           VALUES (?, ?, ?, ?, ?, 'active', ?, ?, ?, ?)`
-        ).bind(
-          id,
-          tableId,
-          body.customer_id || null,
-          body.customer_name || null,
-          body.customer_phone || null,
-          body.notes || null,
-          effectiveSessionTenant,
-          now,
-          now
-        ).run();
-      } catch {
-        try {
-          await db.prepare(
-            `INSERT INTO table_sessions (id, table_id, status, tenant_id, started_at, created_at)
-             VALUES (?, ?, 'active', ?, ?, ?)`
-          ).bind(id, tableId, effectiveSessionTenant, now, now).run();
-        } catch (err) {
-          if (effectiveSessionTenant !== 'default') throw err;
-          await db.prepare(
-            `INSERT INTO table_sessions (id, table_id, customer_id, customer_name, customer_phone, status, notes, created_at, updated_at)
-             VALUES (?, ?, ?, ?, ?, 'active', ?, ?, ?)`
-          ).bind(
-            id,
-            tableId,
-            body.customer_id || null,
-            body.customer_name || null,
-            body.customer_phone || null,
-            body.notes || null,
-            now,
-            now
-          ).run();
+      await atomicSessionWrite(db, true, (schema) => {
+        if (schema.sessionMissing.has('tenant_id') && effectiveSessionTenant !== 'default') {
+          throw new Error('Tenant isolation requires tenant_id');
         }
-      }
-    } catch {
-      if (effectiveSessionTenant !== 'default') {
-        return c.json({ success: false, error: 'Failed to create table session' }, 500);
-      }
-      try {
-        await db.prepare(
-          `INSERT INTO table_sessions (id, table_id, status, started_at, created_at)
-           VALUES (?, ?, 'active', ?, ?)`
-        ).bind(id, tableId, now, now).run();
-      } catch {
-        // table_sessions table not present in minimal schema
-      }
+        const values: Record<string, unknown> = {
+          id, table_id: tableId, customer_id: body.customer_id || null,
+          customer_name: body.customer_name || null, customer_phone: body.customer_phone || null,
+          status: 'active', notes: body.notes || null, tenant_id: effectiveSessionTenant,
+          started_at: now, created_at: now, updated_at: now,
+        };
+        const entries = Object.entries(values).filter(([key]) => !schema.sessionMissing.has(key));
+        const sessionScoped = !schema.sessionMissing.has('tenant_id');
+        const tableScoped = !schema.seatingMissing.has('tenant_id');
+        const binds: unknown[] = [...entries.map(([, value]) => value)];
+        let tableGuard = '1 = 1';
+        if (schema.seatingTable) {
+          const activePointerGuard = schema.seatingMissing.has('current_session_id')
+            ? ''
+            : `AND (t.current_session_id IS NULL OR t.current_session_id = '' OR NOT EXISTS (
+                SELECT 1 FROM table_sessions cs WHERE cs.id = t.current_session_id
+                  AND LOWER(COALESCE(cs.status, 'active')) NOT IN ${endedSessionSql}
+              ))`;
+          tableGuard = `EXISTS (SELECT 1 FROM ${schema.seatingTable} t WHERE t.id = ?
+            ${tableScoped ? "AND COALESCE(NULLIF(TRIM(t.tenant_id), ''), 'default') = ?" : ''}
+            ${schema.seatingMissing.has('is_active') ? '' : 'AND COALESCE(t.is_active, 1) <> 0'}
+            ${activePointerGuard}
+            AND LOWER(COALESCE(t.status, 'available')) NOT IN ('maintenance', 'out_of_order', 'disabled'))`;
+          binds.push(tableId);
+          if (tableScoped) binds.push(effectiveSessionTenant);
+        }
+        binds.push(tableId);
+        if (sessionScoped) binds.push(effectiveSessionTenant);
+        const tableStmt = sessionTableWrite(db, schema, tableId, effectiveSessionTenant, id, false);
+        return {
+          claim: db.prepare(`INSERT INTO table_sessions (${entries.map(([key]) => key).join(', ')})
+            SELECT ${entries.map(() => '?').join(', ')} WHERE ${tableGuard}
+            AND NOT EXISTS (SELECT 1 FROM table_sessions s WHERE s.table_id = ?
+              AND LOWER(COALESCE(s.status, 'active')) NOT IN ${endedSessionSql}
+              ${sessionScoped ? "AND COALESCE(NULLIF(TRIM(s.tenant_id), ''), 'default') = ?" : ''})`).bind(...binds),
+          after: tableStmt ? [tableStmt] : [],
+        };
+      });
+    } catch (error) {
+      return c.json({ success: false, error: sessionConflict(error)
+        ? 'Table availability changed; refresh before retrying' : 'Failed to create table session' }, sessionConflict(error) ? 409 : 500);
     }
-
-    // Mark the table occupied.
-    await db.prepare(
-      "UPDATE cafe_tables SET status = ? WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
-    ).bind('Occupied', tableId, effectiveSessionTenant).run().catch(() =>
-      effectiveSessionTenant === 'default' || tenantId === '*'
-        ? db.prepare(
-            'UPDATE cafe_tables SET status = ? WHERE id = ?'
-          ).bind('Occupied', tableId).run()
-        : undefined
-    );
 
     let session: TableSession | null = null;
     try {
@@ -621,122 +746,15 @@ export function registerSessionHandlers(router: Hono<{ Bindings: Env }>): void {
     }
 
     try {
-      await db.prepare(
-        `UPDATE table_sessions
-         SET status = COALESCE(?, status),
-             closed_at = COALESCE(?, closed_at),
-             notes = COALESCE(?, notes),
-             updated_at = ?
-         WHERE id = ? AND status NOT IN ('closed', 'no_show', 'abandoned')
-           AND (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?)`
-      ).bind(nextStatus || null, closedAt, body.notes || null, now, id, effectiveTenant, effectiveTenant).run();
-    } catch {
-      let updatedEndedAt = false;
-      try {
-        await db.prepare(
-          `UPDATE table_sessions
-           SET status = COALESCE(?, status),
-               ended_at = COALESCE(?, ended_at)
-           WHERE id = ? AND status NOT IN ('closed', 'no_show', 'abandoned')
-             AND (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?)`
-        ).bind(nextStatus || null, closedAt, id, effectiveTenant, effectiveTenant).run();
-        updatedEndedAt = true;
-      } catch {
-        updatedEndedAt = false;
-      }
-      if (!updatedEndedAt) {
-        if (!allowUnscopedFallback) {
-          return c.json({ success: false, error: 'Failed to update table session' }, 500);
-        }
-        try {
-          await db.prepare(
-            `UPDATE table_sessions
-             SET status = COALESCE(?, status),
-                 closed_at = COALESCE(?, closed_at),
-                 notes = COALESCE(?, notes),
-                 updated_at = ?
-             WHERE id = ? AND status NOT IN ('closed', 'no_show', 'abandoned')`
-          ).bind(nextStatus || null, closedAt, body.notes || null, now, id).run();
-        } catch {
-          await db.prepare(
-            `UPDATE table_sessions
-             SET status = COALESCE(?, status),
-                 ended_at = COALESCE(?, ended_at)
-             WHERE id = ? AND status NOT IN ('closed', 'no_show', 'abandoned')`
-          ).bind(nextStatus || null, closedAt, id).run();
-        }
-      }
-    }
-    if (body.total_amount !== undefined && body.total_amount !== null) {
-      try {
-        await db.prepare(
-          `UPDATE table_sessions
-           SET total_amount = ?, updated_at = ?
-           WHERE id = ? AND status NOT IN ('closed', 'no_show', 'abandoned')
-             AND (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?)`
-        ).bind(Number(body.total_amount), now, id, effectiveTenant, effectiveTenant).run();
-      } catch {
-        if (allowUnscopedFallback) {
-          try {
-            await db.prepare(
-              `UPDATE table_sessions
-               SET total_amount = ?, updated_at = ?
-               WHERE id = ? AND status NOT IN ('closed', 'no_show', 'abandoned')`
-            ).bind(Number(body.total_amount), now, id).run();
-          } catch {
-            // Optional column update on minimal schema
-          }
-        }
-      }
-    }
-    if (body.guest_count !== undefined && body.guest_count !== null) {
-      try {
-        await db.prepare(
-          `UPDATE table_sessions
-           SET guest_count = ?, updated_at = ?
-           WHERE id = ? AND status NOT IN ('closed', 'no_show', 'abandoned')
-             AND (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?)`
-        ).bind(Number(body.guest_count), now, id, effectiveTenant, effectiveTenant).run();
-      } catch {
-        if (allowUnscopedFallback) {
-          try {
-            await db.prepare(
-              `UPDATE table_sessions
-               SET guest_count = ?, updated_at = ?
-               WHERE id = ? AND status NOT IN ('closed', 'no_show', 'abandoned')`
-            ).bind(Number(body.guest_count), now, id).run();
-          } catch {
-            // Optional column update on minimal schema
-          }
-        }
-      }
-    }
-
-    // Free the table when the session ends.
-    if (isTerminalTransition) {
-      await db.prepare(
-        "UPDATE cafe_tables SET status = ?, current_order_id = NULL, current_session_id = NULL WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
-      ).bind('Available', session.table_id, effectiveTenant).run().catch(() =>
-        db.prepare(
-          "UPDATE cafe_tables SET status = ? WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
-        ).bind('Available', session.table_id, effectiveTenant).run().catch(() =>
-          db.prepare(
-            "UPDATE tables SET status = ? WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
-          ).bind('available', session.table_id, effectiveTenant).run().catch(() => {
-            if (allowUnscopedFallback) {
-              return db.prepare(
-                'UPDATE cafe_tables SET status = ?, current_order_id = NULL, current_session_id = NULL WHERE id = ?'
-              ).bind('Available', session.table_id).run().catch(() =>
-                db.prepare(
-                  'UPDATE cafe_tables SET status = ? WHERE id = ?'
-                ).bind('Available', session.table_id).run().catch(() =>
-                  db.prepare('UPDATE tables SET status = ? WHERE id = ?').bind('available', session.table_id).run()
-                )
-              );
-            }
-          })
-        )
-      );
+      const values: Record<string, unknown> = { status: nextStatus || session.status, updated_at: now };
+      if (closedAt != null) values.closed_at = closedAt;
+      if (body.notes) values.notes = body.notes;
+      if (body.total_amount !== undefined && body.total_amount !== null) values.total_amount = Number(body.total_amount);
+      if (body.guest_count !== undefined && body.guest_count !== null) values.guest_count = Number(body.guest_count);
+      await mutateSessionAtomically(db, session, effectiveTenant, values, isTerminalTransition);
+    } catch (error) {
+      return c.json({ success: false, error: sessionConflict(error)
+        ? 'Session changed; refresh before retrying' : 'Failed to update table session' }, sessionConflict(error) ? 409 : 500);
     }
 
     const updated = (await db.prepare(
@@ -877,64 +895,13 @@ export function registerSessionHandlers(router: Hono<{ Bindings: Env }>): void {
 
     const now = new Date().toISOString();
     try {
-      await db.prepare(
-        `UPDATE table_sessions
-         SET status = ?, notes = COALESCE(?, notes), closed_at = ?, updated_at = ?
-         WHERE id = ? AND status NOT IN ('closed', 'completed', 'no_show', 'abandoned')
-           AND (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?)`
-      ).bind(targetCloseStatus, closeNotes, now, now, id, effectiveTenant, effectiveTenant).run();
-    } catch {
-      try {
-        await db.prepare(
-          `UPDATE table_sessions
-           SET status = ?, closed_at = ?, updated_at = ?
-           WHERE id = ? AND status NOT IN ('closed', 'completed', 'no_show', 'abandoned')
-             AND (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?)`
-        ).bind(targetCloseStatus, now, now, id, effectiveTenant, effectiveTenant).run();
-      } catch {
-        try {
-          await db.prepare(
-            `UPDATE table_sessions
-             SET status = ?, ended_at = ?
-             WHERE id = ? AND status NOT IN ('closed', 'completed', 'no_show', 'abandoned')
-               AND (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?)`
-          ).bind(targetCloseStatus, now, id, effectiveTenant, effectiveTenant).run();
-        } catch {
-          if (!allowUnscopedFallback) {
-            return c.json({ success: false, error: 'Failed to close table session' }, 500);
-          }
-          await db.prepare(
-            `UPDATE table_sessions SET status = ?, notes = COALESCE(?, notes), closed_at = ?, updated_at = ? WHERE id = ?`
-          ).bind(targetCloseStatus, closeNotes, now, now, id).run().catch(() =>
-            db.prepare(
-              `UPDATE table_sessions SET status = ?, closed_at = ?, updated_at = ? WHERE id = ?`
-            ).bind(targetCloseStatus, now, now, id).run().catch(() =>
-              db.prepare(`UPDATE table_sessions SET status = ?, ended_at = ? WHERE id = ?`).bind(targetCloseStatus, now, id).run()
-            )
-          );
-        }
-      }
+      await mutateSessionAtomically(db, session, effectiveTenant, {
+        status: targetCloseStatus, notes: closeNotes, closed_at: now, updated_at: now,
+      }, true);
+    } catch (error) {
+      return c.json({ success: false, error: sessionConflict(error)
+        ? 'Session changed; refresh before retrying' : 'Failed to close table session' }, sessionConflict(error) ? 409 : 500);
     }
-
-    await db.prepare(
-      "UPDATE cafe_tables SET status = ?, current_order_id = NULL, current_session_id = NULL WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
-    ).bind('Available', session.table_id, effectiveTenant).run().catch(() =>
-      db.prepare(
-        "UPDATE cafe_tables SET status = ? WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
-      ).bind('Available', session.table_id, effectiveTenant).run().catch(() =>
-        db.prepare(
-          "UPDATE tables SET status = ? WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
-        ).bind('available', session.table_id, effectiveTenant).run().catch(() => {
-          if (allowUnscopedFallback) {
-            return db.prepare('UPDATE cafe_tables SET status = ?, current_order_id = NULL, current_session_id = NULL WHERE id = ?').bind('Available', session.table_id).run().catch(() =>
-              db.prepare('UPDATE cafe_tables SET status = ? WHERE id = ?').bind('Available', session.table_id).run().catch(() =>
-                db.prepare('UPDATE tables SET status = ? WHERE id = ?').bind('available', session.table_id).run()
-              )
-            );
-          }
-        })
-      )
-    );
 
     const updated = (await db.prepare('SELECT * FROM table_sessions WHERE id = ?').bind(id).first().catch(() => null)) as TableSession | null;
     return c.json({ success: true, data: updated ?? { ...session, status: targetCloseStatus, notes: closeNotes, closed_at: now } });

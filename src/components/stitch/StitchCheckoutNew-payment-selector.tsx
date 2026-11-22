@@ -12,7 +12,8 @@ export function PaymentMethodSelector({
   selected,
   onSelect,
 }: Readonly<PaymentMethodSelectorProps>) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const isEnglish = i18n?.language?.toLowerCase().startsWith('en') ?? false;
 
   return (
     <section>
@@ -46,9 +47,8 @@ export function PaymentMethodSelector({
               <div
                 className={cn(
                   glassPanelBg,
-                  'p-6 rounded-xl flex items-center justify-between border border-[rgba(var(--aura-chrome-light),0.1)] transition-all',
-                  isSelected && isPayos && 'border-[var(--aura-chrome-bright)] bg-[color-mix(in_srgb,var(--aura-chrome-bright)_5%,transparent)] shadow-[0_0_15px_rgba(var(--aura-chrome-light),0.2)]',
-                  isSelected && !isPayos && 'border-[var(--aura-text-body, #c6c6c7)] bg-[rgba(var(--aura-chrome-light),0.05)]',
+                  'p-6 rounded-xl flex items-center justify-between border border-[rgba(var(--aura-chrome-light),0.1)] transition-all peer-focus-visible:ring-2 peer-focus-visible:ring-[var(--aura-chrome-bright)]',
+                  isSelected && 'border-[var(--aura-chrome-bright)] bg-[color-mix(in_srgb,var(--aura-chrome-bright)_5%,transparent)] shadow-[0_0_15px_rgba(var(--aura-chrome-light),0.2)]',
                   isPayos && !isSelected && 'shadow-[0_0_15px_rgba(var(--aura-chrome-light),0.2)]',
                 )}
               >
@@ -64,11 +64,20 @@ export function PaymentMethodSelector({
                     <IconComp className="w-6 h-6" aria-hidden="true" />
                   </div>
                   <div>
-                    <div className="font-body text-[14px] leading-[1.2] font-medium tracking-[0.1em] uppercase text-[var(--aura-chrome-bright, #E8EEF3)]">
-                      {option.label}
+                    <div className="font-body text-[14px] leading-[1.2] font-medium tracking-[0.1em] uppercase text-[var(--aura-chrome-bright,#E8EEF3)]">
+                      {option.value === 'cod'
+                        ? t('adminOrders.paymentCash', isEnglish ? 'Cash' : 'Tiền mặt')
+                        : option.label}
                     </div>
                     <div className="text-xs text-[var(--aura-chrome-soft)]">
-                      {t(option.descriptionKey)}
+                      {option.value === 'cod'
+                        ? t(
+                            'stitch.codFullDesc',
+                            isEnglish
+                              ? 'Pay in cash on delivery, at the counter, or at your table'
+                              : 'Thanh toán tiền mặt khi giao hàng, nhận tại quầy hoặc dùng tại bàn',
+                          )
+                        : t(option.descriptionKey)}
                     </div>
                   </div>
                 </div>

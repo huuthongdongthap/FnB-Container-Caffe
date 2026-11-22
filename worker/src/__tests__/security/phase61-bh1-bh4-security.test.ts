@@ -1,3 +1,4 @@
+// @vitest-environment node
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { Hono } from 'hono';
 import { OpenAPIHono } from '@hono/zod-openapi';
@@ -23,6 +24,7 @@ import { registerRewardHandlers } from '../../routes/openapi-loyalty-handlers/re
 import { adminLoyaltyRouter } from '../../routes/admin-loyalty';
 import { handleSpendCashback } from '../../tree/loyalty/spend-cashback-handler';
 import { issueStaffSession } from '../../lib/staff-session';
+import { orderCreationFixture } from '../integrations/order-creation-fixture';
 
 describe('Phase 61 Security Regression Suite (BH1-BH4)', () => {
   beforeEach(() => {
@@ -546,64 +548,34 @@ describe('Phase 61 Security Regression Suite (BH1-BH4)', () => {
       );
       expect(cancelledRes.status).toBe(400);
 
-      let rolledBackQuota = false;
-      const throwingDeductDb = {
-        prepare: (sql: string) => ({
-          bind: () => ({
-            first: async () => {
-              if (sql.includes('FROM loyalty_rewards')) {
-                return {
-                  id: 'rwd_1',
-                  name: 'Free Drink',
-                  points_cost: 50,
-                  is_active: 1,
-                  max_redemptions: 10,
-                  current_redemptions: 1,
-                  tenant_id: 'store-a',
-                };
-              }
-              if (sql.includes('FROM loyalty_accounts')) {
-                throw new Error('no such table: loyalty_accounts');
-              }
-              if (sql.includes('FROM customers')) {
-                return {
-                  id: 'cust_1',
-                  customer_id: 'cust_1',
-                  loyalty_points: 100,
-                  current_points: 100,
-                  loyalty_tier: 'bronze',
-                  tenant_id: 'store-a',
-                };
-              }
-              return null;
-            },
-            run: async () => {
-              if (sql.includes('UPDATE customers') && sql.includes('loyalty_points = loyalty_points - ?')) {
-                throw new Error('D1 write error during customer points deduction');
-              }
-              if (sql.includes('current_redemptions = MAX(0')) {
-                rolledBackQuota = true;
-              }
-              return { meta: { changes: 1 } };
-            },
-          }),
-        }),
-      };
-
-      const failClosedRes = await app.request(
-        '/api/loyalty/rewards/redeem',
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            rewardId: 'rwd_1',
-            idempotencyKey: 'idem_fail_closed_1',
-          }),
-        },
-        { AURA_DB: throwingDeductDb as any, PILOT_STORE: 'store-a' } as any
-      );
-      expect(failClosedRes.status).toBe(409);
-      expect(rolledBackQuota).toBe(true);
+      const deduction = orderCreationFixture();
+      try {
+        deduction.sqlite.exec(`DROP TABLE loyalty_accounts;
+          INSERT INTO customers(id,tenant_id,loyalty_points) VALUES ('cust_1','store-a',100);
+          INSERT INTO loyalty_rewards(id,name,tenant_id,points_cost,max_redemptions,current_redemptions,stock)
+            VALUES ('rwd_1','Free Drink','store-a',50,10,1,9);
+          CREATE TRIGGER fail_customer_debit BEFORE UPDATE OF loyalty_points ON customers
+            BEGIN SELECT RAISE(ABORT,'D1 write error during customer points deduction'); END;`);
+        const failClosedRes = await app.request(
+          '/api/loyalty/rewards/redeem',
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ rewardId: 'rwd_1', idempotencyKey: 'idem_fail_closed_1' }),
+          },
+          { ...deduction.env, PILOT_STORE: 'store-a' } as any
+        );
+        // Storage failure is unavailable, not a successful debit followed by compensation.
+        expect(failClosedRes.status).toBe(503);
+        expect(deduction.sqlite.prepare('SELECT loyalty_points FROM customers').get()?.loyalty_points).toBe(100);
+        expect(deduction.sqlite.prepare('SELECT current_redemptions,stock FROM loyalty_rewards').get())
+          .toMatchObject({ current_redemptions: 1, stock: 9 });
+        for (const table of ['loyalty_transactions', 'loyalty_point_logs', 'loyalty_redemptions', 'user_rewards']) {
+          expect(deduction.sqlite.prepare(`SELECT COUNT(*) n FROM ${table}`).get()?.n).toBe(0);
+        }
+      } finally {
+        deduction.sqlite.close();
+      }
     });
 
     it('rejects non-HQ default-tenant owner requesting X-Tenant-ID: * or ?tenantId=store-b on admin-loyalty', async () => {

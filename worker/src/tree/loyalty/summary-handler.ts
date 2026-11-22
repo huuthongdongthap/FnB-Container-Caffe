@@ -150,39 +150,117 @@ export async function handleSummary(c: Context<{ Bindings: Env }>) {
     }
   }
 
+  const isSchemaError = (err: unknown): boolean =>
+    /no such (table|column)/i.test(String((err as Error)?.message ?? err));
+  const isMissingTable = (err: unknown): boolean =>
+    /no such table/i.test(String((err as Error)?.message ?? err));
+  const isMissingTenantCol = (err: unknown): boolean =>
+    /no such column:\s*tenant_id\b/i.test(String((err as Error)?.message ?? err));
+
   let activeRewards: { cnt: number }[] = [];
-  try {
-    const res = await db.prepare(
-      "SELECT COUNT(*) as cnt FROM user_rewards WHERE customer_id = ? AND status IN ('active', 'pending') AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
-    ).bind(cust.id, tenantId).all<{ cnt: number }>();
-    activeRewards = res.results || [];
-  } catch {
+  const tryActiveCount = async (sql: string, args: unknown[]): Promise<boolean> => {
     try {
-      const res = await db.prepare(
-        "SELECT COUNT(*) as cnt FROM loyalty_redemptions WHERE customer_id = ? AND status IN ('active', 'pending') AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
-      ).bind(cust.id, tenantId).all<{ cnt: number }>();
+      const res = await db.prepare(sql).bind(...args).all<{ cnt: number }>();
       activeRewards = res.results || [];
-    } catch {
-      if (tenantId === 'default') {
+      return true;
+    } catch (err) {
+      if (!isSchemaError(err)) throw err;
+      return false;
+    }
+  };
+  // Count active/pending vouchers across both legacy user_rewards and canonical
+  // loyalty_redemptions, deduplicated by code so dual-written vouchers count once.
+  const tenantUnionQueries: Array<[string, unknown[]]> = [
+    [
+      "SELECT COUNT(*) as cnt FROM (SELECT COALESCE(NULLIF(TRIM(code), ''), 'ur:' || id) AS voucher_key FROM user_rewards WHERE customer_id = ? AND status IN ('active', 'pending') AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ? UNION SELECT COALESCE(NULLIF(TRIM(code), ''), NULLIF(TRIM(voucher_code), ''), 'lr:' || id) AS voucher_key FROM loyalty_redemptions WHERE customer_id = ? AND status IN ('active', 'pending') AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?)",
+      [cust.id, tenantId, cust.id, tenantId],
+    ],
+    [
+      "SELECT COUNT(*) as cnt FROM (SELECT COALESCE(NULLIF(TRIM(code), ''), 'ur:' || id) AS voucher_key FROM user_rewards WHERE customer_id = ? AND status IN ('active', 'pending') AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ? UNION SELECT COALESCE(NULLIF(TRIM(code), ''), 'lr:' || id) AS voucher_key FROM loyalty_redemptions WHERE customer_id = ? AND status IN ('active', 'pending') AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?)",
+      [cust.id, tenantId, cust.id, tenantId],
+    ],
+    [
+      "SELECT COUNT(*) as cnt FROM (SELECT COALESCE(NULLIF(TRIM(code), ''), 'ur:' || id) AS voucher_key FROM user_rewards WHERE customer_id = ? AND status IN ('active', 'pending') AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ? UNION SELECT COALESCE(NULLIF(TRIM(voucher_code), ''), 'lr:' || id) AS voucher_key FROM loyalty_redemptions WHERE customer_id = ? AND status IN ('active', 'pending') AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?)",
+      [cust.id, tenantId, cust.id, tenantId],
+    ],
+  ];
+  let countedActiveRewards = false;
+  for (const [sql, args] of tenantUnionQueries) {
+    if (await tryActiveCount(sql, args)) {
+      countedActiveRewards = true;
+      break;
+    }
+  }
+  if (!countedActiveRewards) {
+    // Query each store independently on schema mismatch so asymmetric schemas
+    // (e.g., one table missing or lacking tenant_id) still count both stores
+    // without dropping tenant scope on tables that have tenant_id.
+    type VoucherRow = { id: string; code?: string | null; voucher_code?: string | null };
+    const fetchTableRows = async (
+      scopedQueries: string[],
+      legacyDefaultQueries: string[],
+    ): Promise<VoucherRow[]> => {
+      let sawMissingTenantCol = false;
+      for (const sql of scopedQueries) {
         try {
-          const res = await db.prepare(
-            "SELECT COUNT(*) as cnt FROM user_rewards WHERE customer_id = ? AND status IN ('active', 'pending')"
-          ).bind(cust.id).all<{ cnt: number }>();
-          activeRewards = res.results || [];
-        } catch {
+          const res = await db.prepare(sql).bind(cust.id, tenantId).all<VoucherRow>();
+          return res.results || [];
+        } catch (err) {
+          if (!isSchemaError(err)) throw err;
+          if (isMissingTable(err)) return [];
+          if (isMissingTenantCol(err)) sawMissingTenantCol = true;
+        }
+      }
+      if (sawMissingTenantCol && tenantId === 'default') {
+        for (const sql of legacyDefaultQueries) {
           try {
-            const res = await db.prepare(
-              "SELECT COUNT(*) as cnt FROM loyalty_redemptions WHERE customer_id = ? AND status IN ('active', 'pending')"
-            ).bind(cust.id).all<{ cnt: number }>();
-            activeRewards = res.results || [];
-          } catch {
-            activeRewards = [];
+            const res = await db.prepare(sql).bind(cust.id).all<VoucherRow>();
+            return res.results || [];
+          } catch (err) {
+            if (!isSchemaError(err)) throw err;
+            if (isMissingTable(err)) return [];
           }
         }
-      } else {
-        activeRewards = [];
       }
+      return [];
+    };
+
+    const urRows = await fetchTableRows(
+      [
+        "SELECT id, code FROM user_rewards WHERE customer_id = ? AND status IN ('active', 'pending') AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?",
+        "SELECT id FROM user_rewards WHERE customer_id = ? AND status IN ('active', 'pending') AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?",
+      ],
+      [
+        "SELECT id, code FROM user_rewards WHERE customer_id = ? AND status IN ('active', 'pending')",
+        "SELECT id FROM user_rewards WHERE customer_id = ? AND status IN ('active', 'pending')",
+      ],
+    );
+    const lrRows = await fetchTableRows(
+      [
+        "SELECT id, code, voucher_code FROM loyalty_redemptions WHERE customer_id = ? AND status IN ('active', 'pending') AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?",
+        "SELECT id, code FROM loyalty_redemptions WHERE customer_id = ? AND status IN ('active', 'pending') AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?",
+        "SELECT id, voucher_code FROM loyalty_redemptions WHERE customer_id = ? AND status IN ('active', 'pending') AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?",
+        "SELECT id FROM loyalty_redemptions WHERE customer_id = ? AND status IN ('active', 'pending') AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?",
+      ],
+      [
+        "SELECT id, code, voucher_code FROM loyalty_redemptions WHERE customer_id = ? AND status IN ('active', 'pending')",
+        "SELECT id, code FROM loyalty_redemptions WHERE customer_id = ? AND status IN ('active', 'pending')",
+        "SELECT id, voucher_code FROM loyalty_redemptions WHERE customer_id = ? AND status IN ('active', 'pending')",
+        "SELECT id FROM loyalty_redemptions WHERE customer_id = ? AND status IN ('active', 'pending')",
+      ],
+    );
+    const voucherKeys = new Set<string>();
+    for (const row of urRows) {
+      const code = typeof row.code === 'string' ? row.code.trim() : '';
+      voucherKeys.add(code || `ur:${String(row.id)}`);
     }
+    for (const row of lrRows) {
+      const code =
+        (typeof row.code === 'string' ? row.code.trim() : '') ||
+        (typeof row.voucher_code === 'string' ? row.voucher_code.trim() : '');
+      voucherKeys.add(code || `lr:${String(row.id)}`);
+    }
+    activeRewards = [{ cnt: voucherKeys.size }];
   }
 
   const sevenDaysFromNow = new Date(Date.now() + 7 * 86400000).toISOString();

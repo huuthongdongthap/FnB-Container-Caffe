@@ -22,6 +22,7 @@ export interface OrderData {
   items: OrderItem[];
   total: string;
   cancelledReason?: string;
+  additionalActions?: React.ReactNode;
 }
 
 /* ─── UI Types ───────────────────────────────────────────────────────── */

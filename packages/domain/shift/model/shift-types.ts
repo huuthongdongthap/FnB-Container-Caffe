@@ -13,6 +13,7 @@ export interface ShiftRow {
   attendance_state: 'scheduled' | 'active' | 'completed' | 'cancelled' | null;
   start_time: string | null;
   end_time: string | null;
+  opening_cash?: number;
   notes: string | null;
   created_at: string;
 }

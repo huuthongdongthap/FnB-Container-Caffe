@@ -6,6 +6,7 @@ import { getDatabase, matchesTenantRow } from '../../lib/db';
 import { hashPassword } from '../../lib/jwt';
 import { getTenantId, isHQSuperAdmin } from '../../middleware/tenant';
 import { loadStaffAccount, SessionUnavailableError } from '../../lib/staff-session';
+import { PilotStoreError, resolvePilotStore } from '../../lib/pilot-store';
 import { staffManagementDenial, staffMutationGuard } from '../../lib/staff-account-mutation';
 import { createStaffIdentity, staffEmailInUse } from '../../lib/staff-login-identity';
 
@@ -272,7 +273,7 @@ export function registerStaffHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
     if (!account.ok || (tenantId !== '*' && ((account.account.tenant_id || '').trim() || 'default') !== tenantId)) return c.json({ success: false, error: 'Staff not found' }, 404);
 
 
-    let staff: any = null;
+    let staff: { id: string; name: string; email?: string | null; phone?: string | null; role: string; locale?: string; is_active: number; avatar_url?: string | null; hire_date?: string | null; created_at: string; updated_at: string } | null = null;
     try {
       staff = await db.prepare(
         `SELECT id, name, email, phone, role, locale, is_active, avatar_url, hire_date, created_at, updated_at
@@ -290,11 +291,30 @@ export function registerStaffHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
     }
 
     const targetStaffTenant = (account.account.tenant_id || '').trim() || 'default';
-    const scope = await shiftScope(c.env, c.get('user'), tenantId === '*' ? targetStaffTenant : tenantId);
-    const shifts = await listShifts(scope, { staffId: id, limit: 10 });
-    const attendance = await listShifts(scope, { staffId: id, attendanceOnly: true, limit: 10 });
-    const shiftResults = shifts.rows.map(shiftDto);
-    const attendanceResults = attendance.rows.map(attendanceDto);
+    let shiftsAvailability: { available: true } | { available: false; reason: 'pilot_restricted' | 'pilot_unconfigured' } = { available: true };
+    const hasExplicitPilot = c.env.PILOT_TENANT_ID !== undefined || c.env.ENVIRONMENT === 'production' || c.env.NODE_ENV === 'production';
+    if (hasExplicitPilot) {
+      try {
+        const pilotTenant = resolvePilotStore(c.env);
+        if (!tenantCheck.isHq && targetStaffTenant !== pilotTenant) {
+          shiftsAvailability = { available: false, reason: 'pilot_restricted' };
+        }
+      } catch (error) {
+        if (!(error instanceof PilotStoreError)) throw error;
+        shiftsAvailability = { available: false, reason: 'pilot_unconfigured' };
+      }
+    }
+    let shiftResults: ReturnType<typeof shiftDto>[] = [];
+    let attendanceResults: ReturnType<typeof attendanceDto>[] = [];
+    // Profile authorization above is independent of the optional attendance pilot.
+    // All other scope, authorization and storage errors must still fail closed.
+    if (shiftsAvailability.available) {
+      const scope = await shiftScope(c.env, c.get('user'), tenantId === '*' ? targetStaffTenant : tenantId);
+      const shifts = await listShifts(scope, { staffId: id, limit: 10 });
+      const attendance = await listShifts(scope, { staffId: id, attendanceOnly: true, limit: 10 });
+      shiftResults = shifts.rows.map(shiftDto);
+      attendanceResults = attendance.rows.map(attendanceDto);
+    }
 
     const caller = c.get('user');
     const canViewUnmaskedPii = Boolean(
@@ -312,6 +332,7 @@ export function registerStaffHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
         hireDate: staff.hire_date ?? null,
         createdAt: staff.created_at,
         updatedAt: staff.updated_at,
+        shifts_availability: shiftsAvailability,
         recentShifts: shiftResults,
         recentAttendance: attendanceResults,
       },

@@ -65,6 +65,31 @@ Chay tu repo root. Script se: (Run from repo root. It will:)
 2. Deploy frontend len Cloudflare Pages
 3. Deploy Worker (API) va pass `GIT_COMMIT_SHA`
 
+### Quán khách hàng riêng / Separate client café
+
+Luồng `aura-deploy` khác với lệnh triển khai quán chính ở trên. Không dùng địa chỉ API của quán chính cho khách hàng.
+The `aura-deploy` flow is separate from the flagship command above. Never use the flagship API address for a client.
+
+1. Chạy `aura-deploy init`, rồi điền mã D1 và KV riêng của quán trong `setup/aura-deploy/output/wrangler.toml`. Công cụ không tự tạo tài nguyên.
+   Run `aura-deploy init`, then fill in the client's D1 and KV IDs in `setup/aura-deploy/output/wrangler.toml`. The tool does not create resources.
+2. Lấy địa chỉ HTTPS của API riêng từ tài khoản Cloudflare. Không đoán tên tài khoản, không đưa mật khẩu hoặc mã truy cập vào địa chỉ.
+   Obtain the client's HTTPS API origin from Cloudflare. Do not guess the account hostname or include credentials or access tokens.
+3. Kiểm tra ngoại tuyến trước; thay `<slug>` và địa chỉ ví dụ bằng giá trị của quán.
+   Validate offline first; replace `<slug>` and the example address with the client's values.
+
+   ```text
+   aura-deploy deploy <slug> --api-origin https://api.client.example.com --dry-run
+   ```
+
+4. Khi được phép triển khai, bỏ `--dry-run`. Địa chỉ API là bắt buộc; chỉ dùng HTTPS, không có đường dẫn, cổng, thông tin đăng nhập hoặc tham số. Với địa chỉ `workers.dev`, tên Worker phải là `aura-cafe-<slug>`.
+   When deployment is authorized, remove `--dry-run`. The API origin is required and must use HTTPS without a path, port, credentials or query. For `workers.dev`, the Worker name must be `aura-cafe-<slug>`.
+
+Trang mặc định là `https://aura-cafe-<slug>.pages.dev`. Nếu dùng `--project`, tên miền `pages.dev` trong cấu hình thương hiệu phải khớp tên dự án. Tên miền riêng vẫn được chấp nhận.
+The default site is `https://aura-cafe-<slug>.pages.dev`. With `--project`, a configured `pages.dev` brand hostname must match the project. Custom domains remain allowed.
+
+Bản dựng dùng API riêng cho ứng dụng, chuyển tiếp `/api/*` và quyền kết nối trình duyệt; không sửa mẫu dùng chung. Kiểm tra ngoại tuyến không xác nhận tài nguyên đã tồn tại, quyền tài khoản hoặc kết nối tên miền.
+The build uses the client API for the application, `/api/*` redirects and browser connection permissions without changing shared templates. Offline validation does not verify resource existence, account permissions or domain connectivity.
+
 ### Cac Co / Available Flags
 
 | Flag | Tac Dung / Effect |
@@ -144,8 +169,21 @@ cd worker
 npx wrangler d1 execute fnb-caffe-db --remote --file=db/migrations/YYYYMMDD_NN_description.sql
 ```
 
-**Luu y:** Chay migration truoc hoac sau deploy -- khong anh huong toi availability vi Worker xu-ly gracefully.
-(Run migrations before or after deploy -- no downtime since Worker handles missing columns gracefully.)
+**Luu y:** Ap dung migration duoc phe duyet **truoc** khi trien khai Worker phu thuoc schema moi. Khong gia dinh Worker se bo qua bang/cot thieu; luong tai chinh phai dung an toan thay vi ghi du lieu khong du dieu kien.
+(Apply explicitly approved migrations **before** deploying the Worker that requires them. Missing financial schema must fail closed, not silently bypass integrity guards.)
+
+---
+
+## 5a. Financial cutover prerequisites — manual refunds and collecting shifts
+
+This release is **not** production-approved by a successful local build or PR merge.
+
+- Apply explicitly approved forward migrations before the dependent Worker: `20261121_01_refund_manual_transfer_ledger.sql`, `20261121_02_cash_payment_attribution.sql`, then `20261121_03_refund_atomicity_and_loyalty_work.sql`. The additive third migration also completes installations where the original transfer-ledger migration was already applied. The refund transfer ledger and collecting-shift attribution tables are durable financial evidence, not disposable caches.
+- Manual refunds confirm a bank transfer already made outside the application; they do not initiate a PayOS refund. Verify the original payment, tenant, amount and bank transfer reference before recording a tranche.
+- Historical audit writes were best-effort. An empty new ledger, valid audit JSON, or matching totals cannot certify that all past references were captured. Manual refunds must remain blocked for a tenant until an authorized financial reconciliation establishes its historical reference namespace, reserves prior references, resolves collisions and records evidence. Do not enable a live tenant using test fixture readiness rows.
+- A collecting shift's reconciliation is its cash cutoff even if clock-out has not yet completed. Rejected collection is not permission to collect cash a second time: first verify whether money was already received, then escalate and retry only through the approved workflow.
+- Preserve transfer records, pending loyalty work, reversal ledgers and cash attribution across a code rollback. Never execute destructive `.down.sql` after financial writes; use an approved forward fix or separately approved recovery procedure.
+- Production backup, migration execution, historical reconciliation/readiness approval, rollout and witnessed shop/payment UAT remain separate operational gates.
 
 ---
 

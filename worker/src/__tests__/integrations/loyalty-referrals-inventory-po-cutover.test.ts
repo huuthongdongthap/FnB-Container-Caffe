@@ -103,15 +103,19 @@ function createProductionReplica() {
     CREATE TABLE sop_violations (id TEXT PRIMARY KEY, tenant_id TEXT NOT NULL DEFAULT 'default', staff_id TEXT NOT NULL, staff_name TEXT, category TEXT NOT NULL, is_serious INTEGER NOT NULL DEFAULT 0, description TEXT, occurred_at TEXT, recorded_by TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'recorded', discipline_step TEXT, confirmed_by TEXT, confirmed_at TEXT, applied_by TEXT, applied_at TEXT, appeal_explanation TEXT, audit_log_id TEXT, closed_at TEXT, created_at TEXT DEFAULT (datetime('now')), updated_at TEXT DEFAULT (datetime('now')));
   `);
 
+  const BATCH_RUN = Symbol('d1BatchRun');
+
   function prepare(sql: string) {
     let args: unknown[] = [];
     const run = () => {
+      if (/^\s*SELECT\b/i.test(sql)) return { success: true, results: sqlite.prepare(sql).all(...(args as never[])), meta: { changes: 0 } };
       const before = Number((sqlite.prepare('SELECT total_changes() AS count').get() as { count?: number })?.count ?? 0);
       const result = sqlite.prepare(sql).run(...(args as never[]));
       const after = Number((sqlite.prepare('SELECT total_changes() AS count').get() as { count?: number })?.count ?? 0);
       return { success: true, meta: { changes: after - before, last_row_id: Number(result.lastInsertRowid) } };
     };
     const statement = {
+      [BATCH_RUN]: run,
       bind(...values: unknown[]) { args = values; return statement; },
       async first() { return sqlite.prepare(sql).get(...(args as never[])) ?? null; },
       async all() { return { results: sqlite.prepare(sql).all(...(args as never[])), success: true, meta: {} }; },
@@ -128,7 +132,7 @@ function createProductionReplica() {
       sqlite.exec('BEGIN');
       try {
         const results = statements.map((st) => {
-          const fn = runStatement.get(st);
+          const fn = runStatement.get(st) ?? (st as unknown as { [BATCH_RUN]?: () => unknown })[BATCH_RUN];
           if (!fn) throw new Error('Unknown statement in D1 batch');
           return fn();
         });
@@ -404,7 +408,7 @@ describe('Loyalty, Referrals, Inventory PO, Customer Events & Audit Cutover (202
     const cronJobsBody = (await cronJobsRes.json()) as { data: { jobs: Array<{ id: string }> } };
     expect(cronJobsBody.data.jobs).toHaveLength(5);
 
-    const reconRes = await reconcileShiftCash(
+    await expect(reconcileShiftCash(
       { AURA_DB: db as never },
       {
         shift_id: openedShift.shift!.id,
@@ -416,9 +420,8 @@ describe('Loyalty, Referrals, Inventory PO, Customer Events & Audit Cutover (202
         notes: 'Balanced shift',
       },
       'USR_owner01'
-    );
-    expect(reconRes.shift_id).toBe(openedShift.shift!.id);
-    expect(reconRes.variance_status).toBe('balanced');
+    )).rejects.toMatchObject({ status: 503, message: 'Cash reconciliation schema upgrade required before handover' });
+    expect(sqlite.prepare('SELECT id FROM shift_reconciliations WHERE shift_id = ?').get(openedShift.shift!.id)).toBeUndefined();
 
     // 11. Replica Schema Parity Cutover (20261030_02) + 3-Way 124-Table Column Parity & Zero-Error Canonical D1 Query Priority
     const migration30_02Up = readFileSync(
@@ -461,6 +464,25 @@ describe('Loyalty, Referrals, Inventory PO, Customer Events & Audit Cutover (202
     sqlite.exec(migration1119_02Down);
     sqlite.exec(migration1119_02Up);
 
+    const migration1121_02Up = readFileSync(
+      resolve(__dirname, '../../../db/migrations/20261121_02_cash_payment_attribution.sql'),
+      'utf8'
+    );
+    const migration1121_02Down = readFileSync(
+      resolve(__dirname, '../../../db/migrations/20261121_02_cash_payment_attribution.down.sql'),
+      'utf8'
+    );
+    sqlite.exec(migration1121_02Up);
+    sqlite.exec(migration1121_02Down);
+    sqlite.exec(migration1121_02Up);
+
+    for (const migration of [
+      '20261121_01_refund_manual_transfer_ledger.sql',
+      '20261121_03_refund_atomicity_and_loyalty_work.sql',
+    ]) {
+      sqlite.exec(readFileSync(resolve(__dirname, '../../../db/migrations', migration), 'utf8'));
+    }
+
     const canonicalSqlite = new DatabaseSync(':memory:');
     canonicalSqlite.exec(readFileSync(resolve(__dirname, '../../../schema.sql'), 'utf8'));
     const getSchemaMap = (conn: DatabaseSync) => {
@@ -477,7 +499,7 @@ describe('Loyalty, Referrals, Inventory PO, Customer Events & Audit Cutover (202
     };
     const replicaSchema = getSchemaMap(sqlite);
     const canonicalSchema = getSchemaMap(canonicalSqlite);
-    expect(replicaSchema.tables).toHaveLength(134);
+    expect(replicaSchema.tables).toHaveLength(139);
     expect(replicaSchema.tables).toEqual(canonicalSchema.tables);
     expect(replicaSchema.map).toEqual(canonicalSchema.map);
 

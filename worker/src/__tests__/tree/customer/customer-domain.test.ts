@@ -74,7 +74,7 @@ beforeEach(() => {
 describe('customer helpers', () => {
   it('normalizes phone to digits', () => {
     expect(normalizePhone(' 0909-123-456 ')).toBe('0909123456');
-    expect(normalizePhone('+84909123456')).toBe('84909123456');
+    expect(normalizePhone('+84909123456')).toBe('0909123456');
     expect(normalizePhone(null)).toBe('');
   });
 

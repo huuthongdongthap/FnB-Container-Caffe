@@ -7,7 +7,7 @@
  * Hono-free, D1-only. Designed to be called after order INSERT.
  */
 
-import type { D1Database } from '@cloudflare/workers-types';
+import type { D1Database, D1PreparedStatement } from '@cloudflare/workers-types';
 import type { LoyaltyPolicy } from './loyalty-policy';
 import { tierByName } from './loyalty-policy';
 import { computeTier } from './compute-tier';
@@ -54,21 +54,25 @@ export interface AccrualError {
 
 const INELIGIBLE_ORDER_STATUSES = new Set([
   'cancelled',
+  'canceled',
   'rejected',
   'failed',
   'expired',
   'refunded',
 ]);
 
-const UNPAID_ORDER_PAYMENT_STATUSES = new Set([
-  'pending',
-  'unpaid',
-  'failed',
-  'cancelled',
-  'canceled',
-  'expired',
-  'refunded',
+const ELIGIBLE_ORDER_PAYMENT_STATUSES = new Set([
+  'paid',
+  'completed',
 ]);
+
+function isMissingColumnError(err: unknown): boolean {
+  return /no such column/i.test(String((err as Error)?.message ?? err));
+}
+
+function isMissingTableError(err: unknown): boolean {
+  return /no such table/i.test(String((err as Error)?.message ?? err));
+}
 
 export type AccrualResult = AccrualSuccess | AccrualError;
 
@@ -81,6 +85,17 @@ export async function applyAccrual(
   policy: LoyaltyPolicy,
   input: AccrualInput,
 ): Promise<AccrualResult> {
+  let last: AccrualResult = { ok: false, reason: 'd1_error', error: 'accrual snapshot changed' };
+  for (let attempt = 0; attempt < 3; attempt++) {
+    last = await applyAccrualAttempt(db, policy, input);
+    if (last.ok || last.reason !== 'd1_error' || !last.error?.includes('accrual snapshot changed')) {
+      return last;
+    }
+  }
+  return last;
+}
+
+async function applyAccrualAttempt(db: D1Database, policy: LoyaltyPolicy, input: AccrualInput): Promise<AccrualResult> {
   const { orderId, customerId, orderTotalVnd } = input;
 
   let order: {
@@ -141,11 +156,22 @@ export async function applyAccrual(
     return { ok: false, reason: 'order_not_found' };
   }
 
+  // Legacy reads may omit status columns because another optional column was absent.
+  // Inspect the actual row before choosing the commit-time eligibility predicates.
+  if (order.status === undefined || order.payment_status === undefined) {
+    try {
+      const complete = await db.prepare('SELECT * FROM orders WHERE id = ?').bind(orderId).first<typeof order>();
+      if (complete) Object.assign(order, complete);
+    } catch (error) {
+      return { ok: false, reason: 'd1_error', error: `failed to verify order: ${(error as Error).message}` };
+    }
+  }
   const normalizedOrderStatus = typeof order.status === 'string' ? order.status.trim().toLowerCase() : '';
+  const hasPaymentStatusColumn = 'payment_status' in order && order.payment_status !== undefined;
   const normalizedPaymentStatus = typeof order.payment_status === 'string' ? order.payment_status.trim().toLowerCase() : '';
   if (
     (normalizedOrderStatus && INELIGIBLE_ORDER_STATUSES.has(normalizedOrderStatus)) ||
-    (normalizedPaymentStatus && UNPAID_ORDER_PAYMENT_STATUSES.has(normalizedPaymentStatus))
+    (hasPaymentStatusColumn && !ELIGIBLE_ORDER_PAYMENT_STATUSES.has(normalizedPaymentStatus))
   ) {
     return { ok: false, reason: 'order_not_eligible' };
   }
@@ -184,7 +210,7 @@ export async function applyAccrual(
           .bind(orderId, effectiveTenant)
           .first<{ id: string }>()
           .catch((err) => {
-            if (effectiveTenant === 'default') {
+            if (effectiveTenant === 'default' && isMissingColumnError(err)) {
               return db
                 .prepare("SELECT id FROM cashback_transactions WHERE order_id = ? AND type = 'earn' LIMIT 1")
                 .bind(orderId)
@@ -206,20 +232,24 @@ export async function applyAccrual(
           )
           .bind(orderId, effectiveTenant)
           .first<{ id: string }>()
-          .catch(() =>
-            effectiveTenant === 'default'
-              ? db
-                  .prepare("SELECT id FROM loyalty_point_logs WHERE order_id = ? AND reason = 'purchase' LIMIT 1")
-                  .bind(orderId)
-                  .first<{ id: string }>()
-                  .catch(() => null)
-              : null,
-          )
+          .catch((err) => {
+            if (isMissingTableError(err)) return null;
+            if (effectiveTenant === 'default' && isMissingColumnError(err)) {
+              return db
+                .prepare("SELECT id FROM loyalty_point_logs WHERE order_id = ? AND reason = 'purchase' LIMIT 1")
+                .bind(orderId)
+                .first<{ id: string }>();
+            }
+            throw err;
+          })
       : await db
           .prepare(`SELECT id FROM loyalty_point_logs WHERE order_id = ? AND reason = 'purchase' LIMIT 1`)
           .bind(orderId)
           .first<{ id: string }>()
-          .catch(() => null);
+          .catch((err) => {
+            if (isMissingTableError(err)) return null;
+            throw err;
+          });
     if (existingLog) {
       return { ok: false, reason: 'already_processed' };
     }
@@ -246,8 +276,8 @@ export async function applyAccrual(
           )
           .bind(customerId, effectiveTenant)
           .first<CustomerRow>();
-      } catch {
-        if (effectiveTenant === 'default') {
+      } catch (err) {
+        if (effectiveTenant === 'default' && isMissingColumnError(err)) {
           customer = await db
             .prepare(
               `SELECT id, loyalty_points, lifetime_points, loyalty_tier
@@ -255,6 +285,8 @@ export async function applyAccrual(
             )
             .bind(customerId)
             .first<CustomerRow>();
+        } else {
+          throw err;
         }
       }
     } else {
@@ -293,6 +325,34 @@ export async function applyAccrual(
     }
   }
 
+  // Legacy tables may genuinely lack tenant_id; defaults in current schemas must
+  // never decide accounting ownership, even temporarily before a later patch.
+  const accountingTenantColumns = new Set<string>();
+  let hasAccountMirror = false;
+  let hasTextAuditId = false;
+  try {
+    for (const table of ['cashback_transactions', 'loyalty_point_logs', 'loyalty_audit_log', 'loyalty_accounts']) {
+      const schema = await db.prepare(`PRAGMA table_info(${table})`).all<{ name: string; type: string }>();
+      if (!schema.success || !Array.isArray(schema.results)) throw new Error(`unreadable ${table} schema`);
+      const hasTenantColumn = schema.results.some(column => column.name === 'tenant_id');
+      if (hasTenantColumn) accountingTenantColumns.add(table);
+      if (table === 'loyalty_accounts') hasAccountMirror = schema.results.length > 0;
+      if (table === 'loyalty_audit_log') {
+        hasTextAuditId = schema.results.some(column => column.name === 'id' && /^TEXT$/i.test(column.type));
+      }
+      if (writeTenant !== 'default' && schema.results.length > 0 && !hasTenantColumn) {
+        throw new Error(`tenant scope unavailable for ${table}`);
+      }
+    }
+  } catch (error) {
+    return { ok: false, reason: 'd1_error', error: `failed to verify accounting schema: ${(error as Error).message}` };
+  }
+  const accountingInsert = (table: string, columns: string, values: string, args: unknown[]) => {
+    const tenantColumn = accountingTenantColumns.has(table);
+    return db.prepare(`INSERT INTO ${table} (${columns}${tenantColumn ? ', tenant_id' : ''})
+      VALUES (${values}${tenantColumn ? ', ?' : ''})`).bind(...args, ...(tenantColumn ? [writeTenant] : []));
+  };
+
   const tier = tierByName(policy, customer.loyalty_tier);
   const multiplier = policy.campaignMultiplier;
   const maxCap = policy.maxCapPerTx;
@@ -300,15 +360,95 @@ export async function applyAccrual(
   const baseRate = tier.cashbackRate;
   const netEligibleTotal = Math.max(0, total - cashbackUsed);
   const rawCashback = Math.max(0, Math.round(netEligibleTotal * baseRate * multiplier));
-  const cashback = Math.min(rawCashback, maxCap);
+  const grossCashback = Math.min(rawCashback, maxCap);
 
-  const points = Math.floor((total / 10_000) * (tier.pointMultiplier || 1));
+  const grossPoints = Math.floor((total / 10_000) * (tier.pointMultiplier || 1));
 
   const now = new Date().toISOString().replace('T', ' ').slice(0, 19);
+  const completedAtIso = new Date().toISOString();
   const expiresAt = policy.expiresAt;
+
+  // Coordinate late accrual atomically with prior partial refund work so a paid
+  // order receives exact net remaining benefits with no spendable overcredit
+  // window, while full refunds still mint zero benefits.
+  type RefundWorkRow = {
+    reversal_key: string;
+    amount: number;
+    status: string;
+    points_reversed: number | null;
+    cashback_reversed: number | null;
+  };
+  type TrancheAttribution = {
+    reversalKey: string;
+    amount: number;
+    status: string;
+    pointsReversed: number;
+    cashbackReversed: number;
+  };
+  let hasRefundWorkTable = false;
+  let priorRefundRows: RefundWorkRow[] = [];
+  let priorRefundAmount = 0;
+  let reversedPoints = 0;
+  let reversedCashback = 0;
+  const trancheAttributions: TrancheAttribution[] = [];
+  try {
+    const refundWorkTable = await db
+      .prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'refund_loyalty_work'")
+      .first<{ name: string }>();
+    hasRefundWorkTable = Boolean(refundWorkTable);
+    if (hasRefundWorkTable) {
+      const workRes = await db
+        .prepare(
+          `SELECT reversal_key, amount, status, points_reversed, cashback_reversed
+           FROM refund_loyalty_work
+           WHERE tenant_id = ? AND order_id = ?
+           ORDER BY datetime(COALESCE(completed_at, created_at)) ASC,
+                    RTRIM(REPLACE(COALESCE(completed_at, created_at), 'T', ' '), 'Z') ASC,
+                    reversal_key ASC`,
+        )
+        .bind(writeTenant, orderId)
+        .all<RefundWorkRow>();
+      if (!workRes.success || !Array.isArray(workRes.results)) {
+        throw new Error('unreadable refund_loyalty_work');
+      }
+      priorRefundRows = workRes.results;
+    }
+  } catch (error) {
+    return { ok: false, reason: 'd1_error', error: `failed to verify refund fence: ${(error as Error).message}` };
+  }
+
+  for (const row of priorRefundRows) {
+    const existingPts = Number(row.points_reversed ?? 0);
+    const existingCb = Number(row.cashback_reversed ?? 0);
+    if (existingPts !== 0 || existingCb !== 0) {
+      return { ok: false, reason: 'order_not_eligible' };
+    }
+    const trancheAmount = Math.max(0, Number(row.amount ?? 0));
+    priorRefundAmount += trancheAmount;
+    const cumulativeRatio = total > 0 ? Math.min(1, priorRefundAmount / total) : 1;
+    const targetPoints = Math.round(grossPoints * cumulativeRatio);
+    const targetCashback = Math.round(grossCashback * cumulativeRatio);
+    const tranchePoints = Math.max(0, Math.min(grossPoints - reversedPoints, targetPoints - reversedPoints));
+    const trancheCashback = Math.max(0, Math.min(grossCashback - reversedCashback, targetCashback - reversedCashback));
+    reversedPoints += tranchePoints;
+    reversedCashback += trancheCashback;
+    trancheAttributions.push({
+      reversalKey: row.reversal_key,
+      amount: trancheAmount,
+      status: row.status,
+      pointsReversed: tranchePoints,
+      cashbackReversed: trancheCashback,
+    });
+  }
+  if (hasRefundWorkTable && priorRefundAmount >= total) {
+    return { ok: false, reason: 'order_not_eligible' };
+  }
+  const points = Math.max(0, grossPoints - reversedPoints);
+  const cashback = Math.max(0, grossCashback - reversedCashback);
 
   // ── Ensure wallet exists ──
   let wallet: { id: string; balance: number } | null = null;
+  let walletHasTenant = false;
   try {
     if (effectiveTenant) {
       try {
@@ -316,12 +456,16 @@ export async function applyAccrual(
           .prepare("SELECT id, balance FROM cashback_wallets WHERE customer_id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?")
           .bind(customer.id, effectiveTenant)
           .first<{ id: string; balance: number }>();
-      } catch {
-        if (effectiveTenant === 'default') {
+        walletHasTenant = true;
+      } catch (err) {
+        if (effectiveTenant === 'default' && isMissingColumnError(err)) {
           wallet = await db
             .prepare('SELECT id, balance FROM cashback_wallets WHERE customer_id = ?')
             .bind(customer.id)
             .first<{ id: string; balance: number }>();
+          walletHasTenant = false;
+        } else {
+          throw err;
         }
       }
     } else {
@@ -340,7 +484,7 @@ export async function applyAccrual(
     walletId = genId('wal_');
     newBalance = cashback;
     try {
-      if (effectiveTenant) {
+      if (effectiveTenant && walletHasTenant) {
         try {
           await db
             .prepare(
@@ -351,7 +495,8 @@ export async function applyAccrual(
             .bind(walletId, customer.id, now, now, effectiveTenant)
             .run();
         } catch (innerErr) {
-          if (effectiveTenant === 'default') {
+          if (effectiveTenant === 'default' && isMissingColumnError(innerErr)) {
+            walletHasTenant = false;
             await db
               .prepare(
                 `INSERT INTO cashback_wallets
@@ -384,44 +529,47 @@ export async function applyAccrual(
 
   const newPoints = (customer.loyalty_points ?? 0) + points;
   const newLifetimePoints = (customer.lifetime_points ?? 0) + points;
+  const computed = computeTier(newLifetimePoints, customer.loyalty_tier, policy);
+  const tierUpgraded = computed.changed && computed.tierName !== customer.loyalty_tier;
+  const finalTier = tierUpgraded ? computed.tierName : (customer.loyalty_tier ?? tier.tierName);
+  const customerTenant = customer.tenant_id !== undefined;
+  const customerScope = customerTenant ? " AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?" : '';
+  const customerArgs = [customer.id, ...(customerTenant ? [writeTenant] : [])];
+  const requireWrite = () => db.prepare("SELECT CASE WHEN changes() = 1 THEN 1 ELSE json_extract('{}', 'accrual required write missing') END AS accrual_write");
+  // Distinguish a retryable snapshot change from a failed required ledger write.
+  const requireSnapshotWrite = () => db.prepare("SELECT CASE WHEN changes() = 1 THEN 1 ELSE json_extract('{}', 'accrual snapshot changed') END AS accrual_snapshot");
   // Deterministic ledger IDs keyed by orderId prevent concurrent order_paid + order_completed double-accrual.
   const earnTxId = `cbt_earn_${orderId}`;
   const earnPtLogId = `ptl_earn_${orderId}`;
 
   // ── Batch: wallet + transaction + customer + point log + audit + order ──
-  const walletUpdateStmt = effectiveTenant
+  const walletUpdateStmt = effectiveTenant && walletHasTenant
     ? db
         .prepare(
           `UPDATE cashback_wallets
            SET balance = COALESCE(balance, 0) + ?, total_earned = COALESCE(total_earned, 0) + ?, updated_at = ?
-           WHERE customer_id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?`,
+           WHERE customer_id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ? AND id = ? AND COALESCE(balance, 0) = ?`,
         )
-        .bind(cashback, cashback, now, customer.id, effectiveTenant)
+        .bind(cashback, cashback, now, customer.id, effectiveTenant, walletId, wallet?.balance ?? 0)
     : db
         .prepare(
           `UPDATE cashback_wallets
            SET balance = COALESCE(balance, 0) + ?, total_earned = COALESCE(total_earned, 0) + ?, updated_at = ?
-           WHERE customer_id = ?`,
+           WHERE customer_id = ? AND id = ? AND COALESCE(balance, 0) = ?`,
         )
-        .bind(cashback, cashback, now, customer.id);
+        .bind(cashback, cashback, now, customer.id, walletId, wallet?.balance ?? 0);
 
-  const customerUpdateStmt = effectiveTenant
-    ? db
-        .prepare(
-          `UPDATE customers
-           SET loyalty_points = COALESCE(loyalty_points, 0) + ?, lifetime_points = COALESCE(lifetime_points, 0) + ?, updated_at = ?
-           WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?`,
-        )
-        .bind(points, points, now, customer.id, effectiveTenant)
-    : db
-        .prepare(
-          `UPDATE customers
-           SET loyalty_points = COALESCE(loyalty_points, 0) + ?, lifetime_points = COALESCE(lifetime_points, 0) + ?, updated_at = ?
-           WHERE id = ?`,
-        )
-        .bind(points, points, now, customer.id);
+  // The tier and ledger balances are calculated from the same customer snapshot.
+  // Do not overwrite a tier or publish a stale balance after another mutation.
+  const customerUpdateStmt = db.prepare(`UPDATE customers
+    SET loyalty_points = COALESCE(loyalty_points, 0) + ?, lifetime_points = COALESCE(lifetime_points, 0) + ?,
+      updated_at = ?${tierUpgraded ? ', loyalty_tier = ?' : ''}
+    WHERE id = ?${customerScope}
+      AND COALESCE(loyalty_points, 0) = ? AND COALESCE(lifetime_points, 0) = ? AND loyalty_tier IS ?`)
+    .bind(points, points, now, ...(tierUpgraded ? [finalTier] : []), ...customerArgs,
+      customer.loyalty_points ?? 0, customer.lifetime_points ?? 0, customer.loyalty_tier ?? null);
 
-  const orderUpdateStmt = effectiveTenant
+  const orderUpdateStmt = effectiveTenant && order.tenant_id !== undefined
     ? db
         .prepare(
           `UPDATE orders
@@ -433,203 +581,143 @@ export async function applyAccrual(
         .prepare('UPDATE orders SET cashback_earned = ?, points_earned = ? WHERE id = ?')
         .bind(cashback, points, orderId);
 
+  const auditInsert = (action: 'cashback_earn' | 'tier_upgrade', amount: number, metadata: unknown) => accountingInsert(
+    'loyalty_audit_log',
+    `${hasTextAuditId ? 'id, ' : ''}customer_id, action, amount_vnd, order_id, metadata, created_at`,
+    `${hasTextAuditId ? '?, ' : ''}?, ?, ?, ?, ?, ?`,
+    [...(hasTextAuditId ? [`audit_${action}_${orderId}`] : []), customer.id, action, amount, orderId, JSON.stringify(metadata), now],
+  );
   const stmts = [
     walletUpdateStmt,
-    db
-      .prepare(
-        `INSERT INTO cashback_transactions
-         (id, wallet_id, customer_id, order_id, type, amount, balance_after,
-          expires_at, multiplier_applied, campaign_id, description, created_at)
-         VALUES (?, ?, ?, ?, 'earn', ?, ?, ?, ?, ?, ?, ?)`,
-      )
-      .bind(
-        earnTxId,
-        walletId,
-        customer.id,
-        orderId,
-        cashback,
-        newBalance,
-        expiresAt,
-        multiplier,
+    requireSnapshotWrite(),
+    accountingInsert('cashback_transactions',
+      'id, wallet_id, customer_id, order_id, type, amount, balance_after, expires_at, multiplier_applied, campaign_id, description, created_at',
+      "?, ?, ?, ?, 'earn', ?, ?, ?, ?, ?, ?, ?", [
+        earnTxId, walletId, customer.id, orderId, cashback, newBalance, expiresAt, multiplier,
         policy.campaignCode ?? null,
-        `Cashback don #${orderId.slice(0, 8)}${multiplier > 1 ? ` (x${multiplier})` : ''}`,
-        now,
-      ),
+        `Cashback don #${orderId.slice(0, 8)}${multiplier > 1 ? ` (x${multiplier})` : ''}`, now,
+      ]),
+    requireWrite(),
     customerUpdateStmt,
-    db
-      .prepare(
-        `INSERT INTO loyalty_point_logs
-         (id, customer_id, order_id, points_change, reason, balance_after, description, created_at)
-         VALUES (?, ?, ?, ?, 'purchase', ?, ?, ?)`,
-      )
-      .bind(
-        earnPtLogId,
-        customer.id,
-        orderId,
-        points,
-        newPoints,
-        `Tich diem don #${orderId.slice(0, 8)}`,
-        now,
-      ),
-    db
-      .prepare(
-        `INSERT INTO loyalty_audit_log
-         (customer_id, action, amount_vnd, order_id, metadata, created_at)
-         VALUES (?, 'cashback_earn', ?, ?, ?, ?)`,
-      )
-      .bind(
-        customer.id,
-        cashback,
-        orderId,
-        JSON.stringify({
-          tier: tier.tierName,
-          base_rate: tier.cashbackRate,
-          multiplier,
-          campaign: policy.campaignCode ?? null,
-          raw_cashback: rawCashback,
-          capped: cashback < rawCashback,
-          cap_used: maxCap,
-          actor_id: input.actorId ?? null,
-          actor_role: input.actorRole ?? null,
-        }),
-        now,
-      ),
+    requireSnapshotWrite(),
+    accountingInsert('loyalty_point_logs',
+      'id, customer_id, order_id, points_change, reason, balance_after, description, created_at',
+      "?, ?, ?, ?, 'purchase', ?, ?, ?", [
+        earnPtLogId, customer.id, orderId, points, newPoints, `Tich diem don #${orderId.slice(0, 8)}`, now,
+      ]),
+    requireWrite(),
+    auditInsert('cashback_earn', cashback, {
+      tier: tier.tierName, base_rate: tier.cashbackRate, multiplier, campaign: policy.campaignCode ?? null,
+      raw_cashback: rawCashback, capped: grossCashback < rawCashback, cap_used: maxCap,
+      ...(trancheAttributions.length > 0 ? {
+        gross_cashback: grossCashback,
+        gross_points: grossPoints,
+        refunded_amount_at_accrual: priorRefundAmount,
+        reversed_cashback_at_accrual: reversedCashback,
+        reversed_points_at_accrual: reversedPoints,
+        refund_reversal_keys: trancheAttributions.map(tranche => tranche.reversalKey),
+      } : {}),
+      actor_id: input.actorId ?? null, actor_role: input.actorRole ?? null,
+    }),
+    requireWrite(),
     orderUpdateStmt,
+    requireWrite(),
   ];
+  if (tierUpgraded) {
+    stmts.push(accountingInsert('loyalty_point_logs',
+      'id, customer_id, points_change, reason, balance_after, description, created_at',
+      "?, ?, 0, 'tier_upgrade', ?, ?, ?", [
+        `ptl_tier_${orderId}`, customer.id, newPoints, `Nang hang len ${finalTier}`, now,
+      ]), requireWrite(), auditInsert('tier_upgrade', 0, {
+        from: customer.loyalty_tier, to: finalTier, reason: 'points_threshold', lifetime_points: newLifetimePoints,
+      }), requireWrite());
+  }
+  if (hasAccountMirror) {
+    const accountScope = accountingTenantColumns.has('loyalty_accounts');
+    const where = `customer_id = ?${accountScope ? " AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?" : ''}`;
+    const args = [customer.id, ...(accountScope ? [writeTenant] : [])];
+    // The table and a customer mirror row are optional. If a row exists it must update.
+    stmts.push(db.prepare(`UPDATE loyalty_accounts
+      SET current_points = COALESCE(current_points, 0) + ?, lifetime_points = COALESCE(lifetime_points, 0) + ?, tier = ?, updated_at = ?
+      WHERE ${where}`).bind(points, points, finalTier, now, ...args),
+    db.prepare(`SELECT CASE WHEN changes() = (SELECT COUNT(*) FROM loyalty_accounts WHERE ${where}) THEN 1
+      ELSE json_extract('{}', 'accrual required write missing') END AS accrual_account`).bind(...args));
+  }
 
+  const eligibility = ['id = ?'];
+  const eligibilityArgs: unknown[] = [orderId];
+  if (order.tenant_id !== undefined) {
+    eligibility.push("COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?");
+    eligibilityArgs.push(writeTenant);
+  }
+  if (order.status !== undefined) {
+    eligibility.push("LOWER(TRIM(COALESCE(status, ''))) NOT IN ('cancelled', 'canceled', 'rejected', 'failed', 'expired', 'refunded')");
+  }
+  if (order.payment_status !== undefined) {
+    eligibility.push("LOWER(TRIM(COALESCE(payment_status, ''))) IN ('paid', 'completed')");
+  }
+  // A refund can commit after the eligibility read. Recheck order eligibility and
+  // the exact refund_loyalty_work snapshot inside the same transaction as every
+  // credit, tranche attribution, order metadata update, and mirror write.
+  const eligibilityAssertion = db.prepare(`SELECT CASE WHEN EXISTS (
+    SELECT 1 FROM orders WHERE ${eligibility.join(' AND ')}
+  ) THEN 1 ELSE abs(-9223372036854775808) END AS accrual_eligibility`).bind(...eligibilityArgs);
+  const refundWorkStatements: D1PreparedStatement[] = [];
+  if (hasRefundWorkTable) {
+    refundWorkStatements.push(
+      db
+        .prepare(
+          `SELECT CASE WHEN
+             (SELECT COUNT(*) FROM refund_loyalty_work WHERE tenant_id = ? AND order_id = ?) = ?
+             AND (SELECT COALESCE(SUM(amount), 0) FROM refund_loyalty_work WHERE tenant_id = ? AND order_id = ?) = ?
+             AND (SELECT COALESCE(SUM(COALESCE(points_reversed, 0)), 0) FROM refund_loyalty_work WHERE tenant_id = ? AND order_id = ?) = 0
+             AND (SELECT COALESCE(SUM(COALESCE(cashback_reversed, 0)), 0) FROM refund_loyalty_work WHERE tenant_id = ? AND order_id = ?) = 0
+           THEN 1 ELSE json_extract('{}', 'accrual snapshot changed') END AS accrual_refund_snapshot`,
+        )
+        .bind(
+          writeTenant, orderId, priorRefundRows.length,
+          writeTenant, orderId, priorRefundAmount,
+          writeTenant, orderId,
+          writeTenant, orderId,
+        ),
+    );
+    for (const tranche of trancheAttributions) {
+      refundWorkStatements.push(
+        db
+          .prepare(
+            `UPDATE refund_loyalty_work
+             SET status = 'completed',
+                 customer_id = COALESCE(customer_id, ?),
+                 points_reversed = ?,
+                 cashback_reversed = ?,
+                 completed_at = COALESCE(completed_at, ?)
+             WHERE tenant_id = ? AND reversal_key = ? AND order_id = ?
+               AND status IN ('pending', 'completed') AND amount = ?
+               AND COALESCE(points_reversed, 0) = 0 AND COALESCE(cashback_reversed, 0) = 0`,
+          )
+          .bind(
+            customer.id,
+            tranche.pointsReversed,
+            tranche.cashbackReversed,
+            completedAtIso,
+            writeTenant,
+            tranche.reversalKey,
+            orderId,
+            tranche.amount,
+          ),
+        requireSnapshotWrite(),
+      );
+    }
+  }
   try {
-    await db.batch(stmts);
+    await db.batch([eligibilityAssertion, ...refundWorkStatements, ...stmts]);
   } catch (err) {
     const msg = (err as Error).message || '';
-    if (msg.includes('UNIQUE') || msg.includes('constraint')) {
+    if (/integer overflow/i.test(msg)) return { ok: false, reason: 'order_not_eligible' };
+    if (/UNIQUE constraint failed: (cashback_transactions|loyalty_point_logs)\.id\b/i.test(msg)) {
       return { ok: false, reason: 'already_processed' };
     }
-    try {
-      await db.batch(stmts.slice(0, 5));
-    } catch (coreErr) {
-      const coreMsg = (coreErr as Error).message || '';
-      if (coreMsg.includes('UNIQUE') || coreMsg.includes('constraint')) {
-        return { ok: false, reason: 'already_processed' };
-      }
-      return { ok: false, reason: 'd1_error', error: coreMsg || msg };
-    }
-  }
-
-  // ── Tier upgrade check ──
-  const computed = computeTier(newLifetimePoints, customer.loyalty_tier, policy);
-  let tierUpgraded = false;
-  if (computed.changed && computed.tierName !== customer.loyalty_tier) {
-    tierUpgraded = true;
-    try {
-      const upgradePtLogId = genId('ptl_');
-      if (effectiveTenant) {
-        await db
-          .prepare("UPDATE customers SET loyalty_tier = ?, updated_at = ? WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?")
-          .bind(computed.tierName, now, customer.id, effectiveTenant)
-          .run()
-          .catch((err) => {
-            if (effectiveTenant === 'default') {
-              return db
-                .prepare('UPDATE customers SET loyalty_tier = ?, updated_at = ? WHERE id = ?')
-                .bind(computed.tierName, now, customer.id)
-                .run();
-            }
-            throw err;
-          });
-      } else {
-        await db
-          .prepare('UPDATE customers SET loyalty_tier = ?, updated_at = ? WHERE id = ?')
-          .bind(computed.tierName, now, customer.id)
-          .run();
-      }
-      await db.batch([
-        db
-          .prepare(
-            `INSERT INTO loyalty_point_logs
-             (id, customer_id, points_change, reason, balance_after, description, created_at)
-             VALUES (?, ?, 0, 'tier_upgrade', ?, ?, ?)`,
-          )
-          .bind(
-            upgradePtLogId,
-            customer.id,
-            newPoints,
-            `Nang hang len ${computed.tierName}`,
-            now,
-          ),
-        db
-          .prepare(
-            `INSERT INTO loyalty_audit_log
-             (customer_id, action, amount_vnd, order_id, metadata, created_at)
-             VALUES (?, 'tier_upgrade', null, ?, ?, ?)`,
-          )
-          .bind(
-            customer.id,
-            orderId,
-            JSON.stringify({
-              from: customer.loyalty_tier,
-              to: computed.tierName,
-              reason: 'points_threshold',
-              lifetime_points: newLifetimePoints,
-            }),
-            now,
-          ),
-      ]);
-      await db
-        .prepare('UPDATE loyalty_point_logs SET tenant_id = ? WHERE id = ?')
-        .bind(writeTenant, upgradePtLogId)
-        .run()
-        .catch(() => {});
-      await db
-        .prepare("UPDATE loyalty_audit_log SET tenant_id = ? WHERE order_id = ? AND customer_id = ? AND action = 'tier_upgrade' AND created_at = ?")
-        .bind(writeTenant, orderId, customer.id, now)
-        .run()
-        .catch(() => {});
-    } catch (_e) {
-      // Tier upgrade is non-blocking — accrual already committed.
-      tierUpgraded = false;
-    }
-  }
-
-  const finalTier = tierUpgraded ? computed.tierName : (customer.loyalty_tier ?? tier.tierName);
-  try {
-    if (effectiveTenant) {
-      await db
-        .prepare(
-          "UPDATE loyalty_accounts SET current_points = COALESCE(current_points, 0) + ?, lifetime_points = COALESCE(lifetime_points, 0) + ?, tier = ?, updated_at = ? WHERE customer_id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?",
-        )
-        .bind(points, points, finalTier, now, customer.id, effectiveTenant)
-        .run()
-        .catch((err) => {
-          if (effectiveTenant === 'default') {
-            return db
-              .prepare(
-                'UPDATE loyalty_accounts SET current_points = COALESCE(current_points, 0) + ?, lifetime_points = COALESCE(lifetime_points, 0) + ?, tier = ?, updated_at = ? WHERE customer_id = ?',
-              )
-              .bind(points, points, finalTier, now, customer.id)
-              .run();
-          }
-          throw err;
-        });
-    } else {
-      await db
-        .prepare(
-          'UPDATE loyalty_accounts SET current_points = COALESCE(current_points, 0) + ?, lifetime_points = COALESCE(lifetime_points, 0) + ?, tier = ?, updated_at = ? WHERE customer_id = ?',
-        )
-        .bind(points, points, finalTier, now, customer.id)
-        .run();
-    }
-  } catch {
-    // loyalty_accounts is optional in minimal schemas
-  }
-
-  try {
-    await db.batch([
-      db.prepare('UPDATE cashback_transactions SET tenant_id = ? WHERE id = ? AND tenant_id IS NULL').bind(writeTenant, earnTxId),
-      db.prepare('UPDATE loyalty_point_logs SET tenant_id = ? WHERE id = ? AND tenant_id IS NULL').bind(writeTenant, earnPtLogId),
-      db.prepare("UPDATE loyalty_audit_log SET tenant_id = ? WHERE order_id = ? AND customer_id = ? AND action = 'cashback_earn' AND tenant_id IS NULL").bind(writeTenant, orderId, customer.id),
-    ]);
-  } catch {
-    // Optional tenant_id column in minimal schemas
+    return { ok: false, reason: 'd1_error', error: msg };
   }
 
   return {

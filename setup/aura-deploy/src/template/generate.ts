@@ -1,6 +1,6 @@
 import { readFileSync, mkdirSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { dirname, resolve } from 'node:path';
+import { dirname, relative, resolve } from 'node:path';
 import { validateWizardAnswers } from '../wizard/validators.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -41,12 +41,12 @@ function escapeTemplateValue(raw: string): string {
 /**
  * Read a template file and substitute {{PLACEHOLDER}} tokens with answer values.
  */
-function substitute(template: string, answers: WizardAnswers): string {
+function substitute(template: string, answers: WizardAnswers, domainSlug = answers.domainSlug): string {
   const shortName = answers.cafeName.trim().split(/\s+/)[0] || answers.cafeName;
   const tokens: Record<string, string> = {
     CAFE_NAME: escapeTemplateValue(answers.cafeName),
     CAFE_NAME_SHORT: escapeTemplateValue(shortName),
-    DOMAIN_SLUG: escapeTemplateValue(answers.domainSlug),
+    DOMAIN_SLUG: escapeTemplateValue(domainSlug),
     PRIMARY_COLOR: escapeTemplateValue(answers.primaryColor),
     TAGLINE: escapeTemplateValue(answers.tagline || ''),
     ADMIN_EMAIL: escapeTemplateValue(answers.adminEmail),
@@ -84,7 +84,7 @@ export async function generateConfig(
 
   // --- brand.json ---
   const brandTemplate = readFileSync(resolve(CONFIG_DIR, 'brand.json'), 'utf-8');
-  const brandContent = substitute(brandTemplate, answers);
+  const brandContent = substitute(brandTemplate, answers, `aura-cafe-${answers.domainSlug}`);
   const brandJsonPath = resolve(outputDir, 'brand.json');
   writeFileSync(brandJsonPath, brandContent, 'utf-8');
 
@@ -96,7 +96,10 @@ export async function generateConfig(
 
   // --- wrangler.toml ---
   const wranglerTemplate = readFileSync(resolve(CONFIG_DIR, 'wrangler.toml'), 'utf-8');
-  const wranglerContent = substitute(wranglerTemplate, answers);
+  // Wrangler resolves the entrypoint relative to the generated config, not cwd.
+  const workerEntry = resolve(PACKAGE_ROOT, '../../worker/src/index.ts');
+  const wranglerContent = substitute(wranglerTemplate, answers)
+    .replace(/^main = .*$/m, () => `main = ${JSON.stringify(relative(resolve(outputDir), workerEntry))}`);
   const wranglerTomlPath = resolve(outputDir, 'wrangler.toml');
   writeFileSync(wranglerTomlPath, wranglerContent, 'utf-8');
 

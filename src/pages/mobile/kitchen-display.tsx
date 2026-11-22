@@ -65,12 +65,16 @@ const STATION_COLORS: Record<KitchenStation, string> = {
 export default function KitchenDisplay() {
   const [orders, setOrders] = useState<KitchenOrder[]>([]);
   const [loading, setLoading] = useState(true);
-  const [updatingId, setUpdatingId] = useState<string | null>(null);
+  const [pendingOrders, setPendingOrders] = useState<Record<string, boolean>>({});
+  const [mutationErrors, setMutationErrors] = useState<
+    Record<string, { message: string; targetStatus: KitchenOrder['status'] }>
+  >({});
   const [error, setError] = useState<string | null>(null);
   const [activeStation, setActiveStation] = useState<KitchenStation>('all');
   const pollRef = useRef<ReturnType<typeof setInterval>>(null);
   const abortRef = useRef<AbortController | null>(null);
   const requestSeqRef = useRef(0);
+  const inFlightRef = useRef(new Set<string>());
 
   const fetchOrders = useCallback(async () => {
     abortRef.current?.abort();
@@ -117,7 +121,9 @@ export default function KitchenDisplay() {
       abortRef.current?.abort();
       setOrders([]);
       setError(null);
-      setUpdatingId(null);
+      inFlightRef.current.clear();
+      setPendingOrders({});
+      setMutationErrors({});
       setLoading(true);
       void fetchOrders();
     });
@@ -129,8 +135,16 @@ export default function KitchenDisplay() {
   }, [fetchOrders]);
 
   const updateStatus = useCallback(async (orderId: string, status: KitchenOrder['status']) => {
+    if (inFlightRef.current.has(orderId)) return;
     const snap = readSessionSnapshot();
-    setUpdatingId(orderId);
+    inFlightRef.current.add(orderId);
+    setPendingOrders((prev) => ({ ...prev, [orderId]: true }));
+    setMutationErrors((prev) => {
+      if (!(orderId in prev)) return prev;
+      const next = { ...prev };
+      delete next[orderId];
+      return next;
+    });
     try {
       await apiFetch(`/mobile/kds/orders/${orderId}/status`, {
         method: 'PATCH',
@@ -138,8 +152,24 @@ export default function KitchenDisplay() {
       });
       if (!isSameSessionSnapshot(snap, readSessionSnapshot())) return;
       setOrders((prev) => prev.map((o) => (o.id === orderId ? { ...o, status } : o)));
-    } catch { /* silent */ } finally { setUpdatingId(null); }
-  }, []);
+      void fetchOrders();
+    } catch (err) {
+      if (!isSameSessionSnapshot(snap, readSessionSnapshot())) return;
+      const message =
+        err instanceof Error && err.message
+          ? err.message
+          : 'Không thể cập nhật trạng thái đơn';
+      setMutationErrors((prev) => ({
+        ...prev,
+        [orderId]: { message, targetStatus: status },
+      }));
+    } finally {
+      inFlightRef.current.delete(orderId);
+      if (isSameSessionSnapshot(snap, readSessionSnapshot())) {
+        setPendingOrders((prev) => ({ ...prev, [orderId]: false }));
+      }
+    }
+  }, [fetchOrders]);
 
   const activeOrders = orders.filter((o) => o.status !== 'served');
   const filteredOrders = activeStation === 'all'
@@ -229,7 +259,13 @@ export default function KitchenDisplay() {
           <KitchenOrderCard
             key={order.id}
             order={order}
-            updatingId={updatingId}
+            updatingId={pendingOrders[order.id] ? order.id : null}
+            mutationError={mutationErrors[order.id]?.message}
+            onRetry={
+              mutationErrors[order.id]
+                ? () => updateStatus(order.id, mutationErrors[order.id]!.targetStatus)
+                : undefined
+            }
             onStatusChange={updateStatus}
           />
         ))}

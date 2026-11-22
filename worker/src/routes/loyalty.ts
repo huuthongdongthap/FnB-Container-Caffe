@@ -3,14 +3,16 @@
  * Thin Hono router — handler bodies extracted to tree/loyalty/.
  */
 
-import { Hono } from 'hono';
+import { Hono, type Context } from 'hono';
+import { getAuthToken, verifyJWT } from '../lib/jwt';
+import { isStaffRole } from '../lib/staff-session';
 import { redeemRewardSchema, zodErrorResponse } from '../lib/validators';
 import { resolvePilotStore } from '../lib/pilot-store';
 import { getTenantId, matchesTenantRow } from '../middleware/tenant';
 import type { Env } from '../types/env';
 import type { Customer } from '../types/models';
 
-import { genId } from '../tree/loyalty/helpers';
+import { redeemRewardAtomically } from './openapi-loyalty-handlers/atomic-reward-redemption';
 import { getActiveCampaign } from '../tree/loyalty/campaign';
 import { authCustomer } from '../tree/loyalty/auth-middleware';
 import { handlePhoneAuth } from '../tree/loyalty/phone-auth-handler';
@@ -36,15 +38,42 @@ const LEGACY_LOYALTY_PATHS = new Set([
   '/tiers',
 ]);
 
+async function shouldDelegateRewardsListToOpenApi(c: Context<{ Bindings: Env }>): Promise<boolean> {
+  const token = getAuthToken(c.req.raw);
+  if (!token || !c.env.JWT_SECRET || c.env.JWT_SECRET.length < 16) {
+    return false;
+  }
+  const hasJwtClaimsConfig = c.env.JWT_AUDIENCE !== undefined || c.env.JWT_ISSUER !== undefined;
+  const payload = hasJwtClaimsConfig
+    ? await verifyJWT(token, c.env.JWT_SECRET, {
+        expectedAudience: c.env.JWT_AUDIENCE,
+        expectedIssuer: c.env.JWT_ISSUER,
+      })
+    : await verifyJWT(token, c.env.JWT_SECRET);
+  if (!payload) {
+    return false;
+  }
+  const rawClaims = payload as unknown as { sessionType?: string };
+  return (
+    isStaffRole(payload.role) ||
+    Boolean(rawClaims.sessionType) ||
+    Boolean(payload.role && payload.role !== 'customer')
+  );
+}
+
 loyaltyRouter.use('/*', async (c, next) => {
   const pathSegments = c.req.path.split('/').filter(Boolean);
   const relPath = pathSegments[0] === 'api' && pathSegments[1] === 'loyalty'
     ? `/${pathSegments.slice(2).join('/')}`
     : `/${pathSegments.join('/')}`;
-  const isLegacyRoute =
-    LEGACY_LOYALTY_PATHS.has(relPath) ||
-    (relPath === '/rewards' && c.req.method === 'GET');
-  if (!isLegacyRoute) {
+  if (relPath === '/rewards' && c.req.method === 'GET') {
+    if (await shouldDelegateRewardsListToOpenApi(c)) {
+      await next();
+      return;
+    }
+    return authCustomer(c, next);
+  }
+  if (!LEGACY_LOYALTY_PATHS.has(relPath)) {
     await next();
     return;
   }
@@ -247,8 +276,12 @@ loyaltyRouter.get('/cashback', async(c) => {
   return c.json({ success: true, data: results });
 });
 
-loyaltyRouter.get('/rewards', async(c) => {
-  const cust = c.get('customer') as unknown as Customer;
+loyaltyRouter.get('/rewards', async(c, next) => {
+  const cust = c.get('customer') as unknown as Customer | undefined;
+  if (!cust) {
+    await next();
+    return;
+  }
   const custRecord = cust as unknown as Record<string, unknown>;
   const rawCustTenant = String(custRecord?.tenant_id ?? custRecord?.tenantId ?? '').trim();
   const storeTenant = c.env.PILOT_TENANT_ID
@@ -408,179 +441,26 @@ loyaltyRouter.post('/redeem', rateLimitMiddleware(LOYALTY_REDEEM_RATE_LIMIT), as
     return c.json({ success: false, error: 'Không du diem', needed: reward.point_cost, current: pts }, 400);
   }
 
-  let newPts = pts - reward.point_cost;
   const now = new Date().toISOString();
-  let deductRes: unknown;
-  try {
-    deductRes = await db.prepare(
-      "UPDATE customers SET loyalty_points = loyalty_points - ?, updated_at = ? WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ? AND COALESCE(loyalty_points, 0) >= ?"
-    ).bind(reward.point_cost, now, cust.id, storeTenant, reward.point_cost).run();
-  } catch {
-    if (!storeTenant || storeTenant === 'default') {
-      try {
-        deductRes = await db.prepare(
-          'UPDATE customers SET loyalty_points = loyalty_points - ?, updated_at = ? WHERE id = ? AND COALESCE(loyalty_points, 0) >= ?'
-        ).bind(reward.point_cost, now, cust.id, reward.point_cost).run();
-      } catch {
-        deductRes = await db.prepare(
-          'UPDATE customers SET loyalty_points = loyalty_points - ? WHERE id = ? AND COALESCE(loyalty_points, 0) >= ?'
-        ).bind(reward.point_cost, cust.id, reward.point_cost).run();
-      }
-    } else {
-      deductRes = { meta: { changes: 0 } };
-    }
-  }
-  const deductChanges = (deductRes as { meta?: { changes?: number } } | undefined)?.meta?.changes ?? 1;
-  if (deductChanges === 0) {
-    return c.json({ success: false, error: 'Không du diem', needed: reward.point_cost, current: pts }, 409);
-  }
-  const postCust = await db
-    .prepare(
-      "SELECT loyalty_points FROM customers WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
-    )
-    .bind(cust.id, storeTenant)
-    .first<{ loyalty_points?: number }>()
-    .catch(() =>
-      !storeTenant || storeTenant === 'default'
-        ? db
-            .prepare('SELECT loyalty_points FROM customers WHERE id = ?')
-            .bind(cust.id)
-            .first<{ loyalty_points?: number }>()
-            .catch(() => null)
-        : null
-    );
-  if (typeof postCust?.loyalty_points === 'number') {
-    newPts = Number(postCust.loyalty_points);
-  }
-  await db.prepare(
-    "UPDATE loyalty_accounts SET current_points = MAX(0, COALESCE(current_points, 0) - ?), last_activity_at = ?, updated_at = ? WHERE (customer_id = ? OR id = ?) AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
-  ).bind(reward.point_cost, now, now, cust.id, `la_${cust.id}`, storeTenant).run().catch(() =>
-    !storeTenant || storeTenant === 'default'
-      ? db.prepare(
-          'UPDATE loyalty_accounts SET current_points = MAX(0, COALESCE(current_points, 0) - ?), last_activity_at = ?, updated_at = ? WHERE customer_id = ? OR id = ?'
-        ).bind(reward.point_cost, now, now, cust.id, `la_${cust.id}`).run().catch(() => {})
-      : undefined
-  );
-  if (typeof rewardRec.stock === 'number' && rewardRec.stock > 0) {
-    const stockRes = await db.prepare(
-      "UPDATE rewards SET stock = MAX(0, stock - 1), updated_at = ? WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ? AND (stock IS NULL OR stock = -1 OR stock >= 1)"
-    ).bind(now, reward_id, storeTenant).run().catch(() =>
-      !storeTenant || storeTenant === 'default'
-        ? db.prepare('UPDATE rewards SET stock = MAX(0, stock - 1), updated_at = ? WHERE id = ? AND (stock IS NULL OR stock = -1 OR stock >= 1)').bind(now, reward_id).run().catch(() => null)
-        : null
-    );
-    const stockChanges = (stockRes as { meta?: { changes?: number } } | null)?.meta?.changes ?? 1;
-    if (fromLegacyRewards && stockChanges === 0) {
-      await db.prepare(
-        "UPDATE customers SET loyalty_points = COALESCE(loyalty_points, 0) + ?, updated_at = ? WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
-      ).bind(reward.point_cost, now, cust.id, storeTenant).run().catch(() =>
-        !storeTenant || storeTenant === 'default'
-          ? db.prepare(
-              'UPDATE customers SET loyalty_points = COALESCE(loyalty_points, 0) + ?, updated_at = ? WHERE id = ?'
-            ).bind(reward.point_cost, now, cust.id).run().catch(() => {})
-          : undefined
-      );
-      await db.prepare(
-        "UPDATE loyalty_accounts SET current_points = COALESCE(current_points, 0) + ?, updated_at = ? WHERE (customer_id = ? OR id = ?) AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
-      ).bind(reward.point_cost, now, cust.id, `la_${cust.id}`, storeTenant).run().catch(() =>
-        !storeTenant || storeTenant === 'default'
-          ? db.prepare(
-              'UPDATE loyalty_accounts SET current_points = COALESCE(current_points, 0) + ?, updated_at = ? WHERE customer_id = ? OR id = ?'
-            ).bind(reward.point_cost, now, cust.id, `la_${cust.id}`).run().catch(() => {})
-          : undefined
-      );
-      return c.json({ success: false, error: 'Reward out of stock' }, 409);
-    }
-  }
-  const lrUpdateRes = await db.prepare(
-    "UPDATE loyalty_rewards SET current_redemptions = COALESCE(current_redemptions, 0) + 1, stock = CASE WHEN stock IS NOT NULL AND stock > 0 THEN stock - 1 ELSE stock END, updated_at = ? WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ? AND (max_redemptions IS NULL OR max_redemptions <= 0 OR COALESCE(current_redemptions, 0) < max_redemptions) AND (stock IS NULL OR stock = -1 OR stock >= 1)"
-  ).bind(now, reward_id, storeTenant).run().catch(() =>
-    db.prepare(
-      "UPDATE loyalty_rewards SET current_redemptions = COALESCE(current_redemptions, 0) + 1, updated_at = ? WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ? AND (max_redemptions IS NULL OR max_redemptions <= 0 OR COALESCE(current_redemptions, 0) < max_redemptions)"
-    ).bind(now, reward_id, storeTenant).run().catch(() =>
-      !storeTenant || storeTenant === 'default'
-        ? db.prepare(
-            'UPDATE loyalty_rewards SET current_redemptions = COALESCE(current_redemptions, 0) + 1, stock = CASE WHEN stock IS NOT NULL AND stock > 0 THEN stock - 1 ELSE stock END, updated_at = ? WHERE id = ? AND (max_redemptions IS NULL OR max_redemptions <= 0 OR COALESCE(current_redemptions, 0) < max_redemptions) AND (stock IS NULL OR stock = -1 OR stock >= 1)'
-          ).bind(now, reward_id).run().catch(() =>
-            db.prepare(
-              'UPDATE loyalty_rewards SET current_redemptions = COALESCE(current_redemptions, 0) + 1, updated_at = ? WHERE id = ? AND (max_redemptions IS NULL OR max_redemptions <= 0 OR COALESCE(current_redemptions, 0) < max_redemptions)'
-            ).bind(now, reward_id).run().catch(() =>
-              db.prepare('UPDATE loyalty_rewards SET current_redemptions = COALESCE(current_redemptions, 0) + 1, updated_at = ? WHERE id = ?').bind(now, reward_id).run().catch(() => null)
-            )
-          )
-        : null
-    )
-  );
-  const lrChanges = (lrUpdateRes as { meta?: { changes?: number } } | null)?.meta?.changes ?? 1;
-  if (
-    !fromLegacyRewards &&
-    (typeof rewardRec.max_redemptions === 'number' || typeof rewardRec.stock === 'number') &&
-    lrChanges === 0
-  ) {
-    await db.prepare(
-      "UPDATE customers SET loyalty_points = COALESCE(loyalty_points, 0) + ?, updated_at = ? WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
-    ).bind(reward.point_cost, now, cust.id, storeTenant).run().catch(() =>
-      !storeTenant || storeTenant === 'default'
-        ? db.prepare(
-            'UPDATE customers SET loyalty_points = COALESCE(loyalty_points, 0) + ?, updated_at = ? WHERE id = ?'
-          ).bind(reward.point_cost, now, cust.id).run().catch(() => {})
-        : undefined
-    );
-    await db.prepare(
-      "UPDATE loyalty_accounts SET current_points = COALESCE(current_points, 0) + ?, updated_at = ? WHERE (customer_id = ? OR id = ?) AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
-    ).bind(reward.point_cost, now, cust.id, `la_${cust.id}`, storeTenant).run().catch(() =>
-      !storeTenant || storeTenant === 'default'
-        ? db.prepare(
-            'UPDATE loyalty_accounts SET current_points = COALESCE(current_points, 0) + ?, updated_at = ? WHERE customer_id = ? OR id = ?'
-          ).bind(reward.point_cost, now, cust.id, `la_${cust.id}`).run().catch(() => {})
-        : undefined
-    );
-    return c.json({ success: false, error: 'Reward redemption limit reached' }, 409);
-  }
-
-  const writeTenant = storeTenant && storeTenant !== '*' ? storeTenant : 'default';
-  const logId = genId('ptl_');
-  try {
-    await db.prepare(
-      'INSERT INTO loyalty_point_logs (id, customer_id, points_change, reason, balance_after, description, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)'
-    ).bind(logId, cust.id, -reward.point_cost, 'redeem', newPts, `D?i: ${reward.title}`, now).run();
-    await db.prepare('UPDATE loyalty_point_logs SET tenant_id = ? WHERE id = ?').bind(writeTenant, logId).run().catch(() => {});
-  } catch {
-    // Ignore when loyalty_point_logs is absent
-  }
-  try {
-    await db.prepare(
-      'INSERT OR IGNORE INTO loyalty_transactions (id, account_id, customer_id, points, type, reason, balance_after, description, reward_id, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
-    ).bind(logId, `la_${cust.id}`, cust.id, -reward.point_cost, 'redeem', 'redeem', newPts, `D?i: ${reward.title}`, reward_id, now).run();
-  } catch {
-    await db.prepare(
-      'INSERT OR IGNORE INTO loyalty_transactions (id, customer_id, points, type, description, created_at) VALUES (?, ?, ?, ?, ?, ?)'
-    ).bind(logId, cust.id, -reward.point_cost, 'redeem', `D?i: ${reward.title}`, now).run().catch(() => {});
-  }
-  await db.prepare('UPDATE loyalty_transactions SET tenant_id = ? WHERE id = ?').bind(writeTenant, logId).run().catch(() => {});
-
+  let newPts: number;
   const codeRand = new Uint8Array(3);
   crypto.getRandomValues(codeRand);
   const codeSuffix = Array.from(codeRand, (b) => b.toString(16).padStart(2, '0')).join('').toUpperCase();
   const code = `${reward.title.replace(/[^A-Z0-9]/gi, '').slice(0, 6).toUpperCase()}-${Date.now().toString(36).toUpperCase()}${codeSuffix}`;
   const expiresAt = new Date(Date.now() + 30 * 86400000).toISOString();
-  const redemptionId = genId('uwr_');
-
   try {
-    await db.prepare(
-      `INSERT INTO user_rewards (id, customer_id, reward_id, code, status, expires_at, created_at)
-       SELECT ?, ?, ?, ?, 'active', ?, ?
-       WHERE EXISTS (SELECT 1 FROM rewards WHERE id = ?)`
-    ).bind(redemptionId, cust.id, reward_id, code, expiresAt, now, reward_id).run();
-    await db.prepare('UPDATE user_rewards SET tenant_id = ? WHERE id = ?').bind(writeTenant, redemptionId).run().catch(() => {});
-  } catch {
-    // Ignore when user_rewards is absent
+    newPts = await redeemRewardAtomically(db, {
+      customerRoute: true, usingCustomersFallback: true, fromRewardsTable: fromLegacyRewards,
+      accountId: `la_${cust.id}`, customerId: cust.id, rewardId: reward_id, tenantId: storeTenant,
+      pointsCost: reward.point_cost, transactionId: crypto.randomUUID(), voucherCode: code,
+      expiresAt, now, rewardName: reward.title, orderId: null, idempotencyKey: null,
+    });
+  } catch (error) {
+    const conflict = /integer overflow|Redemption conflict/i.test(String(error));
+    return c.json({ success: false, error: conflict
+      ? 'Reward balance or availability changed; retry after refreshing'
+      : 'Reward redemption storage unavailable' }, conflict ? 409 : 503);
   }
-  await db.prepare(
-    `INSERT OR IGNORE INTO loyalty_redemptions (id, customer_id, reward_id, code, points_spent, status, expires_at, redeemed_at, created_at)
-     VALUES (?, ?, ?, ?, ?, 'active', ?, ?, ?)`
-  ).bind(redemptionId, cust.id, reward_id, code, reward.point_cost, expiresAt, now, now).run().catch(() => {});
-  await db.prepare('UPDATE loyalty_redemptions SET tenant_id = ? WHERE id = ?').bind(writeTenant, redemptionId).run().catch(() => {});
 
   return c.json({
     success: true,
@@ -612,7 +492,7 @@ loyaltyRouter.get('/my-rewards', async(c) => {
   let results: unknown[] = [];
   try {
     const res = await c.env.AURA_DB.prepare(
-      "SELECT ur.*, COALESCE(r.title, lr.name) AS title, COALESCE(r.discount_type, lr.type) AS discount_type, COALESCE(r.discount_value, lr.value) AS discount_value, r.tenant_id AS r_tenant_id, lr.tenant_id AS lr_tenant_id FROM user_rewards ur LEFT JOIN rewards r ON ur.reward_id = r.id LEFT JOIN loyalty_rewards lr ON ur.reward_id = lr.id WHERE ur.customer_id = ? AND COALESCE(NULLIF(TRIM(ur.tenant_id), ''), 'default') = ? ORDER BY ur.created_at DESC LIMIT 20"
+      "SELECT ur.*, COALESCE(r.title, lr.name) AS title, COALESCE(r.discount_type, lr.type) AS discount_type, COALESCE(r.discount_value, lr.value) AS discount_value, r.tenant_id AS r_tenant_id, lr.tenant_id AS lr_tenant_id FROM user_rewards ur LEFT JOIN rewards r ON ur.reward_id = r.id AND COALESCE(NULLIF(TRIM(r.tenant_id), ''), 'default') = COALESCE(NULLIF(TRIM(ur.tenant_id), ''), 'default') LEFT JOIN loyalty_rewards lr ON ur.reward_id = lr.id AND COALESCE(NULLIF(TRIM(lr.tenant_id), ''), 'default') = COALESCE(NULLIF(TRIM(ur.tenant_id), ''), 'default') WHERE ur.customer_id = ? AND COALESCE(NULLIF(TRIM(ur.tenant_id), ''), 'default') = ? ORDER BY ur.created_at DESC LIMIT 20"
     ).bind(cust.id, storeTenant).all();
     results = (res.results || []).filter(matchesMyRewardRow);
   } catch {
@@ -632,10 +512,14 @@ loyaltyRouter.get('/my-rewards', async(c) => {
       }
     }
   }
-  if (results.length === 0) {
+  {
+    // Canonical-only vouchers have no user_rewards row because its reward FK
+    // targets the legacy catalog. Existing legacy vouchers must not hide them.
+    const legacyResults = results;
+    results = [];
     try {
       const res = await c.env.AURA_DB.prepare(
-        "SELECT lr.*, COALESCE(r.name, rw.title) AS title, COALESCE(r.type, rw.discount_type) AS discount_type, COALESCE(r.value, rw.discount_value) AS discount_value, r.tenant_id AS r_tenant_id, rw.tenant_id AS rw_tenant_id FROM loyalty_redemptions lr LEFT JOIN loyalty_rewards r ON lr.reward_id = r.id LEFT JOIN rewards rw ON lr.reward_id = rw.id WHERE lr.customer_id = ? AND COALESCE(NULLIF(TRIM(lr.tenant_id), ''), 'default') = ? ORDER BY lr.created_at DESC LIMIT 20"
+        "SELECT lr.*, COALESCE(r.name, rw.title) AS title, COALESCE(r.type, rw.discount_type) AS discount_type, COALESCE(r.value, rw.discount_value) AS discount_value, r.tenant_id AS r_tenant_id, rw.tenant_id AS rw_tenant_id FROM loyalty_redemptions lr LEFT JOIN loyalty_rewards r ON lr.reward_id = r.id AND COALESCE(NULLIF(TRIM(r.tenant_id), ''), 'default') = COALESCE(NULLIF(TRIM(lr.tenant_id), ''), 'default') LEFT JOIN rewards rw ON lr.reward_id = rw.id AND COALESCE(NULLIF(TRIM(rw.tenant_id), ''), 'default') = COALESCE(NULLIF(TRIM(lr.tenant_id), ''), 'default') WHERE lr.customer_id = ? AND COALESCE(NULLIF(TRIM(lr.tenant_id), ''), 'default') = ? ORDER BY lr.created_at DESC LIMIT 20"
       ).bind(cust.id, storeTenant).all();
       results = (res.results || []).filter(matchesMyRewardRow);
     } catch {
@@ -658,6 +542,16 @@ loyaltyRouter.get('/my-rewards', async(c) => {
         }
       }
     }
+    const seenCodes = new Set(legacyResults.map(row => String((row as Record<string, unknown>).code ?? '')).filter(Boolean));
+    results = [
+      ...legacyResults,
+      ...results.filter(row => {
+        const code = String((row as Record<string, unknown>).code ?? '');
+        return !code || !seenCodes.has(code);
+      }),
+    ].sort((a, b) => String((b as Record<string, unknown>).created_at ?? '').localeCompare(
+      String((a as Record<string, unknown>).created_at ?? ''),
+    )).slice(0, 20);
   }
 
   const scopedResults = results.filter(matchesMyRewardRow);

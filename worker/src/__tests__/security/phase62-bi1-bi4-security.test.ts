@@ -1,3 +1,5 @@
+// @vitest-environment node
+import { orderCreationFixture } from '../integrations/order-creation-fixture';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { Hono } from 'hono';
 import { OpenAPIHono } from '@hono/zod-openapi';
@@ -502,60 +504,30 @@ describe('Phase 62 Security Regression Suite (BI1-BI4)', () => {
 
   describe('BI4: Shift Cash Reconciliation, Staff Tips, Staff KV Revocation & DinDin Cart Hardening', () => {
     it('enforces server-authoritative shift opening_cash and operator ownership in reconcileShiftCash', async () => {
-      const mockDb = {
-        prepare: (sql: string) => ({
-          bind: () => ({
-            first: async () => {
-              if (sql.includes('FROM staff_shifts')) {
-                return {
-                  clock_in: '2026-11-04T08:00:00.000Z',
-                  clock_out: null,
-                  opening_cash: 500000,
-                  staff_id: 'cashier_owner',
-                  tenant_id: 'store-a',
-                };
-              }
-              if (sql.includes('FROM shift_reconciliations')) {
-                return null;
-              }
-              if (sql.includes('FROM payments')) {
-                return { total: 200000 };
-              }
-              if (sql.includes('FROM cash_payouts')) {
-                return { total: 0 };
-              }
-              return null;
-            },
-            run: async () => ({ meta: { changes: 1 } }),
-          }),
-        }),
-      };
-
-      await expect(
-        reconcileShiftCash(
-          { AURA_DB: mockDb } as never,
-          {
-            shift_id: 'shift_bi4_1',
-            opening_float: 0,
-            denominations: { denominations: [{ denomination: 500000, count: 1 }, { denomination: 200000, count: 1 }] },
-          },
-          'other_cashier',
-          'store-a'
-        )
-      ).rejects.toThrow(/Shift operator mismatch/);
-
-      const recon = await reconcileShiftCash(
-        { AURA_DB: mockDb } as never,
-        {
-          shift_id: 'shift_bi4_1',
-          opening_float: 0, // Spoofed 0 opening float; server shift has 500,000 + 200,000 cash sales = 700,000
-          denominations: { denominations: [{ denomination: 200000, count: 1 }] },
-        },
-        'cashier_owner',
-        'store-a'
-      );
-      expect(recon.expected_cash).toBe(700000);
-      expect(recon.variance).toBe(-500000);
+      const { sqlite, env } = orderCreationFixture();
+      try {
+        sqlite.exec(`INSERT INTO users (id,name,role,tenant_id) VALUES
+            ('cashier_owner','Cashier','cashier','store-a'), ('other_cashier','Other','cashier','store-a');
+          INSERT INTO staff_shifts (id,tenant_id,staff_id,staff_name,date,shift,clock_in,opening_cash)
+            VALUES (1,'store-a','cashier_owner','Cashier','2026-11-04','attendance','2026-11-04T08:00:00.000Z',500000);
+          INSERT INTO orders (id,items,total,status,payment_status,payment_method,customer_name,customer_phone,tenant_id)
+            VALUES ('bi4-sale','[]',200000,'ready','paid','cash','Guest','0900000000','store-a');
+          INSERT INTO payments (id,order_id,tenant_id,method,amount,status,created_at,updated_at)
+            VALUES ('bi4-payment','bi4-sale','store-a','cash',200000,'completed',
+              '2026-11-04T09:00:00.000Z','2026-11-04T09:00:00.000Z');`);
+        const input = { shift_id: '1', opening_float: 500000,
+          denominations: { denominations: [{ denomination: 200000, count: 1 }] } };
+        await expect(reconcileShiftCash(env.AURA_DB, input, 'other_cashier', 'store-a'))
+          .rejects.toMatchObject({ status: 403, message: expect.stringMatching(/Forbidden/) });
+        await expect(reconcileShiftCash(env.AURA_DB, { ...input, opening_float: 0 }, 'cashier_owner', 'store-a'))
+          .rejects.toMatchObject({ status: 409, message: 'Opening float does not match recorded opening_cash' });
+        expect(sqlite.prepare('SELECT id FROM shift_reconciliations').all()).toHaveLength(0);
+        const recon = await reconcileShiftCash(env.AURA_DB, input, 'cashier_owner', 'store-a');
+        expect(recon.expected_cash).toBe(700000);
+        expect(recon.variance).toBe(-500000);
+      } finally {
+        sqlite.close();
+      }
     });
 
     it('blocks retroactive tip fabrication on a paid order when existingTipAmount is 0', async () => {

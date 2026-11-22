@@ -232,6 +232,12 @@ describe('COD Payment & Shift Sales Attribution', () => {
   it('attributes collected COD amount to the open cashier shift atomically', async () => {
     const { db, sqlite } = setupTestDb();
     sqlite.exec(`
+      ALTER TABLE payments ADD COLUMN tenant_id TEXT NOT NULL DEFAULT 'default';
+      CREATE TABLE shift_reconciliations (shift_id TEXT, tenant_id TEXT);
+      CREATE TABLE cash_payment_attributions (
+        payment_id TEXT PRIMARY KEY, tenant_id TEXT NOT NULL, shift_id TEXT NOT NULL,
+        collected_by TEXT NOT NULL, settled_at TEXT NOT NULL
+      );
       INSERT INTO staff_shifts (staff_id, tenant_id, date, clock_in, clock_out, cash_sales, total_sales, order_count)
       VALUES ('cashier_1', 'default', '2026-11-15', datetime('now', '-1 hour'), NULL, 0, 0, 0);
       INSERT INTO orders (id, tenant_id, total, payment_method, payment_status, status, is_cod)

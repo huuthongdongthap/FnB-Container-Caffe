@@ -89,6 +89,12 @@ describe('Checkout submit retries use one durable order intent', () => {
     mounted.unmount(); render(<CheckoutPage />); await submit({ ...form, paymentMethod: 'cod' });
     expect(orders.size).toBe(2); expect(mock.clear).toHaveBeenCalledTimes(2);
   });
+  it('fails closed on invalid dine-in table codes instead of changing to takeaway', async () => {
+    render(<CheckoutPage />);
+    expect(await submit({ ...form, orderType: 'dine_in', tableNumber: 'DEMO-1234' })).toBeUndefined();
+    expect(creates()).toHaveLength(0);
+    expect(mock.pay).not.toHaveBeenCalled();
+  });
   it('stops before provider I/O when identity changes during order creation', async () => {
     const create = mock.api.getMockImplementation()!;
     mock.api.mockImplementationOnce(async (...args) => {
