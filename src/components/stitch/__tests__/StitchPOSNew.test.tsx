@@ -96,6 +96,21 @@ describe('StitchPOSNew', () => {
     expect(screen.getAllByText('0₫').length).toBeGreaterThan(0);
     expect(screen.queryByText('$0.00')).toBeNull();
   });
+
+  it('renders add-on chip prices below 1,000 in VND, not USD', () => {
+    renderWithProviders(
+      <StitchPOSNew
+        menuItems={CUSTOM_ITEMS}
+        addOns={[
+          { id: 'a-low', name: 'Syrup Pump', price: 500 },
+          { id: 'a-high', name: 'Oat Milk', price: 10000 },
+        ]}
+      />
+    );
+    expect(screen.getByText('+500₫')).toBeTruthy();
+    expect(screen.getByText('+10.000₫')).toBeTruthy();
+    expect(screen.queryByText('+$500.00')).toBeNull();
+  });
   it('renders with default menu items', () => {
     renderWithProviders(<StitchPOSNew />);
     expect(screen.getByText('Midnight Espresso')).toBeTruthy();

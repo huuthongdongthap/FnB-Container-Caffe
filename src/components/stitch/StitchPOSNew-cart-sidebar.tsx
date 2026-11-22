@@ -57,7 +57,6 @@ export function CartSidebar({
 }: CartSidebarProps) {
   const { t } = useTranslation();
   const formattedSubtotal = formatPosPrice(subtotal);
-  const isUsdSubtotal = formattedSubtotal.startsWith('$');
   return (
     <aside
       className={cn(
@@ -143,16 +142,7 @@ export function CartSidebar({
       <div className="px-6 py-4 bg-[rgba(var(--aura-noir-void),0.5)] border-t border-[rgba(var(--aura-chrome-light),0.08)] flex flex-col gap-2">
         <div className="flex justify-between text-[13px] text-[var(--aura-text-muted, #8A8E96)] font-body">
           <span>{t('posNew.subtotal')}</span>
-          <span aria-label={formattedSubtotal}>
-            {isUsdSubtotal ? (
-              <>
-                <span>{formattedSubtotal.slice(0, 1)}</span>
-                <span>{formattedSubtotal.slice(1)}</span>
-              </>
-            ) : (
-              formattedSubtotal
-            )}
-          </span>
+          <span aria-label={formattedSubtotal}>{formattedSubtotal}</span>
         </div>
         {discount > 0 && (
           <div className="flex justify-between text-[13px] text-[var(--aura-text-muted, #8A8E96)] font-body">
