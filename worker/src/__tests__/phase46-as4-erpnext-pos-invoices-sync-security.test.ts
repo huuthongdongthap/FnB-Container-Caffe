@@ -20,6 +20,7 @@ function createEmptyAuthKv() {
 }
 
 async function makeStaffToken(role = 'owner', tenantId = 'default') {
+  const issuedAt = Math.floor(Date.now() / 1000);
   return generateJWT(
     {
       email: 'staff@aura.test',
@@ -29,11 +30,12 @@ async function makeStaffToken(role = 'owner', tenantId = 'default') {
       tenantId,
       tenant_id: tenantId,
       authVersion: 1,
-      authTime: Math.floor(Date.now() / 1000),
+      authTime: issuedAt,
       sessionType: 'staff-web',
     },
     TEST_JWT_SECRET,
-    28800
+    28800,
+    issuedAt
   );
 }
 

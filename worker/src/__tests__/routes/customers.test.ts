@@ -33,7 +33,8 @@ describe('customers smoke', () => {
     expect(unauthRes.status).toBe(401);
 
     const { generateJWT } = await import('../../lib/jwt');
-    const managerToken = await generateJWT({ id: 'm1', role: 'manager', email: 'm@test.aura', ...staffSessionClaims() } as any, secret, 28800);
+    const issuedAt = Math.floor(Date.now() / 1000);
+    const managerToken = await generateJWT({ id: 'm1', role: 'manager', email: 'm@test.aura', ...staffSessionClaims({ authTime: issuedAt }) } as any, secret, 28800, issuedAt);
     const req = new Request('https://test.aura/api/customers', {
       method: 'GET',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${managerToken}` }
@@ -83,7 +84,8 @@ describe('customers smoke', () => {
     const customerRes = await app.fetch(customerReq, prodEnv);
     expect(customerRes.status).toBe(403);
 
-    const managerToken = await generateJWT({ id: 'm1', role: 'manager', email: 'm@test.aura', ...staffSessionClaims() } as any, prodEnv.JWT_SECRET, 28800);
+    const issuedAt = Math.floor(Date.now() / 1000);
+    const managerToken = await generateJWT({ id: 'm1', role: 'manager', email: 'm@test.aura', ...staffSessionClaims({ authTime: issuedAt }) } as any, prodEnv.JWT_SECRET, 28800, issuedAt);
     const managerReq = new Request('https://test.aura/api/customers', {
       method: 'GET',
       headers: { Authorization: `Bearer ${managerToken}` }
@@ -104,7 +106,8 @@ describe('customers smoke', () => {
 
     const { generateJWT } = await import('../../lib/jwt');
     const secret = 'test-jwt-secret-at-least-16-chars';
-    const token = await generateJWT({ id: 'm1', role: 'manager', email: 'm@test.aura', ...staffSessionClaims() } as any, secret, 28800);
+    const issuedAt = Math.floor(Date.now() / 1000);
+    const token = await generateJWT({ id: 'm1', role: 'manager', email: 'm@test.aura', ...staffSessionClaims({ authTime: issuedAt }) } as any, secret, 28800, issuedAt);
     const req = new Request('https://test.aura/api/customers/segments', {
       method: 'GET',
       headers: { Authorization: `Bearer ${token}` }
@@ -124,7 +127,8 @@ describe('customers smoke', () => {
     const prepareSpy = vi.spyOn(db, 'prepare');
     const { generateJWT } = await import('../../lib/jwt');
     const secret = 'test-jwt-secret-at-least-16-chars';
-    const adminToken = await generateJWT({ id: 'a1', role: 'admin', email: 'a@test.aura', ...staffSessionClaims() } as any, secret, 28800);
+    const issuedAt = Math.floor(Date.now() / 1000);
+    const adminToken = await generateJWT({ id: 'a1', role: 'admin', email: 'a@test.aura', ...staffSessionClaims({ authTime: issuedAt }) } as any, secret, 28800, issuedAt);
 
     const req = new Request('https://test.aura/api/customers?tier=gold&search=090', {
       method: 'GET',

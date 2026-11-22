@@ -32,7 +32,8 @@ const app = new Hono<{ Bindings: any }>();
 app.use('/api/staff-tips/*', requireAuth(['owner', 'staff', 'manager']));
 app.route('/api/staff-tips', staffTipsRouter);
 async function fh(db: D1Database, m: string, p: string, b?: unknown) {
-  const t = await generateJWT({ id: 'u1', email: 'a@b.c', name: 'A', role: 'owner', authVersion: 1, authTime: Math.floor(Date.now() / 1000), sessionType: 'staff-web' }, SECRET, 28800);
+  const issuedAt = Math.floor(Date.now() / 1000);
+  const t = await generateJWT({ id: 'u1', email: 'a@b.c', name: 'A', role: 'owner', authVersion: 1, authTime: issuedAt, sessionType: 'staff-web' }, SECRET, 28800, issuedAt);
   const r = await app.fetch(new Request(`https://test.aura${p}`, { method: m, headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${t}` }, ...(b ? { body: JSON.stringify(b) } : {}) }), env(db), { waitUntil: () => {} } as any);
   return { status: r.status, json: await r.json().catch(() => ({})) };
 }

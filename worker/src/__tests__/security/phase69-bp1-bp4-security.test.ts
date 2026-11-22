@@ -1277,17 +1277,19 @@ describe('Phase 69 Security Regression Suite (BP1..BP4)', () => {
         .prepare(`INSERT INTO customers (id, name, phone, sync_status, tenant_id) VALUES (?, ?, ?, 'pending', ?), (?, ?, ?, 'pending', ?)`)
         .run('erp-cust-a', 'Shared Name A', '0905555111', 'store-a', 'erp-cust-b', 'Shared Name B', '0905555222', 'store-b');
 
+      const issuedAt = Math.floor(Date.now() / 1000);
       const staffTokenA = await generateJWT(
         {
           id: 'mgr-erp-a',
           role: 'manager',
           tenantId: 'store-a',
           authVersion: 1,
-          authTime: Math.floor(Date.now() / 1000),
+          authTime: issuedAt,
           sessionType: 'staff-web',
         } as never,
         JWT_SECRET,
-        28800
+        28800,
+        issuedAt
       );
       sqlite
         .prepare(`INSERT INTO users (id, email, name, role, tenant_id, is_active, auth_version) VALUES (?, ?, ?, 'manager', 'store-a', 1, 1)`)

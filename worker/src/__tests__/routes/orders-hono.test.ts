@@ -15,16 +15,17 @@ import { createMockEnv, createMockDB, isStaffAccountLookup, STAFF_ACCOUNT_ROW, T
  * staff-session gate requires, and names an account row the stub below answers.
  */
 async function staffCheckoutToken(overrides: Record<string, unknown> = {}) {
+  const issuedAt = Math.floor(Date.now() / 1000);
   return generateJWT({
     id: STAFF_ACCOUNT_ROW.id,
     email: 'staff@test.aura',
     name: STAFF_ACCOUNT_ROW.name,
     role: STAFF_ACCOUNT_ROW.role,
     authVersion: 1,
-    authTime: Math.floor(Date.now() / 1000),
+    authTime: issuedAt,
     sessionType: 'staff-web',
     ...overrides,
-  } as import('../../lib/jwt').JwtPayload, TEST_JWT_SECRET, 28800);
+  } as import('../../lib/jwt').JwtPayload, TEST_JWT_SECRET, 28800, issuedAt);
 }
 
 function authRequest(path: string, body: unknown, token: string) {

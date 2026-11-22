@@ -11,7 +11,8 @@ describe('Mounted refund route smoke', () => {
     // The request-time session gate re-reads the account row behind the owner
     // token; without it the request dies as a revoked session before the route.
     sql.staffAccount('OWNER', 'owner', 'default');
-    const token = await generateJWT({ id: 'OWNER', role: 'owner', tenantId: 'default' , authVersion: 1, authTime: Math.floor(Date.now() / 1000), sessionType: 'staff-web'}, TEST_JWT_SECRET, 28800);
+    const issuedAt = Math.floor(Date.now() / 1000);
+    const token = await generateJWT({ id: 'OWNER', role: 'owner', tenantId: 'default' , authVersion: 1, authTime: issuedAt, sessionType: 'staff-web'}, TEST_JWT_SECRET, 28800, issuedAt);
     const spy = vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('No provider calls allowed'));
     try {
       const res = await app.fetch(new Request('https://test.aura/api/payments/refund', { method: 'POST', headers: {

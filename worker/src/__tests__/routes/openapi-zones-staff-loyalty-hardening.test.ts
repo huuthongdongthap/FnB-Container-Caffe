@@ -171,7 +171,8 @@ describe('Phase 15: OpenAPI Table Zones Auth, ORDER BY Allowlisting, Staff & Loy
 
   it('sanitizes ORDER BY sort parameter against SQL injection in /api/table-zones and /api/staff', async () => {
     const { env, executedSqls } = makeHardeningTestEnv();
-    const token = await generateJWT({ sub: 'mgr-1', role: 'manager', name: 'Manager' , authVersion: 1, authTime: Math.floor(Date.now() / 1000), sessionType: 'staff-web'}, TEST_SECRET, 28800);
+    const issuedAt = Math.floor(Date.now() / 1000);
+    const token = await generateJWT({ sub: 'mgr-1', role: 'manager', name: 'Manager' , authVersion: 1, authTime: issuedAt, sessionType: 'staff-web'}, TEST_SECRET, 28800, issuedAt);
 
     const zoneRes = await app.fetch(
       new Request('https://test.aura/api/table-zones?sort=1;DROP%20TABLE%20users--&order=desc', {
@@ -200,7 +201,8 @@ describe('Phase 15: OpenAPI Table Zones Auth, ORDER BY Allowlisting, Staff & Loy
 
   it('hashes staff password with PBKDF2 and redacts plaintext password from audit_logs', async () => {
     const { env, auditInserts, createdUsers } = makeHardeningTestEnv();
-    const token = await generateJWT({ sub: OWNER_ID, role: 'owner', name: 'Owner' , authVersion: 1, authTime: Math.floor(Date.now() / 1000), sessionType: 'staff-web'}, TEST_SECRET, 28800);
+    const issuedAt = Math.floor(Date.now() / 1000);
+    const token = await generateJWT({ sub: OWNER_ID, role: 'owner', name: 'Owner' , authVersion: 1, authTime: issuedAt, sessionType: 'staff-web'}, TEST_SECRET, 28800, issuedAt);
 
     const res = await app.fetch(
       new Request('https://test.aura/api/staff', {
@@ -233,7 +235,8 @@ describe('Phase 15: OpenAPI Table Zones Auth, ORDER BY Allowlisting, Staff & Loy
 
   it('blocks manager from creating, updating, or deleting an owner account (privilege escalation guard)', async () => {
     const { env } = makeHardeningTestEnv();
-    const mgrToken = await generateJWT({ sub: 'mgr-1', role: 'manager', name: 'Manager' , authVersion: 1, authTime: Math.floor(Date.now() / 1000), sessionType: 'staff-web'}, TEST_SECRET, 28800);
+    const issuedAt = Math.floor(Date.now() / 1000);
+    const mgrToken = await generateJWT({ sub: 'mgr-1', role: 'manager', name: 'Manager' , authVersion: 1, authTime: issuedAt, sessionType: 'staff-web'}, TEST_SECRET, 28800, issuedAt);
 
     // 1. Manager attempting to create an owner account
     const createRes = await app.fetch(
@@ -324,7 +327,8 @@ describe('Phase 15: OpenAPI Table Zones Auth, ORDER BY Allowlisting, Staff & Loy
 
   it('authorizes admin role across OpenAPI loyalty admin summary, staff, table-zones, and cron routers', async () => {
     const { env } = makeHardeningTestEnv();
-    const adminToken = await generateJWT({ sub: 'admin-1', role: 'admin', name: 'Admin' , authVersion: 1, authTime: Math.floor(Date.now() / 1000), sessionType: 'staff-web'}, TEST_SECRET, 28800);
+    const issuedAt = Math.floor(Date.now() / 1000);
+    const adminToken = await generateJWT({ sub: 'admin-1', role: 'admin', name: 'Admin' , authVersion: 1, authTime: issuedAt, sessionType: 'staff-web'}, TEST_SECRET, 28800, issuedAt);
 
     const summaryRes = await app.fetch(
       new Request('https://test.aura/api/loyalty/admin/summary', {

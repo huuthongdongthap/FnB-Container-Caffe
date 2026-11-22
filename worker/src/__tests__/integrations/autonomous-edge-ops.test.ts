@@ -25,6 +25,7 @@ async function authRequest(
   };
 
   if (role) {
+    const issuedAt = Math.floor(Date.now() / 1000);
     const token = await generateJWT({
       id: `user-${role}`,
       sub: `user-${role}`,
@@ -32,8 +33,8 @@ async function authRequest(
       email: `${role}@test.aura`,
       name: `User ${role}`,
       tenantId,
-      ...(role === 'customer' ? {} : { authVersion: 1, authTime: Math.floor(Date.now() / 1000), sessionType: 'staff-web' })
-    } as any, TEST_JWT_SECRET, 28800);
+      ...(role === 'customer' ? {} : { authVersion: 1, authTime: issuedAt, sessionType: 'staff-web' })
+    } as any, TEST_JWT_SECRET, 28800, issuedAt);
     headers.Authorization = `Bearer ${token}`;
   }
 

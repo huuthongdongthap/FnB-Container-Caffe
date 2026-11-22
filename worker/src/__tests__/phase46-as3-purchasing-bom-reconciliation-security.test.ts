@@ -575,6 +575,7 @@ describe('Phase 46 Slice AS3 — Purchasing & Receiving, BOM Depletion, Cash Rec
         ['waiter-1', 'waiter'],
         ['staff-1', 'staff'],
       ] as const) {
+        const issuedAt = Math.floor(Date.now() / 1000);
         const token = await generateJWT(
           {
             id,
@@ -582,11 +583,12 @@ describe('Phase 46 Slice AS3 — Purchasing & Receiving, BOM Depletion, Cash Rec
             role,
             tenantId: 'default',
             authVersion: 1,
-            authTime: Math.floor(Date.now() / 1000),
+            authTime: issuedAt,
             sessionType: 'staff-web',
           },
           TEST_SECRET,
-          28800
+          28800,
+          issuedAt
         );
 
         const listRes = await app.fetch(
@@ -615,6 +617,7 @@ describe('Phase 46 Slice AS3 — Purchasing & Receiving, BOM Depletion, Cash Rec
         expect(refundRes.status).toBe(403);
       }
 
+      const issuedAt = Math.floor(Date.now() / 1000);
       const cashierToken = await generateJWT(
         {
           id: 'cashier-1',
@@ -622,11 +625,12 @@ describe('Phase 46 Slice AS3 — Purchasing & Receiving, BOM Depletion, Cash Rec
           role: 'cashier',
           tenantId: 'default',
           authVersion: 1,
-          authTime: Math.floor(Date.now() / 1000),
+          authTime: issuedAt,
           sessionType: 'staff-web',
         },
         TEST_SECRET,
-        28800
+        28800,
+        issuedAt
       );
       const cashierListRes = await app.fetch(
         new Request('https://test.aura/api/payments', {

@@ -196,7 +196,8 @@ describe('OpenAPI Payments IDOR & RBAC Hardening', () => {
 
   it('allows store manager to list payments and view any payment', async () => {
     const env = makePaymentsTestEnv();
-    const token = await generateJWT({ sub: 'mgr-1', role: 'manager', name: 'Store Manager' , authVersion: 1, authTime: Math.floor(Date.now() / 1000), sessionType: 'staff-web'}, TEST_SECRET, 28800);
+    const issuedAt = Math.floor(Date.now() / 1000);
+    const token = await generateJWT({ sub: 'mgr-1', role: 'manager', name: 'Store Manager' , authVersion: 1, authTime: issuedAt, sessionType: 'staff-web'}, TEST_SECRET, 28800, issuedAt);
 
     const listRes = await app.fetch(
       new Request('https://test.aura/api/payments', {
@@ -222,7 +223,8 @@ describe('OpenAPI Payments IDOR & RBAC Hardening', () => {
     const env = makePaymentsTestEnv();
     await env.AURA_DB.prepare('UPDATE orders SET tenant_id = ? WHERE id = ?').bind('cafe-a', ORD_CUST_1).run();
     await env.AURA_DB.prepare('UPDATE orders SET tenant_id = ? WHERE id = ?').bind('cafe-b', ORD_CUST_2).run();
-    const token = await generateJWT({ id: 'staff-a', role: 'cashier', tenantId: 'cafe-a' , authVersion: 1, authTime: Math.floor(Date.now() / 1000), sessionType: 'staff-web'}, TEST_SECRET, 28800);
+    const issuedAt = Math.floor(Date.now() / 1000);
+    const token = await generateJWT({ id: 'staff-a', role: 'cashier', tenantId: 'cafe-a' , authVersion: 1, authTime: issuedAt, sessionType: 'staff-web'}, TEST_SECRET, 28800, issuedAt);
     const res = await app.fetch(new Request('https://test.aura/api/payments?tenant_id=cafe-b', {
       headers: { Authorization: `Bearer ${token}`, 'x-tenant-id': 'cafe-b' } }), env);
     expect(res.status).toBe(200);
@@ -235,7 +237,8 @@ describe('OpenAPI Payments IDOR & RBAC Hardening', () => {
     await env.AURA_DB.prepare('UPDATE orders SET tenant_id = ? WHERE id = ?').bind('cafe-b', ORD_CUST_2).run();
     await env.AURA_DB.prepare("UPDATE payments SET status = 'completed' WHERE id = ?").bind(PAY_2).run();
     const before = await env.AURA_DB.prepare('SELECT * FROM payments WHERE id = ?').bind(PAY_2).first();
-    const token = await generateJWT({ id: 'staff-a', role: 'cashier', tenantId: 'cafe-a' , authVersion: 1, authTime: Math.floor(Date.now() / 1000), sessionType: 'staff-web'}, TEST_SECRET, 28800);
+    const issuedAt = Math.floor(Date.now() / 1000);
+    const token = await generateJWT({ id: 'staff-a', role: 'cashier', tenantId: 'cafe-a' , authVersion: 1, authTime: issuedAt, sessionType: 'staff-web'}, TEST_SECRET, 28800, issuedAt);
     const auth = { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' };
     const url = operation === 'refund' ? '/api/payments/refund' : operation === 'refund-details' ? `/api/payments/refunds/${PAY_2}` : `/api/payments/${PAY_2}`;
     const spy = vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('Provider must not be invoked'));

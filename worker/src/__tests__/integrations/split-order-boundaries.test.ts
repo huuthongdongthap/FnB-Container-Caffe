@@ -15,7 +15,10 @@ const entryFor = (productId = 'coffee') => ({
 });
 const entry = entryFor('coffee-a');
 const guestEntry = entryFor('coffee');
-const auth = () => generateJWT({ id: 'staff-a', role: 'waiter', tenantId: 'cafe-a', ...staffSessionClaims() }, 'test-jwt-secret-at-least-16-chars', 28800);
+const auth = () => {
+  const issuedAt = Math.floor(Date.now() / 1000);
+  return generateJWT({ id: 'staff-a', role: 'waiter', tenantId: 'cafe-a', ...staffSessionClaims({ authTime: issuedAt }) }, 'test-jwt-secret-at-least-16-chars', 28800, issuedAt);
+};
 function split(env: any, table_id: string, orders: unknown[], token?: string) {
   return app.fetch(new Request('https://test.aura/api/orders/split?tenant_id=cafe-b', {
     method: 'POST', headers: { 'Content-Type': 'application/json', 'x-tenant-id': 'cafe-b',

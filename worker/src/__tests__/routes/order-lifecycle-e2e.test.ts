@@ -117,7 +117,8 @@ describe('Order lifecycle E2E', () => {
   let token: string;
 
   beforeEach(async() => {
-    token = await generateJWT({ sub: 'usr-owner', role: 'owner', name: 'Owner' , authVersion: 1, authTime: Math.floor(Date.now() / 1000), sessionType: 'staff-web'}, TEST_JWT_SECRET, 28800);
+    const issuedAt = Math.floor(Date.now() / 1000);
+    token = await generateJWT({ sub: 'usr-owner', role: 'owner', name: 'Owner' , authVersion: 1, authTime: issuedAt, sessionType: 'staff-web'}, TEST_JWT_SECRET, 28800, issuedAt);
   });
 
   it('creates an order, retrieves it, and transitions through the state machine', async() => {

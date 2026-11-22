@@ -74,7 +74,8 @@ testApp.use('/api/table-sessions/*', requireAuth(['owner', 'staff', 'manager']))
 testApp.route('/api/table-sessions', tableSessionsRouter);
 
 async function fetchHandler(db: D1Database, method: string, path: string, body?: unknown) {
-  const token = await generateJWT({ id: 'u1', email: 'a@b.c', name: 'A', role: 'owner' , authVersion: 1, authTime: Math.floor(Date.now() / 1000), sessionType: 'staff-web'}, TEST_JWT_SECRET, 28800);
+  const issuedAt = Math.floor(Date.now() / 1000);
+  const token = await generateJWT({ id: 'u1', email: 'a@b.c', name: 'A', role: 'owner' , authVersion: 1, authTime: issuedAt, sessionType: 'staff-web'}, TEST_JWT_SECRET, 28800, issuedAt);
   const req = new Request(`https://test.aura${path}`, {
     method,
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },

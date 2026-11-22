@@ -205,10 +205,11 @@ describe('Customer Identity & Order Ownership Contract', () => {
     }, env);
     expect(resAttacker.status).toBe(403);
 
+    const issuedAt = Math.floor(Date.now() / 1000);
     const tokStaff = await generateJWT({
       sub: 'staff_1', id: 'staff_1', role: 'staff',
-      authVersion: 1, authTime: Math.floor(Date.now() / 1000), sessionType: 'staff-web',
-    }, secret, 28800);
+      authVersion: 1, authTime: issuedAt, sessionType: 'staff-web',
+    }, secret, 28800, issuedAt);
     const resStaff = await app.request('http://localhost/api/orders/ORD_CUST', {
       method: 'GET', headers: { Authorization: `Bearer ${tokStaff}` }
     }, env);

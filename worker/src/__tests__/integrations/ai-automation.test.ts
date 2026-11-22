@@ -28,6 +28,7 @@ async function authRequest(
   if (role) {
     // Session claims the request-time gate requires: without them a staff
     // token reads as a pre-versioning session and is rejected before the route.
+    const issuedAt = Math.floor(Date.now() / 1000);
     const token = await generateJWT({
       id: `user-${role}`,
       sub: `user-${role}`,
@@ -36,9 +37,9 @@ async function authRequest(
       name: `User ${role}`,
       tenantId,
       authVersion: 1,
-      authTime: Math.floor(Date.now() / 1000),
+      authTime: issuedAt,
       sessionType: 'staff-web'
-    } as any, TEST_JWT_SECRET, 28800);
+    } as any, TEST_JWT_SECRET, 28800, issuedAt);
     headers.Authorization = `Bearer ${token}`;
   }
 
