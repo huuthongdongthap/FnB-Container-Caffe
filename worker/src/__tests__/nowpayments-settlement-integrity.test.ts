@@ -159,6 +159,16 @@ describe('NOWPayments settlement integrity', () => {
     });
   }
 
+  it('settles and refunds standalone non-default tenant invoices without subscription_id', async () => {
+    const { sqlite, db, state } = fixture(true);
+    sqlite.exec(`PRAGMA foreign_keys = OFF;
+      UPDATE subscription_invoices SET subscription_id = '', tenant_id = 'store-a' WHERE id = 'invoice';`);
+    expect(await processNowPaymentsIpn(db, payload)).toMatchObject({ ok: true });
+    expect(state().invoice?.status).toBe('paid');
+    expect(await processNowPaymentsIpn(db, { ...payload, payment_status: 'refunded' })).toMatchObject({ ok: true });
+    expect(state().invoice?.status).toBe('refunded');
+  });
+
   it('returns retryable HTTP failure for unexpected database errors after signature validation', async () => {
     const body = JSON.stringify(payload);
     const secret = 'test-ipn-secret';

@@ -197,18 +197,18 @@ export async function processNowPaymentsIpn(
       }
     }
 
-    if (!sub || !sub.current_period_end || !/^\d{4}-\d{2}-\d{2}/.test(sub.current_period_end)) {
-      return { ok: false, error: 'Subscription unavailable for settlement', status: 500 };
-    }
-    if (typeof db.batch !== 'function') {
-      return { ok: false, error: 'Atomic settlement unavailable', status: 500 };
-    }
     const now = new Date().toISOString();
     const paymentRef = paymentId || inv.payment_ref || '';
     if (inv.subscription_id) {
+      if (!sub || !sub.current_period_end || !/^\d{4}-\d{2}-\d{2}/.test(sub.current_period_end)) {
+        return { ok: false, error: 'Subscription unavailable for settlement', status: 500 };
+      }
+      if (typeof db.batch !== 'function') {
+        return { ok: false, error: 'Atomic settlement unavailable', status: 500 };
+      }
       try {
         const effectiveSubTenant = subTenant || invTenant || 'default';
-        if (sub && sub.current_period_end && /^\d{4}-\d{2}-\d{2}/.test(sub.current_period_end)) {
+        {
           const months =
             sub.billing_cycle === 'quarterly'
               ? 3
@@ -309,6 +309,36 @@ export async function processNowPaymentsIpn(
       } catch {
         return { ok: false, error: 'Subscription settlement failed', status: 500 };
       }
+    } else {
+      try {
+        const settleStandalone = async (legacy: boolean) => {
+          const invoiceScope = legacy ? '' : " AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?";
+          const invoiceArgs = legacy ? [] : [rawInvTenantValue || 'default'];
+          return db
+            .prepare(
+              "UPDATE subscription_invoices SET status = 'paid', paid_at = ?, payment_method = 'crypto', payment_ref = ? WHERE id = ? AND status = ? AND COALESCE(payment_ref, '') = ?" +
+                invoiceScope
+            )
+            .bind(now, paymentRef, inv.id, inv.status, inv.payment_ref || '', ...invoiceArgs)
+            .run();
+        };
+        let result: WriteResult;
+        try {
+          result = await settleStandalone(false);
+        } catch (error) {
+          if (!missingColumn(error) || invTenant !== 'default' || 'tenant_id' in inv) throw error;
+          result = await settleStandalone(true);
+        }
+        if (result?.meta?.changes !== 1) {
+          const current = await fetchInvoiceByColumn(db, 'id', inv.id);
+          if (current?.status === 'paid' && current.payment_ref === paymentRef) {
+            return { ok: true, idempotent: true, status: 200 };
+          }
+          return { ok: false, error: 'Settlement state changed; retry required', status: 500 };
+        }
+      } catch {
+        return { ok: false, error: 'Invoice settlement failed', status: 500 };
+      }
     }
 
     try {
@@ -386,7 +416,7 @@ export async function processNowPaymentsIpn(
       const tenantScope = " AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?";
       const invoiceScope = 'tenant_id' in inv ? tenantScope : '';
       const subScope = sub && 'tenant_id' in sub ? tenantScope : '';
-      if (effectiveRefundTenant !== 'default' && !subScope) {
+      if (effectiveRefundTenant !== 'default' && (!invoiceScope || (sub && !subScope))) {
         return { ok: false, error: 'Tenant-scoped invoice refund update failed', status: 500 };
       }
       const subArgs = [inv.subscription_id, ...(subScope ? [subTenant] : [])];

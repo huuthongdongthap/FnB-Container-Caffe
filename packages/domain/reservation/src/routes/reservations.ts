@@ -1058,6 +1058,11 @@ reservationsRouter.patch('/:id', optionalAuth() as any, requireReservationStaff(
   const hasPartySizeUpdate = body.party_size !== undefined || body.guest_count !== undefined;
   const hasDateUpdate = body.date !== undefined || body.reservation_date !== undefined || body.reserved_date !== undefined;
   const hasTimeUpdate = body.time !== undefined || body.reservation_time !== undefined || body.reserved_time !== undefined;
+  const customerEdits = customerFields.filter(field => body[field] !== undefined);
+  const hasTenantColumn = 'tenant_id' in rsv;
+  if (customerEdits.length && !(rsvTenant && hasTenantColumn) && !(!hasTenantColumn && (!rsvTenant || rsvTenant === 'default'))) {
+    throw new Error('Reservation tenant scope required for customer update');
+  }
   if (rsvTenant) {
     try {
       if (hasPartySizeUpdate || hasDateUpdate || hasTimeUpdate) {
@@ -1118,11 +1123,9 @@ reservationsRouter.patch('/:id', optionalAuth() as any, requireReservationStaff(
     await db.prepare('UPDATE reservations SET status = ?, updated_at = ? WHERE id = ?').bind(effectiveStatus, now, id).run();
   }
   // Keep tenant-scoped customer edits separate from legacy slot-column fallbacks.
-  const customerEdits = customerFields.filter(field => body[field] !== undefined);
   if (customerEdits.length) {
     const assignments = customerEdits.map(field => `${field} = ?`).join(', ');
     const values = customerEdits.map(field => String(body[field]).trim());
-    const hasTenantColumn = 'tenant_id' in rsv;
     if (rsvTenant && hasTenantColumn) {
       await db
         .prepare(`UPDATE reservations SET ${assignments} WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?`)

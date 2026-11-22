@@ -55,15 +55,21 @@ export async function autoPostNewPromotions(env: Record<string, unknown>, tenant
     return { posted: 0 };
   }
 
+  const MAX_POSTS_PER_RUN = 50;
   let posted = 0;
+  let attempts = 0;
   const client = createMixpostClient(apiUrl, apiToken);
 
   for (const promo of promotions) {
+    if (posted >= MAX_POSTS_PER_RUN || attempts >= MAX_POSTS_PER_RUN) break;
     try {
       const content = `🔥 Khuyen Mai ${promo.code}: Giam ${promo.percent}% — Aura Cafe\n#AuraCafe #KhuyenMai`;
       // Older rows may lack an ID; code is the legacy primary key.
       const key = promo.id ? `id:${promo.id}` : `code:${promo.code}`;
-      if (await createClaimedAutoPost(db, job, tenantId, key, now, () => client.createPost({ accounts, content }))) {
+      if (await createClaimedAutoPost(db, job, tenantId, key, now, () => {
+        attempts++;
+        return client.createPost({ accounts, content });
+      })) {
         posted++;
       }
     } catch {

@@ -46,7 +46,7 @@ async function resolveSeatingSchema(
       throw legacyError;
     }
   }
-  for (const field of ['tenant_id', 'is_active', 'current_session_id', 'current_order_id']) {
+  for (const field of ['tenant_id', 'is_active', 'current_session_id', 'current_order_id', 'updated_at']) {
     try {
       await db.prepare(`SELECT ${field} FROM ${seatingTable} LIMIT 0`).all();
     } catch (error) {
@@ -113,6 +113,10 @@ function sessionTableWrite(
     binds.push(release ? null : sessionId);
   }
   if (release && !schema.seatingMissing.has('current_order_id')) fields += ', current_order_id = NULL';
+  if (!schema.seatingMissing.has('updated_at')) {
+    fields += ', updated_at = ?';
+    binds.push(new Date().toISOString());
+  }
   binds.push(tableId);
   if (tableScoped) binds.push(tenant);
   // Do not release a table that another session already occupies or owns.

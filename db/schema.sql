@@ -1018,3 +1018,17 @@ CREATE INDEX IF NOT EXISTS idx_trusted_devices_tenant_id ON trusted_devices(tena
 CREATE INDEX IF NOT EXISTS idx_user_rewards_tenant_id ON user_rewards(tenant_id);
 CREATE INDEX IF NOT EXISTS idx_visits_tenant_id ON visits(tenant_id);
 CREATE INDEX IF NOT EXISTS idx_wifi_sessions_tenant_id ON wifi_sessions(tenant_id);
+
+-- Manual PayOS refund transfer ledger (20261121_01_refund_manual_transfer_ledger.sql)
+CREATE TABLE IF NOT EXISTS payment_refund_transfers (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  tenant_id TEXT NOT NULL,
+  manual_transfer_ref TEXT NOT NULL CHECK (length(trim(manual_transfer_ref)) BETWEEN 1 AND 200),
+  payment_id TEXT NOT NULL,
+  amount INTEGER NOT NULL CHECK (amount > 0),
+  reason TEXT NOT NULL,
+  actor_id TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  UNIQUE (tenant_id, manual_transfer_ref)
+);
+CREATE INDEX IF NOT EXISTS idx_refund_transfers_payment ON payment_refund_transfers(payment_id);
