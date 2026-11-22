@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { renderWithProviders, screen, fireEvent } from '@/test-utils';
 import { StitchPOSNew } from '../StitchPOSNew';
-import type { POSNewMenuItem, POSNewAddOn } from '../StitchPOSNew-types';
+import { formatPosPrice, type POSNewMenuItem, type POSNewAddOn } from '../StitchPOSNew-types';
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
@@ -77,7 +77,25 @@ const _CUSTOM_ADDONS: POSNewAddOn[] = [
   { id: 'pa1', name: 'Extra Shot', price: 1.5 },
 ];
 
+describe('formatPosPrice', () => {
+  it.each([
+    [0, '0₫'],
+    [500, '500₫'],
+    [999, '999₫'],
+    [1000, '1.000₫'],
+    [35000, '35.000₫'],
+    [499.5, '500₫'],
+  ])('formats %s as %s in VND', (value, expected) => {
+    expect(formatPosPrice(value)).toBe(expected);
+  });
+});
+
 describe('StitchPOSNew', () => {
+  it('renders the empty cart total in VND, not USD', () => {
+    renderWithProviders(<StitchPOSNew menuItems={CUSTOM_ITEMS} />);
+    expect(screen.getAllByText('0₫').length).toBeGreaterThan(0);
+    expect(screen.queryByText('$0.00')).toBeNull();
+  });
   it('renders with default menu items', () => {
     renderWithProviders(<StitchPOSNew />);
     expect(screen.getByText('Midnight Espresso')).toBeTruthy();
