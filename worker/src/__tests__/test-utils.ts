@@ -57,9 +57,17 @@ export function staffSessionClaims(overrides: Partial<StaffSessionClaims> = {}):
   };
 }
 
-async function signToken(payload: Record<string, unknown>, secret: string = TEST_JWT_SECRET): Promise<string> {
-  return generateJWT({ ...payload, id: payload.id || payload.sub } as import('../../types/api').JwtPayload,
-    secret, payload.role === 'customer' ? undefined : 28800);
+async function signToken(
+  payload: Record<string, unknown>,
+  secret: string = TEST_JWT_SECRET,
+  nowSeconds?: number,
+): Promise<string> {
+  return generateJWT(
+    { ...payload, id: payload.id || payload.sub } as import('../../types/api').JwtPayload,
+    secret,
+    payload.role === 'customer' ? undefined : 28800,
+    nowSeconds,
+  );
 }
 
 /**
@@ -73,19 +81,21 @@ export async function mockStaffToken(
   overrides: Record<string, unknown> = {},
   secret: string = TEST_JWT_SECRET,
 ): Promise<string> {
+  const now = Math.floor(Date.now() / 1000);
   return signToken({
     id: 'user-staff',
     email: 'staff@test.aura',
     name: 'Staff',
     role: 'staff',
-    ...staffSessionClaims(overrides as Partial<StaffSessionClaims>),
+    ...staffSessionClaims({ authTime: now, ...(overrides as Partial<StaffSessionClaims>) }),
     ...overrides,
-  }, secret);
+  }, secret, now);
 }
 
 export async function mockRequestWithRole(method: string, path: string, role: string, body?: unknown): Promise<Request> {
-  const claims = role === 'customer' ? {} : staffSessionClaims();
-  const token = await signToken({ sub: `user-${role}`, role, email: `${role}@test.aura`, ...claims });
+  const now = Math.floor(Date.now() / 1000);
+  const claims = role === 'customer' ? {} : staffSessionClaims({ authTime: now });
+  const token = await signToken({ sub: `user-${role}`, role, email: `${role}@test.aura`, ...claims }, TEST_JWT_SECRET, now);
   const url = `https://test.aura${path}`;
   const init: RequestInit & { headers: Record<string, string> } = {
     method,

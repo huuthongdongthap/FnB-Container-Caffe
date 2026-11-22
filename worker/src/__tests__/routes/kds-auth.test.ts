@@ -45,6 +45,7 @@ function kdsEnv() {
 }
 
 async function staffToken(role = 'staff', id = 'staff-kds') {
+  const issuedAt = Math.floor(Date.now() / 1000);
   return generateJWT({
     id,
     sub: id,
@@ -52,8 +53,8 @@ async function staffToken(role = 'staff', id = 'staff-kds') {
     name: `KDS ${role}`,
     role,
     tenantId: 'cafe-a',
-    ...staffSessionClaims(),
-  } as any, JWT_SECRET, 28800);
+    ...staffSessionClaims({ authTime: issuedAt }),
+  } as any, JWT_SECRET, 28800, issuedAt);
 }
 
 describe('KDS session protection', () => {
@@ -160,14 +161,15 @@ describe('KDS session protection', () => {
         const results = []; for (const statement of statements) results.push(await statement.run()); return results;
       },
     };
+    const issuedAt = Math.floor(Date.now() / 1000);
     const token = await generateJWT({
       id: 'cashier-1',
       sub: 'cashier-1',
       email: 'cashier@test.aura',
       role: 'cashier',
       tenantId: 'cafe-a',
-      ...staffSessionClaims(),
-    } as any, JWT_SECRET, 28800);
+      ...staffSessionClaims({ authTime: issuedAt }),
+    } as any, JWT_SECRET, 28800, issuedAt);
 
     const response = await app.fetch(
       new Request('https://test.aura/api/orders/ORD_COD/mark-cod-paid', {

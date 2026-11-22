@@ -261,7 +261,8 @@ describe('Catalog Routes Security and Public Access', () => {
   describe('Authenticated staff mutations succeed', () => {
     it('allows staff POST /api/categories', async () => {
       const env = makeTestEnv();
-      const token = await generateJWT({ id: 'staff-1', role: 'staff', name: 'Barista', ...staffSessionClaims() }, TEST_SECRET, 28800);
+      const issuedAt = Math.floor(Date.now() / 1000);
+      const token = await generateJWT({ id: 'staff-1', role: 'staff', name: 'Barista', ...staffSessionClaims({ authTime: issuedAt }) }, TEST_SECRET, 28800, issuedAt);
       const res = await app.fetch(
         new Request('https://test.aura/api/categories', {
           method: 'POST',
@@ -280,7 +281,8 @@ describe('Catalog Routes Security and Public Access', () => {
 
     it('allows staff POST /api/products', async () => {
       const env = makeTestEnv();
-      const token = await generateJWT({ id: 'mgr-1', role: 'manager', name: 'Manager', ...staffSessionClaims() }, TEST_SECRET, 28800);
+      const issuedAt = Math.floor(Date.now() / 1000);
+      const token = await generateJWT({ id: 'mgr-1', role: 'manager', name: 'Manager', ...staffSessionClaims({ authTime: issuedAt }) }, TEST_SECRET, 28800, issuedAt);
       const res = await app.fetch(
         new Request('https://test.aura/api/products', {
           method: 'POST',
@@ -299,7 +301,8 @@ describe('Catalog Routes Security and Public Access', () => {
 
     it('allows staff POST /api/menu-modifiers/groups', async () => {
       const env = makeTestEnv();
-      const token = await generateJWT({ id: 'owner-1', role: 'owner', name: 'Owner', ...staffSessionClaims() }, TEST_SECRET, 28800);
+      const issuedAt = Math.floor(Date.now() / 1000);
+      const token = await generateJWT({ id: 'owner-1', role: 'owner', name: 'Owner', ...staffSessionClaims({ authTime: issuedAt }) }, TEST_SECRET, 28800, issuedAt);
       const res = await app.fetch(
         new Request('https://test.aura/api/menu-modifiers/groups', {
           method: 'POST',

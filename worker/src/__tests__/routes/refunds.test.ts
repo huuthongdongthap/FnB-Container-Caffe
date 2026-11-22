@@ -24,8 +24,9 @@ function fixture(status = 'completed', tenant = 'default') {
 async function headers(role = 'owner', tenantId = 'default') {
   // Claims the staff-session gate requires: the credential entry this session
   // came from and the session version it was issued at.
+  const issuedAt = Math.floor(Date.now() / 1000);
   const token = await generateJWT({ id: `${role}-${tenantId}`, role, tenantId, name: 'Local',
-    ...(role === 'customer' ? {} : { authVersion: 1, authTime: Math.floor(Date.now() / 1000), sessionType: 'staff-web' }) }, TEST_JWT_SECRET, 28800);
+    ...(role === 'customer' ? {} : { authVersion: 1, authTime: issuedAt, sessionType: 'staff-web' }) }, TEST_JWT_SECRET, 28800, issuedAt);
   return { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` };
 }
 function req(body: Record<string, unknown>, auth: Record<string, string> = {}) {

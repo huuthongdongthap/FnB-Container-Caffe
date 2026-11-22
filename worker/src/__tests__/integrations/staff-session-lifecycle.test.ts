@@ -1,7 +1,7 @@
 // @vitest-environment node
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { generateJWT, verifyJWT } from '../../lib/jwt';
-import { TEST_JWT_SECRET } from '../test-utils';
+import { TEST_JWT_SECRET, mockRequestWithRole, mockStaffToken } from '../test-utils';
 import { staffSessionFixture, STAFF_PASSWORD } from '../helpers/staff-session-fixture';
 
 let f: ReturnType<typeof staffSessionFixture>;
@@ -105,5 +105,26 @@ describe('canonical Staff authentication', () => {
     const response = await f.request('/mobile/refresh', token, 'POST', { device_token: 'local-device-token' });
     expect(response.status).toBe(401);
     expect((await response.json()).code).toBe('SESSION_EXPIRED');
+  });
+  it('keeps test-util staff tokens aligned across a 1-second clock boundary', async () => {
+    const baseMs = Math.floor(Date.now() / 1000) * 1000 + 999;
+    let tick = 0;
+    const nowSpy = vi.spyOn(Date, 'now').mockImplementation(() => baseMs + tick++);
+    try {
+      const token = await mockStaffToken({ id: 'staff', tenantId: 'cafe-a' });
+      const claims = await verifyJWT(token, TEST_JWT_SECRET);
+      expect(claims).not.toBeNull();
+      expect(claims!.exp).toBe((claims as { authTime?: number }).authTime! + 28800);
+      expect((await f.request('/api/kds/orders', token)).status).toBe(200);
+
+      tick = 0;
+      const req = await mockRequestWithRole('GET', '/api/kds/orders', 'staff');
+      const roleToken = req.headers.get('Authorization')!.replace('Bearer ', '');
+      const roleClaims = await verifyJWT(roleToken, TEST_JWT_SECRET);
+      expect(roleClaims).not.toBeNull();
+      expect(roleClaims!.exp).toBe((roleClaims as { authTime?: number }).authTime! + 28800);
+    } finally {
+      nowSpy.mockRestore();
+    }
   });
 });

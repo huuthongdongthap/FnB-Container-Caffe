@@ -45,7 +45,8 @@ describe('dbg', () => {
       { match: (s) => s.startsWith('INSERT INTO table_sessions'), rows: [], firstRow: null },
       { match: (s) => s.startsWith('SELECT * FROM table_sessions WHERE id ='), rows: [{ id: 'SES-NEW', table_id: 'T1', status: 'active', order_count: 0, total_amount: 0 }], firstRow: { id: 'SES-NEW', table_id: 'T1', status: 'active', order_count: 0, total_amount: 0 } },
     ]);
-    const token = await generateJWT({ id: 'u1', email: 'a@b.c', name: 'A', role: 'owner' , authVersion: 1, authTime: Math.floor(Date.now() / 1000), sessionType: 'staff-web'}, 'test-jwt-secret-at-least-16-chars', 28800);
+    const issuedAt = Math.floor(Date.now() / 1000);
+    const token = await generateJWT({ id: 'u1', email: 'a@b.c', name: 'A', role: 'owner' , authVersion: 1, authTime: issuedAt, sessionType: 'staff-web'}, 'test-jwt-secret-at-least-16-chars', 28800, issuedAt);
     const app = new Hono();
     app.use('/api/table-sessions/*', requireAuth(['owner', 'staff', 'manager']));
     app.route('/api/table-sessions', tableSessionsRouter);

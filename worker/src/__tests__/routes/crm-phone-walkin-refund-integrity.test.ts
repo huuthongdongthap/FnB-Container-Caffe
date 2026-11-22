@@ -356,15 +356,18 @@ describe('CRM phone normalization (#99), walk-in anonymity (#98), and guest refu
     // Step 3: POS lookup in tenant_a resolves same customer for both +84 and 0
     const app = new Hono<{ Bindings: Env }>();
     app.route('/api/pos/customer', posCustomerRouter);
+    const issuedAt = Math.floor(Date.now() / 1000);
     const tokenA = await generateJWT(
-      { id: 'staff_a', email: 'a@t1.vn', name: 'Cashier A', role: 'cashier', tenantId: 'tenant_a', authVersion: 1, authTime: Math.floor(Date.now() / 1000), sessionType: 'staff-web' },
+      { id: 'staff_a', email: 'a@t1.vn', name: 'Cashier A', role: 'cashier', tenantId: 'tenant_a', authVersion: 1, authTime: issuedAt, sessionType: 'staff-web' },
       TEST_JWT_SECRET,
       28800,
+      issuedAt,
     );
     const tokenB = await generateJWT(
-      { id: 'staff_b', email: 'b@t2.vn', name: 'Cashier B', role: 'cashier', tenantId: 'tenant_b', authVersion: 1, authTime: Math.floor(Date.now() / 1000), sessionType: 'staff-web' },
+      { id: 'staff_b', email: 'b@t2.vn', name: 'Cashier B', role: 'cashier', tenantId: 'tenant_b', authVersion: 1, authTime: issuedAt, sessionType: 'staff-web' },
       TEST_JWT_SECRET,
       28800,
+      issuedAt,
     );
     const env = { AURA_DB: db, JWT_SECRET: TEST_JWT_SECRET } as unknown as Env;
 

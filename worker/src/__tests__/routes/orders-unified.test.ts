@@ -111,7 +111,8 @@ describe('Canonical Unified Orders Router (/api/orders)', () => {
 
   it('routes GET /api/orders/summary to summary handler (not captured by /:id)', async () => {
     const env = makeTestEnv();
-    const token = await generateJWT({ sub: 'staff-1', role: 'staff', tenantId: 'cafe-a', name: 'Staff' , authVersion: 1, authTime: Math.floor(Date.now() / 1000), sessionType: 'staff-web'}, TEST_SECRET, 28800);
+    const issuedAt = Math.floor(Date.now() / 1000);
+    const token = await generateJWT({ sub: 'staff-1', role: 'staff', tenantId: 'cafe-a', name: 'Staff' , authVersion: 1, authTime: issuedAt, sessionType: 'staff-web'}, TEST_SECRET, 28800, issuedAt);
     const res = await app.fetch(
       new Request('https://test.aura/api/orders/summary', {
         headers: { Authorization: `Bearer ${token}` },
@@ -161,7 +162,8 @@ describe('Canonical Unified Orders Router (/api/orders)', () => {
   it('rejects unsupported payment methods on public, guest, and staff order APIs', async () => {
     const env = makeTestEnv();
     const unsupported = ['momo', 'apple_pay', 'google_pay'];
-    const staffToken = await generateJWT({ sub: 'cashier-1', id: 'cashier-1', role: 'cashier', tenantId: 'cafe-a', name: 'Cashier' , authVersion: 1, authTime: Math.floor(Date.now() / 1000), sessionType: 'staff-web'}, TEST_SECRET, 28800);
+    const issuedAt = Math.floor(Date.now() / 1000);
+    const staffToken = await generateJWT({ sub: 'cashier-1', id: 'cashier-1', role: 'cashier', tenantId: 'cafe-a', name: 'Cashier' , authVersion: 1, authTime: issuedAt, sessionType: 'staff-web'}, TEST_SECRET, 28800, issuedAt);
 
     for (const payment_method of unsupported) {
       const customerOrder = await app.fetch(new Request('https://test.aura/api/orders', {
@@ -218,7 +220,8 @@ describe('Canonical Unified Orders Router (/api/orders)', () => {
 
   it('routes GET /api/orders/kds and POST /:id/cancel without wildcard collision', async () => {
     const env = makeTestEnv();
-    const token = await generateJWT({ sub: 'staff-1', role: 'staff', tenantId: 'cafe-a', name: 'Staff' , authVersion: 1, authTime: Math.floor(Date.now() / 1000), sessionType: 'staff-web'}, TEST_SECRET, 28800);
+    const issuedAt = Math.floor(Date.now() / 1000);
+    const token = await generateJWT({ sub: 'staff-1', role: 'staff', tenantId: 'cafe-a', name: 'Staff' , authVersion: 1, authTime: issuedAt, sessionType: 'staff-web'}, TEST_SECRET, 28800, issuedAt);
     const kdsRes = await app.fetch(
       new Request('https://test.aura/api/orders/kds', {
         headers: { Authorization: `Bearer ${token}` },
@@ -303,7 +306,8 @@ describe('Canonical Unified Orders Router (/api/orders)', () => {
 
   it('authorizes manager role on /kds, /checkout, and /:id/status', async () => {
     const env = makeTestEnv();
-    const token = await generateJWT({ sub: 'mgr-1', role: 'manager', tenantId: 'cafe-a', name: 'Store Manager' , authVersion: 1, authTime: Math.floor(Date.now() / 1000), sessionType: 'staff-web'}, TEST_SECRET, 28800);
+    const issuedAt = Math.floor(Date.now() / 1000);
+    const token = await generateJWT({ sub: 'mgr-1', role: 'manager', tenantId: 'cafe-a', name: 'Store Manager' , authVersion: 1, authTime: issuedAt, sessionType: 'staff-web'}, TEST_SECRET, 28800, issuedAt);
 
     const kdsRes = await app.fetch(
       new Request('https://test.aura/api/orders/kds', {
@@ -351,8 +355,9 @@ describe('Canonical Unified Orders Router (/api/orders)', () => {
 
   it('authorizes waiter on /checkout and barista on /kds and /:id/status', async () => {
     const env = makeTestEnv();
-    const waiterToken = await generateJWT({ sub: 'w-1', role: 'waiter', tenantId: 'cafe-a', name: 'Waiter' , authVersion: 1, authTime: Math.floor(Date.now() / 1000), sessionType: 'staff-web'}, TEST_SECRET, 28800);
-    const baristaToken = await generateJWT({ sub: 'b-1', id: 'b-1', role: 'barista', tenantId: 'cafe-a', name: 'Barista', authVersion: 1, authTime: Math.floor(Date.now() / 1000), sessionType: 'staff-web' }, TEST_SECRET, 28800);
+    const issuedAt = Math.floor(Date.now() / 1000);
+    const waiterToken = await generateJWT({ sub: 'w-1', role: 'waiter', tenantId: 'cafe-a', name: 'Waiter' , authVersion: 1, authTime: issuedAt, sessionType: 'staff-web'}, TEST_SECRET, 28800, issuedAt);
+    const baristaToken = await generateJWT({ sub: 'b-1', id: 'b-1', role: 'barista', tenantId: 'cafe-a', name: 'Barista', authVersion: 1, authTime: issuedAt, sessionType: 'staff-web' }, TEST_SECRET, 28800, issuedAt);
 
     const posRes = await app.fetch(
       new Request('https://test.aura/api/orders/checkout', {

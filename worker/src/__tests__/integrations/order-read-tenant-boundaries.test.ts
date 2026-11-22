@@ -24,8 +24,9 @@ function seed(sqlite: ReturnType<typeof orderCreationFixture>['sqlite']) {
     ('order-b','[]',90000,'pending','PRIVATE B CUSTOMER','0999999999','cod','table-b','cafe-b');`);
 }
 async function get(env: any, path: string, tenantId = 'cafe-a', role = 'waiter', headerTenant = tenantId) {
+  const issuedAt = Math.floor(Date.now() / 1000);
   const token = await generateJWT({ id: 'local-staff', role, tenantId,
-    authVersion: 1, authTime: Math.floor(Date.now() / 1000), sessionType: 'staff-web' }, 'test-jwt-secret-at-least-16-chars', 28800);
+    authVersion: 1, authTime: issuedAt, sessionType: 'staff-web' }, 'test-jwt-secret-at-least-16-chars', 28800, issuedAt);
   return app.fetch(new Request(`https://test.aura${path}`, { headers: { Authorization: `Bearer ${token}`, 'x-tenant-id': headerTenant } }), env);
 }
 

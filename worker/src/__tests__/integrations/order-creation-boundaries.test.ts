@@ -32,7 +32,8 @@ const payload = payloadFor('coffee');
 const token = async (tenantId: string, id = 'staff-a', sqlite?: { prepare: (sql: string) => { run: (...a: unknown[]) => unknown } }) => {
   sqlite?.prepare(`INSERT OR IGNORE INTO users (id,name,phone,role,tenant_id,is_active,auth_version)
     VALUES (?, 'Staff A', NULL, 'waiter', ?, 1, 1)`).run(id, tenantId);
-  return generateJWT({ id, role: 'waiter', tenantId , authVersion: 1, authTime: Math.floor(Date.now() / 1000), sessionType: 'staff-web'}, 'test-jwt-secret-at-least-16-chars', 28800);
+  const issuedAt = Math.floor(Date.now() / 1000);
+  return generateJWT({ id, role: 'waiter', tenantId , authVersion: 1, authTime: issuedAt, sessionType: 'staff-web'}, 'test-jwt-secret-at-least-16-chars', 28800, issuedAt);
 };
 async function send(env: any, path: string, body: unknown, auth?: string, extra: Record<string, string> = {}) {
   return app.fetch(new Request(`https://test.aura${path}`, {

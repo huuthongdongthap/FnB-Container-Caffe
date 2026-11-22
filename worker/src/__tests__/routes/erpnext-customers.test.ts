@@ -46,7 +46,8 @@ async function fetchCustomers(
   };
   const app = new Hono<{ Bindings: Record<string, unknown> }>();
   customerRoutes(app as any);
-  const token = await generateJWT({ email: 'a@b.com', name: 'A', id: 'USR_1', role: 'owner' , authVersion: 1, authTime: Math.floor(Date.now() / 1000), sessionType: 'staff-web'}, TEST_JWT_SECRET, 28800);
+  const issuedAt = Math.floor(Date.now() / 1000);
+  const token = await generateJWT({ email: 'a@b.com', name: 'A', id: 'USR_1', role: 'owner' , authVersion: 1, authTime: issuedAt, sessionType: 'staff-web'}, TEST_JWT_SECRET, 28800, issuedAt);
   const reqInit: RequestInit = {
     headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
     method: opts.method || 'GET'

@@ -19,6 +19,7 @@ import { generateId } from '../../tree/auth/helpers';
  * present a session bound to the same device and staff account it is renewing.
  */
 async function mobileSessionBearer(staffId = 'USR_1', deviceId = 'DEV_1'): Promise<string> {
+  const issuedAt = Math.floor(Date.now() / 1000);
   const token = await generateJWT({
     id: staffId,
     email: 'owner@auraspace.cafe',
@@ -26,10 +27,10 @@ async function mobileSessionBearer(staffId = 'USR_1', deviceId = 'DEV_1'): Promi
     role: 'owner',
     tenantId: 'cafe-a',
     authVersion: 1,
-    authTime: Math.floor(Date.now() / 1000),
+    authTime: issuedAt,
     sessionType: 'staff-mobile',
     deviceId,
-  } as Record<string, unknown>, TEST_JWT_SECRET, 28800);
+  } as Record<string, unknown>, TEST_JWT_SECRET, 28800, issuedAt);
   return `Bearer ${token}`;
 }
 

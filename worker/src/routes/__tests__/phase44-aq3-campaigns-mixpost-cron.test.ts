@@ -182,6 +182,7 @@ function createSqliteD1() {
 }
 
 async function mintStaffJwt(userId: string, role: string, tenantId: string): Promise<string> {
+  const issuedAt = Math.floor(Date.now() / 1000);
   return generateJWT(
     {
       id: userId,
@@ -189,10 +190,11 @@ async function mintStaffJwt(userId: string, role: string, tenantId: string): Pro
       role: role as any,
       tenantId,
       email: `${userId}@test.aura`,
-      ...staffSessionClaims(),
+      ...staffSessionClaims({ authTime: issuedAt }),
     } as any,
     TEST_JWT_SECRET,
-    28800
+    28800,
+    issuedAt
   );
 }
 

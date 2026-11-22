@@ -59,6 +59,7 @@ async function authRequest(
   tenantId: string = 'default',
   body?: unknown
 ): Promise<Request> {
+  const issuedAt = Math.floor(Date.now() / 1000);
   const token = await generateJWT({
     id: `user-${role}`,
     sub: `user-${role}`,
@@ -67,9 +68,9 @@ async function authRequest(
     name: `User ${role}`,
     tenantId,
     authVersion: 1,
-    authTime: Math.floor(Date.now() / 1000),
+    authTime: issuedAt,
     sessionType: 'staff-web'
-  } as any, TEST_JWT_SECRET, 28800);
+  } as any, TEST_JWT_SECRET, 28800, issuedAt);
 
   const init: RequestInit & { headers: Record<string, string> } = {
     method,
@@ -14472,6 +14473,7 @@ describe('Multi-Tenant & Franchise Preparation Integration', () => {
       const { mixpostRouter } = await import('../../routes/mixpost');
 
       const jwtSecret = TEST_JWT_SECRET;
+      const issuedAt = Math.floor(Date.now() / 1000);
       const sadecMgrToken = await generateJWT(
         {
           id: 'user-manager',
@@ -14482,11 +14484,12 @@ describe('Multi-Tenant & Franchise Preparation Integration', () => {
           tenantId: 'sadec',
           tenant_id: 'sadec',
           authVersion: 1,
-          authTime: Math.floor(Date.now() / 1000),
+          authTime: issuedAt,
           sessionType: 'staff-web',
         } as any,
         jwtSecret,
-        28800
+        28800,
+        issuedAt
       );
 
       const mgrStaffRow = staffAccountRow('manager', 'sadec');
@@ -14671,6 +14674,7 @@ describe('Multi-Tenant & Franchise Preparation Integration', () => {
       const { validateAccessControl } = await import('../../../../packages/domain/security/src/policies/security-policy');
 
       const jwtSecret = TEST_JWT_SECRET;
+      const issuedAt = Math.floor(Date.now() / 1000);
       const sadecCashierToken = await generateJWT(
         {
           id: 'user-cashier',
@@ -14681,11 +14685,12 @@ describe('Multi-Tenant & Franchise Preparation Integration', () => {
           tenantId: 'sadec',
           tenant_id: 'sadec',
           authVersion: 1,
-          authTime: Math.floor(Date.now() / 1000),
+          authTime: issuedAt,
           sessionType: 'staff-web',
         } as any,
         jwtSecret,
-        28800
+        28800,
+        issuedAt
       );
 
       // 1. AH3-1: POS customer lookup fails closed for non-default tenant when customers.tenant_id column is missing
@@ -17411,6 +17416,7 @@ describe('Multi-Tenant & Franchise Preparation Integration', () => {
 
     it('AX1: Domain /happy-hour enforces cross-tenant 403 for store staff, requires concrete tenant on HQ POST (400), and binds effectiveTenant on HQ PATCH & DELETE', async () => {
       const { Hono } = await import('hono');
+      const issuedAt = Math.floor(Date.now() / 1000);
       const hqToken = await generateJWT(
         {
           id: 'hq-owner-ax1',
@@ -17420,11 +17426,12 @@ describe('Multi-Tenant & Franchise Preparation Integration', () => {
           name: 'HQ Owner AX1',
           tenantId: '*',
           authVersion: 1,
-          authTime: Math.floor(Date.now() / 1000),
+          authTime: issuedAt,
           sessionType: 'staff-web',
         },
         TEST_SECRET,
-        28800
+        28800,
+        issuedAt
       );
       const storeAToken = await generateJWT(
         {
@@ -17435,11 +17442,12 @@ describe('Multi-Tenant & Franchise Preparation Integration', () => {
           name: 'Store A Manager',
           tenantId: 'store-a',
           authVersion: 1,
-          authTime: Math.floor(Date.now() / 1000),
+          authTime: issuedAt,
           sessionType: 'staff-web',
         },
         TEST_SECRET,
-        28800
+        28800,
+        issuedAt
       );
 
       const hhSqlCalls: Array<{ sql: string; args: unknown[] }> = [];
@@ -17590,6 +17598,7 @@ describe('Multi-Tenant & Franchise Preparation Integration', () => {
 
     it('AX2: Domain /api/menu-modifiers binds effectiveGroupTenant on HQ group PATCH/DELETE and enforces parent existence & cross-store product-group match on HQ mutations', async () => {
       const { Hono } = await import('hono');
+      const issuedAt = Math.floor(Date.now() / 1000);
       const hqToken = await generateJWT(
         {
           id: 'hq-owner-ax2',
@@ -17599,11 +17608,12 @@ describe('Multi-Tenant & Franchise Preparation Integration', () => {
           name: 'HQ Owner AX2',
           tenantId: '*',
           authVersion: 1,
-          authTime: Math.floor(Date.now() / 1000),
+          authTime: issuedAt,
           sessionType: 'staff-web',
         },
         TEST_SECRET,
-        28800
+        28800,
+        issuedAt
       );
 
       const modSqlCalls: Array<{ sql: string; args: unknown[] }> = [];
@@ -17729,6 +17739,7 @@ describe('Multi-Tenant & Franchise Preparation Integration', () => {
 
     it('AX3: Legacy /api/promotions PATCH /:code and DELETE /:code resolve HQ wildcard (*) store promotions and bind existing.tenant_id in SQL', async () => {
       const { Hono } = await import('hono');
+      const issuedAt = Math.floor(Date.now() / 1000);
       const hqToken = await generateJWT(
         {
           id: 'hq-owner-ax3',
@@ -17738,11 +17749,12 @@ describe('Multi-Tenant & Franchise Preparation Integration', () => {
           name: 'HQ Owner AX3',
           tenantId: '*',
           authVersion: 1,
-          authTime: Math.floor(Date.now() / 1000),
+          authTime: issuedAt,
           sessionType: 'staff-web',
         },
         TEST_SECRET,
-        28800
+        28800,
+        issuedAt
       );
 
       let promoPercent = 15;
@@ -18381,6 +18393,7 @@ describe('Multi-Tenant & Franchise Preparation Integration', () => {
       const { reconcileShiftCash, getReconciliationForShift } = await import('../../../../packages/domain/shift/src/policies/cash-reconciliation-policy');
 
       const TEST_SECRET = 'test-jwt-secret-key-for-testing-only';
+      const issuedAt = Math.floor(Date.now() / 1000);
       const hqToken = await generateJWT(
         {
           id: 'hq-owner-1',
@@ -18390,11 +18403,12 @@ describe('Multi-Tenant & Franchise Preparation Integration', () => {
           name: 'HQ Owner 1',
           tenantId: '*',
           authVersion: 1,
-          authTime: Math.floor(Date.now() / 1000),
+          authTime: issuedAt,
           sessionType: 'staff-web',
         },
         TEST_SECRET,
-        28800
+        28800,
+        issuedAt
       );
 
       const tipSqlCalls: Array<{ sql: string; args: unknown[] }> = [];

@@ -82,12 +82,13 @@ let authToken: string;
 
 beforeEach(async () => {
   vi.clearAllMocks();
+  const issuedAt = Math.floor(Date.now() / 1000);
   authToken = await generateJWT({
     id: 'test-user-id',
     email: 'test@example.com',
     name: 'Test User',
-    role: 'owner', ...staffSessionClaims(),
-  }, TEST_JWT_SECRET, 28800);
+    role: 'owner', ...staffSessionClaims({ authTime: issuedAt }),
+  }, TEST_JWT_SECRET, 28800, issuedAt);
   env = createEnv();
   const mod = await import('@aura/domain-catalog');
   router = mod.categoriesRouter;

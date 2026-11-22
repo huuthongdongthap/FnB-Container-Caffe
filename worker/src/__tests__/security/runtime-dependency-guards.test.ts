@@ -30,10 +30,11 @@ function fixture() {
 async function headers(role?: 'cashier' | 'staff', extra: Record<string, string> = {}) {
   const result: Record<string, string> = { 'X-Request-ID': requestId, ...extra };
   if (role) {
+    const issuedAt = Math.floor(Date.now() / 1000);
     const token = await generateJWT({
       id: `guard-${role}`, role, tenantId: 'cafe-a', authVersion: 1,
-      authTime: Math.floor(Date.now() / 1000), sessionType: 'staff-web',
-    }, TEST_JWT_SECRET, 28800);
+      authTime: issuedAt, sessionType: 'staff-web',
+    }, TEST_JWT_SECRET, 28800, issuedAt);
     result.Authorization = `Bearer ${token}`;
   }
   return result;

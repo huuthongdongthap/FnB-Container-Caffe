@@ -49,8 +49,9 @@ function fixtures(tenant = 'cafe-a', status = 'preparing', beforeWrite?: (row: R
   return { row, db, env, writes };
 }
 async function request(path: string, method = 'PATCH', role = 'staff', status = 'ready') {
+  const issuedAt = Math.floor(Date.now() / 1000);
   const token = await generateJWT({ id: `actor-${role}`, sub: `actor-${role}`, role, tenantId: 'cafe-a', email: 'a@test.aura',
-    authVersion: 1, authTime: Math.floor(Date.now() / 1000), sessionType: 'staff-web' } as any, TEST_JWT_SECRET, 28800);
+    authVersion: 1, authTime: issuedAt, sessionType: 'staff-web' } as any, TEST_JWT_SECRET, 28800, issuedAt);
   return new Request(`https://test.aura${path}`, {
     method, headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
     ...(method === 'PATCH' && !path.includes('mark-cod-paid') ? { body: JSON.stringify({ status }) } : {}),

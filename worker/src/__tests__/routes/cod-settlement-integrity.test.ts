@@ -22,8 +22,9 @@ function fixture(status = 'preparing', paid = 'unpaid', tenant = 'cafe-a') {
 async function request(path = '/api/orders/COD_LOCAL/mark-cod-paid', method = 'PATCH', role = 'cashier') {
   // The session gate judges these claims against the account row inserted below,
   // so the auth version must be present and must match that row.
+  const issuedAt = Math.floor(Date.now() / 1000);
   const token = await generateJWT({ id: `local-${role}`, role, tenantId: 'cafe-a', email: 'local@test.aura',
-    authVersion: 1, authTime: Math.floor(Date.now() / 1000), sessionType: 'staff-web' } as any, TEST_JWT_SECRET, 28800);
+    authVersion: 1, authTime: issuedAt, sessionType: 'staff-web' } as any, TEST_JWT_SECRET, 28800, issuedAt);
   return new Request(`https://test.aura${path}`, { method, headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' } });
 }
 afterEach(() => { for (const value of fixtures.splice(0)) value.sqlite.close(); });

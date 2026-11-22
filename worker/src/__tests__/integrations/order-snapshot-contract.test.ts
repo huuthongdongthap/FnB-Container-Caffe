@@ -107,7 +107,8 @@ describe('Order Snapshot Contract Integration', () => {
   let token: string;
 
   beforeEach(async () => {
-    token = await generateJWT({ id: 'usr-1', sub: 'usr-1', role: 'owner', name: 'Owner', ...staffSessionClaims() }, TEST_SECRET, 28800);
+    const issuedAt = Math.floor(Date.now() / 1000);
+    token = await generateJWT({ id: 'usr-1', sub: 'usr-1', role: 'owner', name: 'Owner', ...staffSessionClaims({ authTime: issuedAt }) }, TEST_SECRET, 28800, issuedAt);
   });
 
   it('ignores client prices, calculates server authoritative price and single JSON encodes snapshot', async () => {

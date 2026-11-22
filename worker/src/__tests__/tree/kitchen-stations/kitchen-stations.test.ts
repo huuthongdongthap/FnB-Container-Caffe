@@ -61,7 +61,8 @@ app.use('/api/kitchen-stations/*', requireStaff(['owner', 'manager', 'staff']));
 app.route('/api/kitchen-stations', kitchenStationsRouter);
 
 async function fetchHandler(db: D1Database, method: string, path: string, body?: unknown) {
-  const token = await generateJWT({ id: 'u1', email: 'a@b.c', name: 'A', role: 'staff' , authVersion: 1, authTime: Math.floor(Date.now() / 1000), sessionType: 'staff-web'}, SECRET, 28800);
+  const issuedAt = Math.floor(Date.now() / 1000);
+  const token = await generateJWT({ id: 'u1', email: 'a@b.c', name: 'A', role: 'staff' , authVersion: 1, authTime: issuedAt, sessionType: 'staff-web'}, SECRET, 28800, issuedAt);
   const req = new Request(`https://test.aura${path}`, {
     method,
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },

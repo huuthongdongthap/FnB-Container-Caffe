@@ -91,7 +91,8 @@ describe('M4-D: Customer Order History (GET /api/orders)', () => {
   beforeEach(async() => {
     custAToken = await generateJWT({ sub: CUST_A_ID, role: 'customer', name: 'Customer A' }, TEST_JWT_SECRET);
     custBToken = await generateJWT({ sub: CUST_B_ID, role: 'customer', name: 'Customer B' }, TEST_JWT_SECRET);
-    staffToken = await generateJWT({ id: STAFF_OWNER_ID, sub: STAFF_OWNER_ID, role: 'owner', name: 'Staff Owner', ...staffSessionClaims() }, TEST_JWT_SECRET, 28800);
+    const issuedAt = Math.floor(Date.now() / 1000);
+    staffToken = await generateJWT({ id: STAFF_OWNER_ID, sub: STAFF_OWNER_ID, role: 'owner', name: 'Staff Owner', ...staffSessionClaims({ authTime: issuedAt }) }, TEST_JWT_SECRET, 28800, issuedAt);
   });
 
   it('customer sees only their own orders with customer-safe projection', async() => {
