@@ -6,10 +6,7 @@ import { formatPosPrice, type POSNewAddOn } from './StitchPOSNew-types';
 
 export function AddOnChip({ addon, onAdd }: { addon: POSNewAddOn; onAdd: () => void }) {
   const { t } = useTranslation();
-  const formattedAddonPrice =
-    addon.price >= 1000
-      ? `+${formatPosPrice(addon.price)}`
-      : `+$${addon.price.toFixed(2)}`;
+  const formattedAddonPrice = `+${formatPosPrice(addon.price)}`;
   return (
     <button
      type="button"
