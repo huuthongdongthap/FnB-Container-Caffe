@@ -21,7 +21,7 @@ import { useCheckout, useProcessPayOS } from '@/hooks/use-checkout';
 import { useOfflineSync } from '@/hooks/use-offline-sync';
 import { useAuthStore } from '@/hooks/stores/use-auth-store';
 import { apiFetch } from '@/lib/api-client';
-import { CheckCircle2, AlertCircle, X, ExternalLink } from 'lucide-react';
+import { CheckCircle2, AlertCircle, X, ExternalLink, RefreshCw } from 'lucide-react';
 import type { PaymentMethod } from '@/lib/validators';
 import { brandConfig } from '@/config/brand-types';
 import { StitchPOSNew } from '@/components/stitch/StitchPOSNew';
@@ -163,7 +163,12 @@ export default function AdminPOSPage() {
   const [shiftHandoverOpen, setShiftHandoverOpen] = useState(false);
   const [checkoutError, setCheckoutError] = useState<string | null>(null);
   const [paymentUrl, setPaymentUrl] = useState<string | null>(null);
+  const [paymentQrPayload, setPaymentQrPayload] = useState<string | null>(null);
   const [paymentQrDataUrl, setPaymentQrDataUrl] = useState<string | null>(null);
+  const [pendingPayOSOrder, setPendingPayOSOrder] = useState<{ orderId: string; total: number } | null>(null);
+  const [isRetryingPayOS, setIsRetryingPayOS] = useState(false);
+  const [isCancellingOrder, setIsCancellingOrder] = useState(false);
+  const [cartResetKey, setCartResetKey] = useState(0);
   const [, setIsCompleting] = useState(false);
   const isCompletingRef = useRef(false);
   const successTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -172,18 +177,21 @@ export default function AdminPOSPage() {
     setCustomer(null);
     setSelectedTableId(undefined);
     setPaymentUrl(null);
+    setPaymentQrPayload(null);
     setPaymentQrDataUrl(null);
+    setPendingPayOSOrder(null);
     setCheckoutError(null);
     setCheckoutSuccess(false);
   }, [activeTenant, sessionVersion]);
 
   useEffect(() => {
-    if (!paymentUrl) {
+    const qrSource = paymentQrPayload || paymentUrl;
+    if (!qrSource) {
       setPaymentQrDataUrl(null);
       return;
     }
     let cancelled = false;
-    void QRCode.toDataURL(paymentUrl, { width: 180, margin: 1 })
+    void QRCode.toDataURL(qrSource, { width: 180, margin: 1 })
       .then((dataUrl) => {
         if (!cancelled) setPaymentQrDataUrl(dataUrl);
       })
@@ -193,7 +201,54 @@ export default function AdminPOSPage() {
     return () => {
       cancelled = true;
     };
-  }, [paymentUrl]);
+  }, [paymentQrPayload, paymentUrl]);
+
+  useEffect(() => {
+    if (!paymentUrl || !pendingPayOSOrder?.orderId) return;
+    let cancelled = false;
+    const orderId = pendingPayOSOrder.orderId;
+    const pollOrderPayment = async () => {
+      try {
+        const res = await apiFetch<{
+          order?: { payment_status?: string; paymentStatus?: string };
+          data?: { payment_status?: string; paymentStatus?: string };
+          payment_status?: string;
+          paymentStatus?: string;
+        }>(`/api/orders/${encodeURIComponent(orderId)}`);
+        if (cancelled) return;
+        const status = String(
+          res?.order?.payment_status ??
+          res?.order?.paymentStatus ??
+          res?.data?.payment_status ??
+          res?.data?.paymentStatus ??
+          res?.payment_status ??
+          res?.paymentStatus ??
+          ''
+        ).toLowerCase();
+        if (status === 'paid' || status === 'completed') {
+          setPaymentUrl(null);
+          setPaymentQrPayload(null);
+          setPendingPayOSOrder(null);
+          setCartResetKey((k) => k + 1);
+          setCheckoutSuccess(true);
+          if (successTimerRef.current) clearTimeout(successTimerRef.current);
+          successTimerRef.current = setTimeout(() => {
+            setCheckoutSuccess(false);
+            successTimerRef.current = null;
+          }, 5000);
+        }
+      } catch {
+        // Ignore transient polling failures
+      }
+    };
+    const intervalId = setInterval(() => {
+      void pollOrderPayment();
+    }, 3000);
+    return () => {
+      cancelled = true;
+      clearInterval(intervalId);
+    };
+  }, [paymentUrl, pendingPayOSOrder?.orderId]);
 
   useEffect(() => {
     return () => {
@@ -259,32 +314,48 @@ export default function AdminPOSPage() {
 
         if (result.success) {
           let resolvedUrl = result.payment_url || result.checkout_url;
+          let resolvedQrCode: string | null = null;
           const createdOrderId = result.order_id || result.order?.id;
-          if (paymentMethod === 'payos' && !resolvedUrl && createdOrderId) {
-            try {
-              const payRes = await payOSMutation.mutateAsync({
-                order_id: createdOrderId,
-                total: Math.round(total),
-                cancel_url: window.location.href,
-                return_url: window.location.href,
-                description: `POS #${createdOrderId.slice(0, 8)}`,
-              });
-              resolvedUrl = payRes.payment_url || payRes.checkout_url || payRes.checkoutUrl;
-            } catch {
-              // Non-fatal: order created, staff can retry payment link
+          const serverTotal = Math.round(result.order?.total ?? result.order?.totalAmount ?? subtotal);
+
+          if (paymentMethod === 'payos') {
+            if (!createdOrderId) {
+              setCheckoutError(t('adminPOS.createOrderError'));
+              return false;
             }
-          }
-          const safeUrl = sanitizePaymentUrl(resolvedUrl);
-          if (paymentMethod === 'payos' && safeUrl) {
-            setPaymentUrl(safeUrl);
-            try {
-              const parsed = new URL(safeUrl);
-              if (parsed.origin === window.location.origin) {
-                navigate(parsed.pathname + parsed.search);
+            if (!resolvedUrl) {
+              try {
+                const payRes = await payOSMutation.mutateAsync({
+                  order_id: createdOrderId,
+                  total: serverTotal,
+                  cancel_url: window.location.href,
+                  return_url: window.location.href,
+                  description: `POS #${createdOrderId.slice(0, 8)}`,
+                });
+                resolvedUrl = payRes.payment_url || payRes.checkout_url || payRes.checkoutUrl || payRes.data?.checkoutUrl || payRes.data?.payment_url;
+                resolvedQrCode = payRes.qrCode || payRes.qr_code || payRes.qrCodeUrl || payRes.data?.qrCode || payRes.data?.qrCodeUrl || null;
+              } catch (payErr) {
+                setPendingPayOSOrder({ orderId: createdOrderId, total: serverTotal });
+                setCheckoutError(
+                  payErr instanceof Error
+                    ? payErr.message
+                    : 'Không thể tạo mã QR PayOS. Vui lòng thử tạo lại hoặc hủy đơn.'
+                );
+                return false;
               }
-            } catch {
-              // Keep safeUrl modal banner
             }
+            const safeUrl = sanitizePaymentUrl(resolvedUrl);
+            if (!safeUrl) {
+              setPendingPayOSOrder({ orderId: createdOrderId, total: serverTotal });
+              setCheckoutError('Không nhận được liên kết thanh toán PayOS hợp lệ. Vui lòng thử lại.');
+              return false;
+            }
+            setPendingPayOSOrder({ orderId: createdOrderId, total: serverTotal });
+            setPaymentQrPayload(resolvedQrCode || safeUrl);
+            setPaymentUrl(safeUrl);
+            setCustomer(null);
+            _setSelectedTableId(undefined);
+            return true;
           }
 
           setCustomer(null);
@@ -320,6 +391,58 @@ export default function AdminPOSPage() {
     [paymentMethod, checkoutMutation.mutateAsync, payOSMutation.mutateAsync, customer, selectedTableId, queryClient, t, navigate],
   );
 
+  const handleRetryPayOSLink = useCallback(async () => {
+    if (!pendingPayOSOrder || isRetryingPayOS) return;
+    setIsRetryingPayOS(true);
+    setCheckoutError(null);
+    try {
+      const payRes = await payOSMutation.mutateAsync({
+        order_id: pendingPayOSOrder.orderId,
+        total: pendingPayOSOrder.total,
+        cancel_url: window.location.href,
+        return_url: window.location.href,
+        description: `POS #${pendingPayOSOrder.orderId.slice(0, 8)}`,
+      });
+      const resolvedUrl = payRes.payment_url || payRes.checkout_url || payRes.checkoutUrl || payRes.data?.checkoutUrl || payRes.data?.payment_url;
+      const resolvedQrCode = payRes.qrCode || payRes.qr_code || payRes.qrCodeUrl || payRes.data?.qrCode || payRes.data?.qrCodeUrl || null;
+      const safeUrl = sanitizePaymentUrl(resolvedUrl);
+      if (!safeUrl) {
+        setCheckoutError('Không nhận được liên kết thanh toán PayOS hợp lệ.');
+        return;
+      }
+      setPaymentQrPayload((prev) => {
+        if (resolvedQrCode) return resolvedQrCode;
+        if (prev && !/^https?:\/\//i.test(prev)) return prev;
+        return safeUrl;
+      });
+      setPaymentUrl(safeUrl);
+      setCartResetKey((k) => k + 1);
+    } catch (err) {
+      setCheckoutError(err instanceof Error ? err.message : 'Thử tạo lại mã QR PayOS thất bại.');
+    } finally {
+      setIsRetryingPayOS(false);
+    }
+  }, [pendingPayOSOrder, isRetryingPayOS, payOSMutation]);
+
+  const handleCancelPendingOrder = useCallback(async () => {
+    if (!pendingPayOSOrder || isCancellingOrder) return;
+    setIsCancellingOrder(true);
+    try {
+      await apiFetch(`/api/orders/${encodeURIComponent(pendingPayOSOrder.orderId)}/status`, {
+        method: 'PATCH',
+        body: JSON.stringify({ status: 'cancelled' }),
+      });
+      setPaymentUrl(null);
+      setPaymentQrPayload(null);
+      setPendingPayOSOrder(null);
+      setCheckoutError(null);
+    } catch (err) {
+      setCheckoutError(err instanceof Error ? err.message : 'Không thể hủy đơn hàng.');
+    } finally {
+      setIsCancellingOrder(false);
+    }
+  }, [pendingPayOSOrder, isCancellingOrder]);
+
   /* ── Render ───────────────────────────────────────────────────────── */
   return (
     <div className="relative min-h-screen">
@@ -354,6 +477,7 @@ export default function AdminPOSPage() {
         onClearCustomer={() => setCustomer(null)}
         onOpenSchedule={() => navigate('/admin/staff')}
         onEndShift={() => setShiftHandoverOpen(true)}
+        cartResetKey={cartResetKey}
       />
 
       <ShiftHandoverModal
@@ -398,7 +522,8 @@ export default function AdminPOSPage() {
       {/* ── Error Banner Overlay ────────────────────────────────────────── */}
       {checkoutError && (
         <div
-          className="fixed top-20 left-1/2 -translate-x-1/2 z-[100] flex items-center gap-2 px-5 py-3 rounded-lg shadow-lg"
+          role="alert"
+          className="fixed top-20 left-1/2 -translate-x-1/2 z-[100] flex items-center gap-3 px-5 py-3 rounded-lg shadow-lg max-w-xl"
           style={{
             backgroundColor: 'rgba(220,53,69,0.95)',
             color: '#fff',
@@ -406,10 +531,30 @@ export default function AdminPOSPage() {
         >
           <AlertCircle className="w-4 h-4 shrink-0" />
           <span className="text-sm flex-1">{checkoutError}</span>
+          {pendingPayOSOrder && (
+            <div className="flex items-center gap-2 shrink-0">
+              <button
+                type="button"
+                disabled={isRetryingPayOS}
+                onClick={() => void handleRetryPayOSLink()}
+                className="px-2.5 py-1 rounded bg-white/20 hover:bg-white/30 text-xs font-semibold cursor-pointer disabled:opacity-50"
+              >
+                {isRetryingPayOS ? 'Đang tạo...' : 'Thử tạo lại QR'}
+              </button>
+              <button
+                type="button"
+                disabled={isCancellingOrder}
+                onClick={() => void handleCancelPendingOrder()}
+                className="px-2.5 py-1 rounded bg-black/25 hover:bg-black/40 text-xs font-semibold cursor-pointer disabled:opacity-50"
+              >
+                {isCancellingOrder ? 'Đang hủy...' : 'Hủy đơn'}
+              </button>
+            </div>
+          )}
           <button
             type="button"
             onClick={() => setCheckoutError(null)}
-            className="shrink-0 ml-2 hover:opacity-80 transition-opacity cursor-pointer"
+            className="shrink-0 ml-1 hover:opacity-80 transition-opacity cursor-pointer"
           >
             <X className="w-3.5 h-3.5" />
           </button>
@@ -447,10 +592,33 @@ export default function AdminPOSPage() {
             >
               <ExternalLink className="w-4 h-4" /> Mở trang thanh toán
             </a>
+            {pendingPayOSOrder && (
+              <div className="flex items-center gap-2 mt-1">
+                <button
+                  type="button"
+                  disabled={isRetryingPayOS}
+                  onClick={() => void handleRetryPayOSLink()}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/10 hover:bg-white/20 text-xs font-semibold text-white cursor-pointer disabled:opacity-50"
+                >
+                  <RefreshCw className="w-3.5 h-3.5" />
+                  {isRetryingPayOS ? 'Đang tạo...' : 'Tạo lại QR'}
+                </button>
+                <button
+                  type="button"
+                  disabled={isCancellingOrder}
+                  onClick={() => void handleCancelPendingOrder()}
+                  className="px-3 py-1.5 rounded-full bg-red-500/20 hover:bg-red-500/35 text-xs font-semibold text-red-200 cursor-pointer disabled:opacity-50"
+                >
+                  {isCancellingOrder ? 'Đang hủy...' : 'Hủy đơn'}
+                </button>
+              </div>
+            )}
             <button
               type="button"
               onClick={() => {
                 setPaymentUrl(null);
+                setPaymentQrPayload(null);
+                setPendingPayOSOrder(null);
                 setCustomer(null);
                 setSelectedTableId(undefined);
               }}

@@ -61,6 +61,8 @@ export function StitchOrderSuccessNew({
   onAccount,
   onRefresh,
   onReorder,
+  onRetryPayment,
+  isRetryingPayment = false,
 }: Readonly<StitchOrderSuccessNewProps>) {
   const { t } = useTranslation();
   const isVietnamese = locale === 'vi' || locale.startsWith('vi');
@@ -138,6 +140,28 @@ export function StitchOrderSuccessNew({
           pointsEarned={order.pointsEarned}
           cashbackEarned={order.cashbackEarned}
         />
+
+        {/* Retry PayOS CTA when online payment is still unpaid/pending/failed and order is not terminal */}
+        {order.paymentMethod === 'payos' &&
+          !['paid', 'completed', 'refunded', 'partially_refunded'].includes(
+            String(order.paymentStatus ?? '').toLowerCase()
+          ) &&
+          !['cancelled', 'canceled', 'expired', 'rejected', 'failed', 'completed'].includes(
+            String(order.status ?? '').toLowerCase()
+          ) &&
+          onRetryPayment && (
+            <button
+              type="button"
+              data-testid="retry-payos-button"
+              disabled={isRetryingPayment}
+              onClick={onRetryPayment}
+              className="w-full py-3.5 px-6 rounded-full font-bold text-sm uppercase tracking-wider bg-[var(--aura-chrome-light,#C4A77D)] text-[#16130f] hover:opacity-90 transition-opacity disabled:opacity-60 cursor-pointer"
+            >
+              {isRetryingPayment
+                ? t('stitch.orderSuccessRetryingPayOS', { defaultValue: 'ĐANG TẠO LINK PAYOS...' })
+                : t('stitch.orderSuccessRetryPayOS', { defaultValue: 'THANH TOÁN LẠI QUA PAYOS' })}
+            </button>
+          )}
 
         {/* Track Order CTA */}
         <ChromeButton

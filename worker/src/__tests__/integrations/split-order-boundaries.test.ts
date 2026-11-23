@@ -52,7 +52,12 @@ describe('Split bill server financial and tenant boundaries', () => {
     expect(response.status).toBe(201);
     const { data } = await response.json() as any;
     const link = await app.fetch(new Request('https://test.aura/api/payment/create-link', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ order_id: data[0].id }),
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(data[0]?.order_token ? { 'X-Order-Token': data[0].order_token } : {}),
+      },
+      body: JSON.stringify({ order_id: data[0].id }),
     }), env);
     expect(link.status).toBe(200);
     expect(sqlite.prepare('SELECT method,amount,status,transaction_id FROM payments WHERE order_id=?').get(data[0].id))

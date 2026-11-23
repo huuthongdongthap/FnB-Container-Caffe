@@ -14,7 +14,7 @@ interface AttemptInput {
   db: D1Database; kv?: KVNamespace | null; env?: Record<string, unknown> | null; orderId: string; amount: number; clientId: string; apiKey: string;
   checksumKey: string; description: string; returnUrl: string; cancelUrl: string; buyerName?: string; tenantId?: string;
 }
-type AttemptResult = { ok: true; payment: PayOSAttempt; cached: boolean }
+type AttemptResult = { ok: true; payment: PayOSAttempt; cached: boolean; qrCode?: string | null }
   | { ok: false; status: 202 | 409 | 502; code?: string; orderId?: string; error: string; payment?: PayOSAttempt };
 const LEASE_MS = 30_000;
 
@@ -111,14 +111,36 @@ export async function getOrCreatePayOSAttempt(input: AttemptInput): Promise<Atte
     }
     return { ok: false, status: 409, error: 'Payment attempt is closed or requires reconciliation', payment };
   }
-  if (payment.payment_url) return { ok: true, payment, cached: true };
+  const qrCacheKey = `payos:qr:${payment.id}:${payment.transaction_id}`;
+  if (payment.payment_url) {
+    let cachedQrCode: string | null = null;
+    if (input.kv) {
+      try {
+        const stored = await input.kv.get(qrCacheKey);
+        if (typeof stored === 'string' && stored.trim()) {
+          cachedQrCode = stored.trim();
+        }
+      } catch {
+        // Non-fatal KV read failure
+      }
+    }
+    return { ok: true, payment, cached: true, qrCode: cachedQrCode };
+  }
   const headers = { 'Content-Type': 'application/json', 'x-client-id': input.clientId, 'x-api-key': input.apiKey };
-  const saveUrl = async (url: string): Promise<AttemptResult> => {
+  const saveUrl = async (url: string, qrCode?: string | null): Promise<AttemptResult> => {
     const saved = await input.db.prepare(
       "UPDATE payments SET payment_url = ?, updated_at = ? WHERE id = ? AND transaction_id = ? AND status = 'pending'"
     ).bind(url, new Date().toISOString(), payment.id, payment.transaction_id).run();
     if (!((saved.meta?.changes ?? 0) > 0)) return { ok: false, status: 409, error: 'Payment state changed; refresh the order', payment };
-    return { ok: true, payment: { ...payment, payment_url: url }, cached: !reserved.owned };
+    const normalizedQrCode = typeof qrCode === 'string' && qrCode.trim() ? qrCode.trim() : null;
+    if (normalizedQrCode && input.kv) {
+      try {
+        await input.kv.put(qrCacheKey, normalizedQrCode, { expirationTtl: 3600 });
+      } catch {
+        // Non-fatal KV write failure
+      }
+    }
+    return { ok: true, payment: { ...payment, payment_url: url }, cached: !reserved.owned, qrCode: normalizedQrCode };
   };
   const recover = async (): Promise<AttemptResult | null> => {
     const verified = await verifyPayOSPaymentRequest({
@@ -166,7 +188,7 @@ export async function getOrCreatePayOSAttempt(input: AttemptInput): Promise<Atte
       return { ok: false, status: 409, error: 'Provider payment is no longer payable; refresh the order', payment };
     }
     const url = verified.checkoutUrl ?? buildCheckoutUrl({ id: verified.linkId }, true);
-    return url ? saveUrl(url) : { ok: false, status: 502, error: 'Invalid provider checkout link', payment };
+    return url ? saveUrl(url, verified.qrCode ?? null) : { ok: false, status: 502, error: 'Invalid provider checkout link', payment };
   };
   try {
     if (!reserved.owned) {
@@ -198,7 +220,10 @@ export async function getOrCreatePayOSAttempt(input: AttemptInput): Promise<Atte
       }
       const url = checkoutUrl(result.data, false);
       if (!url) return { ok: false, status: 502, error: 'Invalid provider checkout link', payment };
-      return await saveUrl(url);
+      const qrCode = typeof result.data.qrCode === 'string' && result.data.qrCode.trim()
+        ? result.data.qrCode.trim()
+        : null;
+      return await saveUrl(url, qrCode);
     }
     // Duplicate/ambiguous POST results are resolved by the SAME persisted code.
     const recovered = await recover();

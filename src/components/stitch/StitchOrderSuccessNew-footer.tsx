@@ -24,7 +24,7 @@ export function OrderSuccessNewFooter() {
           })}
         </a>
         <a
-          href="/about"
+          href="/privacy"
           className="text-[12px] leading-none font-bold uppercase tracking-[0.1em] text-[var(--aura-chrome-soft)] hover:text-[var(--aura-chrome-bright)] transition-colors"
         >
           {t('footer.footerPrivacy', {
@@ -32,7 +32,7 @@ export function OrderSuccessNewFooter() {
           })}
         </a>
         <a
-          href="/about"
+          href="/terms"
           className="text-[12px] leading-none font-bold uppercase tracking-[0.1em] text-[var(--aura-chrome-soft)] hover:text-[var(--aura-chrome-bright)] transition-colors"
         >
           {t('footer.footerTerms', { defaultValue: 'TERMS' })}
