@@ -2,7 +2,13 @@ import type { Hono } from 'hono';
 import type { Env } from 'worker/src/types/env';
 import { createLogger } from 'worker/src/middleware/logger';
 import { ShiftContractError } from '../../commands/shift-access';
-import { reconcileShiftCash, getReconciliationForShift } from '../policies/cash-reconciliation-policy';
+import {
+  reconcileShiftCash,
+  getReconciliationForShift,
+  assignCashPaymentsToShift,
+  listShiftCashPayouts,
+  createShiftCashPayout,
+} from '../policies/cash-reconciliation-policy';
 import type { ReconciliationInput } from '../model/reconciliation-types';
 
 const log = createLogger({ route: 'shift-reconciliation' });
@@ -15,6 +21,10 @@ const RECONCILIATION_ROLES = new Set([
   'admin',
   'cashier',
   'waiter',
+  'barista',
+  'chef',
+  'kitchen',
+  'shipper',
 ]);
 const HQ_ROLES = new Set(['owner', 'admin']);
 
@@ -192,5 +202,175 @@ export function reconciliationRoutes(app: Hono<{ Bindings: Env; Variables: { use
       return c.json({ success: false, error: 'Shift reconciliation not found' }, 404);
     }
     return c.json({ success: true, data: record });
+  });
+
+  app.post('/api/shifts/:id/assign-cash-payments', async (c) => {
+    const user = c.get('user') as unknown as Record<string, unknown> | undefined;
+    if (!user) return c.json({ error: 'Unauthorized' }, 401);
+    const role = String(user.role || '');
+    if (!RECONCILIATION_ROLES.has(role)) return c.json({ error: 'Forbidden' }, 403);
+    if (!isCashReconciliationEnabled(c.env)) {
+      return c.json(
+        {
+          success: false,
+          code: 'PILOT_CASH_RECONCILIATION_DISABLED',
+          error: 'Cash reconciliation is disabled in attendance pilot mode',
+        },
+        501,
+      );
+    }
+
+    const scope = resolveReconciliationTenant(c, user);
+    if (scope.error) return c.json(scope.error.body, scope.error.status);
+    if (await isTenantCashReconciliationOptedOut(c.env, c.env.AURA_DB, scope.tenantId!)) {
+      return c.json(
+        {
+          success: false,
+          code: 'PILOT_CASH_RECONCILIATION_DISABLED',
+          error: 'Cash reconciliation disabled for tenant',
+        },
+        501,
+      );
+    }
+
+    let body: Record<string, unknown>;
+    try {
+      body = (await c.req.json()) as Record<string, unknown>;
+    } catch {
+      return c.json({ success: false, error: 'Invalid JSON payload' }, 400);
+    }
+    if (!body || typeof body !== 'object' || !Array.isArray(body.payment_ids)) {
+      return c.json({ success: false, error: 'payment_ids array is required' }, 400);
+    }
+
+    const shiftId = c.req.param('id');
+    const actorId = String(user.sub || user.id || '');
+    try {
+      const result = await assignCashPaymentsToShift(
+        c.env,
+        shiftId,
+        body.payment_ids.map(String),
+        actorId,
+        scope.tenantId!,
+        role,
+      );
+      return c.json({ success: true, data: result });
+    } catch (err) {
+      if (err instanceof ShiftContractError) return c.json({ success: false, error: err.message }, err.status);
+      log.error('Unexpected assign-cash-payments error', {
+        shiftId,
+        message: err instanceof Error ? err.message : String(err),
+      });
+      return c.json({ success: false, error: 'Failed to assign cash payments' }, 500);
+    }
+  });
+
+  app.get('/api/shifts/:id/payouts', async (c) => {
+    const user = c.get('user') as unknown as Record<string, unknown> | undefined;
+    if (!user) return c.json({ error: 'Unauthorized' }, 401);
+    const role = String(user.role || '');
+    if (!RECONCILIATION_ROLES.has(role)) {
+      return c.json({ error: 'Forbidden' }, 403);
+    }
+    if (!isCashReconciliationEnabled(c.env)) {
+      return c.json(
+        {
+          success: false,
+          code: 'PILOT_CASH_RECONCILIATION_DISABLED',
+          error: 'Cash reconciliation is disabled in attendance pilot mode',
+        },
+        501,
+      );
+    }
+    const scope = resolveReconciliationTenant(c, user);
+    if (scope.error) return c.json(scope.error.body, scope.error.status);
+    if (await isTenantCashReconciliationOptedOut(c.env, c.env.AURA_DB, scope.tenantId!)) {
+      return c.json(
+        {
+          success: false,
+          code: 'PILOT_CASH_RECONCILIATION_DISABLED',
+          error: 'Cash reconciliation disabled for tenant',
+        },
+        501,
+      );
+    }
+
+    const shiftId = c.req.param('id');
+    const actorId = String(user.sub || user.id || '');
+    try {
+      const payouts = await listShiftCashPayouts(c.env, shiftId, scope.tenantId!, actorId, role);
+      return c.json({ success: true, data: payouts });
+    } catch (err) {
+      if (err instanceof ShiftContractError) return c.json({ success: false, error: err.message }, err.status);
+      log.error('Unexpected list shift payouts error', {
+        shiftId,
+        message: err instanceof Error ? err.message : String(err),
+      });
+      return c.json({ success: false, error: 'Failed to list shift payouts' }, 500);
+    }
+  });
+
+  app.post('/api/shifts/:id/payouts', async (c) => {
+    const user = c.get('user') as unknown as Record<string, unknown> | undefined;
+    if (!user) return c.json({ error: 'Unauthorized' }, 401);
+    const role = String(user.role || '');
+    if (!RECONCILIATION_ROLES.has(role)) return c.json({ error: 'Forbidden' }, 403);
+    if (!isCashReconciliationEnabled(c.env)) {
+      return c.json(
+        {
+          success: false,
+          code: 'PILOT_CASH_RECONCILIATION_DISABLED',
+          error: 'Cash reconciliation is disabled in attendance pilot mode',
+        },
+        501,
+      );
+    }
+
+    const scope = resolveReconciliationTenant(c, user);
+    if (scope.error) return c.json(scope.error.body, scope.error.status);
+    if (await isTenantCashReconciliationOptedOut(c.env, c.env.AURA_DB, scope.tenantId!)) {
+      return c.json(
+        {
+          success: false,
+          code: 'PILOT_CASH_RECONCILIATION_DISABLED',
+          error: 'Cash reconciliation disabled for tenant',
+        },
+        501,
+      );
+    }
+
+    let body: Record<string, unknown>;
+    try {
+      body = (await c.req.json()) as Record<string, unknown>;
+    } catch {
+      return c.json({ success: false, error: 'Invalid JSON payload' }, 400);
+    }
+    if (!body || typeof body !== 'object' || Array.isArray(body)) {
+      return c.json({ success: false, error: 'Invalid payload' }, 400);
+    }
+
+    const shiftId = c.req.param('id');
+    const actorId = String(user.sub || user.id || '');
+    try {
+      const payout = await createShiftCashPayout(
+        c.env,
+        shiftId,
+        {
+          amount: Number(body.amount),
+          reason: typeof body.reason === 'string' ? body.reason : '',
+        },
+        actorId,
+        scope.tenantId!,
+        role,
+      );
+      return c.json({ success: true, data: payout }, 201);
+    } catch (err) {
+      if (err instanceof ShiftContractError) return c.json({ success: false, error: err.message }, err.status);
+      log.error('Unexpected create shift payout error', {
+        shiftId,
+        message: err instanceof Error ? err.message : String(err),
+      });
+      return c.json({ success: false, error: 'Failed to record shift payout' }, 500);
+    }
   });
 }

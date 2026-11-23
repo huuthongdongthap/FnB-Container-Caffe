@@ -60,8 +60,20 @@ shiftsRouter.post('/clock-out', async (c) => {
   if (rawNotes !== undefined && (typeof rawNotes !== 'string' || rawNotes.length > 500)) {
     return c.json({ success: false, error: 'Invalid notes' }, 400);
   }
+  const rawAttendanceId = rawBody && typeof rawBody === 'object'
+    ? ((rawBody as Record<string, unknown>).shift_id ?? (rawBody as Record<string, unknown>).attendance_id)
+    : undefined;
+  if (rawAttendanceId !== undefined && rawAttendanceId !== null && typeof rawAttendanceId !== 'string' && typeof rawAttendanceId !== 'number') {
+    return c.json({ success: false, error: 'Invalid shift_id' }, 400);
+  }
+  const attendanceId = rawAttendanceId !== undefined && rawAttendanceId !== null && String(rawAttendanceId).trim() !== ''
+    ? String(rawAttendanceId).trim()
+    : undefined;
   const scope = await shiftScope(c.env, c.get('user'), reqTenant(c));
-  return c.json({ success: true, data: shiftDto(await clockOut(scope, parsed.data.staff_id, undefined, rawNotes)) });
+  const row = attendanceId
+    ? await clockOut(scope, parsed.data.staff_id, attendanceId, rawNotes)
+    : await clockOut(scope, parsed.data.staff_id, undefined, rawNotes);
+  return c.json({ success: true, data: shiftDto(row) });
 });
 shiftsRouter.get('/today', async (c) => {
   const scope = await shiftScope(c.env, c.get('user'), reqTenant(c));

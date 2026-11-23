@@ -410,9 +410,10 @@ export async function handleMarkCodPaid(c: Context<{ Bindings: Env }>) {
  * KDS queue router, and this file all guard with the same set.
  */
 export const KDS_ROLES = ['owner', 'manager', 'supervisor', 'staff', 'waiter', 'cashier', 'admin', 'kitchen', 'barista', 'chef'];
+export const COD_COLLECTION_ROLES = ['owner', 'manager', 'supervisor', 'cashier', 'admin', 'waiter', 'shipper'];
 
 export function registerKdsHandlers(app: Hono<{ Bindings: Env }>) {
   app.get('/kds', requireAuth(KDS_ROLES), handleGetKdsOrders);
   app.patch('/:id/status', requireAuth([...KDS_ROLES, 'shipper']), audit('order_status_change'), (c) => handleUpdateOrderStatus(c));
-  app.patch('/:id/mark-cod-paid', requireAuth(['owner', 'manager', 'supervisor', 'cashier', 'admin']), audit('order_cod_paid'), handleMarkCodPaid);
+  app.patch('/:id/mark-cod-paid', requireAuth(COD_COLLECTION_ROLES), audit('order_cod_paid'), handleMarkCodPaid);
 }

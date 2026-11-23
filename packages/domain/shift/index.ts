@@ -13,7 +13,14 @@ export { shiftsRouter } from './commands/shifts';
 export { ShiftContractError } from './commands/shift-access';
 export { reconciliationRoutes } from './src/routes/reconciliation';
 // policies
-export { reconcileShiftCash, getReconciliationForShift } from './src/policies/cash-reconciliation-policy';
+export {
+  reconcileShiftCash,
+  getReconciliationForShift,
+  assignCashPaymentsToShift,
+  listShiftCashPayouts,
+  createShiftCashPayout,
+  type ShiftCashPayout,
+} from './src/policies/cash-reconciliation-policy';
 export {
   openCanonicalShift,
   recordShiftSale,

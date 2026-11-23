@@ -1423,8 +1423,8 @@ describe('Phase 68 Security Regression Suite (BO1..BO4)', () => {
             canManage: false,
           },
           'staff-a2',
-          undefined,
-          '1'
+          '1',
+          undefined
         )
       ).rejects.toMatchObject({ status: 409 });
 

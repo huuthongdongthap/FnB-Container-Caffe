@@ -25,7 +25,7 @@ import { authEndpointsRouter } from './routes/auth-endpoints';
 import { staffMobileRouter } from './routes/staff-mobile';
 import { ordersUnifiedRouter } from './routes/orders-unified';
 import { kdsOrdersRouter } from './routes/kds-orders';
-import { KDS_ROLES } from './routes/orders-hono-handlers/kds-handlers';
+import { COD_COLLECTION_ROLES, KDS_ROLES } from './routes/orders-hono-handlers/kds-handlers';
 import { handleRealtimeChannel } from './routes/realtime-orders';
 import { kdsStreamRouter } from '@aura/domain-kitchen';
 import { registerFeatureRoutes } from './routes/features-router';
@@ -124,8 +124,7 @@ app.use('/api/kds/orders', requireAuth(KDS_ROLES));
 app.use('/api/kds/orders/*', requireAuth(KDS_ROLES));
 app.use('/api/kds/orders', tenantMiddleware);
 app.use('/api/kds/orders/*', tenantMiddleware);
-const codCollectionRoles = ['owner', 'manager', 'supervisor', 'cashier', 'admin'];
-app.use('/api/orders/:id/mark-cod-paid', requireAuth(codCollectionRoles));
+app.use('/api/orders/:id/mark-cod-paid', requireAuth(COD_COLLECTION_ROLES));
 app.use('/api/orders/:id/mark-cod-paid', tenantMiddleware);
 app.route('/api/orders', ordersUnifiedRouter);
 // Mount the static SSE endpoint before the dynamic /:id order routes.

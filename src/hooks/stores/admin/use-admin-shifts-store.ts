@@ -32,9 +32,14 @@ export const useAdminShiftsStore = create<AdminShiftsState>((set, get) => ({
   historyShifts: [],
   loading: { ...INITIAL_LOADING },
   error: null,
+  mutationError: null,
+
+  clearMutationError: () => {
+    set({ mutationError: null });
+  },
 
   reset: () => {
-    set({ todayShifts: [], historyShifts: [], loading: { ...INITIAL_LOADING }, error: null });
+    set({ todayShifts: [], historyShifts: [], loading: { ...INITIAL_LOADING }, error: null, mutationError: null });
   },
 
   fetchToday: async () => {
@@ -80,7 +85,7 @@ export const useAdminShiftsStore = create<AdminShiftsState>((set, get) => ({
   },
 
   clockIn: async (staffId: string, _staffName: string, options?: ClockInOptions): Promise<ShiftRecord | null> => {
-    set({ loading: { ...get().loading, clockIn: true }, error: null });
+    set({ loading: { ...get().loading, clockIn: true }, mutationError: null });
     try {
       const payload: Record<string, unknown> = {
         staff_id: staffId,
@@ -103,14 +108,14 @@ export const useAdminShiftsStore = create<AdminShiftsState>((set, get) => ({
     } catch (err) {
       set({
         loading: { ...get().loading, clockIn: false },
-        error: extractShiftError(err, 'Lỗi kết nối khi check-in'),
+        mutationError: extractShiftError(err, 'Lỗi kết nối khi check-in'),
       });
       return null;
     }
   },
 
   clockOut: async (staffId: string, notes?: string): Promise<ShiftRecord | null> => {
-    set({ loading: { ...get().loading, clockOut: true }, error: null });
+    set({ loading: { ...get().loading, clockOut: true }, mutationError: null });
     try {
       const payload: Record<string, unknown> = { staff_id: staffId };
       if (notes?.trim()) payload.notes = notes.trim();
@@ -125,7 +130,7 @@ export const useAdminShiftsStore = create<AdminShiftsState>((set, get) => ({
     } catch (err) {
       set({
         loading: { ...get().loading, clockOut: false },
-        error: extractShiftError(err, 'Lỗi kết nối khi check-out'),
+        mutationError: extractShiftError(err, 'Lỗi kết nối khi check-out'),
       });
       return null;
     }

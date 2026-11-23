@@ -30,9 +30,24 @@ export async function listShifts(scope: ShiftScope, query: ShiftQuery = {}) {
     createdAt: 'created_at', created_at: 'created_at', status: 'attendance_state' } as Record<string, string>)[query.sort || ''] || 'date';
   const order = query.order === 'asc' ? 'ASC' : 'DESC';
   const where = clauses.join(' AND '), db = scope.env.AURA_DB;
+  const qualifiedWhere = clauses.map((c) => c.replace(/\b(tenant_id|staff_id|clock_in|clock_out|date|attendance_state)\b/g, 's.$1')).join(' AND ');
   const count = await db.prepare(`SELECT COUNT(*) AS total FROM staff_shifts WHERE ${where}`).bind(...values).first<{ total: number }>();
-  const rows = await db.prepare(`SELECT * FROM staff_shifts WHERE ${where} ORDER BY ${sort} ${order}, id DESC LIMIT ? OFFSET ?`)
-    .bind(...values, limit, (page - 1) * limit).all<ShiftRow>();
+  let rows: { results?: ShiftRow[] };
+  try {
+    rows = await db.prepare(
+      `SELECT s.*, r.expected_cash AS expected_cash, r.actual_cash AS actual_cash, r.variance AS cash_variance
+       FROM staff_shifts s
+       LEFT JOIN shift_reconciliations r
+         ON r.shift_id = CAST(s.id AS TEXT)
+         AND COALESCE(NULLIF(TRIM(r.tenant_id), ''), 'default') = COALESCE(NULLIF(TRIM(s.tenant_id), ''), 'default')
+       WHERE ${qualifiedWhere}
+       ORDER BY s.${sort} ${order}, s.id DESC LIMIT ? OFFSET ?`
+    ).bind(...values, limit, (page - 1) * limit).all<ShiftRow>();
+  } catch (err) {
+    if (!/no such table:.*shift_reconciliations/i.test(String(err))) throw err;
+    rows = await db.prepare(`SELECT * FROM staff_shifts WHERE ${where} ORDER BY ${sort} ${order}, id DESC LIMIT ? OFFSET ?`)
+      .bind(...values, limit, (page - 1) * limit).all<ShiftRow>();
+  }
   const total = count?.total || 0;
   return { rows: rows.results || [], meta: { page, limit, total, totalPages: Math.ceil(total / limit) } };
 }
