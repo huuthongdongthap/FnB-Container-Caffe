@@ -25,16 +25,41 @@ import { isHeldOutOfKds } from '../policies/kds-hold-policy';
 const SSE_TIMEOUT_MS = 120_000;
 // Poll D1 every 3 seconds for changes.
 const POLL_INTERVAL_MS = 3_000;
+const CANCEL_ALERT_WINDOW_MS = 10 * 60_000;
+const PREP_HISTORY_STATUSES = new Set(['preparing', 'ready', 'served', 'completed']);
+
+export function parseUtcTimestampMs(raw: unknown): number {
+  if (typeof raw !== 'string' || !raw.trim()) return NaN;
+  const trimmed = raw.trim();
+  const iso = /[zZ]|[+-]\d{2}:?\d{2}$/.test(trimmed)
+    ? trimmed.replace(' ', 'T')
+    : `${trimmed.replace(' ', 'T')}Z`;
+  return Date.parse(iso);
+}
+
+function isRecentPrepCancellation(order: Record<string, unknown>, nowMs: number): boolean {
+  if (String(order.status ?? '').trim().toLowerCase() !== 'cancelled') return false;
+  const cancelledMs = parseUtcTimestampMs(order.cancelled_at);
+  if (!Number.isFinite(cancelledMs) || nowMs - cancelledMs > CANCEL_ALERT_WINDOW_MS || nowMs < cancelledMs - 60_000) {
+    return false;
+  }
+  const prev = String(order.previous_status ?? '').trim().toLowerCase();
+  const explicit = order.cancel_alert === true || Number(order.cancel_alert) === 1;
+  return explicit || PREP_HISTORY_STATUSES.has(prev) || Boolean(order.served_at);
+}
 
 interface KdsStreamOrder {
   id: string;
   customer_name: string;
   table_id: string | null;
+  order_type?: string | null;
   items: unknown[];
   notes?: string | null;
   status: string;
   elapsed_minutes: number;
   created_at: string;
+  cancel_alert?: boolean;
+  kds_alert?: string;
 }
 
 interface OrderRecord {
@@ -47,6 +72,10 @@ interface OrderRecord {
   order_type?: string | null;
   payment_status?: string | null;
   created_at: string;
+  cancelled_at?: string | null;
+  previous_status?: string | null;
+  cancel_alert?: number | boolean | null;
+  served_at?: string | null;
 }
 
 export const kdsStreamRouter = new Hono<{ Bindings: Env }>();
@@ -98,7 +127,7 @@ export function hasCrossTenantOverride(
   );
 }
 
-function mapKdsOrder(order: OrderRecord): KdsStreamOrder {
+function mapKdsOrder(order: OrderRecord, isCancelAlert = false): KdsStreamOrder {
   let items: unknown[] = [];
   if (Array.isArray(order.items)) {
     items = order.items;
@@ -109,19 +138,22 @@ function mapKdsOrder(order: OrderRecord): KdsStreamOrder {
     } catch { /* keep empty */ }
   }
 
-  const elapsed = Math.round(
-    (Date.now() - new Date(order.created_at).getTime()) / 60000
-  );
+  const createdMs = parseUtcTimestampMs(order.created_at);
+  const elapsed = Number.isFinite(createdMs)
+    ? Math.max(0, Math.round((Date.now() - createdMs) / 60000))
+    : 0;
 
   return {
     id: order.id,
     customer_name: order.customer_name,
     table_id: order.table_id,
+    ...(order.order_type ? { order_type: order.order_type } : {}),
     items,
     ...(order.notes ? { notes: order.notes } : {}),
     status: order.status,
     elapsed_minutes: elapsed,
-    created_at: order.created_at
+    created_at: order.created_at,
+    ...(isCancelAlert ? { cancel_alert: true, kds_alert: 'cancelled' } : {}),
   };
 }
 
@@ -270,9 +302,29 @@ kdsStreamRouter.get('/stream', async(c) => {
             ({ results } = await (tenantId === '*' ? statement : statement.bind(tenantId)).all<OrderRecord>());
           }
         }
-        return (results || [])
+        const activeOrders = (results || [])
           .filter((r) => !isHeldOutOfKds(r as unknown as Record<string, unknown>))
-          .map(mapKdsOrder);
+          .map((r) => mapKdsOrder(r, false));
+
+        const nowMs = Date.now();
+        let recentCancelled: KdsStreamOrder[] = [];
+        try {
+          const cancelledStatement = db.prepare(
+            `SELECT * FROM orders WHERE status = 'cancelled' AND cancelled_at IS NOT NULL AND datetime(cancelled_at) >= datetime(?)${tenantClause} LIMIT 20`
+          );
+          const cutoff = new Date(nowMs - CANCEL_ALERT_WINDOW_MS).toISOString().replace('T', ' ').slice(0, 19);
+          const cancelledRes = await (tenantId === '*'
+            ? cancelledStatement.bind(cutoff)
+            : cancelledStatement.bind(cutoff, tenantId)).all<OrderRecord>();
+          const activeIds = new Set(activeOrders.map((o) => o.id));
+          recentCancelled = (cancelledRes?.results || [])
+            .filter((o) => !activeIds.has(o.id) && isRecentPrepCancellation(o as unknown as Record<string, unknown>, nowMs))
+            .map((o) => mapKdsOrder(o, true));
+        } catch {
+          // cancelled_at / previous_status absent in minimal schemas: no cancel alerts
+        }
+
+        return [...activeOrders, ...recentCancelled];
       };
 
       try {

@@ -1,6 +1,7 @@
 export interface KDSOrder {
   id: string;
   table: string;
+  orderType?: string;
   status: 'pending' | 'confirmed' | 'preparing' | 'ready' | 'served' | 'cancelled';
   items: Array<{
     name: string;
@@ -10,6 +11,7 @@ export interface KDSOrder {
   }>;
   notes?: string;
   station?: string;
+  cancelAlert?: boolean;
   createdAt: string;
 }
 
@@ -18,11 +20,14 @@ export interface KdsStreamOrder {
   id: string;
   customer_name: string;
   table_id: string | null;
+  order_type?: string | null;
   items: Array<{ product_name: string; product_id?: string; quantity: number; unit_price?: number; notes?: string }>;
   notes?: string | null;
   status: string;
   elapsed_minutes: number;
   created_at: string;
+  cancel_alert?: boolean;
+  kds_alert?: string;
 }
 
 
@@ -38,6 +43,7 @@ export function mapStreamOrders(orders: KdsStreamOrder[]): KDSOrder[] {
   return orders.map((o) => ({
     id: o.id,
     table: o.table_id || '',
+    ...(typeof o.order_type === 'string' && o.order_type.trim() ? { orderType: o.order_type.trim().toLowerCase() } : {}),
     status: o.status as KDSOrder['status'],
     items: (o.items || []).map((item) => {
       const rawItem = item as Record<string, unknown>;
@@ -50,6 +56,7 @@ export function mapStreamOrders(orders: KdsStreamOrder[]): KDSOrder[] {
       };
     }),
     ...(typeof o.notes === 'string' && o.notes.trim() ? { notes: o.notes.trim() } : {}),
+    ...(o.cancel_alert || o.kds_alert === 'cancelled' ? { cancelAlert: true } : {}),
     createdAt: o.created_at,
   }));
 }
@@ -80,9 +87,11 @@ export function normalizeKdsOrder(raw: Record<string, unknown>): KDSOrder {
     }
   }
 
+  const rawOrderType = raw.orderType ?? raw.order_type;
   return {
     id: String(raw.id ?? ''),
     table: String(raw.table ?? raw.table_number ?? raw.table_id ?? ''),
+    ...(typeof rawOrderType === 'string' && rawOrderType.trim() ? { orderType: rawOrderType.trim().toLowerCase() } : {}),
     status: (raw.status as KDSOrder['status']) || 'pending',
     items: parsedItems.map((item) => {
       const modifiers = normalizeModifiers(item.modifiers);
@@ -95,6 +104,7 @@ export function normalizeKdsOrder(raw: Record<string, unknown>): KDSOrder {
     }),
     ...(typeof raw.notes === 'string' && raw.notes.trim() ? { notes: raw.notes.trim() } : {}),
     ...(typeof raw.station === 'string' ? { station: raw.station } : {}),
+    ...(raw.cancelAlert || raw.cancel_alert || raw.kds_alert === 'cancelled' ? { cancelAlert: true } : {}),
     createdAt: String(raw.createdAt ?? raw.created_at ?? ''),
   };
 }

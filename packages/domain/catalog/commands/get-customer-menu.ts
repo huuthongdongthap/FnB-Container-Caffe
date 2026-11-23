@@ -31,6 +31,8 @@ export interface CustomerMenuItem {
   description: string | null;
   priceCents: number;
   category: string;
+  categoryId?: string;
+  categoryName?: string;
   imageUrl: string | null;
   tags: string[];
   available: boolean;
@@ -63,6 +65,8 @@ interface RawMenuRow {
   description: string | null;
   price: number | string;
   category: string;
+  category_id?: string | null;
+  category_name?: string | null;
   image_url: string | null;
   tags: string | string[] | null;
   available: number | boolean;
@@ -230,23 +234,41 @@ export async function getCustomerMenu(
 
     if (results.length === 0) {
       try {
-        let prodQuery = `SELECT *, id, name, name_en, description, description_en, price, category_id AS category, image_url, is_available AS available, is_featured AS featured, tags, sort_order FROM products WHERE 1 = 1`;
+        let prodQuery = `SELECT p.*, p.id, p.name, p.name_en, p.description, p.description_en, p.price, p.category_id, COALESCE(c.slug, p.category_id) AS category, c.name AS category_name, p.image_url, p.is_available AS available, p.is_featured AS featured, p.tags, p.sort_order FROM products p LEFT JOIN categories c ON c.id = p.category_id AND COALESCE(NULLIF(TRIM(c.tenant_id), ''), 'default') = COALESCE(NULLIF(TRIM(p.tenant_id), ''), 'default') WHERE 1 = 1`;
         const prodParams: unknown[] = [];
         if (!includeUnavailable) {
-          prodQuery += ' AND is_available = 1';
+          prodQuery += ' AND p.is_available = 1';
         }
         if (opts.category) {
-          prodQuery += ' AND category_id = ?';
-          prodParams.push(opts.category);
+          prodQuery += ' AND (p.category_id = ? OR c.slug = ? OR c.name = ?)';
+          prodParams.push(opts.category, opts.category, opts.category);
         }
-        prodQuery += ' ORDER BY category_id ASC, name ASC';
+        prodQuery += ' ORDER BY COALESCE(c.slug, p.category_id) ASC, p.name ASC';
         const prodRes = await db.prepare(prodQuery).bind(...prodParams).all<RawMenuRow>();
         results = (prodRes.results ?? []).filter((row) =>
           matchesTenantRow(row as unknown as Record<string, unknown>, effectiveTenant)
         );
         primaryErr = null;
       } catch {
-        if (primaryErr) throw primaryErr;
+        try {
+          let fallbackQuery = `SELECT *, id, name, name_en, description, description_en, price, category_id, category_id AS category, image_url, is_available AS available, is_featured AS featured, tags, sort_order FROM products WHERE 1 = 1`;
+          const fallbackParams: unknown[] = [];
+          if (!includeUnavailable) {
+            fallbackQuery += ' AND is_available = 1';
+          }
+          if (opts.category) {
+            fallbackQuery += ' AND category_id = ?';
+            fallbackParams.push(opts.category);
+          }
+          fallbackQuery += ' ORDER BY category_id ASC, name ASC';
+          const prodRes = await db.prepare(fallbackQuery).bind(...fallbackParams).all<RawMenuRow>();
+          results = (prodRes.results ?? []).filter((row) =>
+            matchesTenantRow(row as unknown as Record<string, unknown>, effectiveTenant)
+          );
+          primaryErr = null;
+        } catch {
+          if (primaryErr) throw primaryErr;
+        }
       }
     }
 
@@ -288,7 +310,7 @@ export async function getCustomerMenu(
             now: opts.now || new Date(),
             channelDeltas: opts.channelDeltas,
             productId: item.id,
-            categoryId: item.category,
+            categoryId: item.category_id ?? item.category,
           })
         : basePrice;
 
@@ -298,6 +320,8 @@ export async function getCustomerMenu(
         description: item.description,
         priceCents,
         category: item.category,
+        ...(item.category_id ? { categoryId: item.category_id } : {}),
+        ...(item.category_name ? { categoryName: item.category_name } : {}),
         imageUrl: item.image_url,
         tags: parseTags(item.tags),
         available: toAvailabilityFlag(item.available),

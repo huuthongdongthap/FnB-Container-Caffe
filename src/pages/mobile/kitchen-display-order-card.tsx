@@ -34,7 +34,13 @@ export default function KitchenOrderCard({
   return (
     <div style={cardBorder(order.status)}>
       <div style={cardHeader}>
-        <h3 style={tableName}>Bàn {order.table_name}</h3>
+        <h3 style={tableName}>
+          {order.table_name
+            ? `Bàn ${order.table_name}`
+            : order.order_type === 'delivery'
+              ? 'Giao hàng'
+              : 'Mang đi'}
+        </h3>
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4 }}>
           <span style={statusBadgeStyle(order.status)}>
             {STATUS_LABEL[order.status] ?? order.status}

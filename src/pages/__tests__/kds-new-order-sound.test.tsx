@@ -17,7 +17,8 @@ vi.mock('@/hooks/use-kds', () => ({
 
 const playBeep = vi.fn();
 vi.mock('@/hooks/use-kds-audio', () => ({
-  useKdsAudio: (orderCount: number, enabled: boolean) => playBeep(orderCount, enabled),
+  useKdsAudio: (orderIds: readonly string[], enabled: boolean, isLoading?: boolean) =>
+    playBeep(orderIds, enabled, isLoading),
 }));
 
 vi.mock('react-helmet-async', () => ({
@@ -57,8 +58,8 @@ describe('KDS new-order sound', () => {
   it('plays a sound for a new order when the sound toggle is on', () => {
     render(<KDSPage />);
     expect(playBeep).toHaveBeenCalled();
-    const [orderCount, enabled] = playBeep.mock.calls.at(-1) ?? [];
-    expect(orderCount).toBe(2);
+    const [orderIds, enabled] = playBeep.mock.calls.at(-1) ?? [];
+    expect(orderIds).toEqual(['order-1', 'order-2']);
     expect(enabled).toBe(true);
   });
 

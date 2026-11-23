@@ -26,6 +26,9 @@ interface HeaderProps {
   activeFilter: StitchKDSNewProps['activeFilter'];
   onFilterChange?: StitchKDSNewProps['onFilterChange'];
   stationLabel: string;
+  selectedStation?: string;
+  stations?: StitchKDSNewProps['stations'];
+  onStationChange?: (stationId: string) => void;
   avgPrepTime: string;
   activeCount: number;
   soundEnabled?: boolean;
@@ -40,6 +43,9 @@ export function Header({
   activeFilter,
   onFilterChange,
   stationLabel,
+  selectedStation,
+  stations,
+  onStationChange,
   avgPrepTime,
   activeCount,
   soundEnabled = true,
@@ -67,7 +73,7 @@ export function Header({
           className="truncate text-xl font-black tracking-tight text-[var(--aura-chrome-bright,#d4e4fa)] sm:text-2xl lg:text-3xl"
           style={{ fontFamily: 'var(--aura-font-display)' }}
         >
-          {t('kds.title', 'HEARTH & STEEL KDS')}
+          {t('kds.title', 'AURA CAFE KDS')}
         </h1>
         <div className="hidden h-7 w-px bg-[var(--aura-chrome-dim)]/30 sm:block" />
         <div className="hidden flex-col sm:flex">
@@ -75,14 +81,30 @@ export function Header({
             className="text-[11px] leading-none font-bold tracking-[0.1em] text-[var(--aura-chrome-soft)] uppercase opacity-75"
             style={{ fontFamily: 'var(--aura-font-body)' }}
           >
-            {t('kds.station', 'STATION')}
+            {t('kds.station', 'TRẠM')}
           </span>
-          <span
-            className="text-base leading-tight font-semibold text-[var(--aura-chrome-bright)]"
-            style={{ fontFamily: 'var(--aura-font-body)' }}
-          >
-            {stationLabel}
-          </span>
+          {stations && stations.length > 0 && onStationChange ? (
+            <select
+              aria-label={t('kds.selectStation', 'Chọn trạm bếp')}
+              value={selectedStation ?? 'all'}
+              onChange={(e) => onStationChange(e.target.value)}
+              className="mt-0.5 rounded bg-[var(--st-surface-container-highest,#273647)]/60 px-2 py-0.5 text-sm font-semibold text-[var(--aura-chrome-bright)] outline-none focus:ring-1 focus:ring-[#efbd8a]"
+              style={{ fontFamily: 'var(--aura-font-body)' }}
+            >
+              {stations.map((st) => (
+                <option key={st.id} value={st.id} className="bg-[#051424] text-[#d4e4fa]">
+                  {st.label}
+                </option>
+              ))}
+            </select>
+          ) : (
+            <span
+              className="text-base leading-tight font-semibold text-[var(--aura-chrome-bright)]"
+              style={{ fontFamily: 'var(--aura-font-body)' }}
+            >
+              {stationLabel}
+            </span>
+          )}
         </div>
       </div>
 

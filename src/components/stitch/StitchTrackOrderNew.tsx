@@ -15,14 +15,13 @@
 'use client';
 
 import { useTranslation } from 'react-i18next';
-import { Coffee, Croissant, MapPin } from 'lucide-react';
+import { Coffee, Croissant, Search } from 'lucide-react';
 import { HelmetHead } from '@/components/seo/HelmetHead';
 import { AURA_PULSE_KEYFRAMES } from './StitchTrackOrderNew-constants';
 import { TopBar } from './StitchTrackOrderNew-top-bar';
 import { OrderHero } from './StitchTrackOrderNew-order-hero';
 import { OrderTimeline } from './StitchTrackOrderNew-order-timeline';
 import { OrderSummary } from './StitchTrackOrderNew-order-summary';
-import { MapOverlay } from './StitchTrackOrderNew-map-overlay';
 import { BottomNav } from './StitchTrackOrderNew-bottom-nav';
 
 /* ─── Re-exports for backward compatibility ─────────────────────── */
@@ -50,7 +49,8 @@ export function StitchTrackOrderNew({
   items = defaultProps.items,
   total = defaultProps.total,
   status,
-  onTrackMap,
+  orderType,
+  onSearchAnother,
   onBack,
   onNavigate,
 }: import('./StitchTrackOrderNew-types').StitchTrackOrderNewProps) {
@@ -66,24 +66,24 @@ export function StitchTrackOrderNew({
       <TopBar onBack={onBack} />
 
       <main className="max-w-[1200px] mx-auto px-5 pt-8 space-y-8 min-h-screen pb-32">
-        <OrderHero orderId={orderId} estimatedMinutes={estimatedMinutes} />
+        <OrderHero orderId={orderId} estimatedMinutes={estimatedMinutes} status={status} />
 
-        <OrderTimeline status={status} />
+        <OrderTimeline status={status} orderType={orderType} />
 
         <OrderSummary items={items} total={total} />
 
-        <div className="pt-4">
-          <button type="button"
-            onClick={onTrackMap}
-            className="w-full h-16 bg-[var(--aura-bronze-shimmer)] text-white font-body text-[14px] font-medium tracking-[0.2em] uppercase rounded-xl flex items-center justify-center gap-3 transition-transform active:scale-95 duration-150"
-            style={{ boxShadow: '0 0 15px rgba(212, 165, 116, 0.4)' }}
-          >
-            <MapPin className="w-5 h-5" />
-            {t('trackOrder.trackMap', 'TRACK ON MAP')}
-          </button>
-        </div>
-
-        <MapOverlay />
+        {onSearchAnother && (
+          <div className="pt-4">
+            <button
+              type="button"
+              onClick={onSearchAnother}
+              className="w-full h-14 border border-white/15 bg-white/5 text-[var(--aura-chrome-bright)] font-body text-[14px] font-medium tracking-[0.12em] uppercase rounded-xl flex items-center justify-center gap-3 transition-colors hover:bg-white/10"
+            >
+              <Search className="w-4 h-4" />
+              {t('trackOrder.searchAnother', 'Tra cứu đơn khác')}
+            </button>
+          </div>
+        )}
       </main>
 
       <BottomNav onNavigate={onNavigate} />
