@@ -8,11 +8,14 @@
  */
 'use client';
 
+import { useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useAccount } from '@/hooks/use-account';
 import { useAuthStore } from '@/hooks/stores/use-auth-store';
+import { useLoyaltyStore } from '@/hooks/stores/use-loyalty-store';
 import { StitchAccountDashNew } from '@/components/stitch';
 import type { DashAccountProfile, DashLoyaltyData, DashOrderItem } from '@/components/stitch';
+import { MyVouchersSection } from '@/components/loyalty/MyVouchersSection';
 
 import { getTierProgress, formatTimeAgo, mapOrderItemIcon, mapOrderStatus } from './account-constants';
 import { AccountNotLoggedIn } from './account-not-logged-in';
@@ -40,8 +43,15 @@ export {
 
 export default function AccountPage() {
   const user = useAuthStore((s) => s.user);
-  const { profile, orders, loading, error, refetchProfile } = useAccount();
+  const { profile, orders, loading, error, ordersError, refetchProfile } = useAccount();
+  const { myVouchers, tierLadder, fetchLoyalty } = useLoyaltyStore();
   const { t } = useTranslation('account');
+
+  useEffect(() => {
+    if (user) {
+      void fetchLoyalty();
+    }
+  }, [user, fetchLoyalty]);
 
   if (!user) return <AccountNotLoggedIn />;
   if (loading) return <AccountLoading />;
@@ -49,9 +59,13 @@ export default function AccountPage() {
 
   /* ─── Profile loaded with data ──────────────────────────────────── */
   if (profile) {
-    const points = profile.loyalty_points ?? profile.cashback_balance ?? 0;
-    const lifetimePoints = profile.lifetime_points ?? points;
-    const progress = getTierProgress(profile.loyalty_tier, lifetimePoints);
+    const points = Number(profile.loyalty_points ?? 0);
+    const cashbackBalance = Number(profile.cashback_balance ?? 0);
+    const lifetimePoints = Number(profile.lifetime_points ?? points);
+    const customThresholds = tierLadder.length > 0
+      ? Object.fromEntries(tierLadder.map((item) => [item.tier_name.toLowerCase(), item.min_points]))
+      : undefined;
+    const progress = getTierProgress(profile.loyalty_tier, lifetimePoints, customThresholds);
 
     const dashProfile: DashAccountProfile = {
       name: profile.name,
@@ -90,7 +104,37 @@ export default function AccountPage() {
           loyalty={dashLoyalty}
           orders={dashOrders}
         />
-        <div className="max-w-md mx-auto px-4 pb-8 -mt-4">
+        <div className="max-w-md mx-auto px-4 pb-8 -mt-4 space-y-4">
+          <div
+            data-testid="account-wallet-summary"
+            className="rounded-2xl border border-[#C69C6D]/20 bg-[#1B1714]/80 p-4 flex items-center justify-between"
+          >
+            <div>
+              <p className="text-xs text-[#A89F91]">Điểm tích lũy</p>
+              <p className="text-lg font-bold text-[#F5EFE6]" data-testid="account-points-value">
+                {points.toLocaleString('vi-VN')} điểm
+              </p>
+            </div>
+            <div className="text-right">
+              <p className="text-xs text-[#A89F91]">Ví hoàn tiền (VND)</p>
+              <p className="text-lg font-bold text-[#C69C6D]" data-testid="account-cashback-value">
+                {cashbackBalance.toLocaleString('vi-VN')}₫
+              </p>
+            </div>
+          </div>
+
+          {ordersError && (
+            <div
+              role="alert"
+              data-testid="account-orders-error"
+              className="rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-xs text-red-300"
+            >
+              Không thể tải lịch sử đơn hàng: {ordersError}
+            </div>
+          )}
+
+          <MyVouchersSection vouchers={myVouchers} compact />
+
           <NotificationPreferences customerId={user.id} />
         </div>
       </>

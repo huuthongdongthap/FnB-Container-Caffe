@@ -41,6 +41,8 @@ export function StitchPOSNew({
   customer = null,
   onCustomerFound,
   onClearCustomer,
+  useCashback = false,
+  onToggleCashback,
   onOpenSchedule,
   onOpenDrawer,
   onPrintReceipt,
@@ -232,6 +234,8 @@ export function StitchPOSNew({
           customer={customer}
           onCustomerFound={onCustomerFound}
           onClearCustomer={onClearCustomer}
+          useCashback={useCashback}
+          onToggleCashback={onToggleCashback}
         />
       </main>
 

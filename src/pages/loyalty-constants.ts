@@ -1,14 +1,15 @@
-export const WEEK_DAYS = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'] as const;
+export const WEEK_DAYS = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'] as const;
 
 export const TIER_BENEFIT_KEYS = ['benefit1', 'benefit2', 'benefit3', 'benefit4'];
 
 export const DEFAULT_CHECKIN: Record<string, boolean> = {
-  MON: true,
-  TUE: true,
-  WED: true,
+  MON: false,
+  TUE: false,
+  WED: false,
   THU: false,
   FRI: false,
   SAT: false,
+  SUN: false,
 };
 
 /** Default campaign image URLs from the Stitch design. */

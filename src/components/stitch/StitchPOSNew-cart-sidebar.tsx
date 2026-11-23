@@ -33,6 +33,8 @@ interface CartSidebarProps {
   customer?: POSCustomer | null;
   onCustomerFound?: (customer: POSCustomer) => void;
   onClearCustomer?: () => void;
+  useCashback?: boolean;
+  onToggleCashback?: (enabled: boolean) => void;
 }
 
 export function CartSidebar({
@@ -54,9 +56,15 @@ export function CartSidebar({
   customer = null,
   onCustomerFound,
   onClearCustomer,
+  useCashback = false,
+  onToggleCashback,
 }: CartSidebarProps) {
   const { t } = useTranslation();
   const formattedSubtotal = formatPosPrice(subtotal);
+  const cashbackDeduction = useCashback && customer && customer.cashback_balance > 0
+    ? Math.min(Math.floor(customer.cashback_balance), Math.max(0, Math.round(total)))
+    : 0;
+  const payableTotal = Math.max(0, Math.round(total) - cashbackDeduction);
   return (
     <aside
       className={cn(
@@ -87,6 +95,8 @@ export function CartSidebar({
         customer={customer}
         onCustomerFound={onCustomerFound}
         onClearCustomer={onClearCustomer}
+        useCashback={useCashback}
+        onToggleCashback={onToggleCashback}
       />
 
       {/* Cart Items */}
@@ -154,12 +164,18 @@ export function CartSidebar({
           <span>{t('posNew.tax')}</span>
           <span>{formatPosPrice(tax)}</span>
         </div>
+        {cashbackDeduction > 0 && (
+          <div className="flex justify-between text-[13px] text-emerald-400 font-body" data-testid="pos-cashback-discount-row">
+            <span>Ví hoàn tiền</span>
+            <span>-{formatPosPrice(cashbackDeduction)}</span>
+          </div>
+        )}
         <div className="flex justify-between items-center mt-2 pt-2 border-t border-[rgba(var(--aura-chrome-light),0.12)]">
           <span className="text-[15px] font-semibold uppercase tracking-widest font-body">
             {t('posNew.total')}
           </span>
           <span className="text-[22px] text-[var(--aura-primary, #f2c08d)] font-bold font-body">
-            {formatPosPrice(total)}
+            {formatPosPrice(payableTotal)}
           </span>
         </div>
         <div className="grid grid-cols-2 gap-3 mt-3">

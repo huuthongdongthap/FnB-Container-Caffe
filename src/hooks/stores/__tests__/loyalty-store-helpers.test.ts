@@ -45,15 +45,21 @@ describe('parseTierLadder', () => {
   });
 
   it('normalizes decimal cashback_rate from tier_config to integer percentage', () => {
-    expect(parseLoyaltySummary({ tier: 'bronze', total_points: 10, tier_config: { cashback_rate: 0.03 } })).toEqual({
+    expect(parseLoyaltySummary({ tier: 'bronze', total_points: 10, tier_config: { cashback_rate: 0.03 } })).toMatchObject({
       tier: 'bronze',
       points: 10,
+      lifetimePoints: 10,
       cashbackRate: 3,
+      cashbackBalance: 0,
+      nextTier: null,
     });
-    expect(parseLoyaltySummary({ tier: 'gold', total_points: 220, tier_config: { cashback_rate: 0.07 } })).toEqual({
+    expect(parseLoyaltySummary({ tier: 'gold', total_points: 220, lifetime_points: 350, wallet: { balance: 15000 }, tier_config: { cashback_rate: 0.07 } })).toMatchObject({
       tier: 'gold',
       points: 220,
+      lifetimePoints: 350,
       cashbackRate: 7,
+      cashbackBalance: 15000,
+      nextTier: null,
     });
   });
 });

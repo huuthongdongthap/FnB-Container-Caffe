@@ -55,10 +55,15 @@ export interface LoyaltyDashboardData {
 
 export type LoyaltyLoadingState = 'idle' | 'loading' | 'error';
 
+import type { RedeemedVoucher } from '@/hooks/stores/loyalty-store-types';
+
 export interface StitchLoyaltyNewProps {
   data?: LoyaltyDashboardData;
   loadingState?: LoyaltyLoadingState;
   errorMessage?: string;
+  myVouchers?: RedeemedVoucher[];
+  lastRedeemedVoucher?: RedeemedVoucher | null;
+  onDismissVoucherBanner?: () => void;
   onRedeemPoints?: () => void;
   onClaimReward?: (rewardId: string) => void;
   onCheckIn?: () => void;

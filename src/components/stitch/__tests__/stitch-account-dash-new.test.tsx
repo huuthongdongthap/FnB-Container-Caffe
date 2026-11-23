@@ -46,24 +46,38 @@ import { StitchAccountDashNew } from '../StitchAccountDashNew';
 describe('StitchAccountDashNew', () => {
   beforeEach(() => vi.clearAllMocks());
 
-  it('renders default profile name', () => {
+  it('renders default profile name without hardcoded mock persona', () => {
     renderWithProviders(<StitchAccountDashNew />);
-    expect(screen.getByText('Julian Vane')).toBeInTheDocument();
+    expect(screen.getByText('Khách hàng')).toBeInTheDocument();
+    expect(screen.queryByText('Julian Vane')).not.toBeInTheDocument();
   });
 
-  it('renders tier badge text', () => {
+  it('renders default Bronze tier badge text', () => {
     renderWithProviders(<StitchAccountDashNew />);
-    expect(screen.getAllByText('Gold').length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText('Bronze').length).toBeGreaterThanOrEqual(1);
   });
 
-  it('renders loyalty points', () => {
+  it('renders zero default loyalty points', () => {
     renderWithProviders(<StitchAccountDashNew />);
-    expect(screen.getByText('1,250')).toBeInTheDocument();
+    expect(screen.getByText('0')).toBeInTheDocument();
   });
 
-  it('renders order history item name', () => {
-    renderWithProviders(<StitchAccountDashNew />);
-    expect(screen.getByText('Truffle Cortado')).toBeInTheDocument();
+  it('renders custom order history item name without hardcoded mock orders', () => {
+    renderWithProviders(
+      <StitchAccountDashNew
+        orders={[
+          {
+            id: 'ORD-1',
+            itemName: 'Cà Phê Sữa Đá',
+            icon: 'coffee',
+            time: '5 phút trước',
+            status: 'delivered',
+          },
+        ]}
+      />,
+    );
+    expect(screen.getByText('Cà Phê Sữa Đá')).toBeInTheDocument();
+    expect(screen.queryByText('Truffle Cortado')).not.toBeInTheDocument();
   });
 
   it('renders with custom profile', () => {

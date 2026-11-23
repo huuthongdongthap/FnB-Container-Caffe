@@ -67,6 +67,7 @@ export default function AdminPOSPage() {
   /* ── Local State ──────────────────────────────────────────────────── */
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('payos');
   const [customer, setCustomer] = useState<POSCustomer | null>(null);
+  const [useCashback, setUseCashback] = useState(false);
   const [selectedTableId, _setSelectedTableId] = useState<string | undefined>(undefined);
   const [checkoutSuccess, setCheckoutSuccess] = useState(false);
   const [shiftHandoverOpen, setShiftHandoverOpen] = useState(false);
@@ -79,6 +80,7 @@ export default function AdminPOSPage() {
 
   useEffect(() => {
     setCustomer(null);
+    setUseCashback(false);
     _setSelectedTableId(undefined);
     setPaymentUrl(null);
     setPaymentQrDataUrl(null);
@@ -145,6 +147,10 @@ export default function AdminPOSPage() {
       try {
         const subtotal = cart.reduce((acc, ci) => acc + ci.price * ci.quantity, 0);
         const serviceFee = Math.max(0, Math.round(total - subtotal));
+        const appliedCashback = useCashback && customer && customer.cashback_balance > 0
+          ? Math.min(Math.floor(customer.cashback_balance), Math.round(total))
+          : 0;
+        const payableTotal = Math.max(0, Math.round(total) - appliedCashback);
         const result = await checkoutMutation.mutateAsync({
           items: cart.map((ci) => ({
             id: ci.id,
@@ -152,7 +158,7 @@ export default function AdminPOSPage() {
             price: ci.price,
             quantity: ci.quantity,
           })),
-          total: Math.round(total),
+          total: payableTotal,
           customer_name: customer?.name || t('adminPOS.customerDefaultName'),
           customer_phone: customer?.phone || '',
           customer_id: customer?.id,
@@ -163,17 +169,18 @@ export default function AdminPOSPage() {
           service_fee: serviceFee,
           discount: 0,
           tip: 0,
+          ...(appliedCashback > 0 ? { use_cashback: true, cashback_amount: appliedCashback } : {}),
           ...(resolvedTableId ? { table_id: resolvedTableId } : {}),
         });
 
         if (result.success) {
           let resolvedUrl = result.payment_url || result.checkout_url;
           const createdOrderId = result.order_id || result.order?.id;
-          if (paymentMethod === 'payos' && !resolvedUrl && createdOrderId) {
+          if (paymentMethod === 'payos' && payableTotal > 0 && !resolvedUrl && createdOrderId) {
             try {
               const payRes = await payOSMutation.mutateAsync({
                 order_id: createdOrderId,
-                total: Math.round(total),
+                total: payableTotal,
                 cancel_url: window.location.href,
                 return_url: window.location.href,
                 description: `POS #${createdOrderId.slice(0, 8)}`,
@@ -197,6 +204,7 @@ export default function AdminPOSPage() {
           }
 
           setCustomer(null);
+          setUseCashback(false);
           _setSelectedTableId(undefined);
           setCheckoutSuccess(true);
           if (successTimerRef.current) {
@@ -223,7 +231,7 @@ export default function AdminPOSPage() {
         setIsCompleting(false);
       }
     },
-    [paymentMethod, checkoutMutation.mutateAsync, payOSMutation.mutateAsync, customer, selectedTableId, t, navigate],
+    [paymentMethod, checkoutMutation.mutateAsync, payOSMutation.mutateAsync, customer, useCashback, selectedTableId, t, navigate],
   );
 
   /* ── Render ───────────────────────────────────────────────────────── */
@@ -246,8 +254,10 @@ export default function AdminPOSPage() {
         onCompleteOrder={handleCompleteOrder}
         onPayment={handlePayment}
         customer={customer}
-        onCustomerFound={setCustomer}
-        onClearCustomer={() => setCustomer(null)}
+        onCustomerFound={(c) => { setCustomer(c); setUseCashback(false); }}
+        onClearCustomer={() => { setCustomer(null); setUseCashback(false); }}
+        useCashback={useCashback}
+        onToggleCashback={setUseCashback}
         onOpenSchedule={() => navigate('/admin/staff')}
         onEndShift={() => setShiftHandoverOpen(true)}
       />
@@ -345,6 +355,7 @@ export default function AdminPOSPage() {
               onClick={() => {
                 setPaymentUrl(null);
                 setCustomer(null);
+          setUseCashback(false);
                 _setSelectedTableId(undefined);
               }}
               className="text-xs text-[#8898A4] hover:text-white mt-1 cursor-pointer transition-colors"

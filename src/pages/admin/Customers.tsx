@@ -74,7 +74,7 @@ function CustomersSession() {
     }
   };
 
-  const handleSaveCustomer = async (data: { name: string; phone: string; tier: string }, requestKey?: string) => {
+  const handleSaveCustomer = async (data: { name: string; phone: string; email?: string; tier: string }, requestKey?: string) => {
     if (editingCustomer) {
       return await updateCustomer(editingCustomer.id, data);
     }

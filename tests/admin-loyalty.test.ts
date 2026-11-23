@@ -41,8 +41,8 @@ function createMockD1(config: {
           return stmt;
         }),
         first: vi.fn(async function () {
-          // Redemption rate query (checkins table)
-          if (sql.includes('FROM checkins')) {
+          // Redemption rate query (user_rewards / legacy checkins table)
+          if (sql.includes('FROM user_rewards') || sql.includes('FROM checkins')) {
             return {
               total: config.redemptionTotal ?? 0,
               redeemed: config.redemptionRedeemed ?? 0,
@@ -76,6 +76,19 @@ function createMockD1(config: {
           return { count: config.totalCustomers ?? 0 };
         }),
         all: vi.fn(async function () {
+          // Voucher redemption rate (user_rewards)
+          if (sql.includes('FROM user_rewards')) {
+            const total = config.redemptionTotal ?? 0;
+            const redeemed = config.redemptionRedeemed ?? 0;
+            const rows: Array<{ customer_id: string; status: string }> = [];
+            for (let i = 0; i < total; i++) {
+              rows.push({
+                customer_id: `cust-${i}`,
+                status: i < redeemed ? 'used' : 'active',
+              });
+            }
+            return { results: rows };
+          }
           // Tier distribution
           if (sql.includes('GROUP BY tier') && !sql.includes('LIMIT')) {
             return { results: config.tiers ?? [] };

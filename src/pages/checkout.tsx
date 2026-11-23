@@ -104,7 +104,8 @@ export function CheckoutPage() {
       ? (totalItems >= 2 ? 0 : 15_000)
       : 0;
     const appliedDiscount = Math.max(0, Number(formData.discount || 0));
-    const effectiveTotal = Math.max(0, subtotal + effectiveShippingFee - appliedDiscount);
+    const appliedCashback = Math.max(0, Math.floor(Number(formData.cashbackAmount || 0)));
+    const effectiveTotal = Math.max(0, subtotal + effectiveShippingFee - appliedDiscount - appliedCashback);
     const normalizedPromoCode = formData.promoCode?.trim().toUpperCase() || undefined;
 
     const payload = {
@@ -141,6 +142,7 @@ export function CheckoutPage() {
       service_fee: 0,
       discount: appliedDiscount,
       ...(normalizedPromoCode ? { promo_code: normalizedPromoCode } : {}),
+      ...(appliedCashback > 0 ? { use_cashback: true, cashback_amount: appliedCashback } : {}),
       tip: 0,
     };
 

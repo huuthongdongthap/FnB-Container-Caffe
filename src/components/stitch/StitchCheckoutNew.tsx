@@ -128,7 +128,11 @@ export function StitchCheckoutNew({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [loyalty, setLoyalty] = useState<LoyaltyLookupResult | null>(null);
   const [isLookingUp, setIsLookingUp] = useState(false);
-  const [promoInput, setPromoInput] = useState<string>(initialState.form.promoCode || '');
+  const [useCashback, setUseCashback] = useState(false);
+  const initialQueryPromo = typeof window !== 'undefined'
+    ? (new URLSearchParams(window.location.search).get('promo') || '').trim().toUpperCase()
+    : '';
+  const [promoInput, setPromoInput] = useState<string>(initialQueryPromo || initialState.form.promoCode || '');
   const [appliedPromoCode, setAppliedPromoCode] = useState<string>(initialState.form.promoCode || '');
   const [appliedDiscount, setAppliedDiscount] = useState<number>(initialState.form.discount || 0);
   const [promoMessage, setPromoMessage] = useState<string | null>(null);
@@ -153,11 +157,13 @@ export function StitchCheckoutNew({
         setLoyalty(res.member);
       } else if (res?.data) {
         const d = res.data;
+        const wallet = d.wallet as Record<string, unknown> | undefined;
+        const tierConfig = d.tier_config as Record<string, unknown> | undefined;
         setLoyalty({
           tier: String(d.tier ?? 'bronze'),
-          tier_vi: String(d.tier_vi ?? d.tier ?? 'Đồng'),
-          balance: Number(d.cashback_balance ?? d.balance ?? 0),
-          loyalty_points: Number(d.points ?? d.loyalty_points ?? 0),
+          tier_vi: String(d.tier_vi ?? tierConfig?.display_name_vi ?? d.tier ?? 'Đồng'),
+          balance: Number(wallet?.balance ?? d.cashback_balance ?? d.balance ?? 0),
+          loyalty_points: Number(d.total_points ?? d.points ?? d.loyalty_points ?? 0),
           member_since: String(d.member_since ?? ''),
         });
       } else {
@@ -221,13 +227,17 @@ export function StitchCheckoutNew({
       : (locale?.startsWith('vi') ? 'Mang về (0₫)' : 'Takeaway ($0.00)'));
   const effectiveDiscount = appliedDiscount > 0 ? appliedDiscount : (summary.discount || 0);
   const effectivePromoCode = appliedPromoCode || summary.promoCode;
-  const effectiveTotal = Math.max(0, summary.subtotal + (summary.tax || 0) + effectiveDeliveryFee - effectiveDiscount);
+  const payableBeforeCashback = Math.max(0, summary.subtotal + (summary.tax || 0) + effectiveDeliveryFee - effectiveDiscount);
+  const appliedCashbackAmount = useCashback && loyalty && loyalty.balance > 0
+    ? Math.min(Math.floor(loyalty.balance), payableBeforeCashback)
+    : 0;
+  const effectiveTotal = Math.max(0, payableBeforeCashback - appliedCashbackAmount);
 
   const activeSummary: CheckoutNewSummary = {
     ...summary,
     deliveryFee: effectiveDeliveryFee,
     deliveryLabel: effectiveDeliveryLabel,
-    ...(effectiveDiscount > 0 ? { discount: effectiveDiscount } : {}),
+    ...(effectiveDiscount + appliedCashbackAmount > 0 ? { discount: effectiveDiscount + appliedCashbackAmount } : {}),
     ...(effectivePromoCode ? { promoCode: effectivePromoCode } : {}),
     total: effectiveTotal,
   };
@@ -307,6 +317,7 @@ export function StitchCheckoutNew({
         paymentMethod,
         orderType,
         ...(effectivePromoCode ? { promoCode: effectivePromoCode, discount: effectiveDiscount } : {}),
+        ...(appliedCashbackAmount > 0 ? { useCashback: true, cashbackAmount: appliedCashbackAmount } : {}),
       });
     } catch (err) {
       setSubmitError(
@@ -459,6 +470,25 @@ export function StitchCheckoutNew({
                         <CreditCard className="w-3.5 h-3.5" aria-hidden="true" />
                         Ví Aura: {loyalty.balance.toLocaleString('vi-VN')}₫
                       </span>
+                      {loyalty.balance > 0 && (
+                        <label
+                          className="w-full mt-1 inline-flex items-center gap-2 text-xs text-[var(--aura-chrome-bright)] cursor-pointer select-none"
+                          data-testid="checkout-use-cashback-toggle"
+                        >
+                          <input
+                            type="checkbox"
+                            checked={useCashback}
+                            onChange={(e) => setUseCashback(e.target.checked)}
+                            className="rounded border-white/20 bg-white/10 accent-[#C69C6D]"
+                          />
+                          <span>
+                            Dùng Ví Hoàn Tiền
+                            {appliedCashbackAmount > 0
+                              ? ` (-${appliedCashbackAmount.toLocaleString('vi-VN')}₫)`
+                              : ` (tối đa ${Math.min(Math.floor(loyalty.balance), payableBeforeCashback).toLocaleString('vi-VN')}₫)`}
+                          </span>
+                        </label>
+                      )}
                     </div>
                   )}
                 </div>

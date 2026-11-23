@@ -44,12 +44,21 @@ export function TierCard({
           >
             {t('loyalty.tierBadge', { tierName: data.tierName })}
           </div>
-          <h2
-            className="mb-2 text-[48px] leading-[1.1] tracking-[-0.02em] font-normal"
-            style={{ fontFamily: 'var(--aura-font-display)', color: 'var(--aura-chrome-bright)' }}
-          >
-            {t('loyalty.memberSince', { year: data.memberSince })}
-          </h2>
+          {data.memberSince ? (
+            <h2
+              className="mb-2 text-[48px] leading-[1.1] tracking-[-0.02em] font-normal"
+              style={{ fontFamily: 'var(--aura-font-display)', color: 'var(--aura-chrome-bright)' }}
+            >
+              {t('loyalty.memberSince', { year: data.memberSince })}
+            </h2>
+          ) : (
+            <h2
+              className="mb-2 text-[48px] leading-[1.1] tracking-[-0.02em] font-normal"
+              style={{ fontFamily: 'var(--aura-font-display)', color: 'var(--aura-chrome-bright)' }}
+            >
+              {data.tierName}
+            </h2>
+          )}
           <p
             className="max-w-xl text-[16px] leading-[1.5] font-normal opacity-80"
             style={{
@@ -68,13 +77,17 @@ export function TierCard({
               className="text-[12px] leading-none font-semibold uppercase tracking-[0.1em]"
               style={{ fontFamily: "var(--aura-font-body)", color: 'var(--aura-chrome-soft)' }}
             >
-              {t('loyalty.nextLevel', { tierName: data.nextTier })}
+              {data.progressPercent >= 100 && data.pointsRemainingForNextTier === 0
+                ? t('loyalty.topTierReached', { defaultValue: 'Hạng cao nhất' })
+                : t('loyalty.nextLevel', { tierName: data.nextTier })}
             </span>
             <span
               className="text-[12px] leading-none font-semibold"
               style={{ fontFamily: "var(--aura-font-body)", color: 'var(--aura-chrome-bright)' }}
             >
-              {t('loyalty.ptsRemaining', { count: data.pointsRemainingForNextTier })}
+              {data.progressPercent >= 100 && data.pointsRemainingForNextTier === 0
+                ? t('loyalty.maxTierBadge', { defaultValue: 'Top Tier' })
+                : t('loyalty.ptsRemaining', { count: data.pointsRemainingForNextTier })}
             </span>
           </div>
           <div

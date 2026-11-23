@@ -9,40 +9,17 @@ export const DISPLAY_FONT = 'var(--aura-font-display)';
 
 /* ─── Default Data ────────────────────────────────────────────── */
 export const defaultProfile: DashAccountProfile = {
-  name: 'Julian Vane',
-  avatar:
-    '/photos/IMG_6593.webp',
-  tier: 'Gold',
-  memberSince: '2022',
+  name: 'Khách hàng',
+  avatar: '',
+  tier: 'Bronze',
+  memberSince: '',
 };
 
 export const defaultLoyalty: DashLoyaltyData = {
-  points: 1250,
-  nextTier: 'Platinum',
-  pointsToNext: 250,
-  progressPercent: 80,
+  points: 0,
+  nextTier: 'Silver',
+  pointsToNext: 50,
+  progressPercent: 0,
 };
 
-export const defaultOrders: DashOrderItem[] = [
-  {
-    id: '1',
-    itemName: 'Truffle Cortado',
-    icon: 'coffee',
-    time: 'Today, 08:45 AM',
-    status: 'preparing',
-  },
-  {
-    id: '2',
-    itemName: 'Gold Leaf Croissant',
-    icon: 'bakery',
-    time: 'Yesterday, 09:12 AM',
-    status: 'delivered',
-  },
-  {
-    id: '3',
-    itemName: 'Iced Obsidian Brew',
-    icon: 'icecream',
-    time: 'Oct 24, 02:30 PM',
-    status: 'delivered',
-  },
-];
+export const defaultOrders: DashOrderItem[] = [];

@@ -34,6 +34,8 @@ export interface CheckoutNewFormData {
   tableNumber?: string;
   promoCode?: string;
   discount?: number;
+  useCashback?: boolean;
+  cashbackAmount?: number;
 }
 
 export interface StitchCheckoutNewProps {
