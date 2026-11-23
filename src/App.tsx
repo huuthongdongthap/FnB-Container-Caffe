@@ -1,6 +1,6 @@
 import React from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from '@/components/auth/AuthProvider';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 import OfflineBanner from '@/components/pwa/offline-banner';
@@ -20,7 +20,6 @@ const NotFoundNew = React.lazy(() => import('@/pages/stitch/not-found'));
 const KDSPage = React.lazy(() => import('@/pages/KDS'));
 const TVMenuPage = React.lazy(() => import('@/pages/TVMenu'));
 const TableOrder = React.lazy(() => import('@/pages/TableOrder'));
-const OrderManagementTerminal = React.lazy(() => import('@/pages/stitch/order-management'));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -51,7 +50,7 @@ function AppContent() {
               <Route element={<OpsShell />}>
                 <Route element={<ProtectedRoute />}>
                   <Route path="/kds" element={<KDSPage />} />
-                  <Route path="/stitch/order-management" element={<OrderManagementTerminal />} />
+                  <Route path="/stitch/order-management" element={<Navigate to="/admin/orders" replace />} />
                   <Route path="/pos/table/:tableId" element={<TableOrder />} />
                 </Route>
                 <Route path="/tv-menu" element={<TVMenuPage />} />

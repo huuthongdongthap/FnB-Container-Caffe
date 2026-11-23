@@ -5,7 +5,7 @@ import { HelmetHead } from '@/components/seo/HelmetHead';
 import { TriangleAlert } from 'lucide-react';
 
 export default function TVMenuPage() {
-  const { menuGroups, totalItems, isLoading, isError, lastUpdated, isHappyHour } = useTVMenu();
+  const { menuGroups, totalItems, isLoading, isError, lastUpdated, isHappyHour, happyHour } = useTVMenu();
   const { t } = useTranslation('tvMenu');
 
   if (isLoading && menuGroups.length === 0) {
@@ -51,10 +51,12 @@ export default function TVMenuPage() {
         description={t('seoDescription', 'Digital TV menu display for AURA CAFE Sa Dec. Browse our coffee, tea, and beverage offerings.')}
         canonical="/tv-menu"
       />
-    <div className="min-h-screen bg-[color:var(--aura-noir-deep)] text-[color:var(--aura-chrome-bright)] p-10 overflow-hidden" style={{ cursor: 'none' }}>
+    <div className="min-h-screen bg-[color:var(--aura-noir-deep)] text-[color:var(--aura-chrome-bright)] p-6 md:p-10 overflow-y-auto">
       <MenuSlideshow
         menuGroups={menuGroups}
         isHappyHour={isHappyHour}
+        happyHour={happyHour}
+        isError={isError}
         lastUpdated={lastUpdated}
         totalItems={totalItems}
       />

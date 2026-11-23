@@ -13,11 +13,13 @@ vi.mock('@/components/seo/HelmetHead', () => ({
 }));
 
 vi.mock('lucide-react', () => ({
+  AlertTriangle: () => null,
   ArrowLeft: () => null,
   Coffee: () => null,
   Croissant: () => null,
   MapPin: () => null,
   Receipt: () => null,
+  Search: () => null,
   UtensilsCrossed: () => null,
   User: () => null,
 }));
@@ -41,17 +43,17 @@ describe('stitch-track-order-new', () => {
     expect(screen.getByText('Cappuccino')).toBeTruthy();
   });
 
-  it('renders order total', () => {
-    renderWithProviders(<StitchTrackOrderNew total={25.75} />);
-    expect(screen.getByText('$25.75')).toBeTruthy();
+  it('renders order total in VND', () => {
+    renderWithProviders(<StitchTrackOrderNew total={45000} />);
+    expect(screen.getByText('45.000₫')).toBeTruthy();
   });
 
-  it('calls onTrackMap when track button clicked', () => {
-    const onTrackMap = vi.fn();
-    renderWithProviders(<StitchTrackOrderNew onTrackMap={onTrackMap} />);
-    const btn = screen.getByText('trackOrder.trackMap');
+  it('calls onSearchAnother when search-another button clicked', () => {
+    const onSearchAnother = vi.fn();
+    renderWithProviders(<StitchTrackOrderNew onSearchAnother={onSearchAnother} />);
+    const btn = screen.getByText('trackOrder.searchAnother');
     fireEvent.click(btn.closest('button')!);
-    expect(onTrackMap).toHaveBeenCalledTimes(1);
+    expect(onSearchAnother).toHaveBeenCalledTimes(1);
   });
 
   it('calls onBack when back button clicked', () => {

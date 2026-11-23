@@ -33,6 +33,8 @@ function toLegacyMenuDto(item: CustomerMenuItem) {
     price: item.priceCents,
     priceCents: item.priceCents,
     category: item.category,
+    ...(item.categoryId ? { categoryId: item.categoryId } : {}),
+    ...(item.categoryName ? { categoryName: item.categoryName } : {}),
     image_url: item.imageUrl ?? '',
     imageUrl: item.imageUrl ?? '',
     available: item.available,

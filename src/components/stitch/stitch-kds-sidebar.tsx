@@ -8,6 +8,7 @@
 'use client';
 
 import { useRef } from 'react';
+import { Link, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { cn } from '@/lib/cn';
 import { useFocusTrap } from '@/hooks/use-focus-trap';
@@ -17,6 +18,8 @@ import {
   Package,
   Users,
   ChefHat,
+  CreditCard,
+  Monitor,
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -29,16 +32,22 @@ interface SidebarProps {
 
 export function Sidebar({ isOpen, onToggle, stationLabel, stationName, stationLoad }: SidebarProps) {
   const { t } = useTranslation();
+  const { pathname } = useLocation();
   const sidebarRef = useRef<HTMLElement>(null);
 
   useFocusTrap(isOpen, onToggle, sidebarRef);
 
   const navItems = [
-    { icon: LayoutDashboard, label: t('kds.dashboard', 'DASHBOARD'), tKey: 'kds.dashboard', href: '/admin', active: true },
-    { icon: History, label: t('kds.history', 'HISTORY'), tKey: 'kds.history', href: '/admin/orders', active: false },
-    { icon: Package, label: t('kds.inventory', 'INVENTORY'), tKey: 'kds.inventory', href: '/admin/inventory', active: false },
-    { icon: Users, label: t('kds.staff', 'STAFF'), tKey: 'kds.staff', href: '/admin/staff', active: false },
-  ];
+    { icon: Monitor, label: t('kds.kdsScreen', 'KDS BẾP'), tKey: 'kds.kdsScreen', to: '/kds' },
+    { icon: CreditCard, label: t('kds.pos', 'POS THU NGÂN'), tKey: 'kds.pos', to: '/admin/pos' },
+    { icon: LayoutDashboard, label: t('kds.dashboard', 'DASHBOARD'), tKey: 'kds.dashboard', to: '/admin' },
+    { icon: History, label: t('kds.history', 'HISTORY'), tKey: 'kds.history', to: '/admin/orders' },
+    { icon: Package, label: t('kds.inventory', 'INVENTORY'), tKey: 'kds.inventory', to: '/admin/inventory' },
+    { icon: Users, label: t('kds.staff', 'STAFF'), tKey: 'kds.staff', to: '/admin/staff' },
+  ].map((item) => ({
+    ...item,
+    active: pathname === item.to || (item.to !== '/admin' && pathname.startsWith(`${item.to}/`)),
+  }));
 
   return (
     <>
@@ -87,9 +96,10 @@ export function Sidebar({ isOpen, onToggle, stationLabel, stationName, stationLo
         {/* Nav */}
         <nav className="flex flex-grow flex-col gap-2" aria-label={t('kds.navigation', 'Navigation')}>
           {navItems.map((item) => (
-            <a
+            <Link
               key={item.tKey}
-              href={item.href}
+              to={item.to}
+              onClick={onToggle}
               className={cn(
                 'flex items-center gap-4 px-4 py-3',
                 'text-[12px] leading-none tracking-[0.1em] font-bold uppercase',
@@ -104,7 +114,7 @@ export function Sidebar({ isOpen, onToggle, stationLabel, stationName, stationLo
             >
               <item.icon className="h-5 w-5" aria-hidden="true" />
               {item.label}
-            </a>
+            </Link>
           ))}
         </nav>
 

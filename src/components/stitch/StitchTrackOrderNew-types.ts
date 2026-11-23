@@ -12,12 +12,15 @@ export interface TrackOrderItem {
 
 export interface StitchTrackOrderNewProps {
   orderId?: string;
-  estimatedMinutes?: number;
+  estimatedMinutes?: number | null;
   items?: TrackOrderItem[];
   total?: number;
   /** Live order status (pending → confirmed → preparing → ready → served/delivered). Drives the timeline when provided. */
   status?: string;
+  /** Order fulfillment type ('delivery' | 'dine_in' | 'takeaway' | ...). */
+  orderType?: string;
   onTrackMap?: () => void;
+  onSearchAnother?: () => void;
   onBack?: () => void;
   onNavigate?: (path: string) => void;
 }

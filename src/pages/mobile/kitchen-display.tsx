@@ -171,7 +171,8 @@ export default function KitchenDisplay() {
     }
   }, [fetchOrders]);
 
-  const activeOrders = orders.filter((o) => o.status !== 'served');
+  const cancelledOrders = orders.filter((o) => o.status === 'cancelled');
+  const activeOrders = orders.filter((o) => o.status !== 'served' && o.status !== 'cancelled');
   const filteredOrders = activeStation === 'all'
     ? activeOrders
     : activeOrders.filter((o) => orderMatchesStation(o, activeStation));
@@ -230,6 +231,40 @@ export default function KitchenDisplay() {
           );
         })}
       </div>
+
+      {cancelledOrders.length > 0 && (
+        <div
+          role="alert"
+          aria-live="assertive"
+          style={{
+            margin: '10px 14px 0',
+            padding: '10px 14px',
+            background: 'rgba(239, 68, 68, 0.18)',
+            border: '2px solid rgba(239, 68, 68, 0.7)',
+            borderRadius: 10,
+            color: '#FECACA',
+            fontSize: 13,
+          }}
+        >
+          <div style={{ fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+            ĐÃ HỦY — DỪNG PHA CHẾ ({cancelledOrders.length})
+          </div>
+          <div style={{ marginTop: 6, display: 'flex', flexWrap: 'wrap', gap: 8, fontSize: 12 }}>
+            {cancelledOrders.map((c) => {
+              const label = c.table_name
+                ? `Bàn ${c.table_name}`
+                : c.order_type === 'delivery'
+                  ? 'Giao hàng'
+                  : 'Mang đi';
+              return (
+                <span key={c.id} style={{ textDecoration: 'line-through' }}>
+                  #{c.id.slice(-4)} ({label}): {c.items.map((i) => `${i.quantity}x ${i.name}`).join(', ')}
+                </span>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {error && (
         <div style={{ margin: '10px 14px 0', padding: '10px 14px', background: 'rgba(239, 83, 80, 0.15)', border: '1px solid rgba(239, 83, 80, 0.4)', borderRadius: 10, color: '#FFB4AB', fontSize: 13 }}>

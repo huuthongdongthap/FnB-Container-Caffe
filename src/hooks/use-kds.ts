@@ -11,6 +11,7 @@ interface KDSResult {
   isLoading: boolean;
   isError: boolean;
   error: Error | null;
+  refetch: () => void;
   completeOrder: (orderId: string) => void;
   updateStatus: (orderId: string, status: KDSOrder['status']) => void;
   isCompleting: boolean;
@@ -35,7 +36,7 @@ export function useKDS(station: string = 'all'): KDSResult {
     setPendingOrders({});
     setMutationErrors({});
   }, [identity, station]);
-  const { data = [], isLoading, isError, error } = useQuery<KDSOrder[]>({
+  const { data = [], isLoading, isError, error, refetch } = useQuery<KDSOrder[]>({
     queryKey,
     enabled,
     queryFn: ({ signal }) => apiFetch<{ orders?: Record<string, unknown>[]; data?: Record<string, unknown>[] }>(
@@ -55,7 +56,14 @@ export function useKDS(station: string = 'all'): KDSResult {
     if (enabled && station === 'all') {
       void consumeKdsStream(controller.signal, payload => {
         if (!controller.signal.aborted) {
-          queryClient.setQueryData(queryKey, mapStreamOrders(payload as KdsStreamOrder[]));
+          const incoming = mapStreamOrders(payload as KdsStreamOrder[]);
+          queryClient.setQueryData<KDSOrder[]>(queryKey, (prev = []) => {
+            const incomingIds = new Set(incoming.map((o) => o.id));
+            const preservedCancelled = prev.filter(
+              (o) => o.status === 'cancelled' && !incomingIds.has(o.id),
+            );
+            return preservedCancelled.length > 0 ? [...incoming, ...preservedCancelled] : incoming;
+          });
         }
       });
     }
@@ -107,6 +115,9 @@ export function useKDS(station: string = 'all'): KDSResult {
     isLoading,
     isError,
     error: error as Error | null,
+    refetch: () => {
+      void refetch();
+    },
     completeOrder: (orderId: string) => {
       const current = data.find(order => order.id === orderId);
       updateStatus(orderId, current?.status === 'pending' || current?.status === 'confirmed' ? 'preparing' : 'ready');

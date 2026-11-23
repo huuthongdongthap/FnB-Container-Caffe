@@ -193,19 +193,65 @@ export async function getKdsMobile(
     const rows = (orders.results as Array<Record<string, unknown>>).filter(
       (r) => !isHeldOutOfKds(r)
     );
+
+    const nowMs = Date.now();
+    const cancelWindowMs = 10 * 60_000;
+    const prepHistoryStatuses = new Set(['preparing', 'ready', 'served', 'completed']);
+    let recentCancelled: Array<Record<string, unknown>> = [];
+    try {
+      const cutoff = new Date(nowMs - cancelWindowMs).toISOString().replace('T', ' ').slice(0, 19);
+      const cancelledTenantClause = tenantClause ? tenantClause.replace('?1', '?2') : '';
+      const cancelledRes = await context.env.AURA_DB
+        .prepare(
+          `SELECT o.*, COALESCE(t.table_number, t.id) as table_name
+           FROM orders o
+           LEFT JOIN cafe_tables t ON (t.id = o.table_id OR CAST(t.table_number AS TEXT) = CAST(o.table_id AS TEXT))
+             AND COALESCE(NULLIF(t.tenant_id, ''), 'default') = COALESCE(NULLIF(o.tenant_id, ''), 'default')
+           WHERE o.status = 'cancelled' AND o.cancelled_at IS NOT NULL AND datetime(o.cancelled_at) >= datetime(?)${cancelledTenantClause}
+           LIMIT 20`
+        )
+        .bind(cutoff, ...tenantBinds)
+        .all();
+      const activeIds = new Set(rows.map((r) => String(r.id ?? '')));
+      recentCancelled = ((cancelledRes?.results ?? []) as Array<Record<string, unknown>>).filter((r) => {
+        if (activeIds.has(String(r.id ?? ''))) return false;
+        const rawCancelledAt = typeof r.cancelled_at === 'string' ? r.cancelled_at.trim() : '';
+        if (!rawCancelledAt) return false;
+        const iso = /[zZ]|[+-]\d{2}:?\d{2}$/.test(rawCancelledAt)
+          ? rawCancelledAt.replace(' ', 'T')
+          : `${rawCancelledAt.replace(' ', 'T')}Z`;
+        const cancelledMs = Date.parse(iso);
+        if (!Number.isFinite(cancelledMs) || nowMs - cancelledMs > cancelWindowMs || nowMs < cancelledMs - 60_000) {
+          return false;
+        }
+        const prev = String(r.previous_status ?? '').trim().toLowerCase();
+        const explicit = r.cancel_alert === true || Number(r.cancel_alert) === 1;
+        return explicit || prepHistoryStatuses.has(prev) || Boolean(r.served_at);
+      });
+    } catch {
+      // cancelled_at / previous_status absent in minimal schemas: no cancel alerts
+    }
+
+    const mapMobileRow = (r: Record<string, unknown>, isCancelAlert: boolean) => ({
+      id: r.id as string,
+      order_number: (r.order_number as string | undefined) ?? undefined,
+      table_id: (r.table_id as string | null) ?? null,
+      table_name: (r.table_name as string | null) ?? null,
+      order_type: (r.order_type as string | null | undefined) ?? null,
+      items: parseKdsItems(r.items),
+      notes: (r.notes as string | null | undefined) ?? null,
+      status: r.status as string,
+      created_at: r.created_at as string,
+      updated_at: r.updated_at as string,
+      ...(isCancelAlert ? { cancel_alert: true } : {}),
+    });
+
     return jsonResponse({
       success: true,
-      orders: rows.map((r) => ({
-        id: r.id as string,
-        order_number: (r.order_number as string | undefined) ?? undefined,
-        table_id: r.table_id as string,
-        table_name: r.table_name as string | null,
-        items: parseKdsItems(r.items),
-        notes: (r.notes as string | null | undefined) ?? null,
-        status: r.status as string,
-        created_at: r.created_at as string,
-        updated_at: r.updated_at as string,
-      })),
+      orders: [
+        ...rows.map((r) => mapMobileRow(r, false)),
+        ...recentCancelled.map((r) => mapMobileRow(r, true)),
+      ],
     });
   } catch (err) {
     const errMsg = (err as Error).message;

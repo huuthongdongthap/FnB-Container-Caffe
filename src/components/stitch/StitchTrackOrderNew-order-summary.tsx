@@ -14,10 +14,8 @@ interface OrderSummaryProps {
 }
 
 function formatAmount(val: number): string {
-  if (val >= 1000) {
-    return new Intl.NumberFormat('vi-VN').format(val) + '₫';
-  }
-  return `$${val.toFixed(2)}`;
+  const safeVal = Number.isFinite(val) ? Math.round(val) : 0;
+  return `${new Intl.NumberFormat('vi-VN').format(safeVal)}₫`;
 }
 
 export function OrderSummary({ items, total }: OrderSummaryProps) {
@@ -54,7 +52,7 @@ export function OrderSummary({ items, total }: OrderSummaryProps) {
                 </div>
               </div>
               <span className="font-body text-[14px] font-semibold text-[var(--aura-chrome-bright)]">
-                {formatAmount(item.price)}
+                {formatAmount(item.price * item.quantity)}
               </span>
             </li>
           );

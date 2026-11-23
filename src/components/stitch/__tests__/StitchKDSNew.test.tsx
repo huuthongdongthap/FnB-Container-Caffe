@@ -31,6 +31,8 @@ vi.mock('lucide-react', () => ({
   Minimize2: () => null,
   Volume2: () => null,
   VolumeX: () => null,
+  Monitor: () => null,
+  CreditCard: () => null,
 }));
 
 vi.mock('@/hooks/use-focus-trap', () => ({
@@ -40,17 +42,17 @@ vi.mock('@/hooks/use-focus-trap', () => ({
 describe('StitchKDSNew', () => {
   it('renders the KDS title', () => {
     renderWithProviders(<StitchKDSNew />);
-    expect(screen.getByText('HEARTH & STEEL KDS')).toBeTruthy();
+    expect(screen.getByText('AURA CAFE KDS')).toBeTruthy();
   });
 
   it('shows loading state', () => {
     renderWithProviders(<StitchKDSNew isLoading />);
-    expect(screen.getByText('HEARTH & STEEL KDS')).toBeTruthy();
+    expect(screen.getByText('AURA CAFE KDS')).toBeTruthy();
   });
 
   it('shows error state', () => {
     renderWithProviders(<StitchKDSNew error="Connection lost" />);
-    expect(screen.getByText('HEARTH & STEEL KDS')).toBeTruthy();
+    expect(screen.getByText('AURA CAFE KDS')).toBeTruthy();
   });
 
   it('renders filter buttons visible on small screens', () => {
