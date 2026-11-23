@@ -75,63 +75,112 @@ export const DEFAULT_ORDERS: OrderData[] = [
 export const FILTER_TABS: FilterTab[] = [
   { key: 'all', tKey: 'orderMgmt.all' },
   { key: 'pending', tKey: 'orderMgmt.pending' },
+  { key: 'confirmed', tKey: 'orderMgmt.confirmed' },
   { key: 'preparing', tKey: 'orderMgmt.preparing' },
   { key: 'ready', tKey: 'orderMgmt.ready' },
   { key: 'served', tKey: 'orderMgmt.served' },
+  { key: 'delivered', tKey: 'orderMgmt.delivered' },
+  { key: 'completed', tKey: 'orderMgmt.completed' },
+  { key: 'cancelled', tKey: 'orderMgmt.cancelled' },
 ];
 
-/* ─── Status Badge Styles ────────────────────────────────────────────── */
+/* ─── Status Badge Styles (High-contrast FnB semantic colors) ────────── */
 
 export const STATUS_BADGE_CONFIG: Record<OrderStatus, StatusBadgeConfig> = {
   pending: {
-    bg: 'bg-[var(--aura-noir-void, #050D1A)]/40',
-    text: 'text-[var(--aura-chrome-light, #C9D6DF)]',
-    border: 'border-[var(--aura-chrome-light, #C9D6DF)]/20',
+    bg: 'bg-amber-500/15',
+    text: 'text-amber-300',
+    border: 'border-amber-400/40',
     tKey: 'orderMgmt.pending',
   },
+  confirmed: {
+    bg: 'bg-sky-500/15',
+    text: 'text-sky-300',
+    border: 'border-sky-400/40',
+    tKey: 'orderMgmt.confirmed',
+  },
   preparing: {
-    bg: 'bg-[var(--aura-chrome-light, #C9D6DF)]/10',
-    text: 'text-[var(--aura-chrome-bright, #E8EEF3)]',
-    border: 'border-[var(--aura-chrome-bright, #E8EEF3)]/20',
+    bg: 'bg-blue-500/15',
+    text: 'text-blue-300',
+    border: 'border-blue-400/40',
     tKey: 'orderMgmt.preparing',
   },
   ready: {
-    bg: 'bg-[var(--aura-primary, #c6c6c7)]/10',
-    text: 'text-[var(--aura-primary, #c6c6c7)]',
-    border: 'border-[var(--aura-primary, #c6c6c7)]/20',
+    bg: 'bg-emerald-500/15',
+    text: 'text-emerald-300',
+    border: 'border-emerald-400/40',
     tKey: 'orderMgmt.ready',
   },
+  delivering: {
+    bg: 'bg-indigo-500/15',
+    text: 'text-indigo-300',
+    border: 'border-indigo-400/40',
+    tKey: 'orderMgmt.delivering',
+  },
   served: {
-    bg: 'bg-white/5',
-    text: 'text-[var(--aura-text-secondary, #a0a8b0)]',
-    border: 'border-white/10',
+    bg: 'bg-slate-500/15',
+    text: 'text-slate-300',
+    border: 'border-slate-400/30',
     tKey: 'orderMgmt.served',
   },
+  delivered: {
+    bg: 'bg-teal-500/15',
+    text: 'text-teal-300',
+    border: 'border-teal-400/40',
+    tKey: 'orderMgmt.delivered',
+  },
+  completed: {
+    bg: 'bg-slate-600/20',
+    text: 'text-slate-300',
+    border: 'border-slate-400/30',
+    tKey: 'orderMgmt.completed',
+  },
   cancelled: {
-    bg: 'bg-[var(--aura-error, #FFB4AB)]/10',
-    text: 'text-[var(--aura-error, #FFB4AB)]',
-    border: 'border-[var(--aura-error, #FFB4AB)]/20',
+    bg: 'bg-red-500/15',
+    text: 'text-red-300',
+    border: 'border-red-400/40',
     tKey: 'orderMgmt.cancelled',
+  },
+  failed: {
+    bg: 'bg-rose-500/15',
+    text: 'text-rose-300',
+    border: 'border-rose-400/40',
+    tKey: 'orderMgmt.failed',
+  },
+  expired: {
+    bg: 'bg-zinc-500/15',
+    text: 'text-zinc-300',
+    border: 'border-zinc-400/30',
+    tKey: 'orderMgmt.expired',
   },
 };
 
 export const STATUS_BAR_CLASSES: Record<OrderStatus, string> = {
-  pending: 'bg-[var(--aura-chrome-light, #C9D6DF)] shadow-[0_0_10px_rgba(201,214,223,0.5)]',
-  preparing: 'bg-[var(--aura-chrome-bright, #E8EEF3)] shadow-[0_0_10px_rgba(232,238,243,0.5)]',
-  ready: 'bg-[var(--aura-primary, #c6c6c7)] shadow-[0_0_10px_rgba(201,214,223,0.5)]',
-  served: 'bg-[var(--aura-text-secondary, #a0a8b0)] shadow-[0_0_10px_rgba(160,168,176,0.5)]',
-  cancelled: 'bg-[var(--aura-error, #FFB4AB)] shadow-[0_0_10px_rgba(255,180,171,0.5)]',
+  pending: 'bg-amber-400 shadow-[0_0_10px_rgba(251,191,36,0.5)]',
+  confirmed: 'bg-sky-400 shadow-[0_0_10px_rgba(56,189,248,0.5)]',
+  preparing: 'bg-blue-400 shadow-[0_0_10px_rgba(96,165,250,0.5)]',
+  ready: 'bg-emerald-400 shadow-[0_0_10px_rgba(52,211,153,0.5)]',
+  delivering: 'bg-indigo-400 shadow-[0_0_10px_rgba(129,140,248,0.5)]',
+  served: 'bg-slate-400 shadow-[0_0_10px_rgba(148,163,184,0.4)]',
+  delivered: 'bg-teal-400 shadow-[0_0_10px_rgba(45,212,191,0.4)]',
+  completed: 'bg-slate-500 shadow-[0_0_10px_rgba(100,116,139,0.4)]',
+  cancelled: 'bg-red-400 shadow-[0_0_10px_rgba(248,113,113,0.5)]',
+  failed: 'bg-rose-400 shadow-[0_0_10px_rgba(251,113,133,0.5)]',
+  expired: 'bg-zinc-400 shadow-[0_0_10px_rgba(161,161,170,0.4)]',
 };
 
 /* ─── Status Helpers ─────────────────────────────────────────────────── */
 
-/** Returns the action label for advancing an order to the next status. */
-export function getActionForStatus(status: OrderStatus): string {
+/** Returns the action label key for advancing an order to the next status. */
+export function getActionForStatus(status: OrderStatus, orderType?: string): string {
   switch (status) {
-    case 'pending': return 'Preparing';
-    case 'preparing': return 'Ready';
-    case 'ready': return 'Serve';
-    case 'served': return 'Completed';
-    default: return 'Completed';
+    case 'pending': return 'preparing';
+    case 'confirmed': return 'preparing';
+    case 'preparing': return 'ready';
+    case 'ready': return orderType === 'delivery' ? 'deliver' : 'serve';
+    case 'delivering': return 'deliver';
+    case 'served':
+    case 'delivered': return 'complete';
+    default: return 'completed';
   }
 }

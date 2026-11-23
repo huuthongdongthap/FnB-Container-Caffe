@@ -25,6 +25,7 @@ import {
   Settings,
   TrendingUp,
   DollarSign,
+  Flame,
 } from 'lucide-react';
 import type { NavSectionData } from './StitchAdminTerminalNew-types';
 
@@ -35,9 +36,11 @@ export const SECTIONS: NavSectionData[] = [
     ],
   },
   {
-    title: 'Vận hành / Operations',
+    title: 'Vận hành',
+    titleKey: 'terminal.section.operations',
     items: [
       { label: 'Đơn hàng', labelEn: 'Orders', to: '/admin/orders', icon: ShoppingCart },
+      { label: 'Bếp / KDS', labelEn: 'Kitchen / KDS', to: '/kds', icon: Flame },
       { label: 'POS', labelEn: 'POS', to: '/admin/pos', icon: CreditCard },
       { label: 'Thực đơn', labelEn: 'Menu', to: '/admin/manage-menu', icon: UtensilsCrossed },
       { label: 'Tồn kho', labelEn: 'Inventory', to: '/admin/inventory', icon: Package },
@@ -49,7 +52,8 @@ export const SECTIONS: NavSectionData[] = [
     ],
   },
   {
-    title: 'Phân tích / Analytics',
+    title: 'Phân tích',
+    titleKey: 'terminal.section.analytics',
     items: [
       { label: 'Phân tích', labelEn: 'Metrics', to: '/admin/metrics', icon: BarChart3 },
       { label: 'Báo cáo', labelEn: 'Sales Reports', to: '/admin/sales-reports', icon: FileBarChart },
@@ -58,7 +62,8 @@ export const SECTIONS: NavSectionData[] = [
     ],
   },
   {
-    title: 'Tiếp thị / Marketing',
+    title: 'Tiếp thị',
+    titleKey: 'terminal.section.marketing',
     items: [
       { label: 'Chiến dịch', labelEn: 'Campaigns', to: '/admin/campaigns', icon: Megaphone },
       { label: 'Khuyến mãi', labelEn: 'Promotions', to: '/admin/promotions', icon: Percent },
@@ -66,13 +71,15 @@ export const SECTIONS: NavSectionData[] = [
     ],
   },
   {
-    title: 'Giao tiếp / Communication',
+    title: 'Giao tiếp',
+    titleKey: 'terminal.section.communication',
     items: [
       { label: 'Chat', labelEn: 'Chat', to: '/admin/chat', icon: MessageSquare },
     ],
   },
   {
-    title: 'Hệ thống / System',
+    title: 'Hệ thống',
+    titleKey: 'terminal.section.system',
     items: [
       {
         label: 'Cài đặt cửa hàng & SaaS',

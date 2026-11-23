@@ -19,8 +19,31 @@ export interface RefundState {
   txHash: string | null;
 }
 
+interface RefundApiPayload {
+  data?: {
+    tx_hash?: string;
+    transactionHash?: string;
+    txHash?: string;
+    refundAmount?: number;
+    amount?: number;
+    refundReason?: string;
+    reason?: string;
+    refundStatus?: string;
+    status?: string;
+  };
+  tx_hash?: string;
+  transactionHash?: string;
+  txHash?: string;
+  refundAmount?: number;
+  amount?: number;
+  refundReason?: string;
+  reason?: string;
+  refundStatus?: string;
+  status?: string;
+}
+
 interface RefundActions {
-  initiateRefund: (paymentId: string | number, amount: number, reason: string) => Promise<string | null>;
+  initiateRefund: (paymentId: string | number, amount: number, reason: string, manualTransferRef: string) => Promise<string | null>;
   checkRefundStatus: (paymentId: string | number) => Promise<void>;
   reset: () => void;
 }
@@ -39,7 +62,12 @@ const INITIAL: RefundState = {
 export const useRefundStore = create<RefundStore>((set, get) => ({
   ...INITIAL,
 
-  initiateRefund: async (paymentId: string | number, amount: number, reason: string) => {
+  initiateRefund: async (paymentId: string | number, amount: number, reason: string, manualTransferRef: string) => {
+    const trimmedRef = manualTransferRef.trim();
+    if (!trimmedRef) {
+      set({ status: 'error', error: 'Mã chuyển khoản là bắt buộc / Manual transfer reference is required' });
+      return null;
+    }
     set({
       paymentId,
       amount,
@@ -50,9 +78,9 @@ export const useRefundStore = create<RefundStore>((set, get) => ({
     });
 
     try {
-      const body = await apiFetch<any>('/api/payments/refund', {
+      const body = await apiFetch<RefundApiPayload>('/api/payments/refund', {
         method: 'POST',
-        body: JSON.stringify({ paymentId, amount, reason }),
+        body: JSON.stringify({ paymentId, amount, reason, manual_transfer_ref: trimmedRef }),
       });
 
       const data = body?.data ?? body;
@@ -77,7 +105,7 @@ export const useRefundStore = create<RefundStore>((set, get) => ({
     set({ status: 'pending', error: null });
 
     try {
-      const body = await apiFetch<any>(`/api/payments/refunds/${encodeURIComponent(String(paymentId))}`);
+      const body = await apiFetch<RefundApiPayload>(`/api/payments/refunds/${encodeURIComponent(String(paymentId))}`);
       const data = body?.data ?? body;
       set({
         paymentId,

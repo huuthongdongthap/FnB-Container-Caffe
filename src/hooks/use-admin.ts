@@ -12,8 +12,18 @@ export interface AdminStats {
 export interface AdminOrder {
   id: string;
   customer: string;
+  customerPhone?: string;
+  customerAddress?: string;
+  orderType?: 'dine_in' | 'takeaway' | 'delivery' | string;
+  tableId?: string;
+  tableNumber?: string;
+  tableZone?: string;
+  paymentMethod?: string;
+  paymentStatus?: string;
+  notes?: string;
+  deliveryTime?: string;
   items: number;
-  itemsList?: Array<{ name: string; quantity: number }>;
+  itemsList?: Array<{ name: string; quantity: number; notes?: string; modifiers?: string[] }>;
   total: number;
   status: string;
   payment: string;

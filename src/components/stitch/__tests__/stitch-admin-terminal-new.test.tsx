@@ -34,7 +34,7 @@ describe('StitchAdminTerminalNew', () => {
 
   it('renders brand subtitle', () => {
     renderWithRouter(<StitchAdminTerminalNew />);
-    expect(screen.getByText('Admin Terminal')).toBeInTheDocument();
+    expect(screen.getAllByText('terminal.managementTitle').length).toBeGreaterThan(0);
   });
 
   it('renders admin name', () => {
@@ -42,11 +42,11 @@ describe('StitchAdminTerminalNew', () => {
     expect(screen.getByText('Aura Admin')).toBeInTheDocument();
   });
 
-  it('renders sidebar nav items with Vietnamese labels', () => {
+  it('renders sidebar nav items in active language', () => {
     renderWithRouter(<StitchAdminTerminalNew />);
-    expect(screen.getByText('Đơn hàng')).toBeInTheDocument();
+    expect(screen.getByText('Orders')).toBeInTheDocument();
     expect(screen.getByText('POS')).toBeInTheDocument();
-    expect(screen.getByText('Thực đơn')).toBeInTheDocument();
+    expect(screen.getByText('Menu')).toBeInTheDocument();
   });
 
   it('renders children when provided', () => {
@@ -63,8 +63,8 @@ describe('StitchAdminTerminalNew', () => {
     expect(screen.getByRole('main')).toBeInTheDocument();
   });
 
-  it('renders search input', () => {
+  it('does not render dead topbar search input', () => {
     renderWithRouter(<StitchAdminTerminalNew />);
-    expect(screen.getByRole('textbox')).toBeInTheDocument();
+    expect(screen.queryByRole('textbox')).toBeNull();
   });
 });

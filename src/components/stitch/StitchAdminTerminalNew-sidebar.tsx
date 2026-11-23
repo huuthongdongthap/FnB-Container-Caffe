@@ -33,14 +33,23 @@ export const Sidebar = forwardRef<HTMLElement, SidebarProps>(
     { open, onClose, brandName, brandSubtitle, adminName, terminalId, adminAvatarUrl },
     ref: Ref<HTMLElement>,
   ) => {
-    const { t } = useTranslation();
+    const { t, i18n } = useTranslation();
     const location = useLocation();
     const navigate = useNavigate();
     const user = useAuthStore((s) => s.user);
     const visibleSections = filterAdminNavSections(SECTIONS, user);
     const isPosRoute = location.pathname.startsWith('/admin/pos');
+    const isEn = i18n?.language?.startsWith('en') ?? false;
     const tNav = (key: string, fallback: string) => t(`nav.${key}`, { defaultValue: fallback });
     const tTerminal = (key: string) => t(`terminal.${key}`);
+    const resolvedAdminName = user?.name || user?.email || adminName;
+    const resolvedRoleLabel = user?.role
+      ? t(`terminal.role.${user.role}`, { defaultValue: user.role })
+      : '';
+    const resolvedTerminalId = user
+      ? [resolvedRoleLabel, user.tenantId && user.tenantId !== 'default' ? user.tenantId : ''].filter(Boolean).join(' · ') || terminalId
+      : terminalId;
+    const resolvedBrandSubtitle = brandSubtitle || tTerminal('managementTitle');
 
     return (
       <aside
@@ -59,21 +68,22 @@ export const Sidebar = forwardRef<HTMLElement, SidebarProps>(
               {t('hero.title') || brandName}
             </span>
           </Link>
-          <p className="text-sm text-[var(--aura-text-secondary, #a0a8b0)] opacity-70">{brandSubtitle}</p>
+          <p className="text-sm text-[var(--aura-text-secondary, #a0a8b0)] opacity-70">{resolvedBrandSubtitle}</p>
         </div>
 
         {/* Navigation */}
         <nav className="flex-1 overflow-y-auto px-3" aria-label={tTerminal('mainNavigation')}>
           {visibleSections.map((section: NavSectionData, si: number) => (
             <div key={si} className="mb-4">
-              {section.title && (
+              {(section.titleKey || section.title) && (
                 <p className="mb-2 px-3 text-[10px] font-semibold uppercase tracking-widest text-[var(--aura-text-secondary, #a0a8b0)]">
-                  {section.title}
+                  {section.titleKey ? t(section.titleKey, { defaultValue: section.title }) : section.title}
                 </p>
               )}
               {section.items.map((item) => {
                 const active = isActivePath(location.pathname, item.to);
                 const Icon = item.icon;
+                const itemLabel = isEn ? item.labelEn : item.label;
                 return (
                   <Link
                     key={item.to}
@@ -86,10 +96,10 @@ export const Sidebar = forwardRef<HTMLElement, SidebarProps>(
                         : 'text-[var(--aura-text-secondary, #a0a8b0)] hover:bg-[var(--st-surface-container-highest, #273a55)]/30 hover:text-[var(--aura-text-primary, #e8e8e8)]',
                     )}
                     aria-current={active ? 'page' : undefined}
-                    aria-label={tNav(item.to, item.label)}
+                    aria-label={tNav(item.to, itemLabel)}
                   >
                     <Icon size={20} />
-                    <span>{item.label}</span>
+                    <span>{itemLabel}</span>
                   </Link>
                 );
               })}
@@ -132,13 +142,13 @@ export const Sidebar = forwardRef<HTMLElement, SidebarProps>(
                     className="flex h-full w-full items-center justify-center text-xs font-semibold uppercase text-[var(--aura-text-primary, #e8e8e8)]"
                     aria-label={tTerminal('adminAvatar')}
                   >
-                    {adminName?.charAt(0) || 'A'}
+                    {resolvedAdminName?.charAt(0) || 'A'}
                   </span>
                 )}
               </div>
               <div>
-                <p className="text-sm font-semibold text-[var(--aura-text-primary, #e8e8e8)]">{adminName}</p>
-                <p className="text-xs text-[var(--aura-text-secondary, #a0a8b0)]">{terminalId}</p>
+                <p className="text-sm font-semibold text-[var(--aura-text-primary, #e8e8e8)]">{resolvedAdminName}</p>
+                <p className="text-xs text-[var(--aura-text-secondary, #a0a8b0)]">{resolvedTerminalId}</p>
               </div>
             </div>
 

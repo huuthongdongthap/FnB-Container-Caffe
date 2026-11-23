@@ -22,7 +22,7 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { cn } from '@/lib/cn';
-import { Loader2, AlertCircle, RefreshCw } from 'lucide-react';
+import { AlertCircle, RefreshCw, X } from 'lucide-react';
 
 import type { StitchOrderMgmtNewProps } from './StitchOrderMgmtNew-types';
 import {
@@ -47,11 +47,23 @@ export function StitchOrderMgmtNew({
   orders = DEFAULT_ORDERS,
   activeNav: _activeNav = 'orders',
   activeFilter = 'all',
+  activeChannel = 'all',
+  searchQuery,
+  searchField = 'all',
+  statusCounts,
   isLoading = false,
   error = null,
+  mutationError = null,
+  onDismissMutationError,
   onFilterChange,
+  onChannelChange,
   onSearch,
+  onSearchFieldChange,
   onOrderAction,
+  onViewDetails,
+  onCancelOrder,
+  onEditOrder,
+  onPrintOrder,
   onRefresh,
   currentPage = 1,
   pageSize = 12,
@@ -64,22 +76,9 @@ export function StitchOrderMgmtNew({
 
   const tTerminal = (key: string) => t(`terminal.${key}`);
 
-  /* ─── Loading State ────────────────────────────────────────────── */
+  /* ─── Fatal Initial Fetch Error State (only when no orders loaded) ─── */
 
-  if (isLoading) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-[var(--aura-bg-page, var(--aura-bg-surface))]">
-        <div className="flex flex-col items-center gap-4" role="status" aria-label={tTerminal('loading')}>
-          <Loader2 size={40} className="animate-spin text-[var(--aura-primary, #c6c6c7)]" />
-          <p className="font-sans text-sm text-[var(--aura-text-secondary, #a0a8b0)]">{tTerminal('loading')}</p>
-        </div>
-      </div>
-    );
-  }
-
-  /* ─── Error State ──────────────────────────────────────────────── */
-
-  if (error) {
+  if (error && orders.length === 0) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-[var(--aura-bg-page, var(--aura-bg-surface))]">
         <div
@@ -116,6 +115,29 @@ export function StitchOrderMgmtNew({
         aria-label={tTerminal('mainContent')}
       >
         <div className="mx-auto w-full max-w-[1440px]">
+          {/* Non-blocking mutation or background refresh error banner */}
+          {(mutationError || error) && (
+            <div
+              role="alert"
+              className="mb-4 flex items-center justify-between gap-3 rounded-xl border border-red-400/40 bg-red-500/15 px-4 py-3 text-sm text-red-200"
+            >
+              <div className="flex items-center gap-2">
+                <AlertCircle size={16} className="shrink-0" />
+                <span>{mutationError || error}</span>
+              </div>
+              {onDismissMutationError && mutationError && (
+                <button
+                  type="button"
+                  onClick={onDismissMutationError}
+                  aria-label={t('orderMgmt.close', { defaultValue: 'Close' })}
+                  className="rounded p-1 hover:bg-white/10"
+                >
+                  <X size={14} />
+                </button>
+              )}
+            </div>
+          )}
+
           {/* Stat overview cards */}
           <section
             className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4"
@@ -140,13 +162,25 @@ export function StitchOrderMgmtNew({
           {/* Revenue, Staff, Promotions */}
           {showDashboardPanels && <StitchOrderMgmtDashboard />}
 
-          {/* Search, Filters, Order Grid, Pagination */}
+          {/* Search, Filters, Order Grid/Table, Pagination */}
           <StitchOrderMgmtTable
             orders={orders}
             activeFilter={activeFilter}
+            activeChannel={activeChannel}
+            searchQuery={searchQuery}
+            searchField={searchField}
+            statusCounts={statusCounts}
+            isLoading={isLoading}
             onFilterChange={onFilterChange}
+            onChannelChange={onChannelChange}
             onSearch={onSearch}
+            onSearchFieldChange={onSearchFieldChange}
             onOrderAction={onOrderAction}
+            onViewDetails={onViewDetails}
+            onCancelOrder={onCancelOrder}
+            onEditOrder={onEditOrder}
+            onPrintOrder={onPrintOrder}
+            onRefresh={onRefresh}
             currentPage={currentPage}
             pageSize={pageSize}
             totalCount={totalCount}

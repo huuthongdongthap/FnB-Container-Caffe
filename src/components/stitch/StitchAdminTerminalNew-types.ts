@@ -10,6 +10,7 @@ export interface NavItemData {
 
 export interface NavSectionData {
   title?: string;
+  titleKey?: string;
   items: NavItemData[];
 }
 
