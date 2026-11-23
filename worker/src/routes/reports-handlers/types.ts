@@ -70,10 +70,20 @@ export interface CategorySummary {
   revenue: number;
 }
 
+export interface UnreconciledShiftSummary {
+  shift_id: string;
+  staff_name: string;
+  date: string;
+  status: 'open' | 'unreconciled';
+  opening_float: number;
+}
+
 export interface DailyReconciliationReport {
   from: string;
   to: string;
   shifts: ReconciliationRow[];
+  unreconciled_shifts?: UnreconciledShiftSummary[];
+  has_unreconciled_shifts?: boolean;
   payment_methods: PaymentMethodSummary[];
   categories: CategorySummary[];
   totals: {

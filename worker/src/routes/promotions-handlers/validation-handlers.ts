@@ -4,6 +4,10 @@ import { validatePromotionSchema, redeemPromotionSchema } from '../../lib/valida
 import { optionalAuth } from '../../middleware/auth';
 import { isHQSuperAdmin, matchesTenantRow, resolvePublicTenantId } from '../../middleware/tenant';
 import { verifyGuestOrderToken } from '../../../../packages/domain/customer/policies/order-ownership-policy';
+import {
+  findLoyaltyVoucherByCode,
+  validateLoyaltyVoucher,
+} from '../../../../packages/domain/order/loyalty-voucher';
 import type { Env } from '../../types/env';
 import { isPlaceholderPhone } from './helpers';
 import type { PromotionCode } from './types';
@@ -247,6 +251,43 @@ export function registerPromotionValidationHandlers(router: Hono<{ Bindings: Env
     }
 
     if (!promo) {
+      const loyaltyVoucher = await findLoyaltyVoucherByCode(db, upperCode, tenantId);
+      if (loyaltyVoucher) {
+        const authUser = c.get('user' as never) as {
+          id?: string;
+          sub?: string;
+          customerId?: string;
+          role?: string;
+        } | undefined;
+        const role = String(authUser?.role ?? '').trim().toLowerCase();
+        const isStaff = ['staff', 'cashier', 'waiter', 'barista', 'supervisor', 'manager', 'admin', 'owner'].includes(role);
+        const callerCustomerId = isStaff
+          ? (data.customer_id || null)
+          : (authUser?.customerId || authUser?.id || authUser?.sub || null);
+        const check = validateLoyaltyVoucher(loyaltyVoucher, {
+          customerId: callerCustomerId,
+          allowStaffOverride: isStaff,
+          orderTotal: data.order_total,
+        });
+        if (!check.valid) {
+          return c.json({ success: true, data: { valid: false, reason: check.reason } });
+        }
+        return c.json({
+          success: true,
+          data: {
+            valid: true,
+            code: loyaltyVoucher.code,
+            source: 'loyalty_voucher',
+            title: loyaltyVoucher.title,
+            discount_type: loyaltyVoucher.discount_type,
+            percent: loyaltyVoucher.discount_type === 'percent' ? loyaltyVoucher.discount_value : 0,
+            discount_value: loyaltyVoucher.discount_value,
+            max_discount: loyaltyVoucher.max_discount,
+            min_order: loyaltyVoucher.min_order,
+            ...(check.discountAmount !== undefined ? { discount_amount: check.discountAmount } : {}),
+          },
+        });
+      }
       return c.json({ success: true, data: { valid: false, reason: 'Mã không tồn tại hoặc đã bị vô hiệu hoá' } });
     }
 

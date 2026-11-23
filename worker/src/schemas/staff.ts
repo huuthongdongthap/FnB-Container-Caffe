@@ -112,6 +112,8 @@ export const AttendanceCheckInSchema = z.object({
   shiftId: ShiftIdSchema.optional(),
   locationId: z.string().min(1).optional(),
   notes: z.string().max(500).optional(),
+  openingCash: z.number().finite().min(0).optional(),
+  opening_cash: z.number().finite().min(0).optional(),
 }).openapi('AttendanceCheckIn');
 export const AttendanceCheckOutSchema = z.object({
   staffId: z.string().min(1).optional(),

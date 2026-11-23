@@ -88,7 +88,7 @@ describe('AdminOrdersPage', () => {
 
   it('passes header title to Stitch component', () => {
     renderWithProviders(<AdminOrdersPage />);
-    expect(screen.getByTestId('header-title').textContent).toBe('Orders');
+    expect(screen.getByTestId('header-title').textContent).toBe('terminal.nav.orders');
   });
 
   it('shows loading state', () => {
@@ -115,27 +115,29 @@ describe('AdminOrdersPage', () => {
     expect(screen.getByTestId('stats-count').textContent).toBe('4');
   });
 
-  it('wires real pagination props, hides fake dashboard panels, and resets to page 1 on filter/search', () => {
+  it('wires real pagination props, hides fake dashboard panels, and resets to page 1 on filter/search', async () => {
     const { getByTestId } = renderWithProviders(<AdminOrdersPage />);
     expect(getByTestId('current-page').textContent).toBe('1');
     expect(getByTestId('page-size').textContent).toBe('12');
     expect(getByTestId('total-count').textContent).toBe('27');
     expect(getByTestId('show-dashboard').textContent).toBe('false');
-    expect(fetchOrdersSpy).toHaveBeenLastCalledWith(1, { status: undefined, search: undefined }, 12);
+    expect(fetchOrdersSpy).toHaveBeenLastCalledWith(1, { status: undefined, search: undefined, searchField: undefined, orderType: undefined }, 12);
 
     fireEvent.click(getByTestId('goto-page-2'));
     expect(getByTestId('current-page').textContent).toBe('2');
-    expect(fetchOrdersSpy).toHaveBeenLastCalledWith(2, { status: undefined, search: undefined }, 12);
+    expect(fetchOrdersSpy).toHaveBeenLastCalledWith(2, { status: undefined, search: undefined, searchField: undefined, orderType: undefined }, 12);
 
     fireEvent.click(getByTestId('filter-preparing'));
     expect(getByTestId('current-page').textContent).toBe('1');
-    expect(fetchOrdersSpy).toHaveBeenLastCalledWith(1, { status: 'preparing', search: undefined }, 12);
+    expect(fetchOrdersSpy).toHaveBeenLastCalledWith(1, { status: 'preparing', search: undefined, searchField: undefined, orderType: undefined }, 12);
 
     fireEvent.click(getByTestId('goto-page-2'));
     expect(getByTestId('current-page').textContent).toBe('2');
 
     fireEvent.click(getByTestId('search-vip'));
     expect(getByTestId('current-page').textContent).toBe('1');
-    expect(fetchOrdersSpy).toHaveBeenLastCalledWith(1, { status: 'preparing', search: 'VIP' }, 12);
+    await vi.waitFor(() => {
+      expect(fetchOrdersSpy).toHaveBeenLastCalledWith(1, { status: 'preparing', search: 'VIP', searchField: 'all', orderType: undefined }, 12);
+    });
   });
 });

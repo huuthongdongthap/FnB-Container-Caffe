@@ -212,7 +212,7 @@ describe('Shift Handover Flow (#102)', () => {
       '/api/shifts/clock-out',
       expect.objectContaining({
         method: 'POST',
-        body: JSON.stringify({ staff_id: 'staff_1' }),
+        body: JSON.stringify({ staff_id: 'staff_1', shift_id: '55' }),
       }),
     );
     expect(onCompleted).toHaveBeenCalledTimes(1);
@@ -250,6 +250,10 @@ describe('Shift Handover Flow (#102)', () => {
     });
 
     fireEvent.click(screen.getByTestId('submit-handover-btn'));
+    await waitFor(() => {
+      expect(screen.getByTestId('confirm-zero-cash-btn')).toBeTruthy();
+    });
+    fireEvent.click(screen.getByTestId('confirm-zero-cash-btn'));
 
     await waitFor(() => {
       expect(screen.getByRole('alert').textContent).toContain('Shift cash ledger changed concurrently');
@@ -317,8 +321,12 @@ describe('Shift Handover Flow (#102)', () => {
       expect(screen.getByTestId('submit-handover-btn')).toBeTruthy();
     });
 
-    // First click: reconcile succeeds, clock-out fails
+    // First click: prompts 0đ confirmation, then confirm triggers reconcile (succeeds) + clock-out (fails)
     fireEvent.click(screen.getByTestId('submit-handover-btn'));
+    await waitFor(() => {
+      expect(screen.getByTestId('confirm-zero-cash-btn')).toBeTruthy();
+    });
+    fireEvent.click(screen.getByTestId('confirm-zero-cash-btn'));
 
     await waitFor(() => {
       expect(screen.getByTestId('reconciliation-recorded')).toBeTruthy();

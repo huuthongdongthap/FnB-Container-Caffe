@@ -23,7 +23,7 @@ export function LocationCard({ locationName, imageUrl }: LocationCardProps) {
   return (
     <div
       className={cn(
-        'glass-card rounded-[24px] overflow-hidden w-full h-40 relative group cursor-pointer transition-all duration-500 hover:border-[color-mix(in_oklab,var(--aura-chrome-bright)_40%,transparent)]',
+        'glass-card rounded-[24px] overflow-hidden w-full h-40 relative group transition-all duration-500 hover:border-[color-mix(in_oklab,var(--aura-chrome-bright)_40%,transparent)]',
         glassPanelClasses,
       )}
       role="region"

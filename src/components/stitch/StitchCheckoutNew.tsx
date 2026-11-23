@@ -70,6 +70,13 @@ function getInitialCheckoutForm(): {
     const params = new URLSearchParams(window.location.search);
     const urlTable = (params.get('table') || params.get('ban') || '').trim();
     const urlPromo = params.get('promo') || localStorage.getItem('aura_selected_promo_code') || '';
+    const rawUrlMethod = (params.get('method') || '').trim().toLowerCase();
+    const urlMethod: PaymentMethod | null =
+      rawUrlMethod === 'payos' || rawUrlMethod === 'vietqr'
+        ? 'payos'
+        : rawUrlMethod === 'cod' || rawUrlMethod === 'cash'
+          ? 'cod'
+          : null;
 
     const merged: CheckoutNewFormData = {
       ...defaultForm,
@@ -80,6 +87,7 @@ function getInitialCheckoutForm(): {
         address: savedProfile.address || '',
       } : {}),
       ...(savedForm ? savedForm : {}),
+      ...(urlMethod ? { paymentMethod: urlMethod } : {}),
     };
     if (merged.paymentMethod !== 'payos' && merged.paymentMethod !== 'cod') {
       merged.paymentMethod = 'payos';
@@ -99,6 +107,10 @@ function getInitialCheckoutForm(): {
     if (urlTable) {
       merged.orderType = 'dine_in';
       merged.tableNumber = urlTable;
+    }
+
+    if (merged.orderType === 'delivery' && merged.paymentMethod === 'cod') {
+      merged.paymentMethod = 'payos';
     }
 
     return { form: merged, booking };
@@ -128,13 +140,38 @@ export function StitchCheckoutNew({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [loyalty, setLoyalty] = useState<LoyaltyLookupResult | null>(null);
   const [isLookingUp, setIsLookingUp] = useState(false);
-  const [promoInput, setPromoInput] = useState<string>(initialState.form.promoCode || '');
+  const [useCashback, setUseCashback] = useState(false);
+  const initialQueryPromo = typeof window !== 'undefined'
+    ? (new URLSearchParams(window.location.search).get('promo') || '').trim().toUpperCase()
+    : '';
+  const [promoInput, setPromoInput] = useState<string>(initialQueryPromo || initialState.form.promoCode || '');
   const [appliedPromoCode, setAppliedPromoCode] = useState<string>(initialState.form.promoCode || '');
   const [appliedDiscount, setAppliedDiscount] = useState<number>(initialState.form.discount || 0);
   const [promoMessage, setPromoMessage] = useState<string | null>(null);
   const [promoError, setPromoError] = useState<string | null>(null);
   const [isValidatingPromo, setIsValidatingPromo] = useState(false);
   const lookupTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const prevSubtotalRef = useRef<number | undefined>(summary?.subtotal);
+
+  // Delivery orders require prepaid PayOS; auto-switch away from COD
+  useEffect(() => {
+    if (orderType === 'delivery' && paymentMethod === 'cod') {
+      setPaymentMethod('payos');
+    }
+  }, [orderType, paymentMethod]);
+
+  // Clear applied promo discount when cart subtotal changes so stale discounts are never submitted
+  useEffect(() => {
+    const currentSubtotal = summary?.subtotal;
+    if (prevSubtotalRef.current !== undefined && currentSubtotal !== prevSubtotalRef.current) {
+      if (appliedDiscount > 0 || appliedPromoCode) {
+        setAppliedDiscount(0);
+        setAppliedPromoCode('');
+        setPromoMessage(null);
+      }
+    }
+    prevSubtotalRef.current = currentSubtotal;
+  }, [summary?.subtotal, appliedDiscount, appliedPromoCode]);
 
   // Loyalty lookup: only query authenticated customer summary (no public phone lookup)
   const lookupLoyalty = useCallback(async (phone: string) => {
@@ -153,11 +190,13 @@ export function StitchCheckoutNew({
         setLoyalty(res.member);
       } else if (res?.data) {
         const d = res.data;
+        const wallet = d.wallet as Record<string, unknown> | undefined;
+        const tierConfig = d.tier_config as Record<string, unknown> | undefined;
         setLoyalty({
           tier: String(d.tier ?? 'bronze'),
-          tier_vi: String(d.tier_vi ?? d.tier ?? 'Đồng'),
-          balance: Number(d.cashback_balance ?? d.balance ?? 0),
-          loyalty_points: Number(d.points ?? d.loyalty_points ?? 0),
+          tier_vi: String(d.tier_vi ?? tierConfig?.display_name_vi ?? d.tier ?? 'Đồng'),
+          balance: Number(wallet?.balance ?? d.cashback_balance ?? d.balance ?? 0),
+          loyalty_points: Number(d.total_points ?? d.points ?? d.loyalty_points ?? 0),
           member_since: String(d.member_since ?? ''),
         });
       } else {
@@ -221,13 +260,25 @@ export function StitchCheckoutNew({
       : (locale?.startsWith('vi') ? 'Mang về (0₫)' : 'Takeaway ($0.00)'));
   const effectiveDiscount = appliedDiscount > 0 ? appliedDiscount : (summary.discount || 0);
   const effectivePromoCode = appliedPromoCode || summary.promoCode;
-  const effectiveTotal = Math.max(0, summary.subtotal + (summary.tax || 0) + effectiveDeliveryFee - effectiveDiscount);
+  const payableBeforeCashback = Math.max(0, summary.subtotal + (summary.tax || 0) + effectiveDeliveryFee - effectiveDiscount);
+  const rawMaxCashback = loyalty && loyalty.balance > 0
+    ? Math.min(Math.floor(loyalty.balance), payableBeforeCashback)
+    : 0;
+  const maxUsableCashback =
+    paymentMethod === 'payos' &&
+    rawMaxCashback > 0 &&
+    payableBeforeCashback - rawMaxCashback > 0 &&
+    payableBeforeCashback - rawMaxCashback < 1000
+      ? Math.max(0, payableBeforeCashback - 1000)
+      : rawMaxCashback;
+  const appliedCashbackAmount = useCashback ? maxUsableCashback : 0;
+  const effectiveTotal = Math.max(0, payableBeforeCashback - appliedCashbackAmount);
 
   const activeSummary: CheckoutNewSummary = {
     ...summary,
     deliveryFee: effectiveDeliveryFee,
     deliveryLabel: effectiveDeliveryLabel,
-    ...(effectiveDiscount > 0 ? { discount: effectiveDiscount } : {}),
+    ...(effectiveDiscount + appliedCashbackAmount > 0 ? { discount: effectiveDiscount + appliedCashbackAmount } : {}),
     ...(effectivePromoCode ? { promoCode: effectivePromoCode } : {}),
     total: effectiveTotal,
   };
@@ -276,10 +327,11 @@ export function StitchCheckoutNew({
   };
 
   // VN mobile numbers: exactly 10 digits starting with 0
+  const isFullNameValid = form.fullName.trim().length > 0;
   const isPhoneValid = /^0\d{9}$/.test(form.phone.replace(/\s/g, ''));
   const isAddressMissing = orderType === 'delivery' && !form.address.trim();
   const isTableMissing = orderType === 'dine_in' && !form.tableNumber?.trim();
-  const canSubmit = isPhoneValid && !isAddressMissing && !isTableMissing;
+  const canSubmit = isFullNameValid && isPhoneValid && !isAddressMissing && !isTableMissing;
   const processing = isProcessing || isSubmitting;
 
   const updateField = <K extends keyof CheckoutNewFormData>(
@@ -292,11 +344,13 @@ export function StitchCheckoutNew({
     setSubmitError(null);
     if (!canSubmit) {
       setSubmitError(
-        !isPhoneValid
-          ? t('stitch.phoneInvalid', 'Số điện thoại không hợp lệ (VD: 0901234567)')
-          : isAddressMissing
-            ? t('stitch.addressRequired', 'Vui lòng nhập địa chỉ giao hàng')
-            : t('stitch.tableRequired', 'Vui lòng nhập số bàn'),
+        !isFullNameValid
+          ? t('stitch.fullNameRequired', 'Vui lòng nhập họ và tên')
+          : !isPhoneValid
+            ? t('stitch.phoneInvalid', 'Số điện thoại không hợp lệ (VD: 0901234567)')
+            : isAddressMissing
+              ? t('stitch.addressRequired', 'Vui lòng nhập địa chỉ giao hàng')
+              : t('stitch.tableRequired', 'Vui lòng nhập số bàn'),
       );
       return;
     }
@@ -307,6 +361,7 @@ export function StitchCheckoutNew({
         paymentMethod,
         orderType,
         ...(effectivePromoCode ? { promoCode: effectivePromoCode, discount: effectiveDiscount } : {}),
+        ...(appliedCashbackAmount > 0 ? { useCashback: true, cashbackAmount: appliedCashbackAmount } : {}),
       });
     } catch (err) {
       setSubmitError(
@@ -459,6 +514,25 @@ export function StitchCheckoutNew({
                         <CreditCard className="w-3.5 h-3.5" aria-hidden="true" />
                         Ví Aura: {loyalty.balance.toLocaleString('vi-VN')}₫
                       </span>
+                      {loyalty.balance > 0 && (
+                        <label
+                          className="w-full mt-1 inline-flex items-center gap-2 text-xs text-[var(--aura-chrome-bright)] cursor-pointer select-none"
+                          data-testid="checkout-use-cashback-toggle"
+                        >
+                          <input
+                            type="checkbox"
+                            checked={useCashback}
+                            onChange={(e) => setUseCashback(e.target.checked)}
+                            className="rounded border-white/20 bg-white/10 accent-[#C69C6D]"
+                          />
+                          <span>
+                            Dùng Ví Hoàn Tiền
+                            {appliedCashbackAmount > 0
+                              ? ` (-${appliedCashbackAmount.toLocaleString('vi-VN')}₫)`
+                              : ` (tối đa ${maxUsableCashback.toLocaleString('vi-VN')}₫)`}
+                          </span>
+                        </label>
+                      )}
                     </div>
                   )}
                 </div>
@@ -560,7 +634,11 @@ export function StitchCheckoutNew({
               </div>
             </section>
 
-            <PaymentMethodSelector selected={paymentMethod} onSelect={setPaymentMethod} />
+            <PaymentMethodSelector
+              selected={paymentMethod}
+              onSelect={setPaymentMethod}
+              orderType={orderType}
+            />
           </div>
 
           <OrderSummaryPanel

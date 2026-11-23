@@ -21,13 +21,14 @@
 'use client';
 
 import { useSearchParams, useNavigate } from 'react-router-dom';
-import { useEffect, useCallback, useMemo } from 'react';
+import { useEffect, useCallback, useMemo, useState } from 'react';
 import { HelmetHead } from '@/components/seo/HelmetHead';
 import { useOrderObservation } from '@/hooks/use-order-observation';
 import { useCartStore } from '@/hooks/stores/use-cart-store';
 import { useToast } from '@/components/ui/toast';
 import { StitchOrderSuccessNew, type OrderSuccessNewData } from '@/components/stitch/StitchOrderSuccessNew';
-import { rememberGuestOrderToken, stripOrderTokenFromBrowserUrl } from '@/lib/guest-order-token';
+import { apiFetch } from '@/lib/api-client';
+import { getGuestOrderToken, rememberGuestOrderToken, stripOrderTokenFromBrowserUrl } from '@/lib/guest-order-token';
 import { acknowledgeCheckoutOrder } from './checkout-intent';
 
 /* ---- Types --------------------------------------------------------- */
@@ -61,24 +62,24 @@ export function OrderSuccessPage(_props: Readonly<OrderSuccessPageProps>) {
       orderToken: queryOrderToken,
     });
 
+  const [isRetryingPayment, setIsRetryingPayment] = useState(false);
+
   useEffect(() => {
-    if (orderId && matchedOrder
-      && ['paid', 'completed', 'refunded', 'partially_refunded'].includes(matchedOrder.paymentStatus)) {
+    if (!orderId || !matchedOrder) return;
+    const normalizedPaymentStatus = String(matchedOrder.paymentStatus ?? '').toLowerCase();
+    const isPaymentConfirmed = ['paid', 'completed', 'refunded', 'partially_refunded'].includes(normalizedPaymentStatus);
+    const isCodConfirmed = String(matchedOrder.paymentMethod ?? '').toLowerCase() === 'cod';
+    if (isPaymentConfirmed || isCodConfirmed) {
       acknowledgeCheckoutOrder(orderId);
+      try {
+        localStorage.removeItem('pendingOrder');
+        localStorage.removeItem('aura_active_booking');
+        localStorage.removeItem('aura_checkout_form');
+        sessionStorage.removeItem('aura_last_order');
+      } catch { /* storage unavailable */ }
+      useCartStore.getState().clearCart();
     }
   }, [orderId, matchedOrder]);
-
-  // Remove legacy order caches; confirmation details always come from the order API.
-  useEffect(() => {
-    try {
-      localStorage.removeItem('pendingOrder');
-      localStorage.removeItem('aura_active_booking');
-      localStorage.removeItem('aura_checkout_form');
-      sessionStorage.removeItem('aura_last_order');
-    } catch { /* storage unavailable */ }
-    // Ensure cart is cleared after completed order checkout
-    useCartStore.getState().clearCart();
-  }, []);
 
   // Navigation callbacks for StitchOrderSuccessNew
   const handleBack = useCallback(() => {
@@ -118,6 +119,56 @@ export function OrderSuccessPage(_props: Readonly<OrderSuccessPageProps>) {
     navigate('/menu');
   }, [currentOrder, clearCart, addItem, showToast, navigate]);
 
+  const handleRetryPayment = useCallback(async () => {
+    if (!matchedOrder?.id || isRetryingPayment) return;
+    setIsRetryingPayment(true);
+    try {
+      const guestToken = queryOrderToken || getGuestOrderToken(matchedOrder.id);
+      const totalAmount = Math.round(
+        matchedOrder.totalAmount ?? (matchedOrder as unknown as { total?: number }).total ?? 0
+      );
+      const res = await apiFetch<{
+        checkoutUrl?: string;
+        checkout_url?: string;
+        payment_url?: string;
+        data?: { checkoutUrl?: string; paymentUrl?: string };
+      }>('/api/payment/create-link', {
+        method: 'POST',
+        headers: guestToken ? { 'X-Order-Token': guestToken } : undefined,
+        body: JSON.stringify({
+          order_id: matchedOrder.id,
+          amount: totalAmount,
+          description: `Order #${matchedOrder.orderNumber || matchedOrder.id.slice(0, 8)}`,
+        }),
+      });
+      const targetUrl =
+        res.checkoutUrl || res.checkout_url || res.payment_url || res.data?.checkoutUrl || res.data?.paymentUrl;
+      let safeTargetUrl: string | null = null;
+      if (typeof targetUrl === 'string' && targetUrl.trim()) {
+        try {
+          const parsed = new URL(targetUrl.trim(), window.location.origin);
+          if (parsed.protocol === 'https:' || parsed.origin === window.location.origin) {
+            safeTargetUrl = parsed.toString();
+          }
+        } catch {
+          safeTargetUrl = null;
+        }
+      }
+      if (!safeTargetUrl) {
+        showToast('Không thể tạo liên kết thanh toán PayOS. Vui lòng thử lại.', 'error');
+        return;
+      }
+      window.location.assign(safeTargetUrl);
+    } catch (err) {
+      showToast(
+        err instanceof Error ? err.message : 'Không thể tạo liên kết thanh toán PayOS.',
+        'error'
+      );
+    } finally {
+      setIsRetryingPayment(false);
+    }
+  }, [matchedOrder, isRetryingPayment, queryOrderToken, showToast]);
+
   const orderForDisplay = matchedOrder && matchedOrder.items.length > 0
     ? matchedOrder
     : null;
@@ -132,6 +183,25 @@ export function OrderSuccessPage(_props: Readonly<OrderSuccessPageProps>) {
   // Money is stored in cents server-side; convert once at this boundary.
   const orderSuccessData: OrderSuccessNewData | null = useMemo(() => {
     if (orderForDisplay) {
+      const rawOrder = orderForDisplay as unknown as Record<string, unknown>;
+      const customerName =
+        typeof rawOrder.customerName === 'string'
+          ? rawOrder.customerName
+          : typeof rawOrder.customer_name === 'string'
+            ? rawOrder.customer_name
+            : '';
+      const pointsEarned =
+        typeof rawOrder.pointsEarned === 'number'
+          ? rawOrder.pointsEarned
+          : typeof rawOrder.points_earned === 'number'
+            ? rawOrder.points_earned
+            : undefined;
+      const cashbackEarned =
+        typeof rawOrder.cashbackEarned === 'number'
+          ? rawOrder.cashbackEarned
+          : typeof rawOrder.cashback_earned === 'number'
+            ? rawOrder.cashback_earned
+            : undefined;
       return {
         orderId: orderForDisplay.orderNumber || orderForDisplay.id || '---',
         items: orderForDisplay.items.map((item, index) => ({
@@ -146,8 +216,10 @@ export function OrderSuccessPage(_props: Readonly<OrderSuccessPageProps>) {
         paymentStatus: orderForDisplay.paymentStatus,
         paymentMethod: orderForDisplay.paymentMethod,
         locationName: 'AURA CAFE',
-        customerName: '',
+        customerName,
         table: orderForDisplay.table?.name,
+        pointsEarned,
+        cashbackEarned,
       };
     }
     return null;
@@ -168,6 +240,8 @@ export function OrderSuccessPage(_props: Readonly<OrderSuccessPageProps>) {
         onTrackOrder={handleTrackOrder}
         onRefresh={handleRetry}
         onReorder={handleReorder}
+        onRetryPayment={handleRetryPayment}
+        isRetryingPayment={isRetryingPayment}
       />
     </>
   );

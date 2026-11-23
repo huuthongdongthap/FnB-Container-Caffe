@@ -24,6 +24,7 @@ export type VerifyPayOSResult =
       amountRemaining: number;
       linkId: string | null;
       checkoutUrl: string | null;
+      qrCode?: string | null;
     }
   | {
       ok: false;
@@ -131,6 +132,8 @@ export async function verifyPayOSPaymentRequest(input: VerifyPayOSInput): Promis
     ? Number(data.amountRemaining)
     : (data.amountPaid !== undefined ? Math.max(0, amount - Number(data.amountPaid)) : (status === 'PAID' ? 0 : amount));
 
+  const qrCode = typeof data.qrCode === 'string' && data.qrCode.trim() ? data.qrCode.trim() : null;
+
   return {
     ok: true,
     status,
@@ -140,5 +143,6 @@ export async function verifyPayOSPaymentRequest(input: VerifyPayOSInput): Promis
     amountRemaining,
     linkId,
     checkoutUrl: buildCheckoutUrl(data, true),
+    qrCode,
   };
 }

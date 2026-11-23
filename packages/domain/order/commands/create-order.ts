@@ -15,6 +15,13 @@ import {
   hashOrderToken,
   resolveServerOrderOwnership,
 } from '../../customer/policies/order-ownership-policy';
+import {
+  findLoyaltyVoucherByCode,
+  validateLoyaltyVoucher,
+  reserveLoyaltyVoucherAtomically,
+  rollbackLoyaltyVoucherReservation,
+  type LoyaltyVoucherRecord,
+} from '../loyalty-voucher';
 
 const log = createLogger({ route: 'orders' });
 interface SavedCreation { fingerprint: string; response_body: string }
@@ -89,6 +96,7 @@ export async function createOrder(
     const now = new Date().toISOString();
     const rawPromoCode = (data.promo_code || data.promotion_code || '').trim().toUpperCase();
     let appliedPromo: { id: string; code: string; discountAmount: number; reservedInPlace?: boolean } | null = null;
+    let appliedLoyaltyVoucher: LoyaltyVoucherRecord | null = null;
     if (rawPromoCode) {
       const isWelcome = rawPromoCode === 'WELCOME';
       type PromoRow = {
@@ -125,7 +133,37 @@ export async function createOrder(
       if (!promo && isWelcome) {
         promo = { id: 'promo_welcome', code: 'WELCOME', percent: 10, max_discount: 30000, min_order: 0, usage_limit: 0, usage_count: 0, is_active: 1 };
       }
-      if (!promo) return errorResponse('Mã khuyến mãi không tồn tại hoặc đã bị vô hiệu hoá', 400);
+      if (!promo) {
+        const loyaltyVoucher = await findLoyaltyVoucherByCode(db, rawPromoCode, tenantId);
+        if (!loyaltyVoucher) {
+          return errorResponse('Mã khuyến mãi không tồn tại hoặc đã bị vô hiệu hoá', 400);
+        }
+        const actorRole = String(actor?.role ?? '').trim().toLowerCase();
+        const isStaffActor = ['staff', 'cashier', 'waiter', 'barista', 'supervisor', 'manager', 'admin', 'owner'].includes(actorRole);
+        if (
+          (ownership.resolvedVia === 'staff_override' || ownership.resolvedVia === 'deterministic_identifier') &&
+          !isStaffActor
+        ) {
+          return errorResponse('Không có quyền sử dụng mã voucher thay cho khách hàng', 403);
+        }
+        const voucherCheck = validateLoyaltyVoucher(loyaltyVoucher, {
+          customerId: resolvedCustomerId,
+          allowStaffOverride: isStaffActor && !resolvedCustomerId,
+          orderTotal: snapshot.subtotal,
+        });
+        if (!voucherCheck.valid) {
+          return errorResponse(voucherCheck.reason || 'Mã voucher không hợp lệ', 400);
+        }
+        const reserved = await reserveLoyaltyVoucherAtomically(db, loyaltyVoucher, orderId, now);
+        if (!reserved) {
+          return errorResponse('Mã voucher đã được sử dụng hoặc không còn hiệu lực', 400);
+        }
+        appliedLoyaltyVoucher = loyaltyVoucher;
+        const voucherDiscount = voucherCheck.discountAmount ?? 0;
+        snapshot.discount = Math.min(snapshot.subtotal, Math.max(0, voucherDiscount));
+        snapshot.total = Math.max(0, snapshot.subtotal - snapshot.discount) + (snapshot.service_fee ?? 0) + snapshot.shipping_fee + snapshot.tip_amount;
+      }
+      if (promo) {
       const startsAt = promo.starts_at ?? promo.valid_from;
       const expiresAt = promo.expires_at ?? promo.valid_to;
       const minOrder = Number(promo.min_order ?? promo.min_order_value ?? 0);
@@ -226,50 +264,186 @@ export async function createOrder(
       snapshot.discount = Math.min(snapshot.subtotal, Math.max(0, cappedDisc));
       snapshot.total = Math.max(0, snapshot.subtotal - snapshot.discount) + (snapshot.service_fee ?? 0) + snapshot.shipping_fee + snapshot.tip_amount;
       appliedPromo = { id: promo.id ?? promo.code, code: promo.code, discountAmount: snapshot.discount, reservedInPlace };
+      }
     }
     // Redeem customer loyalty points atomically (1 point = 100 VND => 100 points = 10,000 VND)
     const rawRequestedPoints = Math.max(0, Math.floor(Number(data.redeem_points ?? data.loyalty_points_redeemed ?? 0)));
     let redeemedPoints = 0;
+    let appliedCashback = 0;
+    let cashbackWalletId: string | null = null;
+    let cashbackBalanceAfter = 0;
+
+    const rollbackPreOrderReservations = async () => {
+      if (appliedLoyaltyVoucher) {
+        await rollbackLoyaltyVoucherReservation(db, appliedLoyaltyVoucher, orderId);
+        appliedLoyaltyVoucher = null;
+      }
+      if (appliedCashback > 0 && cashbackWalletId) {
+        const walletTenant = tenantId === '*' ? 'default' : (tenantId || 'default');
+        await db.prepare(
+          "UPDATE cashback_wallets SET balance = balance + ?, total_spent = CASE WHEN COALESCE(total_spent, 0) >= ? THEN total_spent - ? ELSE 0 END, updated_at = ? WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
+        ).bind(appliedCashback, appliedCashback, appliedCashback, now, cashbackWalletId, walletTenant).run().catch(async () => {
+          if (walletTenant === 'default') {
+            await db.prepare(
+              'UPDATE cashback_wallets SET balance = balance + ?, total_spent = CASE WHEN COALESCE(total_spent, 0) >= ? THEN total_spent - ? ELSE 0 END, updated_at = ? WHERE id = ?'
+            ).bind(appliedCashback, appliedCashback, appliedCashback, now, cashbackWalletId).run().catch(() => {});
+          }
+        });
+        appliedCashback = 0;
+      }
+      if (redeemedPoints > 0 && resolvedCustomerId) {
+        const loyaltyTenant = tenantId === '*' ? 'default' : (tenantId || 'default');
+        await db.prepare(
+          "UPDATE customers SET loyalty_points = COALESCE(loyalty_points, 0) + ? WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
+        ).bind(redeemedPoints, resolvedCustomerId, loyaltyTenant).run().catch(async () => {
+          if (loyaltyTenant === 'default') {
+            await db.prepare('UPDATE customers SET loyalty_points = COALESCE(loyalty_points, 0) + ? WHERE id = ?')
+              .bind(redeemedPoints, resolvedCustomerId).run().catch(() => {});
+          }
+        });
+        redeemedPoints = 0;
+      }
+      if (appliedPromo?.reservedInPlace) {
+        const promoTenant = tenantId === '*' ? 'default' : (tenantId || 'default');
+        await db.prepare(
+          "UPDATE promotions SET usage_count = CASE WHEN usage_count > 0 THEN usage_count - 1 ELSE 0 END, current_uses = CASE WHEN COALESCE(current_uses, 0) > 0 THEN current_uses - 1 ELSE 0 END WHERE UPPER(code) = UPPER(?) AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
+        ).bind(appliedPromo.code, promoTenant).run().catch(async () => {
+          if (promoTenant === 'default') {
+            await db.prepare(
+              'UPDATE promotions SET usage_count = CASE WHEN usage_count > 0 THEN usage_count - 1 ELSE 0 END WHERE UPPER(code) = ?'
+            ).bind(appliedPromo.code).run().catch(() => {});
+          }
+        });
+        appliedPromo.reservedInPlace = false;
+      }
+    };
+
     if (rawRequestedPoints > 0) {
       if (!resolvedCustomerId) {
+        await rollbackPreOrderReservations();
         return errorResponse('Cần xác định tài khoản khách hàng thành viên để đổi điểm thưởng', 400);
+      }
+      if (ownership.resolvedVia === 'staff_override' || ownership.resolvedVia === 'deterministic_identifier') {
+        const pointsActorRole = String(actor?.role ?? '').trim().toLowerCase();
+        const allowedPointsStaffRoles = ['staff', 'cashier', 'waiter', 'barista', 'supervisor', 'manager', 'admin', 'owner'];
+        if (!allowedPointsStaffRoles.includes(pointsActorRole)) {
+          await rollbackPreOrderReservations();
+          return errorResponse('Không có quyền đổi điểm thưởng thay cho khách hàng', 403);
+        }
       }
       const remainingPayable = Math.max(0, snapshot.subtotal - snapshot.discount);
       const maxSubtotalRedeemVnd = Math.floor(snapshot.subtotal * 0.5);
       const maxRedeemablePoints = Math.floor(Math.min(remainingPayable, maxSubtotalRedeemVnd) / 100);
-      redeemedPoints = Math.min(rawRequestedPoints, maxRedeemablePoints);
-      if (redeemedPoints > 0) {
+      const candidatePoints = Math.min(rawRequestedPoints, maxRedeemablePoints);
+      if (candidatePoints > 0) {
         const loyaltyTenant = tenantId === '*' ? 'default' : (tenantId || 'default');
         let deductRes: { meta?: { changes?: number } } | null = null;
         try {
           deductRes = await db.prepare(
             "UPDATE customers SET loyalty_points = loyalty_points - ? WHERE id = ? AND COALESCE(loyalty_points, 0) >= ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
-          ).bind(redeemedPoints, resolvedCustomerId, redeemedPoints, loyaltyTenant).run();
+          ).bind(candidatePoints, resolvedCustomerId, candidatePoints, loyaltyTenant).run();
         } catch {
           if (loyaltyTenant === 'default') {
             deductRes = await db.prepare(
               'UPDATE customers SET loyalty_points = loyalty_points - ? WHERE id = ? AND COALESCE(loyalty_points, 0) >= ?'
-            ).bind(redeemedPoints, resolvedCustomerId, redeemedPoints).run();
+            ).bind(candidatePoints, resolvedCustomerId, candidatePoints).run();
           }
         }
         if ((deductRes?.meta?.changes ?? 0) < 1) {
+          await rollbackPreOrderReservations();
           return errorResponse('Số điểm thưởng hiện tại không đủ để quy đổi cho đơn hàng này', 400);
         }
+        redeemedPoints = candidatePoints;
         const pointsDiscountVnd = redeemedPoints * 100;
         snapshot.discount = Math.min(snapshot.subtotal, snapshot.discount + pointsDiscountVnd);
         snapshot.total = Math.max(0, snapshot.subtotal - snapshot.discount) + (snapshot.service_fee ?? 0) + snapshot.shipping_fee + snapshot.tip_amount;
       }
     }
+    // Atomic cashback wallet deduction (Checkout & POS)
+    const rawCashbackRequested = Math.max(0, Math.floor(Number(data.cashback_amount ?? 0)));
+    const wantCashback = Boolean(data.use_cashback) || rawCashbackRequested > 0;
+    if (wantCashback) {
+      if (!resolvedCustomerId) {
+        await rollbackPreOrderReservations();
+        return errorResponse('Cần xác định tài khoản khách hàng thành viên để sử dụng ví hoàn tiền', 400);
+      }
+      if (ownership.resolvedVia === 'staff_override' || ownership.resolvedVia === 'deterministic_identifier') {
+        const cashbackActorRole = String(actor?.role ?? '').trim().toLowerCase();
+        const allowedCashbackStaffRoles = ['staff', 'cashier', 'waiter', 'barista', 'supervisor', 'manager', 'admin', 'owner'];
+        if (!allowedCashbackStaffRoles.includes(cashbackActorRole)) {
+          await rollbackPreOrderReservations();
+          return errorResponse('Không có quyền sử dụng ví hoàn tiền thay cho khách hàng', 403);
+        }
+      }
+      const walletTenant = tenantId === '*' ? 'default' : (tenantId || 'default');
+      const walletRow = await db.prepare(
+        "SELECT id, balance FROM cashback_wallets WHERE customer_id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ? LIMIT 1"
+      ).bind(resolvedCustomerId, walletTenant).first<{ id: string; balance: number }>().catch(() =>
+        walletTenant === 'default'
+          ? db.prepare('SELECT id, balance FROM cashback_wallets WHERE customer_id = ? LIMIT 1')
+              .bind(resolvedCustomerId).first<{ id: string; balance: number }>().catch(() => null)
+          : null
+      );
+      const availableBalance = Math.max(0, Math.floor(Number(walletRow?.balance ?? 0)));
+      const remainingPayable = Math.max(0, snapshot.total);
+      let desiredCashback = rawCashbackRequested > 0
+        ? Math.min(rawCashbackRequested, availableBalance, remainingPayable)
+        : Math.min(availableBalance, remainingPayable);
+      if (rawCashbackRequested > availableBalance) {
+        await rollbackPreOrderReservations();
+        return errorResponse('Số dư ví hoàn tiền không đủ', 400);
+      }
+      if (validatedMethod === 'payos' && desiredCashback > 0) {
+        const postCashbackTotal = remainingPayable - desiredCashback;
+        if (postCashbackTotal > 0 && postCashbackTotal < 1000) {
+          if (rawCashbackRequested > 0) {
+            await rollbackPreOrderReservations();
+            return errorResponse('Số tiền còn lại sau khi trừ ví hoàn tiền cho PayOS phải bằng 0đ hoặc tối thiểu 1.000đ', 400);
+          }
+          desiredCashback = Math.max(0, remainingPayable - 1000);
+        }
+      }
+      if (desiredCashback > 0 && walletRow) {
+        let walletDeductRes: { meta?: { changes?: number } } | null = null;
+        try {
+          walletDeductRes = await db.prepare(
+            "UPDATE cashback_wallets SET balance = balance - ?, total_spent = COALESCE(total_spent, 0) + ?, updated_at = ? WHERE id = ? AND balance >= ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
+          ).bind(desiredCashback, desiredCashback, now, walletRow.id, desiredCashback, walletTenant).run();
+        } catch {
+          if (walletTenant === 'default') {
+            walletDeductRes = await db.prepare(
+              'UPDATE cashback_wallets SET balance = balance - ?, total_spent = COALESCE(total_spent, 0) + ?, updated_at = ? WHERE id = ? AND balance >= ?'
+            ).bind(desiredCashback, desiredCashback, now, walletRow.id, desiredCashback).run().catch(() => null);
+          }
+        }
+        if ((walletDeductRes?.meta?.changes ?? 0) < 1) {
+          await rollbackPreOrderReservations();
+          return errorResponse('Số dư ví hoàn tiền không đủ hoặc vừa thay đổi, vui lòng thử lại', 409);
+        }
+        appliedCashback = desiredCashback;
+        cashbackWalletId = walletRow.id;
+        cashbackBalanceAfter = Math.max(0, availableBalance - appliedCashback);
+        snapshot.discount = snapshot.discount + appliedCashback;
+        snapshot.total = Math.max(0, snapshot.total - appliedCashback);
+      }
+    }
+    if (validatedMethod === 'payos' && snapshot.total > 0 && snapshot.total < 1000) {
+      await rollbackPreOrderReservations();
+      return errorResponse('Số tiền còn lại cho PayOS phải bằng 0đ hoặc tối thiểu 1.000đ', 400);
+    }
+    const initialPaymentStatus: 'paid' | 'unpaid' = snapshot.total === 0 ? 'paid' : 'unpaid';
     const guestOrderToken = !resolvedCustomerId ? generateOrderToken() : null;
     const guestTokenHash = guestOrderToken ? await hashOrderToken(guestOrderToken) : null;
     const responseBody = {
       success: true, data: {
-        id: orderId, status: 'pending', payment_status: 'unpaid', items: snapshot.items, total: snapshot.total,
+        id: orderId, status: 'pending', payment_status: initialPaymentStatus, items: snapshot.items, total: snapshot.total,
         customer: { full_name: data.customer_name, phone: data.customer_phone, address: data.customer_address || null },
         customer_name: data.customer_name, customer_phone: data.customer_phone,
         customer_address: data.customer_address || null, payment_method: validatedMethod,
         shipping_fee: snapshot.shipping_fee, discount: snapshot.discount,
         ...(redeemedPoints > 0 ? { loyalty_points_redeemed: redeemedPoints } : {}),
+        ...(appliedCashback > 0 ? { cashback_used: appliedCashback } : {}),
+        ...(appliedLoyaltyVoucher ? { loyalty_voucher_code: appliedLoyaltyVoucher.code } : {}),
         notes: data.notes || null,
         delivery_time: data.delivery_time || 'now', table_id: resolvedTableId, order_type: orderType, created_at: now,
       },
@@ -287,58 +461,42 @@ export async function createOrder(
       noGuestHashStatements.push(db.prepare(idemSql).bind(...idemArgs));
       legacyStatements.push(db.prepare(idemSql).bind(...idemArgs));
     }
-    const orderInsertSql = redeemedPoints > 0
-      ? `INSERT INTO orders (
+    const extraOrderCols: string[] = [];
+    const extraOrderVals: unknown[] = [];
+    if (redeemedPoints > 0) {
+      extraOrderCols.push('loyalty_points_redeemed');
+      extraOrderVals.push(redeemedPoints);
+    }
+    if (appliedCashback > 0) {
+      extraOrderCols.push('cashback_used');
+      extraOrderVals.push(appliedCashback);
+    }
+    const extraColSql = extraOrderCols.length > 0 ? `, ${extraOrderCols.join(', ')}` : '';
+    const extraPhSql = extraOrderCols.length > 0 ? `, ${extraOrderCols.map(() => '?').join(', ')}` : '';
+    const orderInsertSql = `INSERT INTO orders (
       id, items, total, status, customer_name, customer_phone,
       customer_email, customer_address, payment_method, payment_status,
-      shipping_fee, discount, loyalty_points_redeemed, notes, delivery_time, table_id,
+      shipping_fee, discount${extraColSql}, notes, delivery_time, table_id,
       order_type, tip_amount, service_fee, customer_id, guest_token_hash, tenant_id, created_at, updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-      : `INSERT INTO orders (
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?${extraPhSql}, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+    const orderInsertArgs = [
+      orderId, snapshot.itemsJson, snapshot.total, 'pending', data.customer_name, data.customer_phone,
+      data.customer_email || null, data.customer_address || null, validatedMethod, initialPaymentStatus,
+      snapshot.shipping_fee, snapshot.discount, ...extraOrderVals, data.notes || null, data.delivery_time || 'now', resolvedTableId,
+      orderType, snapshot.tip_amount, snapshot.service_fee, resolvedCustomerId, guestTokenHash, tenantId, now, now,
+    ];
+    const orderInsertNoGuestSql = `INSERT INTO orders (
       id, items, total, status, customer_name, customer_phone,
       customer_email, customer_address, payment_method, payment_status,
-      shipping_fee, discount, notes, delivery_time, table_id,
-      order_type, tip_amount, service_fee, customer_id, guest_token_hash, tenant_id, created_at, updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
-    const orderInsertArgs = redeemedPoints > 0
-      ? [
-          orderId, snapshot.itemsJson, snapshot.total, 'pending', data.customer_name, data.customer_phone,
-          data.customer_email || null, data.customer_address || null, validatedMethod, 'unpaid',
-          snapshot.shipping_fee, snapshot.discount, redeemedPoints, data.notes || null, data.delivery_time || 'now', resolvedTableId,
-          orderType, snapshot.tip_amount, snapshot.service_fee, resolvedCustomerId, guestTokenHash, tenantId, now, now,
-        ]
-      : [
-          orderId, snapshot.itemsJson, snapshot.total, 'pending', data.customer_name, data.customer_phone,
-          data.customer_email || null, data.customer_address || null, validatedMethod, 'unpaid',
-          snapshot.shipping_fee, snapshot.discount, data.notes || null, data.delivery_time || 'now', resolvedTableId,
-          orderType, snapshot.tip_amount, snapshot.service_fee, resolvedCustomerId, guestTokenHash, tenantId, now, now,
-        ];
-    const orderInsertNoGuestSql = redeemedPoints > 0
-      ? `INSERT INTO orders (
-      id, items, total, status, customer_name, customer_phone,
-      customer_email, customer_address, payment_method, payment_status,
-      shipping_fee, discount, loyalty_points_redeemed, notes, delivery_time, table_id,
+      shipping_fee, discount${extraColSql}, notes, delivery_time, table_id,
       order_type, tip_amount, service_fee, customer_id, tenant_id, created_at, updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-      : `INSERT INTO orders (
-      id, items, total, status, customer_name, customer_phone,
-      customer_email, customer_address, payment_method, payment_status,
-      shipping_fee, discount, notes, delivery_time, table_id,
-      order_type, tip_amount, service_fee, customer_id, tenant_id, created_at, updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
-    const orderInsertNoGuestArgs = redeemedPoints > 0
-      ? [
-          orderId, snapshot.itemsJson, snapshot.total, 'pending', data.customer_name, data.customer_phone,
-          data.customer_email || null, data.customer_address || null, validatedMethod, 'unpaid',
-          snapshot.shipping_fee, snapshot.discount, redeemedPoints, data.notes || null, data.delivery_time || 'now', resolvedTableId,
-          orderType, snapshot.tip_amount, snapshot.service_fee, resolvedCustomerId, tenantId, now, now,
-        ]
-      : [
-          orderId, snapshot.itemsJson, snapshot.total, 'pending', data.customer_name, data.customer_phone,
-          data.customer_email || null, data.customer_address || null, validatedMethod, 'unpaid',
-          snapshot.shipping_fee, snapshot.discount, data.notes || null, data.delivery_time || 'now', resolvedTableId,
-          orderType, snapshot.tip_amount, snapshot.service_fee, resolvedCustomerId, tenantId, now, now,
-        ];
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?${extraPhSql}, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+    const orderInsertNoGuestArgs = [
+      orderId, snapshot.itemsJson, snapshot.total, 'pending', data.customer_name, data.customer_phone,
+      data.customer_email || null, data.customer_address || null, validatedMethod, initialPaymentStatus,
+      snapshot.shipping_fee, snapshot.discount, ...extraOrderVals, data.notes || null, data.delivery_time || 'now', resolvedTableId,
+      orderType, snapshot.tip_amount, snapshot.service_fee, resolvedCustomerId, tenantId, now, now,
+    ];
     const orderInsertLegacySql = `INSERT INTO orders (
       id, items, total, status, customer_name, customer_phone,
       customer_email, customer_address, payment_method, payment_status,
@@ -347,7 +505,7 @@ export async function createOrder(
     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
     const orderInsertLegacyArgs = [
       orderId, snapshot.itemsJson, snapshot.total, 'pending', data.customer_name, data.customer_phone,
-      data.customer_email || null, data.customer_address || null, validatedMethod, 'unpaid',
+      data.customer_email || null, data.customer_address || null, validatedMethod, initialPaymentStatus,
       snapshot.shipping_fee, snapshot.discount, data.notes || null, data.delivery_time || 'now', resolvedTableId,
       orderType, snapshot.tip_amount, snapshot.service_fee, resolvedCustomerId, tenantId, now, now,
     ] as const;
@@ -371,6 +529,23 @@ export async function createOrder(
         ).bind(loyaltyTxId, resolvedCustomerId, orderId, -redeemedPoints, loyaltyDesc, now)
       );
     }
+    if (appliedCashback > 0 && resolvedCustomerId && cashbackWalletId) {
+      const cbTxId = generateId('CBTX_');
+      const walletTenant = tenantId === '*' ? 'default' : (tenantId || 'default');
+      const cbDesc = `Thanh toán bằng ví hoàn tiền cho đơn ${orderId}`;
+      const scopedCbStmt = db.prepare(
+        `INSERT INTO cashback_transactions (id, wallet_id, customer_id, order_id, type, amount, balance_after, description, tenant_id, created_at)
+         VALUES (?, ?, ?, ?, 'spend', ?, ?, ?, ?, ?)`
+      ).bind(cbTxId, cashbackWalletId, resolvedCustomerId, orderId, -appliedCashback, cashbackBalanceAfter, cbDesc, walletTenant, now);
+      statements.push(scopedCbStmt);
+      noGuestHashStatements.push(scopedCbStmt);
+      legacyStatements.push(
+        db.prepare(
+          `INSERT INTO cashback_transactions (id, wallet_id, customer_id, order_id, type, amount, balance_after, description, created_at)
+           VALUES (?, ?, ?, ?, 'spend', ?, ?, ?, ?)`
+        ).bind(cbTxId, cashbackWalletId, resolvedCustomerId, orderId, -appliedCashback, cashbackBalanceAfter, cbDesc, now)
+      );
+    }
     for (const item of snapshot.items) {
       const itemId = generateId('ITEM_');
       const modifiersJson = JSON.stringify(item.modifiers || []);
@@ -391,7 +566,7 @@ export async function createOrder(
       }
       legacyStatements.push(legacyItemStmt);
     }
-    if (validatedMethod === 'cod') {
+    if (validatedMethod === 'cod' && snapshot.total > 0) {
       const payId = generateId('PAY_');
       const scopedPayStmt = db.prepare(`INSERT INTO payments (id, order_id, method, amount, status, tenant_id, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`)
@@ -450,29 +625,7 @@ export async function createOrder(
       }
     }
     catch (error) {
-      if (redeemedPoints > 0 && resolvedCustomerId) {
-        const loyaltyTenant = tenantId === '*' ? 'default' : (tenantId || 'default');
-        await db.prepare(
-          "UPDATE customers SET loyalty_points = COALESCE(loyalty_points, 0) + ? WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
-        ).bind(redeemedPoints, resolvedCustomerId, loyaltyTenant).run().catch(async () => {
-          if (loyaltyTenant === 'default') {
-            await db.prepare('UPDATE customers SET loyalty_points = COALESCE(loyalty_points, 0) + ? WHERE id = ?')
-              .bind(redeemedPoints, resolvedCustomerId).run().catch(() => {});
-          }
-        });
-      }
-      if (appliedPromo?.reservedInPlace) {
-        const promoTenant = tenantId === '*' ? 'default' : (tenantId || 'default');
-        await db.prepare(
-          "UPDATE promotions SET usage_count = CASE WHEN usage_count > 0 THEN usage_count - 1 ELSE 0 END, current_uses = CASE WHEN COALESCE(current_uses, 0) > 0 THEN current_uses - 1 ELSE 0 END WHERE UPPER(code) = UPPER(?) AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
-        ).bind(appliedPromo.code, promoTenant).run().catch(async () => {
-          if (promoTenant === 'default') {
-            await db.prepare(
-              'UPDATE promotions SET usage_count = CASE WHEN usage_count > 0 THEN usage_count - 1 ELSE 0 END WHERE UPPER(code) = ?'
-            ).bind(appliedPromo.code).run().catch(() => {});
-          }
-        });
-      }
+      await rollbackPreOrderReservations();
       // A concurrent same-key request either committed the entire order or nothing.
       const saved = idem ? await findReplay() : null;
       if (saved) return replayResponse(saved, idem!.fingerprint);
@@ -501,7 +654,7 @@ export async function createOrder(
         : 'default';
     await publishOrderEvent(env.AUTH_KV as KVNamespace | undefined, orderId, 'pending', {
       tenantId: orderEventTenant,
-      paymentStatus: 'unpaid',
+      paymentStatus: initialPaymentStatus,
     });
     // Notifications and cache writes run only after commit and cannot turn success into a retryable 500.
     try {
@@ -511,7 +664,7 @@ export async function createOrder(
         const doChannel = doTenant !== 'default' ? `${doTenant}:${orderId}` : orderId;
         const stub = ns.get(ns.idFromName(doChannel));
         const event = {
-          orderId, status: 'pending', payment_status: 'unpaid', items: snapshot.items, total: snapshot.total,
+          orderId, status: 'pending', payment_status: initialPaymentStatus, items: snapshot.items, total: snapshot.total,
           customer_name: data.customer_name, customer_phone: data.customer_phone, table_id: resolvedTableId,
           ...(doTenant !== 'default' ? { tenant_id: doTenant } : {}),
           createdAt: Date.now(), updatedAt: Date.now(),

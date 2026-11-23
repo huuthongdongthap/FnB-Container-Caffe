@@ -10,9 +10,17 @@ import {
   Plus,
   Minus,
 } from 'lucide-react';
-import { formatPosPrice, type POSNewCartItem } from './StitchPOSNew-types';
+import { formatPosPrice, type POSNewCartItem, type POSTableOption } from './StitchPOSNew-types';
 import type { POSCustomer } from '@/hooks/use-pos-customer';
 import { CustomerLookup } from './StitchPOSNew-customer-lookup';
+
+function formatTableStatusVi(status: string): string {
+  const s = status.trim().toLowerCase();
+  if (s === 'available' || s === 'free') return 'Trống';
+  if (s === 'occupied') return 'Đang có khách';
+  if (s === 'reserved') return 'Đã đặt';
+  return status;
+}
 
 interface CartSidebarProps {
   cart: POSNewCartItem[];
@@ -23,9 +31,12 @@ interface CartSidebarProps {
   total: number;
   discount?: number;
   paymentMethod?: 'payos' | 'cod';
-  tableLabel: string;
-  guestLabel: string;
-  orderNumber: string;
+  tables?: POSTableOption[];
+  selectedTableId?: string;
+  onSelectTable?: (tableId: string | undefined) => void;
+  tableLabel?: string;
+  guestLabel?: string;
+  orderNumber?: string;
   cartOpen: boolean;
   setCartOpen: (open: boolean) => void;
   onCompleteOrder?: (cart: POSNewCartItem[], total: number) => void;
@@ -33,6 +44,8 @@ interface CartSidebarProps {
   customer?: POSCustomer | null;
   onCustomerFound?: (customer: POSCustomer) => void;
   onClearCustomer?: () => void;
+  useCashback?: boolean;
+  onToggleCashback?: (enabled: boolean) => void;
 }
 
 export function CartSidebar({
@@ -44,6 +57,9 @@ export function CartSidebar({
   total,
   discount = 0,
   paymentMethod = 'payos',
+  tables = [],
+  selectedTableId,
+  onSelectTable,
   tableLabel,
   guestLabel,
   orderNumber,
@@ -54,9 +70,26 @@ export function CartSidebar({
   customer = null,
   onCustomerFound,
   onClearCustomer,
+  useCashback = false,
+  onToggleCashback,
 }: CartSidebarProps) {
   const { t } = useTranslation();
   const formattedSubtotal = formatPosPrice(subtotal);
+  const selectedTable = tables.find((tb) => tb.id === selectedTableId);
+  const resolvedTableBadge = selectedTable
+    ? selectedTable.name
+    : tableLabel || t('posNew.takeaway', { defaultValue: 'Mang về' });
+  const rawCashbackDeduction = useCashback && customer && customer.cashback_balance > 0
+    ? Math.min(Math.floor(customer.cashback_balance), Math.max(0, Math.round(total)))
+    : 0;
+  const cashbackDeduction =
+    paymentMethod === 'payos' &&
+    rawCashbackDeduction > 0 &&
+    Math.round(total) - rawCashbackDeduction > 0 &&
+    Math.round(total) - rawCashbackDeduction < 1000
+      ? Math.max(0, Math.round(total) - 1000)
+      : rawCashbackDeduction;
+  const payableTotal = Math.max(0, Math.round(total) - cashbackDeduction);
   return (
     <aside
       className={cn(
@@ -67,19 +100,47 @@ export function CartSidebar({
       )}
       aria-label={t('posNew.cartSection')}
     >
-      {/* Cart Header */}
+      {/* Cart Header & Table Selector (#113) */}
       <div className="px-6 py-4 border-b border-[rgba(var(--aura-chrome-light),0.08)]">
-        <div className="flex justify-between items-start mb-1">
+        <div className="flex justify-between items-center mb-2">
           <h2 className="text-[14px] text-[var(--aura-primary, #f2c08d)] font-semibold uppercase tracking-wider font-body">
             {t('posNew.orderSummary')}
           </h2>
           <span className="bg-[rgba(var(--aura-chrome-light),0.08)] text-[var(--aura-primary, #f2c08d)] border border-[rgba(var(--aura-chrome-light),0.15)] px-2.5 py-0.5 rounded-sm text-[11px] font-body">
-            {tableLabel}
+            {resolvedTableBadge}
           </span>
         </div>
-        <p className="text-[12px] text-[var(--aura-text-muted, #8A8E96)] font-body">
-          {guestLabel} &bull; {t('posNew.order')} #{orderNumber}
-        </p>
+        {onSelectTable ? (
+          <div className="mt-1">
+            <label htmlFor="pos-table-selector" className="sr-only">
+              {t('posNew.selectTable', { defaultValue: 'Chọn bàn phục vụ' })}
+            </label>
+            <select
+              id="pos-table-selector"
+              data-testid="pos-table-selector"
+              value={selectedTableId || ''}
+              onChange={(e) => onSelectTable(e.target.value || undefined)}
+              aria-label={t('posNew.selectTable', { defaultValue: 'Chọn bàn phục vụ' })}
+              className="w-full bg-[rgba(var(--aura-noir-void),0.6)] border border-[rgba(var(--aura-chrome-light),0.18)] rounded-md px-3 py-2 text-[12px] text-[var(--aura-text-primary,#eae1db)] font-body outline-none focus:border-[var(--aura-primary,#f2c08d)] cursor-pointer"
+            >
+              <option value="">
+                {t('posNew.takeawayOption', { defaultValue: 'Mang về (Takeaway)' })}
+              </option>
+              {tables.map((tb) => (
+                <option key={tb.id} value={tb.id}>
+                  {tb.name}
+                  {tb.capacity ? ` (${tb.capacity} chỗ)` : ''} — {formatTableStatusVi(tb.status)}
+                </option>
+              ))}
+            </select>
+          </div>
+        ) : (
+          (guestLabel || orderNumber) && (
+            <p className="text-[12px] text-[var(--aura-text-muted, #8A8E96)] font-body">
+              {[guestLabel, orderNumber ? `${t('posNew.order')} #${orderNumber}` : ''].filter(Boolean).join(' • ')}
+            </p>
+          )
+        )}
       </div>
 
       {/* Customer Lookup */}
@@ -87,6 +148,8 @@ export function CartSidebar({
         customer={customer}
         onCustomerFound={onCustomerFound}
         onClearCustomer={onClearCustomer}
+        useCashback={useCashback}
+        onToggleCashback={onToggleCashback}
       />
 
       {/* Cart Items */}
@@ -154,12 +217,18 @@ export function CartSidebar({
           <span>{t('posNew.tax')}</span>
           <span>{formatPosPrice(tax)}</span>
         </div>
+        {cashbackDeduction > 0 && (
+          <div className="flex justify-between text-[13px] text-emerald-400 font-body" data-testid="pos-cashback-discount-row">
+            <span>Ví hoàn tiền</span>
+            <span>-{formatPosPrice(cashbackDeduction)}</span>
+          </div>
+        )}
         <div className="flex justify-between items-center mt-2 pt-2 border-t border-[rgba(var(--aura-chrome-light),0.12)]">
           <span className="text-[15px] font-semibold uppercase tracking-widest font-body">
             {t('posNew.total')}
           </span>
           <span className="text-[22px] text-[var(--aura-primary, #f2c08d)] font-bold font-body">
-            {formatPosPrice(total)}
+            {formatPosPrice(payableTotal)}
           </span>
         </div>
         <div className="grid grid-cols-2 gap-3 mt-3">

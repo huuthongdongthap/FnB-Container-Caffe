@@ -89,7 +89,16 @@ interface PayOSResponse {
   payment_url?: string;
   checkout_url?: string;
   checkoutUrl?: string;
-  data?: { checkoutUrl?: string; checkout_url?: string; payment_url?: string };
+  qrCode?: string | null;
+  qr_code?: string | null;
+  qrCodeUrl?: string | null;
+  data?: {
+    checkoutUrl?: string;
+    checkout_url?: string;
+    payment_url?: string;
+    qrCode?: string | null;
+    qrCodeUrl?: string | null;
+  };
   payment?: { checkoutUrl?: string };
   order_id?: string;
 }

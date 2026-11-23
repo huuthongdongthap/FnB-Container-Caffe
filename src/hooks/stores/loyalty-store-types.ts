@@ -32,3 +32,22 @@ export interface LoyaltyTierLadderItem {
   cashback_rate: number;
   is_current: boolean;
 }
+
+export interface NextTierInfo {
+  tier_name: string;
+  display_name_vi: string;
+  min_points: number;
+  points_needed: number;
+}
+
+export interface RedeemedVoucher {
+  id: string;
+  rewardId: string;
+  code: string;
+  title: string;
+  status: 'active' | 'used' | 'expired';
+  expiresAt: string | null;
+  createdAt: string | null;
+  discountType?: string;
+  discountValue?: number;
+}

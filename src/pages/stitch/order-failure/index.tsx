@@ -1,9 +1,17 @@
+import { useSearchParams } from 'react-router-dom';
 import { LandingNav } from '@/components/stitch/StitchLandingNew-nav';
 import { LandingFooter } from '@/components/stitch/StitchLandingNew-footer';
 import { HelmetHead } from '@/components/seo/HelmetHead';
 import { AlertCircle, RotateCcw, QrCode, Banknote, MessageCircle, Phone } from 'lucide-react';
 
 export default function OrderFailureNew() {
+  const [searchParams] = useSearchParams();
+  const orderId = searchParams.get('order_id')?.trim() || '';
+  const orderIdQuery = orderId ? `&order_id=${encodeURIComponent(orderId)}` : '';
+  const retryPayosHref = orderId
+    ? `/order-success?order_id=${encodeURIComponent(orderId)}`
+    : '/checkout?method=payos';
+  const retryCodHref = `/checkout?method=cod${orderIdQuery}`;
   return (
     <div className="relative min-h-screen bg-[var(--aura-noir-deep,#0a1a2e)] text-[var(--aura-chrome-bright)] selection:bg-[var(--aura-chrome-mid)] selection:text-[#0A1A2E] flex flex-col justify-between">
       <HelmetHead
@@ -34,7 +42,7 @@ export default function OrderFailureNew() {
           {/* Primary Action */}
           <div className="space-y-4 mb-8">
             <a
-              href="/checkout"
+              href={retryPayosHref}
               className="w-full py-4 rounded-2xl bg-[var(--aura-chrome-bright)] hover:bg-white text-[var(--aura-noir-deep)] font-body text-xs font-bold uppercase tracking-widest transition-all flex items-center justify-center gap-2.5 shadow-xl active:scale-[0.98]"
             >
               <RotateCcw className="w-4 h-4" />
@@ -55,7 +63,7 @@ export default function OrderFailureNew() {
             </span>
 
             <a
-              href="/checkout?method=vietqr"
+              href={retryPayosHref}
               className="flex items-center justify-between p-4 rounded-2xl bg-white/[0.03] border border-white/10 hover:border-[var(--aura-chrome-bright)]/40 transition-all group"
             >
               <div className="flex items-center gap-3.5">
@@ -71,7 +79,7 @@ export default function OrderFailureNew() {
             </a>
 
             <a
-              href="/checkout?method=cash"
+              href={retryCodHref}
               className="flex items-center justify-between p-4 rounded-2xl bg-white/[0.03] border border-white/10 hover:border-[var(--aura-chrome-bright)]/40 transition-all group"
             >
               <div className="flex items-center gap-3.5">
@@ -102,7 +110,7 @@ export default function OrderFailureNew() {
               </a>
               <span className="text-white/20">•</span>
               <a
-                href="https://zalo.me"
+                href="https://zalo.me/0946013633"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="inline-flex items-center gap-2 text-xs font-semibold text-[var(--aura-chrome-bright)] hover:underline"

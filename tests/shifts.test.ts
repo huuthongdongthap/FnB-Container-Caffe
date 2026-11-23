@@ -77,7 +77,8 @@ describe('canonical attendance access and persistence', () => {
     expect((await f.request('/?staff_id=*', 'owner')).status).toBe(403);
     expect((await (await f.request('/', 'manager')).json()).data).toHaveLength(2);
     expect((await f.request('/clock-in','staff',{ staff_id:'peer' })).status).toBe(403);
-    expect((await f.request('/clock-in','admin',{ staff_id:'peer' })).status).toBe(403);
+    expect((await f.request('/clock-in','admin',{ staff_id:'peer' })).status).toBe(201);
+    expect((await f.request('/clock-out','admin',{ staff_id:'peer' })).status).toBe(200);
     expect((await f.request('/clock-in','owner',{ staff_id:'peer' })).status).toBe(201);
     expect((await f.request('/clock-out','manager',{ staff_id:'peer' })).status).toBe(200);
     expect((await f.request('/clock-in','manager',{ staff_id:'other' })).status).toBe(404);

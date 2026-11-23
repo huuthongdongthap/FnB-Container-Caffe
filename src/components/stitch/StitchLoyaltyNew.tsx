@@ -37,6 +37,7 @@ import { ReferralBlock } from './loyalty-referral-block';
 import { TierBenefits } from './loyalty-tier-benefits';
 import { TierLadder } from './loyalty-tier-ladder';
 import { LoyaltyFooter } from './loyalty-footer';
+import { MyVouchersSection } from '@/components/loyalty/MyVouchersSection';
 
 /* ─── Hooks ───────────────────────────────────────────────────────── */
 import { useParallaxGlass } from '@/hooks/use-parallax-glass';
@@ -51,6 +52,9 @@ export function StitchLoyaltyNew({
   data: externalData,
   loadingState = 'idle',
   errorMessage: externalErrorMessage,
+  myVouchers = [],
+  lastRedeemedVoucher = null,
+  onDismissVoucherBanner,
   onRedeemPoints,
   onClaimReward,
   onCheckIn,
@@ -120,7 +124,38 @@ export function StitchLoyaltyNew({
         <div className="col-span-12 lg:col-span-8 flex flex-col gap-[48px]">
           <TierCard data={data} onRedeemPoints={onRedeemPoints} />
           <TierLadder tiers={data.tierLadder} />
-          <RewardsGrid rewards={data.rewards} onClaimReward={onClaimReward} />
+          {lastRedeemedVoucher && (
+            <div
+              role="status"
+              data-testid="redeemed-voucher-banner"
+              className="rounded-2xl border border-emerald-500/40 bg-emerald-500/10 p-4 flex items-center justify-between gap-4"
+            >
+              <div>
+                <p className="text-sm font-semibold text-emerald-300">
+                  Đổi quà thành công: {lastRedeemedVoucher.title}
+                </p>
+                <p className="text-xs text-[#F5EFE6] mt-1">
+                  Mã voucher của bạn:{' '}
+                  <span className="font-mono font-bold text-[#C69C6D] select-all">
+                    {lastRedeemedVoucher.code}
+                  </span>
+                </p>
+              </div>
+              {onDismissVoucherBanner && (
+                <button
+                  type="button"
+                  onClick={onDismissVoucherBanner}
+                  className="text-xs text-emerald-300 hover:underline shrink-0"
+                >
+                  Đóng
+                </button>
+              )}
+            </div>
+          )}
+          <div id="loyalty-rewards-section">
+            <RewardsGrid rewards={data.rewards} onClaimReward={onClaimReward} />
+          </div>
+          <MyVouchersSection vouchers={myVouchers} />
           <PointsHistorySection history={data.pointsHistory} />
         </div>
 

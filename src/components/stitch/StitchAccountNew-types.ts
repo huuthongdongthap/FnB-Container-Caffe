@@ -48,50 +48,19 @@ export interface StitchAccountNewProps {
 /* ─── Default Data ────────────────────────────────────────────── */
 
 export const defaultProfile: AccountProfileNew = {
-  name: 'Julian Vane',
-  avatar:
-    '/photos/IMG_6556-frame.webp',
-  tier: 'Gold',
-  memberSince: '2022',
+  name: 'Khách hàng',
+  avatar: '',
+  tier: 'Bronze',
+  memberSince: '',
 };
 
 export const defaultLoyalty: LoyaltyDataNew = {
-  points: 1250,
-  nextTier: 'Platinum',
-  pointsToNext: 250,
-  progressPercent: 80,
+  points: 0,
+  nextTier: 'Silver',
+  pointsToNext: 50,
+  progressPercent: 0,
 };
 
-export const defaultOrders: OrderItemNew[] = [
-  {
-    id: '1',
-    itemName: 'Truffle Cortado',
-    icon: 'coffee',
-    time: 'Today, 08:45 AM',
-    status: 'preparing',
-  },
-  {
-    id: '2',
-    itemName: 'Gold Leaf Croissant',
-    icon: 'bakery',
-    time: 'Yesterday, 10:15 AM',
-    status: 'delivered',
-  },
-];
+export const defaultOrders: OrderItemNew[] = [];
 
-export const defaultCards: AccountCardNew[] = [
-  {
-    type: 'subscription',
-    title: 'Aura Elite',
-    subtitle: 'Subscription',
-    meta: 'Active',
-    accent: true,
-  },
-  {
-    type: 'payment',
-    title: 'Visa •• 4242',
-    subtitle: 'Payment',
-    meta: 'Default',
-    accent: false,
-  },
-];
+export const defaultCards: AccountCardNew[] = [];

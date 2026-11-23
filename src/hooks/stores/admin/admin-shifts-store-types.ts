@@ -8,6 +8,9 @@ export interface ShiftRecord {
   date: string;
   notes: string | null;
   opening_cash?: number;
+  expected_cash?: number | null;
+  actual_cash?: number | null;
+  cash_variance?: number | null;
   attendance_state?: 'scheduled' | 'active' | 'completed' | 'cancelled' | null;
   start_time?: string | null;
   end_time?: string | null;
@@ -63,6 +66,8 @@ export interface AdminShiftsState {
   historyShifts: ShiftRecord[];
   loading: LoadingMap;
   error: string | null;
+  mutationError: string | null;
+  clearMutationError: () => void;
   fetchToday: () => Promise<void>;
   fetchHistory: (staffId?: string) => Promise<void>;
   clockIn: (staffId: string, staffName: string, options?: ClockInOptions) => Promise<ShiftRecord | null>;

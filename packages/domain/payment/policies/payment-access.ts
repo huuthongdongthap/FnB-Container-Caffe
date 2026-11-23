@@ -256,7 +256,7 @@ export function canAccessPaymentOrder(c: any, order: PaymentOrderIdentity, allow
     if (reqOrderToken && guestHash && order.orderTokenVerified === false) {
       return false;
     }
-    return Boolean(allowGuest && !orderCustomerId && !orderToken);
+    return Boolean(allowGuest && !orderCustomerId && !orderToken && !guestHash);
   }
   if (userRole === 'customer') {
     if (!orderCustomerId) return false;

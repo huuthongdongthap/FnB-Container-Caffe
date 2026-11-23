@@ -14,8 +14,8 @@ import {
 export const createOrderSchema = z.object({
   items: z.array(orderItemSchema).min(1, 'Phải có ít nhất 1 sản phẩm').max(100, 'Tối đa 100 sản phẩm mỗi đơn'),
   total: z.number().or(z.string()).refine(
-    (val) => Number.isFinite(Number(val)) && Number(val) >= 1000,
-    'Tổng tiền tối thiểu 1,000đ'
+    (val) => Number.isFinite(Number(val)) && Number(val) >= 0,
+    'Tổng tiền không hợp lệ'
   ),
   customer_name: nameSchema,
   customer_phone: z.string().min(8, 'Số điện thoại không hợp lệ').max(20).or(z.literal('')),
@@ -38,6 +38,8 @@ export const createOrderSchema = z.object({
   service_fee: z.number().nonnegative().optional().default(0),
   redeem_points: z.number().int().min(0).max(100000).optional(),
   loyalty_points_redeemed: z.number().int().min(0).max(100000).optional(),
+  cashback_amount: z.number().int().min(0).max(10000000).optional(),
+  use_cashback: z.boolean().optional(),
   /** Legacy compatibility only. The server never uses this field to choose the store. */
   tenant_id: z.string().optional(),
 }).superRefine((data, ctx) => {
@@ -60,6 +62,21 @@ export const createOrderSchema = z.object({
       code: z.ZodIssueCode.custom,
       path: ['table_id'],
       message: 'Số bàn là bắt buộc với đơn tại quán',
+    });
+  }
+  const hasFullDiscountPotential = Boolean(
+    data.use_cashback ||
+    (data.cashback_amount ?? 0) > 0 ||
+    (data.promo_code ?? '').trim() ||
+    (data.promotion_code ?? '').trim() ||
+    (data.redeem_points ?? 0) > 0 ||
+    (data.loyalty_points_redeemed ?? 0) > 0
+  );
+  if (Number(data.total) < 1000 && !hasFullDiscountPotential) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['total'],
+      message: 'Tổng tiền tối thiểu 1,000đ',
     });
   }
 });

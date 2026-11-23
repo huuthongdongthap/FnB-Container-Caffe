@@ -25,7 +25,8 @@ export async function http(runtime, pathname, { method = 'GET', body, token, hea
 export async function createOrder(runtime, method, name, extra = {}, token) {
   const response = await http(runtime, '/api/orders', { method: 'POST', body: orderInput(method, name, extra), token });
   const row = await runtime.db.prepare('SELECT * FROM orders WHERE customer_name = ? ORDER BY created_at DESC LIMIT 1').bind(name).first();
-  return { response, row, id: response.body.data?.id || row?.id };
+  const orderToken = response.body.data?.order_token || response.body.order_token || null;
+  return { response, row, id: response.body.data?.id || row?.id, orderToken };
 }
 
 export async function runApiFlow(runtime, check) {
@@ -63,11 +64,13 @@ export async function runApiFlow(runtime, check) {
   }
   check('retired-routes', removedRoutes.every(result => result.status === 404), 'all 404', removedRoutes);
 
-  const tamperedLink = await http(runtime, '/api/payment/create-link', { method: 'POST', body: { order_id: payos.id, amount: 1 } });
+  const payosHeaders = payos.orderToken ? { 'X-Order-Token': payos.orderToken } : {};
+  const codHeaders = cod.orderToken ? { 'X-Order-Token': cod.orderToken } : {};
+  const tamperedLink = await http(runtime, '/api/payment/create-link', { method: 'POST', body: { order_id: payos.id, amount: 1 }, headers: payosHeaders });
   check('payos-rejects-tampered-amount', tamperedLink.status === 400, 400, tamperedLink.status);
-  const codLink = await http(runtime, '/api/payment/create-link', { method: 'POST', body: { order_id: cod.id, amount: 20000 } });
+  const codLink = await http(runtime, '/api/payment/create-link', { method: 'POST', body: { order_id: cod.id, amount: 20000 }, headers: codHeaders });
   check('payos-rejects-cod', codLink.status === 409, 409, codLink.status);
-  const payosLink = await http(runtime, '/api/payment/create-link', { method: 'POST', body: { order_id: payos.id } });
+  const payosLink = await http(runtime, '/api/payment/create-link', { method: 'POST', body: { order_id: payos.id }, headers: payosHeaders });
   const payment = await runtime.db.prepare('SELECT * FROM payments WHERE order_id = ?').bind(payos.id).first();
   check('payos-server-amount', payosLink.status === 200 && payment?.amount === 20000 && runtime.providerRequests.some(r => r.kind === 'create' && r.amount === 20000),
     'link200, persisted/provider amount20000', { status: payosLink.status, amount: payment?.amount });

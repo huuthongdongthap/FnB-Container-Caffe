@@ -33,7 +33,7 @@ export const MD3_SHELL_CONFIG: ShellRouteConfig[] = [
   { match: '/order-failure', title: 'Thanh toán chưa hoàn tất', variant: 'small', showNav: false, showTop: true },
   { match: '/order', title: 'Gọi món tại bàn', variant: 'small', showNav: false, showTop: false },
   { match: '/checkin', title: 'Check-in tại quán', variant: 'small', showNav: false, showTop: true },
-  { match: '/track-order', title: 'Tra cứu đơn hàng', variant: 'small', showNav: false, showTop: true },
+  { match: '/track-order', title: 'Tra cứu đơn hàng', variant: 'small', showNav: false, showTop: false },
   { match: '/hub', title: 'Trạm Điều Hành', variant: 'small', showNav: false, showTop: false },
   { match: '/portal', title: 'Trạm Điều Hành', variant: 'small', showNav: false, showTop: false },
 ];

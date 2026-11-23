@@ -33,6 +33,7 @@ vi.mock('lucide-react', () => ({
   FileBarChart: () => null,
   Megaphone: () => null,
   Percent: () => null,
+  Flame: () => null,
   Send: () => null,
   MessageSquare: () => null,
   ScrollText: () => null,
@@ -61,7 +62,7 @@ describe('StitchAdminTerminalNew', () => {
 
   it('renders brand subtitle', () => {
     renderWithProviders(<StitchAdminTerminalNew />);
-    expect(screen.getByText('Admin Terminal')).toBeTruthy();
+    expect(screen.getAllByText('terminal.managementTitle').length).toBeGreaterThan(0);
   });
 
   it('renders sidebar nav items with Vietnamese labels', () => {
@@ -76,14 +77,14 @@ describe('StitchAdminTerminalNew', () => {
 
   it('renders analytics section nav items', () => {
     renderWithProviders(<StitchAdminTerminalNew />);
-    expect(screen.getByText('Phân tích')).toBeTruthy();
+    expect(screen.getAllByText('Phân tích').length).toBeGreaterThan(0);
     expect(screen.getByText('Báo cáo')).toBeTruthy();
   });
 
   it('renders section group titles', () => {
     renderWithProviders(<StitchAdminTerminalNew />);
-    expect(screen.getByText('Vận hành / Operations')).toBeTruthy();
-    expect(screen.getByText('Phân tích / Analytics')).toBeTruthy();
+    expect(screen.getByText('Vận hành')).toBeTruthy();
+    expect(screen.getAllByText('Phân tích').length).toBeGreaterThan(0);
   });
 
   it('renders generate report button with i18n key', () => {

@@ -56,27 +56,44 @@ vi.mock('lucide-react', () => ({
 }));
 
 describe('StitchAccountNew', () => {
-  it('renders the account page with profile', () => {
+  it('renders mock-free default profile', () => {
     renderWithProviders(<StitchAccountNew />);
-    expect(screen.getByText('Julian Vane')).toBeTruthy();
+    expect(screen.getByText('Khách hàng')).toBeTruthy();
+    expect(screen.queryByText('Julian Vane')).toBeNull();
   });
 
-  it('renders loyalty progress', () => {
-    renderWithProviders(<StitchAccountNew />);
+  it('renders loyalty progress with explicit loyalty props', () => {
+    renderWithProviders(
+      <StitchAccountNew
+        loyalty={{ points: 1250, nextTier: 'Platinum', pointsToNext: 250, progressPercent: 83 }}
+      />,
+    );
     expect(screen.getByText('Current Balance')).toBeTruthy();
     expect(screen.getByText('1,250')).toBeTruthy();
   });
 
-  it('renders recent orders', () => {
-    renderWithProviders(<StitchAccountNew />);
-    expect(screen.getByText('Truffle Cortado')).toBeTruthy();
-    expect(screen.getByText('Gold Leaf Croissant')).toBeTruthy();
+  it('renders recent orders when provided', () => {
+    renderWithProviders(
+      <StitchAccountNew
+        orders={[
+          { id: 'ORD-1', itemName: 'Cà Phê Sữa Đá', icon: 'coffee', time: '5m ago', status: 'delivered' },
+          { id: 'ORD-2', itemName: 'Bánh Sừng Bò', icon: 'bakery', time: '1h ago', status: 'delivered' },
+        ]}
+      />,
+    );
+    expect(screen.getByText('Cà Phê Sữa Đá')).toBeTruthy();
+    expect(screen.getByText('Bánh Sừng Bò')).toBeTruthy();
   });
 
-  it('renders account cards', () => {
-    renderWithProviders(<StitchAccountNew />);
-    expect(screen.getByText('Aura Elite')).toBeTruthy();
-    expect(screen.getByText('Visa •• 4242')).toBeTruthy();
+  it('renders account cards when provided', () => {
+    renderWithProviders(
+      <StitchAccountNew
+        cards={[
+          { type: 'subscription', title: 'Aura Member', subtitle: 'Active', meta: 'Monthly', accent: true },
+        ]}
+      />,
+    );
+    expect(screen.getByText('Aura Member')).toBeTruthy();
   });
 
   it('renders quick order button', () => {

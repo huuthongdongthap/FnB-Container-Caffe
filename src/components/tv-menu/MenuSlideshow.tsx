@@ -1,16 +1,25 @@
 import { useState, useEffect, useCallback } from 'react';
 import { cn } from '@/lib/cn';
-import type { MenuGroup } from '@/hooks/use-tv-menu';
-import { ClipboardList, Clock, Smartphone } from 'lucide-react';
+import type { HappyHourInfo, MenuGroup } from '@/hooks/use-tv-menu';
+import { ClipboardList, Clock, Smartphone, WifiOff } from 'lucide-react';
 
 interface MenuSlideshowProps {
   menuGroups: MenuGroup[];
   isHappyHour: boolean;
+  happyHour?: HappyHourInfo;
+  isError?: boolean;
   lastUpdated: Date | null;
   totalItems: number;
 }
 
-export function MenuSlideshow({ menuGroups, isHappyHour, lastUpdated, totalItems }: MenuSlideshowProps) {
+export function MenuSlideshow({
+  menuGroups,
+  isHappyHour,
+  happyHour,
+  isError = false,
+  lastUpdated,
+  totalItems,
+}: MenuSlideshowProps) {
   const [currentPage, setCurrentPage] = useState(0);
   const itemsPerPage = 6;
   const totalPages = Math.ceil(menuGroups.length / itemsPerPage) || 1;
@@ -54,14 +63,33 @@ export function MenuSlideshow({ menuGroups, isHappyHour, lastUpdated, totalItems
         </div>
       </header>
 
+      {/* Non-blocking stale/offline warning when showing cached data */}
+      {isError && menuGroups.length > 0 && (
+        <div
+          role="alert"
+          className="mb-4 flex items-center justify-center gap-2 rounded-xl border border-amber-400/50 bg-amber-500/15 px-5 py-2.5 text-sm font-medium text-amber-200 shrink-0"
+        >
+          <WifiOff size={18} aria-hidden="true" />
+          <span>Mất kết nối máy chủ — đang hiển thị thực đơn đã lưu tạm</span>
+        </div>
+      )}
+
       {/* Happy Hour */}
       {isHappyHour && (
         <div className="happy-hour-banner bg-gold/10 border border-gold rounded-xl px-7 py-3 mb-5 flex items-center justify-center gap-4 shrink-0 animate-pulse">
           <span className="text-2xl"><Clock size={24} className="inline" /></span>
-          <span className="text-gold font-medium">HAPPY HOUR &mdash; Giảm</span>
-          <span className="text-gold font-mono font-bold">20%</span>
+          <span className="text-gold font-medium">
+            {happyHour?.name || 'HAPPY HOUR'} &mdash; Giảm
+          </span>
+          {typeof happyHour?.discountPercent === 'number' && (
+            <span className="text-gold font-mono font-bold">{happyHour.discountPercent}%</span>
+          )}
           <span className="text-gold font-medium">đồ uống</span>
-          <span className="text-gold font-mono font-bold">14:00 &ndash; 16:00</span>
+          {happyHour?.startTime && happyHour?.endTime && (
+            <span className="text-gold font-mono font-bold">
+              {happyHour.startTime} &ndash; {happyHour.endTime}
+            </span>
+          )}
         </div>
       )}
 
@@ -111,8 +139,8 @@ export function MenuSlideshow({ menuGroups, isHappyHour, lastUpdated, totalItems
           Quét mã QR để đặt món
         </span>
         <span className="flex items-center gap-1">
-          <span className={cn('w-2 h-2 rounded-full', menuGroups.length > 0 ? 'bg-green-500' : 'bg-red-500')} />
-          {menuGroups.length > 0 ? 'Online' : 'Lỗi kết nối'}
+          <span className={cn('w-2 h-2 rounded-full', !isError && menuGroups.length > 0 ? 'bg-green-500' : 'bg-amber-400')} />
+          {!isError && menuGroups.length > 0 ? 'Online' : 'Offline (dữ liệu tạm)'}
         </span>
       </footer>
 

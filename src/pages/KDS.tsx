@@ -1,5 +1,8 @@
 import { useState, useCallback, useMemo } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { HelmetHead } from '@/components/seo/HelmetHead';
+import { apiFetch } from '@/lib/api-client';
+import { useAuthStore } from '@/hooks/stores/use-auth-store';
 import { useKDS } from '@/hooks/use-kds';
 import {
   StitchKDSNew,
@@ -39,18 +42,74 @@ function splitKdsItemModifierAndNotes(item: { modifiers?: string[]; notes?: stri
 
 /* ─── Main Page Component ──────────────────────────────────────── */
 
+interface KitchenStationDto {
+  id: string;
+  name: string;
+  active?: number | boolean;
+}
+
+const DEFAULT_STATION_OPTION = { id: 'all', label: 'Tất cả trạm' } as const;
+
 export default function KDSPage() {
+  const user = useAuthStore((s) => s.user);
+  const sessionVersion = useAuthStore((s) => s.sessionVersion);
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [selectedStation, setSelectedStation] = useState<string>('all');
   const [viewFilter, setViewFilter] = useState<
     'all' | 'priority' | 'preparing' | 'ready'
   >('all');
 
-  const { orders, isLoading, isError, error, updateStatus, pendingOrders = {}, mutationErrors = {} } = useKDS('all');
+  const { data: stationList = [] } = useQuery<KitchenStationDto[]>({
+    queryKey: ['kds-kitchen-stations', sessionVersion, user?.tenantId ?? 'default'],
+    enabled: Boolean(user),
+    queryFn: async () => {
+      try {
+        const res = await apiFetch<{
+          stations?: KitchenStationDto[];
+          data?: KitchenStationDto[];
+        }>('/api/kitchen-stations');
+        const list = Array.isArray(res?.stations)
+          ? res.stations
+          : Array.isArray(res?.data)
+            ? res.data
+            : Array.isArray(res)
+              ? (res as unknown as KitchenStationDto[])
+              : [];
+        return list.filter(
+          (s) => Boolean(s?.id && s?.name) && s.active !== 0 && s.active !== false,
+        );
+      } catch {
+        return [];
+      }
+    },
+    staleTime: 5 * 60_000,
+    retry: 0,
+  });
+
+  const stations = useMemo(
+    () => [
+      DEFAULT_STATION_OPTION,
+      ...stationList.map((s) => ({ id: s.id, label: s.name })),
+    ],
+    [stationList],
+  );
+
+  const { orders, isLoading, isError, error, refetch, updateStatus, pendingOrders = {}, mutationErrors = {} } = useKDS(selectedStation);
+
+  const activeOrders = useMemo(
+    () => orders.filter((o) => o.status !== 'served' && o.status !== 'cancelled'),
+    [orders],
+  );
+
+  const activeOrderIds = useMemo(
+    () => activeOrders.map((o) => o.id),
+    [activeOrders],
+  );
 
   // A new order beeps through WebAudio: no static asset to 404, and no
   // <audio> element whose failed load looks like a silent feature.
-  useKdsAudio(orders.length, soundEnabled);
+  useKdsAudio(activeOrderIds, soundEnabled, isLoading, selectedStation);
 
   const orderIdMap = useMemo(() => {
     const map = new Map<string, string>();
@@ -83,22 +142,21 @@ export default function KDSPage() {
   }, []);
 
   const handleRetry = useCallback(() => {
-    window.location.reload();
-  }, []);
+    refetch();
+  }, [refetch]);
 
   const avgTime = useMemo(() => {
-    if (orders.length === 0) return 0;
+    if (activeOrders.length === 0) return 0;
     return Math.round(
-      orders.reduce((sum, o) => sum + calcElapsedSeconds(o.createdAt), 0) /
-        orders.length /
+      activeOrders.reduce((sum, o) => sum + calcElapsedSeconds(o.createdAt), 0) /
+        activeOrders.length /
         60,
     );
-  }, [orders]);
+  }, [activeOrders]);
 
   const stationLoadPct = useMemo(() => {
-    const active = orders.filter((o) => o.status !== 'served' && o.status !== 'cancelled').length;
-    return Math.min(Math.round((active / 20) * 100), 100);
-  }, [orders]);
+    return Math.min(Math.round((activeOrders.length / 20) * 100), 100);
+  }, [activeOrders]);
 
   const cancelledOrders = useMemo(
     () => orders.filter((o) => o.status === 'cancelled'),
@@ -107,8 +165,7 @@ export default function KDSPage() {
 
   const tickets = useMemo((): Ticket[] => {
     const seenShort = new Set<string>();
-    return orders
-      .filter((o) => o.status !== 'served' && o.status !== 'cancelled')
+    return activeOrders
       .map((o): Ticket => {
         const shortId = `#${o.id.slice(-4)}`;
         const ticketId = seenShort.has(shortId) ? `#${o.id}` : shortId;
@@ -122,10 +179,21 @@ export default function KDSPage() {
         const status: TicketStatus = isOverdue
           ? 'overdue'
           : (normalizedRawStatus as TicketStatus);
+        const isDelivery = o.orderType === 'delivery';
+        const ticketType: Ticket['type'] = isDelivery
+          ? 'DELIVERY'
+          : o.table
+            ? 'DINE IN'
+            : 'TOGO';
+        const tableLabel = isDelivery
+          ? 'GIAO HÀNG'
+          : o.table
+            ? `Bàn ${o.table}`
+            : 'MANG ĐI';
         return {
           id: ticketId,
-          table: o.table ? `TABLE ${o.table}` : 'TAKEAWAY',
-          type: o.table ? ('DINE IN' as const) : ('TOGO' as const),
+          table: tableLabel,
+          type: ticketType,
           status,
           rawStatus: normalizedRawStatus,
           isOverdue,
@@ -141,7 +209,7 @@ export default function KDSPage() {
             : {}),
         };
       });
-  }, [orders]);
+  }, [activeOrders]);
 
   const handleStartPrep = useCallback(
     (ticketId: string) => {
@@ -198,9 +266,12 @@ export default function KDSPage() {
           tickets={tickets}
           pendingOrders={Object.fromEntries([...orderIdMap].map(([displayId, id]) => [displayId, pendingOrders[id] ?? false]))}
           mutationErrors={Object.fromEntries([...orderIdMap].filter(([, id]) => mutationErrors[id]).map(([displayId, id]) => [displayId, mutationErrors[id]!]))}
-          stationName="KITCHEN STATION"
-          stationLabel="STATION 01"
-          stationLocation="MAIN KITCHEN"
+          stationName={stations.find((s) => s.id === selectedStation)?.label ?? 'QUẦY PHA CHẾ'}
+          stationLabel={stations.find((s) => s.id === selectedStation)?.label ?? 'TẤT CẢ TRẠM'}
+          stationLocation="BẾP CHÍNH"
+          selectedStation={selectedStation}
+          stations={stations}
+          onStationChange={setSelectedStation}
           stationLoad={stationLoadPct}
           avgPrepTime={`${avgTime}M`}
           isLoading={isLoading}

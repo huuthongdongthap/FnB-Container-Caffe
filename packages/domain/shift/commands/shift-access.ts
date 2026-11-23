@@ -41,7 +41,8 @@ export async function shiftScope(env: Env, user: AuthUser | undefined, requested
   const actor = await requireStaffAccount(env.AURA_DB, user.id);
   const rawActorTenant = typeof actor.tenant_id === 'string' ? actor.tenant_id.trim() : '';
   const isHqAdmin = (actor.role === 'owner' || actor.role === 'admin') && (rawActorTenant.toLowerCase() === 'hq' || rawActorTenant === '*');
-  if (!isHqAdmin && cleanRequested && (cleanRequested === '*' || cleanRequested.toLowerCase() === 'hq' || cleanRequested !== rawActorTenant)) {
+  const normalizedActorTenant = rawActorTenant || 'default';
+  if (!isHqAdmin && cleanRequested && (cleanRequested === '*' || cleanRequested.toLowerCase() === 'hq' || cleanRequested !== normalizedActorTenant)) {
     throw new ShiftContractError('Cross-tenant shift access denied', 403);
   }
   if (isHqAdmin) {
@@ -53,7 +54,7 @@ export async function shiftScope(env: Env, user: AuthUser | undefined, requested
     }
     return { env, tenantId: '*', actor, canManage: true };
   }
-  const actorTenant = rawActorTenant;
+  const actorTenant = normalizedActorTenant;
   if (
     !actorTenant ||
     actorTenant === '*' ||
@@ -64,7 +65,7 @@ export async function shiftScope(env: Env, user: AuthUser | undefined, requested
     throw new ShiftContractError('Attendance is unavailable for this store', 403);
   }
   const tenantId = pilotTenant ?? actorTenant;
-  const allowedRoles = hasExplicitPilot ? ['owner', 'manager', 'supervisor'] : SHIFT_MANAGERS;
+  const allowedRoles = SHIFT_MANAGERS;
   return { env, tenantId, actor, canManage: allowedRoles.includes(actor.role) };
 }
 export function managerScope(scope: ShiftScope) {

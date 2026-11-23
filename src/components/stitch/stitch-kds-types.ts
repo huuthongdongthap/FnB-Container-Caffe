@@ -26,6 +26,11 @@ export interface Ticket {
   totalTimeSeconds?: number;
 }
 
+export interface KdsStationOption {
+  id: string;
+  label: string;
+}
+
 export interface StitchKDSNewProps {
   tickets?: Ticket[];
   stationName?: string;
@@ -33,6 +38,9 @@ export interface StitchKDSNewProps {
   stationLocation?: string;
   stationLoad?: number;
   avgPrepTime?: string;
+  selectedStation?: string;
+  stations?: KdsStationOption[];
+  onStationChange?: (stationId: string) => void;
   isLoading?: boolean;
   error?: string | null;
   pendingOrders?: Record<string, boolean>;

@@ -2,20 +2,46 @@
 
 import { useEffect, useRef } from 'react';
 
-export function useKdsAudio(orderCount: number, enabled: boolean): void {
-  const prevCountRef = useRef(orderCount);
+export function useKdsAudio(
+  orderIds: readonly string[],
+  enabled: boolean,
+  isLoading = false,
+  resetKey?: string,
+): void {
+  const seenIdsRef = useRef<Set<string> | null>(null);
+  const prevResetKeyRef = useRef(resetKey);
 
   useEffect(() => {
-    if (!enabled) {
-      prevCountRef.current = orderCount;
+    if (prevResetKeyRef.current !== resetKey) {
+      prevResetKeyRef.current = resetKey;
+      seenIdsRef.current = null;
+    }
+
+    if (isLoading) return;
+
+    const currentIds = new Set(orderIds);
+
+    // Initial non-loading snapshot (or first snapshot after station switch):
+    // record existing orders without triggering a false beep.
+    if (seenIdsRef.current === null) {
+      seenIdsRef.current = currentIds;
       return;
     }
 
-    if (orderCount > prevCountRef.current) {
+    let hasNewOrder = false;
+    for (const id of currentIds) {
+      if (!seenIdsRef.current.has(id)) {
+        hasNewOrder = true;
+        break;
+      }
+    }
+
+    if (enabled && hasNewOrder) {
       playBeep();
     }
-    prevCountRef.current = orderCount;
-  }, [orderCount, enabled]);
+
+    seenIdsRef.current = currentIds;
+  }, [orderIds, enabled, isLoading, resetKey]);
 }
 
 function playBeep(): void {

@@ -74,23 +74,10 @@ export async function clockIn(scope: ShiftScope, staffId?: string, notes?: strin
   return getShift(targetScope, id);
 }
 export async function clockOut(scope: ShiftScope, staffId?: string, attendanceId?: string, notes?: string): Promise<ShiftRow> {
-  let resolvedAttendanceId = attendanceId;
-  let resolvedNotes = notes;
-  if (
-    resolvedNotes === undefined &&
-    resolvedAttendanceId !== undefined &&
-    !/^[1-9]\d*$/.test(String(resolvedAttendanceId).trim())
-  ) {
-    resolvedNotes = resolvedAttendanceId;
-    resolvedAttendanceId = undefined;
-  } else if (
-    resolvedAttendanceId === undefined &&
-    resolvedNotes !== undefined &&
-    /^[1-9]\d*$/.test(String(resolvedNotes).trim())
-  ) {
-    resolvedAttendanceId = resolvedNotes;
-    resolvedNotes = undefined;
-  }
+  const resolvedAttendanceId = attendanceId !== undefined && String(attendanceId).trim() !== ''
+    ? String(attendanceId).trim()
+    : undefined;
+  const resolvedNotes = notes;
   const preloaded = resolvedAttendanceId ? await getShift({ ...scope, canManage: true }, resolvedAttendanceId) : undefined;
   const checkStaffId = staffId || (!scope.canManage ? scope.actor.id : undefined);
   if (preloaded && checkStaffId && String(preloaded.staff_id) !== String(checkStaffId).trim()) {

@@ -92,10 +92,19 @@ function verifyKdsOrderTenant(
 const CANCEL_ALERT_WINDOW_MS = 10 * 60_000;
 const PREP_HISTORY_STATUSES = new Set(['preparing', 'ready', 'served', 'completed']);
 
+function parseUtcTimestampMs(raw: unknown): number {
+  if (typeof raw !== 'string' || !raw.trim()) return NaN;
+  const trimmed = raw.trim();
+  const iso = /[zZ]|[+-]\d{2}:?\d{2}$/.test(trimmed)
+    ? trimmed.replace(' ', 'T')
+    : `${trimmed.replace(' ', 'T')}Z`;
+  return Date.parse(iso);
+}
+
 /** A cancelled order the kitchen already started on, so baristas must stop and discard. */
 function isRecentPrepCancellation(order: Record<string, unknown>, nowMs: number): boolean {
   if (String(order.status ?? '').trim().toLowerCase() !== 'cancelled') return false;
-  const cancelledMs = order.cancelled_at ? Date.parse(String(order.cancelled_at).replace(' ', 'T') + (/[zZ]|[+-]\d{2}:?\d{2}$/.test(String(order.cancelled_at)) ? '' : 'Z')) : NaN;
+  const cancelledMs = parseUtcTimestampMs(order.cancelled_at);
   if (!Number.isFinite(cancelledMs) || nowMs - cancelledMs > CANCEL_ALERT_WINDOW_MS || nowMs < cancelledMs - 60_000) return false;
   const prev = String(order.previous_status ?? '').trim().toLowerCase();
   const explicit = order.cancel_alert === true || Number(order.cancel_alert) === 1;
@@ -192,11 +201,18 @@ export async function handleGetKdsOrders(c: Context<{ Bindings: Env }>) {
       if (items.length === 0) continue;
     }
 
-    const elapsed = Math.round((Date.now() - new Date(order.created_at).getTime()) / 60000);
-    const entry: KdsOrder & { cancel_alert?: boolean; kds_alert?: string } = {
+    const createdMs = parseUtcTimestampMs(order.created_at);
+    const elapsed = Number.isFinite(createdMs)
+      ? Math.max(0, Math.round((Date.now() - createdMs) / 60000))
+      : 0;
+    const orderType = typeof rawOrder.order_type === 'string' && rawOrder.order_type.trim()
+      ? rawOrder.order_type.trim()
+      : undefined;
+    const entry: KdsOrder & { order_type?: string; cancel_alert?: boolean; kds_alert?: string } = {
       id: order.id,
       customer_name: order.customer_name,
       table_id: order.table_id,
+      ...(orderType ? { order_type: orderType } : {}),
       items,
       ...(order.notes ? { notes: order.notes } : {}),
       status: order.status,
@@ -410,9 +426,10 @@ export async function handleMarkCodPaid(c: Context<{ Bindings: Env }>) {
  * KDS queue router, and this file all guard with the same set.
  */
 export const KDS_ROLES = ['owner', 'manager', 'supervisor', 'staff', 'waiter', 'cashier', 'admin', 'kitchen', 'barista', 'chef'];
+export const COD_COLLECTION_ROLES = ['owner', 'manager', 'supervisor', 'cashier', 'admin', 'waiter', 'shipper'];
 
 export function registerKdsHandlers(app: Hono<{ Bindings: Env }>) {
   app.get('/kds', requireAuth(KDS_ROLES), handleGetKdsOrders);
   app.patch('/:id/status', requireAuth([...KDS_ROLES, 'shipper']), audit('order_status_change'), (c) => handleUpdateOrderStatus(c));
-  app.patch('/:id/mark-cod-paid', requireAuth(['owner', 'manager', 'supervisor', 'cashier', 'admin']), audit('order_cod_paid'), handleMarkCodPaid);
+  app.patch('/:id/mark-cod-paid', requireAuth(COD_COLLECTION_ROLES), audit('order_cod_paid'), handleMarkCodPaid);
 }

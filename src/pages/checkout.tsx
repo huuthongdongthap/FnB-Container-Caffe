@@ -52,7 +52,7 @@ export function CheckoutPage() {
       navigate(`/order-failure?order_id=${orderId}`, { replace: true });
     }
     if (cancelled === 'true') {
-      setPayosError(t('paymentCancelled', 'Giao dịch chuyển khoản đã huỷ. Giỏ hàng vẫn được giữ nguyên, bạn có thể thử lại hoặc đổi sang Tiền mặt.'));
+      setPayosError(t('paymentCancelled', 'Giao dịch chuyển khoản đã huỷ. Giỏ hàng vẫn được giữ nguyên, bạn có thể thử thanh toán lại qua PayOS.'));
     }
   }, [searchParams, navigate, t]);
 
@@ -86,9 +86,9 @@ export function CheckoutPage() {
     setPayosError(null);
     clearPaymentError();
 
-    // Parse numeric table number (1-12) from inputs like "Bàn 5", "5", "01", "t01-indoor", "12-vip", "AURA-5"
+    // Parse positive numeric table number from inputs like "Bàn 5", "15", "01", "t01-indoor", "12-vip"
     const rawTable = formData.tableNumber?.trim() || '';
-    const numMatch = rawTable.match(/(?:^|\b|[tT])0*([1-9]|1[0-2])(?:\b|-|$)/);
+    const numMatch = rawTable.match(/^(?:(?:bàn|ban|table|t)\s*[-#]?\s*)?0*([1-9]\d*)(?:[-_][a-z0-9]+)?$/i);
     const validTableNumber = numMatch ? numMatch[1] : null;
 
     // Never silently change a requested dine-in order into takeaway.
@@ -104,7 +104,8 @@ export function CheckoutPage() {
       ? (totalItems >= 2 ? 0 : 15_000)
       : 0;
     const appliedDiscount = Math.max(0, Number(formData.discount || 0));
-    const effectiveTotal = Math.max(0, subtotal + effectiveShippingFee - appliedDiscount);
+    const appliedCashback = Math.max(0, Math.floor(Number(formData.cashbackAmount || 0)));
+    const effectiveTotal = Math.max(0, subtotal + effectiveShippingFee - appliedDiscount - appliedCashback);
     const normalizedPromoCode = formData.promoCode?.trim().toUpperCase() || undefined;
 
     const payload = {
@@ -141,6 +142,7 @@ export function CheckoutPage() {
       service_fee: 0,
       discount: appliedDiscount,
       ...(normalizedPromoCode ? { promo_code: normalizedPromoCode } : {}),
+      ...(appliedCashback > 0 ? { use_cashback: true, cashback_amount: appliedCashback } : {}),
       tip: 0,
     };
 
@@ -152,7 +154,7 @@ export function CheckoutPage() {
       const { id: orderId, total: serverTotal } = order;
 
       // Handle PayOS redirect with internal retry
-      if (formData.paymentMethod === 'payos' && !alreadyPaid) {
+      if (formData.paymentMethod === 'payos' && !alreadyPaid && serverTotal > 0) {
         setPayosRetrying(true);
         const url = await retryCreatePaymentLink(orderId, serverTotal);
         setPayosRetrying(false);

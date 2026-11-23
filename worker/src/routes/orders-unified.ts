@@ -28,6 +28,7 @@ import {
 
 import {
   handleGetKdsOrders,
+  COD_COLLECTION_ROLES,
   KDS_ROLES,
   handleUpdateOrderStatus,
   handleMarkCodPaid,
@@ -72,7 +73,7 @@ ordersUnifiedRouter.get('/:id/events', optionalAuth(), handleOrderStreamEvents);
 ordersUnifiedRouter.get('/:id/track', optionalAuth(), handleTrackOrder);
 
 ordersUnifiedRouter.patch('/:id/status', requireAuth(['owner', 'manager', 'supervisor', 'staff', 'waiter', 'cashier', 'admin', 'kitchen', 'barista', 'chef', 'shipper']), audit('order_status_change'), handleUpdateOrderStatus);
-ordersUnifiedRouter.patch('/:id/mark-cod-paid', requireAuth(['owner', 'manager', 'supervisor', 'cashier', 'admin']), audit('order_cod_paid'), handleMarkCodPaid);
+ordersUnifiedRouter.patch('/:id/mark-cod-paid', requireAuth(COD_COLLECTION_ROLES), audit('order_cod_paid'), handleMarkCodPaid);
 
 ordersUnifiedRouter.post('/:id/cancel', requireAuth(['owner', 'manager', 'supervisor', 'staff', 'waiter', 'cashier', 'admin', 'customer']), handleCancelOrder);
 ordersUnifiedRouter.post('/:id/claim', requireAuth(['owner', 'manager', 'supervisor', 'staff', 'waiter', 'cashier', 'admin', 'customer']), handleClaimOrder);

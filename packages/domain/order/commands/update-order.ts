@@ -9,6 +9,7 @@ import { parseJSON } from '../model/helpers';
 import { isTerminal } from '../model/order-state-machine';
 import { transitionOrderStatus, changedRows } from '../policies/order-status-transition';
 import { releaseTableIfNoActiveOrders } from '../policies/table-occupancy-release';
+import { restoreLoyaltyVoucherForOrder } from '../loyalty-voucher';
 import type { ErpnextEnv } from 'worker/src/clients/erpnext-client';
 import type { WorkerEnv } from 'worker/src/clients/erpnext-accounting-client';
 
@@ -442,7 +443,7 @@ export async function updateOrder(
               : null
           );
           let refundCustomerId = spendRow?.customer_id ? String(spendRow.customer_id).trim() : '';
-          let refundAmount = Number(spendRow?.amount ?? 0);
+          let refundAmount = Math.abs(Number(spendRow?.amount ?? 0));
           if (!refundCustomerId || !(refundAmount > 0)) {
             const ordSpend = await db.prepare(
               "SELECT customer_id, cashback_used FROM orders WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
@@ -462,23 +463,30 @@ export async function updateOrder(
           }
           if (refundCustomerId && refundAmount > 0) {
             const wRow = await db.prepare(
-              "SELECT id FROM cashback_wallets WHERE customer_id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ? LIMIT 1"
-            ).bind(refundCustomerId, effectiveCancelTenant).first<{ id?: string }>().catch(() =>
+              "SELECT id, balance FROM cashback_wallets WHERE customer_id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ? LIMIT 1"
+            ).bind(refundCustomerId, effectiveCancelTenant).first<{ id?: string; balance?: number }>().catch(() =>
               effectiveCancelTenant === 'default'
                 ? db.prepare(
-                    'SELECT id FROM cashback_wallets WHERE customer_id = ? LIMIT 1'
-                  ).bind(refundCustomerId).first<{ id?: string }>().catch(() => null)
+                    'SELECT id, balance FROM cashback_wallets WHERE customer_id = ? LIMIT 1'
+                  ).bind(refundCustomerId).first<{ id?: string; balance?: number }>().catch(() => null)
                 : null
             );
             const walletId = wRow?.id || `wal_${refundCustomerId}`;
+            const balanceAfter = Number(wRow?.balance ?? 0) + refundAmount;
             const refundTxId = `cb_ref_${id}`;
             let insertedRefund = true;
             try {
               const insRes = await db.prepare(
-                `INSERT INTO cashback_transactions (id, wallet_id, customer_id, order_id, type, amount, tenant_id, created_at)
-                 SELECT ?, ?, ?, ?, 'refund', ?, ?, datetime('now')
+                `INSERT INTO cashback_transactions (id, wallet_id, customer_id, order_id, type, amount, balance_after, tenant_id, created_at)
+                 SELECT ?, ?, ?, ?, 'refund', ?, ?, ?, datetime('now')
                  WHERE NOT EXISTS (SELECT 1 FROM cashback_transactions WHERE order_id = ? AND type = 'refund' AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?)`
-              ).bind(refundTxId, walletId, refundCustomerId, id, refundAmount, effectiveCancelTenant, id, effectiveCancelTenant).run();
+              ).bind(refundTxId, walletId, refundCustomerId, id, refundAmount, balanceAfter, effectiveCancelTenant, id, effectiveCancelTenant).run().catch(() =>
+                db.prepare(
+                  `INSERT INTO cashback_transactions (id, wallet_id, customer_id, order_id, type, amount, tenant_id, created_at)
+                   SELECT ?, ?, ?, ?, 'refund', ?, ?, datetime('now')
+                   WHERE NOT EXISTS (SELECT 1 FROM cashback_transactions WHERE order_id = ? AND type = 'refund' AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?)`
+                ).bind(refundTxId, walletId, refundCustomerId, id, refundAmount, effectiveCancelTenant, id, effectiveCancelTenant).run()
+              );
               const changes = (insRes as unknown as { meta?: { changes?: number }; changes?: number })?.meta?.changes
                 ?? (insRes as unknown as { changes?: number })?.changes;
               if (changes !== undefined && Number(changes) === 0) insertedRefund = false;
@@ -486,10 +494,16 @@ export async function updateOrder(
               if (effectiveCancelTenant === 'default') {
                 try {
                   const insRes = await db.prepare(
-                    `INSERT INTO cashback_transactions (id, wallet_id, customer_id, order_id, type, amount, created_at)
-                     SELECT ?, ?, ?, ?, 'refund', ?, datetime('now')
+                    `INSERT INTO cashback_transactions (id, wallet_id, customer_id, order_id, type, amount, balance_after, created_at)
+                     SELECT ?, ?, ?, ?, 'refund', ?, ?, datetime('now')
                      WHERE NOT EXISTS (SELECT 1 FROM cashback_transactions WHERE order_id = ? AND type = 'refund')`
-                  ).bind(refundTxId, walletId, refundCustomerId, id, refundAmount, id).run();
+                  ).bind(refundTxId, walletId, refundCustomerId, id, refundAmount, balanceAfter, id).run().catch(() =>
+                    db.prepare(
+                      `INSERT INTO cashback_transactions (id, wallet_id, customer_id, order_id, type, amount, created_at)
+                       SELECT ?, ?, ?, ?, 'refund', ?, datetime('now')
+                       WHERE NOT EXISTS (SELECT 1 FROM cashback_transactions WHERE order_id = ? AND type = 'refund')`
+                    ).bind(refundTxId, walletId, refundCustomerId, id, refundAmount, id).run()
+                  );
                   const changes = (insRes as unknown as { meta?: { changes?: number }; changes?: number })?.meta?.changes
                     ?? (insRes as unknown as { changes?: number })?.changes;
                   if (changes !== undefined && Number(changes) === 0) insertedRefund = false;
@@ -538,6 +552,13 @@ export async function updateOrder(
         }
       } catch (refSpendErr) {
         log.warn('Cashback spend refund error (non-blocking):', { message: (refSpendErr as Error).message, orderId: id });
+      }
+
+      // Restore loyalty voucher redeemed on this order
+      try {
+        await restoreLoyaltyVoucherForOrder(db, id, effectiveCancelTenant);
+      } catch (voucherRestoreErr) {
+        log.warn('Loyalty voucher restore error (non-blocking):', { message: (voucherRestoreErr as Error).message, orderId: id });
       }
 
       // Release promotion redemption usage count if redeemed on this order

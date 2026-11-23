@@ -10,6 +10,7 @@ import { optionalAuth, requireAuth } from 'worker/src/middleware/auth';
 import { getTenantId, matchesTenantRow, resolvePilotStore, resolvePublicTenantId } from 'worker/src/middleware/tenant';
 import { assertTenantResourceLimit } from '../../../../worker/src/lib/saas-entitlement';
 import { audit } from 'worker/src/middleware/audit-log';
+import { releaseStaleReservedTables } from 'worker/src/routes/openapi-tables-handlers/table-crud-handlers';
 import type { CafeTable, QrCodeRow } from '../model/table-types';
 import { canTransitionTo, normalizeTableStatus } from '../policies/status';
 
@@ -154,6 +155,7 @@ tablesRouter.get('/', optionalAuth(), async (c) => {
   }
   const db = c.env.AURA_DB;
   const tenantId = tenantCheck.tenantId;
+  await releaseStaleReservedTables(db, tenantId);
   const zone = c.req.query('zone');
   const status = c.req.query('status');
   let baseQuery = 'SELECT * FROM cafe_tables WHERE 1=1';
@@ -279,6 +281,7 @@ tablesRouter.get('/:id', optionalAuth(), async (c) => {
   const db = c.env.AURA_DB;
   const tenantId = tenantCheck.tenantId;
   const id = c.req.param('id');
+  await releaseStaleReservedTables(db, tenantId);
   const row = await db.prepare('SELECT * FROM cafe_tables WHERE id = ?').bind(id).first<CafeTable>();
   if (!row || !matchesTenantRow(row as unknown as Record<string, unknown>, tenantId)) {
     return c.json({ success: false, error: 'Table not found' }, 404);
@@ -307,39 +310,48 @@ async function hasUnpaidActiveOrderOnTable(
       return false;
     }
     const payStatus = String(row.payment_status ?? 'unpaid').trim().toLowerCase();
-    return !['paid', 'completed', 'refunded', 'cancelled', 'canceled'].includes(payStatus);
+    return !['paid', 'completed', 'refunded', 'cancelled', 'canceled', 'failed', 'expired'].includes(payStatus);
   };
+  const activeUnpaidWhere =
+    "table_id = ? AND LOWER(TRIM(COALESCE(status, 'pending'))) NOT IN ('completed', 'cancelled', 'canceled', 'rejected', 'failed', 'expired', 'refunded') AND LOWER(TRIM(COALESCE(payment_status, 'unpaid'))) NOT IN ('paid', 'completed', 'refunded', 'cancelled', 'canceled', 'failed', 'expired')";
   const scopedTenant = tenantId === '*' ? 'default' : tenantId;
   try {
-    const res = await db
-      .prepare(
-        `SELECT id, status, payment_status FROM orders
-         WHERE table_id = ?
-           AND LOWER(COALESCE(status, 'pending')) NOT IN ('completed', 'cancelled', 'canceled', 'rejected', 'failed', 'expired', 'refunded')
-           AND LOWER(COALESCE(payment_status, 'unpaid')) NOT IN ('paid', 'completed', 'refunded', 'cancelled', 'canceled')
-           AND (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?)
-         LIMIT 5`
-      )
-      .bind(tableId, tenantId, scopedTenant)
-      .all<Record<string, unknown>>();
-    if ((res?.results || []).some(isOrderRowUnpaid)) return true;
-  } catch {
-    if (tenantId === 'default' || tenantId === '*') {
-      const res = await db
-        .prepare(
-          `SELECT id, status, payment_status FROM orders
-           WHERE table_id = ?
-             AND LOWER(COALESCE(status, 'pending')) NOT IN ('completed', 'cancelled', 'canceled', 'rejected', 'failed', 'expired', 'refunded')
-             AND LOWER(COALESCE(payment_status, 'unpaid')) NOT IN ('paid', 'completed', 'refunded', 'cancelled', 'canceled')
-           LIMIT 5`
-        )
+    let res: { results?: Array<Record<string, unknown>> } | null = null;
+    if (tenantId && tenantId !== '*') {
+      try {
+        res = await db
+          .prepare(
+            `SELECT id, status, payment_status FROM orders
+             WHERE ${activeUnpaidWhere}
+               AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?
+             LIMIT 1`
+          )
+          .bind(tableId, scopedTenant)
+          .all<Record<string, unknown>>();
+      } catch (err) {
+        const msg = String(err);
+        if (/no such table:.*orders/i.test(msg)) return false;
+        if (scopedTenant === 'default' && /no such column:.*tenant_id/i.test(msg)) {
+          res = await db
+            .prepare(`SELECT id, status, payment_status FROM orders WHERE ${activeUnpaidWhere} LIMIT 1`)
+            .bind(tableId)
+            .all<Record<string, unknown>>();
+        } else {
+          // Fail closed on unexpected DB errors so unpaid active orders cannot be orphaned.
+          return true;
+        }
+      }
+    } else {
+      res = await db
+        .prepare(`SELECT id, status, payment_status FROM orders WHERE ${activeUnpaidWhere} LIMIT 1`)
         .bind(tableId)
-        .all<Record<string, unknown>>()
-        .catch(() => ({ results: [] as Record<string, unknown>[] }));
-      if ((res?.results || []).some(isOrderRowUnpaid)) return true;
+        .all<Record<string, unknown>>();
     }
+    return (res?.results || []).some(isOrderRowUnpaid);
+  } catch (err) {
+    if (/no such table:.*orders/i.test(String(err))) return false;
+    return true;
   }
-  return false;
 }
 
 // PATCH helper — read current row then update status, returning the row pre-update.
@@ -576,6 +588,12 @@ tablesRouter.delete('/:id', tableMutationAuth, audit('table_delete'), async (c) 
     : ('tenant_id' in existing && typeof (existing as unknown as Record<string, unknown>).tenant_id === 'string' && String((existing as unknown as Record<string, unknown>).tenant_id).trim() && String((existing as unknown as Record<string, unknown>).tenant_id).trim() !== '*' && String((existing as unknown as Record<string, unknown>).tenant_id).trim().toLowerCase() !== 'hq'
         ? String((existing as unknown as Record<string, unknown>).tenant_id).trim()
         : '*');
+  if (await hasUnpaidActiveOrderOnTable(db, id, effectiveTableTenant)) {
+    return c.json(
+      { success: false, error: 'Cannot delete table while an active unpaid order exists on this table' },
+      409
+    );
+  }
   if (effectiveTableTenant !== '*') {
     try {
       await db

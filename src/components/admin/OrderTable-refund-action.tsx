@@ -12,9 +12,9 @@ type ExtendedOrder = AdminOrder & {
 export function RefundAction({ order, userRole, onRefund, t }: RefundActionProps) {
   const ord = order as ExtendedOrder;
   const refundStatus = ord.refund_status ?? null;
-  const isAlreadyRefunded = refundStatus === 'refunded' || refundStatus === 'partial';
+  const isAlreadyRefunded = refundStatus === 'refunded' || refundStatus === 'completed';
 
-  const allowedRoles = ['owner', 'manager', 'admin', 'staff'];
+  const allowedRoles = ['owner', 'manager', 'admin'];
   if (!userRole || !allowedRoles.includes(userRole)) {
     return null;
   }

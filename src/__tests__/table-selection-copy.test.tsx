@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { MenuTableBanner } from '@/components/menu/menu-catalog-unavailable-state';
 import { TableOrder } from '@/pages/TableOrder';
@@ -56,12 +57,15 @@ describe('New-order table selection copy (issue #95)', () => {
   });
 
   it('TableOrder POS header clarifies choosing a table for a new order instead of transferring', () => {
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     render(
-      <MemoryRouter initialEntries={['/pos/table/05']}>
-        <Routes>
-          <Route path="/pos/table/:tableId" element={<TableOrder />} />
-        </Routes>
-      </MemoryRouter>,
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter initialEntries={['/pos/table/05']}>
+          <Routes>
+            <Route path="/pos/table/:tableId" element={<TableOrder />} />
+          </Routes>
+        </MemoryRouter>
+      </QueryClientProvider>,
     );
 
     const button = screen.getByRole('button', { name: 'Chọn bàn cho đơn mới' });

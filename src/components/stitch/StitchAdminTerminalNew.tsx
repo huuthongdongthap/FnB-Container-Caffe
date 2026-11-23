@@ -20,9 +20,9 @@ export type { StitchAdminTerminalNewProps, NavItemData, NavSectionData } from '.
 
 export function StitchAdminTerminalNew({
   brandName = 'Aura Cafe',
-  brandSubtitle = 'Admin Terminal',
+  brandSubtitle = '',
   adminName = 'Aura Admin',
-  terminalId = 'Terminal #04',
+  terminalId = '',
   adminAvatarUrl = DEFAULT_ADMIN_AVATAR,
   children,
 }: Readonly<StitchAdminTerminalNewProps>) {
@@ -30,7 +30,6 @@ export function StitchAdminTerminalNew({
   const location = useLocation();
   const isPosRoute = location.pathname.startsWith('/admin/pos');
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
   const sidebarRef = useRef<HTMLElement>(null);
 
   useFocusTrap(sidebarOpen, () => setSidebarOpen(false), sidebarRef);
@@ -60,8 +59,6 @@ export function StitchAdminTerminalNew({
 
       {!isPosRoute && (
         <TopBar
-          searchQuery={searchQuery}
-          onSearchChange={setSearchQuery}
           onOpenSidebar={() => setSidebarOpen(true)}
         />
       )}

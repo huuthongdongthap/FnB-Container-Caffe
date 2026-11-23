@@ -59,6 +59,8 @@ vi.mock('lucide-react', () => ({
   AlertCircle: () => null,
   Gift: () => null,
   Filter: () => null,
+  Ticket: () => null,
+  ArrowRight: () => null,
 }));
 
 const MOCK_DATA: LoyaltyDashboardData = {

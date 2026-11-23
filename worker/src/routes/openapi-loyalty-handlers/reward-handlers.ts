@@ -667,12 +667,15 @@ export function registerRewardHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
       success: true,
       data: {
         transactionId,
+        voucherCode,
+        code: voucherCode,
         reward: {
           ...mapRewardRow(reward),
           currentRedemptions: currentRedemptions + 1,
         },
         newBalance: authoritativeBalance,
         expiresAt,
+        expires_at: expiresAt,
       },
     });
   });

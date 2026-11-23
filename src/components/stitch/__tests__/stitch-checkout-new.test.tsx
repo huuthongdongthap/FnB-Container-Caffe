@@ -53,6 +53,7 @@ describe('StitchCheckoutNew', () => {
 
   it('renders payment method options', () => {
     renderWithProviders(<StitchCheckoutNew {...defaultProps} />);
+    fireEvent.click(screen.getByRole('button', { name: /mang đi/i }));
     expect(screen.getByText('PayOS')).toBeInTheDocument();
     expect(screen.getByText('Cash')).toBeInTheDocument();
     expect(screen.queryByText('Cash on Delivery')).not.toBeInTheDocument();
@@ -61,6 +62,7 @@ describe('StitchCheckoutNew', () => {
   it('toggles payment method on click and keyboard', async () => {
     const user = userEvent.setup();
     renderWithProviders(<StitchCheckoutNew {...defaultProps} />);
+    await user.click(screen.getByRole('button', { name: /mang đi/i }));
     const codRadio = screen.getByDisplayValue('cod');
     await user.click(codRadio);
     expect(codRadio).toBeChecked();

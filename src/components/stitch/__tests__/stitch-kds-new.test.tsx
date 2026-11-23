@@ -37,12 +37,12 @@ describe('StitchKDSNew', () => {
 
   it('renders station label', () => {
     renderWithProviders(<StitchKDSNew />);
-    expect(screen.getAllByText('STATION 01').length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText('TRẠM 01').length).toBeGreaterThanOrEqual(1);
   });
 
   it('renders station name', () => {
     renderWithProviders(<StitchKDSNew />);
-    expect(screen.getByText('GRILL & SAUTE')).toBeInTheDocument();
+    expect(screen.getByText('QUẦY PHA CHẾ')).toBeInTheDocument();
   });
 
   it('renders status badge counts with i18n keys', () => {

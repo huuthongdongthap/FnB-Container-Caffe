@@ -22,16 +22,40 @@ export interface POSNewCartItem {
   quantity: number;
 }
 
+export interface POSTableOption {
+  id: string;
+  name: string;
+  code?: string;
+  status: string;
+  capacity?: number;
+  zone?: string;
+}
+
+export interface POSActiveShift {
+  id: string;
+  shiftName?: string;
+  clockIn?: string | null;
+  staffName?: string;
+}
+
 export interface StitchPOSNewProps {
   menuItems?: POSNewMenuItem[];
   addOns?: POSNewAddOn[];
+  /** Map of category ID (e.g. cat_trad_coffee) to Vietnamese display label */
+  categoryLabels?: Record<string, string>;
+  /** Real tables loaded from /api/tables for table selector */
+  tables?: POSTableOption[];
+  /** Currently selected table ID (undefined = Takeaway / Mang về) */
+  selectedTableId?: string;
+  /** Called when cashier switches between Takeaway or a specific table */
+  onSelectTable?: (tableId: string | undefined) => void;
   tableLabel?: string;
   guestLabel?: string;
   orderNumber?: string;
   loading?: boolean;
   error?: string | null;
   brandName?: string;
-  /** Tax rate as a decimal (e.g. 0.05 = 5 %) */
+  /** Tax rate as a decimal (default 0 — Aura Cafe does not add hidden 5% VAT) */
   taxRate?: number;
   /** Discount amount to subtract before tax */
   discount?: number;
@@ -39,8 +63,16 @@ export interface StitchPOSNewProps {
   paymentMethod?: 'payos' | 'cod';
   /** Staff member name displayed in header */
   staffName?: string;
+  /** Staff member role displayed in header */
+  staffRole?: string;
+  /** Currently open shift (null when no shift is open) */
+  activeShift?: POSActiveShift | null;
+  /** Triggered when clicking the shift badge (open or close shift) */
+  onShiftAction?: () => void;
+  /** Triggered for 1-tap POS header navigation */
+  onNavigate?: (path: string) => void;
   /** Fired when "Complete Order" is clicked; return false to keep cart on error */
-  onCompleteOrder?: (cart: POSNewCartItem[], total: number) => void | boolean | Promise<void | boolean>;
+  onCompleteOrder?: (cart: POSNewCartItem[], total: number, tableId?: string) => void | boolean | Promise<void | boolean>;
   /** Fired when a payment method is selected */
   onPayment?: (method: 'payos' | 'cod') => void;
   /** Currently identified customer (null when none) */
@@ -49,11 +81,17 @@ export interface StitchPOSNewProps {
   onCustomerFound?: (customer: POSCustomer) => void;
   /** Called when the cashier clears the customer */
   onClearCustomer?: () => void;
+  /** Whether the cashier chose to apply customer cashback balance */
+  useCashback?: boolean;
+  /** Toggle customer cashback application */
+  onToggleCashback?: (enabled: boolean) => void;
   /** Header/Footer action callbacks */
   onOpenSchedule?: () => void;
   onOpenDrawer?: () => void;
   onPrintReceipt?: () => void;
   onEndShift?: () => void;
+  /** Incrementing key that clears the POS cart when changed */
+  cartResetKey?: number;
 }
 
 /* ─── Helpers & Constants ───────────────────────────────────────────── */
@@ -61,7 +99,49 @@ export function formatPosPrice(val: number): string {
   return `${Math.round(val).toLocaleString('vi-VN')}₫`;
 }
 
-export const MENU_CATEGORIES = ['All', 'Coffee', 'Tea', 'Signature', 'Pastries', 'Brunch', 'Merchandise'];
+export const DEFAULT_CATEGORY_LABELS: Record<string, string> = {
+  All: 'Tất cả',
+  cat_trad_coffee: 'Cà Phê Truyền Thống',
+  cat_hot_coffee: 'Cà Phê Nóng',
+  cat_iced_coffee: 'Cà Phê Đá',
+  cat_frappuccino: 'Đá Xay',
+  cat_tea: 'Trà',
+  cat_fruit_tea: 'Trà Trái Cây',
+  cat_milk_tea: 'Trà Sữa',
+  cat_matcha: 'Matcha',
+  cat_juice: 'Nước Ép',
+  cat_smoothie: 'Sinh Tố',
+  cat_soda: 'Soda',
+  cat_bottled: 'Đồ Uống Đóng Chai',
+  cat_pastry: 'Bánh Ngọt',
+  cat_pastries: 'Bánh Ngọt',
+  cat_snack: 'Ăn Nhẹ',
+  cat_signature: 'Signature',
+  cat_topping: 'Topping',
+};
+
+export function resolvePosCategoryLabel(
+  categoryId: string,
+  categoryLabels?: Record<string, string>,
+): string {
+  if (categoryId === 'All') {
+    return categoryLabels?.All ?? DEFAULT_CATEGORY_LABELS.All ?? 'Tất cả';
+  }
+  const custom = categoryLabels?.[categoryId];
+  if (custom) return custom;
+  const fallback = DEFAULT_CATEGORY_LABELS[categoryId] ?? DEFAULT_CATEGORY_LABELS[categoryId.toLowerCase()];
+  if (fallback) return fallback;
+  if (categoryId.startsWith('cat_')) {
+    return categoryId
+      .slice(4)
+      .split('_')
+      .map((w) => (w ? `${w.charAt(0).toUpperCase()}${w.slice(1)}` : ''))
+      .join(' ');
+  }
+  return categoryId;
+}
+
+export const MENU_CATEGORIES = ['All'];
 
 export const DEFAULT_MENU_ITEMS: POSNewMenuItem[] = [
   { id: 'm1', name: 'Midnight Espresso', price: 6.50, category: 'Coffee' },
@@ -78,8 +158,4 @@ export const DEFAULT_MENU_ITEMS: POSNewMenuItem[] = [
   { id: 'm12', name: 'Golden Matcha Latte', price: 7.25, category: 'Tea' },
 ];
 
-export const DEFAULT_ADDONS: POSNewAddOn[] = [
-  { id: 'a1', name: 'Oat Milk', price: 1.00 },
-  { id: 'a2', name: 'Double Shot', price: 2.00 },
-  { id: 'a3', name: 'Vanilla Bean', price: 0.75 },
-];
+export const DEFAULT_ADDONS: POSNewAddOn[] = [];

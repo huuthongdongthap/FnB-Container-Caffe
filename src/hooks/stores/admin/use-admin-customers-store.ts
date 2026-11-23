@@ -18,7 +18,7 @@ interface AdminCustomersState {
   pending: Record<string, boolean>;
   error: string | null;
   fetchCustomers: (page?: number, search?: string, tier?: string) => Promise<void>;
-  addCustomer: (data: { name: string; phone: string; tier: string }, requestKey?: string) => Promise<boolean>;
+  addCustomer: (data: { name: string; phone: string; email?: string; tier: string }, requestKey?: string) => Promise<boolean>;
   updateCustomer: (id: string, data: Partial<AdminCustomer>) => Promise<boolean>;
   deleteCustomer: (id: string) => Promise<boolean>;
 }

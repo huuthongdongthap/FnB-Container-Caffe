@@ -57,10 +57,17 @@ describe('Atomic canonical order acceptance', () => {
       payosCheckoutResponse(JSON.parse(String(init?.body)), env.PAYOS_CHECKSUM_KEY, 'returning-guest'));
     const response = await createOrder(request('returning-guest', { payment_method: 'payos' }), env);
     expect(response.status).toBe(201);
-    const { data } = await response.json() as any;
+    const body = await response.json() as any;
+    const { data } = body;
+    const orderToken = body.order_token || data?.order_token;
     expect(sqlite.prepare('SELECT customer_id FROM orders').get()).toMatchObject({ customer_id: null });
     const link = await app.fetch(new Request('https://test.aura/api/payment/create-link', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ order_id: data.id }),
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(orderToken ? { 'X-Order-Token': orderToken } : {}),
+      },
+      body: JSON.stringify({ order_id: data.id }),
     }), env);
     expect(link.status).toBe(200);
     const tracked = await app.fetch(new Request(`https://test.aura/api/orders/${data.id}/track`), env);

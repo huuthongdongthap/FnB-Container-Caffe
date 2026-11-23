@@ -65,11 +65,14 @@ function KdsStyles() {
 
 export function StitchKDSNew({
   tickets = DEFAULT_TICKETS,
-  stationName = 'GRILL & SAUTE',
-  stationLabel = 'STATION 01',
-  stationLocation = 'REVENUE CENTER: BAR',
+  stationName = 'QUẦY PHA CHẾ',
+  stationLabel = 'TRẠM 01',
+  stationLocation = 'BẾP CHÍNH',
   stationLoad = 75,
   avgPrepTime = '12M',
+  selectedStation,
+  stations,
+  onStationChange,
   isLoading = false,
   error = null,
   pendingOrders = {},
@@ -120,6 +123,9 @@ export function StitchKDSNew({
         activeFilter={activeFilter}
         onFilterChange={onFilterChange}
         stationLabel={stationLabel}
+        selectedStation={selectedStation}
+        stations={stations}
+        onStationChange={onStationChange}
         avgPrepTime={avgPrepTime}
         activeCount={activeCount}
         soundEnabled={soundEnabled}

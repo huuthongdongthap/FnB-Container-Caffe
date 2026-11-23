@@ -10,7 +10,7 @@ import { Input } from '@/components/ui/input';
 interface CustomerModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSave: (data: { name: string; phone: string; tier: string }, requestKey?: string) => Promise<boolean>;
+  onSave: (data: { name: string; phone: string; email?: string; tier: string }, requestKey?: string) => Promise<boolean>;
   customer?: AdminCustomer | null;
 }
 
@@ -26,6 +26,7 @@ export function CustomerModal({
   useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
+  const [email, setEmail] = useState('');
   const [tier, setTier] = useState('bronze');
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -34,10 +35,12 @@ export function CustomerModal({
     if (customer) {
       setName(customer.name);
       setPhone(customer.phone);
+      setEmail(customer.email || '');
       setTier((customer.tier || 'bronze').toLowerCase());
     } else {
       setName('');
       setPhone('');
+      setEmail('');
       setTier('bronze');
     }
     setError(null);
@@ -63,7 +66,12 @@ export function CustomerModal({
     setSubmitting(true);
     setError(null);
     try {
-      const data = { name: name.trim(), phone: phone.trim(), tier };
+      const data = {
+        name: name.trim(),
+        phone: phone.trim(),
+        ...(email.trim() ? { email: email.trim() } : {}),
+        tier,
+      };
       const ok = await onSave(data, requestKey.current.forPayload(data));
       if (!current()) return;
       if (ok) {
@@ -130,6 +138,18 @@ export function CustomerModal({
               onChange={(e) => setPhone(e.target.value)}
               placeholder="0946013633"
               required
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold uppercase tracking-wider text-muted mb-1.5">
+              Email
+            </label>
+            <Input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="khachhang@example.com"
             />
           </div>
 

@@ -34,7 +34,8 @@ export function registerAttendanceHandlers(app: OpenAPIHono<{ Bindings: Env }>) 
     }
     const effectiveScope = locId && scope.tenantId === '*' ? { ...scope, tenantId: locId } : scope;
     const scheduled = body.shiftId ? await getShift(effectiveScope, body.shiftId) : undefined;
-    const row = await clockIn(effectiveScope, body.staffId || scheduled?.staff_id, body.notes, body.shiftId);
+    const openingCash = body.openingCash ?? body.opening_cash;
+    const row = await clockIn(effectiveScope, body.staffId || scheduled?.staff_id, body.notes, body.shiftId, openingCash);
     return c.json({ success: true, data: attendanceDto(row) }, 201);
   });
   app.openapi(StaffRoutes.attendance.checkOut as any, async (c: any) => {

@@ -91,7 +91,7 @@ export function registerFeatureRoutes(app: Hono<{ Bindings: Env }>): void {
     const user = c.get('user' as any) as { tenantId?: string; role?: string } | undefined;
     const isHQ = isHQSuperAdmin(user);
     const requestedTenant = (c.req.query('tenant_id') || c.req.header('X-Tenant-ID') || c.req.header('x-tenant-id') || '').trim() || undefined;
-    const effectiveTenant = isHQ ? (requestedTenant ? getTenantId(c) : undefined) : getTenantId(c);
+    const effectiveTenant = isHQ ? (requestedTenant ? getTenantId(c) : '*') : getTenantId(c);
     return getAdminOrders(c.req.raw, c.env, effectiveTenant);
   });
   // Every alias uses the same tenant-scoped state machine and compare-and-set.

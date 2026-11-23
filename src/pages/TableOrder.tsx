@@ -1,12 +1,16 @@
 'use client';
 
-import { useState, useCallback, useEffect, useMemo as _useMemo, type ReactNode } from 'react';
+import { useState, useCallback, useEffect, useMemo, type ReactNode } from 'react';
 import { useSearchParams, useNavigate, useLocation, useParams } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { HelmetHead } from '@/components/seo/HelmetHead';
 import { StitchMobileOrderNew } from '@/components/stitch';
 import type { MenuItem } from '@/components/stitch/StitchMobileOrderNew-types';
 import { useOrderStoreWithOfflineFlush } from '@/hooks/stores/use-order-store';
+import { useAuthStore } from '@/hooks/stores/use-auth-store';
+import { useMenu } from '@/hooks/use-menu';
+import { apiFetch } from '@/lib/api-client';
 import { isTableIdValid, validateCustomerForm } from './TableOrder-utils';
 import {
   GuestInfoForm,
@@ -198,6 +202,56 @@ export function TableOrder(): ReactNode {
     },
   });
 
+  const activeTenant = useAuthStore((s) => s.user?.tenantId) || 'default';
+  const sessionVersion = useAuthStore((s) => s.sessionVersion);
+  const { data: liveMenuData } = useMenu({ available: true, limit: 100 });
+  const { data: liveTablesRes } = useQuery<{
+    success?: boolean;
+    data?: Array<{ id: string; name?: string; code?: string; table_number?: number; zone?: string; zone_name?: string; status?: string }>;
+    tables?: Array<{ id: string; name?: string; code?: string; table_number?: number; zone?: string; zone_name?: string; status?: string }>;
+  }>({
+    queryKey: ['table-order-tables', activeTenant, sessionVersion],
+    queryFn: () => apiFetch('/api/tables?limit=100', { silent: true }),
+    staleTime: 15_000,
+  });
+
+  const liveZones = useMemo(() => {
+    const rows = Array.isArray(liveTablesRes?.data)
+      ? liveTablesRes.data
+      : Array.isArray(liveTablesRes?.tables)
+        ? liveTablesRes.tables
+        : [];
+    if (rows.length === 0) return ZONES_FOR_TABLES;
+    const grouped = new Map<string, { id: string; name: string; tables: Array<{ id: string; label: string }> }>();
+    for (const row of rows) {
+      const zoneName = row.zone_name || row.zone || 'Khu vực chung';
+      const zoneKey = zoneName.toLowerCase();
+      if (!grouped.has(zoneKey)) {
+        grouped.set(zoneKey, { id: zoneKey, name: zoneName, tables: [] });
+      }
+      grouped.get(zoneKey)!.tables.push({
+        id: row.id,
+        label: row.name || (row.table_number ? `Bàn ${row.table_number}` : row.code || row.id),
+      });
+    }
+    return Array.from(grouped.values());
+  }, [liveTablesRes]);
+
+  const resolvedMenuItems = useMemo<MenuItem[]>(() => {
+    const items = liveMenuData?.items;
+    if (!items || items.length === 0) return AURA_VI_ORDER_ITEMS;
+    return items.map((item) => ({
+      id: item.id,
+      name: item.name,
+      description: item.description || '',
+      price: item.price,
+      priceLabel: `${Math.round(item.price).toLocaleString('vi-VN')}₫`,
+      category: item.category || 'all',
+      imageSrc: resolveMenuDrinkImage(item.id, item.image_url) || '/photos/IMG_6593.webp',
+      imageAlt: item.name,
+    }));
+  }, [liveMenuData]);
+
   const clearError = useCallback(() => {
     if (submitError) setSubmitError(null);
   }, [submitError]);
@@ -237,7 +291,7 @@ export function TableOrder(): ReactNode {
           </div>
 
           <div className="space-y-6">
-            {ZONES_FOR_TABLES.map((zone) => (
+            {liveZones.map((zone) => (
               <div
                 key={zone.id}
                 className="p-5 rounded-2xl bg-white/[0.03] border border-white/10 backdrop-blur-md hover:border-[var(--aura-chrome-mid)]/40 transition-colors"
@@ -249,17 +303,21 @@ export function TableOrder(): ReactNode {
                   </h2>
                 </div>
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                  {zone.tables.map((tNum) => (
-                    <button
-                      key={tNum}
-                      type="button"
-                      onClick={() => handleSelectTable(tNum)}
-                      className="py-3 px-4 rounded-xl font-display font-bold text-base text-center transition-all bg-white/[0.05] hover:bg-[var(--aura-chrome-mid)] hover:text-white border border-white/10 hover:border-transparent active:scale-95 shadow-md flex items-center justify-center gap-2"
-                    >
-                      <UtensilsCrossed className="w-4 h-4 opacity-70" />
-                      Bàn {tNum}
-                    </button>
-                  ))}
+                  {zone.tables.map((tEntry) => {
+                    const tId = typeof tEntry === 'string' ? tEntry : tEntry.id;
+                    const tLabel = typeof tEntry === 'string' ? `Bàn ${tEntry}` : tEntry.label;
+                    return (
+                      <button
+                        key={tId}
+                        type="button"
+                        onClick={() => handleSelectTable(tId)}
+                        className="py-3 px-4 rounded-xl font-display font-bold text-base text-center transition-all bg-white/[0.05] hover:bg-[var(--aura-chrome-mid)] hover:text-white border border-white/10 hover:border-transparent active:scale-95 shadow-md flex items-center justify-center gap-2"
+                      >
+                        <UtensilsCrossed className="w-4 h-4 opacity-70" />
+                        {tLabel}
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
             ))}
@@ -330,7 +388,7 @@ export function TableOrder(): ReactNode {
       {queuedOffline && <OfflineIndicator />}
 
       <StitchMobileOrderNew
-        items={AURA_VI_ORDER_ITEMS}
+        items={resolvedMenuItems}
         tableId={tableId}
         onViewCart={handleViewCart}
       />

@@ -14,6 +14,7 @@ import type {
 
 const VND_DENOMINATIONS = [500_000, 200_000, 100_000, 50_000, 20_000, 10_000, 5_000, 2_000, 1_000] as const;
 const MANAGER_ROLES = new Set(['owner', 'manager', 'supervisor', 'admin']);
+const CASH_DRAWER_ROLES = new Set(['owner', 'admin', 'manager', 'supervisor', 'cashier']);
 
 interface ReconciliationResponse {
   success: boolean;
@@ -86,6 +87,11 @@ export function ShiftHandoverModal({
   const [reconciliation, setReconciliation] = useState<ShiftReconciliationRecord | null>(null);
   const [reconciliationDisabled, setReconciliationDisabled] = useState(false);
   const [completedShift, setCompletedShift] = useState<ShiftRecord | null>(null);
+  const [confirmZeroCash, setConfirmZeroCash] = useState(false);
+  const [payouts, setPayouts] = useState<Array<{ id: string; amount: number; reason: string | null; created_at: string }>>([]);
+  const [payoutAmount, setPayoutAmount] = useState('');
+  const [payoutReason, setPayoutReason] = useState('');
+  const [payoutSubmitting, setPayoutSubmitting] = useState(false);
 
   const submittingRef = useRef(false);
 
@@ -122,17 +128,43 @@ export function ShiftHandoverModal({
     [counts],
   );
 
+  const activeReconRequestRef = useRef(0);
+  const isCashDrawerRole = CASH_DRAWER_ROLES.has(String(user?.role || '').toLowerCase());
+
+  const fetchShiftPayouts = useCallback(async (shiftId: string, requestId: number) => {
+    try {
+      const res = await apiFetch<{ success: boolean; data?: Array<{ id: string; amount: number; reason: string | null; created_at: string }> }>(
+        `/api/shifts/${encodeURIComponent(shiftId)}/payouts`,
+        { silent: true },
+      );
+      if (activeReconRequestRef.current !== requestId) return;
+      setPayouts(Array.isArray(res?.data) ? res.data : []);
+    } catch {
+      if (activeReconRequestRef.current !== requestId) return;
+      setPayouts([]);
+    }
+  }, []);
+
   const fetchExistingReconciliation = useCallback(async (shiftId: string) => {
+    const requestId = ++activeReconRequestRef.current;
     setReconciliation(null);
     setReconciliationDisabled(false);
+    setConfirmZeroCash(false);
+    setPayouts([]);
+    if (!isCashDrawerRole) {
+      return;
+    }
+    void fetchShiftPayouts(shiftId, requestId);
     try {
       const res = await apiFetch<ReconciliationResponse>(`/api/shifts/${encodeURIComponent(shiftId)}/reconciliation`, {
         silent: true,
       });
+      if (activeReconRequestRef.current !== requestId) return;
       if (res?.data) {
         setReconciliation(res.data);
       }
     } catch (err) {
+      if (activeReconRequestRef.current !== requestId) return;
       const info = getErrorInfo(err, '');
       if (info.status === 404) {
         return;
@@ -146,7 +178,7 @@ export function ShiftHandoverModal({
         setLoadError({ status: info.status, message: info.message || 'Không có quyền truy cập đối soát ca.' });
       }
     }
-  }, []);
+  }, [fetchShiftPayouts, isCashDrawerRole]);
 
   const loadShifts = useCallback(async () => {
     setLoading(true);
@@ -258,7 +290,7 @@ export function ShiftHandoverModal({
   };
 
   const performClockOut = async (shift: ShiftRecord): Promise<boolean> => {
-    const payload: Record<string, unknown> = { staff_id: shift.staff_id };
+    const payload: Record<string, unknown> = { staff_id: shift.staff_id, shift_id: shift.id };
     if (handoverNotes.trim()) payload.notes = handoverNotes.trim();
 
     const clockOutRes = await apiFetch<SingleShiftResponse>('/api/shifts/clock-out', {
@@ -273,8 +305,59 @@ export function ShiftHandoverModal({
     return false;
   };
 
-  const handleReconcileAndClockOut = async () => {
+  const handleClockOutOnly = async () => {
+    if (submittingRef.current || !selectedShift || completedShift) return;
+    submittingRef.current = true;
+    setSubmitting(true);
+    setActionError(null);
+    try {
+      await performClockOut(selectedShift);
+    } catch (err) {
+      const info = getErrorInfo(err, 'Kết ca thất bại. Vui lòng thử lại.');
+      setActionError(info.message);
+    } finally {
+      submittingRef.current = false;
+      setSubmitting(false);
+    }
+  };
+
+  const handleAddPayout = async () => {
+    if (!selectedShift || payoutSubmitting || reconciliation) return;
+    const amount = Number(payoutAmount);
+    const reason = payoutReason.trim();
+    if (!Number.isFinite(amount) || amount <= 0) {
+      setActionError('Số tiền chi phải lớn hơn 0.');
+      return;
+    }
+    if (!reason) {
+      setActionError('Vui lòng nhập lý do chi tiền mặt.');
+      return;
+    }
+    setPayoutSubmitting(true);
+    setActionError(null);
+    try {
+      await apiFetch(`/api/shifts/${encodeURIComponent(selectedShift.id)}/payouts`, {
+        method: 'POST',
+        body: JSON.stringify({ amount, reason }),
+      });
+      setPayoutAmount('');
+      setPayoutReason('');
+      await fetchShiftPayouts(selectedShift.id, activeReconRequestRef.current);
+    } catch (err) {
+      const info = getErrorInfo(err, 'Không thể ghi phiếu chi tiền mặt.');
+      setActionError(info.message);
+    } finally {
+      setPayoutSubmitting(false);
+    }
+  };
+
+  const handleReconcileAndClockOut = async (bypassZeroConfirm = false) => {
     if (submittingRef.current || !selectedShift || completedShift || reconciliationDisabled) return;
+    if (!reconciliation && countedTotal === 0 && !bypassZeroConfirm && !confirmZeroCash) {
+      setConfirmZeroCash(true);
+      return;
+    }
+    setConfirmZeroCash(false);
 
     submittingRef.current = true;
     setSubmitting(true);
@@ -569,7 +652,14 @@ export function ShiftHandoverModal({
                 </div>
               )}
 
-              {reconciliation ? (
+              {!isCashDrawerRole ? (
+                <div
+                  className="rounded-lg border border-border bg-background/50 p-3 text-xs text-muted"
+                  data-testid="non-cash-handover-notice"
+                >
+                  Vai trò hiện tại không giữ quỹ tiền mặt — bạn có thể chốt ca trực tiếp. / Non-cash role: clock out directly without cash drawer reconciliation.
+                </div>
+              ) : reconciliation ? (
                 <div className="rounded-lg border border-emerald-500/40 bg-emerald-500/10 p-3 space-y-2" data-testid="reconciliation-recorded">
                   <p className="text-xs font-semibold text-emerald-700">
                     Tiền mặt đã được đối soát / Cash Reconciled (ID: {reconciliation.id})
@@ -633,27 +723,116 @@ export function ShiftHandoverModal({
                   maxLength={500}
                   value={handoverNotes}
                   onChange={(e) => setHandoverNotes(e.target.value)}
-                  disabled={submitting || reconciliationDisabled}
+                  disabled={submitting}
                   placeholder="VD: Bàn giao quỹ ca chiều"
                   className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm"
                 />
               </div>
 
+              {isCashDrawerRole && !reconciliation && !reconciliationDisabled && (
+                <div className="space-y-2 rounded-lg border border-border bg-background p-3">
+                  <p className="text-xs font-medium text-muted">Phiếu chi tiền mặt trong ca / Cash Payouts</p>
+                  <div className="flex gap-2">
+                    <input
+                      type="number"
+                      min={1000}
+                      step={1000}
+                      placeholder="Số tiền (₫)"
+                      aria-label="Cash payout amount"
+                      value={payoutAmount}
+                      onChange={(e) => setPayoutAmount(e.target.value)}
+                      disabled={payoutSubmitting || submitting}
+                      className="w-32 rounded border border-border bg-surface px-2 py-1 text-xs"
+                    />
+                    <input
+                      type="text"
+                      maxLength={300}
+                      placeholder="Lý do (VD: mua đá, sữa)"
+                      aria-label="Cash payout reason"
+                      value={payoutReason}
+                      onChange={(e) => setPayoutReason(e.target.value)}
+                      disabled={payoutSubmitting || submitting}
+                      className="flex-1 rounded border border-border bg-surface px-2 py-1 text-xs"
+                    />
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      disabled={payoutSubmitting || submitting}
+                      onClick={() => void handleAddPayout()}
+                      data-testid="add-payout-btn"
+                    >
+                      {payoutSubmitting ? '...' : 'Ghi chi'}
+                    </Button>
+                  </div>
+                  {payouts.length > 0 && (
+                    <ul className="space-y-1 text-xs text-muted" data-testid="shift-payouts-list">
+                      {payouts.map((p) => (
+                        <li key={p.id} className="flex justify-between">
+                          <span>{p.reason || 'Chi tiền mặt'}</span>
+                          <strong className="text-foreground">-{formatVnd(p.amount)}</strong>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              )}
+
+              {confirmZeroCash && !reconciliation && !reconciliationDisabled && (
+                <div
+                  role="alert"
+                  data-testid="zero-cash-confirm-banner"
+                  className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-xs space-y-2"
+                >
+                  <p className="font-medium text-amber-700 dark:text-amber-300">
+                    Tổng tiền mặt đếm được đang là 0 ₫. Bạn có chắc chắn muốn chốt đối soát với 0 ₫ không?
+                  </p>
+                  <div className="flex justify-end gap-2">
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={() => setConfirmZeroCash(false)}
+                      disabled={submitting}
+                    >
+                      Kiểm tra lại
+                    </Button>
+                    <Button
+                      size="sm"
+                      onClick={() => void handleReconcileAndClockOut(true)}
+                      disabled={submitting}
+                      data-testid="confirm-zero-cash-btn"
+                    >
+                      Xác nhận 0 ₫ &amp; Kết ca
+                    </Button>
+                  </div>
+                </div>
+              )}
+
               <div className="flex justify-end gap-2 pt-2">
                 <Button variant="secondary" onClick={onClose} disabled={submitting}>
                   Hủy / Cancel
                 </Button>
-                <Button
-                  disabled={submitting || reconciliationDisabled}
-                  onClick={() => void handleReconcileAndClockOut()}
-                  data-testid="submit-handover-btn"
-                >
-                  {submitting
-                    ? 'Đang xử lý...'
-                    : reconciliation
-                      ? 'Hoàn tất kết ca / Complete Clock-Out'
-                      : 'Đối soát & Kết ca / Reconcile & End Shift'}
-                </Button>
+                {(!isCashDrawerRole || reconciliationDisabled) && (
+                  <Button
+                    disabled={submitting}
+                    onClick={() => void handleClockOutOnly()}
+                    data-testid="clock-out-only-btn"
+                  >
+                    {submitting ? 'Đang xử lý...' : 'Chốt ca không cần đối soát / Clock out only'}
+                  </Button>
+                )}
+                {isCashDrawerRole && (
+                  <Button
+                    disabled={submitting || reconciliationDisabled}
+                    onClick={() => void handleReconcileAndClockOut(false)}
+                    data-testid="submit-handover-btn"
+                  >
+                    {submitting
+                      ? 'Đang xử lý...'
+                      : reconciliation
+                        ? 'Hoàn tất kết ca / Complete Clock-Out'
+                        : 'Đối soát & Kết ca / Reconcile & End Shift'}
+                  </Button>
+                )}
               </div>
             </div>
           )}

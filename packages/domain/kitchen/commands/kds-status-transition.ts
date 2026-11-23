@@ -5,6 +5,7 @@
 
 import { transitionOrderStatus, type OrderStatusDb, type OrderStatusResult } from '../../order/policies/order-status-transition';
 import { releaseTableIfNoActiveOrders } from '../../order/policies/table-occupancy-release';
+import { restoreLoyaltyVoucherForOrder } from '../../order/loyalty-voucher';
 
 export type TransitionKdsResult = OrderStatusResult;
 export type KdsTransitionDb = OrderStatusDb;
@@ -195,7 +196,7 @@ export async function executeKdsStatusTransition(
               : null
           );
         let refundCustomerId = spendRow?.customer_id ? String(spendRow.customer_id).trim() : '';
-        let refundAmount = Number(spendRow?.amount ?? 0);
+        let refundAmount = Math.abs(Number(spendRow?.amount ?? 0));
         if (!refundCustomerId || !(refundAmount > 0)) {
           const ordSpend = ordRow ?? await rawDb
             .prepare("SELECT customer_id, cashback_used FROM orders WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?")
@@ -343,6 +344,7 @@ export async function executeKdsStatusTransition(
           }
         }
       }
+      await restoreLoyaltyVoucherForOrder(rawDb, orderId, effectiveCancelTenant).catch(() => {});
       const refRow = await rawDb
         .prepare("SELECT id FROM referrals WHERE first_order_id = ? AND status = 'completed' AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ? LIMIT 1")
         .bind(orderId, effectiveCancelTenant)

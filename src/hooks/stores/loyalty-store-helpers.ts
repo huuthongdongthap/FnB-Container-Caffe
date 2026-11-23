@@ -1,6 +1,14 @@
 /* ── Loyalty store helper functions ── */
 
-import { LOYALTY_KEY, type Reward, type PointsHistoryEntry, type StoredLoyalty, type LoyaltyTierLadderItem } from './loyalty-store-types';
+import {
+  LOYALTY_KEY,
+  type Reward,
+  type PointsHistoryEntry,
+  type StoredLoyalty,
+  type LoyaltyTierLadderItem,
+  type NextTierInfo,
+  type RedeemedVoucher,
+} from './loyalty-store-types';
 
 export function loadInitialLoyalty(): StoredLoyalty | null {
   try {
@@ -39,17 +47,63 @@ export function parseRewards(data: Record<string, unknown>[]): Reward[] {
   }));
 }
 
-export function parseLoyaltySummary(data: Record<string, unknown>): { tier: string; points: number; cashbackRate: number } {
+export function parseLoyaltySummary(data: Record<string, unknown>): {
+  tier: string;
+  points: number;
+  lifetimePoints: number;
+  cashbackRate: number;
+  cashbackBalance: number;
+  nextTier: NextTierInfo | null;
+} {
   const tier = (data.tier as string) || 'bronze';
   const points = Number(data.total_points ?? data.points ?? 0);
+  const lifetimePoints = Number(data.lifetime_points ?? data.total_points ?? data.points ?? 0);
   const tierConfig = data.tier_config as Record<string, unknown> | undefined;
+  const wallet = data.wallet as Record<string, unknown> | undefined;
+  const cashbackBalance = Number(wallet?.balance ?? data.cashback_balance ?? data.balance ?? 0);
   const rawRate = Number(
     (data.cashbackRate as number) ??
     (tierConfig?.cashback_rate as number) ??
     3
   );
   const cashbackRate = rawRate > 0 && rawRate < 1 ? Math.round(rawRate * 100) : rawRate;
-  return { tier, points, cashbackRate };
+  const rawNext = data.next_tier as Record<string, unknown> | null | undefined;
+  const nextTier: NextTierInfo | null = rawNext && typeof rawNext === 'object'
+    ? {
+        tier_name: String(rawNext.tier_name ?? rawNext.tier ?? ''),
+        display_name_vi: String(rawNext.display_name_vi ?? rawNext.tier_name ?? ''),
+        min_points: Number(rawNext.min_points ?? 0),
+        points_needed: Number(rawNext.points_needed ?? 0),
+      }
+    : null;
+  return { tier, points, lifetimePoints, cashbackRate, cashbackBalance, nextTier };
+}
+
+export function parseMyRewards(data: Record<string, unknown>[]): RedeemedVoucher[] {
+  const now = Date.now();
+  return data
+    .map((row) => {
+      const code = String(row.code ?? row.voucher_code ?? row.voucherCode ?? '').trim();
+      const expiresAt = row.expires_at ? String(row.expires_at) : row.expiresAt ? String(row.expiresAt) : null;
+      const rawStatus = String(row.status ?? 'active').toLowerCase();
+      let status: 'active' | 'used' | 'expired' =
+        rawStatus === 'used' ? 'used' : rawStatus === 'expired' ? 'expired' : 'active';
+      if (status === 'active' && expiresAt && new Date(expiresAt).getTime() < now) {
+        status = 'expired';
+      }
+      return {
+        id: String(row.id ?? code),
+        rewardId: String(row.reward_id ?? row.rewardId ?? ''),
+        code,
+        title: String(row.title ?? row.reward ?? row.name ?? code),
+        status,
+        expiresAt,
+        createdAt: row.created_at ? String(row.created_at) : null,
+        discountType: row.discount_type ? String(row.discount_type) : undefined,
+        discountValue: row.discount_value !== undefined ? Number(row.discount_value) : undefined,
+      };
+    })
+    .filter((v) => Boolean(v.code));
 }
 
 export function parseTierLadder(data: Record<string, unknown>[], currentTier: string): LoyaltyTierLadderItem[] {

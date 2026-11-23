@@ -323,7 +323,7 @@ export async function reconcileShiftCash(
     if (actorRole !== undefined && actor.role !== actorRole) {
       throw new ShiftContractError('Forbidden cross-tenant or inactive reconciliation actor', 403);
     }
-    if (!['staff', 'cashier', 'waiter', 'supervisor', 'manager', 'owner', 'admin'].includes(effectiveActorRole) ||
+    if (!['staff', 'cashier', 'waiter', 'barista', 'chef', 'kitchen', 'shipper', 'supervisor', 'manager', 'owner', 'admin'].includes(effectiveActorRole) ||
         (shiftWindow.staff_id !== staffId && !['supervisor', 'manager', 'owner', 'admin'].includes(effectiveActorRole))) {
       throw new ShiftContractError('Forbidden reconciliation actor', 403);
     }
@@ -336,7 +336,7 @@ export async function reconcileShiftCash(
     if (actor.is_active !== 1 || (actorRole !== undefined && actor.role !== actorRole)) {
       throw new ShiftContractError('Forbidden cross-tenant or inactive reconciliation actor', 403);
     }
-    if (!['staff', 'cashier', 'waiter', 'supervisor', 'manager', 'owner', 'admin'].includes(actor.role)) {
+    if (!['staff', 'cashier', 'waiter', 'barista', 'chef', 'kitchen', 'shipper', 'supervisor', 'manager', 'owner', 'admin'].includes(actor.role)) {
       throw new ShiftContractError('Forbidden reconciliation actor', 403);
     }
     const actorTenant = (actor.tenant_id?.trim() || 'default').toLowerCase();
@@ -521,11 +521,45 @@ export async function reconcileShiftCash(
 export async function getReconciliationForShift(
   env: Env | D1Database,
   shiftId: string,
-  tenantId?: string
+  tenantId?: string,
+  actor?: { id: string; role: string }
 ): Promise<ShiftReconciliation | null> {
   const db = (env as Env)?.AURA_DB ?? (env as D1Database);
   const rawTenant = tenantId && tenantId.trim() ? tenantId.trim() : 'default';
   const normTenant = rawTenant === 'hq' ? '*' : rawTenant;
+
+  if (actor) {
+    const effectiveRole = await requireActiveActor(db, actor.id, actor.role, normTenant);
+    if (!SHIFT_MANAGER_ROLES.has(effectiveRole)) {
+      let shiftOwner: { staff_id?: string | null } | null = null;
+      let hasShiftsTable = true;
+      try {
+        shiftOwner = normTenant === '*'
+          ? await db
+              .prepare('SELECT staff_id FROM staff_shifts WHERE CAST(id AS TEXT) = ? LIMIT 1')
+              .bind(String(shiftId))
+              .first<{ staff_id?: string | null }>()
+          : await db
+              .prepare(
+                "SELECT staff_id FROM staff_shifts WHERE CAST(id AS TEXT) = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ? LIMIT 1"
+              )
+              .bind(String(shiftId), normTenant)
+              .first<{ staff_id?: string | null }>();
+      } catch (err) {
+        if (/no such table:.*staff_shifts/i.test(String(err))) {
+          hasShiftsTable = false;
+        } else {
+          throw err;
+        }
+      }
+      if (hasShiftsTable) {
+        if (!shiftOwner) return null;
+        if (String(shiftOwner.staff_id || '') !== String(actor.id || '')) {
+          throw new ShiftContractError('Forbidden: cannot view reconciliation for another staff member shift', 403);
+        }
+      }
+    }
+  }
 
   let row: Record<string, unknown> | null = null;
   if (normTenant !== '*') {
@@ -567,5 +601,345 @@ export async function getReconciliationForShift(
     denominations: typeof row.denominations === 'string'
       ? JSON.parse(row.denominations)
       : row.denominations as ShiftReconciliation['denominations'],
+  };
+}
+
+export interface ShiftCashPayout {
+  id: string;
+  tenant_id: string;
+  shift_id: string;
+  amount: number;
+  reason: string | null;
+  status: string;
+  created_by: string | null;
+  created_at: string;
+}
+
+const CASH_ASSIGN_ROLES = new Set(['owner', 'manager', 'supervisor', 'admin', 'cashier']);
+const PAYOUT_ROLES = new Set(['owner', 'manager', 'supervisor', 'admin', 'cashier', 'staff', 'waiter']);
+const SHIFT_MANAGER_ROLES = new Set(['owner', 'manager', 'supervisor', 'admin']);
+const MAX_ASSIGN_PAYMENT_IDS = 100;
+const MAX_PAYOUT_AMOUNT_VND = 100_000_000;
+
+function normalizeScopeTenant(tenantId: string): string {
+  const trimmed = tenantId.trim();
+  return trimmed.toLowerCase() === 'hq' ? '*' : (trimmed || 'default');
+}
+
+async function requireActiveActor(
+  db: D1Database,
+  actorId: string,
+  expectedRole: string,
+  targetTenant: string,
+  allowedRoles?: Set<string>,
+): Promise<string> {
+  if (!actorId.trim()) {
+    throw new ShiftContractError('Forbidden: actor identity required', 403);
+  }
+  let actor: { is_active?: number | null; role?: string | null; tenant_id?: string | null } | null = null;
+  let hasUsersTable = true;
+  try {
+    actor = await db
+      .prepare('SELECT is_active, role, tenant_id FROM users WHERE id = ? LIMIT 1')
+      .bind(actorId)
+      .first<{ is_active?: number | null; role?: string | null; tenant_id?: string | null }>();
+  } catch (err) {
+    if (err instanceof ShiftContractError) throw err;
+    if (/no such table:.*users/i.test(String(err))) {
+      hasUsersTable = false;
+    } else {
+      throw err;
+    }
+  }
+  if (!hasUsersTable) {
+    if (allowedRoles && !allowedRoles.has(expectedRole)) {
+      throw new ShiftContractError('Forbidden: insufficient role', 403);
+    }
+    return expectedRole;
+  }
+  if (!actor || Number(actor.is_active) !== 1 || typeof actor.role !== 'string' || !actor.role.trim()) {
+    throw new ShiftContractError('Forbidden: inactive or unknown staff account', 403);
+  }
+  const dbRole = actor.role.trim();
+  if (expectedRole && dbRole !== expectedRole) {
+    throw new ShiftContractError('Forbidden: actor role mismatch', 403);
+  }
+  if (allowedRoles && !allowedRoles.has(dbRole)) {
+    throw new ShiftContractError('Forbidden: insufficient role', 403);
+  }
+  const normalizedTargetTenant = normalizeScopeTenant(targetTenant);
+  const actorTenantRaw = (actor.tenant_id?.trim() || 'default');
+  const actorTenantLower = actorTenantRaw.toLowerCase();
+  const isHqActor =
+    (dbRole === 'owner' || dbRole === 'admin') && (actorTenantLower === 'hq' || actorTenantLower === '*');
+  if (!isHqActor && (normalizedTargetTenant === '*' || actorTenantRaw !== normalizedTargetTenant)) {
+    throw new ShiftContractError('Forbidden: cross-tenant actor', 403);
+  }
+  return dbRole;
+}
+
+async function requireUnreconciledShiftInTenant(
+  db: D1Database,
+  shiftId: string,
+  tenantId: string,
+): Promise<{ id: string; tenant: string; clock_in: string; clock_out: string | null; staff_id: string | null }> {
+  const normTenant = normalizeScopeTenant(tenantId);
+  const shift = normTenant === '*'
+    ? await db.prepare('SELECT id, tenant_id, clock_in, clock_out, staff_id, attendance_state FROM staff_shifts WHERE id = ? LIMIT 1')
+        .bind(shiftId)
+        .first<{ id: string | number; tenant_id?: string | null; clock_in: string | null; clock_out: string | null; staff_id?: string | null; attendance_state?: string | null }>()
+    : await db.prepare(
+        "SELECT id, tenant_id, clock_in, clock_out, staff_id, attendance_state FROM staff_shifts WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ? LIMIT 1"
+      )
+        .bind(shiftId, normTenant)
+        .first<{ id: string | number; tenant_id?: string | null; clock_in: string | null; clock_out: string | null; staff_id?: string | null; attendance_state?: string | null }>();
+  if (!shift) {
+    throw new ShiftContractError('Shift not found', 404);
+  }
+  if (!shift.clock_in || String(shift.attendance_state || '').toLowerCase() === 'cancelled') {
+    throw new ShiftContractError(`Shift ${shiftId} is not active or has been cancelled`, 409);
+  }
+  const effectiveTenant = (typeof shift.tenant_id === 'string' && shift.tenant_id.trim()) || (normTenant === '*' ? 'default' : normTenant);
+  const existingRecon = await db.prepare(
+    "SELECT id FROM shift_reconciliations WHERE shift_id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ? LIMIT 1"
+  ).bind(String(shift.id), effectiveTenant).first();
+  if (existingRecon) {
+    throw new ShiftContractError(`Shift ${shiftId} has already been reconciled`, 409);
+  }
+  return {
+    id: String(shift.id),
+    tenant: effectiveTenant,
+    clock_in: shift.clock_in,
+    clock_out: shift.clock_out,
+    staff_id: shift.staff_id ? String(shift.staff_id) : null,
+  };
+}
+
+export async function assignCashPaymentsToShift(
+  env: Env | D1Database,
+  shiftId: string,
+  paymentIds: string[],
+  actorId: string,
+  tenantId: string,
+  actorRole: string,
+): Promise<{ shift_id: string; assigned_count: number; payment_ids: string[] }> {
+  if (!CASH_ASSIGN_ROLES.has(actorRole)) {
+    throw new ShiftContractError('Forbidden: insufficient role to assign cash payments', 403);
+  }
+  const db = (env as Env)?.AURA_DB ?? (env as D1Database);
+  const normTenant = normalizeScopeTenant(tenantId);
+  const effectiveRole = await requireActiveActor(db, actorId, actorRole, normTenant, CASH_ASSIGN_ROLES);
+  const shift = await requireUnreconciledShiftInTenant(db, shiftId, tenantId);
+  const isManager = SHIFT_MANAGER_ROLES.has(effectiveRole);
+  if (!isManager && shift.staff_id !== actorId) {
+    throw new ShiftContractError('Forbidden: cannot assign cash payments to another staff member shift', 403);
+  }
+  const cleanIds = Array.from(new Set(paymentIds.map((id) => String(id).trim()).filter(Boolean)));
+  if (cleanIds.length === 0) {
+    throw new ShiftContractError('payment_ids must be a non-empty array', 400);
+  }
+  if (cleanIds.length > MAX_ASSIGN_PAYMENT_IDS) {
+    throw new ShiftContractError(`payment_ids cannot exceed ${MAX_ASSIGN_PAYMENT_IDS} items`, 400);
+  }
+
+  const now = new Date().toISOString();
+  const validated: Array<{ id: string; settledAt: string }> = [];
+  for (const paymentId of cleanIds) {
+    const payment = await db.prepare(
+      `SELECT id, updated_at, created_at FROM payments
+       WHERE id = ? AND method IN ('cash', 'cod') AND status = 'completed'
+         AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?
+       LIMIT 1`
+    ).bind(paymentId, shift.tenant).first<{ id: string; updated_at?: string | null; created_at?: string | null }>();
+    if (!payment) {
+      throw new ShiftContractError(`Completed cash payment ${paymentId} not found in tenant`, 404);
+    }
+
+    const existingAttr = await db.prepare(
+      `SELECT a.shift_id, s.staff_id, r.id AS recon_id
+       FROM cash_payment_attributions a
+       LEFT JOIN staff_shifts s ON CAST(s.id AS TEXT) = a.shift_id
+         AND COALESCE(NULLIF(TRIM(s.tenant_id), ''), 'default') = ?
+       LEFT JOIN shift_reconciliations r ON r.shift_id = a.shift_id
+         AND COALESCE(NULLIF(TRIM(r.tenant_id), ''), 'default') = ?
+       WHERE a.payment_id = ? AND COALESCE(NULLIF(TRIM(a.tenant_id), ''), 'default') = ?
+       LIMIT 1`
+    ).bind(shift.tenant, shift.tenant, payment.id, shift.tenant).first<{
+      shift_id: string;
+      staff_id?: string | null;
+      recon_id?: string | null;
+    }>();
+
+    if (existingAttr) {
+      if (existingAttr.recon_id) {
+        throw new ShiftContractError(`Payment ${payment.id} is already attributed to a reconciled shift`, 409);
+      }
+      if (!isManager && existingAttr.shift_id !== shift.id && existingAttr.staff_id !== actorId) {
+        throw new ShiftContractError(`Forbidden: payment ${payment.id} is already attributed to another staff member shift`, 403);
+      }
+    }
+
+    validated.push({ id: payment.id, settledAt: payment.updated_at || payment.created_at || now });
+  }
+
+  // Guard attribution writes atomically in SQL against concurrent reconciliation of either
+  // the target shift or any shift currently holding the payment.
+  const statements = validated.map((item) =>
+    db.prepare(
+      `INSERT INTO cash_payment_attributions (payment_id, tenant_id, shift_id, collected_by, settled_at)
+       SELECT ?, ?, ?, ?, ?
+       WHERE NOT EXISTS (
+         SELECT 1 FROM shift_reconciliations
+         WHERE shift_id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?
+       )
+       AND NOT EXISTS (
+         SELECT 1 FROM cash_payment_attributions a
+         JOIN shift_reconciliations r
+           ON r.shift_id = a.shift_id
+           AND COALESCE(NULLIF(TRIM(r.tenant_id), ''), 'default') = COALESCE(NULLIF(TRIM(a.tenant_id), ''), 'default')
+         WHERE a.payment_id = ?
+           AND COALESCE(NULLIF(TRIM(a.tenant_id), ''), 'default') = ?
+       )
+       ON CONFLICT(payment_id) DO UPDATE SET
+         shift_id = excluded.shift_id,
+         collected_by = excluded.collected_by
+       WHERE NOT EXISTS (
+         SELECT 1 FROM shift_reconciliations
+         WHERE shift_id = cash_payment_attributions.shift_id
+           AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = COALESCE(NULLIF(TRIM(cash_payment_attributions.tenant_id), ''), 'default')
+       )
+       AND NOT EXISTS (
+         SELECT 1 FROM shift_reconciliations
+         WHERE shift_id = excluded.shift_id
+           AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = COALESCE(NULLIF(TRIM(excluded.tenant_id), ''), 'default')
+       )`
+    ).bind(
+      item.id, shift.tenant, shift.id, actorId, item.settledAt,
+      shift.id, shift.tenant,
+      item.id, shift.tenant,
+    )
+  );
+
+  const writeResults: Array<{ meta?: { changes?: number }; changes?: number } | null | undefined> = [];
+  if (typeof db.batch === 'function') {
+    const batchRes = await db.batch(statements);
+    if (Array.isArray(batchRes)) {
+      writeResults.push(...(batchRes as Array<{ meta?: { changes?: number }; changes?: number }>));
+    }
+  } else {
+    for (const stmt of statements) {
+      writeResults.push((await stmt.run()) as { meta?: { changes?: number }; changes?: number });
+    }
+  }
+
+  for (let i = 0; i < writeResults.length; i++) {
+    const res = writeResults[i];
+    const changes = res?.meta?.changes ?? res?.changes;
+    if (changes !== undefined && Number(changes) === 0) {
+      throw new ShiftContractError(
+        `Payment ${validated[i]?.id ?? ''} or shift ${shift.id} was reconciled concurrently; refresh and retry`,
+        409
+      );
+    }
+  }
+
+  return {
+    shift_id: shift.id,
+    assigned_count: validated.length,
+    payment_ids: validated.map((v) => v.id),
+  };
+}
+
+export async function listShiftCashPayouts(
+  env: Env | D1Database,
+  shiftId: string,
+  tenantId: string,
+  actorId: string,
+  actorRole: string,
+): Promise<ShiftCashPayout[]> {
+  const db = (env as Env)?.AURA_DB ?? (env as D1Database);
+  const normTenant = normalizeScopeTenant(tenantId);
+  const effectiveRole = await requireActiveActor(db, actorId, actorRole, normTenant);
+  const shift = normTenant === '*'
+    ? await db.prepare('SELECT id, tenant_id, staff_id FROM staff_shifts WHERE id = ? LIMIT 1')
+        .bind(shiftId).first<{ id: string | number; tenant_id?: string | null; staff_id?: string | null }>()
+    : await db.prepare(
+        "SELECT id, tenant_id, staff_id FROM staff_shifts WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ? LIMIT 1"
+      ).bind(shiftId, normTenant).first<{ id: string | number; tenant_id?: string | null; staff_id?: string | null }>();
+  if (!shift) {
+    throw new ShiftContractError('Shift not found', 404);
+  }
+  if (!SHIFT_MANAGER_ROLES.has(effectiveRole) && String(shift.staff_id || '') !== String(actorId || '')) {
+    throw new ShiftContractError('Forbidden: cannot view cash payouts for another staff member shift', 403);
+  }
+  const effectiveTenant = (typeof shift.tenant_id === 'string' && shift.tenant_id.trim()) || (normTenant === '*' ? 'default' : normTenant);
+  const res = await db.prepare(
+    `SELECT id, tenant_id, shift_id, amount, reason, status, created_by, created_at
+     FROM cash_payouts
+     WHERE shift_id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?
+     ORDER BY created_at DESC`
+  ).bind(String(shift.id), effectiveTenant).all<ShiftCashPayout>();
+  return res.results || [];
+}
+
+export async function createShiftCashPayout(
+  env: Env | D1Database,
+  shiftId: string,
+  input: { amount: number; reason: string },
+  actorId: string,
+  tenantId: string,
+  actorRole: string,
+): Promise<ShiftCashPayout> {
+  if (!PAYOUT_ROLES.has(actorRole)) {
+    throw new ShiftContractError('Forbidden: insufficient role to record cash payout', 403);
+  }
+  if (!Number.isInteger(input.amount) || input.amount <= 0 || input.amount > MAX_PAYOUT_AMOUNT_VND) {
+    throw new ShiftContractError(`Payout amount must be a positive integer VND amount (max ${MAX_PAYOUT_AMOUNT_VND})`, 400);
+  }
+  const reason = String(input.reason || '').trim();
+  if (!reason || reason.length > 300) {
+    throw new ShiftContractError('Payout reason is required (max 300 characters)', 400);
+  }
+  const db = (env as Env)?.AURA_DB ?? (env as D1Database);
+  const normTenant = normalizeScopeTenant(tenantId);
+  const effectiveRole = await requireActiveActor(db, actorId, actorRole, normTenant, PAYOUT_ROLES);
+  const shift = await requireUnreconciledShiftInTenant(db, shiftId, tenantId);
+  const isManager = SHIFT_MANAGER_ROLES.has(effectiveRole);
+  if (!isManager && shift.staff_id !== actorId) {
+    throw new ShiftContractError('Forbidden: cannot record payout for another staff member shift', 403);
+  }
+
+  const id = `payout_${crypto.randomUUID()}`;
+  const createdAt = new Date().toISOString();
+  await db.prepare(
+    `INSERT INTO cash_payouts (id, tenant_id, shift_id, amount, reason, status, created_by, created_at)
+     VALUES (?, ?, ?, ?, ?, 'completed', ?, ?)`
+  ).bind(id, shift.tenant, shift.id, input.amount, reason, actorId, createdAt).run();
+
+  try {
+    await db.prepare(
+      `INSERT INTO audit_logs (id, tenant_id, user_id, action, entity_type, entity_id, details, created_at)
+       VALUES (?, ?, ?, 'shift_cash_payout_created', 'cash_payout', ?, ?, ?)`
+    ).bind(
+      `audit_${crypto.randomUUID()}`,
+      shift.tenant,
+      actorId,
+      id,
+      JSON.stringify({ shift_id: shift.id, amount: input.amount, reason }),
+      createdAt,
+    ).run();
+  } catch {
+    // Non-fatal when lightweight test schemas omit audit_logs
+  }
+
+  return {
+    id,
+    tenant_id: shift.tenant,
+    shift_id: shift.id,
+    amount: input.amount,
+    reason,
+    status: 'completed',
+    created_by: actorId,
+    created_at: createdAt,
   };
 }

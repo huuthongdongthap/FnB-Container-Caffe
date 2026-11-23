@@ -94,7 +94,7 @@ export function OrderSummaryCard({
                 className="text-sm italic text-[var(--aura-chrome-soft)]"
                 style={{ fontFamily: "var(--aura-font-display)" }}
               >
-                {formatFn(item.price)}
+                {formatFn(item.price * item.quantity)}
               </span>
             </div>
           ))

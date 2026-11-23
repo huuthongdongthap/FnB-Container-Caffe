@@ -114,6 +114,10 @@ export function projectCustomerOrderPayload(
     table = { id: tableId, name: tableName };
   }
 
+  const discountAmount = Number(order.discount_amount ?? order.discountAmount ?? order.discount ?? 0);
+  const totalAmount = Number(order.total_amount ?? order.total ?? order.totalAmount ?? 0);
+  const subtotal = Number(order.subtotal ?? (totalAmount + discountAmount));
+
   return {
     id: String(order.id || ''),
     orderNumber: String(order.order_number || order.orderNumber || order.id || ''),
@@ -124,10 +128,10 @@ export function projectCustomerOrderPayload(
     channel: String(order.order_type || order.channel || 'dine_in'),
     table,
     items,
-    subtotal: Number(order.subtotal ?? 0),
-    discountAmount: Number(order.discount_amount ?? order.discountAmount ?? 0),
+    subtotal,
+    discountAmount,
     taxAmount: Number(order.tax_amount ?? order.taxAmount ?? 0),
-    totalAmount: Number(order.total_amount ?? order.total ?? order.totalAmount ?? 0),
+    totalAmount,
     notes: typeof order.notes === 'string' ? order.notes : null,
     createdAt: String(order.created_at || order.createdAt || new Date().toISOString()),
     updatedAt: String(order.updated_at || order.updatedAt || order.created_at || new Date().toISOString()),

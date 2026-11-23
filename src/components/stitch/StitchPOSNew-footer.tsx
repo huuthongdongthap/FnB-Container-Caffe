@@ -20,7 +20,7 @@ export function POSFooter({
   return (
     <footer
       className={cn(
-        'fixed bottom-0 left-0 right-0 bg-[rgba(var(--aura-noir-void),0.9)] border-t border-[rgba(var(--aura-chrome-light),0.08)] flex justify-start items-center gap-5 px-6 h-14 z-50',
+        'fixed bottom-0 left-0 right-0 bg-[rgba(var(--aura-noir-void),0.9)] border-t border-[rgba(var(--aura-chrome-light),0.08)] flex justify-start items-center gap-5 px-6 h-14 z-30',
         'lg:right-96'
       )}
       role="contentinfo"
@@ -33,19 +33,21 @@ export function POSFooter({
       </div>
       <div className="h-5 w-px bg-[rgba(var(--aura-chrome-light),0.15)]" aria-hidden="true" />
       <nav className="flex items-center gap-3" aria-label={t('posNew.footerNav')}>
-        <button
-         type="button"
-          onClick={() => onOpenDrawer?.()}
-          className="text-[var(--aura-text-muted, #8a7a6a)] px-5 py-1.5 min-h-[36px] border border-[rgba(var(--aura-chrome-light),0.15)] rounded-full text-[11px] hover:border-[rgba(var(--aura-chrome-light),0.4)] hover:text-[var(--aura-text-primary, #eae1db)] transition-all active:scale-95 font-body"
-          aria-label={t('posNew.openDrawer')}
-        >
-          <LogOut className="w-3.5 h-3.5 inline mr-1.5" />
-          {t('posNew.openDrawer')}
-        </button>
+        {onOpenDrawer && (
+          <button
+            type="button"
+            onClick={() => onOpenDrawer()}
+            className="text-[var(--aura-text-muted, #8a7a6a)] px-5 py-1.5 min-h-[36px] border border-[rgba(var(--aura-chrome-light),0.15)] rounded-full text-[11px] hover:border-[rgba(var(--aura-chrome-light),0.4)] hover:text-[var(--aura-text-primary, #eae1db)] transition-all active:scale-95 font-body cursor-pointer"
+            aria-label={t('posNew.openDrawer')}
+          >
+            <LogOut className="w-3.5 h-3.5 inline mr-1.5" />
+            {t('posNew.openDrawer')}
+          </button>
+        )}
         <button
          type="button"
           onClick={() => (onPrintReceipt ? onPrintReceipt() : window.print())}
-          className="text-[var(--aura-text-muted, #8a7a6a)] px-5 py-1.5 min-h-[36px] border border-[rgba(var(--aura-chrome-light),0.15)] rounded-full text-[11px] hover:border-[rgba(var(--aura-chrome-light),0.4)] hover:text-[var(--aura-text-primary, #eae1db)] transition-all active:scale-95 font-body"
+          className="text-[var(--aura-text-muted, #8a7a6a)] px-5 py-1.5 min-h-[36px] border border-[rgba(var(--aura-chrome-light),0.15)] rounded-full text-[11px] hover:border-[rgba(var(--aura-chrome-light),0.4)] hover:text-[var(--aura-text-primary, #eae1db)] transition-all active:scale-95 font-body cursor-pointer"
           aria-label={t('posNew.printReceipt')}
         >
           <Printer className="w-3.5 h-3.5 inline mr-1.5" />
@@ -53,8 +55,8 @@ export function POSFooter({
         </button>
         <button
          type="button"
-          onClick={() => (onEndShift ? onEndShift() : window.location.assign('/admin/shifts'))}
-          className="bg-[var(--aura-primary, #f2c08d)] text-[var(--aura-noir-void, #1a1008)] font-bold px-5 py-1.5 min-h-[36px] rounded-full text-[11px] active:scale-95 font-body"
+          onClick={() => (onEndShift ? onEndShift() : window.location.assign('/admin/staff'))}
+          className="bg-[var(--aura-primary, #f2c08d)] text-[var(--aura-noir-void, #1a1008)] font-bold px-5 py-1.5 min-h-[36px] rounded-full text-[11px] active:scale-95 font-body cursor-pointer"
           aria-label={t('posNew.endShift')}
         >
           <Receipt className="w-3.5 h-3.5 inline mr-1.5" />
