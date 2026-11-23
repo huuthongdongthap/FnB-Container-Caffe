@@ -1,13 +1,15 @@
-# Pre-Flight Checklist — Lượt 9 (`v2.3.0` Store Operations & Multi-Tenant Hardening)
+# Pre-Flight Checklist — Production Deploy `main` (`27a04144`)
 
-- [x] `npm run lint` — 0 warnings / 0 errors
-- [x] `npm run lint:migrations` — 60 forward / 18 down in `worker/db/migrations` (87 forward total)
-- [x] `npm run check:contrast` — 11/11 MD3 token pairs pass WCAG AA
-- [x] `npm run typecheck:all` — 0 TypeScript errors across frontend, worker, and aura-deploy
-- [x] `npx vitest run` — 577 test files / 5,763 tests passing
-- [x] `node scripts/local-payment-flow/run.mjs --api-only` — 58/58 live loopback assertions passing
-- [x] `npm run build` — production SPA bundle built in `dist/`
-- [x] **Pre-Migration Remote D1 Backup:** Exported `fnb-caffe-db` (`97ae7a5f-fc4d-460d-b019-8535332bd81f`, 834 KB) to `/tmp/fnb-caffe-db-pre-luot9-20261118T095443Z.sql`
-- [x] **Remote D1 Migrations Applied:** `20261030_02` delta + `20261115_01_tenant_unique_constraints_and_indexes.sql` + `20261118_01_orders_loyalty_points_redeemed.sql` (recorded in `schema_migrations`)
-- [x] **Cloudflare Pages Deployed:** `https://5cfde7a7.fnb-caffe-container.pages.dev` → `https://auraspace.cafe` (`shortSha: 8bbc93c8`)
-- [x] **Cloudflare Worker Deployed:** `aura-space-worker` Version ID `c53c7d97-69c6-48c4-8924-1cd30705e417` (`shortSha: 8bbc93c8`)
+- [x] **Target Ref:** `origin/main` = `27a041441fd41c73dcede0794be609021404ca1f` (includes PR `#145` UAT `#111`–`#138` integrity hardening + PR `#146` Playwright pre-existing spec fixes)
+- [x] **Repo Hygiene:** `0` open PRs, `0` open issues, clean working tree in detached HEAD at exact `origin/main` (`HEAD == origin/main == origin/HEAD`)
+- [x] **Hosted CI (`main` run `45137756849` on `27a04144`):** `lint-and-test=SUCCESS`, `e2e-smoke=SUCCESS`
+- [x] **Cloudflare Auth & Account:** OAuth active (`b69fee03bdd94234eea8e4114cfc36ab`), Worker secrets intact (`JWT_SECRET`, `PAYOS_API_KEY`, `PAYOS_CHECKSUM_KEY`, `PAYOS_CLIENT_ID`, `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`; flagship `PAYOS_*` isolated from SaaS billing)
+- [x] **D1 Schema Parity (`fnb-caffe-db` / `97ae7a5f-fc4d-460d-b019-8535332bd81f`):**
+  - `git diff --name-only 37e9b80b..origin/main -- worker/db/migrations/ worker/migrations/ worker/wrangler.toml` = empty (0 new migrations)
+  - Verified remote D1 DDL contains `cash_payouts` (with `tenant_id`), `cash_payment_attributions`, `cashback_transactions` (with `balance_after`, `tenant_id`), `idx_reconciliation_tenant_shift_unique`, `orders.cashback_used`, `orders.loyalty_points_redeemed`, `payment_refund_transfers`, `refund_loyalty_work`, `refund_mutation_guards`, `refund_tenant_readiness`
+  - Fail-closed default applied: `0` remote D1 migrations executed
+- [x] **Rollback Handles Captured Pre-Deploy:**
+  - Previous Worker Version ID: `44babe91-1e5f-42fd-b3cb-a6590b0c74fb` (`37e9b80b`)
+  - Previous Pages Deployment ID: `32a30b2e-f0f8-41f7-907e-1fe8f4b5608e` (`37e9b80`)
+- [x] **Cloudflare Pages Deployed:** `dc5dc3b5-9bb3-4deb-b709-be7dcd978d31` (`https://dc5dc3b5.fnb-caffe-container.pages.dev` → `https://auraspace.cafe`, `shortSha: 27a04144`)
+- [x] **Cloudflare Worker Deployed:** `aura-space-worker` Version ID `97385200-3bd6-474d-83ee-9965ab819070` (`shortSha: 27a04144`, 100% traffic)

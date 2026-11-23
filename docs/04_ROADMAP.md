@@ -15,6 +15,19 @@ status: stable
 
 ---
 
+## UAT End-to-End Hardening & Production Rollout — 2026-11-23
+
+**Status:** Deployed to production (`main` `27a04144`, PRs `#108`–`#146` merged, post-merge CI `45137756849` green).
+
+- Consolidated 6-flow UAT hardening across orders, tables, shifts, loyalty, KDS, POS, and Playwright smoke specs (`#108`–`#146`), including cancel refunds, voucher ownership checks, table occupancy guards, shift payout/reconciliation actor & tenant boundaries, customer spend query hardening, and pre-existing Playwright spec alignment.
+- **Production rollout (2026-11-23, 0 D1 migrations):**
+  - Cloudflare Worker `aura-space-worker`: deployed `97385200-3bd6-474d-83ee-9965ab819070` (`27a04144`, 100% traffic; rollback baseline `44babe91-1e5f-42fd-b3cb-a6590b0c74fb` / `37e9b80b`).
+  - Cloudflare Pages `fnb-caffe-container` (`https://auraspace.cafe`): deployed `dc5dc3b5-9bb3-4deb-b709-be7dcd978d31` (`27a04144`; rollback baseline `32a30b2e-f0f8-41f7-907e-1fe8f4b5608e` / `37e9b80b`).
+  - Live read-only smoke passed across `/api/health`, `/api/health?ready=1` (D1 latency `24ms`), `/api/version`, `/version.json`, `/api/products`, `/api/tables`, unauthenticated `401` guards, and SPA/static routes.
+- **Remaining operational gates:** Witnessed shop UAT at Aura Café and explicit operator attestation in `refund_tenant_readiness` for `'default'` (currently fail-closed with 0 rows); SaaS commercial secrets (`TENANT_SECRETS_KEY`, dedicated `SAAS_PAYOS_*`) and wildcard DNS (`*.auraspace.cafe`) remain deferred until SaaS activation phase.
+
+---
+
 ## Financial integrity & issues remediation — 2026-11-22
 
 **Status:** Deployed to production (`main` `37e9b80b`, PR `#106` merged, PRs `#103`/`#105` closed, issues `#79`, `#82`, `#90`–`#102` closed, post-merge CI `44981478525` green).

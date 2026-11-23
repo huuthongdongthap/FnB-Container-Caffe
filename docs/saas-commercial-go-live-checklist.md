@@ -2,7 +2,7 @@
 
 Runbook triển khai thực tế để đưa **AURA SaaS Commercial Edition v3 / v3.1** lên Cloudflare Workers + D1 + Pages (Staging → Production) mà **không ảnh hưởng đến quán flagship `default` (AURA SPACE Sa Đéc)**.
 
-> **Trạng thái hiện tại (2026-11-22):** Schema `20261119_02_saas_commercial_v3.sql` cùng bộ code `main` (`37e9b80b`, PR `#106`) đã được triển khai lên Production (`fnb-caffe-db`, Worker `44babe91`, Pages `32a30b2e`, issues `#79`/`#82` đã đóng) với chế độ cô lập hoàn toàn cho quán flagship `'default'`. **Không chạy lại `20261119_02_saas_commercial_v3.sql` trên Production D1.** Các bước kích hoạt SaaS thương mại còn lại (nạp secrets `TENANT_SECRETS_KEY` và `SAAS_PAYOS_*` tách biệt hoàn toàn với `PAYOS_*`, cấu hình DNS wildcard `*.auraspace.cafe`, onboard tenant pilot) hiện đang hoãn theo chủ trương ưu tiên vận hành quán Aura Café trước.
+> **Trạng thái hiện tại (2026-11-23):** Schema `20261119_02_saas_commercial_v3.sql` (áp dụng 2026-11-22) cùng bộ code `main` mới nhất (`27a04144`, PR `#108`–`#146`) đã được triển khai lên Production (`fnb-caffe-db`, Worker `97385200`, Pages `dc5dc3b5`, 0 D1 migrations mới, issues `#79`/`#82` đã đóng) với chế độ cô lập hoàn toàn cho quán flagship `'default'`. **Không chạy lại `20261119_02_saas_commercial_v3.sql` trên Production D1.** Các bước kích hoạt SaaS thương mại còn lại (nạp secrets `TENANT_SECRETS_KEY` và `SAAS_PAYOS_*` tách biệt hoàn toàn với `PAYOS_*`, cấu hình DNS wildcard `*.auraspace.cafe`, onboard tenant pilot) hiện đang hoãn theo chủ trương ưu tiên vận hành quán Aura Café trước.
 
 ---
 
@@ -37,7 +37,7 @@ cd worker
 npx wrangler d1 export fnb-caffe-db --remote --output=../backups/d1-pre-saas-v3-$(date +%Y%m%d-%H%M%S).sql
 ```
 
-### Bước 2.2 — Apply Migration (Fail-Closed Runner — Chưa chạy Production)
+### Bước 2.2 — Apply Migration (Fail-Closed Runner — Đã chạy Production 2026-11-22)
 
 `worker/scripts/apply-migrations.sh` bắt buộc truyền `--file` tường minh (chặn glob, `--all`, `.down.sql`) và dừng ngay (`break` + exit non-zero) khi một file remote migration lỗi. `worker/wrangler.toml` bind D1 `fnb-caffe-db`, còn `.github/workflows/deploy.yml` (`action: apply-d1-migration`, `migration_file: 20261119_02_saas_commercial_v3.sql`) yêu cầu duyệt tay environment `production` sau khi export backup.
 

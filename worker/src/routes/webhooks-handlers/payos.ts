@@ -1,5 +1,11 @@
 import type { Hono, Context } from 'hono';
-import { publishOrderEvent } from '@aura/domain-order';
+import {
+  dispatchOrderBroadcast,
+  normalizeBroadcastTotal,
+  parseBroadcastItems,
+  parseBroadcastTimestamp,
+  publishOrderEvent,
+} from '@aura/domain-order';
 import { getDatabase } from '../../lib/db';
 import { payosWebhookSchema } from '../../lib/validators';
 import { createMetricsCollector } from '../../lib/metrics-collector';
@@ -283,52 +289,24 @@ export async function handlePayosWebhook(
         }
         if (c.env.ORDER_BROADCASTER) {
           try {
-            const ns = c.env.ORDER_BROADCASTER;
             const doChannel =
               settledOrderTenant !== 'default'
                 ? `${settledOrderTenant}:${payment.order_id}`
                 : payment.order_id;
-            const stub = ns.get(ns.idFromName(doChannel));
-            let parsedItems: unknown[] = [];
-            if (Array.isArray(effectiveOrderRecord.items)) {
-              parsedItems = effectiveOrderRecord.items;
-            } else if (typeof effectiveOrderRecord.items === 'string') {
-              try {
-                parsedItems = JSON.parse(effectiveOrderRecord.items) as unknown[];
-              } catch {
-                parsedItems = [];
-              }
-            }
             const eventPayload = {
               orderId: payment.order_id,
               status: String(effectiveOrderRecord.status || 'pending'),
               payment_status: 'paid',
-              items: parsedItems,
-              total: Number(effectiveOrderRecord.total ?? effectiveOrderRecord.total_amount ?? payment.amount ?? 0),
+              items: parseBroadcastItems(effectiveOrderRecord.items),
+              total: normalizeBroadcastTotal(effectiveOrderRecord.total ?? effectiveOrderRecord.total_amount ?? payment.amount ?? 0),
               customer_name: String(effectiveOrderRecord.customer_name ?? ''),
               customer_phone: String(effectiveOrderRecord.customer_phone ?? ''),
               table_id: effectiveOrderRecord.table_id ? String(effectiveOrderRecord.table_id) : null,
               ...(settledOrderTenant !== 'default' ? { tenant_id: settledOrderTenant } : {}),
-              createdAt: effectiveOrderRecord.created_at
-                ? new Date(String(effectiveOrderRecord.created_at)).getTime()
-                : Date.now(),
+              createdAt: parseBroadcastTimestamp(effectiveOrderRecord.created_at),
               updatedAt: Date.now(),
             };
-            const rpcStub = stub as unknown as {
-              broadcast?: (msg: unknown) => Promise<void>;
-              fetch?: (input: RequestInfo, init?: RequestInit) => Promise<Response>;
-            };
-            const doPromise =
-              typeof rpcStub.broadcast === 'function'
-                ? rpcStub.broadcast(eventPayload)
-                : typeof rpcStub.fetch === 'function'
-                  ? rpcStub.fetch('https://do/broadcast', {
-                      method: 'POST',
-                      headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify(eventPayload),
-                    })
-                  : Promise.resolve();
-            safeWaitUntil(c, Promise.resolve(doPromise));
+            safeWaitUntil(c, dispatchOrderBroadcast(c.env.ORDER_BROADCASTER, doChannel, eventPayload));
           } catch {
             /* Non-blocking realtime broadcast */
           }

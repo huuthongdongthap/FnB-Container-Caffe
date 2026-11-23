@@ -15,6 +15,13 @@ export { buildOrderFilterClause, buildOrderTail } from './queries/shared-listing
 export type { OrderSortColumn, OrderListOptions } from './queries/shared-listing';
 export { getLatestOrderTimestamp } from './queries/latest-timestamp';
 // policies
+export {
+  dispatchOrderBroadcast,
+  parseBroadcastItems,
+  parseBroadcastTimestamp,
+  normalizeBroadcastTotal,
+} from './policies/order-broadcast';
+export type { OrderBroadcasterNamespaceLike, OrderBroadcasterStubLike } from './policies/order-broadcast';
 export { creditLoyaltyIfEligible } from './policies/loyalty-trigger';
 export { restoreLoyaltyVoucherForOrder } from './loyalty-voucher';
 export { releaseTableIfNoActiveOrders } from './policies/table-occupancy-release';

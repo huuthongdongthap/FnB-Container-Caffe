@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { usePosCustomerLookup, type POSCustomer } from '@/hooks/use-pos-customer';
 import { Search, X, UserCheck } from 'lucide-react';
@@ -37,10 +37,18 @@ export function CustomerLookup({
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<POSCustomer[]>([]);
   const lookupMutation = usePosCustomerLookup();
+  const { mutate: lookupCustomer } = lookupMutation;
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const searchSeqRef = useRef(0);
+  const onCustomerFoundRef = useRef(onCustomerFound);
+  const onClearCustomerRef = useRef(onClearCustomer);
 
-  const runSearch = (raw: string, autoSelectSingle: boolean) => {
+  useEffect(() => {
+    onCustomerFoundRef.current = onCustomerFound;
+    onClearCustomerRef.current = onClearCustomer;
+  }, [onCustomerFound, onClearCustomer]);
+
+  const runSearch = useCallback((raw: string, autoSelectSingle: boolean) => {
     const trimmed = raw.trim();
     if (trimmed.length < 2) {
       searchSeqRef.current += 1;
@@ -48,14 +56,14 @@ export function CustomerLookup({
       return;
     }
     const seq = ++searchSeqRef.current;
-    lookupMutation.mutate(trimmed, {
+    lookupCustomer(trimmed, {
       onSuccess: (res) => {
         if (seq !== searchSeqRef.current) return;
         if (Array.isArray(res.customers) && res.customers.length > 0) {
           const singleMatch = res.customers[0];
           if (autoSelectSingle && res.customers.length === 1 && singleMatch) {
             setResults([]);
-            onCustomerFound?.(singleMatch);
+            onCustomerFoundRef.current?.(singleMatch);
           } else {
             setResults(res.customers);
           }
@@ -63,16 +71,16 @@ export function CustomerLookup({
         }
         if (res.found && res.customer) {
           setResults([]);
-          onCustomerFound?.(res.customer);
+          onCustomerFoundRef.current?.(res.customer);
         } else {
           setResults([]);
           if (autoSelectSingle) {
-            onClearCustomer?.();
+            onClearCustomerRef.current?.();
           }
         }
       },
     });
-  };
+  }, [lookupCustomer]);
 
   useEffect(() => {
     if (customer) return;
@@ -88,8 +96,7 @@ export function CustomerLookup({
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [query, customer]);
+  }, [query, customer, runSearch]);
 
   const handleLookup = () => {
     if (debounceRef.current) clearTimeout(debounceRef.current);

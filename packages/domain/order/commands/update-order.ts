@@ -9,6 +9,12 @@ import { parseJSON } from '../model/helpers';
 import { isTerminal } from '../model/order-state-machine';
 import { transitionOrderStatus, changedRows } from '../policies/order-status-transition';
 import { releaseTableIfNoActiveOrders } from '../policies/table-occupancy-release';
+import {
+  dispatchOrderBroadcast,
+  normalizeBroadcastTotal,
+  parseBroadcastItems,
+  parseBroadcastTimestamp,
+} from '../policies/order-broadcast';
 import { restoreLoyaltyVoucherForOrder } from '../loyalty-voucher';
 import type { ErpnextEnv } from 'worker/src/clients/erpnext-client';
 import type { WorkerEnv } from 'worker/src/clients/erpnext-accounting-client';
@@ -155,52 +161,31 @@ export async function updateOrder(
       (body.status !== undefined || body.notes !== undefined || body.delivery_time !== undefined) &&
       (env as Record<string, unknown>).ORDER_BROADCASTER
     ) {
-      const ns = (env as Record<string, unknown>).ORDER_BROADCASTER as import('@cloudflare/workers-types').DurableObjectNamespace;
       const row = results[0];
       const doTenant = effectiveEventTenant;
       const doChannel = doTenant !== 'default' ? `${doTenant}:${id}` : id;
-      const stub = ns.get(ns.idFromName(doChannel));
-      let items: unknown = [];
-      if (typeof row.items === 'string') {
-        try {
-          items = JSON.parse(row.items);
-        } catch {
-          items = [];
-        }
-      } else {
-        items = row.items ?? [];
-      }
       const eventPayload = {
         orderId: id,
         status: String(body.status ?? currentStatus),
         payment_status: String(row.payment_status ?? 'unpaid'),
-        items,
-        total: Number(row.total ?? 0),
+        items: parseBroadcastItems(row.items),
+        total: normalizeBroadcastTotal(row.total),
         customer_name: String(row.customer_name ?? ''),
         customer_phone: String(row.customer_phone ?? ''),
         table_id: row.table_id ? String(row.table_id) : null,
         ...(body.notes !== undefined ? { notes: body.notes } : row.notes !== undefined ? { notes: row.notes } : {}),
         ...(body.delivery_time !== undefined ? { delivery_time: body.delivery_time } : {}),
         ...(doTenant !== 'default' ? { tenant_id: doTenant } : {}),
-        createdAt: row.created_at ? new Date(row.created_at as string).getTime() : Date.now(),
+        createdAt: parseBroadcastTimestamp(row.created_at),
         updatedAt: Date.now(),
       };
-      const doTask = (async () => {
-        try {
-          const rpcStub = stub as unknown as { broadcast?: (msg: unknown) => Promise<void>; fetch?: (input: RequestInfo, init?: RequestInit) => Promise<Response> };
-          if (typeof rpcStub.broadcast === 'function') {
-            await rpcStub.broadcast(eventPayload);
-          } else if (typeof rpcStub.fetch === 'function') {
-            await rpcStub.fetch('https://do/broadcast', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify(eventPayload),
-            });
-          }
-        } catch (e) {
-          log.warn('DO broadcast error (non-blocking):', { message: (e as Error).message, orderId: id });
-        }
-      })();
+      const doTask = dispatchOrderBroadcast(
+        (env as Record<string, unknown>).ORDER_BROADCASTER,
+        doChannel,
+        eventPayload,
+      ).catch((e) => {
+        log.warn('DO broadcast error (non-blocking):', { message: (e as Error).message, orderId: id });
+      });
       const execCtx = env.executionCtx as { waitUntil?: (p: Promise<unknown>) => void } | undefined;
       try {
         if (execCtx?.waitUntil) execCtx.waitUntil(doTask);

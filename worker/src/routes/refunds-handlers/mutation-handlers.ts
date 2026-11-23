@@ -9,6 +9,12 @@ import {
   verifyPaymentOrderToken,
 } from '../../../../packages/domain/payment/policies/payment-access';
 import { publishOrderEvent } from '../../../../packages/domain/order/policies/customer-order-payload';
+import {
+  dispatchOrderBroadcast,
+  normalizeBroadcastTotal,
+  parseBroadcastItems,
+  parseBroadcastTimestamp,
+} from '../../../../packages/domain/order/policies/order-broadcast';
 import type { Env } from '../../types/env';
 import { processRefundLoyalty } from './loyalty-work';
 import { log, refundRequestSchema, ERRORS } from './helpers';
@@ -228,10 +234,26 @@ export async function handleRefund(c: Context<{ Bindings: Env }>, openApi = fals
         throw failure;
       }
 
+      type PostRefundOrderRow = {
+        status?: string | null;
+        payment_status?: string | null;
+        items?: string | unknown[] | null;
+        total?: number | null;
+        customer_name?: string | null;
+        customer_phone?: string | null;
+        table_id?: string | null;
+        created_at?: string | null;
+      };
       const postRefundOrder = await db
-        .prepare('SELECT status, payment_status FROM orders WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), \'\'), \'default\') = ? LIMIT 1')
+        .prepare('SELECT status, payment_status, items, total, customer_name, customer_phone, table_id, created_at FROM orders WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), \'\'), \'default\') = ? LIMIT 1')
         .bind(payment.order_id, effectivePaymentTenant)
-        .first<{ status?: string | null; payment_status?: string | null }>();
+        .first<PostRefundOrderRow>()
+        .catch(() =>
+          db
+            .prepare('SELECT status, payment_status FROM orders WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), \'\'), \'default\') = ? LIMIT 1')
+            .bind(payment.order_id, effectivePaymentTenant)
+            .first<PostRefundOrderRow>(),
+        );
       const effectiveOrderStatus = String(postRefundOrder?.status || 'pending');
       const effectiveOrderPayStatus = String(postRefundOrder?.payment_status || 'paid');
 
@@ -248,20 +270,23 @@ export async function handleRefund(c: Context<{ Bindings: Env }>, openApi = fals
 
       if (c.env?.ORDER_BROADCASTER) {
         try {
-          const ns = c.env.ORDER_BROADCASTER;
           const doChannel = effectivePaymentTenant !== 'default'
             ? `${effectivePaymentTenant}:${payment.order_id}` : payment.order_id;
-          const stub = ns.get(ns.idFromName(doChannel)) as unknown as {
-            broadcast?: (msg: unknown) => Promise<void>;
-            fetch?: (input: RequestInfo, init?: RequestInit) => Promise<Response>;
+          const payload = {
+            orderId: payment.order_id,
+            status: effectiveOrderStatus,
+            payment_status: effectiveOrderPayStatus,
+            refund_status: refundStatus,
+            items: parseBroadcastItems(postRefundOrder?.items),
+            total: normalizeBroadcastTotal(postRefundOrder?.total ?? payment.amount ?? 0),
+            customer_name: String(postRefundOrder?.customer_name ?? ''),
+            customer_phone: String(postRefundOrder?.customer_phone ?? ''),
+            table_id: postRefundOrder?.table_id ? String(postRefundOrder.table_id) : null,
+            ...(effectivePaymentTenant !== 'default' ? { tenant_id: effectivePaymentTenant } : {}),
+            createdAt: parseBroadcastTimestamp(postRefundOrder?.created_at),
+            updatedAt: Date.now(),
           };
-          const payload = { orderId: payment.order_id, status: effectiveOrderStatus,
-            payment_status: effectiveOrderPayStatus, refund_status: refundStatus,
-            ...(effectivePaymentTenant !== 'default' ? { tenant_id: effectivePaymentTenant } : {}), updatedAt: Date.now() };
-          if (typeof stub.broadcast === 'function') await stub.broadcast(payload);
-          else if (typeof stub.fetch === 'function') await stub.fetch('https://do/broadcast', {
-            method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload),
-          });
+          await dispatchOrderBroadcast(c.env.ORDER_BROADCASTER, doChannel, payload);
         } catch { /* Non-blocking broadcaster notification */ }
       }
 
