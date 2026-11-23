@@ -140,6 +140,12 @@ export async function createOrder(
         }
         const actorRole = String(actor?.role ?? '').trim().toLowerCase();
         const isStaffActor = ['staff', 'cashier', 'waiter', 'barista', 'supervisor', 'manager', 'admin', 'owner'].includes(actorRole);
+        if (
+          (ownership.resolvedVia === 'staff_override' || ownership.resolvedVia === 'deterministic_identifier') &&
+          !isStaffActor
+        ) {
+          return errorResponse('Không có quyền sử dụng mã voucher thay cho khách hàng', 403);
+        }
         const voucherCheck = validateLoyaltyVoucher(loyaltyVoucher, {
           customerId: resolvedCustomerId,
           allowStaffOverride: isStaffActor,
@@ -316,6 +322,14 @@ export async function createOrder(
       if (!resolvedCustomerId) {
         await rollbackPreOrderReservations();
         return errorResponse('Cần xác định tài khoản khách hàng thành viên để đổi điểm thưởng', 400);
+      }
+      if (ownership.resolvedVia === 'staff_override' || ownership.resolvedVia === 'deterministic_identifier') {
+        const pointsActorRole = String(actor?.role ?? '').trim().toLowerCase();
+        const allowedPointsStaffRoles = ['staff', 'cashier', 'waiter', 'barista', 'supervisor', 'manager', 'admin', 'owner'];
+        if (!allowedPointsStaffRoles.includes(pointsActorRole)) {
+          await rollbackPreOrderReservations();
+          return errorResponse('Không có quyền đổi điểm thưởng thay cho khách hàng', 403);
+        }
       }
       const remainingPayable = Math.max(0, snapshot.subtotal - snapshot.discount);
       const maxSubtotalRedeemVnd = Math.floor(snapshot.subtotal * 0.5);

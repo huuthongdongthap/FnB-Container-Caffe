@@ -1,3 +1,4 @@
+// @vitest-environment node
 import fs from 'node:fs';
 import path from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
@@ -235,5 +236,126 @@ describe('Cashback wallet, voucher rollback, and promo IDOR integration (#121, #
     const body = await res.json() as { success: boolean; data: { valid: boolean } };
     expect(body.success).toBe(true);
     expect(body.data.valid).toBe(false);
+  });
+
+  it('rejects unauthenticated guest redeeming another customer voucher or points via phone lookup (403)', async () => {
+    const { d1, raw } = createSqliteD1();
+    const now = '2026-11-23T05:00:00.000Z';
+
+    raw.prepare(
+      `INSERT INTO categories (id, name, slug, tenant_id, created_at)
+       VALUES ('cat-sec', 'Coffee', 'coffee-sec', 'default', ?)`
+    ).run(now);
+
+    raw.prepare(
+      `INSERT INTO products (id, name, price, category_id, is_available, tenant_id, created_at, updated_at)
+       VALUES ('prod-sec', 'Americano', 50000, 'cat-sec', 1, 'default', ?, ?)`
+    ).run(now, now);
+
+    raw.prepare(
+      `INSERT INTO customers (id, name, phone, loyalty_points, loyalty_tier, tenant_id, created_at, updated_at)
+       VALUES ('cust-sec', 'Victim Member', '0905556666', 500, 'gold', 'default', ?, ?)`
+    ).run(now, now);
+
+    raw.prepare(
+      `INSERT INTO rewards (id, title, point_cost, discount_type, discount_value, min_order, is_active, tenant_id, created_at)
+       VALUES ('rew-sec', 'Giảm 15k', 50, 'fixed', 15000, 0, 1, 'default', ?)`
+    ).run(now);
+
+    raw.prepare(
+      `INSERT INTO user_rewards (id, customer_id, reward_id, code, status, expires_at, tenant_id, created_at)
+       VALUES ('ur-sec', 'cust-sec', 'rew-sec', 'VCH-SEC-ONLY', 'active', '2099-12-31T23:59:59.000Z', 'default', ?)`
+    ).run(now);
+
+    // 1. Non-POS staff (kitchen) with staff_override attempting to use customer's voucher -> 403
+    const voucherReq = new Request('http://localhost/api/orders', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        customer_id: 'cust-sec',
+        customer_name: 'Victim Member',
+        customer_phone: '0905556666',
+        customer_address: '123 Sa Đéc',
+        payment_method: 'cod',
+        total: 35000,
+        items: [{ id: 'prod-sec', name: 'Americano', price: 50000, quantity: 1 }],
+        promo_code: 'VCH-SEC-ONLY',
+      }),
+    });
+    const voucherRes = await createOrder(
+      voucherReq,
+      { AURA_DB: d1 },
+      undefined,
+      { id: 'kitchen-1', role: 'kitchen' },
+    );
+    expect(voucherRes.status).toBe(403);
+    const vRow = raw.prepare('SELECT status FROM user_rewards WHERE id = ?').get('ur-sec') as { status: string };
+    expect(vRow.status).toBe('active');
+
+    // 2. Non-POS staff (kitchen) with staff_override attempting to redeem customer's loyalty points -> 403
+    const pointsReq = new Request('http://localhost/api/orders', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        customer_id: 'cust-sec',
+        customer_name: 'Victim Member',
+        customer_phone: '0905556666',
+        customer_address: '123 Sa Đéc',
+        payment_method: 'cod',
+        total: 40000,
+        items: [{ id: 'prod-sec', name: 'Americano', price: 50000, quantity: 1 }],
+        redeem_points: 100,
+      }),
+    });
+    const pointsRes = await createOrder(
+      pointsReq,
+      { AURA_DB: d1 },
+      undefined,
+      { id: 'kitchen-1', role: 'kitchen' },
+    );
+    expect(pointsRes.status).toBe(403);
+    const cRow = raw.prepare('SELECT loyalty_points FROM customers WHERE id = ?').get('cust-sec') as { loyalty_points: number };
+    expect(cRow.loyalty_points).toBe(500);
+
+    // 3. Unauthenticated guest with victim's phone cannot redeem voucher or points either
+    const guestVoucherRes = await createOrder(
+      new Request('http://localhost/api/orders', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          customer_name: 'Guest Attacker',
+          customer_phone: '0905556666',
+          customer_address: '123 Sa Đéc',
+          payment_method: 'cod',
+          total: 35000,
+          items: [{ id: 'prod-sec', name: 'Americano', price: 50000, quantity: 1 }],
+          promo_code: 'VCH-SEC-ONLY',
+        }),
+      }),
+      { AURA_DB: d1 },
+    );
+    expect([400, 403]).toContain(guestVoucherRes.status);
+    const vRowAfterGuest = raw.prepare('SELECT status FROM user_rewards WHERE id = ?').get('ur-sec') as { status: string };
+    expect(vRowAfterGuest.status).toBe('active');
+
+    const guestPointsRes = await createOrder(
+      new Request('http://localhost/api/orders', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          customer_name: 'Guest Attacker',
+          customer_phone: '0905556666',
+          customer_address: '123 Sa Đéc',
+          payment_method: 'cod',
+          total: 40000,
+          items: [{ id: 'prod-sec', name: 'Americano', price: 50000, quantity: 1 }],
+          redeem_points: 100,
+        }),
+      }),
+      { AURA_DB: d1 },
+    );
+    expect([400, 403]).toContain(guestPointsRes.status);
+    const cRowAfterGuest = raw.prepare('SELECT loyalty_points FROM customers WHERE id = ?').get('cust-sec') as { loyalty_points: number };
+    expect(cRowAfterGuest.loyalty_points).toBe(500);
   });
 });
