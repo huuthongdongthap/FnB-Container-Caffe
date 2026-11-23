@@ -88,6 +88,76 @@ async function releaseTableSessionsAndOrder(db: any, tableId: string, effectiveT
   }
 }
 
+function vietnamTodayIso(now = new Date()): string {
+  return new Date(now.getTime() + 7 * 3_600_000).toISOString().slice(0, 10);
+}
+
+/**
+ * Release tables stuck in `Reserved` when no active reservation exists for today or later.
+ * Enforces tenant isolation (`tenant_id`) on every query, guards writes with a fast read probe,
+ * and falls back to legacy `reservations.date` when `reservation_date` is absent.
+ */
+export async function releaseStaleReservedTables(db: D1Database, tenantId: string): Promise<void> {
+  try {
+    const scopedTenant = tenantId && tenantId !== '*' ? tenantId : '';
+    const tenantFilter = scopedTenant
+      ? "AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
+      : '';
+    const probeBinds = scopedTenant ? [scopedTenant] : [];
+    const hasReserved = await db
+      .prepare(
+        `SELECT 1 AS found FROM cafe_tables
+         WHERE LOWER(TRIM(COALESCE(status, ''))) = 'reserved'
+           ${tenantFilter}
+         LIMIT 1`
+      )
+      .bind(...probeBinds)
+      .first<{ found: number }>();
+
+    if (!hasReserved) return;
+
+    const today = vietnamTodayIso();
+    const subTenantFilter = scopedTenant
+      ? "AND COALESCE(NULLIF(TRIM(r.tenant_id), ''), 'default') = ?"
+      : "AND COALESCE(NULLIF(TRIM(r.tenant_id), ''), 'default') = COALESCE(NULLIF(TRIM(cafe_tables.tenant_id), ''), 'default')";
+    const updateBinds: string[] = [today];
+    if (scopedTenant) {
+      updateBinds.push(scopedTenant, scopedTenant);
+    }
+
+    const buildUpdateSql = (dateExpr: string) =>
+      `UPDATE cafe_tables
+       SET status = 'Available'
+       WHERE LOWER(TRIM(COALESCE(status, ''))) = 'reserved'
+         AND id NOT IN (
+           SELECT DISTINCT r.table_id
+           FROM reservations r
+           WHERE r.table_id IS NOT NULL
+             AND TRIM(r.table_id) != ''
+             AND LOWER(TRIM(COALESCE(r.status, ''))) IN ('pending', 'confirmed', 'approved', 'checked_in', 'seated')
+             AND DATE(${dateExpr}) >= DATE(?)
+             ${subTenantFilter}
+         )
+         ${tenantFilter}`;
+
+    try {
+      await db
+        .prepare(buildUpdateSql("COALESCE(NULLIF(TRIM(r.reservation_date), ''), r.date, '')"))
+        .bind(...updateBinds)
+        .run();
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      if (/no such column.*reservation_date/i.test(msg)) {
+        await db.prepare(buildUpdateSql("COALESCE(r.date, '')")).bind(...updateBinds).run();
+      } else if (/no such column.*\bdate\b/i.test(msg)) {
+        await db.prepare(buildUpdateSql("COALESCE(r.reservation_date, '')")).bind(...updateBinds).run();
+      }
+    }
+  } catch {
+    // reservations table or columns may be absent in minimal test schemas
+  }
+}
+
 export function registerTableCrudHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
   // GET /api/tables - List tables with pagination and filtering
   app.openapi(TableRoutes.list as any, async (c: any) => {
@@ -95,6 +165,7 @@ export function registerTableCrudHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
     if (!tenantCheck.ok) return tenantCheck.response;
     const db = getDatabase(c);
     const tenantId = tenantCheck.tenantId;
+    await releaseStaleReservedTables(db, tenantId);
     const query = c.req.valid('query');
     const { page: rawPage = 1, limit: rawLimit = 20, sort = 'name', order = 'asc', zoneId, status, capacity, locationId, search } = query;
     const page = Math.max(1, Number(rawPage) || 1);

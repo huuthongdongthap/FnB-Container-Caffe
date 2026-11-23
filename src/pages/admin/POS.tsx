@@ -10,7 +10,8 @@
  */
 'use client';
 
-import { useState, useCallback, useRef, useEffect } from 'react';
+import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import QRCode from 'qrcode';
 import type { POSCustomer } from '@/hooks/use-pos-customer';
 import { useTranslation } from 'react-i18next';
@@ -19,18 +20,35 @@ import { useMenu } from '@/hooks/use-menu';
 import { useCheckout, useProcessPayOS } from '@/hooks/use-checkout';
 import { useOfflineSync } from '@/hooks/use-offline-sync';
 import { useAuthStore } from '@/hooks/stores/use-auth-store';
+import { apiFetch } from '@/lib/api-client';
 import { CheckCircle2, AlertCircle, X, ExternalLink } from 'lucide-react';
 import type { PaymentMethod } from '@/lib/validators';
 import { brandConfig } from '@/config/brand-types';
 import { StitchPOSNew } from '@/components/stitch/StitchPOSNew';
 import { ShiftHandoverModal } from '@/components/admin/ShiftHandoverModal';
-import type { POSNewMenuItem, POSNewCartItem, POSNewAddOn } from '@/components/stitch/StitchPOSNew-types';
+import type {
+  POSNewMenuItem,
+  POSNewCartItem,
+  POSTableOption,
+  POSActiveShift,
+} from '@/components/stitch/StitchPOSNew-types';
+import type { TodayResponse } from '@/hooks/stores/admin/admin-shifts-store-types';
 
-const VND_POS_ADDONS: POSNewAddOn[] = [
-  { id: 'a1', name: 'Oat Milk', price: 10000 },
-  { id: 'a2', name: 'Double Shot', price: 15000 },
-  { id: 'a3', name: 'Vanilla Bean', price: 10000 },
-];
+interface CategoryApiRow {
+  id: string;
+  name: string;
+}
+
+interface TableApiRow {
+  id: string;
+  name?: string;
+  code?: string;
+  table_number?: number;
+  status?: string;
+  capacity?: number;
+  seats?: number;
+  zone?: string;
+}
 
 function sanitizePaymentUrl(rawUrl: string | undefined | null): string | null {
   if (!rawUrl || typeof rawUrl !== 'string') return null;
@@ -59,15 +77,88 @@ export default function AdminPOSPage() {
   const checkoutMutation = useCheckout();
   const payOSMutation = useProcessPayOS();
   const { quarantinedCount } = useOfflineSync();
-  const activeTenant = useAuthStore((s) => s.user?.tenantId) || 'default';
+  const user = useAuthStore((s) => s.user);
+  const activeTenant = user?.tenantId || 'default';
   const sessionVersion = useAuthStore((s) => s.sessionVersion);
+  const queryClient = useQueryClient();
   const { t } = useTranslation();
   const navigate = useNavigate();
+
+  const { data: categoriesRes } = useQuery<{ success?: boolean; data?: CategoryApiRow[]; categories?: CategoryApiRow[] }>({
+    queryKey: ['pos-categories', activeTenant, sessionVersion],
+    queryFn: () => apiFetch('/api/categories', { silent: true }),
+    staleTime: 60_000,
+  });
+
+  const { data: tablesRes } = useQuery<{ success?: boolean; data?: TableApiRow[]; tables?: TableApiRow[] }>({
+    queryKey: ['pos-tables', activeTenant, sessionVersion],
+    queryFn: () => apiFetch('/api/tables?limit=100', { silent: true }),
+    staleTime: 15_000,
+  });
+
+  const { data: todayShiftsRes, refetch: refetchShifts } = useQuery<TodayResponse>({
+    queryKey: ['pos-today-shifts', activeTenant, user?.id, sessionVersion],
+    queryFn: () => apiFetch('/api/shifts/today', { silent: true }),
+    staleTime: 15_000,
+  });
+
+  const categoryLabels = useMemo<Record<string, string>>(() => {
+    const rows = Array.isArray(categoriesRes?.data)
+      ? categoriesRes.data
+      : Array.isArray(categoriesRes?.categories)
+        ? categoriesRes.categories
+        : [];
+    const map: Record<string, string> = {};
+    for (const row of rows) {
+      if (row?.id && row?.name) {
+        map[row.id] = row.name;
+      }
+    }
+    return map;
+  }, [categoriesRes]);
+
+  const tables = useMemo<POSTableOption[]>(() => {
+    const rows = Array.isArray(tablesRes?.data)
+      ? tablesRes.data
+      : Array.isArray(tablesRes?.tables)
+        ? tablesRes.tables
+        : [];
+    return rows.map((row) => ({
+      id: row.id,
+      name: row.name || (row.table_number ? `Bàn ${row.table_number}` : row.code || row.id),
+      code: row.code,
+      status: row.status || 'Available',
+      capacity: row.capacity ?? row.seats,
+      zone: row.zone,
+    }));
+  }, [tablesRes]);
+
+  const activeShift = useMemo<POSActiveShift | null>(() => {
+    const shifts = Array.isArray(todayShiftsRes?.data) ? todayShiftsRes.data : [];
+    const openShifts = shifts.filter((s) => Boolean(s.clock_in) && !s.clock_out);
+    const mine = user?.id ? openShifts.find((s) => s.staff_id === user.id) : undefined;
+    const chosen = mine ?? openShifts[0];
+    if (!chosen) return null;
+    const clockInHour = chosen.clock_in ? new Date(chosen.clock_in).getHours() : NaN;
+    const derivedShiftName = Number.isFinite(clockInHour)
+      ? clockInHour < 12
+        ? 'Ca sáng'
+        : clockInHour < 18
+          ? 'Ca chiều'
+          : 'Ca tối'
+      : 'Ca làm việc';
+    return {
+      id: chosen.id,
+      shiftName: derivedShiftName,
+      clockIn: chosen.clock_in,
+      staffName: chosen.staff_name,
+    };
+  }, [todayShiftsRes, user?.id]);
 
   /* ── Local State ──────────────────────────────────────────────────── */
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('payos');
   const [customer, setCustomer] = useState<POSCustomer | null>(null);
-  const [selectedTableId, _setSelectedTableId] = useState<string | undefined>(undefined);
+  const [selectedTableId, setSelectedTableId] = useState<string | undefined>(undefined);
   const [checkoutSuccess, setCheckoutSuccess] = useState(false);
   const [shiftHandoverOpen, setShiftHandoverOpen] = useState(false);
   const [checkoutError, setCheckoutError] = useState<string | null>(null);
@@ -79,7 +170,7 @@ export default function AdminPOSPage() {
 
   useEffect(() => {
     setCustomer(null);
-    _setSelectedTableId(undefined);
+    setSelectedTableId(undefined);
     setPaymentUrl(null);
     setPaymentQrDataUrl(null);
     setCheckoutError(null);
@@ -197,7 +288,10 @@ export default function AdminPOSPage() {
           }
 
           setCustomer(null);
-          _setSelectedTableId(undefined);
+          setSelectedTableId(undefined);
+          if (resolvedTableId) {
+            void queryClient.invalidateQueries({ queryKey: ['pos-tables'] });
+          }
           setCheckoutSuccess(true);
           if (successTimerRef.current) {
             clearTimeout(successTimerRef.current);
@@ -223,7 +317,7 @@ export default function AdminPOSPage() {
         setIsCompleting(false);
       }
     },
-    [paymentMethod, checkoutMutation.mutateAsync, payOSMutation.mutateAsync, customer, selectedTableId, t, navigate],
+    [paymentMethod, checkoutMutation.mutateAsync, payOSMutation.mutateAsync, customer, selectedTableId, queryClient, t, navigate],
   );
 
   /* ── Render ───────────────────────────────────────────────────────── */
@@ -232,7 +326,17 @@ export default function AdminPOSPage() {
       <StitchPOSNew
         key={`${activeTenant}:${sessionVersion}`}
         menuItems={stitchMenuItems}
-        addOns={VND_POS_ADDONS}
+        addOns={[]}
+        categoryLabels={categoryLabels}
+        tables={tables}
+        selectedTableId={selectedTableId}
+        onSelectTable={setSelectedTableId}
+        taxRate={0}
+        staffName={user?.name || user?.email || undefined}
+        staffRole={user?.role || undefined}
+        activeShift={activeShift}
+        onShiftAction={() => setShiftHandoverOpen(true)}
+        onNavigate={(path) => navigate(path)}
         paymentMethod={paymentMethod === 'cod' ? 'cod' : 'payos'}
         loading={menuLoading}
         error={
@@ -255,6 +359,9 @@ export default function AdminPOSPage() {
       <ShiftHandoverModal
         isOpen={shiftHandoverOpen}
         onClose={() => setShiftHandoverOpen(false)}
+        onCompleted={() => {
+          void refetchShifts();
+        }}
       />
 
       {/* ── Quarantined Offline Orders Alert (MD3 Strict) ──────────────── */}
@@ -345,7 +452,7 @@ export default function AdminPOSPage() {
               onClick={() => {
                 setPaymentUrl(null);
                 setCustomer(null);
-                _setSelectedTableId(undefined);
+                setSelectedTableId(undefined);
               }}
               className="text-xs text-[#8898A4] hover:text-white mt-1 cursor-pointer transition-colors"
             >

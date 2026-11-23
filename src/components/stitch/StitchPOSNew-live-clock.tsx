@@ -7,8 +7,8 @@ export function LiveClock() {
   const updateClock = useCallback(() => {
     const now = new Date();
     setTime(
-      now.toLocaleTimeString('en-US', {
-        hour12: true,
+      now.toLocaleTimeString('vi-VN', {
+        hour12: false,
         hour: '2-digit',
         minute: '2-digit',
         second: '2-digit',

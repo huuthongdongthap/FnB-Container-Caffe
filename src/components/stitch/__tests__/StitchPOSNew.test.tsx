@@ -66,7 +66,14 @@ vi.mock('lucide-react', () => ({
   Printer: () => null,
   Loader2: () => null,
   AlertCircle: () => null,
+  AlertTriangle: () => null,
   Coffee: () => null,
+  Home: () => null,
+  LayoutDashboard: () => null,
+  ClipboardList: () => null,
+  ChefHat: () => null,
+  UserCheck: () => null,
+  X: () => null,
 }));
 
 const CUSTOM_ITEMS: POSNewMenuItem[] = [
@@ -181,5 +188,94 @@ describe('StitchPOSNew', () => {
     renderWithProviders(<StitchPOSNew tableLabel="T-5" guestLabel="VIP" />);
     expect(screen.getByText('T-5')).toBeTruthy();
     expect(screen.getByText(/VIP/)).toBeTruthy();
+  });
+
+  it('maps cat_* category IDs to Vietnamese labels without fake English tabs and uses shrink-0', () => {
+    const d1Items: POSNewMenuItem[] = [
+      { id: 'tc001', name: 'Cà phê sữa đá', price: 25000, category: 'cat_trad_coffee' },
+      { id: 'fp001', name: 'Matcha đá xay', price: 38000, category: 'cat_frappuccino' },
+    ];
+    renderWithProviders(
+      <StitchPOSNew
+        menuItems={d1Items}
+        categoryLabels={{ cat_trad_coffee: 'Cà Phê Truyền Thống', cat_frappuccino: 'Đá Xay' }}
+      />
+    );
+    const tabs = screen.getAllByRole('tab');
+    expect(tabs.map((el) => el.textContent)).toEqual(['Tất cả', 'Cà Phê Truyền Thống', 'Đá Xay']);
+    expect(tabs[0]?.className).toContain('shrink-0');
+    expect(screen.queryByText('Pastries')).toBeNull();
+    expect(screen.queryByText('Brunch')).toBeNull();
+  });
+
+  it('displays real staff name and shift status badge without hardcoded Julian R.', () => {
+    const onShiftAction = vi.fn();
+    renderWithProviders(
+      <StitchPOSNew
+        menuItems={CUSTOM_ITEMS}
+        staffName="Nguyễn Minh"
+        activeShift={{ id: 'sh_1', shiftName: 'Ca sáng', clockIn: '2026-11-23T06:00:00+07:00' }}
+        onShiftAction={onShiftAction}
+      />
+    );
+    expect(screen.queryByText('Julian R.')).toBeNull();
+    expect(screen.getByText('Nguyễn Minh')).toBeTruthy();
+    const shiftBadge = screen.getByTestId('pos-shift-badge');
+    expect(shiftBadge.textContent).toContain('Ca sáng');
+    expect(shiftBadge.textContent).toContain('Đang mở');
+    fireEvent.click(shiftBadge);
+    expect(onShiftAction).toHaveBeenCalledTimes(1);
+  });
+
+  it('renders open-shift prompt when no active shift exists', () => {
+    renderWithProviders(<StitchPOSNew menuItems={CUSTOM_ITEMS} activeShift={null} />);
+    const shiftBadge = screen.getByTestId('pos-shift-badge');
+    expect(shiftBadge.textContent).toContain('Chưa mở ca');
+  });
+
+  it('allows selecting a real table and passes selectedTableId to onCompleteOrder with 0% default tax', () => {
+    const onSelectTable = vi.fn();
+    const onCompleteOrder = vi.fn();
+    renderWithProviders(
+      <StitchPOSNew
+        menuItems={[{ id: 'tc001', name: 'Cà phê sữa', price: 25000, category: 'cat_trad_coffee' }]}
+        tables={[
+          { id: 't01', name: 'Bàn 1', status: 'Available', capacity: 4 },
+          { id: 't02', name: 'Bàn 2', status: 'Occupied', capacity: 2 },
+        ]}
+        selectedTableId="t01"
+        onSelectTable={onSelectTable}
+        onCompleteOrder={onCompleteOrder}
+      />
+    );
+    const selector = screen.getByTestId('pos-table-selector') as HTMLSelectElement;
+    expect(selector.value).toBe('t01');
+    fireEvent.change(selector, { target: { value: 't02' } });
+    expect(onSelectTable).toHaveBeenCalledWith('t02');
+
+    // Add item and complete order — total must be 25000 (0% default tax, no 5% hidden fee)
+    fireEvent.click(screen.getByText('Cà phê sữa'));
+    fireEvent.click(screen.getByText('Complete Order'));
+    expect(onCompleteOrder).toHaveBeenCalledWith(
+      [{ id: 'tc001', name: 'Cà phê sữa', price: 25000, quantity: 1 }],
+      25000,
+      't01'
+    );
+    // No fake English add-ons by default and no dead Open Drawer button
+    expect(screen.queryByText('Oat Milk')).toBeNull();
+    expect(screen.queryByLabelText('Open Drawer')).toBeNull();
+  });
+
+  it('provides 1-tap navigation buttons in POSHeader', () => {
+    const onNavigate = vi.fn();
+    renderWithProviders(<StitchPOSNew menuItems={CUSTOM_ITEMS} onNavigate={onNavigate} />);
+    fireEvent.click(screen.getByLabelText('Quản trị'));
+    expect(onNavigate).toHaveBeenCalledWith('/admin');
+    fireEvent.click(screen.getByLabelText('Đơn hàng'));
+    expect(onNavigate).toHaveBeenCalledWith('/admin/orders');
+    fireEvent.click(screen.getByLabelText('KDS'));
+    expect(onNavigate).toHaveBeenCalledWith('/kds');
+    fireEvent.click(screen.getByLabelText('Trang chủ'));
+    expect(onNavigate).toHaveBeenCalledWith('/');
   });
 });
