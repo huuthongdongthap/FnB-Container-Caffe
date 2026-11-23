@@ -184,6 +184,8 @@ export function validateLoyaltyVoucher(
   return { valid: true, voucher, discountAmount };
 }
 
+const SYNTHETIC_ORDER_LINK_PREFIX = 'lr_ord_';
+
 export async function reserveLoyaltyVoucherAtomically(
   db: D1Database,
   voucher: LoyaltyVoucherRecord,
@@ -202,12 +204,46 @@ export async function reserveLoyaltyVoucherAtomically(
     ).bind(voucher.id, voucher.code, scopedTenant).run().catch(() => null) as { meta?: { changes?: number } } | null;
     reserved = Number(res?.meta?.changes ?? 0) >= 1;
     if (reserved) {
-      await db.prepare(
+      const lrRes = await db.prepare(
         `UPDATE loyalty_redemptions
          SET status = 'used', order_id = COALESCE(order_id, ?), used_at = ?
          WHERE (UPPER(voucher_code) = ? OR UPPER(code) = ?) AND status = 'active'
            AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?`
-      ).bind(orderId, nowIso, voucher.code, voucher.code, scopedTenant).run().catch(() => {});
+      ).bind(orderId, nowIso, voucher.code, voucher.code, scopedTenant).run().catch(() => null) as { meta?: { changes?: number } } | null;
+      // user_rewards has no order_id column; record an order-scoped linkage row when no loyalty_redemptions row exists so order cancellation can restore the voucher.
+      if (Number(lrRes?.meta?.changes ?? 0) === 0) {
+        const linkId = `${SYNTHETIC_ORDER_LINK_PREFIX}${orderId}`;
+        await db.prepare(
+          `INSERT INTO loyalty_redemptions (id, customer_id, reward_id, code, points_spent, order_id, status, voucher_code, expires_at, redeemed_at, used_at, tenant_id, created_at)
+           VALUES (?, ?, ?, ?, 0, ?, 'used', ?, ?, ?, ?, ?, ?)`
+        ).bind(
+          linkId,
+          voucher.customer_id || 'guest',
+          voucher.reward_id || 'voucher',
+          voucher.code,
+          orderId,
+          voucher.code,
+          voucher.expires_at ?? null,
+          nowIso,
+          nowIso,
+          scopedTenant,
+          nowIso,
+        ).run().catch(() =>
+          db.prepare(
+            `INSERT INTO loyalty_redemptions (id, customer_id, reward_id, code, points_spent, order_id, status, voucher_code, used_at, tenant_id)
+             VALUES (?, ?, ?, ?, 0, ?, 'used', ?, ?, ?)`
+          ).bind(
+            linkId,
+            voucher.customer_id || 'guest',
+            voucher.reward_id || 'voucher',
+            voucher.code,
+            orderId,
+            voucher.code,
+            nowIso,
+            scopedTenant,
+          ).run().catch(() => {})
+        );
+      }
     }
     return reserved;
   }
@@ -244,6 +280,11 @@ export async function rollbackLoyaltyVoucherReservation(
   ).bind(voucher.code, scopedTenant).run().catch(() => {});
   if (orderId) {
     await db.prepare(
+      `DELETE FROM loyalty_redemptions
+       WHERE id = ? AND order_id = ?
+         AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?`
+    ).bind(`${SYNTHETIC_ORDER_LINK_PREFIX}${orderId}`, orderId, scopedTenant).run().catch(() => {});
+    await db.prepare(
       `UPDATE loyalty_redemptions
        SET status = 'active', order_id = NULL, used_at = NULL
        WHERE order_id = ? AND status = 'used'
@@ -264,4 +305,55 @@ export async function rollbackLoyaltyVoucherReservation(
          AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?`
     ).bind(voucher.code, voucher.code, scopedTenant).run().catch(() => {});
   }
+}
+
+export async function restoreLoyaltyVoucherForOrder(
+  db: D1Database,
+  orderId: string,
+  tenantId: string = 'default',
+): Promise<boolean> {
+  const scopedTenant = normalizeTenant(tenantId);
+  const { results } = await db.prepare(
+    `SELECT id, code, voucher_code
+     FROM loyalty_redemptions
+     WHERE order_id = ? AND status = 'used'
+       AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?`
+  ).bind(orderId, scopedTenant).all<{ id?: string; code?: string | null; voucher_code?: string | null }>().catch(() => ({
+    results: [] as Array<{ id?: string; code?: string | null; voucher_code?: string | null }>,
+  }));
+
+  if (!results || results.length === 0) return false;
+
+  let restored = false;
+  for (const row of results) {
+    const code = String(row.voucher_code ?? row.code ?? '').trim().toUpperCase();
+    if (code) {
+      const urRes = await db.prepare(
+        `UPDATE user_rewards
+         SET status = 'active'
+         WHERE UPPER(code) = ? AND status = 'used'
+           AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?`
+      ).bind(code, scopedTenant).run().catch(() => null) as { meta?: { changes?: number } } | null;
+      if (Number(urRes?.meta?.changes ?? 0) >= 1) restored = true;
+    }
+
+    const rowId = String(row.id ?? '');
+    if (rowId.startsWith(SYNTHETIC_ORDER_LINK_PREFIX)) {
+      const delRes = await db.prepare(
+        `DELETE FROM loyalty_redemptions
+         WHERE id = ? AND order_id = ?
+           AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?`
+      ).bind(rowId, orderId, scopedTenant).run().catch(() => null) as { meta?: { changes?: number } } | null;
+      if (Number(delRes?.meta?.changes ?? 0) >= 1) restored = true;
+    } else if (rowId) {
+      const updRes = await db.prepare(
+        `UPDATE loyalty_redemptions
+         SET status = 'active', order_id = NULL, used_at = NULL
+         WHERE id = ? AND order_id = ? AND status = 'used'
+           AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?`
+      ).bind(rowId, orderId, scopedTenant).run().catch(() => null) as { meta?: { changes?: number } } | null;
+      if (Number(updRes?.meta?.changes ?? 0) >= 1) restored = true;
+    }
+  }
+  return restored;
 }

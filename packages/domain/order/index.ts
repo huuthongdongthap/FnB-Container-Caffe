@@ -16,6 +16,7 @@ export type { OrderSortColumn, OrderListOptions } from './queries/shared-listing
 export { getLatestOrderTimestamp } from './queries/latest-timestamp';
 // policies
 export { creditLoyaltyIfEligible } from './policies/loyalty-trigger';
+export { restoreLoyaltyVoucherForOrder } from './loyalty-voucher';
 export { releaseTableIfNoActiveOrders } from './policies/table-occupancy-release';
 export { calculateOrderSnapshot } from './policies/order-snapshot';
 export { canActorTransition, toActorRole } from './policies/transition-authorization';

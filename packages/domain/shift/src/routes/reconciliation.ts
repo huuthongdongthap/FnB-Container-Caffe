@@ -197,11 +197,23 @@ export function reconciliationRoutes(app: Hono<{ Bindings: Env; Variables: { use
     }
 
     const shiftId = c.req.param('id');
-    const record = await getReconciliationForShift(c.env, shiftId, scope.tenantId);
-    if (!record) {
-      return c.json({ success: false, error: 'Shift reconciliation not found' }, 404);
+    const actorId = String(user.id || user.sub || '').trim();
+    const actorRole = String(user.role || '').trim();
+    try {
+      const record = await getReconciliationForShift(c.env, shiftId, scope.tenantId, {
+        id: actorId,
+        role: actorRole,
+      });
+      if (!record) {
+        return c.json({ success: false, error: 'Shift reconciliation not found' }, 404);
+      }
+      return c.json({ success: true, data: record });
+    } catch (err) {
+      if (err instanceof ShiftContractError) {
+        return c.json({ success: false, error: err.message }, err.status as 400 | 403 | 404 | 409);
+      }
+      throw err;
     }
-    return c.json({ success: true, data: record });
   });
 
   app.post('/api/shifts/:id/assign-cash-payments', async (c) => {

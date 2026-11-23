@@ -191,6 +191,22 @@ export function registerReconciliationHandlers(app: Hono<{ Bindings: Env }>) {
             quantity?: number;
             price?: number;
             unit_price?: number;
+            unitPriceCents?: number;
+            subtotal?: number;
+            subtotalCents?: number;
+            line_total?: number;
+            total_price?: number;
+            modifiers?: Array<
+              | {
+                  priceAdjustment?: number;
+                  price_adjustment?: number;
+                  priceDelta?: number;
+                  price_delta?: number;
+                  extraPrice?: number;
+                  price?: number;
+                }
+              | string
+            >;
           }>;
           if (!Array.isArray(parsed)) continue;
           for (const item of parsed) {
@@ -202,11 +218,34 @@ export function registerReconciliationHandlers(app: Hono<{ Bindings: Env }>) {
                 : '');
             const cat = String(rawCat || 'Khác').trim() || 'Khác';
             const qty = Math.max(0, Number(item.quantity ?? 1) || 0);
-            const unitPrice = Number(item.price ?? item.unit_price ?? 0) || 0;
+            const explicitLineTotal =
+              item.subtotalCents ?? item.subtotal ?? item.line_total ?? item.total_price;
+            let lineRevenue: number;
+            if (explicitLineTotal !== undefined && explicitLineTotal !== null && Number.isFinite(Number(explicitLineTotal))) {
+              lineRevenue = Math.max(0, Number(explicitLineTotal));
+            } else {
+              const unitPrice = Number(item.unitPriceCents ?? item.price ?? item.unit_price ?? 0) || 0;
+              const modifierUnitDelta = Array.isArray(item.modifiers)
+                ? item.modifiers.reduce((sum, mod) => {
+                    if (!mod || typeof mod !== 'object') return sum;
+                    const delta = Number(
+                      mod.priceAdjustment ??
+                        mod.price_adjustment ??
+                        mod.priceDelta ??
+                        mod.price_delta ??
+                        mod.extraPrice ??
+                        mod.price ??
+                        0
+                    );
+                    return sum + (Number.isFinite(delta) ? delta : 0);
+                  }, 0)
+                : 0;
+              lineRevenue = Math.max(0, qty * (unitPrice + modifierUnitDelta));
+            }
             const prev = categoryMap.get(cat) || { items_sold: 0, revenue: 0 };
             categoryMap.set(cat, {
               items_sold: prev.items_sold + qty,
-              revenue: prev.revenue + qty * unitPrice,
+              revenue: prev.revenue + lineRevenue,
             });
           }
         } catch {
@@ -230,10 +269,14 @@ export function registerReconciliationHandlers(app: Hono<{ Bindings: Env }>) {
       const reconBinds = tenantId !== '*' ? [tenantId] : [];
       const { results: staffShiftRows } = await db
         .prepare(
-          `SELECT id, staff_name, date, clock_in, clock_out, opening_cash
+          `SELECT id, staff_name, role, date, clock_in, clock_out, opening_cash
            FROM staff_shifts
            WHERE date BETWEEN ? AND ?
              AND clock_in IS NOT NULL${tf.and}
+             AND (
+               LOWER(TRIM(COALESCE(role, 'staff'))) NOT IN ('barista', 'chef', 'kitchen', 'shipper', 'waiter')
+               OR COALESCE(opening_cash, 0) > 0
+             )
              AND NOT EXISTS (
                SELECT 1 FROM shift_reconciliations r
                WHERE r.shift_id = CAST(staff_shifts.id AS TEXT)${reconTenantClause}
@@ -244,6 +287,7 @@ export function registerReconciliationHandlers(app: Hono<{ Bindings: Env }>) {
         .all<{
           id: string | number;
           staff_name?: string | null;
+          role?: string | null;
           date?: string | null;
           clock_in?: string | null;
           clock_out?: string | null;

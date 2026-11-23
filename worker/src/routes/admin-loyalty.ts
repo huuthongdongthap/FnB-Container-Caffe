@@ -198,38 +198,22 @@ adminLoyaltyRouter.get('/widgets', async(c) => {
       }
 
       let spentScoped = scopedCustomers.reduce((sum, r) => sum + Number(r.total_spent || 0), 0);
-      if (spentScoped === 0 && scopedIds.size > 0) {
-        const walSpentRes = await db
-          .prepare("SELECT customer_id, total_spent, tenant_id FROM cashback_wallets WHERE (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?)")
-          .bind(tenantId, tenantId)
-          .all<{ customer_id: string; total_spent: number; tenant_id?: string | null }>()
-          .catch(() =>
-            tenantId === 'default'
-              ? db
-                  .prepare('SELECT customer_id, total_spent FROM cashback_wallets')
-                  .all<{ customer_id: string; total_spent: number }>()
-                  .catch(() => ({ results: [] as Array<{ customer_id: string; total_spent: number }> }))
-              : ({ results: [] as Array<{ customer_id: string; total_spent: number; tenant_id?: string | null }> })
-          );
-        spentScoped = (walSpentRes.results || [])
-          .filter(
-            (w) =>
-              scopedIds.has(String(w.customer_id)) &&
-              (!('tenant_id' in w) || w.tenant_id === undefined || matchesTenantRow(w, tenantId))
-          )
-          .reduce((sum, w) => sum + Number(w.total_spent || 0), 0);
-      }
       if (spentScoped === 0) {
+        const scopedPhones = new Set(
+          scopedCustomers
+            .map((r) => String(r.phone || '').trim())
+            .filter(Boolean)
+        );
         const ordRes = await db
-          .prepare("SELECT customer_id, total, tenant_id, status, payment_status FROM orders WHERE status != 'cancelled' AND COALESCE(status, '') NOT IN ('cancelled', 'refunded', 'failed', 'expired') AND COALESCE(payment_status, '') NOT IN ('refunded', 'failed') AND (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?)")
+          .prepare("SELECT customer_id, customer_phone, total, tenant_id, status, payment_status FROM orders WHERE status != 'cancelled' AND COALESCE(status, '') NOT IN ('cancelled', 'canceled', 'rejected', 'refunded', 'failed', 'expired') AND COALESCE(payment_status, '') NOT IN ('refunded', 'failed', 'cancelled', 'canceled') AND (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?)")
           .bind(tenantId, tenantId)
-          .all<{ customer_id?: string; total?: number; tenant_id?: string | null; status?: string | null; payment_status?: string | null }>()
+          .all<{ customer_id?: string; customer_phone?: string; total?: number; tenant_id?: string | null; status?: string | null; payment_status?: string | null }>()
           .catch(() =>
             db
-              .prepare("SELECT customer_id, total, tenant_id FROM orders WHERE status != 'cancelled' AND (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?)")
+              .prepare("SELECT customer_id, customer_phone, total, tenant_id FROM orders WHERE status != 'cancelled' AND (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?)")
               .bind(tenantId, tenantId)
-              .all<{ customer_id?: string; total?: number; tenant_id?: string | null }>()
-              .catch(() => ({ results: [] as Array<{ customer_id?: string; total?: number; tenant_id?: string | null }> }))
+              .all<{ customer_id?: string; customer_phone?: string; total?: number; tenant_id?: string | null }>()
+              .catch(() => ({ results: [] as Array<{ customer_id?: string; customer_phone?: string; total?: number; tenant_id?: string | null }> }))
           );
         spentScoped = (ordRes.results || [])
           .filter((o) => {
@@ -243,7 +227,10 @@ adminLoyaltyRouter.get('/widgets', async(c) => {
             }
             return 'tenant_id' in o && o.tenant_id !== undefined
               ? matchesTenantRow(o, tenantId)
-              : Boolean(o.customer_id && scopedIds.has(String(o.customer_id)));
+              : Boolean(
+                  (o.customer_id && scopedIds.has(String(o.customer_id))) ||
+                  (o.customer_phone && scopedPhones.has(String(o.customer_phone).trim()))
+                );
           })
           .reduce((sum, o) => sum + Number(o.total || 0), 0);
       }
@@ -565,7 +552,7 @@ adminLoyaltyRouter.get('/top-customers', async(c) => {
     if (tenantId !== '*') {
       res = await db.prepare(`
         SELECT c.id, c.name, c.phone, c.loyalty_tier as tier, c.tenant_id,
-               COALESCE((SELECT SUM(o.total) FROM orders o WHERE o.customer_id = c.id AND COALESCE(NULLIF(TRIM(o.tenant_id), ''), 'default') = COALESCE(NULLIF(TRIM(c.tenant_id), ''), 'default') AND LOWER(COALESCE(o.status, '')) NOT IN ('cancelled', 'failed', 'rejected', 'expired', 'refunded') AND LOWER(COALESCE(o.payment_status, '')) != 'refunded'), 0) as total_spent,
+               COALESCE((SELECT SUM(o.total) FROM orders o WHERE (o.customer_id = c.id OR (c.phone IS NOT NULL AND TRIM(c.phone) != '' AND o.customer_phone = c.phone)) AND COALESCE(NULLIF(TRIM(o.tenant_id), ''), 'default') = COALESCE(NULLIF(TRIM(c.tenant_id), ''), 'default') AND LOWER(TRIM(COALESCE(o.status, ''))) NOT IN ('cancelled', 'canceled', 'failed', 'rejected', 'expired', 'refunded') AND LOWER(TRIM(COALESCE(o.payment_status, ''))) NOT IN ('refunded', 'failed', 'cancelled', 'canceled')), 0) as total_spent,
                (SELECT COUNT(*) FROM orders o WHERE (o.customer_id = c.id OR (c.phone IS NOT NULL AND c.phone != '' AND o.customer_phone = c.phone)) AND o.status != 'cancelled' AND COALESCE(o.status, '') NOT IN ('cancelled', 'refunded', 'failed', 'expired') AND COALESCE(o.payment_status, '') NOT IN ('refunded', 'failed') AND COALESCE(NULLIF(o.tenant_id, ''), 'default') = COALESCE(NULLIF(c.tenant_id, ''), 'default')) as visit_count
         FROM customers c
         LEFT JOIN cashback_wallets cw ON cw.customer_id = c.id AND COALESCE(NULLIF(TRIM(cw.tenant_id), ''), 'default') = COALESCE(NULLIF(TRIM(c.tenant_id), ''), 'default')
@@ -577,7 +564,7 @@ adminLoyaltyRouter.get('/top-customers', async(c) => {
     if (tenantId === '*' || (!res && tenantId === 'default')) {
       res = await db.prepare(`
         SELECT c.id, c.name, c.phone, c.loyalty_tier as tier, c.tenant_id,
-               COALESCE((SELECT SUM(o.total) FROM orders o WHERE o.customer_id = c.id AND COALESCE(NULLIF(TRIM(o.tenant_id), ''), 'default') = COALESCE(NULLIF(TRIM(c.tenant_id), ''), 'default') AND LOWER(COALESCE(o.status, '')) NOT IN ('cancelled', 'failed', 'rejected', 'expired', 'refunded') AND LOWER(COALESCE(o.payment_status, '')) != 'refunded'), 0) as total_spent,
+               COALESCE((SELECT SUM(o.total) FROM orders o WHERE (o.customer_id = c.id OR (c.phone IS NOT NULL AND TRIM(c.phone) != '' AND o.customer_phone = c.phone)) AND COALESCE(NULLIF(TRIM(o.tenant_id), ''), 'default') = COALESCE(NULLIF(TRIM(c.tenant_id), ''), 'default') AND LOWER(TRIM(COALESCE(o.status, ''))) NOT IN ('cancelled', 'canceled', 'failed', 'rejected', 'expired', 'refunded') AND LOWER(TRIM(COALESCE(o.payment_status, ''))) NOT IN ('refunded', 'failed', 'cancelled', 'canceled')), 0) as total_spent,
                (SELECT COUNT(*) FROM orders o WHERE (o.customer_id = c.id OR (c.phone IS NOT NULL AND c.phone != '' AND o.customer_phone = c.phone)) AND o.status != 'cancelled' AND COALESCE(o.status, '') NOT IN ('cancelled', 'refunded', 'failed', 'expired') AND COALESCE(o.payment_status, '') NOT IN ('refunded', 'failed') AND COALESCE(NULLIF(o.tenant_id, ''), 'default') = COALESCE(NULLIF(c.tenant_id, ''), 'default')) as visit_count
         FROM customers c
         LEFT JOIN cashback_wallets cw ON cw.customer_id = c.id AND COALESCE(NULLIF(TRIM(cw.tenant_id), ''), 'default') = COALESCE(NULLIF(TRIM(c.tenant_id), ''), 'default')
@@ -595,7 +582,7 @@ adminLoyaltyRouter.get('/top-customers', async(c) => {
       if (tenantId !== '*') {
         res = await db.prepare(`
           SELECT c.id, c.name, c.phone, c.loyalty_tier as tier, c.tenant_id,
-                 COALESCE((SELECT SUM(o.total) FROM orders o WHERE o.customer_id = c.id AND COALESCE(NULLIF(TRIM(o.tenant_id), ''), 'default') = COALESCE(NULLIF(TRIM(c.tenant_id), ''), 'default') AND LOWER(COALESCE(o.status, '')) NOT IN ('cancelled', 'failed', 'rejected', 'expired', 'refunded') AND LOWER(COALESCE(o.payment_status, '')) != 'refunded'), 0) as total_spent,
+                 COALESCE((SELECT SUM(o.total) FROM orders o WHERE (o.customer_id = c.id OR (c.phone IS NOT NULL AND TRIM(c.phone) != '' AND o.customer_phone = c.phone)) AND COALESCE(NULLIF(TRIM(o.tenant_id), ''), 'default') = COALESCE(NULLIF(TRIM(c.tenant_id), ''), 'default') AND LOWER(TRIM(COALESCE(o.status, ''))) NOT IN ('cancelled', 'canceled', 'failed', 'rejected', 'expired', 'refunded') AND LOWER(TRIM(COALESCE(o.payment_status, ''))) NOT IN ('refunded', 'failed', 'cancelled', 'canceled')), 0) as total_spent,
                  (SELECT COUNT(*) FROM orders o WHERE (o.customer_id = c.id OR (c.phone IS NOT NULL AND c.phone != '' AND o.customer_phone = c.phone)) AND o.status != 'cancelled' AND COALESCE(o.status, '') NOT IN ('cancelled', 'refunded', 'failed', 'expired') AND COALESCE(NULLIF(o.tenant_id, ''), 'default') = COALESCE(NULLIF(c.tenant_id, ''), 'default')) as visit_count
           FROM customers c
           LEFT JOIN cashback_wallets cw ON cw.customer_id = c.id
@@ -607,7 +594,7 @@ adminLoyaltyRouter.get('/top-customers', async(c) => {
       if (tenantId === '*' || (!res && tenantId === 'default')) {
         res = await db.prepare(`
           SELECT c.id, c.name, c.phone, c.loyalty_tier as tier, c.tenant_id,
-                 COALESCE((SELECT SUM(o.total) FROM orders o WHERE o.customer_id = c.id AND COALESCE(NULLIF(TRIM(o.tenant_id), ''), 'default') = COALESCE(NULLIF(TRIM(c.tenant_id), ''), 'default') AND LOWER(COALESCE(o.status, '')) NOT IN ('cancelled', 'failed', 'rejected', 'expired', 'refunded') AND LOWER(COALESCE(o.payment_status, '')) != 'refunded'), 0) as total_spent,
+                 COALESCE((SELECT SUM(o.total) FROM orders o WHERE (o.customer_id = c.id OR (c.phone IS NOT NULL AND TRIM(c.phone) != '' AND o.customer_phone = c.phone)) AND COALESCE(NULLIF(TRIM(o.tenant_id), ''), 'default') = COALESCE(NULLIF(TRIM(c.tenant_id), ''), 'default') AND LOWER(TRIM(COALESCE(o.status, ''))) NOT IN ('cancelled', 'canceled', 'failed', 'rejected', 'expired', 'refunded') AND LOWER(TRIM(COALESCE(o.payment_status, ''))) NOT IN ('refunded', 'failed', 'cancelled', 'canceled')), 0) as total_spent,
                  (SELECT COUNT(*) FROM orders o WHERE (o.customer_id = c.id OR (c.phone IS NOT NULL AND c.phone != '' AND o.customer_phone = c.phone)) AND o.status != 'cancelled' AND COALESCE(NULLIF(o.tenant_id, ''), 'default') = COALESCE(NULLIF(c.tenant_id, ''), 'default')) as visit_count
           FROM customers c
           LEFT JOIN cashback_wallets cw ON cw.customer_id = c.id
@@ -674,7 +661,7 @@ adminLoyaltyRouter.get('/export', requireAuth(['owner', 'admin', 'manager', 'sup
         SELECT c.id, c.name, c.phone, c.email, c.date_of_birth AS birthday,
                c.loyalty_tier AS tier,
                COALESCE(cw.balance, 0) AS cashback_balance,
-               COALESCE((SELECT SUM(o.total) FROM orders o WHERE o.customer_id = c.id AND COALESCE(NULLIF(TRIM(o.tenant_id), ''), 'default') = COALESCE(NULLIF(TRIM(c.tenant_id), ''), 'default') AND LOWER(COALESCE(o.status, '')) NOT IN ('cancelled', 'failed', 'rejected', 'expired', 'refunded') AND LOWER(COALESCE(o.payment_status, '')) != 'refunded'), 0) AS total_spent,
+               COALESCE((SELECT SUM(o.total) FROM orders o WHERE (o.customer_id = c.id OR (c.phone IS NOT NULL AND TRIM(c.phone) != '' AND o.customer_phone = c.phone)) AND COALESCE(NULLIF(TRIM(o.tenant_id), ''), 'default') = COALESCE(NULLIF(TRIM(c.tenant_id), ''), 'default') AND LOWER(TRIM(COALESCE(o.status, ''))) NOT IN ('cancelled', 'canceled', 'failed', 'rejected', 'expired', 'refunded') AND LOWER(TRIM(COALESCE(o.payment_status, ''))) NOT IN ('refunded', 'failed', 'cancelled', 'canceled')), 0) AS total_spent,
                (SELECT COUNT(*) FROM orders o WHERE (o.customer_id = c.id OR (c.phone IS NOT NULL AND c.phone != '' AND o.customer_phone = c.phone)) AND o.status != 'cancelled' AND COALESCE(o.status, '') NOT IN ('cancelled', 'refunded', 'failed', 'expired') AND COALESCE(o.payment_status, '') NOT IN ('refunded', 'failed') AND COALESCE(NULLIF(TRIM(o.tenant_id), ''), 'default') = COALESCE(NULLIF(TRIM(c.tenant_id), ''), 'default')) AS visit_count,
                c.created_at, c.tenant_id
         FROM customers c
@@ -693,7 +680,7 @@ adminLoyaltyRouter.get('/export', requireAuth(['owner', 'admin', 'manager', 'sup
           SELECT c.id, c.name, c.phone, c.email, c.date_of_birth AS birthday,
                  c.loyalty_tier AS tier,
                  COALESCE(cw.balance, 0) AS cashback_balance,
-                 COALESCE((SELECT SUM(o.total) FROM orders o WHERE o.customer_id = c.id AND COALESCE(NULLIF(TRIM(o.tenant_id), ''), 'default') = COALESCE(NULLIF(TRIM(c.tenant_id), ''), 'default') AND LOWER(COALESCE(o.status, '')) NOT IN ('cancelled', 'failed', 'rejected', 'expired', 'refunded') AND LOWER(COALESCE(o.payment_status, '')) != 'refunded'), 0) AS total_spent,
+                 COALESCE((SELECT SUM(o.total) FROM orders o WHERE (o.customer_id = c.id OR (c.phone IS NOT NULL AND TRIM(c.phone) != '' AND o.customer_phone = c.phone)) AND COALESCE(NULLIF(TRIM(o.tenant_id), ''), 'default') = COALESCE(NULLIF(TRIM(c.tenant_id), ''), 'default') AND LOWER(TRIM(COALESCE(o.status, ''))) NOT IN ('cancelled', 'canceled', 'failed', 'rejected', 'expired', 'refunded') AND LOWER(TRIM(COALESCE(o.payment_status, ''))) NOT IN ('refunded', 'failed', 'cancelled', 'canceled')), 0) AS total_spent,
                  (SELECT COUNT(*) FROM orders o WHERE (o.customer_id = c.id OR (c.phone IS NOT NULL AND c.phone != '' AND o.customer_phone = c.phone)) AND o.status != 'cancelled' AND COALESCE(o.status, '') NOT IN ('cancelled', 'refunded', 'failed', 'expired') AND COALESCE(o.payment_status, '') NOT IN ('refunded', 'failed') AND COALESCE(NULLIF(TRIM(o.tenant_id), ''), 'default') = COALESCE(NULLIF(TRIM(c.tenant_id), ''), 'default')) AS visit_count,
                  c.created_at, c.tenant_id
           FROM customers c
@@ -708,7 +695,7 @@ adminLoyaltyRouter.get('/export', requireAuth(['owner', 'admin', 'manager', 'sup
           SELECT c.id, c.name, c.phone, c.email, c.date_of_birth AS birthday,
                  c.loyalty_tier AS tier,
                  COALESCE(cw.balance, 0) AS cashback_balance,
-                 COALESCE((SELECT SUM(o.total) FROM orders o WHERE o.customer_id = c.id AND COALESCE(NULLIF(TRIM(o.tenant_id), ''), 'default') = COALESCE(NULLIF(TRIM(c.tenant_id), ''), 'default') AND LOWER(COALESCE(o.status, '')) NOT IN ('cancelled', 'failed', 'rejected', 'expired', 'refunded') AND LOWER(COALESCE(o.payment_status, '')) != 'refunded'), 0) AS total_spent,
+                 COALESCE((SELECT SUM(o.total) FROM orders o WHERE (o.customer_id = c.id OR (c.phone IS NOT NULL AND TRIM(c.phone) != '' AND o.customer_phone = c.phone)) AND COALESCE(NULLIF(TRIM(o.tenant_id), ''), 'default') = COALESCE(NULLIF(TRIM(c.tenant_id), ''), 'default') AND LOWER(TRIM(COALESCE(o.status, ''))) NOT IN ('cancelled', 'canceled', 'failed', 'rejected', 'expired', 'refunded') AND LOWER(TRIM(COALESCE(o.payment_status, ''))) NOT IN ('refunded', 'failed', 'cancelled', 'canceled')), 0) AS total_spent,
                  (SELECT COUNT(*) FROM orders o WHERE (o.customer_id = c.id OR (c.phone IS NOT NULL AND c.phone != '' AND o.customer_phone = c.phone)) AND o.status != 'cancelled' AND COALESCE(o.status, '') NOT IN ('cancelled', 'refunded', 'failed', 'expired') AND COALESCE(o.payment_status, '') NOT IN ('refunded', 'failed') AND COALESCE(NULLIF(TRIM(o.tenant_id), ''), 'default') = COALESCE(NULLIF(TRIM(c.tenant_id), ''), 'default')) AS visit_count,
                  c.created_at, c.tenant_id
           FROM customers c
@@ -737,7 +724,7 @@ adminLoyaltyRouter.get('/export', requireAuth(['owner', 'admin', 'manager', 'sup
               SELECT c.id, c.name, c.phone, c.email, '' AS birthday,
                      c.loyalty_tier AS tier,
                      COALESCE(cw.balance, 0) AS cashback_balance,
-                     COALESCE((SELECT SUM(o.total) FROM orders o WHERE o.customer_id = c.id AND COALESCE(NULLIF(TRIM(o.tenant_id), ''), 'default') = COALESCE(NULLIF(TRIM(c.tenant_id), ''), 'default') AND LOWER(COALESCE(o.status, '')) NOT IN ('cancelled', 'failed', 'rejected', 'expired', 'refunded') AND LOWER(COALESCE(o.payment_status, '')) != 'refunded'), 0) AS total_spent,
+                     COALESCE((SELECT SUM(o.total) FROM orders o WHERE (o.customer_id = c.id OR (c.phone IS NOT NULL AND TRIM(c.phone) != '' AND o.customer_phone = c.phone)) AND COALESCE(NULLIF(TRIM(o.tenant_id), ''), 'default') = COALESCE(NULLIF(TRIM(c.tenant_id), ''), 'default') AND LOWER(TRIM(COALESCE(o.status, ''))) NOT IN ('cancelled', 'canceled', 'failed', 'rejected', 'expired', 'refunded') AND LOWER(TRIM(COALESCE(o.payment_status, ''))) NOT IN ('refunded', 'failed', 'cancelled', 'canceled')), 0) AS total_spent,
                      (SELECT COUNT(*) FROM orders o WHERE (o.customer_id = c.id OR (c.phone IS NOT NULL AND c.phone != '' AND o.customer_phone = c.phone)) AND o.status != 'cancelled' AND COALESCE(o.status, '') NOT IN ('cancelled', 'refunded', 'failed', 'expired')) AS visit_count,
                      c.created_at, c.tenant_id
               FROM customers c
@@ -752,7 +739,7 @@ adminLoyaltyRouter.get('/export', requireAuth(['owner', 'admin', 'manager', 'sup
               SELECT c.id, c.name, c.phone, c.email, '' AS birthday,
                      c.loyalty_tier AS tier,
                      COALESCE(cw.balance, 0) AS cashback_balance,
-                     COALESCE((SELECT SUM(o.total) FROM orders o WHERE o.customer_id = c.id AND COALESCE(NULLIF(TRIM(o.tenant_id), ''), 'default') = COALESCE(NULLIF(TRIM(c.tenant_id), ''), 'default') AND LOWER(COALESCE(o.status, '')) NOT IN ('cancelled', 'failed', 'rejected', 'expired', 'refunded') AND LOWER(COALESCE(o.payment_status, '')) != 'refunded'), 0) AS total_spent,
+                     COALESCE((SELECT SUM(o.total) FROM orders o WHERE (o.customer_id = c.id OR (c.phone IS NOT NULL AND TRIM(c.phone) != '' AND o.customer_phone = c.phone)) AND COALESCE(NULLIF(TRIM(o.tenant_id), ''), 'default') = COALESCE(NULLIF(TRIM(c.tenant_id), ''), 'default') AND LOWER(TRIM(COALESCE(o.status, ''))) NOT IN ('cancelled', 'canceled', 'failed', 'rejected', 'expired', 'refunded') AND LOWER(TRIM(COALESCE(o.payment_status, ''))) NOT IN ('refunded', 'failed', 'cancelled', 'canceled')), 0) AS total_spent,
                      (SELECT COUNT(*) FROM orders o WHERE (o.customer_id = c.id OR (c.phone IS NOT NULL AND c.phone != '' AND o.customer_phone = c.phone)) AND o.status != 'cancelled' AND COALESCE(o.status, '') NOT IN ('cancelled', 'refunded', 'failed', 'expired') AND COALESCE(o.payment_status, '') NOT IN ('refunded', 'failed')) AS visit_count,
                      c.created_at, c.tenant_id
               FROM customers c

@@ -120,15 +120,24 @@ export async function getAdminOrders(request: Request, env: Record<string, unkno
       extraClause += ' AND COALESCE(o.payment_method, p.method) = ?';
       extraParams.push(paymentMethod);
     }
+    let dateFilterClause = '';
     if (dateFrom) {
-      extraClause += ' AND o.created_at >= ?';
+      if (/^\d{4}-\d{2}-\d{2}$/.test(dateFrom)) {
+        dateFilterClause += " AND DATE(datetime(o.created_at, '+7 hours')) >= ?";
+      } else {
+        dateFilterClause += ' AND o.created_at >= ?';
+      }
       extraParams.push(dateFrom);
     }
     if (dateTo) {
-      const normalizedDateTo = /^\d{4}-\d{2}-\d{2}$/.test(dateTo) ? `${dateTo} 23:59:59` : dateTo;
-      extraClause += ' AND o.created_at <= ?';
-      extraParams.push(normalizedDateTo);
+      if (/^\d{4}-\d{2}-\d{2}$/.test(dateTo)) {
+        dateFilterClause += " AND DATE(datetime(o.created_at, '+7 hours')) <= ?";
+      } else {
+        dateFilterClause += ' AND o.created_at <= ?';
+      }
+      extraParams.push(dateTo);
     }
+    extraClause += dateFilterClause;
 
     const searchWithTable = search ? buildSearchClause(search, searchField, true) : { sql: '', params: [] };
     const searchNoTable = search ? buildSearchClause(search, searchField, false) : { sql: '', params: [] };
@@ -138,8 +147,7 @@ export async function getAdminOrders(request: Request, env: Record<string, unkno
 
     const fallbackClause = baseClause
       + (paymentMethod && paymentMethod !== 'all' ? ' AND o.payment_method = ?' : '')
-      + (dateFrom ? ' AND o.created_at >= ?' : '')
-      + (dateTo ? ' AND o.created_at <= ?' : '')
+      + dateFilterClause
       + searchNoTable.sql;
     const fallbackParams = [...baseParams, ...extraParams, ...searchNoTable.params];
 

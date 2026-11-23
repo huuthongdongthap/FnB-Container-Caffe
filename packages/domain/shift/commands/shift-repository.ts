@@ -38,8 +38,14 @@ export async function listShifts(scope: ShiftScope, query: ShiftQuery = {}) {
       `SELECT s.*, r.expected_cash AS expected_cash, r.actual_cash AS actual_cash, r.variance AS cash_variance
        FROM staff_shifts s
        LEFT JOIN shift_reconciliations r
-         ON r.shift_id = CAST(s.id AS TEXT)
-         AND COALESCE(NULLIF(TRIM(r.tenant_id), ''), 'default') = COALESCE(NULLIF(TRIM(s.tenant_id), ''), 'default')
+         ON r.id = (
+           SELECT r2.id
+           FROM shift_reconciliations r2
+           WHERE r2.shift_id = CAST(s.id AS TEXT)
+             AND COALESCE(NULLIF(TRIM(r2.tenant_id), ''), 'default') = COALESCE(NULLIF(TRIM(s.tenant_id), ''), 'default')
+           ORDER BY r2.created_at DESC, r2.rowid DESC
+           LIMIT 1
+         )
        WHERE ${qualifiedWhere}
        ORDER BY s.${sort} ${order}, s.id DESC LIMIT ? OFFSET ?`
     ).bind(...values, limit, (page - 1) * limit).all<ShiftRow>();

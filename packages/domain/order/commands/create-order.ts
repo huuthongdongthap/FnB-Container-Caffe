@@ -148,7 +148,7 @@ export async function createOrder(
         }
         const voucherCheck = validateLoyaltyVoucher(loyaltyVoucher, {
           customerId: resolvedCustomerId,
-          allowStaffOverride: isStaffActor,
+          allowStaffOverride: isStaffActor && !resolvedCustomerId,
           orderTotal: snapshot.subtotal,
         });
         if (!voucherCheck.valid) {
@@ -461,58 +461,42 @@ export async function createOrder(
       noGuestHashStatements.push(db.prepare(idemSql).bind(...idemArgs));
       legacyStatements.push(db.prepare(idemSql).bind(...idemArgs));
     }
-    const orderInsertSql = redeemedPoints > 0
-      ? `INSERT INTO orders (
+    const extraOrderCols: string[] = [];
+    const extraOrderVals: unknown[] = [];
+    if (redeemedPoints > 0) {
+      extraOrderCols.push('loyalty_points_redeemed');
+      extraOrderVals.push(redeemedPoints);
+    }
+    if (appliedCashback > 0) {
+      extraOrderCols.push('cashback_used');
+      extraOrderVals.push(appliedCashback);
+    }
+    const extraColSql = extraOrderCols.length > 0 ? `, ${extraOrderCols.join(', ')}` : '';
+    const extraPhSql = extraOrderCols.length > 0 ? `, ${extraOrderCols.map(() => '?').join(', ')}` : '';
+    const orderInsertSql = `INSERT INTO orders (
       id, items, total, status, customer_name, customer_phone,
       customer_email, customer_address, payment_method, payment_status,
-      shipping_fee, discount, loyalty_points_redeemed, notes, delivery_time, table_id,
+      shipping_fee, discount${extraColSql}, notes, delivery_time, table_id,
       order_type, tip_amount, service_fee, customer_id, guest_token_hash, tenant_id, created_at, updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-      : `INSERT INTO orders (
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?${extraPhSql}, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+    const orderInsertArgs = [
+      orderId, snapshot.itemsJson, snapshot.total, 'pending', data.customer_name, data.customer_phone,
+      data.customer_email || null, data.customer_address || null, validatedMethod, initialPaymentStatus,
+      snapshot.shipping_fee, snapshot.discount, ...extraOrderVals, data.notes || null, data.delivery_time || 'now', resolvedTableId,
+      orderType, snapshot.tip_amount, snapshot.service_fee, resolvedCustomerId, guestTokenHash, tenantId, now, now,
+    ];
+    const orderInsertNoGuestSql = `INSERT INTO orders (
       id, items, total, status, customer_name, customer_phone,
       customer_email, customer_address, payment_method, payment_status,
-      shipping_fee, discount, notes, delivery_time, table_id,
-      order_type, tip_amount, service_fee, customer_id, guest_token_hash, tenant_id, created_at, updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
-    const orderInsertArgs = redeemedPoints > 0
-      ? [
-          orderId, snapshot.itemsJson, snapshot.total, 'pending', data.customer_name, data.customer_phone,
-          data.customer_email || null, data.customer_address || null, validatedMethod, initialPaymentStatus,
-          snapshot.shipping_fee, snapshot.discount, redeemedPoints, data.notes || null, data.delivery_time || 'now', resolvedTableId,
-          orderType, snapshot.tip_amount, snapshot.service_fee, resolvedCustomerId, guestTokenHash, tenantId, now, now,
-        ]
-      : [
-          orderId, snapshot.itemsJson, snapshot.total, 'pending', data.customer_name, data.customer_phone,
-          data.customer_email || null, data.customer_address || null, validatedMethod, initialPaymentStatus,
-          snapshot.shipping_fee, snapshot.discount, data.notes || null, data.delivery_time || 'now', resolvedTableId,
-          orderType, snapshot.tip_amount, snapshot.service_fee, resolvedCustomerId, guestTokenHash, tenantId, now, now,
-        ];
-    const orderInsertNoGuestSql = redeemedPoints > 0
-      ? `INSERT INTO orders (
-      id, items, total, status, customer_name, customer_phone,
-      customer_email, customer_address, payment_method, payment_status,
-      shipping_fee, discount, loyalty_points_redeemed, notes, delivery_time, table_id,
+      shipping_fee, discount${extraColSql}, notes, delivery_time, table_id,
       order_type, tip_amount, service_fee, customer_id, tenant_id, created_at, updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-      : `INSERT INTO orders (
-      id, items, total, status, customer_name, customer_phone,
-      customer_email, customer_address, payment_method, payment_status,
-      shipping_fee, discount, notes, delivery_time, table_id,
-      order_type, tip_amount, service_fee, customer_id, tenant_id, created_at, updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
-    const orderInsertNoGuestArgs = redeemedPoints > 0
-      ? [
-          orderId, snapshot.itemsJson, snapshot.total, 'pending', data.customer_name, data.customer_phone,
-          data.customer_email || null, data.customer_address || null, validatedMethod, initialPaymentStatus,
-          snapshot.shipping_fee, snapshot.discount, redeemedPoints, data.notes || null, data.delivery_time || 'now', resolvedTableId,
-          orderType, snapshot.tip_amount, snapshot.service_fee, resolvedCustomerId, tenantId, now, now,
-        ]
-      : [
-          orderId, snapshot.itemsJson, snapshot.total, 'pending', data.customer_name, data.customer_phone,
-          data.customer_email || null, data.customer_address || null, validatedMethod, initialPaymentStatus,
-          snapshot.shipping_fee, snapshot.discount, data.notes || null, data.delivery_time || 'now', resolvedTableId,
-          orderType, snapshot.tip_amount, snapshot.service_fee, resolvedCustomerId, tenantId, now, now,
-        ];
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?${extraPhSql}, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+    const orderInsertNoGuestArgs = [
+      orderId, snapshot.itemsJson, snapshot.total, 'pending', data.customer_name, data.customer_phone,
+      data.customer_email || null, data.customer_address || null, validatedMethod, initialPaymentStatus,
+      snapshot.shipping_fee, snapshot.discount, ...extraOrderVals, data.notes || null, data.delivery_time || 'now', resolvedTableId,
+      orderType, snapshot.tip_amount, snapshot.service_fee, resolvedCustomerId, tenantId, now, now,
+    ];
     const orderInsertLegacySql = `INSERT INTO orders (
       id, items, total, status, customer_name, customer_phone,
       customer_email, customer_address, payment_method, payment_status,

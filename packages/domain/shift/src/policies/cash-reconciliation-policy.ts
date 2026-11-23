@@ -521,11 +521,45 @@ export async function reconcileShiftCash(
 export async function getReconciliationForShift(
   env: Env | D1Database,
   shiftId: string,
-  tenantId?: string
+  tenantId?: string,
+  actor?: { id: string; role: string }
 ): Promise<ShiftReconciliation | null> {
   const db = (env as Env)?.AURA_DB ?? (env as D1Database);
   const rawTenant = tenantId && tenantId.trim() ? tenantId.trim() : 'default';
   const normTenant = rawTenant === 'hq' ? '*' : rawTenant;
+
+  if (actor) {
+    const effectiveRole = await requireActiveActor(db, actor.id, actor.role, normTenant);
+    if (!SHIFT_MANAGER_ROLES.has(effectiveRole)) {
+      let shiftOwner: { staff_id?: string | null } | null = null;
+      let hasShiftsTable = true;
+      try {
+        shiftOwner = normTenant === '*'
+          ? await db
+              .prepare('SELECT staff_id FROM staff_shifts WHERE CAST(id AS TEXT) = ? LIMIT 1')
+              .bind(String(shiftId))
+              .first<{ staff_id?: string | null }>()
+          : await db
+              .prepare(
+                "SELECT staff_id FROM staff_shifts WHERE CAST(id AS TEXT) = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ? LIMIT 1"
+              )
+              .bind(String(shiftId), normTenant)
+              .first<{ staff_id?: string | null }>();
+      } catch (err) {
+        if (/no such table:.*staff_shifts/i.test(String(err))) {
+          hasShiftsTable = false;
+        } else {
+          throw err;
+        }
+      }
+      if (hasShiftsTable) {
+        if (!shiftOwner) return null;
+        if (String(shiftOwner.staff_id || '') !== String(actor.id || '')) {
+          throw new ShiftContractError('Forbidden: cannot view reconciliation for another staff member shift', 403);
+        }
+      }
+    }
+  }
 
   let row: Record<string, unknown> | null = null;
   if (normTenant !== '*') {
@@ -748,19 +782,64 @@ export async function assignCashPaymentsToShift(
     validated.push({ id: payment.id, settledAt: payment.updated_at || payment.created_at || now });
   }
 
+  // Guard attribution writes atomically in SQL against concurrent reconciliation of either
+  // the target shift or any shift currently holding the payment.
   const statements = validated.map((item) =>
     db.prepare(
       `INSERT INTO cash_payment_attributions (payment_id, tenant_id, shift_id, collected_by, settled_at)
-       VALUES (?, ?, ?, ?, ?)
-       ON CONFLICT(payment_id) DO UPDATE SET shift_id = excluded.shift_id, collected_by = excluded.collected_by`
-    ).bind(item.id, shift.tenant, shift.id, actorId, item.settledAt)
+       SELECT ?, ?, ?, ?, ?
+       WHERE NOT EXISTS (
+         SELECT 1 FROM shift_reconciliations
+         WHERE shift_id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?
+       )
+       AND NOT EXISTS (
+         SELECT 1 FROM cash_payment_attributions a
+         JOIN shift_reconciliations r
+           ON r.shift_id = a.shift_id
+           AND COALESCE(NULLIF(TRIM(r.tenant_id), ''), 'default') = COALESCE(NULLIF(TRIM(a.tenant_id), ''), 'default')
+         WHERE a.payment_id = ?
+           AND COALESCE(NULLIF(TRIM(a.tenant_id), ''), 'default') = ?
+       )
+       ON CONFLICT(payment_id) DO UPDATE SET
+         shift_id = excluded.shift_id,
+         collected_by = excluded.collected_by
+       WHERE NOT EXISTS (
+         SELECT 1 FROM shift_reconciliations
+         WHERE shift_id = cash_payment_attributions.shift_id
+           AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = COALESCE(NULLIF(TRIM(cash_payment_attributions.tenant_id), ''), 'default')
+       )
+       AND NOT EXISTS (
+         SELECT 1 FROM shift_reconciliations
+         WHERE shift_id = excluded.shift_id
+           AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = COALESCE(NULLIF(TRIM(excluded.tenant_id), ''), 'default')
+       )`
+    ).bind(
+      item.id, shift.tenant, shift.id, actorId, item.settledAt,
+      shift.id, shift.tenant,
+      item.id, shift.tenant,
+    )
   );
 
+  const writeResults: Array<{ meta?: { changes?: number }; changes?: number } | null | undefined> = [];
   if (typeof db.batch === 'function') {
-    await db.batch(statements);
+    const batchRes = await db.batch(statements);
+    if (Array.isArray(batchRes)) {
+      writeResults.push(...(batchRes as Array<{ meta?: { changes?: number }; changes?: number }>));
+    }
   } else {
     for (const stmt of statements) {
-      await stmt.run();
+      writeResults.push((await stmt.run()) as { meta?: { changes?: number }; changes?: number });
+    }
+  }
+
+  for (let i = 0; i < writeResults.length; i++) {
+    const res = writeResults[i];
+    const changes = res?.meta?.changes ?? res?.changes;
+    if (changes !== undefined && Number(changes) === 0) {
+      throw new ShiftContractError(
+        `Payment ${validated[i]?.id ?? ''} or shift ${shift.id} was reconciled concurrently; refresh and retry`,
+        409
+      );
     }
   }
 

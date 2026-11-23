@@ -10,6 +10,7 @@ import {
 } from '@aura/domain-shift';
 import { clockIn, clockOut } from '../../../../packages/domain/shift/commands/attendance';
 import { shiftScope } from '../../../../packages/domain/shift/commands/shift-access';
+import { listShifts } from '../../../../packages/domain/shift/commands/shift-repository';
 import { shiftsRouter } from '../../../../packages/domain/shift/commands/shifts';
 import { registerReconciliationHandlers } from '../../routes/reports-handlers/reconciliation-handlers';
 import { COD_COLLECTION_ROLES } from '../../routes/orders-hono-handlers/kds-handlers';
@@ -221,7 +222,11 @@ describe('UAT #132/#133/#134 COD, shifts, payouts, and reconciliation regression
     expect(list).toHaveLength(1);
     expect(list[0].reason).toBe('Mua đá viên');
 
-    // Verify route layer for barista role on reconciliation endpoint (no 403)
+    // Verify route layer for barista role on reconciliation endpoint:
+    // - cross-staff shift access returns 403 (prevents IDOR)
+    // - own unreconciled shift returns 404 (not 403)
+    const baristaScope = await shiftScope(env, { id: 'barista-1', role: 'barista', tenantId: 'default' });
+    const baristaShift = await clockIn(baristaScope, 'barista-1', undefined, undefined, 0);
     const app = new Hono<{ Bindings: Env; Variables: { user: Record<string, unknown>; tenantId: string } }>();
     app.use('*', async (c, next) => {
       c.set('user', { id: 'barista-1', role: 'barista', tenantId: 'default' });
@@ -229,8 +234,10 @@ describe('UAT #132/#133/#134 COD, shifts, payouts, and reconciliation regression
       await next();
     });
     reconciliationRoutes(app);
-    const reconRes = await app.request(`/api/shifts/${shift.id}/reconciliation`, { method: 'GET' }, env);
-    expect(reconRes.status).toBe(404); // Not reconciled yet, NOT 403
+    const crossStaffRes = await app.request(`/api/shifts/${shift.id}/reconciliation`, { method: 'GET' }, env);
+    expect(crossStaffRes.status).toBe(403);
+    const ownShiftRes = await app.request(`/api/shifts/${baristaShift.id}/reconciliation`, { method: 'GET' }, env);
+    expect(ownShiftRes.status).toBe(404);
   });
 
   it('#134: reconciliation report populates categories and flags unreconciled shifts', async () => {
@@ -334,5 +341,124 @@ describe('UAT #132/#133/#134 COD, shifts, payouts, and reconciliation regression
     await expect(
       listShiftCashPayouts(env, String(shift.id), 'default', '', '')
     ).rejects.toMatchObject({ status: 403 });
+  });
+
+  it('reconciliation report includes modifier pricing in category revenue and excludes non-cash roles from unreconciled_shifts', async () => {
+    const { sqlite, db } = setupDb();
+    dbs.push(sqlite);
+    const today = new Date(Date.now() + 7 * 3600_000).toISOString().slice(0, 10);
+    sqlite.prepare(
+      `INSERT INTO orders (id, items, total, status, payment_status, payment_method, tenant_id, created_at)
+       VALUES
+         ('ord-mod-1', ?, 110000, 'completed', 'paid', 'cod', 'default', datetime('now')),
+         ('ord-mod-2', ?, 65000, 'completed', 'paid', 'cod', 'default', datetime('now'))`
+    ).run(
+      JSON.stringify([{ name: 'Latte', category: 'Coffee', quantity: 2, price: 45000, subtotalCents: 110000 }]),
+      JSON.stringify([{ name: 'Matcha', category: 'Tea', quantity: 1, price: 50000, modifiers: [{ name: 'Kem cheese', priceAdjustment: 15000 }] }]),
+    );
+    sqlite.prepare(
+      `INSERT INTO staff_shifts (tenant_id, staff_id, staff_name, role, date, shift, clock_in, opening_cash)
+       VALUES
+         ('default', 'barista-1', 'Barista One', 'barista', ?, 'attendance', datetime('now'), 0),
+         ('default', 'cashier-1', 'Cashier One', 'cashier', ?, 'attendance', datetime('now'), 100000)`
+    ).run(today, today);
+
+    const app = new Hono<{ Bindings: Env; Variables: { user: Record<string, unknown>; tenantId: string } }>();
+    app.use('*', async (c, next) => {
+      c.set('user', { id: 'admin-flagship', role: 'admin', tenantId: 'default' });
+      c.set('tenantId', 'default');
+      await next();
+    });
+    registerReconciliationHandlers(app);
+
+    const env = { AURA_DB: db, CASH_RECONCILIATION_ENABLED: 'true' } as unknown as Env;
+    const res = await app.request(`/reconciliation?from=${today}&to=${today}`, { method: 'GET' }, env);
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      data: {
+        categories: Array<{ category: string; items_sold: number; revenue: number }>;
+        has_unreconciled_shifts: boolean;
+        unreconciled_shifts: Array<{ staff_name: string }>;
+      };
+    };
+    expect(body.data.categories).toEqual([
+      { category: 'Coffee', items_sold: 2, revenue: 110000 },
+      { category: 'Tea', items_sold: 1, revenue: 65000 },
+    ]);
+    expect(body.data.has_unreconciled_shifts).toBe(true);
+    expect(body.data.unreconciled_shifts).toHaveLength(1);
+    expect(body.data.unreconciled_shifts[0].staff_name).toBe('Cashier One');
+  });
+
+  it('listShifts deduplicates multiple reconciliation rows per shift and returns latest cash metrics', async () => {
+    const { sqlite, db } = setupDb();
+    dbs.push(sqlite);
+    const env = { AURA_DB: db, CASH_RECONCILIATION_ENABLED: 'true' } as unknown as Env;
+    const scope = await shiftScope(env, { id: 'cashier-1', role: 'cashier', tenantId: 'default' });
+    const shift = await clockIn(scope, 'cashier-1', undefined, undefined, 200000);
+    sqlite.prepare(
+      `INSERT INTO shift_reconciliations (id, shift_id, tenant_id, expected_cash, actual_cash, variance, created_at)
+       VALUES
+         ('rec-old', ?, 'default', 250000, 240000, -10000, '2026-11-23T08:00:00.000Z'),
+         ('rec-new', ?, 'default', 250000, 250000, 0, '2026-11-23T09:00:00.000Z')`
+    ).run(String(shift.id), String(shift.id));
+
+    const app = new Hono<{ Bindings: Env; Variables: { user: Record<string, unknown>; tenantId: string } }>();
+    app.use('*', async (c, next) => {
+      c.set('user', { id: 'cashier-1', role: 'cashier', tenantId: 'default' });
+      c.set('tenantId', 'default');
+      await next();
+    });
+    app.route('/api/shifts', shiftsRouter);
+
+    const listed = await listShifts(scope, { attendanceOnly: true });
+    expect(listed.meta.total).toBe(1);
+    expect(listed.rows).toHaveLength(1);
+    expect(listed.rows[0].actual_cash).toBe(250000);
+    expect(listed.rows[0].cash_variance).toBe(0);
+
+    const res = await app.request('/api/shifts', { method: 'GET' }, env);
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      data: Array<{ id: string; actual_cash: number; cash_variance: number }>;
+    };
+    expect(body.data).toHaveLength(1);
+    expect(body.data[0].actual_cash).toBe(250000);
+    expect(body.data[0].cash_variance).toBe(0);
+  });
+
+  it('assignCashPaymentsToShift rejects concurrent reconciliation via atomic SQL guard', async () => {
+    const { sqlite, db } = setupDb();
+    dbs.push(sqlite);
+    const env = { AURA_DB: db, CASH_RECONCILIATION_ENABLED: 'true' } as unknown as Env;
+    const scope = await shiftScope(env, { id: 'cashier-1', role: 'cashier', tenantId: 'default' });
+    const shift = await clockIn(scope, 'cashier-1', undefined, undefined, 200000);
+    sqlite.prepare(
+      "INSERT INTO payments (id, order_id, method, amount, status, tenant_id) VALUES ('pay-race-1', 'ord-race-1', 'cod', 50000, 'completed', 'default')"
+    ).run();
+
+    // Simulate a reconciliation committing right before the attribution batch executes
+    const racingDb = {
+      ...db,
+      prepare: db.prepare.bind(db),
+      async batch(stmts: Array<{ run: () => Promise<unknown> }>) {
+        sqlite.prepare(
+          `INSERT INTO shift_reconciliations (id, shift_id, tenant_id, expected_cash, actual_cash, variance, created_at)
+           VALUES ('rec-race', ?, 'default', 200000, 200000, 0, datetime('now'))`
+        ).run(String(shift.id));
+        const out = [];
+        for (const s of stmts) out.push(await s.run());
+        return out;
+      },
+    };
+    const racingEnv = { AURA_DB: racingDb, CASH_RECONCILIATION_ENABLED: 'true' } as unknown as Env;
+    await expect(
+      assignCashPaymentsToShift(racingEnv, String(shift.id), ['pay-race-1'], 'cashier-1', 'default', 'cashier')
+    ).rejects.toMatchObject({ status: 409 });
+
+    const attrCount = sqlite
+      .prepare("SELECT COUNT(*) AS cnt FROM cash_payment_attributions WHERE payment_id = 'pay-race-1'")
+      .get() as { cnt: number };
+    expect(attrCount.cnt).toBe(0);
   });
 });
