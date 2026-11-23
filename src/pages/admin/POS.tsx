@@ -157,6 +157,8 @@ export default function AdminPOSPage() {
 
   /* ── Local State ──────────────────────────────────────────────────── */
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('payos');
+  const [orderType, setOrderType] = useState<'dine_in' | 'takeaway' | 'delivery'>('dine_in');
+  const [deliveryAddress, setDeliveryAddress] = useState('');
   const [customer, setCustomer] = useState<POSCustomer | null>(null);
   const [selectedTableId, setSelectedTableId] = useState<string | undefined>(undefined);
   const [checkoutSuccess, setCheckoutSuccess] = useState(false);
@@ -303,7 +305,13 @@ export default function AdminPOSPage() {
           customer_phone: customer?.phone || '',
           customer_id: customer?.id,
           customer_email: undefined,
-          customer_address: t('adminPOS.customerDefaultAddress'),
+          customer_address:
+            orderType === 'dine_in'
+              ? t('adminPOS.customerDefaultAddress')
+              : orderType === 'delivery'
+                ? deliveryAddress.trim()
+                : '',
+          order_type: resolvedTableId ? 'dine_in' : orderType,
           payment_method: paymentMethod,
           shipping_fee: 0,
           service_fee: serviceFee,
@@ -354,12 +362,17 @@ export default function AdminPOSPage() {
             setPaymentQrPayload(resolvedQrCode || safeUrl);
             setPaymentUrl(safeUrl);
             setCustomer(null);
-            _setSelectedTableId(undefined);
+            setSelectedTableId(undefined);
+            setDeliveryAddress('');
+            if (resolvedTableId) {
+              void queryClient.invalidateQueries({ queryKey: ['pos-tables'] });
+            }
             return true;
           }
 
           setCustomer(null);
           setSelectedTableId(undefined);
+          setDeliveryAddress('');
           if (resolvedTableId) {
             void queryClient.invalidateQueries({ queryKey: ['pos-tables'] });
           }
@@ -388,7 +401,7 @@ export default function AdminPOSPage() {
         setIsCompleting(false);
       }
     },
-    [paymentMethod, checkoutMutation.mutateAsync, payOSMutation.mutateAsync, customer, selectedTableId, queryClient, t, navigate],
+    [paymentMethod, orderType, deliveryAddress, checkoutMutation.mutateAsync, payOSMutation.mutateAsync, customer, selectedTableId, queryClient, t, navigate],
   );
 
   const handleRetryPayOSLink = useCallback(async () => {
@@ -446,6 +459,43 @@ export default function AdminPOSPage() {
   /* ── Render ───────────────────────────────────────────────────────── */
   return (
     <div className="relative min-h-screen">
+      <div
+        role="group"
+        aria-label={t('orderMgmt.channelFilter', { defaultValue: 'Loại đơn' })}
+        className="fixed bottom-4 left-4 z-40 flex items-center gap-1 rounded-xl border border-white/15 bg-[#0A1A2E]/90 p-1 backdrop-blur-md shadow-lg"
+      >
+        {(
+          [
+            { key: 'dine_in', label: t('orderMgmt.channel.dine_in', { defaultValue: 'Tại quán' }) },
+            { key: 'takeaway', label: t('orderMgmt.channel.takeaway', { defaultValue: 'Mang đi' }) },
+            { key: 'delivery', label: t('orderMgmt.channel.delivery', { defaultValue: 'Giao hàng' }) },
+          ] as const
+        ).map((opt) => (
+          <button
+            key={opt.key}
+            type="button"
+            onClick={() => setOrderType(opt.key)}
+            aria-pressed={orderType === opt.key}
+            className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors ${
+              orderType === opt.key
+                ? 'bg-amber-400/20 text-amber-200 border border-amber-400/40'
+                : 'text-slate-300 hover:bg-white/10'
+            }`}
+          >
+            {opt.label}
+          </button>
+        ))}
+        {orderType === 'delivery' && (
+          <input
+            type="text"
+            value={deliveryAddress}
+            onChange={(e) => setDeliveryAddress(e.target.value)}
+            placeholder={t('orderMgmt.searchField.address', { defaultValue: 'Địa chỉ giao hàng' })}
+            aria-label={t('orderMgmt.searchField.address', { defaultValue: 'Địa chỉ giao hàng' })}
+            className="ml-2 flex-1 min-w-[200px] max-w-sm rounded-lg border border-white/15 bg-white/5 px-3 py-1.5 text-xs text-white placeholder:text-slate-400 outline-none focus:border-amber-400"
+          />
+        )}
+      </div>
       <StitchPOSNew
         key={`${activeTenant}:${sessionVersion}`}
         menuItems={stitchMenuItems}

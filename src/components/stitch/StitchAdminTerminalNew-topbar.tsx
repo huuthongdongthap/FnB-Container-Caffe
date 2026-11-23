@@ -1,14 +1,12 @@
 import { useTranslation } from 'react-i18next';
-import { Search, Bell, HelpCircle, Menu } from 'lucide-react';
+import { Menu } from 'lucide-react';
 import { cn } from '@/lib/cn';
 
 interface TopBarProps {
-  searchQuery: string;
-  onSearchChange: (value: string) => void;
   onOpenSidebar: () => void;
 }
 
-export function TopBar({ searchQuery, onSearchChange, onOpenSidebar }: TopBarProps) {
+export function TopBar({ onOpenSidebar }: TopBarProps) {
   const { t } = useTranslation();
   const tTerminal = (key: string) => t(`terminal.${key}`);
 
@@ -36,39 +34,6 @@ export function TopBar({ searchQuery, onSearchChange, onOpenSidebar }: TopBarPro
         <span className="truncate whitespace-nowrap font-display text-lg font-bold text-[var(--aura-chrome-bright, #E8EEF3)] lg:text-2xl">
           {tTerminal('managementTitle')}
         </span>
-      </div>
-
-      {/* Right actions */}
-      <div className="flex shrink-0 items-center gap-2 md:gap-4 lg:gap-6">
-        {/* Search */}
-        <div className="relative hidden lg:block">
-          <Search
-            size={16}
-            className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--aura-text-secondary, #a0a8b0)]"
-          />
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => onSearchChange(e.target.value)}
-            placeholder={tTerminal('searchPlaceholder')}
-            className="w-40 border-b border-[var(--st-outline-variant, #44474d)] bg-black/20 py-2 pl-10 pr-4 text-sm text-[var(--aura-text-primary, #e8e8e8)] outline-none transition-all placeholder:text-[var(--aura-text-secondary, #a0a8b0)]/60 focus:border-[var(--aura-chrome-bright, #E8EEF3)] md:w-64"
-            aria-label={tTerminal('search')}
-          />
-        </div>
-
-        {/* Icon buttons */}
-        <button type="button"
-          className="min-h-[44px] min-w-[44px] flex items-center justify-center text-[var(--aura-text-secondary, #a0a8b0)] transition-all hover:text-[var(--aura-primary, #c6c6c7)]"
-          aria-label={tTerminal('notifications') || 'Notifications'}
-        >
-          <Bell size={20} />
-        </button>
-        <button type="button"
-          className="min-h-[44px] min-w-[44px] flex items-center justify-center text-[var(--aura-text-secondary, #a0a8b0)] transition-all hover:text-[var(--aura-primary, #c6c6c7)]"
-          aria-label={tTerminal('help') || 'Help'}
-        >
-          <HelpCircle size={20} />
-        </button>
       </div>
     </header>
   );

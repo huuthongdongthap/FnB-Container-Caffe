@@ -31,6 +31,7 @@ vi.mock('lucide-react', () => ({
   TrendingUp: () => null,
   Users: () => null,
   LayoutGrid: () => null,
+  Table: () => null,
   Loader2: () => null,
   LayoutDashboard: () => null,
   Receipt: () => null,

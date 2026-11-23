@@ -60,7 +60,7 @@ describe('StitchOrderMgmtNew', () => {
     const onRefresh = vi.fn();
     const user = (await import('@testing-library/user-event')).default.setup();
     renderWithProviders(
-      <StitchOrderMgmtNew error="Something went wrong" onRefresh={onRefresh} />,
+      <StitchOrderMgmtNew orders={[]} error="Something went wrong" onRefresh={onRefresh} />,
     );
     const retryBtn = screen.getByLabelText(/terminal\.retry/);
     await user.click(retryBtn);
