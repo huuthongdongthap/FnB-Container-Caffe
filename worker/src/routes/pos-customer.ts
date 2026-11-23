@@ -125,9 +125,11 @@ posCustomerRouter.get('/', requireStaff(['owner', 'manager', 'supervisor', 'staf
   });
 
   if (isSearchMode && q) {
+    const boundedQ = q.slice(0, 100);
     const escapeLike = (v: string) => v.replace(/[\\%_]/g, '\\$&');
-    const likePattern = `%${escapeLike(q.toLowerCase())}%`;
-    const phoneDigits = q.replace(/\D/g, '');
+    const likePattern = `%${escapeLike(boundedQ.toLowerCase())}%`;
+    const isPhoneLike = /^[+\d\s\-().]+$/.test(boundedQ);
+    const phoneDigits = isPhoneLike ? boundedQ.replace(/\D/g, '') : '';
     const phoneLike = phoneDigits.length >= 2 ? `%${escapeLike(phoneDigits)}%` : likePattern;
     let searchRows: PosCustomerRow[] = [];
     try {
@@ -178,7 +180,7 @@ posCustomerRouter.get('/', requireStaff(['owner', 'manager', 'supervisor', 'staf
         searchRows = res?.results ?? [];
       } catch (secondaryErr) {
         const secondaryMsg = secondaryErr instanceof Error ? secondaryErr.message : String(secondaryErr);
-        if (!/no such column/i.test(secondaryMsg)) {
+        if (!/no such column.*tenant_id/i.test(secondaryMsg)) {
           return errorResponse('Lỗi truy vấn khách hàng', 500);
         }
         if (!isNonDefaultTenant) {

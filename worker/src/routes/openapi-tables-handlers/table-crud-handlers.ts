@@ -119,7 +119,7 @@ export async function releaseStaleReservedTables(db: D1Database, tenantId: strin
     const today = vietnamTodayIso();
     const subTenantFilter = scopedTenant
       ? "AND COALESCE(NULLIF(TRIM(r.tenant_id), ''), 'default') = ?"
-      : '';
+      : "AND COALESCE(NULLIF(TRIM(r.tenant_id), ''), 'default') = COALESCE(NULLIF(TRIM(cafe_tables.tenant_id), ''), 'default')";
     const updateBinds: string[] = [today];
     if (scopedTenant) {
       updateBinds.push(scopedTenant, scopedTenant);
