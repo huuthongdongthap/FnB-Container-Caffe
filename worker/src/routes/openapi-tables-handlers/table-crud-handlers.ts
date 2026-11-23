@@ -6,7 +6,11 @@ import { formatTable, isAllowedLocationForTenant, resolveOpenApiTablesTenant, wr
 import { getDatabase } from '../../lib/db';
 import { matchesTenantRow, resolvePilotStore } from '../../middleware/tenant';
 
-async function hasUnpaidActiveOrdersOnTable(db: any, tableId: string, effectiveTableTenant: string): Promise<boolean> {
+export async function hasUnpaidActiveOrdersOnTable(
+  db: { prepare: (sql: string) => { bind: (...args: unknown[]) => { all: () => Promise<{ results?: Array<Record<string, unknown>> }> } } },
+  tableId: string,
+  effectiveTableTenant: string,
+): Promise<boolean> {
   const isOrderRowUnpaid = (row: Record<string, unknown> | null | undefined): boolean => {
     if (!row || typeof row !== 'object') return false;
     const status = String(row.status ?? 'pending').trim().toLowerCase();
@@ -19,23 +23,40 @@ async function hasUnpaidActiveOrdersOnTable(db: any, tableId: string, effectiveT
     }
     return true;
   };
+  const activeUnpaidWhere =
+    "table_id = ? AND LOWER(TRIM(COALESCE(status, 'pending'))) NOT IN ('completed', 'cancelled', 'canceled', 'rejected', 'failed', 'expired', 'refunded') AND LOWER(TRIM(COALESCE(payment_status, 'unpaid'))) NOT IN ('paid', 'completed', 'refunded', 'cancelled', 'canceled', 'failed', 'expired')";
   try {
-    const res = effectiveTableTenant && effectiveTableTenant !== '*'
-      ? await db
+    let res: { results?: Array<Record<string, unknown>> } | null = null;
+    if (effectiveTableTenant && effectiveTableTenant !== '*') {
+      try {
+        res = await db
           .prepare(
-            "SELECT id, status, payment_status, tenant_id FROM orders WHERE table_id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ? LIMIT 10"
+            `SELECT id, status, payment_status, tenant_id FROM orders WHERE ${activeUnpaidWhere} AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ? LIMIT 1`
           )
           .bind(tableId, effectiveTableTenant)
-          .all()
-          .catch(() =>
-            effectiveTableTenant === 'default'
-              ? db.prepare('SELECT id, status, payment_status FROM orders WHERE table_id = ? LIMIT 10').bind(tableId).all()
-              : { results: [] }
-          )
-      : await db.prepare('SELECT id, status, payment_status, tenant_id FROM orders WHERE table_id = ? LIMIT 10').bind(tableId).all();
+          .all();
+      } catch (err) {
+        const msg = String(err);
+        if (/no such table:.*orders/i.test(msg)) return false;
+        if (effectiveTableTenant === 'default' && /no such column:.*tenant_id/i.test(msg)) {
+          res = await db
+            .prepare(`SELECT id, status, payment_status FROM orders WHERE ${activeUnpaidWhere} LIMIT 1`)
+            .bind(tableId)
+            .all();
+        } else {
+          return true;
+        }
+      }
+    } else {
+      res = await db
+        .prepare(`SELECT id, status, payment_status, tenant_id FROM orders WHERE ${activeUnpaidWhere} LIMIT 1`)
+        .bind(tableId)
+        .all();
+    }
     return (res?.results || []).some((r: Record<string, unknown>) => isOrderRowUnpaid(r));
-  } catch {
-    return false;
+  } catch (err) {
+    if (/no such table:.*orders/i.test(String(err))) return false;
+    return true;
   }
 }
 

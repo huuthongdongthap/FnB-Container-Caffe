@@ -278,4 +278,49 @@ describe('UAT #132/#133/#134 COD, shifts, payouts, and reconciliation regression
     expect(body.data.has_unreconciled_shifts).toBe(true);
     expect(body.data.unreconciled_shifts.length).toBe(1);
   });
+
+  it('shift cash assignment and payout endpoints fail closed for missing, inactive, demoted, or cross-tenant actors', async () => {
+    const { sqlite, db } = setupDb();
+    dbs.push(sqlite);
+    sqlite.prepare(
+      `INSERT INTO users (id, name, role, tenant_id, is_active) VALUES
+        ('inactive-cashier', 'Inactive Cashier', 'cashier', 'default', 0),
+        ('other-tenant-mgr', 'Other Store Mgr', 'manager', 'store-b', 1)`
+    ).run();
+    const env = { AURA_DB: db, CASH_RECONCILIATION_ENABLED: 'true' } as unknown as Env;
+    const scope = await shiftScope(env, { id: 'cashier-1', role: 'cashier', tenantId: 'default' });
+    const shift = await clockIn(scope, 'cashier-1', undefined, undefined, 200000);
+    sqlite.prepare(
+      "INSERT INTO payments (id, order_id, method, amount, status, tenant_id) VALUES ('pay-sec-1', 'ord-sec-1', 'cod', 50000, 'completed', 'default')"
+    ).run();
+
+    // Unknown / deleted actor fails closed (403)
+    await expect(
+      assignCashPaymentsToShift(env, String(shift.id), ['pay-sec-1'], 'ghost-user', 'default', 'manager')
+    ).rejects.toMatchObject({ status: 403 });
+    await expect(
+      createShiftCashPayout(env, String(shift.id), { amount: 10000, reason: 'Ice' }, 'ghost-user', 'default', 'manager')
+    ).rejects.toMatchObject({ status: 403 });
+    await expect(
+      listShiftCashPayouts(env, String(shift.id), 'default', 'ghost-user', 'manager')
+    ).rejects.toMatchObject({ status: 403 });
+
+    // Inactive actor fails closed (403)
+    await expect(
+      listShiftCashPayouts(env, String(shift.id), 'default', 'inactive-cashier', 'cashier')
+    ).rejects.toMatchObject({ status: 403 });
+
+    // Stale JWT claiming manager when DB role is cashier fails closed (403)
+    await expect(
+      createShiftCashPayout(env, String(shift.id), { amount: 10000, reason: 'Ice' }, 'cashier-1', 'default', 'manager')
+    ).rejects.toMatchObject({ status: 403 });
+    await expect(
+      listShiftCashPayouts(env, String(shift.id), 'default', 'cashier-1', 'manager')
+    ).rejects.toMatchObject({ status: 403 });
+
+    // Cross-tenant manager fails closed (403)
+    await expect(
+      assignCashPaymentsToShift(env, String(shift.id), ['pay-sec-1'], 'other-tenant-mgr', 'default', 'manager')
+    ).rejects.toMatchObject({ status: 403 });
+  });
 });

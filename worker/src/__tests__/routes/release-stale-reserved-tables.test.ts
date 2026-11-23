@@ -1,6 +1,9 @@
 import { describe, it, expect, vi } from 'vitest';
 import type { D1Database } from '@cloudflare/workers-types';
-import { releaseStaleReservedTables } from '../../routes/openapi-tables-handlers/table-crud-handlers';
+import {
+  hasUnpaidActiveOrdersOnTable,
+  releaseStaleReservedTables,
+} from '../../routes/openapi-tables-handlers/table-crud-handlers';
 
 interface RecordedQuery {
   sql: string;
@@ -89,5 +92,43 @@ describe('releaseStaleReservedTables', () => {
     expect(queries[1]?.sql).toContain("COALESCE(NULLIF(TRIM(r.reservation_date), ''), r.date, '')");
     expect(queries[2]?.sql).toContain("COALESCE(r.reservation_date, '')");
     expect(queries[2]?.binds).toEqual([expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/), 'tenant_d', 'tenant_d']);
+  });
+});
+
+describe('hasUnpaidActiveOrdersOnTable', () => {
+  it('filters terminal and paid orders in SQL with LIMIT 1 so historical completed orders never hide active unpaid orders', async () => {
+    let capturedSql = '';
+    const db = {
+      prepare: vi.fn((sql: string) => {
+        capturedSql = sql;
+        return {
+          bind: vi.fn(() => ({
+            all: vi.fn(async () => ({
+              results: [{ id: 'ord-15', status: 'preparing', payment_status: 'unpaid', tenant_id: 'default' }],
+            })),
+          })),
+        };
+      }),
+    };
+
+    const blocked = await hasUnpaidActiveOrdersOnTable(db, 'table-1', 'default');
+    expect(blocked).toBe(true);
+    expect(capturedSql).toContain("NOT IN ('completed', 'cancelled', 'canceled', 'rejected', 'failed', 'expired', 'refunded')");
+    expect(capturedSql).toContain("NOT IN ('paid', 'completed', 'refunded', 'cancelled', 'canceled', 'failed', 'expired')");
+    expect(capturedSql).toContain('LIMIT 1');
+  });
+
+  it('fails closed on unexpected DB errors instead of allowing table release', async () => {
+    const db = {
+      prepare: vi.fn(() => ({
+        bind: vi.fn(() => ({
+          all: vi.fn(async () => {
+            throw new Error('D1_ERROR: database is locked');
+          }),
+        })),
+      })),
+    };
+
+    await expect(hasUnpaidActiveOrdersOnTable(db, 'table-1', 'tenant_a')).resolves.toBe(true);
   });
 });

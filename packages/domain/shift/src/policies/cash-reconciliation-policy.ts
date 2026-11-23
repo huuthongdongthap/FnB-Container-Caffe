@@ -587,22 +587,56 @@ const SHIFT_MANAGER_ROLES = new Set(['owner', 'manager', 'supervisor', 'admin'])
 const MAX_ASSIGN_PAYMENT_IDS = 100;
 const MAX_PAYOUT_AMOUNT_VND = 100_000_000;
 
-async function requireActiveActor(db: D1Database, actorId: string): Promise<void> {
+async function requireActiveActor(
+  db: D1Database,
+  actorId: string,
+  expectedRole: string,
+  targetTenant: string,
+  allowedRoles?: Set<string>,
+): Promise<string> {
   if (!actorId.trim()) {
     throw new ShiftContractError('Forbidden: actor identity required', 403);
   }
+  let actor: { is_active?: number | null; role?: string | null; tenant_id?: string | null } | null = null;
+  let hasUsersTable = true;
   try {
-    const actor = await db
-      .prepare('SELECT is_active FROM users WHERE id = ? LIMIT 1')
+    actor = await db
+      .prepare('SELECT is_active, role, tenant_id FROM users WHERE id = ? LIMIT 1')
       .bind(actorId)
-      .first<{ is_active?: number | null }>();
-    if (actor && Number(actor.is_active) !== 1) {
-      throw new ShiftContractError('Forbidden: inactive staff account', 403);
-    }
+      .first<{ is_active?: number | null; role?: string | null; tenant_id?: string | null }>();
   } catch (err) {
     if (err instanceof ShiftContractError) throw err;
-    if (!/no such table:.*users/i.test(String(err))) throw err;
+    if (/no such table:.*users/i.test(String(err))) {
+      hasUsersTable = false;
+    } else {
+      throw err;
+    }
   }
+  if (!hasUsersTable) {
+    if (allowedRoles && !allowedRoles.has(expectedRole)) {
+      throw new ShiftContractError('Forbidden: insufficient role', 403);
+    }
+    return expectedRole;
+  }
+  if (!actor || Number(actor.is_active) !== 1 || typeof actor.role !== 'string' || !actor.role.trim()) {
+    throw new ShiftContractError('Forbidden: inactive or unknown staff account', 403);
+  }
+  const dbRole = actor.role.trim();
+  if (expectedRole && dbRole !== expectedRole) {
+    throw new ShiftContractError('Forbidden: actor role mismatch', 403);
+  }
+  if (allowedRoles && !allowedRoles.has(dbRole)) {
+    throw new ShiftContractError('Forbidden: insufficient role', 403);
+  }
+  const normalizedTargetTenant = targetTenant.trim() || 'default';
+  const actorTenantRaw = (actor.tenant_id?.trim() || 'default');
+  const actorTenantLower = actorTenantRaw.toLowerCase();
+  const isHqActor =
+    (dbRole === 'owner' || dbRole === 'admin') && (actorTenantLower === 'hq' || actorTenantLower === '*');
+  if (!isHqActor && normalizedTargetTenant !== '*' && actorTenantRaw !== normalizedTargetTenant) {
+    throw new ShiftContractError('Forbidden: cross-tenant actor', 403);
+  }
+  return dbRole;
 }
 
 async function requireUnreconciledShiftInTenant(
@@ -654,9 +688,10 @@ export async function assignCashPaymentsToShift(
     throw new ShiftContractError('Forbidden: insufficient role to assign cash payments', 403);
   }
   const db = (env as Env)?.AURA_DB ?? (env as D1Database);
-  await requireActiveActor(db, actorId);
+  const normTenant = tenantId.trim() === 'hq' ? '*' : (tenantId.trim() || 'default');
+  const effectiveRole = await requireActiveActor(db, actorId, actorRole, normTenant, CASH_ASSIGN_ROLES);
   const shift = await requireUnreconciledShiftInTenant(db, shiftId, tenantId);
-  const isManager = SHIFT_MANAGER_ROLES.has(actorRole);
+  const isManager = SHIFT_MANAGER_ROLES.has(effectiveRole);
   if (!isManager && shift.staff_id !== actorId) {
     throw new ShiftContractError('Forbidden: cannot assign cash payments to another staff member shift', 403);
   }
@@ -740,6 +775,10 @@ export async function listShiftCashPayouts(
 ): Promise<ShiftCashPayout[]> {
   const db = (env as Env)?.AURA_DB ?? (env as D1Database);
   const normTenant = tenantId.trim() === 'hq' ? '*' : (tenantId.trim() || 'default');
+  let effectiveRole = actorRole;
+  if (actorId !== undefined || actorRole !== undefined) {
+    effectiveRole = await requireActiveActor(db, actorId || '', actorRole || '', normTenant);
+  }
   const shift = normTenant === '*'
     ? await db.prepare('SELECT id, tenant_id, staff_id FROM staff_shifts WHERE id = ? LIMIT 1')
         .bind(shiftId).first<{ id: string | number; tenant_id?: string | null; staff_id?: string | null }>()
@@ -749,7 +788,7 @@ export async function listShiftCashPayouts(
   if (!shift) {
     throw new ShiftContractError('Shift not found', 404);
   }
-  if (actorRole && !SHIFT_MANAGER_ROLES.has(actorRole) && String(shift.staff_id || '') !== String(actorId || '')) {
+  if (effectiveRole && !SHIFT_MANAGER_ROLES.has(effectiveRole) && String(shift.staff_id || '') !== String(actorId || '')) {
     throw new ShiftContractError('Forbidden: cannot view cash payouts for another staff member shift', 403);
   }
   const effectiveTenant = (typeof shift.tenant_id === 'string' && shift.tenant_id.trim()) || (normTenant === '*' ? 'default' : normTenant);
@@ -781,9 +820,10 @@ export async function createShiftCashPayout(
     throw new ShiftContractError('Payout reason is required (max 300 characters)', 400);
   }
   const db = (env as Env)?.AURA_DB ?? (env as D1Database);
-  await requireActiveActor(db, actorId);
+  const normTenant = tenantId.trim() === 'hq' ? '*' : (tenantId.trim() || 'default');
+  const effectiveRole = await requireActiveActor(db, actorId, actorRole, normTenant, PAYOUT_ROLES);
   const shift = await requireUnreconciledShiftInTenant(db, shiftId, tenantId);
-  const isManager = SHIFT_MANAGER_ROLES.has(actorRole);
+  const isManager = SHIFT_MANAGER_ROLES.has(effectiveRole);
   if (!isManager && shift.staff_id !== actorId) {
     throw new ShiftContractError('Forbidden: cannot record payout for another staff member shift', 403);
   }
