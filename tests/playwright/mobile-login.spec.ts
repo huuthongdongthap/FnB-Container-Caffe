@@ -94,8 +94,8 @@ test.describe('Mobile Login', () => {
     await page.getByRole('button', { name: /Đăng nhập|Login/ }).click();
     // Should remain on login page
     await expect(page).toHaveURL(/\/mobile\/login/);
-    // Error message appears
-    await expect(page.getByText(/Đăng nhập thất bại|Login failed/)).toBeVisible();
+    // Error message appears (API returns specific error message when provided)
+    await expect(page.getByText(/Thiet bi chua dang ky|Đăng nhập thất bại|Login failed/)).toBeVisible();
   });
 
   test('navigates to /mobile on successful login (mock)', { tag: '@smoke' }, async ({ page }) => {

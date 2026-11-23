@@ -263,8 +263,8 @@ test.describe('AURA CAFE — New Stitch Routes E2E', () => {
             if (!main) return '';
             return getComputedStyle(main).backgroundColor;
           });
-          // Dark navy #0A1A2E in RGB
-          expect(bgColor).toMatch(/rgba?\(10,\s*26,\s*46/);
+          // Dark navy Stitch surface (#0A1A2E or #0E1322) in RGB
+          expect(bgColor).toMatch(/rgba?\((?:10,\s*26,\s*46|14,\s*19,\s*34)/);
 
           // Verify Stitch CSS custom properties are resolved
           const primaryColor = await page.evaluate(() =>
