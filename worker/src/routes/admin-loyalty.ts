@@ -305,16 +305,27 @@ adminLoyaltyRouter.get('/widgets', async(c) => {
       }
 
       const voucherRes = await db
-        .prepare("SELECT customer_id, status, tenant_id FROM user_rewards WHERE COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?")
-        .bind(tenantId)
+        .prepare("SELECT customer_id, status, tenant_id FROM user_rewards WHERE (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?)")
+        .bind(tenantId, tenantId)
         .all<{ customer_id: string; status: string; tenant_id?: string | null }>()
-        .catch(() =>
-          db
-            .prepare("SELECT customer_id, status, tenant_id FROM loyalty_redemptions WHERE COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?")
-            .bind(tenantId)
-            .all<{ customer_id: string; status: string; tenant_id?: string | null }>()
-            .catch(() => ({ results: [] as Array<{ customer_id: string; status: string; tenant_id?: string | null }> }))
-        );
+        .catch(async (err: unknown) => {
+          const msg = err instanceof Error ? err.message : String(err);
+          if (!/no such table:.*user_rewards/i.test(msg)) {
+            throw err;
+          }
+          try {
+            return await db
+              .prepare("SELECT customer_id, status, tenant_id FROM loyalty_redemptions WHERE (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?)")
+              .bind(tenantId, tenantId)
+              .all<{ customer_id: string; status: string; tenant_id?: string | null }>();
+          } catch (fallbackErr: unknown) {
+            const fallbackMsg = fallbackErr instanceof Error ? fallbackErr.message : String(fallbackErr);
+            if (!/no such table:.*loyalty_redemptions/i.test(fallbackMsg)) {
+              throw fallbackErr;
+            }
+            return { results: [] as Array<{ customer_id: string; status: string; tenant_id?: string | null }> };
+          }
+        });
       const scopedVouchers = (voucherRes.results || []).filter(
         (v) =>
           scopedIds.has(String(v.customer_id)) &&

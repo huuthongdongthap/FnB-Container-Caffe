@@ -587,6 +587,11 @@ const SHIFT_MANAGER_ROLES = new Set(['owner', 'manager', 'supervisor', 'admin'])
 const MAX_ASSIGN_PAYMENT_IDS = 100;
 const MAX_PAYOUT_AMOUNT_VND = 100_000_000;
 
+function normalizeScopeTenant(tenantId: string): string {
+  const trimmed = tenantId.trim();
+  return trimmed.toLowerCase() === 'hq' ? '*' : (trimmed || 'default');
+}
+
 async function requireActiveActor(
   db: D1Database,
   actorId: string,
@@ -628,7 +633,7 @@ async function requireActiveActor(
   if (allowedRoles && !allowedRoles.has(dbRole)) {
     throw new ShiftContractError('Forbidden: insufficient role', 403);
   }
-  const normalizedTargetTenant = targetTenant.trim() || 'default';
+  const normalizedTargetTenant = normalizeScopeTenant(targetTenant);
   const actorTenantRaw = (actor.tenant_id?.trim() || 'default');
   const actorTenantLower = actorTenantRaw.toLowerCase();
   const isHqActor =
@@ -644,7 +649,7 @@ async function requireUnreconciledShiftInTenant(
   shiftId: string,
   tenantId: string,
 ): Promise<{ id: string; tenant: string; clock_in: string; clock_out: string | null; staff_id: string | null }> {
-  const normTenant = tenantId.trim() === 'hq' ? '*' : (tenantId.trim() || 'default');
+  const normTenant = normalizeScopeTenant(tenantId);
   const shift = normTenant === '*'
     ? await db.prepare('SELECT id, tenant_id, clock_in, clock_out, staff_id, attendance_state FROM staff_shifts WHERE id = ? LIMIT 1')
         .bind(shiftId)
@@ -688,7 +693,7 @@ export async function assignCashPaymentsToShift(
     throw new ShiftContractError('Forbidden: insufficient role to assign cash payments', 403);
   }
   const db = (env as Env)?.AURA_DB ?? (env as D1Database);
-  const normTenant = tenantId.trim() === 'hq' ? '*' : (tenantId.trim() || 'default');
+  const normTenant = normalizeScopeTenant(tenantId);
   const effectiveRole = await requireActiveActor(db, actorId, actorRole, normTenant, CASH_ASSIGN_ROLES);
   const shift = await requireUnreconciledShiftInTenant(db, shiftId, tenantId);
   const isManager = SHIFT_MANAGER_ROLES.has(effectiveRole);
@@ -770,15 +775,12 @@ export async function listShiftCashPayouts(
   env: Env | D1Database,
   shiftId: string,
   tenantId: string,
-  actorId?: string,
-  actorRole?: string,
+  actorId: string,
+  actorRole: string,
 ): Promise<ShiftCashPayout[]> {
   const db = (env as Env)?.AURA_DB ?? (env as D1Database);
-  const normTenant = tenantId.trim() === 'hq' ? '*' : (tenantId.trim() || 'default');
-  let effectiveRole = actorRole;
-  if (actorId !== undefined || actorRole !== undefined) {
-    effectiveRole = await requireActiveActor(db, actorId || '', actorRole || '', normTenant);
-  }
+  const normTenant = normalizeScopeTenant(tenantId);
+  const effectiveRole = await requireActiveActor(db, actorId, actorRole, normTenant);
   const shift = normTenant === '*'
     ? await db.prepare('SELECT id, tenant_id, staff_id FROM staff_shifts WHERE id = ? LIMIT 1')
         .bind(shiftId).first<{ id: string | number; tenant_id?: string | null; staff_id?: string | null }>()
@@ -788,7 +790,7 @@ export async function listShiftCashPayouts(
   if (!shift) {
     throw new ShiftContractError('Shift not found', 404);
   }
-  if (effectiveRole && !SHIFT_MANAGER_ROLES.has(effectiveRole) && String(shift.staff_id || '') !== String(actorId || '')) {
+  if (!SHIFT_MANAGER_ROLES.has(effectiveRole) && String(shift.staff_id || '') !== String(actorId || '')) {
     throw new ShiftContractError('Forbidden: cannot view cash payouts for another staff member shift', 403);
   }
   const effectiveTenant = (typeof shift.tenant_id === 'string' && shift.tenant_id.trim()) || (normTenant === '*' ? 'default' : normTenant);
@@ -820,7 +822,7 @@ export async function createShiftCashPayout(
     throw new ShiftContractError('Payout reason is required (max 300 characters)', 400);
   }
   const db = (env as Env)?.AURA_DB ?? (env as D1Database);
-  const normTenant = tenantId.trim() === 'hq' ? '*' : (tenantId.trim() || 'default');
+  const normTenant = normalizeScopeTenant(tenantId);
   const effectiveRole = await requireActiveActor(db, actorId, actorRole, normTenant, PAYOUT_ROLES);
   const shift = await requireUnreconciledShiftInTenant(db, shiftId, tenantId);
   const isManager = SHIFT_MANAGER_ROLES.has(effectiveRole);

@@ -223,9 +223,9 @@ export async function runBrowserFlow(runtime, context, check) {
       const kdsBodyText = await page.innerText('body');
       const f03NoteOnKds = kdsBodyText.includes('Ghi chú: QA local: giu nguyen ghi chu')
         && kdsBodyText.includes('Ghi chú đơn: QA don: mang ra cung luc')
-        && kdsBodyText.includes('TABLE 8');
+        && /(?:Bàn|BÀN|TABLE)\s*8/i.test(kdsBodyText);
       check('browser-f03-kds-notes-visible', f03NoteOnKds,
-        'KDS ticket displays item notes, order notes, and TABLE 8 context',
+        'KDS ticket displays item notes, order notes, and table 8 context',
         { f03NoteOnKds });
       if (loaded) {
         const start = page.getByRole('button', { name: /Bắt đầu|START PREP/i }).first();

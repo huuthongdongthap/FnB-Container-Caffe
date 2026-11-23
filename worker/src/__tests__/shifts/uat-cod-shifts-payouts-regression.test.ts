@@ -217,7 +217,7 @@ describe('UAT #132/#133/#134 COD, shifts, payouts, and reconciliation regression
     );
     expect(createdPayout.amount).toBe(25000);
 
-    const list = await listShiftCashPayouts(env, String(shift.id), 'default');
+    const list = await listShiftCashPayouts(env, String(shift.id), 'default', 'cashier-1', 'cashier');
     expect(list).toHaveLength(1);
     expect(list[0].reason).toBe('Mua đá viên');
 
@@ -327,6 +327,12 @@ describe('UAT #132/#133/#134 COD, shifts, payouts, and reconciliation regression
     ).rejects.toMatchObject({ status: 403 });
     await expect(
       listShiftCashPayouts(env, String(shift.id), 'hq', 'other-tenant-mgr', 'manager')
+    ).rejects.toMatchObject({ status: 403 });
+    await expect(
+      listShiftCashPayouts(env, String(shift.id), 'HQ', 'other-tenant-mgr', 'manager')
+    ).rejects.toMatchObject({ status: 403 });
+    await expect(
+      listShiftCashPayouts(env, String(shift.id), 'default', '', '')
     ).rejects.toMatchObject({ status: 403 });
   });
 });
