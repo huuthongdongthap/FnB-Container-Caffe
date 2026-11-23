@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { TableOrder } from '../TableOrder';
 import type { CartItem } from '@/components/stitch';
@@ -86,12 +87,15 @@ describe('TableOrder cash payment display and submit payload', () => {
   });
 
   it('displays Tiền mặt tại quán before submit and submits cod without PayOS redirect', async () => {
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     render(
-      <MemoryRouter initialEntries={['/order?table=01']}>
-        <Routes>
-          <Route path="/order" element={<TableOrder />} />
-        </Routes>
-      </MemoryRouter>,
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter initialEntries={['/order?table=01']}>
+          <Routes>
+            <Route path="/order" element={<TableOrder />} />
+          </Routes>
+        </MemoryRouter>
+      </QueryClientProvider>,
     );
 
     expect(screen.getByTestId('table-order-payment-method')).toHaveTextContent(

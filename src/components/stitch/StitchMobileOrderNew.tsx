@@ -14,6 +14,7 @@ import { Coffee } from 'lucide-react';
 
 import type { MenuItem, CartItem, StitchMobileOrderNewProps } from './StitchMobileOrderNew-types';
 import { DEFAULT_ITEMS, CATEGORIES } from './StitchMobileOrderNew-default-data';
+import { resolvePosCategoryLabel } from './StitchPOSNew-types';
 import { ProductCard } from './StitchMobileOrderNew-product-card';
 import { FloatingCartBar } from './StitchMobileOrderNew-cart-bar';
 import { CategoryFilter } from './StitchMobileOrderNew-category-filter';
@@ -35,6 +36,22 @@ export function StitchMobileOrderNew({
   const [cart, setCart] = useState<CartItem[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [showSearch, setShowSearch] = useState(false);
+
+  const derivedCategories = useMemo(() => {
+    const knownKeys = new Set<string>(CATEGORIES.map((c) => c.key));
+    const itemCats = Array.from(
+      new Set(items.map((item) => item.category?.trim()).filter((c): c is string => Boolean(c))),
+    );
+    const hasCustomCategories = itemCats.some((c) => !knownKeys.has(c));
+    if (!hasCustomCategories) return CATEGORIES;
+    return [
+      { key: 'all', label: 'Tất cả' },
+      ...itemCats.map((cat) => ({
+        key: cat,
+        label: resolvePosCategoryLabel(cat),
+      })),
+    ];
+  }, [items]);
 
   const filteredItems = useMemo(() => {
     return items.filter((item) => {
@@ -132,7 +149,7 @@ export function StitchMobileOrderNew({
         {!loading && !error && (
           <>
             <CategoryFilter
-              categories={CATEGORIES}
+              categories={derivedCategories}
               activeCategory={activeCategory}
               onSelect={setActiveCategory}
             />

@@ -26,16 +26,24 @@ import { POS_STYLES } from './StitchPOSNew-styles';
 export function StitchPOSNew({
   menuItems = DEFAULT_MENU_ITEMS,
   addOns = DEFAULT_ADDONS,
-  tableLabel = 'Table 12',
-  guestLabel = 'Guest 2',
-  orderNumber = '842',
+  categoryLabels,
+  tables = [],
+  selectedTableId,
+  onSelectTable,
+  tableLabel,
+  guestLabel,
+  orderNumber,
   loading = false,
   error = null,
   brandName = 'AURA CAFE',
-  taxRate = 0.05,
+  taxRate = 0,
   discount = 0,
   paymentMethod: externalPaymentMethod,
   staffName,
+  staffRole,
+  activeShift = null,
+  onShiftAction,
+  onNavigate,
   onCompleteOrder,
   onPayment,
   customer = null,
@@ -48,7 +56,7 @@ export function StitchPOSNew({
 }: Readonly<StitchPOSNewProps>) {
   const { t } = useTranslation();
   const [searchQuery, setSearchQuery] = useState('');
-  const [activeCategory, setActiveCategory] = useState('Coffee');
+  const [activeCategory, setActiveCategory] = useState('All');
   const [cart, setCart] = useState<POSNewCartItem[]>([]);
   const [cartOpen, setCartOpen] = useState(true);
   const [internalPaymentMethod, setInternalPaymentMethod] = useState<'payos' | 'cod'>('payos');
@@ -121,7 +129,7 @@ export function StitchPOSNew({
 
   const handleCompleteOrder = async (completedCart: POSNewCartItem[], completedTotal: number) => {
     try {
-      const result = await onCompleteOrder?.(completedCart, completedTotal);
+      const result = await onCompleteOrder?.(completedCart, completedTotal, selectedTableId);
       if (result !== false) {
         setCart([]);
       }
@@ -178,7 +186,11 @@ export function StitchPOSNew({
       <POSHeader
         brandName={brandName}
         staffName={staffName}
+        staffRole={staffRole}
+        activeShift={activeShift}
+        onShiftAction={onShiftAction}
         onOpenSchedule={onOpenSchedule}
+        onNavigate={onNavigate}
       />
 
       <main className="pt-16 flex h-screen w-full relative">
@@ -188,6 +200,7 @@ export function StitchPOSNew({
           activeCategory={activeCategory}
           onCategoryChange={setActiveCategory}
           categories={categories}
+          categoryLabels={categoryLabels}
           filteredItems={filteredItems}
           addOns={addOns}
           getQuantity={getQuantity}
@@ -222,6 +235,9 @@ export function StitchPOSNew({
           total={total}
           discount={discount}
           paymentMethod={activePaymentMethod}
+          tables={tables}
+          selectedTableId={selectedTableId}
+          onSelectTable={onSelectTable}
           tableLabel={tableLabel}
           guestLabel={guestLabel}
           orderNumber={orderNumber}

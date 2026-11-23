@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { usePosCustomerLookup, type POSCustomer } from '@/hooks/use-pos-customer';
 import { Search, X, UserCheck } from 'lucide-react';
@@ -28,25 +28,78 @@ export function CustomerLookup({
   onClearCustomer,
 }: CustomerLookupProps) {
   const { t } = useTranslation();
-  const [phone, setPhone] = useState('');
+  const [query, setQuery] = useState('');
+  const [results, setResults] = useState<POSCustomer[]>([]);
   const lookupMutation = usePosCustomerLookup();
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const searchSeqRef = useRef(0);
 
-  const handleLookup = () => {
-    const trimmed = phone.trim();
-    if (!trimmed || trimmed.length < 8) return;
+  const runSearch = (raw: string, autoSelectSingle: boolean) => {
+    const trimmed = raw.trim();
+    if (trimmed.length < 2) {
+      searchSeqRef.current += 1;
+      setResults([]);
+      return;
+    }
+    const seq = ++searchSeqRef.current;
     lookupMutation.mutate(trimmed, {
       onSuccess: (res) => {
+        if (seq !== searchSeqRef.current) return;
+        if (Array.isArray(res.customers) && res.customers.length > 0) {
+          const singleMatch = res.customers[0];
+          if (autoSelectSingle && res.customers.length === 1 && singleMatch) {
+            setResults([]);
+            onCustomerFound?.(singleMatch);
+          } else {
+            setResults(res.customers);
+          }
+          return;
+        }
         if (res.found && res.customer) {
+          setResults([]);
           onCustomerFound?.(res.customer);
         } else {
-          onClearCustomer?.();
+          setResults([]);
+          if (autoSelectSingle) {
+            onClearCustomer?.();
+          }
         }
       },
     });
   };
 
+  useEffect(() => {
+    if (customer) return;
+    const trimmed = query.trim();
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    if (trimmed.length < 2) {
+      setResults([]);
+      return;
+    }
+    debounceRef.current = setTimeout(() => {
+      runSearch(trimmed, false);
+    }, 300);
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [query, customer]);
+
+  const handleLookup = () => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    runSearch(query, true);
+  };
+
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') handleLookup();
+  };
+
+  const handleSelectCustomer = (selected: POSCustomer) => {
+    searchSeqRef.current += 1;
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    setResults([]);
+    setQuery('');
+    onCustomerFound?.(selected);
   };
 
   /* ── Identified customer badge ────────────────────────────────────── */
@@ -64,7 +117,7 @@ export function CustomerLookup({
           </div>
           <button
            type="button"
-            onClick={() => { onClearCustomer?.(); setPhone(''); }}
+            onClick={() => { searchSeqRef.current += 1; onClearCustomer?.(); setQuery(''); setResults([]); }}
             className="text-[var(--aura-text-muted, #8a7a6a)] hover:text-[var(--aura-text-primary, #eae1db)] transition-colors cursor-pointer"
             aria-label={t('posNew.clearCustomer')}
           >
@@ -95,37 +148,72 @@ export function CustomerLookup({
     );
   }
 
-  /* ── Phone lookup input ──────────────────────────────────────────── */
+  /* ── Name or Phone lookup input ──────────────────────────────────── */
   return (
-    <div className="px-6 py-3 border-b border-[rgba(var(--aura-chrome-light),0.08)]">
+    <div className="px-6 py-3 border-b border-[rgba(var(--aura-chrome-light),0.08)] relative">
       <p className="text-[11px] text-[var(--aura-text-muted, #8A8E96)] uppercase tracking-wide font-body mb-2">
         {t('posNew.lookupCustomer')}
       </p>
       <div className="flex gap-2">
         <input
-          type="tel"
-          value={phone}
-          onChange={(e) => setPhone(e.target.value)}
+          type="text"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
           onKeyDown={handleKeyDown}
-          placeholder={t('posNew.phonePlaceholder')}
+          placeholder={t('posNew.customerSearchPlaceholder', { defaultValue: 'Tìm theo Tên hoặc SĐT khách hàng...' })}
           className="flex-1 bg-[rgba(var(--aura-chrome-light),0.05)] border border-[rgba(var(--aura-chrome-light),0.12)] rounded-sm px-3 py-2 text-[13px] text-[var(--aura-text-primary, #eae1db)] placeholder:text-[var(--aura-text-muted, #5a4a3a)] font-body outline-none focus:border-[rgba(var(--aura-chrome-light),0.3)] transition-colors"
         />
         <button
          type="button"
           onClick={handleLookup}
-          disabled={!phone.trim() || lookupMutation.isPending}
+          disabled={query.trim().length < 2 || lookupMutation.isPending}
           className="px-4 py-2 bg-[rgba(var(--aura-chrome-light),0.1)] border border-[rgba(var(--aura-chrome-light),0.2)] rounded-sm text-[var(--aura-primary, #f2c08d)] active:scale-95 transition-transform disabled:opacity-40 cursor-pointer"
           aria-label={t('posNew.lookupBtn')}
         >
           <Search className="w-4 h-4" />
         </button>
       </div>
+      {results.length > 0 && (
+        <ul
+          role="listbox"
+          aria-label={t('posNew.lookupCustomer')}
+          className="mt-2 max-h-48 overflow-y-auto rounded-md border border-[rgba(var(--aura-chrome-light),0.15)] bg-[var(--aura-noir-void,#1a1008)] divide-y divide-[rgba(var(--aura-chrome-light),0.08)]"
+        >
+          {results.map((item) => {
+            const tierClass = TIER_COLORS[item.loyalty_tier] || TIER_COLORS.bronze;
+            return (
+              <li key={item.id} role="option" aria-selected={false}>
+                <button
+                  type="button"
+                  onClick={() => handleSelectCustomer(item)}
+                  className="w-full text-left px-3 py-2 hover:bg-[rgba(var(--aura-chrome-light),0.08)] transition-colors cursor-pointer"
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-[13px] font-medium text-[var(--aura-text-primary,#eae1db)] truncate font-body">
+                      {item.name}
+                    </span>
+                    <span className={`text-[10px] px-1.5 py-0.5 rounded-sm uppercase shrink-0 font-body ${tierClass}`}>
+                      {item.loyalty_tier_label}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between text-[11px] text-[var(--aura-text-muted,#8A8E96)] mt-0.5 font-body">
+                    <span>{item.phone}</span>
+                    <span className="text-[var(--aura-primary,#f2c08d)]">
+                      {item.loyalty_points} {t('posNew.loyaltyPoints')}
+                    </span>
+                  </div>
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+      )}
       {lookupMutation.isError && (
         <p className="text-[11px] text-[var(--aura-error, #FFB4AB)] mt-1.5 font-body">
           {lookupMutation.error?.message || t('posNew.phoneInvalid')}
         </p>
       )}
-      {lookupMutation.isSuccess && lookupMutation.data && !lookupMutation.data.found && (
+      {lookupMutation.isSuccess && lookupMutation.data && !lookupMutation.data.found && results.length === 0 && (
         <p className="text-[11px] text-[var(--aura-text-muted, #8A8E96)] mt-1.5 font-body">
           {lookupMutation.data.message || t('posNew.customerNotFound')}
         </p>

@@ -312,4 +312,96 @@ describe('pos-customer routes', () => {
       expect(json.customer.loyalty_tier_label).toBe(label);
     }
   });
+
+  it('returns 400 when search query q is shorter than 2 characters', async () => {
+    const { status, json } = await fetchHandler(db, 'GET', '/api/pos/customer?q=a');
+    expect(status).toBe(400);
+    expect(json.success).toBe(false);
+  });
+
+  it('searches customers by name or partial phone with ?q= and enforces tenant isolation', async () => {
+    const matchingRows = [
+      {
+        id: 'cust_1',
+        name: 'Nguyễn Minh Long',
+        phone: '0901234567',
+        email: 'long@example.com',
+        loyalty_tier: 'gold',
+        loyalty_points: 1200,
+        lifetime_points: 2000,
+        created_at: '2025-01-01T00:00:00Z',
+        cashback_balance: 50000,
+        total_earned: 100000,
+        total_spent: 50000,
+        visit_count: 8,
+        tenant_id: 'default',
+      },
+      {
+        id: 'cust_other_tenant',
+        name: 'Nguyễn Minh Other',
+        phone: '0909999999',
+        email: 'other@example.com',
+        loyalty_tier: 'bronze',
+        loyalty_points: 10,
+        lifetime_points: 10,
+        created_at: '2025-01-01T00:00:00Z',
+        cashback_balance: 0,
+        total_earned: 0,
+        total_spent: 0,
+        visit_count: 1,
+        tenant_id: 'other-store',
+      },
+    ];
+
+    db = makeScriptedDB([
+      {
+        match: (sql) => sql.includes('FROM customers') && sql.includes('LIKE'),
+        rows: matchingRows,
+      },
+    ]);
+
+    const { status, json } = await fetchHandler(db, 'GET', '/api/pos/customer?q=Minh');
+    expect(status).toBe(200);
+    expect(json.success).toBe(true);
+    expect(json.found).toBe(true);
+    expect(json.customers).toHaveLength(1);
+    expect(json.customers[0].id).toBe('cust_1');
+    expect(json.customers[0].loyalty_tier_label).toBe('Vàng');
+  });
+
+  it('escapes SQL LIKE wildcards (% and _) in ?q= search patterns', async () => {
+    const capturedCalls: Array<{ sql: string; binds: unknown[] }> = [];
+    const accountState = { role: 'staff' };
+    const customDb = {
+      _accountState: accountState,
+      prepare: (sql: string) => ({
+        bind: (...args: unknown[]) => {
+          capturedCalls.push({ sql, binds: args });
+          return {
+            all: async () => ({ results: [] }),
+            first: async () => {
+              if (sql.includes('FROM users')) {
+                return { id: 'u1', email: 'a@b.c', role: accountState.role, is_active: 1, auth_version: 1, tenant_id: 'default' };
+              }
+              return null;
+            },
+            run: async () => ({ success: true, meta: { changes: 0 } }),
+          };
+        },
+      }),
+    } as unknown as D1Database;
+
+    const { status, json } = await fetchHandler(
+      customDb,
+      'GET',
+      '/api/pos/customer?q=%25_test%5C',
+    );
+    expect(status).toBe(200);
+    expect(json.success).toBe(true);
+    expect(json.found).toBe(false);
+    expect(capturedCalls.length).toBeGreaterThan(0);
+    const searchCall = capturedCalls.find((c) => c.sql.includes('ESCAPE'));
+    expect(searchCall).toBeDefined();
+    expect(searchCall?.binds).toContain('%\\%\\_test\\\\%');
+  });
 });

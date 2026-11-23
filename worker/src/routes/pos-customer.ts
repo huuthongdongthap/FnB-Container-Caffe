@@ -12,14 +12,19 @@ import { canonicalPhone, phoneVariants } from '../../../packages/domain/customer
 
 export const posCustomerRouter = new Hono<{ Bindings: Env }>();
 
-// GET /api/pos/customer?phone=09xxxxxxxx
+// GET /api/pos/customer?phone=09xxxxxxxx OR ?q=name_or_partial_phone
 posCustomerRouter.get('/', requireStaff(['owner', 'manager', 'supervisor', 'staff', 'waiter', 'cashier', 'admin']), async (c) => {
   const phone = c.req.query('phone')?.trim();
-  if (!phone) {
-    return errorResponse('Thiếu số điện thoại', 400);
+  const q = c.req.query('q')?.trim();
+  if (!phone && !q) {
+    return errorResponse('Thiếu số điện thoại hoặc từ khóa tìm kiếm', 400);
   }
-  const normalizedPhone = canonicalPhone(phone);
-  if (!normalizedPhone) {
+  const isSearchMode = !phone && Boolean(q);
+  if (isSearchMode && (q?.length ?? 0) < 2) {
+    return errorResponse('Từ khóa tìm kiếm cần ít nhất 2 ký tự', 400);
+  }
+  const normalizedPhone = phone ? canonicalPhone(phone) : null;
+  if (phone && !normalizedPhone) {
     return errorResponse('Số điện thoại không hợp lệ (định dạng: 09xxxxxxxx)', 400);
   }
 
@@ -79,6 +84,13 @@ posCustomerRouter.get('/', requireStaff(['owner', 'manager', 'supervisor', 'staf
     : baseTenant;
   const tenantId = isHqSuperAdmin && (rawTenantId === '*' || rawTenantId.toLowerCase() === 'hq') ? '*' : rawTenantId;
 
+  const tierLabels: Record<string, string> = {
+    bronze: 'Đồng',
+    silver: 'Bạc',
+    gold: 'Vàng',
+    platinum: 'Bạch kim',
+  };
+
   // Query customer + cashback wallet
   type PosCustomerRow = {
     id: string;
@@ -95,7 +107,121 @@ posCustomerRouter.get('/', requireStaff(['owner', 'manager', 'supervisor', 'staf
     visit_count: number;
     tenant_id?: string | null;
   };
-  const variants = phoneVariants(normalizedPhone);
+
+  const formatCustomerRow = (r: PosCustomerRow) => ({
+    id: r.id,
+    name: r.name,
+    phone: r.phone,
+    email: r.email,
+    loyalty_tier: r.loyalty_tier,
+    loyalty_tier_label: tierLabels[r.loyalty_tier] || r.loyalty_tier,
+    loyalty_points: r.loyalty_points,
+    lifetime_points: r.lifetime_points,
+    cashback_balance: r.cashback_balance,
+    total_earned: r.total_earned,
+    total_spent: r.total_spent,
+    visit_count: r.visit_count,
+    created_at: r.created_at,
+  });
+
+  if (isSearchMode && q) {
+    const escapeLike = (v: string) => v.replace(/[\\%_]/g, '\\$&');
+    const likePattern = `%${escapeLike(q.toLowerCase())}%`;
+    const phoneDigits = q.replace(/\D/g, '');
+    const phoneLike = phoneDigits.length >= 2 ? `%${escapeLike(phoneDigits)}%` : likePattern;
+    let searchRows: PosCustomerRow[] = [];
+    try {
+      const res = await db
+        .prepare(
+          `
+            SELECT c.id, c.name, c.phone, c.email,
+                   c.loyalty_tier, c.loyalty_points, c.lifetime_points,
+                   c.created_at, c.tenant_id,
+                   COALESCE(cw.balance, 0) AS cashback_balance,
+                   COALESCE(cw.total_earned, 0) AS total_earned,
+                   COALESCE(cw.total_spent, 0) AS total_spent,
+                   (SELECT COUNT(*) FROM orders o WHERE (o.customer_phone = c.phone OR o.customer_id = c.id) AND LOWER(TRIM(COALESCE(o.status, ''))) NOT IN ('cancelled', 'failed', 'rejected', 'expired', 'refunded') AND LOWER(TRIM(COALESCE(o.payment_status, ''))) != 'refunded' AND (? = '*' OR CASE WHEN o.tenant_id = '' THEN 'default' ELSE COALESCE(NULLIF(TRIM(o.tenant_id), ''), 'default') END = ?)) AS visit_count
+            FROM customers c
+            LEFT JOIN cashback_wallets cw ON cw.customer_id = c.id AND (? = '*' OR COALESCE(NULLIF(TRIM(cw.tenant_id), ''), 'default') = ?)
+            WHERE (LOWER(COALESCE(c.name, '')) LIKE ? ESCAPE '\\' OR LOWER(COALESCE(c.phone, '')) LIKE ? ESCAPE '\\')
+              AND (? = '*' OR CASE WHEN c.tenant_id = '' THEN 'default' ELSE COALESCE(NULLIF(TRIM(c.tenant_id), ''), 'default') END = ?)
+            ORDER BY c.name ASC
+            LIMIT 10
+          `,
+        )
+        .bind(tenantId, tenantId, tenantId, tenantId, likePattern, phoneLike, tenantId, tenantId)
+        .all<PosCustomerRow>();
+      searchRows = res?.results ?? [];
+    } catch (primaryErr) {
+      const primaryMsg = primaryErr instanceof Error ? primaryErr.message : String(primaryErr);
+      if (!/no such (?:column|table)/i.test(primaryMsg)) {
+        return errorResponse('Lỗi truy vấn khách hàng', 500);
+      }
+      const isNonDefaultTenant = tenantId !== 'default' && tenantId !== '*';
+      try {
+        const res = await db
+          .prepare(
+            `
+              SELECT c.id, c.name, c.phone, c.email,
+                     c.loyalty_tier, c.loyalty_points, c.loyalty_points AS lifetime_points,
+                     c.created_at, c.tenant_id,
+                     0 AS cashback_balance, 0 AS total_earned, 0 AS total_spent, 0 AS visit_count
+              FROM customers c
+              WHERE (LOWER(COALESCE(c.name, '')) LIKE ? ESCAPE '\\' OR LOWER(COALESCE(c.phone, '')) LIKE ? ESCAPE '\\')
+                AND (? = '*' OR COALESCE(NULLIF(TRIM(c.tenant_id), ''), 'default') = ?)
+              ORDER BY c.name ASC
+              LIMIT 10
+            `,
+          )
+          .bind(likePattern, phoneLike, tenantId, tenantId)
+          .all<PosCustomerRow>();
+        searchRows = res?.results ?? [];
+      } catch (secondaryErr) {
+        const secondaryMsg = secondaryErr instanceof Error ? secondaryErr.message : String(secondaryErr);
+        if (!/no such column/i.test(secondaryMsg)) {
+          return errorResponse('Lỗi truy vấn khách hàng', 500);
+        }
+        if (!isNonDefaultTenant) {
+          const res = await db
+            .prepare(
+              `
+                SELECT c.id, c.name, c.phone, c.email,
+                       c.loyalty_tier, c.loyalty_points, c.loyalty_points AS lifetime_points,
+                       c.created_at,
+                       0 AS cashback_balance, 0 AS total_earned, 0 AS total_spent, 0 AS visit_count
+                FROM customers c
+                WHERE (LOWER(COALESCE(c.name, '')) LIKE ? ESCAPE '\\' OR LOWER(COALESCE(c.phone, '')) LIKE ? ESCAPE '\\')
+                ORDER BY c.name ASC
+                LIMIT 10
+              `,
+            )
+            .bind(likePattern, phoneLike)
+            .all<PosCustomerRow>();
+          searchRows = res?.results ?? [];
+        }
+      }
+    }
+
+    const filteredRows = searchRows.filter((r) => {
+      if (tenantId === '*') return true;
+      const rowTenant =
+        'tenant_id' in r && r.tenant_id !== undefined
+          ? (typeof r.tenant_id === 'string' && r.tenant_id.trim() ? r.tenant_id.trim() : 'default')
+          : 'default';
+      return rowTenant === tenantId;
+    });
+
+    const customers = filteredRows.map(formatCustomerRow);
+    return jsonResponse({
+      success: true,
+      found: customers.length > 0,
+      customers,
+      customer: customers.length === 1 ? customers[0] : undefined,
+      message: customers.length === 0 ? 'Không tìm thấy khách hàng phù hợp' : undefined,
+    });
+  }
+
+  const variants = phoneVariants(normalizedPhone!);
   const phoneInClause = variants.map(() => '?').join(', ');
   let row: PosCustomerRow | null = null;
   let ambiguousMatch = false;
@@ -496,31 +622,9 @@ posCustomerRouter.get('/', requireStaff(['owner', 'manager', 'supervisor', 'staf
     });
   }
 
-  // Tier label mapping
-  const tierLabels: Record<string, string> = {
-    bronze: 'Đồng',
-    silver: 'Bạc',
-    gold: 'Vàng',
-    platinum: 'Bạch kim'
-  };
-
   return jsonResponse({
     success: true,
     found: true,
-    customer: {
-      id: row.id,
-      name: row.name,
-      phone: row.phone,
-      email: row.email,
-      loyalty_tier: row.loyalty_tier,
-      loyalty_tier_label: tierLabels[row.loyalty_tier] || row.loyalty_tier,
-      loyalty_points: row.loyalty_points,
-      lifetime_points: row.lifetime_points,
-      cashback_balance: row.cashback_balance,
-      total_earned: row.total_earned,
-      total_spent: row.total_spent,
-      visit_count: row.visit_count,
-      created_at: row.created_at
-    }
+    customer: formatCustomerRow(row),
   });
 });

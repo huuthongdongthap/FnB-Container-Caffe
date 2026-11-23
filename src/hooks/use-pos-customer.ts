@@ -23,18 +23,29 @@ export interface POSCustomer {
   created_at: string;
 }
 
-interface POSCustomerLookupResponse {
+export interface POSCustomerLookupResponse {
   success: boolean;
   found: boolean;
   customer?: POSCustomer;
+  customers?: POSCustomer[];
   message?: string;
+}
+
+function isFullPhoneQuery(query: string): boolean {
+  const trimmed = query.trim();
+  if (!/^[+\d\s\-().]+$/.test(trimmed)) return false;
+  const digits = trimmed.replace(/\D/g, '');
+  return digits.length >= 9 && digits.length <= 12;
 }
 
 export function usePosCustomerLookup() {
   return useMutation<POSCustomerLookupResponse, Error, string>({
-    mutationFn: (phone) =>
-      apiFetch<POSCustomerLookupResponse>(
-        `/api/pos/customer?phone=${encodeURIComponent(phone)}`,
-      ),
+    mutationFn: (query) => {
+      const trimmed = query.trim();
+      const param = isFullPhoneQuery(trimmed)
+        ? `phone=${encodeURIComponent(trimmed)}`
+        : `q=${encodeURIComponent(trimmed)}`;
+      return apiFetch<POSCustomerLookupResponse>(`/api/pos/customer?${param}`);
+    },
   });
 }
