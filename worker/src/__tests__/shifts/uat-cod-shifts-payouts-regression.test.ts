@@ -318,9 +318,15 @@ describe('UAT #132/#133/#134 COD, shifts, payouts, and reconciliation regression
       listShiftCashPayouts(env, String(shift.id), 'default', 'cashier-1', 'manager')
     ).rejects.toMatchObject({ status: 403 });
 
-    // Cross-tenant manager fails closed (403)
+    // Cross-tenant manager fails closed (403) — including wildcard/hq tenant target
     await expect(
       assignCashPaymentsToShift(env, String(shift.id), ['pay-sec-1'], 'other-tenant-mgr', 'default', 'manager')
+    ).rejects.toMatchObject({ status: 403 });
+    await expect(
+      assignCashPaymentsToShift(env, String(shift.id), ['pay-sec-1'], 'other-tenant-mgr', '*', 'manager')
+    ).rejects.toMatchObject({ status: 403 });
+    await expect(
+      listShiftCashPayouts(env, String(shift.id), 'hq', 'other-tenant-mgr', 'manager')
     ).rejects.toMatchObject({ status: 403 });
   });
 });

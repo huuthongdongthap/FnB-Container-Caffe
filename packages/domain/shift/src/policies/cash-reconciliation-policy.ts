@@ -633,7 +633,7 @@ async function requireActiveActor(
   const actorTenantLower = actorTenantRaw.toLowerCase();
   const isHqActor =
     (dbRole === 'owner' || dbRole === 'admin') && (actorTenantLower === 'hq' || actorTenantLower === '*');
-  if (!isHqActor && normalizedTargetTenant !== '*' && actorTenantRaw !== normalizedTargetTenant) {
+  if (!isHqActor && (normalizedTargetTenant === '*' || actorTenantRaw !== normalizedTargetTenant)) {
     throw new ShiftContractError('Forbidden: cross-tenant actor', 403);
   }
   return dbRole;
