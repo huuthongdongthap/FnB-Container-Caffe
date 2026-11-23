@@ -154,7 +154,7 @@ export function CheckoutPage() {
       const { id: orderId, total: serverTotal } = order;
 
       // Handle PayOS redirect with internal retry
-      if (formData.paymentMethod === 'payos' && !alreadyPaid) {
+      if (formData.paymentMethod === 'payos' && !alreadyPaid && serverTotal > 0) {
         setPayosRetrying(true);
         const url = await retryCreatePaymentLink(orderId, serverTotal);
         setPayosRetrying(false);

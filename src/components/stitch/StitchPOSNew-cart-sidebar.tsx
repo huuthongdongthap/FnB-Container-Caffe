@@ -79,9 +79,16 @@ export function CartSidebar({
   const resolvedTableBadge = selectedTable
     ? selectedTable.name
     : tableLabel || t('posNew.takeaway', { defaultValue: 'Mang về' });
-  const cashbackDeduction = useCashback && customer && customer.cashback_balance > 0
+  const rawCashbackDeduction = useCashback && customer && customer.cashback_balance > 0
     ? Math.min(Math.floor(customer.cashback_balance), Math.max(0, Math.round(total)))
     : 0;
+  const cashbackDeduction =
+    paymentMethod === 'payos' &&
+    rawCashbackDeduction > 0 &&
+    Math.round(total) - rawCashbackDeduction > 0 &&
+    Math.round(total) - rawCashbackDeduction < 1000
+      ? Math.max(0, Math.round(total) - 1000)
+      : rawCashbackDeduction;
   const payableTotal = Math.max(0, Math.round(total) - cashbackDeduction);
   return (
     <aside

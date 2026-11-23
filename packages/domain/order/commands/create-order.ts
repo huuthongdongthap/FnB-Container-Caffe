@@ -386,12 +386,22 @@ export async function createOrder(
       );
       const availableBalance = Math.max(0, Math.floor(Number(walletRow?.balance ?? 0)));
       const remainingPayable = Math.max(0, snapshot.total);
-      const desiredCashback = rawCashbackRequested > 0
+      let desiredCashback = rawCashbackRequested > 0
         ? Math.min(rawCashbackRequested, availableBalance, remainingPayable)
         : Math.min(availableBalance, remainingPayable);
       if (rawCashbackRequested > availableBalance) {
         await rollbackPreOrderReservations();
         return errorResponse('Số dư ví hoàn tiền không đủ', 400);
+      }
+      if (validatedMethod === 'payos' && desiredCashback > 0) {
+        const postCashbackTotal = remainingPayable - desiredCashback;
+        if (postCashbackTotal > 0 && postCashbackTotal < 1000) {
+          if (rawCashbackRequested > 0) {
+            await rollbackPreOrderReservations();
+            return errorResponse('Số tiền còn lại sau khi trừ ví hoàn tiền cho PayOS phải bằng 0đ hoặc tối thiểu 1.000đ', 400);
+          }
+          desiredCashback = Math.max(0, remainingPayable - 1000);
+        }
       }
       if (desiredCashback > 0 && walletRow) {
         let walletDeductRes: { meta?: { changes?: number } } | null = null;
@@ -417,11 +427,16 @@ export async function createOrder(
         snapshot.total = Math.max(0, snapshot.total - appliedCashback);
       }
     }
+    if (validatedMethod === 'payos' && snapshot.total > 0 && snapshot.total < 1000) {
+      await rollbackPreOrderReservations();
+      return errorResponse('Số tiền còn lại cho PayOS phải bằng 0đ hoặc tối thiểu 1.000đ', 400);
+    }
+    const initialPaymentStatus: 'paid' | 'unpaid' = snapshot.total === 0 ? 'paid' : 'unpaid';
     const guestOrderToken = !resolvedCustomerId ? generateOrderToken() : null;
     const guestTokenHash = guestOrderToken ? await hashOrderToken(guestOrderToken) : null;
     const responseBody = {
       success: true, data: {
-        id: orderId, status: 'pending', payment_status: 'unpaid', items: snapshot.items, total: snapshot.total,
+        id: orderId, status: 'pending', payment_status: initialPaymentStatus, items: snapshot.items, total: snapshot.total,
         customer: { full_name: data.customer_name, phone: data.customer_phone, address: data.customer_address || null },
         customer_name: data.customer_name, customer_phone: data.customer_phone,
         customer_address: data.customer_address || null, payment_method: validatedMethod,
@@ -462,13 +477,13 @@ export async function createOrder(
     const orderInsertArgs = redeemedPoints > 0
       ? [
           orderId, snapshot.itemsJson, snapshot.total, 'pending', data.customer_name, data.customer_phone,
-          data.customer_email || null, data.customer_address || null, validatedMethod, 'unpaid',
+          data.customer_email || null, data.customer_address || null, validatedMethod, initialPaymentStatus,
           snapshot.shipping_fee, snapshot.discount, redeemedPoints, data.notes || null, data.delivery_time || 'now', resolvedTableId,
           orderType, snapshot.tip_amount, snapshot.service_fee, resolvedCustomerId, guestTokenHash, tenantId, now, now,
         ]
       : [
           orderId, snapshot.itemsJson, snapshot.total, 'pending', data.customer_name, data.customer_phone,
-          data.customer_email || null, data.customer_address || null, validatedMethod, 'unpaid',
+          data.customer_email || null, data.customer_address || null, validatedMethod, initialPaymentStatus,
           snapshot.shipping_fee, snapshot.discount, data.notes || null, data.delivery_time || 'now', resolvedTableId,
           orderType, snapshot.tip_amount, snapshot.service_fee, resolvedCustomerId, guestTokenHash, tenantId, now, now,
         ];
@@ -488,13 +503,13 @@ export async function createOrder(
     const orderInsertNoGuestArgs = redeemedPoints > 0
       ? [
           orderId, snapshot.itemsJson, snapshot.total, 'pending', data.customer_name, data.customer_phone,
-          data.customer_email || null, data.customer_address || null, validatedMethod, 'unpaid',
+          data.customer_email || null, data.customer_address || null, validatedMethod, initialPaymentStatus,
           snapshot.shipping_fee, snapshot.discount, redeemedPoints, data.notes || null, data.delivery_time || 'now', resolvedTableId,
           orderType, snapshot.tip_amount, snapshot.service_fee, resolvedCustomerId, tenantId, now, now,
         ]
       : [
           orderId, snapshot.itemsJson, snapshot.total, 'pending', data.customer_name, data.customer_phone,
-          data.customer_email || null, data.customer_address || null, validatedMethod, 'unpaid',
+          data.customer_email || null, data.customer_address || null, validatedMethod, initialPaymentStatus,
           snapshot.shipping_fee, snapshot.discount, data.notes || null, data.delivery_time || 'now', resolvedTableId,
           orderType, snapshot.tip_amount, snapshot.service_fee, resolvedCustomerId, tenantId, now, now,
         ];
@@ -506,7 +521,7 @@ export async function createOrder(
     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
     const orderInsertLegacyArgs = [
       orderId, snapshot.itemsJson, snapshot.total, 'pending', data.customer_name, data.customer_phone,
-      data.customer_email || null, data.customer_address || null, validatedMethod, 'unpaid',
+      data.customer_email || null, data.customer_address || null, validatedMethod, initialPaymentStatus,
       snapshot.shipping_fee, snapshot.discount, data.notes || null, data.delivery_time || 'now', resolvedTableId,
       orderType, snapshot.tip_amount, snapshot.service_fee, resolvedCustomerId, tenantId, now, now,
     ] as const;
@@ -567,7 +582,7 @@ export async function createOrder(
       }
       legacyStatements.push(legacyItemStmt);
     }
-    if (validatedMethod === 'cod') {
+    if (validatedMethod === 'cod' && snapshot.total > 0) {
       const payId = generateId('PAY_');
       const scopedPayStmt = db.prepare(`INSERT INTO payments (id, order_id, method, amount, status, tenant_id, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`)
@@ -655,7 +670,7 @@ export async function createOrder(
         : 'default';
     await publishOrderEvent(env.AUTH_KV as KVNamespace | undefined, orderId, 'pending', {
       tenantId: orderEventTenant,
-      paymentStatus: 'unpaid',
+      paymentStatus: initialPaymentStatus,
     });
     // Notifications and cache writes run only after commit and cannot turn success into a retryable 500.
     try {
@@ -665,7 +680,7 @@ export async function createOrder(
         const doChannel = doTenant !== 'default' ? `${doTenant}:${orderId}` : orderId;
         const stub = ns.get(ns.idFromName(doChannel));
         const event = {
-          orderId, status: 'pending', payment_status: 'unpaid', items: snapshot.items, total: snapshot.total,
+          orderId, status: 'pending', payment_status: initialPaymentStatus, items: snapshot.items, total: snapshot.total,
           customer_name: data.customer_name, customer_phone: data.customer_phone, table_id: resolvedTableId,
           ...(doTenant !== 'default' ? { tenant_id: doTenant } : {}),
           createdAt: Date.now(), updatedAt: Date.now(),

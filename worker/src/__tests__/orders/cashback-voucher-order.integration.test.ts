@@ -358,4 +358,107 @@ describe('Cashback wallet, voucher rollback, and promo IDOR integration (#121, #
     const cRowAfterGuest = raw.prepare('SELECT loyalty_points FROM customers WHERE id = ?').get('cust-sec') as { loyalty_points: number };
     expect(cRowAfterGuest.loyalty_points).toBe(500);
   });
+
+  it('marks 100% cashback orders as paid with zero pending COD payment and guards PayOS sub-1000 VND remainder', async () => {
+    const { raw, d1 } = createSqliteD1();
+    const now = new Date().toISOString();
+    raw.prepare(
+      `INSERT INTO categories (id, name, slug, tenant_id, created_at) VALUES ('cat-cb100', 'Coffee', 'coffee-cb100', 'default', ?)`
+    ).run(now);
+    raw.prepare(
+      `INSERT INTO products (id, name, price, category_id, is_available, tenant_id, created_at, updated_at)
+       VALUES ('prod-cb100', 'Matcha Latte', 40000, 'cat-cb100', 1, 'default', ?, ?)`
+    ).run(now, now);
+    raw.prepare(
+      `INSERT INTO customers (id, name, phone, loyalty_points, loyalty_tier, tenant_id, created_at, updated_at)
+       VALUES ('cust-cb100', 'Full Cashback User', '0907778888', 0, 'bronze', 'default', ?, ?)`
+    ).run(now, now);
+    raw.prepare(
+      `INSERT INTO cashback_wallets (id, customer_id, balance, total_earned, total_spent, tenant_id, created_at, updated_at)
+       VALUES ('wal-cb100', 'cust-cb100', 40000, 40000, 0, 'default', ?, ?)`
+    ).run(now, now);
+
+    // 1. Explicit cashback leaving 1..999 VND on PayOS is rejected BEFORE debiting wallet
+    const subMinRes = await createOrder(
+      new Request('http://localhost/api/orders', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          customer_name: 'Full Cashback User',
+          customer_phone: '0907778888',
+          customer_address: 'Tại quầy',
+          payment_method: 'payos',
+          total: 500,
+          items: [{ id: 'prod-cb100', name: 'Matcha Latte', price: 40000, quantity: 1 }],
+          use_cashback: true,
+          cashback_amount: 39500,
+        }),
+      }),
+      { AURA_DB: d1 },
+      undefined,
+      { id: 'cust-cb100', role: 'customer', phone: '0907778888' },
+    );
+    expect(subMinRes.status).toBe(400);
+    const walletAfterReject = raw.prepare('SELECT balance FROM cashback_wallets WHERE id = ?').get('wal-cb100') as { balance: number };
+    expect(walletAfterReject.balance).toBe(40000);
+
+    // 2. 100% cashback order on COD creates order with total=0, payment_status='paid', and NO pending COD payment row
+    const fullCbRes = await createOrder(
+      new Request('http://localhost/api/orders', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          customer_name: 'Full Cashback User',
+          customer_phone: '0907778888',
+          customer_address: 'Tại quầy',
+          payment_method: 'cod',
+          total: 0,
+          items: [{ id: 'prod-cb100', name: 'Matcha Latte', price: 40000, quantity: 1 }],
+          use_cashback: true,
+          cashback_amount: 40000,
+        }),
+      }),
+      { AURA_DB: d1 },
+      undefined,
+      { id: 'cust-cb100', role: 'customer', phone: '0907778888' },
+    );
+    expect(fullCbRes.status).toBe(201);
+    const fullCbJson = await fullCbRes.json() as { data: { id: string; total: number; payment_status: string; cashback_used: number } };
+    expect(fullCbJson.data.total).toBe(0);
+    expect(fullCbJson.data.payment_status).toBe('paid');
+    expect(fullCbJson.data.cashback_used).toBe(40000);
+
+    const dbOrder = raw.prepare('SELECT total, payment_status FROM orders WHERE id = ?').get(fullCbJson.data.id) as { total: number; payment_status: string };
+    expect(dbOrder.total).toBe(0);
+    expect(dbOrder.payment_status).toBe('paid');
+
+    const pendingCodPayments = raw.prepare('SELECT COUNT(*) as cnt FROM payments WHERE order_id = ?').get(fullCbJson.data.id) as { cnt: number };
+    expect(pendingCodPayments.cnt).toBe(0);
+
+    // 3. Auto-max cashback on PayOS when wallet has 39,500 VND caps deduction to 39,000 VND so PayOS gets 1,000 VND
+    raw.prepare('UPDATE cashback_wallets SET balance = 39500 WHERE id = ?').run('wal-cb100');
+    const autoCapRes = await createOrder(
+      new Request('http://localhost/api/orders', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          customer_name: 'Full Cashback User',
+          customer_phone: '0907778888',
+          customer_address: 'Tại quầy',
+          payment_method: 'payos',
+          total: 1000,
+          items: [{ id: 'prod-cb100', name: 'Matcha Latte', price: 40000, quantity: 1 }],
+          use_cashback: true,
+        }),
+      }),
+      { AURA_DB: d1 },
+      undefined,
+      { id: 'cust-cb100', role: 'customer', phone: '0907778888' },
+    );
+    expect(autoCapRes.status).toBe(201);
+    const autoCapJson = await autoCapRes.json() as { data: { total: number; payment_status: string; cashback_used: number } };
+    expect(autoCapJson.data.cashback_used).toBe(39000);
+    expect(autoCapJson.data.total).toBe(1000);
+    expect(autoCapJson.data.payment_status).toBe('unpaid');
+  });
 });

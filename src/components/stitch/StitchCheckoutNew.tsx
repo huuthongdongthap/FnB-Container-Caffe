@@ -261,9 +261,17 @@ export function StitchCheckoutNew({
   const effectiveDiscount = appliedDiscount > 0 ? appliedDiscount : (summary.discount || 0);
   const effectivePromoCode = appliedPromoCode || summary.promoCode;
   const payableBeforeCashback = Math.max(0, summary.subtotal + (summary.tax || 0) + effectiveDeliveryFee - effectiveDiscount);
-  const appliedCashbackAmount = useCashback && loyalty && loyalty.balance > 0
+  const rawMaxCashback = loyalty && loyalty.balance > 0
     ? Math.min(Math.floor(loyalty.balance), payableBeforeCashback)
     : 0;
+  const maxUsableCashback =
+    paymentMethod === 'payos' &&
+    rawMaxCashback > 0 &&
+    payableBeforeCashback - rawMaxCashback > 0 &&
+    payableBeforeCashback - rawMaxCashback < 1000
+      ? Math.max(0, payableBeforeCashback - 1000)
+      : rawMaxCashback;
+  const appliedCashbackAmount = useCashback ? maxUsableCashback : 0;
   const effectiveTotal = Math.max(0, payableBeforeCashback - appliedCashbackAmount);
 
   const activeSummary: CheckoutNewSummary = {
@@ -521,7 +529,7 @@ export function StitchCheckoutNew({
                             Dùng Ví Hoàn Tiền
                             {appliedCashbackAmount > 0
                               ? ` (-${appliedCashbackAmount.toLocaleString('vi-VN')}₫)`
-                              : ` (tối đa ${Math.min(Math.floor(loyalty.balance), payableBeforeCashback).toLocaleString('vi-VN')}₫)`}
+                              : ` (tối đa ${maxUsableCashback.toLocaleString('vi-VN')}₫)`}
                           </span>
                         </label>
                       )}

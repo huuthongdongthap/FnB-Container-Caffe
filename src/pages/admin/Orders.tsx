@@ -428,10 +428,16 @@ export default function AdminOrdersPage() {
     }
   }, [loadOrdersAndSummary]);
 
+  const canCollectCod = useMemo(() => {
+    const normalizedRole = (actorRole || '').trim().toLowerCase();
+    return ['owner', 'manager', 'supervisor', 'cashier', 'admin', 'waiter', 'shipper'].includes(normalizedRole);
+  }, [actorRole]);
+
   const stitchOrders: OrderData[] = useMemo(
     () =>
       orders.map((order) => {
         const unpaidCod =
+          canCollectCod &&
           isCodMethod(order) &&
           getPaymentStatus(order) !== 'paid' &&
           getPaymentStatus(order) !== 'completed' &&
@@ -462,7 +468,7 @@ export default function AdminOrdersPage() {
           ),
         };
       }),
-    [orders, actorRole, t, loadOrdersAndSummary, codCollectingId, handleMarkCodPaid],
+    [orders, actorRole, canCollectCod, t, loadOrdersAndSummary, codCollectingId, handleMarkCodPaid],
   );
 
   const stats: StatCardData[] = useMemo(

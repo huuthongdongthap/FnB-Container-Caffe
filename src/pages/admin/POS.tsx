@@ -155,9 +155,14 @@ export default function AdminPOSPage() {
     };
   }, [todayShiftsRes, user?.id]);
 
+  const canCollectCod = useMemo(() => {
+    const normalizedRole = (user?.role || '').trim().toLowerCase();
+    return ['owner', 'manager', 'supervisor', 'cashier', 'admin', 'waiter', 'shipper'].includes(normalizedRole);
+  }, [user?.role]);
+
   /* ── Local State ──────────────────────────────────────────────────── */
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('payos');
-  const [orderType, setOrderType] = useState<'dine_in' | 'takeaway' | 'delivery'>('dine_in');
+  const [orderType, setOrderType] = useState<'dine_in' | 'takeaway' | 'delivery'>('takeaway');
   const [deliveryAddress, setDeliveryAddress] = useState('');
   const [customer, setCustomer] = useState<POSCustomer | null>(null);
   const [useCashback, setUseCashback] = useState(false);
@@ -324,6 +329,10 @@ export default function AdminPOSPage() {
       setCheckoutError(null);
       setCheckoutSuccess(false);
       setPaymentUrl(null);
+      setPaymentQrPayload(null);
+      setPendingPayOSOrder(null);
+      setPendingCodOrder(null);
+      setCodCollectedOrderId(null);
 
       // Use tableId from POS component if provided, else fall back to state
       const resolvedTableId = tableId ?? selectedTableId;
@@ -331,9 +340,16 @@ export default function AdminPOSPage() {
       try {
         const subtotal = cart.reduce((acc, ci) => acc + ci.price * ci.quantity, 0);
         const serviceFee = Math.max(0, Math.round(total - subtotal));
-        const appliedCashback = useCashback && customer && customer.cashback_balance > 0
+        const rawAppliedCashback = useCashback && customer && customer.cashback_balance > 0
           ? Math.min(Math.floor(customer.cashback_balance), Math.round(total))
           : 0;
+        const appliedCashback =
+          paymentMethod === 'payos' &&
+          rawAppliedCashback > 0 &&
+          Math.round(total) - rawAppliedCashback > 0 &&
+          Math.round(total) - rawAppliedCashback < 1000
+            ? Math.max(0, Math.round(total) - 1000)
+            : rawAppliedCashback;
         const payableTotal = Math.max(0, Math.round(total) - appliedCashback);
         const result = await checkoutMutation.mutateAsync({
           items: cart.map((ci) => ({
@@ -407,6 +423,7 @@ export default function AdminPOSPage() {
             setCustomer(null);
             setUseCashback(false);
             setSelectedTableId(undefined);
+            setOrderType('takeaway');
             setDeliveryAddress('');
             if (resolvedTableId) {
               void queryClient.invalidateQueries({ queryKey: ['pos-tables'] });
@@ -417,11 +434,13 @@ export default function AdminPOSPage() {
           setCustomer(null);
           setUseCashback(false);
           setSelectedTableId(undefined);
+          setOrderType('takeaway');
           setDeliveryAddress('');
           if (resolvedTableId) {
             void queryClient.invalidateQueries({ queryKey: ['pos-tables'] });
           }
-          if (paymentMethod === 'cod' && createdOrderId) {
+          const needsCodCollection = canCollectCod && paymentMethod === 'cod' && Boolean(createdOrderId) && serverTotal > 0;
+          if (needsCodCollection && createdOrderId) {
             setPendingCodOrder({ id: createdOrderId, total: serverTotal });
           } else {
             setPendingCodOrder(null);
@@ -430,7 +449,7 @@ export default function AdminPOSPage() {
           if (successTimerRef.current) {
             clearTimeout(successTimerRef.current);
           }
-          if (paymentMethod !== 'cod' || !createdOrderId) {
+          if (!needsCodCollection) {
             successTimerRef.current = setTimeout(() => {
               setCheckoutSuccess(false);
               successTimerRef.current = null;
@@ -453,7 +472,7 @@ export default function AdminPOSPage() {
         setIsCompleting(false);
       }
     },
-    [paymentMethod, orderType, deliveryAddress, checkoutMutation.mutateAsync, payOSMutation.mutateAsync, customer, useCashback, selectedTableId, queryClient, t, navigate],
+    [paymentMethod, orderType, deliveryAddress, checkoutMutation.mutateAsync, payOSMutation.mutateAsync, customer, useCashback, selectedTableId, canCollectCod, queryClient, t, navigate],
   );
 
   const handleRetryPayOSLink = useCallback(async () => {
@@ -481,13 +500,19 @@ export default function AdminPOSPage() {
         return safeUrl;
       });
       setPaymentUrl(safeUrl);
+      setCustomer(null);
+      setUseCashback(false);
+      setSelectedTableId(undefined);
+      setOrderType('takeaway');
+      setDeliveryAddress('');
+      void queryClient.invalidateQueries({ queryKey: ['pos-tables'] });
       setCartResetKey((k) => k + 1);
     } catch (err) {
       setCheckoutError(err instanceof Error ? err.message : 'Thử tạo lại mã QR PayOS thất bại.');
     } finally {
       setIsRetryingPayOS(false);
     }
-  }, [pendingPayOSOrder, isRetryingPayOS, payOSMutation]);
+  }, [pendingPayOSOrder, isRetryingPayOS, payOSMutation, queryClient]);
 
   const handleCancelPendingOrder = useCallback(async () => {
     if (!pendingPayOSOrder || isCancellingOrder) return;
@@ -501,12 +526,13 @@ export default function AdminPOSPage() {
       setPaymentQrPayload(null);
       setPendingPayOSOrder(null);
       setCheckoutError(null);
+      void queryClient.invalidateQueries({ queryKey: ['pos-tables'] });
     } catch (err) {
       setCheckoutError(err instanceof Error ? err.message : 'Không thể hủy đơn hàng.');
     } finally {
       setIsCancellingOrder(false);
     }
-  }, [pendingPayOSOrder, isCancellingOrder]);
+  }, [pendingPayOSOrder, isCancellingOrder, queryClient]);
 
   /* ── Render ───────────────────────────────────────────────────────── */
   return (
@@ -526,7 +552,12 @@ export default function AdminPOSPage() {
           <button
             key={opt.key}
             type="button"
-            onClick={() => setOrderType(opt.key)}
+            onClick={() => {
+              setOrderType(opt.key);
+              if (opt.key !== 'dine_in') {
+                setSelectedTableId(undefined);
+              }
+            }}
             aria-pressed={orderType === opt.key}
             className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors ${
               orderType === opt.key
@@ -555,7 +586,14 @@ export default function AdminPOSPage() {
         categoryLabels={categoryLabels}
         tables={tables}
         selectedTableId={selectedTableId}
-        onSelectTable={setSelectedTableId}
+        onSelectTable={(tableId) => {
+          setSelectedTableId(tableId);
+          if (tableId) {
+            setOrderType('dine_in');
+          } else if (orderType === 'dine_in') {
+            setOrderType('takeaway');
+          }
+        }}
         taxRate={0}
         staffName={user?.name || user?.email || undefined}
         staffRole={user?.role || undefined}
