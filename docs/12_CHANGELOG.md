@@ -4,6 +4,17 @@ Tất cả các thay đổi đáng kể của dự án F&B Caffe Container đư�
 
 ## [Unreleased]
 
+### Durable Object broadcast parity, deploy hygiene & static-analysis cleanup (2026-11-23)
+
+- **fix(realtime-broadcast)** — Added shared `dispatchOrderBroadcast` (`packages/domain/order/policies/order-broadcast.ts`) that invokes `stub.fetch('https://do/broadcast', ...)` before checking `stub.broadcast`, preventing Cloudflare `workerd` DurableObjectStub Proxy RPC failures on `OrderBroadcaster`. Refactored `update-order`, `split-orders`, `payos-reconcile`, `refunds-handlers/mutation-handlers`, and `webhooks-handlers/payos` to dispatch complete cold-DO-safe `OrderEvent` payloads (preserving minimal-schema query fallbacks), and accepted `'completed'` in `worker/src/do/order-broadcast-event.ts`.
+- **fix(deploy-script)** — Appended `${SCRIPT_DIR}/worker/node_modules/.bin` to `PATH` in `deploy-cloudflare.sh` when present so root `npx --no-install wrangler` resolves without requiring global `wrangler` while preserving earlier `PATH` overrides in CI/tests.
+- **fix(hygiene)** — Replaced `@ts-ignore` in `packages/domain/order/commands/create-order-side-effects.ts` with a typed `PushEnv` binding `AURA_DB: db`, and removed the `react-hooks/exhaustive-deps` suppression in `src/components/stitch/StitchPOSNew-customer-lookup.tsx` using `useCallback` and callback refs.
+
+### UAT 6-flow hardening & Playwright alignment — deployed to production (`27a04144`, 2026-11-23)
+
+- **fix(uat-hardening)** — Merged PRs `#108`–`#146` covering order cancellation refunds, voucher ownership and redemption guards, table release and occupancy checks, shift payout actor enforcement, HQ tenant normalization, shift reconciliation and customer spend query hardening, KDS local-flow alignment, and pre-existing Playwright spec alignment (`mobile-login`, `stitch-routes`).
+- **Production Deploy (`27a04144`, 0 D1 migrations):** Worker `aura-space-worker` deployed `97385200-3bd6-474d-83ee-9965ab819070` (rollback baseline `44babe91-1e5f-42fd-b3cb-a6590b0c74fb`); Pages `fnb-caffe-container` (`https://auraspace.cafe`) deployed `dc5dc3b5-9bb3-4deb-b709-be7dcd978d31` (rollback baseline `32a30b2e-f0f8-41f7-907e-1fe8f4b5608e`); post-deploy API/readiness/RBAC/SPA smoke passed.
+
 ### POS currency display consistency & safe explicit D1 migration resume (2026-11-22)
 
 - **fix(pos)** — Format POS amounts consistently as VND, including empty-cart totals and amounts below 1,000; remove amount-based switching to USD (`src/components/stitch/StitchPOSNew-types.ts`). Display-only correction; checkout calculations remain unchanged.

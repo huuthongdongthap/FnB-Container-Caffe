@@ -227,8 +227,14 @@ export async function runPostOrderSideEffects(params: PostOrderParams): Promise<
 
   const { sendPushToStaff } = await import('worker/src/tree/push/notifier.js');
   const { STAFF_PUSH_ROLE } = await import('worker/src/tree/push/roles.js');
-  // @ts-ignore -- PushEnv needs AURA_DB binding
-  const pushPromise = sendPushToStaff(env, {
+  const pushEnv: import('worker/src/tree/push/notifier').PushEnv = {
+    AURA_DB: db,
+    VAPID_PUBLIC_KEY: typeof env.VAPID_PUBLIC_KEY === 'string' ? env.VAPID_PUBLIC_KEY : undefined,
+    VAPID_PRIVATE_KEY: typeof env.VAPID_PRIVATE_KEY === 'string' ? env.VAPID_PRIVATE_KEY : undefined,
+    VAPID_EMAIL: typeof env.VAPID_EMAIL === 'string' ? env.VAPID_EMAIL : undefined,
+    PILOT_STORE: typeof env.PILOT_STORE === 'string' ? env.PILOT_STORE : undefined,
+  };
+  const pushPromise = sendPushToStaff(pushEnv, {
     title: 'Đơn hàng mới 🍳',
     body: `Bàn ${data.table_id || 'Mang đi'} — ${snapshot.items.length} món`,
     data: { url: '/kds', orderId }

@@ -1,5 +1,11 @@
 import type { D1Database, KVNamespace } from '@cloudflare/workers-types';
 import { settlePayOS } from '../../../../worker/src/routes/webhooks-handlers/payos-settlement';
+import {
+  dispatchOrderBroadcast,
+  normalizeBroadcastTotal,
+  parseBroadcastItems,
+  parseBroadcastTimestamp,
+} from '../../order/policies/order-broadcast';
 import { extractPayOSLinkId, verifyPayOSPaymentRequest, type VerifyFailureReason, type VerifyPayOSResult } from './payos-provider-verify';
 import { RECONCILE_LEASE_MS, claimReconcileJob, releaseReconcileJob, writePaymentReviewMarker, type ReconcileOutcome, type ReviewMarkerInput } from './payos-reconcile-lease';
 
@@ -266,15 +272,7 @@ export async function reconcilePayOSPayment(input: ReconcilePayOSInput): Promise
       }
       if (!isTerminalNonPayable && input.env?.ORDER_BROADCASTER) {
         try {
-          const ns = input.env.ORDER_BROADCASTER as {
-            idFromName(name: string): unknown;
-            get(id: unknown): {
-              broadcast?: (msg: unknown) => Promise<void>;
-              fetch?: (req: RequestInfo, init?: RequestInit) => Promise<Response>;
-            };
-          };
           const doChannel = rowTenant !== 'default' ? `${rowTenant}:${row.order_id}` : row.order_id;
-          const stub = ns.get(ns.idFromName(doChannel));
           const ordDetails = await input.db
             .prepare(
               "SELECT items, COALESCE(total, total_amount) AS total, customer_name, customer_phone, table_id, created_at FROM orders WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?",
@@ -290,42 +288,20 @@ export async function reconcilePayOSPayment(input: ReconcilePayOSInput): Promise
                     .catch(() => null)
                 : Promise.resolve(null),
             );
-          let parsedItems: unknown[] = [];
-          if (Array.isArray(ordDetails?.items)) {
-            parsedItems = ordDetails.items;
-          } else if (typeof ordDetails?.items === 'string') {
-            try {
-              parsedItems = JSON.parse(ordDetails.items) as unknown[];
-            } catch {
-              parsedItems = [];
-            }
-          }
           const eventPayload = {
             orderId: row.order_id,
             status: String(after?.order_status ?? fresh.order_status ?? 'pending'),
             payment_status: 'paid',
-            items: parsedItems,
-            total: Number(ordDetails?.total ?? expectedOrderTotal ?? expectedAmount ?? 0),
+            items: parseBroadcastItems(ordDetails?.items),
+            total: normalizeBroadcastTotal(ordDetails?.total ?? expectedOrderTotal ?? expectedAmount ?? 0),
             customer_name: String(ordDetails?.customer_name ?? ''),
             customer_phone: String(ordDetails?.customer_phone ?? ''),
             table_id: ordDetails?.table_id ? String(ordDetails.table_id) : null,
             ...(rowTenant !== 'default' ? { tenant_id: rowTenant } : {}),
-            createdAt: ordDetails?.created_at
-              ? new Date(String(ordDetails.created_at)).getTime()
-              : Date.now(),
+            createdAt: parseBroadcastTimestamp(ordDetails?.created_at),
             updatedAt: Date.now(),
           };
-          if (typeof stub.broadcast === 'function') {
-            await stub.broadcast(eventPayload).catch(() => {});
-          } else if (typeof stub.fetch === 'function') {
-            await stub
-              .fetch('https://do/broadcast', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(eventPayload),
-              })
-              .catch(() => {});
-          }
+          await dispatchOrderBroadcast(input.env.ORDER_BROADCASTER, doChannel, eventPayload);
         } catch {
           // Non-blocking realtime broadcast after reconciliation settlement
         }

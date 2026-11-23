@@ -15,6 +15,12 @@ import {
 } from '../policies/order-creation-scope';
 import { publishOrderEvent } from '../policies/customer-order-payload';
 import {
+  dispatchOrderBroadcast,
+  normalizeBroadcastTotal,
+  parseBroadcastItems,
+  parseBroadcastTimestamp,
+} from '../policies/order-broadcast';
+import {
    resolveServerOrderOwnership,
   generateOrderToken,
   hashOrderToken,
@@ -155,7 +161,7 @@ export async function splitOrders(
 
     const db = env.AURA_DB as D1Database;
     const parentOrderId = (parsed.data.order_id || parsed.data.parent_order_id || '').trim();
-    let parentOrder: {
+    type SplitParentOrderRow = {
       id: string;
       table_id?: string | null;
       tenant_id?: string | null;
@@ -163,36 +169,49 @@ export async function splitOrders(
       payment_status?: string | null;
       total?: number | null;
       session_id?: string | null;
-    } | null = null;
+      items?: string | unknown[] | null;
+      customer_name?: string | null;
+      customer_phone?: string | null;
+      created_at?: string | null;
+    };
+    let parentOrder: SplitParentOrderRow | null = null;
     if (parentOrderId) {
       parentOrder = await db
         .prepare(
-          "SELECT id, table_id, tenant_id, status, payment_status, total, session_id FROM orders WHERE id = ? AND (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?) LIMIT 1"
+          "SELECT id, table_id, tenant_id, status, payment_status, total, session_id, items, customer_name, customer_phone, created_at FROM orders WHERE id = ? AND (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?) LIMIT 1"
         )
         .bind(parentOrderId, scopeTenant, scopeTenant)
-        .first<{ id: string; table_id?: string | null; tenant_id?: string | null; status?: string | null; payment_status?: string | null; total?: number | null; session_id?: string | null }>()
+        .first<SplitParentOrderRow>()
         .catch(() =>
           db
             .prepare(
-              "SELECT id, table_id, tenant_id, status, payment_status, total FROM orders WHERE id = ? AND (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?) LIMIT 1"
+              "SELECT id, table_id, tenant_id, status, payment_status, total, session_id FROM orders WHERE id = ? AND (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?) LIMIT 1"
             )
             .bind(parentOrderId, scopeTenant, scopeTenant)
-            .first<{ id: string; table_id?: string | null; tenant_id?: string | null; status?: string | null; payment_status?: string | null; total?: number | null; session_id?: string | null }>()
+            .first<SplitParentOrderRow>()
             .catch(() =>
               db
                 .prepare(
-                  "SELECT id, table_id, tenant_id, status, payment_status FROM orders WHERE id = ? AND (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?) LIMIT 1"
+                  "SELECT id, table_id, tenant_id, status, payment_status, total FROM orders WHERE id = ? AND (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?) LIMIT 1"
                 )
                 .bind(parentOrderId, scopeTenant, scopeTenant)
-                .first<{ id: string; table_id?: string | null; tenant_id?: string | null; status?: string | null; payment_status?: string | null; total?: number | null; session_id?: string | null }>()
+                .first<SplitParentOrderRow>()
                 .catch(() =>
-                  (scopeTenant === 'default' || scopeTenant === '*')
-                    ? db
-                        .prepare('SELECT id, table_id, status FROM orders WHERE id = ? LIMIT 1')
-                        .bind(parentOrderId)
-                        .first<{ id: string; table_id?: string | null; tenant_id?: string | null; status?: string | null; payment_status?: string | null; total?: number | null; session_id?: string | null }>()
-                        .catch(() => null)
-                    : null
+                  db
+                    .prepare(
+                      "SELECT id, table_id, tenant_id, status, payment_status FROM orders WHERE id = ? AND (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?) LIMIT 1"
+                    )
+                    .bind(parentOrderId, scopeTenant, scopeTenant)
+                    .first<SplitParentOrderRow>()
+                    .catch(() =>
+                      (scopeTenant === 'default' || scopeTenant === '*')
+                        ? db
+                            .prepare('SELECT id, table_id, status FROM orders WHERE id = ? LIMIT 1')
+                            .bind(parentOrderId)
+                            .first<SplitParentOrderRow>()
+                            .catch(() => null)
+                        : null
+                    )
                 )
             )
         );
@@ -839,24 +858,21 @@ export async function splitOrders(
       }
       if (env.ORDER_BROADCASTER) {
         try {
-          const ns = env.ORDER_BROADCASTER as import('@cloudflare/workers-types').DurableObjectNamespace;
           const doChannel = effectiveTenant !== 'default' ? `${effectiveTenant}:${parentOrder.id}` : parentOrder.id;
-          const stub = ns.get(ns.idFromName(doChannel)) as unknown as {
-            broadcast?: (msg: unknown) => Promise<void>;
-            fetch?: (input: RequestInfo, init?: RequestInit) => Promise<Response>;
-          };
           const cancelEvent = {
             orderId: parentOrder.id,
             status: 'cancelled',
             payment_status: String(parentOrder.payment_status || 'unpaid'),
+            items: parseBroadcastItems(parentOrder.items),
+            total: normalizeBroadcastTotal(parentOrder.total),
+            customer_name: String(parentOrder.customer_name ?? ''),
+            customer_phone: String(parentOrder.customer_phone ?? ''),
             table_id: tableId,
             ...(effectiveTenant !== 'default' ? { tenant_id: effectiveTenant } : {}),
+            createdAt: parseBroadcastTimestamp(parentOrder.created_at),
             updatedAt: Date.now(),
           };
-          if (typeof stub.broadcast === 'function') await stub.broadcast(cancelEvent);
-          else if (typeof stub.fetch === 'function') {
-            await stub.fetch('https://do/broadcast', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(cancelEvent) });
-          }
+          await dispatchOrderBroadcast(env.ORDER_BROADCASTER, doChannel, cancelEvent);
         } catch { /* non-blocking parent DO broadcast */ }
       }
     }

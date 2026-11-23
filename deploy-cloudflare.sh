@@ -23,6 +23,12 @@ WORKER_DIR="worker"
 DIST_DIR="dist"
 MIGRATIONS_DIR="worker/db/migrations"
 
+# Make worker-local binaries (e.g. wrangler) discoverable from repo root without
+# shadowing earlier PATH entries used by system installs or test harnesses.
+if [[ -d "${SCRIPT_DIR}/${WORKER_DIR}/node_modules/.bin" ]]; then
+  export PATH="${PATH}:${SCRIPT_DIR}/${WORKER_DIR}/node_modules/.bin"
+fi
+
 WORKER_ONLY=false
 PAGES_ONLY=false
 SKIP_TESTS=false

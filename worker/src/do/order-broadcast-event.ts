@@ -2,7 +2,7 @@
 import type { OrderEvent } from './OrderBroadcaster';
 
 const statuses = new Set(['pending', 'confirmed', 'preparing', 'ready', 'served', 'completed', 'delivered', 'cancelled', 'refunded', 'failed', 'expired']);
-const paymentStatuses = new Set(['pending', 'unpaid', 'paid', 'failed', 'refunded', 'partially_refunded']);
+const paymentStatuses = new Set(['pending', 'unpaid', 'paid', 'completed', 'failed', 'refunded', 'partially_refunded']);
 export function parseOrderBroadcast(raw: unknown, previous?: OrderEvent): OrderEvent | null {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
   const payload = raw as Record<string, unknown>;
