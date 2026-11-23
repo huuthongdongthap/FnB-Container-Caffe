@@ -10,7 +10,7 @@
  */
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Loader2, AlertCircle } from 'lucide-react';
 
@@ -32,7 +32,7 @@ export function StitchPOSNew({
   loading = false,
   error = null,
   brandName = 'AURA CAFE',
-  taxRate = 0.05,
+  taxRate = 0,
   discount = 0,
   paymentMethod: externalPaymentMethod,
   staffName,
@@ -45,6 +45,7 @@ export function StitchPOSNew({
   onOpenDrawer,
   onPrintReceipt,
   onEndShift,
+  cartResetKey = 0,
 }: Readonly<StitchPOSNewProps>) {
   const { t } = useTranslation();
   const [searchQuery, setSearchQuery] = useState('');
@@ -53,6 +54,12 @@ export function StitchPOSNew({
   const [cartOpen, setCartOpen] = useState(true);
   const [internalPaymentMethod, setInternalPaymentMethod] = useState<'payos' | 'cod'>('payos');
   const activePaymentMethod = externalPaymentMethod ?? internalPaymentMethod;
+
+  useEffect(() => {
+    if (cartResetKey > 0) {
+      setCart([]);
+    }
+  }, [cartResetKey]);
 
   const categories = Array.from(
     new Set([

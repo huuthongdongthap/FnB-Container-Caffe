@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { renderWithProviders, screen } from '@/test-utils';
+import { renderWithProviders, screen, fireEvent } from '@/test-utils';
 import { StitchCheckoutNew } from '../StitchCheckoutNew';
 import type { CheckoutNewSummary } from '../StitchCheckoutNew';
 
@@ -117,6 +117,7 @@ describe('StitchCheckoutNew', () => {
     renderWithProviders(
       <StitchCheckoutNew summary={MOCK_SUMMARY} onPlaceOrder={vi.fn()} />,
     );
+    fireEvent.click(screen.getByRole('button', { name: /mang đi/i }));
     expect(screen.getByText('PayOS')).toBeTruthy();
     expect(screen.getByText('Tiền mặt')).toBeTruthy();
     expect(screen.queryByText('Cash on Delivery')).toBeNull();

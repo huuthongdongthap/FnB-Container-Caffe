@@ -46,6 +46,8 @@ export interface StitchOrderSuccessNewProps {
   onAccount?: () => void;
   onRefresh?: () => void;
   onReorder?: () => void;
+  onRetryPayment?: () => void;
+  isRetryingPayment?: boolean;
 }
 
 /* ─── Status Steps ───────────────────────────────────────────────────────── */

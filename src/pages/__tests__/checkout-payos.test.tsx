@@ -4,7 +4,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen } from '@/test-utils';
+import { render, screen, fireEvent } from '@/test-utils';
 import { CheckoutPage } from '@/pages/checkout';
 import { useCartStore } from '@/hooks/stores/use-cart-store';
 
@@ -36,6 +36,7 @@ describe('CheckoutPage — PayOS flow', () => {
 
   it('shows COD as Vietnamese Tiền mặt payment method without English hardcode', () => {
     render(<CheckoutPage />);
+    fireEvent.click(screen.getByRole('button', { name: /mang đi/i }));
     expect(screen.getByText('Tiền mặt')).toBeInTheDocument();
     expect(screen.queryByText('Cash on Delivery')).not.toBeInTheDocument();
   });
@@ -47,6 +48,7 @@ describe('CheckoutPage — PayOS flow', () => {
 
   it('shows both payment methods enabled and allows selecting Tiền mặt', () => {
     render(<CheckoutPage />);
+    fireEvent.click(screen.getByRole('button', { name: /mang đi/i }));
     const codButton = screen.getByRole('radio', { name: /tiền mặt/i });
     const payosButton = screen.getByRole('radio', { name: /payos/i });
     expect(codButton).not.toBeDisabled();

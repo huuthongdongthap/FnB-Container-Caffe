@@ -249,14 +249,7 @@ describe('D1 primary session pinning and guest_token_hash verification', () => {
     );
     expect(forgedRes.status).toBe(403);
 
-    // Unauthenticated guest create-link without X-Order-Token continues to succeed
-    vi.spyOn(globalThis, 'fetch').mockImplementationOnce(async (_url, init) =>
-      payosCheckoutResponse(
-        JSON.parse(String(init?.body || '{}')),
-        'checksum-secret',
-        'ord-link-1',
-      ),
-    );
+    // Unauthenticated guest create-link without X-Order-Token is rejected when guest_token_hash is set
     const unauthGuestRes = await app.fetch(
       new Request('https://test.aura/api/payment/create-link', {
         method: 'POST',
@@ -265,7 +258,28 @@ describe('D1 primary session pinning and guest_token_hash verification', () => {
       }),
       env,
     );
-    expect(unauthGuestRes.status).toBe(200);
+    expect(unauthGuestRes.status).toBe(403);
+
+    // Valid X-Order-Token matching guest_token_hash succeeds
+    vi.spyOn(globalThis, 'fetch').mockImplementationOnce(async (_url, init) =>
+      payosCheckoutResponse(
+        JSON.parse(String(init?.body || '{}')),
+        'checksum-secret',
+        'ord-link-1',
+      ),
+    );
+    const validGuestRes = await app.fetch(
+      new Request('https://test.aura/api/payment/create-link', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Order-Token': rawToken,
+        },
+        body: JSON.stringify({ order_id: 'ORD_LINK_1' }),
+      }),
+      env,
+    );
+    expect(validGuestRes.status).toBe(200);
   });
 
   it('returns order_token from POST /api/orders/sync and allows X-Order-Token in CORS preflight', async () => {

@@ -1,19 +1,24 @@
 import { useTranslation } from 'react-i18next';
 import { cn } from '@/lib/cn';
 import { glassPanelBg, PAYMENT_OPTIONS } from './StitchCheckoutNew-utils';
-import type { PaymentMethod } from './StitchCheckoutNew-types';
+import type { OrderType, PaymentMethod } from './StitchCheckoutNew-types';
 
 interface PaymentMethodSelectorProps {
   selected: PaymentMethod;
   onSelect: (method: PaymentMethod) => void;
+  orderType?: OrderType;
 }
 
 export function PaymentMethodSelector({
   selected,
   onSelect,
+  orderType,
 }: Readonly<PaymentMethodSelectorProps>) {
   const { t, i18n } = useTranslation();
   const isEnglish = i18n?.language?.toLowerCase().startsWith('en') ?? false;
+  const visibleOptions = orderType === 'delivery'
+    ? PAYMENT_OPTIONS.filter((opt) => opt.value !== 'cod')
+    : PAYMENT_OPTIONS;
 
   return (
     <section>
@@ -29,7 +34,7 @@ export function PaymentMethodSelector({
       </h2>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {PAYMENT_OPTIONS.map((option) => {
+        {visibleOptions.map((option) => {
           const isSelected = selected === option.value;
           const isPayos = option.value === 'payos';
           const IconComp = option.icon;

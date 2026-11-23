@@ -245,18 +245,22 @@ export function formatCustomerOrder(order: Row, items: Row[]) {
       fallbackItems = [];
     }
   }
+  const discountAmount = order.discount_amount ?? order.discount ?? 0;
+  const totalAmount = order.total_amount ?? order.total ?? 0;
+  const subtotal = order.subtotal ?? Number(totalAmount) + Number(discountAmount);
   return {
     id: order.id,
     orderNumber: order.order_number,
     table: order.table_id ? { id: order.table_id, name: order.table_name } : null,
     items: items.length > 0 ? items.map(formatCustomerOrderItem) : fallbackItems,
-    channel: order.channel ?? 'dine_in',
-    subtotal: order.subtotal,
-    discountAmount: order.discount_amount,
-    taxAmount: order.tax_amount,
-    totalAmount: order.total_amount ?? order.total,
+    channel: order.order_type || order.channel || 'dine_in',
+    subtotal,
+    discountAmount,
+    taxAmount: order.tax_amount ?? 0,
+    totalAmount,
     status: order.status,
     paymentStatus: order.payment_status,
+    paymentMethod: typeof order.payment_method === 'string' ? order.payment_method : undefined,
     notes: order.notes ?? null,
     createdAt: order.created_at,
     updatedAt: order.updated_at,
