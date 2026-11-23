@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardBody, CardHeader } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ShiftHandoverModal } from '@/components/admin/ShiftHandoverModal';
+import { apiFetch } from '@/lib/api-client';
 import { useAuthStore } from '@/hooks/stores/use-auth-store';
 import { useAdminStaffStore } from '@/hooks/stores/admin/use-admin-staff-store';
 import { useAdminShiftsStore, type ShiftRecord } from '@/hooks/stores/admin/use-admin-shifts-store';
@@ -14,6 +15,37 @@ const MANAGER_ROLES = new Set(['owner', 'manager', 'supervisor', 'admin']);
 
 function vietnamBusinessDate(now = new Date()): string {
   return new Date(now.getTime() + 7 * 3_600_000).toISOString().slice(0, 10);
+}
+
+function parseUtcTimestamp(raw: string): number {
+  const trimmed = raw.trim();
+  if (!trimmed) return Number.NaN;
+  const normalized = trimmed.includes('T')
+    ? (/(Z|[+-]\d{2}:?\d{2})$/i.test(trimmed) ? trimmed : `${trimmed}Z`)
+    : `${trimmed.replace(' ', 'T')}Z`;
+  return Date.parse(normalized);
+}
+
+interface ReconciliationReportData {
+  from: string;
+  to: string;
+  has_unreconciled_shifts?: boolean;
+  unreconciled_shifts?: Array<{
+    shift_id: string;
+    staff_name: string;
+    date: string;
+    status: 'open' | 'unreconciled';
+    opening_float: number;
+  }>;
+  categories: Array<{ category: string; items_sold: number; revenue: number }>;
+  totals: {
+    revenue: number;
+    cash_expected: number;
+    cash_actual: number;
+    cash_variance: number;
+    digital_payments: number;
+    order_count: number;
+  };
 }
 
 function formatVnd(amount: number): string {
@@ -88,13 +120,24 @@ export function ShiftsTab() {
   const user = useAuthStore((s) => s.user);
   const canManage = MANAGER_ROLES.has(user?.role || '');
   const { staff, fetchStaff } = useAdminStaffStore();
-  const { todayShifts, historyShifts, loading, error, fetchToday, fetchHistory, clockIn } = useAdminShiftsStore();
+  const {
+    todayShifts,
+    historyShifts,
+    loading,
+    error,
+    mutationError,
+    clearMutationError,
+    fetchToday,
+    fetchHistory,
+    clockIn,
+  } = useAdminShiftsStore();
 
   const [selectedStaffId, setSelectedStaffId] = useState<string>('');
   const [selectedScheduledId, setSelectedScheduledId] = useState<string>('');
   const [openingCashInput, setOpeningCashInput] = useState<string>('0');
   const [clockInNotes, setClockInNotes] = useState<string>('');
   const [formError, setFormError] = useState<string | null>(null);
+  const [reconReport, setReconReport] = useState<ReconciliationReportData | null>(null);
 
   const [handoverShiftId, setHandoverShiftId] = useState<string | undefined>(undefined);
   const [handoverOpen, setHandoverOpen] = useState(false);
@@ -103,7 +146,24 @@ export function ShiftsTab() {
     fetchStaff();
     fetchToday();
     fetchHistory();
-  }, [fetchStaff, fetchToday, fetchHistory]);
+    if (canManage) {
+      const today = vietnamBusinessDate();
+      Promise.resolve(
+        apiFetch<{ success: boolean; data?: ReconciliationReportData }>(
+          `/api/reports/reconciliation?from=${encodeURIComponent(today)}&to=${encodeURIComponent(today)}`,
+          { silent: true },
+        ),
+      )
+        .then((res) => {
+          if (res?.data && res.data.totals && typeof res.data.totals.revenue === 'number') {
+            setReconReport(res.data);
+          }
+        })
+        .catch(() => {
+          setReconReport(null);
+        });
+    }
+  }, [fetchStaff, fetchToday, fetchHistory, canManage]);
 
   const defaultManageStaffId =
     (user?.id && staff.some((m) => m.id === user.id) ? user.id : staff[0]?.id) || user?.id || '';
@@ -124,6 +184,7 @@ export function ShiftsTab() {
 
   const handleClockIn = async () => {
     setFormError(null);
+    clearMutationError();
     const parsedOpening = Number(openingCashInput);
     if (!openingCashLocked && (!Number.isFinite(parsedOpening) || parsedOpening < 0)) {
       setFormError('Tiền đầu ca phải là số không âm. / Opening cash must be a non-negative number.');
@@ -168,12 +229,15 @@ export function ShiftsTab() {
     );
   }
 
+  const todayBizDate = vietnamBusinessDate();
+  const todayMidnightUtcMs = Date.parse(`${todayBizDate}T00:00:00+07:00`);
   const totalHoursToday = todayShifts.reduce((acc: number, s: ShiftRecord) => {
     if (s.hours_worked) return acc + s.hours_worked;
     if (!s.clock_out && s.clock_in) {
-      const startTime = new Date(s.clock_in).getTime();
-      if (!Number.isNaN(startTime)) {
-        const elapsed = Math.max(0, (Date.now() - startTime) / 3_600_000);
+      const parsedStart = parseUtcTimestamp(s.clock_in);
+      if (!Number.isNaN(parsedStart)) {
+        const clampedStart = Number.isFinite(todayMidnightUtcMs) ? Math.max(parsedStart, todayMidnightUtcMs) : parsedStart;
+        const elapsed = Math.max(0, (Date.now() - clampedStart) / 3_600_000);
         return acc + Math.round(elapsed * 10) / 10;
       }
     }
@@ -290,9 +354,9 @@ export function ShiftsTab() {
             />
           </div>
 
-          {formError && (
-            <p className="mt-2 text-xs text-destructive" role="alert">
-              {formError}
+          {(formError || mutationError) && (
+            <p className="mt-2 text-xs text-destructive" role="alert" data-testid="shifts-inline-error">
+              {formError || mutationError}
             </p>
           )}
         </CardBody>
@@ -320,6 +384,53 @@ export function ShiftsTab() {
         </CardBody>
       </Card>
 
+      {canManage && reconReport && (
+        <Card className="mb-6" data-testid="reconciliation-report-card">
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <h2 className="text-lg font-semibold">Đối soát tiền mặt hôm nay / Daily Reconciliation</h2>
+              {reconReport.has_unreconciled_shifts && (
+                <Badge variant="warning">
+                  {reconReport.unreconciled_shifts?.length || 0} ca chưa đối soát
+                </Badge>
+              )}
+            </div>
+          </CardHeader>
+          <CardBody>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+              <div className="rounded-lg bg-surface p-3 border border-border">
+                <p className="text-xs text-muted">Doanh thu / Revenue</p>
+                <p className="font-semibold">{formatVnd(reconReport.totals.revenue)}</p>
+              </div>
+              <div className="rounded-lg bg-surface p-3 border border-border">
+                <p className="text-xs text-muted">Tiền mặt kỳ vọng / Expected</p>
+                <p className="font-semibold">{formatVnd(reconReport.totals.cash_expected)}</p>
+              </div>
+              <div className="rounded-lg bg-surface p-3 border border-border">
+                <p className="text-xs text-muted">Tiền mặt thực đếm / Actual</p>
+                <p className="font-semibold">{formatVnd(reconReport.totals.cash_actual)}</p>
+              </div>
+              <div className="rounded-lg bg-surface p-3 border border-border">
+                <p className="text-xs text-muted">Chênh lệch / Variance</p>
+                <p className="font-semibold">{formatVnd(reconReport.totals.cash_variance)}</p>
+              </div>
+            </div>
+            {reconReport.categories.length > 0 && (
+              <div className="mt-3 pt-3 border-t border-border">
+                <p className="text-xs font-medium text-muted mb-1.5">Theo danh mục / By Category</p>
+                <div className="flex flex-wrap gap-2 text-xs">
+                  {reconReport.categories.map((cat) => (
+                    <span key={cat.category} className="rounded-md bg-surface px-2 py-1 border border-border">
+                      {cat.category}: {cat.items_sold} món ({formatVnd(cat.revenue)})
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+          </CardBody>
+        </Card>
+      )}
+
       <Card>
         <CardHeader>
           <h2 className="text-lg font-semibold">{t('adminStaff.recentShifts')}</h2>
@@ -330,12 +441,18 @@ export function ShiftsTab() {
           ) : (
             <div className="space-y-2">
               {historyShifts.slice(0, 50).map((s) => (
-                <div key={s.id} className="flex items-center justify-between p-3 rounded-lg bg-surface border border-border">
-                  <div>
+                <div key={s.id} className="flex items-center justify-between gap-3 p-3 rounded-lg bg-surface border border-border">
+                  <div className="min-w-0">
                     <p className="font-medium">{staff.find((m) => m.id === s.staff_id)?.name || s.staff_name || s.staff_id}</p>
                     <p className="text-xs text-muted">
                       {formatDate(s.date)} | {s.clock_in ? formatTime(s.clock_in) : '--:--'}{' '}
                       {s.clock_out ? `- ${formatTime(s.clock_out)}` : s.clock_in ? `(${t('adminStaff.active')})` : '(Scheduled)'}
+                    </p>
+                    <p className="text-xs text-muted mt-0.5">
+                      Đầu ca: {formatVnd(s.opening_cash ?? 0)}
+                      {typeof s.expected_cash === 'number' ? ` • Kỳ vọng: ${formatVnd(s.expected_cash)}` : ''}
+                      {typeof s.actual_cash === 'number' ? ` • Thực đếm: ${formatVnd(s.actual_cash)}` : ''}
+                      {typeof s.cash_variance === 'number' ? ` • Lệch: ${formatVnd(s.cash_variance)}` : ''}
                     </p>
                   </div>
                   <Badge>{s.hours_worked ? formatHours(s.hours_worked) : '--'}</Badge>

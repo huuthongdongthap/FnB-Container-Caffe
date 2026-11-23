@@ -16,6 +16,7 @@ import {
 import type { AdminOrder } from '@/hooks/use-admin';
 import { useAuthStore } from '@/hooks/stores/use-auth-store';
 import { ManualOrderRefund } from '@/components/admin/manual-order-refund';
+import { apiFetch } from '@/lib/api-client';
 
 /* ─── Status & Transition Logic ──────────────────────────────────────── */
 
@@ -222,6 +223,17 @@ function computeNextAction(
   };
 }
 
+function isCodMethod(order: AdminOrder): boolean {
+  const raw = order as unknown as Record<string, unknown>;
+  const method = String(raw.payment_method ?? raw.paymentMethod ?? '').toLowerCase();
+  return method === 'cod' || method === 'cash' || raw.is_cod === 1;
+}
+
+function getPaymentStatus(order: AdminOrder): string {
+  const raw = order as unknown as Record<string, unknown>;
+  return String(raw.payment_status ?? raw.paymentStatus ?? 'unpaid').toLowerCase();
+}
+
 function mapAdminOrder(
   ao: AdminOrder,
   actorRole: string,
@@ -328,6 +340,8 @@ export default function AdminOrdersPage() {
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [searchField, setSearchField] = useState<OrderSearchFieldType>('all');
   const [currentPage, setCurrentPage] = useState(1);
+  const [codCollectingId, setCodCollectingId] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
 
   // Modals state
   const [detailsOrder, setDetailsOrder] = useState<AdminOrder | null>(null);
@@ -395,20 +409,60 @@ export default function AdminOrdersPage() {
   }, [orders]);
 
   /* ─── Derived data ──────────────────────────────────────────────────── */
+  const handleMarkCodPaid = useCallback(async (orderId: string) => {
+    setCodCollectingId(orderId);
+    setActionError(null);
+    try {
+      const res = await apiFetch<{ success?: boolean; error?: string }>(
+        `/api/orders/${encodeURIComponent(orderId)}/mark-cod-paid`,
+        { method: 'PATCH' },
+      );
+      if (res && res.success === false) {
+        throw new Error(res.error || 'Không thể xác nhận đã thu tiền mặt');
+      }
+      loadOrdersAndSummary();
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : 'Không thể xác nhận đã thu tiền mặt');
+    } finally {
+      setCodCollectingId(null);
+    }
+  }, [loadOrdersAndSummary]);
+
   const stitchOrders: OrderData[] = useMemo(
     () =>
-      orders.map((order) => ({
-        ...mapAdminOrder(order, actorRole, t),
-        additionalActions: (
-          <ManualOrderRefund
-            order={order}
-            onRecorded={() => {
-              loadOrdersAndSummary();
-            }}
-          />
-        ),
-      })),
-    [orders, actorRole, t, loadOrdersAndSummary],
+      orders.map((order) => {
+        const unpaidCod =
+          isCodMethod(order) &&
+          getPaymentStatus(order) !== 'paid' &&
+          getPaymentStatus(order) !== 'completed' &&
+          order.status !== 'cancelled' &&
+          order.status !== 'completed';
+        return {
+          ...mapAdminOrder(order, actorRole, t),
+          additionalActions: (
+            <div className="inline-flex items-center gap-2">
+              {unpaidCod && (
+                <button
+                  type="button"
+                  data-testid={`mark-cod-paid-${order.id}`}
+                  disabled={codCollectingId === order.id}
+                  onClick={() => { void handleMarkCodPaid(order.id); }}
+                  className="rounded-md bg-emerald-600 px-2.5 py-1 text-xs font-semibold text-white hover:bg-emerald-700 disabled:opacity-50"
+                >
+                  {codCollectingId === order.id ? 'Đang thu...' : 'Thu tiền COD'}
+                </button>
+              )}
+              <ManualOrderRefund
+                order={order}
+                onRecorded={() => {
+                  loadOrdersAndSummary();
+                }}
+              />
+            </div>
+          ),
+        };
+      }),
+    [orders, actorRole, t, loadOrdersAndSummary, codCollectingId, handleMarkCodPaid],
   );
 
   const stats: StatCardData[] = useMemo(
@@ -462,11 +516,23 @@ export default function AdminOrdersPage() {
               : normalized === 'cancel'
                 ? 'cancelled'
                 : normalized;
-      if (VALID_STATUSES.has(targetStatus)) {
-        await updateOrderStatus(orderId, targetStatus);
+      if (!VALID_STATUSES.has(targetStatus)) return;
+      if (targetStatus === 'delivered' || targetStatus === 'completed') {
+        const targetOrder = orders.find((o) => o.id === orderId);
+        if (
+          targetOrder &&
+          isCodMethod(targetOrder) &&
+          getPaymentStatus(targetOrder) !== 'paid' &&
+          getPaymentStatus(targetOrder) !== 'completed'
+        ) {
+          setActionError('Đơn tiền mặt/COD chưa thu tiền. Vui lòng bấm "Thu tiền COD" trước khi hoàn tất đơn.');
+          return;
+        }
       }
+      setActionError(null);
+      await updateOrderStatus(orderId, targetStatus);
     },
-    [updateOrderStatus],
+    [orders, updateOrderStatus],
   );
 
   const handleViewDetails = useCallback(
@@ -530,9 +596,30 @@ export default function AdminOrdersPage() {
     }
   }, [orderMap]);
 
+  const handleRefresh = useCallback(() => {
+    setActionError(null);
+    loadOrdersAndSummary();
+  }, [loadOrdersAndSummary]);
+
   /* ─── Render ────────────────────────────────────────────────────────── */
   return (
     <>
+      {actionError && (
+        <div
+          role="alert"
+          data-testid="orders-action-error"
+          className="mb-3 flex items-center justify-between gap-3 rounded-lg border border-amber-500/40 bg-amber-500/10 px-4 py-2.5 text-sm text-amber-200"
+        >
+          <span>{actionError}</span>
+          <button
+            type="button"
+            onClick={() => setActionError(null)}
+            className="rounded px-2 py-0.5 text-xs font-semibold hover:bg-amber-500/20 cursor-pointer"
+          >
+            Đóng / Dismiss
+          </button>
+        </div>
+      )}
       <StitchOrderMgmtNew
         headerTitle={t('terminal.nav.orders')}
         headerSubtitle={t('terminal.orderMgmtSubtitle', { defaultValue: 'Order Management' })}
@@ -556,14 +643,13 @@ export default function AdminOrdersPage() {
         onCancelOrder={handleOpenCancel}
         onEditOrder={handleOpenEdit}
         onPrintOrder={handlePrintOrder}
-        onRefresh={loadOrdersAndSummary}
+        onRefresh={handleRefresh}
         currentPage={currentPage}
         pageSize={ADMIN_ORDERS_PAGE_SIZE}
         totalCount={totalCount || stitchOrders.length}
         onPageChange={handlePageChange}
         showDashboardPanels={false}
       />
-
       {/* Order Details / Log Modal */}
       {detailsOrder && (
         <div

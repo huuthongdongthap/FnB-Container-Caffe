@@ -8,7 +8,13 @@ import {
   validateDateRangeWindow,
   verifyReportAnalyticsAccess,
 } from './analytics-handlers';
-import type { DailyReconciliationReport, PaymentMethodSummary, ReconciliationRow } from './types';
+import type {
+  CategorySummary,
+  DailyReconciliationReport,
+  PaymentMethodSummary,
+  ReconciliationRow,
+  UnreconciledShiftSummary,
+} from './types';
 
 const ICT_OFFSET_MS = 7 * 3600_000;
 
@@ -149,12 +155,122 @@ export function registerReconciliationHandlers(app: Hono<{ Bindings: Env }>) {
     const cashExpected = shifts.reduce((acc, s) => acc + s.expected_cash, 0);
     const cashActual = shifts.reduce((acc, s) => acc + (s.actual_cash ?? 0), 0);
 
+    // Populate real category breakdown from valid revenue orders in window
+    const categoryMap = new Map<string, { items_sold: number; revenue: number }>();
+    // Load tenant categories map to resolve category_id stored in order snapshots
+    const categoryNameById = new Map<string, string>();
+    try {
+      const { results: catRows } = await db
+        .prepare(`SELECT id, name FROM categories WHERE 1=1${tf.and}`)
+        .bind(...tf.binds)
+        .all<{ id?: string | number | null; name?: string | null }>();
+      for (const row of catRows || []) {
+        if (row.id !== null && row.id !== undefined && row.name) {
+          categoryNameById.set(String(row.id), String(row.name).trim());
+        }
+      }
+    } catch {
+      // categories table unavailable in minimal test schemas
+    }
+
+    try {
+      const { results: orderItemRows } = await db
+        .prepare(
+          `SELECT items FROM orders
+           WHERE DATE(datetime(created_at, '+7 hours')) BETWEEN ? AND ? AND ${VALID_REVENUE_ORDER_SQL}${tf.and}`
+        )
+        .bind(from, to, ...tf.binds)
+        .all<{ items?: string | null }>();
+      for (const row of orderItemRows || []) {
+        if (!row.items) continue;
+        try {
+          const parsed = JSON.parse(row.items) as Array<{
+            category?: string;
+            category_name?: string;
+            category_id?: string | number;
+            quantity?: number;
+            price?: number;
+            unit_price?: number;
+          }>;
+          if (!Array.isArray(parsed)) continue;
+          for (const item of parsed) {
+            const rawCat =
+              item.category ||
+              item.category_name ||
+              (item.category_id !== undefined && item.category_id !== null
+                ? categoryNameById.get(String(item.category_id)) || String(item.category_id)
+                : '');
+            const cat = String(rawCat || 'Khác').trim() || 'Khác';
+            const qty = Math.max(0, Number(item.quantity ?? 1) || 0);
+            const unitPrice = Number(item.price ?? item.unit_price ?? 0) || 0;
+            const prev = categoryMap.get(cat) || { items_sold: 0, revenue: 0 };
+            categoryMap.set(cat, {
+              items_sold: prev.items_sold + qty,
+              revenue: prev.revenue + qty * unitPrice,
+            });
+          }
+        } catch {
+          // Skip malformed JSON items row
+        }
+      }
+    } catch {
+      // orders.items unavailable
+    }
+    const categories: CategorySummary[] = Array.from(categoryMap.entries())
+      .map(([category, stats]) => ({ category, ...stats }))
+      .sort((a, b) => b.revenue - a.revenue);
+
+    // Flag open or clock-out shifts in range that have not been reconciled yet
+    // Exclude any shift already reconciled (including overnight shifts reconciled on the next day)
+    const unreconciledShifts: UnreconciledShiftSummary[] = [];
+    try {
+      const reconTenantClause = tenantId !== '*'
+        ? " AND COALESCE(NULLIF(TRIM(r.tenant_id), ''), 'default') = ?"
+        : '';
+      const reconBinds = tenantId !== '*' ? [tenantId] : [];
+      const { results: staffShiftRows } = await db
+        .prepare(
+          `SELECT id, staff_name, date, clock_in, clock_out, opening_cash
+           FROM staff_shifts
+           WHERE date BETWEEN ? AND ?
+             AND clock_in IS NOT NULL${tf.and}
+             AND NOT EXISTS (
+               SELECT 1 FROM shift_reconciliations r
+               WHERE r.shift_id = CAST(staff_shifts.id AS TEXT)${reconTenantClause}
+             )
+           ORDER BY clock_in DESC`
+        )
+        .bind(from, to, ...tf.binds, ...reconBinds)
+        .all<{
+          id: string | number;
+          staff_name?: string | null;
+          date?: string | null;
+          clock_in?: string | null;
+          clock_out?: string | null;
+          opening_cash?: number | null;
+        }>();
+      for (const s of staffShiftRows || []) {
+        const sid = String(s.id);
+        unreconciledShifts.push({
+          shift_id: sid,
+          staff_name: String(s.staff_name || 'Nhân viên'),
+          date: String(s.date || from),
+          status: s.clock_out ? 'unreconciled' : 'open',
+          opening_float: Number(s.opening_cash || 0),
+        });
+      }
+    } catch {
+      // staff_shifts table unavailable
+    }
+
     const report: DailyReconciliationReport = {
       from,
       to,
       shifts,
+      unreconciled_shifts: unreconciledShifts,
+      has_unreconciled_shifts: unreconciledShifts.length > 0,
       payment_methods: paymentMethods,
-      categories: [],
+      categories,
       totals: {
         revenue: totalRevenue,
         order_count: totalOrders,

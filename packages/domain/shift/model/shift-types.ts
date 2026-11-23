@@ -14,6 +14,9 @@ export interface ShiftRow {
   start_time: string | null;
   end_time: string | null;
   opening_cash?: number;
+  expected_cash?: number | null;
+  actual_cash?: number | null;
+  cash_variance?: number | null;
   notes: string | null;
   created_at: string;
 }

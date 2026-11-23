@@ -1,167 +1,66 @@
 import { Hono } from 'hono';
-import {
-  reconcileShiftCash,
-  getReconciliationForShift,
-  ShiftContractError,
-  type ReconciliationInput,
-} from '@aura/domain-shift';
+import { reconciliationRoutes } from '@aura/domain-shift';
 import type { Env } from '../types/env';
 import { authenticateRequest } from '../middleware/auth';
-import { createLogger } from '../middleware/logger';
 
-const log = createLogger({ route: 'shift-reconciliation' });
-const shiftReconciliationRouter = new Hono<{ Bindings: Env }>();
+type ShiftReconApp = Hono<{
+  Bindings: Env;
+  Variables: { user: Record<string, unknown>; tenantId: string };
+}>;
 
-const RECONCILIATION_ROLES = new Set([
-  'owner',
-  'manager',
-  'supervisor',
-  'staff',
-  'admin',
-  'cashier',
-  'waiter',
-]);
-const HQ_ROLES = new Set(['owner', 'admin']);
+/**
+ * Legacy sub-router mounted at `/api/shifts`.
+ * Delegates directly to `@aura/domain-shift` `reconciliationRoutes` as the single source of truth.
+ */
+export const shiftReconciliationRouter = new Hono<{
+  Bindings: Env;
+  Variables: { user?: Record<string, unknown>; tenantId?: string };
+}>();
 
-function isCashReconciliationEnabled(env: Env | undefined): boolean {
-  const flag = String(env?.CASH_RECONCILIATION_ENABLED ?? '').trim().toLowerCase();
-  return flag === 'true' || flag === '1';
-}
+const forwardToDomain = async (c: {
+  req: { url: string; raw: Request };
+  env: Env;
+  get: (k: 'user' | 'tenantId') => unknown;
+}) => {
+  const url = new URL(c.req.url);
+  const forwardedReq = url.pathname.startsWith('/api/shifts')
+    ? c.req.raw
+    : new Request(
+        new URL(`/api/shifts${url.pathname.startsWith('/') ? '' : '/'}${url.pathname}${url.search}`, url.origin).toString(),
+        c.req.raw,
+      );
+  const existingUser = c.get('user') as Record<string, unknown> | undefined;
+  const existingTenant = c.get('tenantId') as string | undefined;
 
-function resolveTenantScope(
-  c: { req: { header: (k: string) => string | undefined; query: (k: string) => string | undefined }; get: (k: string) => unknown },
-  user: { role?: string; tenant_id?: string }
-): { tenantId?: string; status?: 400 | 403; error?: string } {
-  const boundTenant = user.tenant_id && user.tenant_id.trim() ? user.tenant_id.trim() : 'default';
-  const isHq = HQ_ROLES.has(String(user.role || '')) && (boundTenant === '*' || boundTenant.toLowerCase() === 'hq');
-  const headerTenant = c.req.header('X-Tenant-ID')?.trim() || '';
-  const queryTenant = c.req.query('tenant_id')?.trim() || '';
-  if (headerTenant && queryTenant && headerTenant !== queryTenant) {
-    return { status: 400, error: 'Conflicting tenant scope parameters' };
-  }
-  const requested = headerTenant || queryTenant;
-  if (!isHq) {
-    if (requested && requested !== boundTenant) {
-      return { status: 403, error: 'Forbidden cross-tenant reconciliation access' };
+  const wrapper: ShiftReconApp = new Hono();
+  wrapper.use('*', async (wc, next) => {
+    if (existingUser) {
+      wc.set('user', existingUser);
+    } else {
+      const auth = await authenticateRequest(wc.req.raw, wc.env);
+      if (auth && !('blocked' in auth)) {
+        const tenantId = auth.account?.tenant_id ?? auth.payload.tenantId ?? 'default';
+        wc.set('user', {
+          id: auth.account?.id ?? auth.payload.sub,
+          role: auth.account?.role ?? auth.payload.role,
+          tenantId,
+          tenant_id: tenantId,
+          name: auth.account?.name ?? auth.payload.name,
+        });
+        if (tenantId) wc.set('tenantId', String(tenantId));
+      }
     }
-    return { tenantId: boundTenant };
-  }
-  const ctxTenant = typeof c.get('tenantId') === 'string' ? String(c.get('tenantId')).trim() : '';
-  const target = requested || ctxTenant || 'default';
-  return { tenantId: target.toLowerCase() === 'hq' ? '*' : target };
-}
+    if (existingTenant) wc.set('tenantId', existingTenant);
+    await next();
+  });
+  reconciliationRoutes(wrapper);
+  return wrapper.fetch(forwardedReq, c.env);
+};
 
-async function resolveShiftActor(
-  c: { get?: (k: never) => unknown; req: { raw: Request }; env: Env }
-): Promise<{ sub?: string; id?: string; role?: string; tenant_id?: string } | undefined> {
-  const fromCtx = (typeof c.get === 'function' ? c.get('user' as never) : undefined) as
-    | { sub?: string; id?: string; role?: string; tenant_id?: string }
-    | undefined;
-  if (fromCtx) return fromCtx;
-  const session = await authenticateRequest(c.req.raw, c.env, { optional: true }).catch(() => null);
-  if (!session || 'blocked' in session) return undefined;
-  const payload = session.payload;
-  return {
-    sub: payload.sub,
-    id: payload.sub,
-    role: payload.role,
-    tenant_id: payload.tenantId ?? (payload as unknown as { tenant_id?: string }).tenant_id,
-  };
-}
+shiftReconciliationRouter.post('/:id/reconcile', forwardToDomain);
+shiftReconciliationRouter.get('/:id/reconciliation', forwardToDomain);
+shiftReconciliationRouter.post('/:id/assign-cash-payments', forwardToDomain);
+shiftReconciliationRouter.get('/:id/payouts', forwardToDomain);
+shiftReconciliationRouter.post('/:id/payouts', forwardToDomain);
 
-shiftReconciliationRouter.post('/:id/reconcile', async (c) => {
-  const user = await resolveShiftActor(c);
-  if (!user) return c.json({ success: false, error: 'Authentication required' }, 401);
-  if (!RECONCILIATION_ROLES.has(String(user.role || ''))) {
-    return c.json({ success: false, error: 'Forbidden' }, 403);
-  }
-
-  if (!isCashReconciliationEnabled(c.env)) {
-    return c.json(
-      {
-        success: false,
-        code: 'PILOT_CASH_RECONCILIATION_DISABLED',
-        error: 'Cash reconciliation is unavailable for the attendance pilot',
-      },
-      501
-    );
-  }
-
-  const scope = resolveTenantScope(c as never, user);
-  if (scope.error && scope.status) {
-    return c.json({ success: false, error: scope.error }, scope.status);
-  }
-
-  let body: Record<string, unknown>;
-  try {
-    const parsed = await c.req.json();
-    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
-      return c.json({ success: false, error: 'Invalid payload' }, 400);
-    }
-    body = parsed as Record<string, unknown>;
-  } catch {
-    return c.json({ success: false, error: 'Invalid JSON payload' }, 400);
-  }
-
-  const shiftId = c.req.param('id');
-  const staffId = String(user.sub || user.id || '');
-  const denominations =
-    body.denominations && typeof body.denominations === 'object'
-      ? (body.denominations as ReconciliationInput['denominations'])
-      : { denominations: [] };
-
-  const input: ReconciliationInput & { actual_cash_counted?: unknown } = {
-    shift_id: shiftId,
-    opening_float: Number(body.opening_float ?? 0),
-    denominations,
-    notes: typeof body.notes === 'string' ? body.notes : undefined,
-    ...(body.actual_cash_counted !== undefined ? { actual_cash_counted: body.actual_cash_counted } : {}),
-  };
-
-  try {
-    const result = await reconcileShiftCash(c.env, input, staffId, scope.tenantId, String(user.role || ''));
-    return c.json({ success: true, data: result }, 201);
-  } catch (err) {
-    if (err instanceof ShiftContractError) {
-      return c.json({ success: false, error: err.message }, err.status);
-    }
-    log.error('Unexpected shift reconciliation error', {
-      shiftId,
-      message: err instanceof Error ? err.message : String(err),
-    });
-    return c.json({ success: false, error: 'Failed to reconcile shift cash' }, 500);
-  }
-});
-
-shiftReconciliationRouter.get('/:id/reconciliation', async (c) => {
-  const user = await resolveShiftActor(c);
-  if (!user) return c.json({ success: false, error: 'Authentication required' }, 401);
-  if (!RECONCILIATION_ROLES.has(String(user.role || ''))) {
-    return c.json({ success: false, error: 'Forbidden' }, 403);
-  }
-
-  if (!isCashReconciliationEnabled(c.env)) {
-    return c.json(
-      {
-        success: false,
-        code: 'PILOT_CASH_RECONCILIATION_DISABLED',
-        error: 'Cash reconciliation is unavailable for the attendance pilot',
-      },
-      501
-    );
-  }
-
-  const scope = resolveTenantScope(c as never, user);
-  if (scope.error && scope.status) {
-    return c.json({ success: false, error: scope.error }, scope.status);
-  }
-
-  const shiftId = c.req.param('id');
-  const record = await getReconciliationForShift(c.env, shiftId, scope.tenantId);
-  if (!record) {
-    return c.json({ success: false, error: 'Shift reconciliation not found' }, 404);
-  }
-  return c.json({ success: true, data: record });
-});
-
-export { shiftReconciliationRouter };
+export { reconciliationRoutes };

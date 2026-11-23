@@ -21,7 +21,7 @@ import { useCheckout, useProcessPayOS } from '@/hooks/use-checkout';
 import { useOfflineSync } from '@/hooks/use-offline-sync';
 import { useAuthStore } from '@/hooks/stores/use-auth-store';
 import { apiFetch } from '@/lib/api-client';
-import { CheckCircle2, AlertCircle, X, ExternalLink, RefreshCw } from 'lucide-react';
+import { CheckCircle2, AlertCircle, X, ExternalLink, RefreshCw, Banknote } from 'lucide-react';
 import type { PaymentMethod } from '@/lib/validators';
 import { brandConfig } from '@/config/brand-types';
 import { StitchPOSNew } from '@/components/stitch/StitchPOSNew';
@@ -162,6 +162,9 @@ export default function AdminPOSPage() {
   const [customer, setCustomer] = useState<POSCustomer | null>(null);
   const [selectedTableId, setSelectedTableId] = useState<string | undefined>(undefined);
   const [checkoutSuccess, setCheckoutSuccess] = useState(false);
+  const [pendingCodOrder, setPendingCodOrder] = useState<{ id: string; total: number } | null>(null);
+  const [codCollecting, setCodCollecting] = useState(false);
+  const [codCollectedOrderId, setCodCollectedOrderId] = useState<string | null>(null);
   const [shiftHandoverOpen, setShiftHandoverOpen] = useState(false);
   const [checkoutError, setCheckoutError] = useState<string | null>(null);
   const [paymentUrl, setPaymentUrl] = useState<string | null>(null);
@@ -184,7 +187,40 @@ export default function AdminPOSPage() {
     setPendingPayOSOrder(null);
     setCheckoutError(null);
     setCheckoutSuccess(false);
+    setPendingCodOrder(null);
+    setCodCollectedOrderId(null);
   }, [activeTenant, sessionVersion]);
+
+  const handleMarkCodPaid = useCallback(async (orderId: string) => {
+    setCodCollecting(true);
+    setCheckoutError(null);
+    try {
+      const res = await apiFetch<{ success?: boolean; error?: string }>(
+        `/api/orders/${encodeURIComponent(orderId)}/mark-cod-paid`,
+        { method: 'PATCH' },
+      );
+      if (res && res.success === false) {
+        throw new Error(res.error || 'Không thể xác nhận đã thu tiền mặt');
+      }
+      setPendingCodOrder(null);
+      setCodCollectedOrderId(orderId);
+      setCheckoutSuccess(true);
+      if (successTimerRef.current) clearTimeout(successTimerRef.current);
+      successTimerRef.current = setTimeout(() => {
+        setCheckoutSuccess(false);
+        setCodCollectedOrderId(null);
+        successTimerRef.current = null;
+      }, 5000);
+    } catch (err) {
+      setCheckoutError(
+        err instanceof Error
+          ? err.message
+          : 'Không thể xác nhận đã thu tiền mặt (kiểm tra ca làm việc đang mở)',
+      );
+    } finally {
+      setCodCollecting(false);
+    }
+  }, []);
 
   useEffect(() => {
     const qrSource = paymentQrPayload || paymentUrl;
@@ -376,14 +412,21 @@ export default function AdminPOSPage() {
           if (resolvedTableId) {
             void queryClient.invalidateQueries({ queryKey: ['pos-tables'] });
           }
+          if (paymentMethod === 'cod' && createdOrderId) {
+            setPendingCodOrder({ id: createdOrderId, total: Math.round(total) });
+          } else {
+            setPendingCodOrder(null);
+          }
           setCheckoutSuccess(true);
           if (successTimerRef.current) {
             clearTimeout(successTimerRef.current);
           }
-          successTimerRef.current = setTimeout(() => {
-            setCheckoutSuccess(false);
-            successTimerRef.current = null;
-          }, 5000);
+          if (paymentMethod !== 'cod' || !createdOrderId) {
+            successTimerRef.current = setTimeout(() => {
+              setCheckoutSuccess(false);
+              successTimerRef.current = null;
+            }, 5000);
+          }
           return true;
         } else {
           setCheckoutError(
@@ -556,16 +599,45 @@ export default function AdminPOSPage() {
       )}
 
       {/* ── Success Banner Overlay ─────────────────────────────────────── */}
-      {checkoutSuccess && (
+      {(checkoutSuccess || pendingCodOrder) && (
         <div
-          className="fixed top-20 left-1/2 -translate-x-1/2 z-[100] flex items-center gap-2 px-5 py-3 rounded-lg shadow-lg"
+          className="fixed top-20 left-1/2 -translate-x-1/2 z-[100] flex items-center gap-3 px-5 py-3 rounded-lg shadow-lg"
           style={{
             backgroundColor: 'rgba(76,175,80,0.95)',
             color: '#fff',
           }}
         >
           <CheckCircle2 className="w-4 h-4 shrink-0" />
-          <span className="text-sm font-medium">Order created successfully!</span>
+          <span className="text-sm font-medium">
+            {codCollectedOrderId
+              ? `Đã thu tiền mặt đơn #${codCollectedOrderId.slice(0, 8)}!`
+              : 'Order created successfully!'}
+          </span>
+          {pendingCodOrder && (
+            <>
+              <button
+                type="button"
+                data-testid="pos-mark-cod-paid-btn"
+                disabled={codCollecting}
+                onClick={() => void handleMarkCodPaid(pendingCodOrder.id)}
+                className="inline-flex items-center gap-1.5 rounded-md bg-white px-3 py-1 text-xs font-semibold text-emerald-800 hover:bg-emerald-50 disabled:opacity-60 cursor-pointer"
+              >
+                <Banknote className="w-3.5 h-3.5" />
+                {codCollecting ? 'Đang xác nhận...' : 'Đã thu tiền mặt'}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setPendingCodOrder(null);
+                  setCheckoutSuccess(false);
+                }}
+                aria-label="Dismiss COD banner"
+                className="rounded px-1.5 py-0.5 text-xs text-white/90 hover:bg-white/20 cursor-pointer"
+              >
+                ×
+              </button>
+            </>
+          )}
         </div>
       )}
 
