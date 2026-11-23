@@ -254,14 +254,14 @@ posCustomerRouter.get('/', requireStaff(['owner', 'manager', 'supervisor', 'staf
                c.created_at, c.tenant_id,
                COALESCE(cw.balance, 0) AS cashback_balance,
                COALESCE(cw.total_earned, 0) AS total_earned,
-               COALESCE(cw.total_spent, 0) AS total_spent,
+               (SELECT COALESCE(SUM(o.total), 0) FROM orders o WHERE (o.customer_phone = c.phone OR o.customer_id = c.id) AND LOWER(TRIM(COALESCE(o.status, ''))) NOT IN ('cancelled', 'failed', 'rejected', 'expired', 'refunded') AND LOWER(TRIM(COALESCE(o.payment_status, ''))) != 'refunded' AND (? = '*' OR CASE WHEN o.tenant_id = '' THEN 'default' ELSE COALESCE(NULLIF(TRIM(o.tenant_id), ''), 'default') END = ?)) AS total_spent,
                (SELECT COUNT(*) FROM orders o WHERE (o.customer_phone = c.phone OR o.customer_id = c.id) AND LOWER(TRIM(COALESCE(o.status, ''))) NOT IN ('cancelled', 'failed', 'rejected', 'expired', 'refunded') AND LOWER(TRIM(COALESCE(o.payment_status, ''))) != 'refunded' AND (? = '*' OR CASE WHEN o.tenant_id = '' THEN 'default' ELSE COALESCE(NULLIF(TRIM(o.tenant_id), ''), 'default') END = ?)) AS visit_count
         FROM customers c
         LEFT JOIN cashback_wallets cw ON cw.customer_id = c.id AND (? = '*' OR COALESCE(NULLIF(TRIM(cw.tenant_id), ''), 'default') = ?)
         WHERE c.phone IN (${phoneInClause}) AND (? = '*' OR CASE WHEN c.tenant_id = '' THEN 'default' ELSE COALESCE(NULLIF(TRIM(c.tenant_id), ''), 'default') END = ?)
         LIMIT 2
       `,
-      [tenantId, tenantId, tenantId, tenantId, ...variants, tenantId, tenantId],
+      [tenantId, tenantId, tenantId, tenantId, tenantId, tenantId, ...variants, tenantId, tenantId],
     );
   } catch (err) {
     const errMsg = err instanceof Error ? err.message : String(err);
@@ -283,7 +283,7 @@ posCustomerRouter.get('/', requireStaff(['owner', 'manager', 'supervisor', 'staf
                      c.created_at,
                      COALESCE(cw.balance, 0) AS cashback_balance,
                      COALESCE(cw.total_earned, 0) AS total_earned,
-                     COALESCE(cw.total_spent, 0) AS total_spent,
+                     COALESCE((SELECT SUM(o.total) FROM orders o WHERE (o.customer_phone = c.phone OR o.customer_id = c.id) AND LOWER(COALESCE(o.status, '')) NOT IN ('cancelled', 'failed', 'rejected', 'expired', 'refunded') AND LOWER(COALESCE(o.payment_status, '')) != 'refunded'), 0) AS total_spent,
                      (SELECT COUNT(*) FROM orders o WHERE (o.customer_phone = c.phone OR o.customer_id = c.id) AND LOWER(TRIM(COALESCE(o.status, ''))) NOT IN ('cancelled', 'failed', 'rejected', 'expired', 'refunded')) AS visit_count
               FROM customers c
               LEFT JOIN cashback_wallets cw ON cw.customer_id = c.id
@@ -356,7 +356,7 @@ posCustomerRouter.get('/', requireStaff(['owner', 'manager', 'supervisor', 'staf
                      c.created_at, c.tenant_id,
                      COALESCE(cw.balance, 0) AS cashback_balance,
                      COALESCE(cw.total_earned, 0) AS total_earned,
-                     COALESCE(cw.total_spent, 0) AS total_spent,
+                     COALESCE((SELECT SUM(o.total) FROM orders o WHERE (o.customer_phone = c.phone OR o.customer_id = c.id) AND LOWER(COALESCE(o.status, '')) NOT IN ('cancelled', 'failed', 'rejected', 'expired', 'refunded') AND LOWER(COALESCE(o.payment_status, '')) != 'refunded'), 0) AS total_spent,
                      (SELECT COUNT(*) FROM orders o WHERE (o.customer_phone = c.phone OR o.customer_id = c.id) AND LOWER(TRIM(COALESCE(o.status, ''))) NOT IN ('cancelled', 'failed', 'rejected', 'expired', 'refunded')) AS visit_count
               FROM customers c
               LEFT JOIN cashback_wallets cw ON cw.customer_id = c.id AND (? = '*' OR COALESCE(NULLIF(TRIM(cw.tenant_id), ''), 'default') = ?)
@@ -428,7 +428,7 @@ posCustomerRouter.get('/', requireStaff(['owner', 'manager', 'supervisor', 'staf
                      c.created_at, c.tenant_id,
                      COALESCE(cw.balance, 0) AS cashback_balance,
                      COALESCE(cw.total_earned, 0) AS total_earned,
-                     COALESCE(cw.total_spent, 0) AS total_spent,
+                     COALESCE((SELECT SUM(o.total) FROM orders o WHERE o.customer_id = c.id AND COALESCE(NULLIF(TRIM(o.tenant_id), ''), 'default') = COALESCE(NULLIF(TRIM(c.tenant_id), ''), 'default') AND LOWER(COALESCE(o.status, '')) NOT IN ('cancelled', 'failed', 'rejected', 'expired', 'refunded') AND LOWER(COALESCE(o.payment_status, '')) != 'refunded'), 0) AS total_spent,
                      (SELECT COUNT(*) FROM orders o WHERE (o.customer_phone = c.phone OR o.customer_id = c.id) AND LOWER(TRIM(COALESCE(o.status, ''))) NOT IN ('cancelled', 'failed', 'rejected', 'expired', 'refunded') AND (? = '*' OR COALESCE(NULLIF(TRIM(o.tenant_id), ''), 'default') = ?)) AS visit_count
               FROM customers c
               LEFT JOIN cashback_wallets cw ON cw.customer_id = c.id
@@ -445,7 +445,7 @@ posCustomerRouter.get('/', requireStaff(['owner', 'manager', 'supervisor', 'staf
                      c.created_at, c.tenant_id,
                      COALESCE(cw.balance, 0) AS cashback_balance,
                      COALESCE(cw.total_earned, 0) AS total_earned,
-                     COALESCE(cw.total_spent, 0) AS total_spent,
+                     COALESCE((SELECT SUM(o.total) FROM orders o WHERE o.customer_id = c.id AND COALESCE(NULLIF(TRIM(o.tenant_id), ''), 'default') = COALESCE(NULLIF(TRIM(c.tenant_id), ''), 'default') AND LOWER(COALESCE(o.status, '')) NOT IN ('cancelled', 'failed', 'rejected', 'expired', 'refunded') AND LOWER(COALESCE(o.payment_status, '')) != 'refunded'), 0) AS total_spent,
                      (SELECT COUNT(*) FROM orders o WHERE o.customer_phone = c.phone AND LOWER(TRIM(COALESCE(o.status, ''))) NOT IN ('cancelled', 'failed', 'rejected', 'expired', 'refunded') AND (? = '*' OR COALESCE(NULLIF(TRIM(o.tenant_id), ''), 'default') = ?)) AS visit_count
               FROM customers c
               LEFT JOIN cashback_wallets cw ON cw.customer_id = c.id
@@ -554,7 +554,7 @@ posCustomerRouter.get('/', requireStaff(['owner', 'manager', 'supervisor', 'staf
                            c.created_at, c.tenant_id,
                            COALESCE(cw.balance, 0) AS cashback_balance,
                            COALESCE(cw.total_earned, 0) AS total_earned,
-                           COALESCE(cw.total_spent, 0) AS total_spent,
+                           COALESCE((SELECT SUM(o.total) FROM orders o WHERE o.customer_id = c.id AND COALESCE(NULLIF(TRIM(o.tenant_id), ''), 'default') = COALESCE(NULLIF(TRIM(c.tenant_id), ''), 'default') AND LOWER(COALESCE(o.status, '')) NOT IN ('cancelled', 'failed', 'rejected', 'expired', 'refunded') AND LOWER(COALESCE(o.payment_status, '')) != 'refunded'), 0) AS total_spent,
                            (SELECT COUNT(*) FROM orders o WHERE o.customer_phone = c.phone AND LOWER(TRIM(COALESCE(o.status, ''))) NOT IN ('cancelled', 'failed', 'rejected', 'expired', 'refunded') AND (? = '*' OR COALESCE(NULLIF(TRIM(o.tenant_id), ''), 'default') = ?)) AS visit_count
                     FROM customers c
                     LEFT JOIN cashback_wallets cw ON cw.customer_id = c.id

@@ -464,7 +464,15 @@ loyaltyRouter.post('/redeem', rateLimitMiddleware(LOYALTY_REDEEM_RATE_LIMIT), as
 
   return c.json({
     success: true,
-    data: { code, reward: reward.title, points_spent: reward.point_cost, points_remaining: newPts, expires_at: expiresAt }
+    data: {
+      code,
+      voucherCode: code,
+      reward: reward.title,
+      points_spent: reward.point_cost,
+      points_remaining: newPts,
+      expires_at: expiresAt,
+      expiresAt,
+    }
   });
 });
 

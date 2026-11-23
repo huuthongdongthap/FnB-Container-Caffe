@@ -10,9 +10,9 @@ export const TIER_ORDER = ['bronze', 'silver', 'gold', 'platinum'] as const;
 
 export const TIER_POINTS: Record<string, number> = {
   bronze: 0,
-  silver: 500,
-  gold: 2000,
-  platinum: 5000,
+  silver: 50,
+  gold: 200,
+  platinum: 500,
 };
 
 export function getNextTier(tier: string): string | null {
@@ -24,12 +24,15 @@ export function getNextTier(tier: string): string | null {
 export function getTierProgress(
   tier: string,
   points: number,
+  customThresholds?: Record<string, number>,
 ): { percent: number; remaining: number; nextTier: string | null } {
-  const nextTier = getNextTier(tier);
+  const normalizedTier = (tier || 'bronze').toLowerCase();
+  const nextTier = getNextTier(normalizedTier);
   if (!nextTier) return { percent: 100, remaining: 0, nextTier: null };
 
-  const currentMin = TIER_POINTS[tier] ?? 0;
-  const nextMin = TIER_POINTS[nextTier] ?? currentMin + 1000;
+  const thresholds = customThresholds ?? TIER_POINTS;
+  const currentMin = thresholds[normalizedTier] ?? TIER_POINTS[normalizedTier] ?? 0;
+  const nextMin = thresholds[nextTier] ?? TIER_POINTS[nextTier] ?? currentMin + 100;
   const range = nextMin - currentMin;
   const progress = Math.max(0, Math.min(range, points - currentMin));
   const percent = range > 0 ? Math.round((progress / range) * 100) : 0;

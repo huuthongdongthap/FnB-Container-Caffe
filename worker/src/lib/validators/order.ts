@@ -38,6 +38,8 @@ export const createOrderSchema = z.object({
   service_fee: z.number().nonnegative().optional().default(0),
   redeem_points: z.number().int().min(0).max(100000).optional(),
   loyalty_points_redeemed: z.number().int().min(0).max(100000).optional(),
+  cashback_amount: z.number().int().min(0).max(10000000).optional(),
+  use_cashback: z.boolean().optional(),
   /** Legacy compatibility only. The server never uses this field to choose the store. */
   tenant_id: z.string().optional(),
 }).superRefine((data, ctx) => {

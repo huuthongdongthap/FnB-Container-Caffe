@@ -65,6 +65,8 @@ export const orderApiPayloadSchema = z.object({
   order_type: z.enum(['dine_in', 'takeaway', 'delivery']).optional(),
   /** Customer id from POS lookup — guest orders leave it unset */
   customer_id: z.string().optional(),
+  use_cashback: z.boolean().optional(),
+  cashback_amount: z.number().int().min(0).optional(),
 });
 
 export type OrderApiPayload = z.infer<typeof orderApiPayloadSchema>;

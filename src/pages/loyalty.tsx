@@ -16,7 +16,6 @@ import {
 } from '@/components/stitch/StitchLoyaltyNew';
 import { WEEK_DAYS, TIER_BENEFIT_KEYS, DEFAULT_CHECKIN, REWARD_IMAGES } from './loyalty-constants';
 import { getDefaultLoyaltyData } from '@/components/stitch/loyalty-default-data';
-import { LoyaltyHeader } from './loyalty-header';
 import type { Reward, PointsHistoryEntry as _PointsHistoryEntry, LoyaltyPageProps } from './loyalty-types';
 
 /* ── Re-exports for backward compatibility ──────────────────────── */
@@ -39,7 +38,8 @@ export function LoyaltyPage({
 
   useEffect(() => {
     if (isAuthenticated) {
-      store.fetchLoyalty();
+      void store.fetchLoyalty();
+      void useReferralStore.getState().fetchReferralData();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAuthenticated]);
@@ -81,36 +81,50 @@ export function LoyaltyPage({
 
   /* ── Build dashboard data ──────────────────────────────────────── */
   const formatTierLabel = (name: string) => (name ? name.charAt(0).toUpperCase() + name.slice(1) : 'Bronze');
+  const lifetimePoints = propPoints ?? store.lifetimePoints ?? points;
+  const hasExplicitProps = propPoints !== undefined || propRewards !== undefined || propHistory !== undefined;
   const activeTierLadder = store.tierLadder.length > 0
     ? store.tierLadder
-    : getDefaultLoyaltyData(t).tierLadder;
+    : (isAuthenticated || hasExplicitProps ? getDefaultLoyaltyData(t).tierLadder : []);
   const normalizedTier = (tier || 'bronze').toLowerCase();
   const sortedTiers = [...activeTierLadder].sort((a, b) => a.min_points - b.min_points);
   const currentTierIdx = Math.max(
     0,
     sortedTiers.findIndex((item) => item.tier_name.toLowerCase() === normalizedTier),
   );
-  const nextTierObj = sortedTiers[currentTierIdx + 1] ?? sortedTiers[sortedTiers.length - 1];
-  const externalNextTierMinPoints =
-    storeSummary.next_tier &&
-    typeof storeSummary.next_tier === 'object' &&
-    typeof storeSummary.next_tier.min_points === 'number'
-      ? storeSummary.next_tier.min_points
-      : undefined;
+  const hasHigherTier = sortedTiers.length > 0 && currentTierIdx < sortedTiers.length - 1;
+  const nextTierObj = hasHigherTier ? sortedTiers[currentTierIdx + 1] : null;
+  const serverNextTier = store.nextTier ?? (
+    storeSummary.next_tier && typeof storeSummary.next_tier === 'object'
+      ? storeSummary.next_tier
+      : null
+  );
+  const isMaxTier = !serverNextTier && !hasHigherTier && sortedTiers.length > 0;
   const targetPoints =
-    externalNextTierMinPoints ??
-    (nextTierObj && nextTierObj.min_points > 0 ? nextTierObj.min_points : 500);
+    (serverNextTier && typeof serverNextTier.min_points === 'number' && serverNextTier.min_points > 0
+      ? serverNextTier.min_points
+      : nextTierObj && nextTierObj.min_points > 0
+        ? nextTierObj.min_points
+        : 500);
   const formattedTier = formatTierLabel(tier);
-  const resolvedExternalNextTier = storeSummary.next_tier
-    ? resolveTierString(storeSummary.next_tier, '')
-    : '';
-  const nextTierName = resolvedExternalNextTier
-    ? formatTierLabel(resolvedExternalNextTier)
-    : currentTierIdx < sortedTiers.length - 1 && nextTierObj
-      ? formatTierLabel(nextTierObj.tier_name)
-      : 'Platinum';
-  const pointsRemaining = Math.max(0, targetPoints - points);
-  const progressPct = Math.min(100, Math.round((points / targetPoints) * 100));
+  const resolvedExternalNextTier = serverNextTier
+    ? resolveTierString(serverNextTier, '')
+    : (typeof storeSummary.next_tier === 'string' ? storeSummary.next_tier : '');
+  const nextTierName = isMaxTier
+    ? formattedTier
+    : resolvedExternalNextTier
+      ? formatTierLabel(resolvedExternalNextTier)
+      : nextTierObj
+        ? formatTierLabel(nextTierObj.tier_name)
+        : formattedTier;
+  const pointsRemaining = isMaxTier
+    ? 0
+    : (serverNextTier && 'points_needed' in serverNextTier && typeof serverNextTier.points_needed === 'number'
+        ? Math.max(0, serverNextTier.points_needed)
+        : Math.max(0, targetPoints - lifetimePoints));
+  const progressPct = isMaxTier
+    ? 100
+    : Math.min(100, Math.round((lifetimePoints / Math.max(1, targetPoints)) * 100));
   const resolvedTierLadder = sortedTiers.map((item) => ({
     ...item,
     is_current: item.tier_name.toLowerCase() === normalizedTier,
@@ -176,15 +190,43 @@ export function LoyaltyPage({
     label: t(`loyalty.${key}`),
   }));
 
+  const userRecord = user as (typeof user & { created_at?: string }) | null;
+  const memberSinceYear = userRecord?.created_at
+    ? new Date(userRecord.created_at).getFullYear().toString()
+    : '';
+  const streakCount = streakDays.filter((d) => d.checked).length;
+
+  const handleRedeemPointsScroll = () => {
+    if (typeof document !== 'undefined') {
+      document.getElementById('loyalty-rewards-section')?.scrollIntoView({ behavior: 'smooth' });
+    }
+  };
+
+  const handleShareReferral = async () => {
+    if (!referralCode) return;
+    try {
+      if (typeof navigator !== 'undefined' && navigator.share) {
+        await navigator.share({
+          title: 'AURA CAFE',
+          text: `Dùng mã giới thiệu ${referralCode} tại AURA CAFE!`,
+        });
+        return;
+      }
+      await navigator.clipboard?.writeText(referralCode);
+    } catch {
+      // Ignore share cancellation or unavailable clipboard
+    }
+  };
+
   const dashboardData: LoyaltyDashboardData = {
     tierName: formattedTier,
-    memberSince: '2022',
+    memberSince: memberSinceYear,
     tierDescription: t('loyalty.heroDescription'),
     nextTier: nextTierName,
     pointsRemainingForNextTier: pointsRemaining,
     progressPercent: progressPct,
     pointsBalance: points,
-    streakCount: 12,
+    streakCount,
     referralCode: referralCode,
     rewards: mappedRewards,
     pointsHistory: mappedHistory,
@@ -205,13 +247,17 @@ export function LoyaltyPage({
           fontFamily: "var(--aura-font-body)",
         }}
       >
-        <LoyaltyHeader />
         <StitchLoyaltyNew
           data={dashboardData}
           loadingState={loadingState}
           errorMessage={storeError || t('loyalty.errorDescription')}
-          onClaimReward={(rewardId) => store.redeemReward(rewardId)}
+          myVouchers={store.myVouchers}
+          lastRedeemedVoucher={store.lastRedeemedVoucher}
+          onDismissVoucherBanner={store.clearLastRedeemedVoucher}
+          onRedeemPoints={handleRedeemPointsScroll}
+          onClaimReward={(rewardId) => { void store.redeemReward(rewardId); }}
           onCheckIn={handleCheckIn}
+          onShareReferral={handleShareReferral}
         />
       </div>
     </>

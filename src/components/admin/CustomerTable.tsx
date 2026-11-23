@@ -37,7 +37,8 @@ export function CustomerTable({
       result = result.filter(
         (c) =>
           c.name.toLowerCase().includes(q) ||
-          c.phone.includes(q),
+          c.phone.includes(q) ||
+          (c.email || '').toLowerCase().includes(q),
       );
     }
 

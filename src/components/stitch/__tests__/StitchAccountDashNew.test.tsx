@@ -44,10 +44,10 @@ describe('StitchAccountDashNew', () => {
     expect(container.querySelector('header')).toBeNull();
   });
 
-  it('renders profile name', () => {
+  it('renders mock-free default profile name', () => {
     renderWithProviders(<StitchAccountDashNew />);
-    // Default profile name is 'Julian Vane'
-    expect(screen.getByText('Julian Vane')).toBeTruthy();
+    expect(screen.getByText('Khách hàng')).toBeTruthy();
+    expect(screen.queryByText('Julian Vane')).toBeNull();
   });
 
   it('renders nav items via i18n fallback defaults', () => {
@@ -60,7 +60,11 @@ describe('StitchAccountDashNew', () => {
   });
 
   it('renders loyalty progress text', () => {
-    renderWithProviders(<StitchAccountDashNew />);
+    renderWithProviders(
+      <StitchAccountDashNew
+        loyalty={{ points: 1250, nextTier: 'Platinum', pointsToNext: 250, progressPercent: 83 }}
+      />,
+    );
     // pointsToNext (250) + pts + to go
     expect(screen.getByText(/250.*pts.*to go/)).toBeTruthy();
   });

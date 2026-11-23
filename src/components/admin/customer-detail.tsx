@@ -58,7 +58,7 @@ export function CustomerDetail({ customer, onClose }: { customer: AdminCustomer;
       {!detail && !error && <p role="status">Đang tải / Loading</p>}
       {detail && <>
         <p>Email: {detail.account?.email || '—'} · Điểm / Points: {detail.account?.points ?? 'Chưa có dữ liệu / Unavailable'}</p>
-        <p>Quyền lợi / Benefits: {detail.tier.name} · Cashback {detail.tier.cashbackRate} · x{detail.tier.pointMultiplier} điểm / points</p>
+        <p>Quyền lợi / Benefits: {detail.tier.name} · Cashback {detail.tier.cashbackRate < 1 ? Math.round(detail.tier.cashbackRate * 100) : Math.round(detail.tier.cashbackRate)}% · x{detail.tier.pointMultiplier} điểm / points</p>
         <h3>Đơn gần đây / Recent orders</h3>
         <ul>{detail.account?.recentOrders.map(order => <li key={order.id}>{order.id} · {order.status} · {order.totalCents.toLocaleString('vi-VN')}₫ · {order.placedAt}</li>)}</ul>
         <h3>Lịch sử điểm gần đây / Recent point history</h3>

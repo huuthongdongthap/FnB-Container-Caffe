@@ -31,8 +31,8 @@ export const PROFILE_SQL = `
          c.created_at, c.tenant_id,
          COALESCE(cw.balance, 0) AS cashback_balance,
          COALESCE(cw.total_earned, 0) AS total_earned,
-         COALESCE(cw.total_spent, 0) AS total_spent,
-         (SELECT COUNT(*) FROM orders o WHERE (o.customer_id = c.id OR (c.phone IS NOT NULL AND TRIM(c.phone) != '' AND o.customer_phone = c.phone)) AND o.status != 'cancelled' AND COALESCE(NULLIF(TRIM(o.tenant_id), ''), 'default') = COALESCE(NULLIF(TRIM(c.tenant_id), ''), 'default')) AS visit_count
+         (SELECT COALESCE(SUM(o.total), 0) FROM orders o WHERE (o.customer_id = c.id OR (c.phone IS NOT NULL AND TRIM(c.phone) != '' AND o.customer_phone = c.phone)) AND LOWER(TRIM(COALESCE(o.status, ''))) NOT IN ('cancelled', 'failed', 'rejected', 'expired', 'refunded') AND LOWER(TRIM(COALESCE(o.payment_status, ''))) != 'refunded' AND COALESCE(NULLIF(TRIM(o.tenant_id), ''), 'default') = COALESCE(NULLIF(TRIM(c.tenant_id), ''), 'default')) AS total_spent,
+         (SELECT COUNT(*) FROM orders o WHERE (o.customer_id = c.id OR (c.phone IS NOT NULL AND TRIM(c.phone) != '' AND o.customer_phone = c.phone)) AND LOWER(TRIM(COALESCE(o.status, ''))) NOT IN ('cancelled', 'failed', 'rejected', 'expired', 'refunded') AND LOWER(TRIM(COALESCE(o.payment_status, ''))) != 'refunded' AND COALESCE(NULLIF(TRIM(o.tenant_id), ''), 'default') = COALESCE(NULLIF(TRIM(c.tenant_id), ''), 'default')) AS visit_count
   FROM customers c
   LEFT JOIN cashback_wallets cw ON cw.customer_id = c.id
     AND COALESCE(NULLIF(TRIM(cw.tenant_id), ''), 'default') = COALESCE(NULLIF(TRIM(c.tenant_id), ''), 'default')
@@ -44,8 +44,8 @@ export const LEGACY_PROFILE_SQL = `
          c.created_at, c.tenant_id,
          COALESCE(cw.balance, 0) AS cashback_balance,
          COALESCE(cw.total_earned, 0) AS total_earned,
-         COALESCE(cw.total_spent, 0) AS total_spent,
-         (SELECT COUNT(*) FROM orders o WHERE (o.customer_id = c.id OR (c.phone IS NOT NULL AND TRIM(c.phone) != '' AND o.customer_phone = c.phone)) AND o.status != 'cancelled') AS visit_count
+         (SELECT COALESCE(SUM(o.total), 0) FROM orders o WHERE (o.customer_id = c.id OR (c.phone IS NOT NULL AND TRIM(c.phone) != '' AND o.customer_phone = c.phone)) AND LOWER(TRIM(COALESCE(o.status, ''))) NOT IN ('cancelled', 'failed', 'rejected', 'expired', 'refunded') AND LOWER(TRIM(COALESCE(o.payment_status, ''))) != 'refunded') AS total_spent,
+         (SELECT COUNT(*) FROM orders o WHERE (o.customer_id = c.id OR (c.phone IS NOT NULL AND TRIM(c.phone) != '' AND o.customer_phone = c.phone)) AND LOWER(TRIM(COALESCE(o.status, ''))) NOT IN ('cancelled', 'failed', 'rejected', 'expired', 'refunded') AND LOWER(TRIM(COALESCE(o.payment_status, ''))) != 'refunded') AS visit_count
   FROM customers c
   LEFT JOIN cashback_wallets cw ON cw.customer_id = c.id
 `;

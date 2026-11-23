@@ -655,9 +655,9 @@ export async function resolveTierForPoints(db: any, points: number, tenantId: st
     // Fallback to static thresholds
   }
 
-  if (points >= 5000) return 'platinum';
-  if (points >= 2000) return 'gold';
-  if (points >= 500) return 'silver';
+  if (points >= 500) return 'platinum';
+  if (points >= 200) return 'gold';
+  if (points >= 50) return 'silver';
   return 'bronze';
 }
 

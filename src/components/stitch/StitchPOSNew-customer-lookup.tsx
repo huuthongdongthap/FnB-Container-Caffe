@@ -12,6 +12,10 @@ interface CustomerLookupProps {
   onCustomerFound?: (customer: POSCustomer) => void;
   /** Called when the cashier clears the customer */
   onClearCustomer?: () => void;
+  /** Whether customer cashback wallet is applied to the cart */
+  useCashback?: boolean;
+  /** Called when cashier toggles cashback wallet usage */
+  onToggleCashback?: (enabled: boolean) => void;
 }
 
 /* Tier badge color mapping — module-level to avoid per-render allocation */
@@ -26,6 +30,8 @@ export function CustomerLookup({
   customer,
   onCustomerFound,
   onClearCustomer,
+  useCashback = false,
+  onToggleCashback,
 }: CustomerLookupProps) {
   const { t } = useTranslation();
   const [query, setQuery] = useState('');
@@ -138,12 +144,28 @@ export function CustomerLookup({
         </div>
         <div className="flex gap-3 mt-1.5">
           <span className="text-[11px] text-[var(--aura-text-muted, #8A8E96)] font-body">
-            {t('posNew.cashbackBalance')}: {customer.cashback_balance.toLocaleString()}
+            {t('posNew.cashbackBalance')}: {customer.cashback_balance.toLocaleString('vi-VN')}₫
           </span>
           <span className="text-[11px] text-[var(--aura-text-muted, #8A8E96)] font-body">
             {t('posNew.visitCount')}: {customer.visit_count}
           </span>
         </div>
+        {customer.cashback_balance > 0 && onToggleCashback && (
+          <button
+            type="button"
+            data-testid="pos-apply-cashback-btn"
+            onClick={() => onToggleCashback(!useCashback)}
+            className={`mt-2 w-full px-3 py-1.5 rounded-sm text-[11px] font-semibold border transition-colors cursor-pointer ${
+              useCashback
+                ? 'bg-emerald-500/20 border-emerald-500/40 text-emerald-300'
+                : 'bg-[rgba(var(--aura-chrome-light),0.08)] border-[rgba(var(--aura-chrome-light),0.2)] text-[var(--aura-primary, #f2c08d)] hover:bg-[rgba(var(--aura-chrome-light),0.14)]'
+            }`}
+          >
+            {useCashback
+              ? `Đang dùng Ví Hoàn Tiền (-${customer.cashback_balance.toLocaleString('vi-VN')}₫ tối đa)`
+              : `Áp dụng Ví Hoàn Tiền (${customer.cashback_balance.toLocaleString('vi-VN')}₫)`}
+          </button>
+        )}
       </div>
     );
   }

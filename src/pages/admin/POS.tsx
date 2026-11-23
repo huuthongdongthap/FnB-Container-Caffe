@@ -160,6 +160,7 @@ export default function AdminPOSPage() {
   const [orderType, setOrderType] = useState<'dine_in' | 'takeaway' | 'delivery'>('dine_in');
   const [deliveryAddress, setDeliveryAddress] = useState('');
   const [customer, setCustomer] = useState<POSCustomer | null>(null);
+  const [useCashback, setUseCashback] = useState(false);
   const [selectedTableId, setSelectedTableId] = useState<string | undefined>(undefined);
   const [checkoutSuccess, setCheckoutSuccess] = useState(false);
   const [pendingCodOrder, setPendingCodOrder] = useState<{ id: string; total: number } | null>(null);
@@ -180,6 +181,7 @@ export default function AdminPOSPage() {
 
   useEffect(() => {
     setCustomer(null);
+    setUseCashback(false);
     setSelectedTableId(undefined);
     setPaymentUrl(null);
     setPaymentQrPayload(null);
@@ -329,6 +331,10 @@ export default function AdminPOSPage() {
       try {
         const subtotal = cart.reduce((acc, ci) => acc + ci.price * ci.quantity, 0);
         const serviceFee = Math.max(0, Math.round(total - subtotal));
+        const appliedCashback = useCashback && customer && customer.cashback_balance > 0
+          ? Math.min(Math.floor(customer.cashback_balance), Math.round(total))
+          : 0;
+        const payableTotal = Math.max(0, Math.round(total) - appliedCashback);
         const result = await checkoutMutation.mutateAsync({
           items: cart.map((ci) => ({
             id: ci.id,
@@ -336,7 +342,7 @@ export default function AdminPOSPage() {
             price: ci.price,
             quantity: ci.quantity,
           })),
-          total: Math.round(total),
+          total: payableTotal,
           customer_name: customer?.name || t('adminPOS.customerDefaultName'),
           customer_phone: customer?.phone || '',
           customer_id: customer?.id,
@@ -353,6 +359,7 @@ export default function AdminPOSPage() {
           service_fee: serviceFee,
           discount: 0,
           tip: 0,
+          ...(appliedCashback > 0 ? { use_cashback: true, cashback_amount: appliedCashback } : {}),
           ...(resolvedTableId ? { table_id: resolvedTableId } : {}),
         });
 
@@ -360,9 +367,9 @@ export default function AdminPOSPage() {
           let resolvedUrl = result.payment_url || result.checkout_url;
           let resolvedQrCode: string | null = null;
           const createdOrderId = result.order_id || result.order?.id;
-          const serverTotal = Math.round(result.order?.total ?? result.order?.totalAmount ?? subtotal);
+          const serverTotal = Math.round(result.order?.total ?? result.order?.totalAmount ?? payableTotal);
 
-          if (paymentMethod === 'payos') {
+          if (paymentMethod === 'payos' && serverTotal > 0) {
             if (!createdOrderId) {
               setCheckoutError(t('adminPOS.createOrderError'));
               return false;
@@ -398,6 +405,7 @@ export default function AdminPOSPage() {
             setPaymentQrPayload(resolvedQrCode || safeUrl);
             setPaymentUrl(safeUrl);
             setCustomer(null);
+            setUseCashback(false);
             setSelectedTableId(undefined);
             setDeliveryAddress('');
             if (resolvedTableId) {
@@ -407,13 +415,14 @@ export default function AdminPOSPage() {
           }
 
           setCustomer(null);
+          setUseCashback(false);
           setSelectedTableId(undefined);
           setDeliveryAddress('');
           if (resolvedTableId) {
             void queryClient.invalidateQueries({ queryKey: ['pos-tables'] });
           }
           if (paymentMethod === 'cod' && createdOrderId) {
-            setPendingCodOrder({ id: createdOrderId, total: Math.round(total) });
+            setPendingCodOrder({ id: createdOrderId, total: serverTotal });
           } else {
             setPendingCodOrder(null);
           }
@@ -444,7 +453,7 @@ export default function AdminPOSPage() {
         setIsCompleting(false);
       }
     },
-    [paymentMethod, orderType, deliveryAddress, checkoutMutation.mutateAsync, payOSMutation.mutateAsync, customer, selectedTableId, queryClient, t, navigate],
+    [paymentMethod, orderType, deliveryAddress, checkoutMutation.mutateAsync, payOSMutation.mutateAsync, customer, useCashback, selectedTableId, queryClient, t, navigate],
   );
 
   const handleRetryPayOSLink = useCallback(async () => {
@@ -566,8 +575,10 @@ export default function AdminPOSPage() {
         onCompleteOrder={handleCompleteOrder}
         onPayment={handlePayment}
         customer={customer}
-        onCustomerFound={setCustomer}
-        onClearCustomer={() => setCustomer(null)}
+        onCustomerFound={(c) => { setCustomer(c); setUseCashback(false); }}
+        onClearCustomer={() => { setCustomer(null); setUseCashback(false); }}
+        useCashback={useCashback}
+        onToggleCashback={setUseCashback}
         onOpenSchedule={() => navigate('/admin/staff')}
         onEndShift={() => setShiftHandoverOpen(true)}
         cartResetKey={cartResetKey}
@@ -742,6 +753,7 @@ export default function AdminPOSPage() {
                 setPaymentQrPayload(null);
                 setPendingPayOSOrder(null);
                 setCustomer(null);
+                setUseCashback(false);
                 setSelectedTableId(undefined);
               }}
               className="text-xs text-[#8898A4] hover:text-white mt-1 cursor-pointer transition-colors"

@@ -34,6 +34,7 @@ export interface AdminCustomer {
   id: string;
   name: string;
   phone: string;
+  email?: string | null;
   totalOrders: number;
   totalSpent: number;
   tier: string;

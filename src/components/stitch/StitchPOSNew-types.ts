@@ -81,6 +81,10 @@ export interface StitchPOSNewProps {
   onCustomerFound?: (customer: POSCustomer) => void;
   /** Called when the cashier clears the customer */
   onClearCustomer?: () => void;
+  /** Whether the cashier chose to apply customer cashback balance */
+  useCashback?: boolean;
+  /** Toggle customer cashback application */
+  onToggleCashback?: (enabled: boolean) => void;
   /** Header/Footer action callbacks */
   onOpenSchedule?: () => void;
   onOpenDrawer?: () => void;
