@@ -40,12 +40,15 @@ export async function runSecurityChecks(runtime, context, check) {
       items: [{ product_id: 'review-coffee', name: 'Cà phê kiểm thử local', qty: 1, price: 1000 }],
     } });
     const row = await db.prepare('SELECT id,total FROM orders WHERE customer_name = ?').bind('Guest price tamper').first();
-    const link = row?.id ? await http(runtime, '/api/payment/create-link', { method: 'POST', body: { order_id: row.id } }) : null;
+    const guestOrderToken = response.body?.data?.order_token || response.body?.order_token || null;
+    const guestHeaders = guestOrderToken ? { 'X-Order-Token': guestOrderToken } : {};
+    const link = row?.id ? await http(runtime, '/api/payment/create-link', { method: 'POST', body: { order_id: row.id }, headers: guestHeaders }) : null;
     const charged = row?.id ? await db.prepare('SELECT amount FROM payments WHERE order_id = ?').bind(row.id).first() : null;
     check('guest-price-tamper', (!row && response.status === 400) || (response.status === 201 && row?.total === 20000 && link?.status === 200 && charged?.amount === 20000),
       'reject tamper or persist catalog price20000', { status: response.status, row, linkStatus: link?.status, charged });
     const discount = await createOrder(runtime, 'payos', 'Public discount tamper', { discount: 19000, total: 1000 });
-    const discountLink = discount.id ? await http(runtime, '/api/payment/create-link', { method: 'POST', body: { order_id: discount.id } }) : null;
+    const discountHeaders = discount.orderToken ? { 'X-Order-Token': discount.orderToken } : {};
+    const discountLink = discount.id ? await http(runtime, '/api/payment/create-link', { method: 'POST', body: { order_id: discount.id }, headers: discountHeaders }) : null;
     const discountPayment = discount.id ? await db.prepare('SELECT amount FROM payments WHERE order_id = ?').bind(discount.id).first() : null;
     check('public-discount-tamper', (!discount.row && discount.response.status === 400) || (discount.response.status === 201 && discount.row?.total === 20000 && discountLink?.status === 200 && discountPayment?.amount === 20000),
       'reject unauthorized discount or charge20000', { status: discount.response.status, total: discount.row?.total, linkStatus: discountLink?.status, charged: discountPayment });
@@ -67,9 +70,10 @@ export async function runSecurityChecks(runtime, context, check) {
 
   await guarded('payos-concurrent-create', async () => {
     const concurrent = await createOrder(runtime, 'payos', 'Concurrent PayOS links');
+    const concurrentHeaders = concurrent.orderToken ? { 'X-Order-Token': concurrent.orderToken } : {};
     runtime.setProviderDelay(150);
     const links = await Promise.all([1, 2].map(() => http(runtime, '/api/payment/create-link', {
-      method: 'POST', body: { order_id: concurrent.id },
+      method: 'POST', body: { order_id: concurrent.id }, headers: concurrentHeaders,
     })));
     runtime.setProviderDelay(0);
     const rows = await db.prepare("SELECT transaction_id,payment_url FROM payments WHERE order_id = ? AND status = 'pending'").bind(concurrent.id).all();

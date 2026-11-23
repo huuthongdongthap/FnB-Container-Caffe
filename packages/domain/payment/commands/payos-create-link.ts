@@ -3,7 +3,7 @@ import { Hono } from 'hono';
 import { optionalAuth } from 'worker/src/middleware/auth';
 import { createLogger } from 'worker/src/middleware/logger';
 import { payOSCreateLinkSchema } from 'worker/src/lib/validators';
-import { canAccessPaymentOrder, resolvePaymentCustomerOwnerIds, resolvePaymentTenantScope, verifyPaymentOrderToken } from '../policies/payment-access';
+import { canAccessPaymentOrder, PAYMENT_ROLES, resolvePaymentCustomerOwnerIds, resolvePaymentTenantScope, verifyPaymentOrderToken } from '../policies/payment-access';
 import { getOrCreatePayOSAttempt } from './payos-attempt';
 import { resolveMerchantPaymentConfig } from '../../../../worker/src/lib/merchant-payment';
 import { PAYOS_ERROR_MESSAGES as errMsg } from './payos-helpers';
@@ -13,13 +13,16 @@ const log = createLogger({ route: 'payment' });
 export const paymentRouter = new Hono<{ Bindings: Env }>();
 
 function resolveSafePosRedirectUrl(rawUrl: unknown, baseUrl: string): string | null {
-  if (typeof rawUrl !== 'string' || !rawUrl.trim()) return null;
+  if (typeof rawUrl !== 'string') return null;
+  const trimmed = rawUrl.trim();
+  if (!trimmed || trimmed.includes('\\') || /(?:^|\/)\.\.(?:\/|$)|%2e/i.test(trimmed)) return null;
   try {
     const trustedBase = new URL(baseUrl);
-    const parsed = new URL(rawUrl.trim(), trustedBase.origin);
+    const parsed = new URL(trimmed, trustedBase.origin);
     if (parsed.origin !== trustedBase.origin) return null;
+    if (parsed.username || parsed.password) return null;
     if (parsed.pathname !== '/admin/pos' && !parsed.pathname.startsWith('/admin/pos/')) return null;
-    return parsed.toString();
+    return `${trustedBase.origin}${parsed.pathname}${parsed.search}`;
   } catch {
     return null;
   }
@@ -199,8 +202,10 @@ export const handleCreateLink = async (c: any, input?: unknown, openApi = false)
       );
     }
     const baseUrl = c.env.FE_BASE_URL || 'https://auraspace.cafe';
-    const safePosReturnUrl = resolveSafePosRedirectUrl(requestedReturnUrl, baseUrl);
-    const safePosCancelUrl = resolveSafePosRedirectUrl(requestedCancelUrl, baseUrl);
+    const callerRole = String(user?.role || '').trim().toLowerCase();
+    const canOverridePosRedirect = Boolean(user) && (callerRole === 'super_admin' || PAYMENT_ROLES.includes(callerRole));
+    const safePosReturnUrl = canOverridePosRedirect ? resolveSafePosRedirectUrl(requestedReturnUrl, baseUrl) : null;
+    const safePosCancelUrl = canOverridePosRedirect ? resolveSafePosRedirectUrl(requestedCancelUrl, baseUrl) : null;
     // Resolve a trusted storefront slug for non-default tenants so redirect URLs never
     // leak flagship or cross-tenant paths. Default tenant keeps flagship URLs unchanged.
     let returnUrl: string;
