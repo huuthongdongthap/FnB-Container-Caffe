@@ -23,21 +23,21 @@ describe('manual refund confirmation', () => {
   it('requires transfer confirmation and locks uncertain writes for reconciliation', async () => {
     vi.mocked(apiFetch).mockRejectedValue(new Error('Network unavailable'));
     renderWithProviders(<ManualOrderRefund order={order} onRecorded={vi.fn()} />);
-    fireEvent.click(screen.getByText('Ghi nhận hoàn tiền / Record refund'));
-    expect(screen.getByText(/Remaining: 15.000/)).toBeTruthy();
-    fireEvent.change(screen.getByLabelText('Lý do / Reason'), { target: { value: 'Return' } });
-    fireEvent.change(screen.getByLabelText('Mã chuyển khoản / Transfer reference'), { target: { value: 'BANK-1' } });
-    expect(screen.getByText('Xác nhận ghi nhận / Confirm recording')).toBeDisabled();
+    fireEvent.click(screen.getByRole('button', { name: /Ghi nhận hoàn tiền/i }));
+    expect(screen.getByText(/15\.000/)).toBeTruthy();
+    fireEvent.change(screen.getByLabelText(/Lý do/i), { target: { value: 'Return' } });
+    fireEvent.change(screen.getByLabelText(/Mã chuyển khoản/i), { target: { value: 'BANK-1' } });
+    expect(screen.getByRole('button', { name: /Xác nhận ghi nhận/i })).toBeDisabled();
     fireEvent.click(screen.getByRole('checkbox'));
-    fireEvent.click(screen.getByText('Xác nhận ghi nhận / Confirm recording'));
-    expect(await screen.findByRole('alert')).toHaveTextContent('Reconcile and reload');
-    expect(screen.getByText('Xác nhận ghi nhận / Confirm recording')).toBeDisabled();
+    fireEvent.click(screen.getByRole('button', { name: /Xác nhận ghi nhận/i }));
+    expect(await screen.findByRole('alert')).toHaveTextContent(/đối soát|tải lại|Reconcile/i);
+    expect(screen.getByRole('button', { name: /Xác nhận ghi nhận/i })).toBeDisabled();
     expect(apiFetch).toHaveBeenCalledTimes(1);
   });
   it('does not expose a refund action to cashier', () => {
     session.role = 'cashier';
     renderWithProviders(<ManualOrderRefund order={order} onRecorded={vi.fn()} />);
-    expect(screen.queryByText('Ghi nhận hoàn tiền / Record refund')).toBeNull();
+    expect(screen.queryByRole('button', { name: /Ghi nhận hoàn tiền/i })).toBeNull();
   });
 });
 

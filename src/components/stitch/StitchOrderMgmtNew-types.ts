@@ -34,6 +34,7 @@ export type OrderSearchFieldType =
 export interface OrderItem {
   name: string;
   quantity: number;
+  price?: number;
   notes?: string;
   modifiers?: string[];
 }
@@ -55,6 +56,10 @@ export interface OrderData {
   timeAgo: string;
   status: OrderStatus;
   items: OrderItem[];
+  subtotal?: number;
+  shippingFee?: number;
+  discount?: number;
+  serviceFee?: number;
   total: string;
   cancelledReason?: string;
   nextActionLabel?: string;

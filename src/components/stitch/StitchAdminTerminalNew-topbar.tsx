@@ -13,7 +13,7 @@ export function TopBar({ onOpenSidebar }: TopBarProps) {
   return (
     <header
       className={cn(
-        'fixed right-0 top-0 z-30 flex h-20 items-center justify-between gap-3 border-b bg-[var(--aura-bg-page, var(--aura-bg-surface))]/80 px-4 backdrop-blur-md lg:px-10',
+        'fixed right-0 top-0 z-30 flex h-20 items-center justify-between gap-3 border-b bg-[var(--aura-bg-page, var(--aura-bg-surface))]/80 px-4 backdrop-blur-md lg:px-10 print:hidden no-print',
         'left-0 md:left-72',
       )}
       style={{

@@ -506,6 +506,19 @@ export async function provisionSelfServeTenant(
     throw new ProvisionError(500, 'provisioning_failed', 'Không thể khởi tạo quán lúc này. Vui lòng thử lại sau.');
   }
 
+  // Brand-new tenants have zero legacy refund history — mark refund ledger ready immediately.
+  try {
+    await db
+      .prepare(
+        `INSERT OR IGNORE INTO refund_tenant_readiness (tenant_id, reconciled_at, reconciled_by, evidence)
+         VALUES (?, ?, ?, ?)`
+      )
+      .bind(tenantId, nowIso, ownerId, `new-tenant-provisioning:${tenantId}`)
+      .run();
+  } catch {
+    // Non-fatal if refund_tenant_readiness table is absent in legacy test schemas
+  }
+
   return {
     tenantId,
     slug,

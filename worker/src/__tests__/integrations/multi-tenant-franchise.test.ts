@@ -8432,8 +8432,18 @@ describe('Multi-Tenant & Franchise Preparation Integration', () => {
       ).toBe(true);
 
       // 3. W3: Cron checkOverdueOrders & sendCashbackExpiryWarnings, Mautic enrollment/sync, and Loyalty getActiveCampaign
+      executedSqls.length = 0;
       await checkOverdueOrders(franEnv as any);
-      expect(overdueOrders.find((o) => o.id === 'ord_overdue_fran')?.notes).toBe('[OVERDUE]');
+      expect(
+        executedSqls.some(
+          (q) =>
+            /FROM orders/i.test(q.sql) &&
+            q.sql.includes("COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?") &&
+            q.args.includes('tenant_sadec_02')
+        )
+      ).toBe(true);
+      // checkOverdueOrders records metrics/alerts without mutating customer/internal orders.notes
+      expect(overdueOrders.find((o) => o.id === 'ord_overdue_fran')?.notes).toBeNull();
       expect(overdueOrders.find((o) => o.id === 'ord_overdue_def')?.notes).toBeNull();
 
       customers.find((c) => c.id === 'cust_fran_w1')!.last_expiry_warning_at = null;
@@ -10666,13 +10676,8 @@ describe('Multi-Tenant & Franchise Preparation Integration', () => {
         )
       ).toBe(true);
       expect(
-        executedSqls.some(
-          (q) =>
-            /UPDATE orders SET notes/i.test(q.sql) &&
-            q.sql.includes("COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?") &&
-            q.args.includes('default')
-        )
-      ).toBe(true);
+        executedSqls.some((q) => /UPDATE orders SET notes/i.test(q.sql))
+      ).toBe(false);
 
       executedSqls.length = 0;
       const warnRes = await sendCashbackExpiryWarnings(defEnv as any, 'default');

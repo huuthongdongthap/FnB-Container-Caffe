@@ -212,12 +212,12 @@ export async function handleRefund(c: Context<{ Bindings: Env }>, openApi = fals
           .bind(effectivePaymentTenant, manualTransferRef, payment.id, payment.order_id, amount),
         db.prepare(`INSERT INTO refund_mutation_guards (settlement_ok)
           VALUES (CASE WHEN changes() = 1 THEN 1 ELSE 0 END)`),
-        ...(fullRefund ? [db.prepare(`UPDATE orders SET payment_status = 'refunded', updated_at = ?
+        db.prepare(`UPDATE orders SET payment_status = ?, updated_at = ?
           WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?
-            AND LOWER(COALESCE(payment_status, '')) IN ('paid', 'completed')`)
-          .bind(now, payment.order_id, effectivePaymentTenant),
-          db.prepare(`INSERT INTO refund_mutation_guards (settlement_ok)
-            VALUES (CASE WHEN changes() = 1 THEN 1 ELSE 0 END)`)] : []),
+            AND LOWER(COALESCE(payment_status, '')) IN ('paid', 'completed', 'partially_refunded')`)
+          .bind(fullRefund ? 'refunded' : 'partially_refunded', now, payment.order_id, effectivePaymentTenant),
+        db.prepare(`INSERT INTO refund_mutation_guards (settlement_ok)
+          VALUES (CASE WHEN changes() = 1 THEN 1 ELSE 0 END)`),
         db.prepare('DELETE FROM refund_mutation_guards'),
       ];
       try {

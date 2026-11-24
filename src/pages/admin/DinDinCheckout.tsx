@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { HelmetHead } from '@/components/seo/HelmetHead';
 import { apiFetch } from '@/lib/api-client';
+import { ThermalReceipt, type ThermalReceiptData } from '@/components/receipt/ThermalReceipt';
 
 interface CheckoutEntry {
   orderId: string;
@@ -22,22 +23,26 @@ export default function DinDinCheckout() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState<'all' | 'pending' | 'printed' | 'qc_ok'>('all');
+  const [printReceipt, setPrintReceipt] = useState<ThermalReceiptData | null>(null);
 
   const loadEntries = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const data = await apiFetch<CheckoutEntry[]>(
+      const data = await apiFetch<CheckoutEntry[] | { data?: CheckoutEntry[]; checkouts?: CheckoutEntry[] }>(
         `/api/admin/dindin/checkouts?filter=${filter}&status=${filter !== 'all' ? filter : ''}`,
       );
       const rawList = Array.isArray(data)
         ? data
-        : ((data as any)?.data ?? (data as any)?.checkouts ?? []);
+        : (data?.data ?? data?.checkouts ?? []);
       setEntries(
-        rawList.map((item: any) => ({
-          ...item,
-          qcOk: Boolean(item.qcOk ?? item.qcPassed),
-        })),
+        rawList.map((item) => {
+          const rec = item as CheckoutEntry & { qcPassed?: boolean };
+          return {
+            ...rec,
+            qcOk: Boolean(rec.qcOk ?? rec.qcPassed),
+          };
+        }),
       );
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Lỗi');
@@ -48,18 +53,44 @@ export default function DinDinCheckout() {
 
   useEffect(() => { void loadEntries(); }, [loadEntries]);
 
-  const markPrinted = async (orderId: string) => {
+  const markPrinted = async (entry: CheckoutEntry) => {
+    setError(null);
+    const receipt: ThermalReceiptData = {
+      orderId: entry.orderId,
+      createdAt: entry.createdAt,
+      items: [{ name: `Đơn checkout #${entry.orderId.slice(0, 8)}`, quantity: 1, price: entry.total }],
+      total: entry.total,
+      paymentMethod: entry.paymentMethod,
+      paymentStatus: entry.status,
+    };
+    setPrintReceipt(receipt);
     try {
-      await apiFetch(`/api/admin/dindin/checkout/${orderId}/print`, { method: 'POST' });
-      setEntries((prev) => prev.map((e) => (e.orderId === orderId ? { ...e, printed: true } : e)));
-    } catch { /* silent */ }
+      await apiFetch(`/api/admin/dindin/checkout/${entry.orderId}/print`, { method: 'POST' });
+      setEntries((prev) => prev.map((e) => (e.orderId === entry.orderId ? { ...e, printed: true } : e)));
+      if (typeof window !== 'undefined' && typeof window.print === 'function') {
+        requestAnimationFrame(() => window.print());
+      }
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : t('dindin.printFailed', { defaultValue: 'Không thể cập nhật trạng thái in phiếu' }),
+      );
+    }
   };
 
   const markQcOk = async (orderId: string) => {
+    setError(null);
     try {
       await apiFetch(`/api/admin/dindin/checkout/${orderId}/qc`, { method: 'POST' });
       setEntries((prev) => prev.map((e) => (e.orderId === orderId ? { ...e, qcOk: true } : e)));
-    } catch { /* silent */ }
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : t('dindin.qcFailed', { defaultValue: 'Không thể cập nhật trạng thái QC' }),
+      );
+    }
   };
 
   if (loading) {
@@ -73,7 +104,8 @@ export default function DinDinCheckout() {
   return (
     <>
       <HelmetHead title={t('dindin.checkoutTitle', { defaultValue: 'Kiểm tra Checkout' })} description={t('dindin.checkoutDesc', { defaultValue: 'Xem lại đơn hàng trước khi xác nhận' })} />
-      <div className="max-w-5xl mx-auto px-4 py-8 space-y-6">
+      <ThermalReceipt receipt={printReceipt} />
+      <div className="max-w-5xl mx-auto px-4 py-8 space-y-6 print:hidden no-print">
         <h1 className="text-2xl font-bold text-[var(--aura-text-primary)]">
           {t('dindin.checkoutTitle', { defaultValue: 'Kiểm tra Checkout' })}
         </h1>
@@ -127,7 +159,7 @@ export default function DinDinCheckout() {
                     ) : (
                       <button
                         type="button"
-                        onClick={() => markPrinted(entry.orderId)}
+                        onClick={() => void markPrinted(entry)}
                         className="text-[10px] text-blue-400 hover:underline"
                       >
                         {t('dindin.printSlip', { defaultValue: 'In phiếu' })}

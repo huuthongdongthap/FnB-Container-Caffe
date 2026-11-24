@@ -8,6 +8,8 @@ import { withPrimarySession } from './lib/db';
 import type { Env } from './types/env';
 import {
   checkOverdueOrders,
+  expireUnpaidOnlineOrders,
+  retryPendingRefundLoyaltyWork,
   processErpnextRetryQueue,
   processErpnextProductSync,
   syncMauticContacts,
@@ -39,6 +41,8 @@ export async function handleScheduled(
   };
 
   safeWait(checkOverdueOrders(primaryEnv as unknown as Record<string, unknown>));
+  safeWait(expireUnpaidOnlineOrders(primaryEnv as unknown as Record<string, unknown>));
+  safeWait(retryPendingRefundLoyaltyWork(primaryEnv));
   safeWait(runPaymentReconciliation(primaryEnv as unknown as Record<string, unknown>));
   safeWait(pruneOldMetrics(primaryDb, 7));
   safeWait(processErpnextRetryQueue(primaryEnv as unknown as Record<string, unknown>));

@@ -17,6 +17,7 @@ import type { AdminOrder } from '@/hooks/use-admin';
 import { useAuthStore } from '@/hooks/stores/use-auth-store';
 import { ManualOrderRefund } from '@/components/admin/manual-order-refund';
 import { apiFetch } from '@/lib/api-client';
+import { ThermalReceipt, type ThermalReceiptData } from '@/components/receipt/ThermalReceipt';
 
 /* ─── Status & Transition Logic ──────────────────────────────────────── */
 
@@ -271,6 +272,10 @@ function mapAdminOrder(
     timeAgo: formatTimeAgo(ao.createdAt, t),
     status: normalizeOrderStatus(ao.status),
     items: lineItems,
+    subtotal: ao.subtotal,
+    shippingFee: ao.shippingFee,
+    discount: ao.discount,
+    serviceFee: ao.serviceFee,
     total: formatCurrency(ao.total),
     nextActionLabel: nextInfo.label,
     nextActionStatus: nextInfo.nextStatus,
@@ -282,6 +287,16 @@ function mapAdminOrder(
   };
 }
 
+const TERMINAL_ORDER_STATUSES = new Set([
+  'completed',
+  'cancelled',
+  'canceled',
+  'failed',
+  'rejected',
+  'expired',
+  'refunded',
+]);
+
 function computeStats(
   orders: AdminOrder[],
   summary: OrderSummaryData | null,
@@ -289,8 +304,11 @@ function computeStats(
 ): StatCardData[] {
   const counts = summary?.byStatus;
   const activeOrders = counts
-    ? (counts.pending ?? 0) + (counts.confirmed ?? 0)
-    : orders.filter((o) => o.status === 'pending' || o.status === 'confirmed').length;
+    ? Object.entries(counts).reduce((sum, [status, count]) => {
+        const normalized = status.trim().toLowerCase();
+        return TERMINAL_ORDER_STATUSES.has(normalized) ? sum : sum + Number(count || 0);
+      }, 0)
+    : orders.filter((o) => !TERMINAL_ORDER_STATUSES.has(o.status)).length;
   const inPrep = counts
     ? (counts.preparing ?? 0)
     : orders.filter((o) => o.status === 'preparing').length;
@@ -344,7 +362,8 @@ export default function AdminOrdersPage() {
   const [actionError, setActionError] = useState<string | null>(null);
 
   // Modals state
-  const [detailsOrder, setDetailsOrder] = useState<AdminOrder | null>(null);
+  const [detailsOrderId, setDetailsOrderId] = useState<string | null>(null);
+  const [printReceipt, setPrintReceipt] = useState<ThermalReceiptData | null>(null);
   const [pendingPrintOrderId, setPendingPrintOrderId] = useState<string | null>(null);
   const [cancelTarget, setCancelTarget] = useState<AdminOrder | null>(null);
   const [cancelReason, setCancelReason] = useState('');
@@ -388,9 +407,9 @@ export default function AdminOrdersPage() {
     return () => clearInterval(interval);
   }, [fetchOrders, fetchSummary, currentPage, currentFilters]);
 
-  // Trigger window.print() only after detailsOrder has committed to the DOM
+  // Trigger window.print() only after ThermalReceipt has committed to the DOM
   useEffect(() => {
-    if (!pendingPrintOrderId || detailsOrder?.id !== pendingPrintOrderId) return;
+    if (!pendingPrintOrderId || printReceipt?.orderId !== pendingPrintOrderId) return;
     const frame = requestAnimationFrame(() => {
       if (typeof window !== 'undefined' && typeof window.print === 'function') {
         window.print();
@@ -398,7 +417,7 @@ export default function AdminOrdersPage() {
       setPendingPrintOrderId(null);
     });
     return () => cancelAnimationFrame(frame);
-  }, [pendingPrintOrderId, detailsOrder]);
+  }, [pendingPrintOrderId, printReceipt]);
 
   const orderMap = useMemo(() => {
     const map = new Map<string, AdminOrder>();
@@ -407,6 +426,11 @@ export default function AdminOrdersPage() {
     }
     return map;
   }, [orders]);
+
+  const detailsOrder = useMemo(
+    () => (detailsOrderId ? orderMap.get(detailsOrderId) ?? null : null),
+    [detailsOrderId, orderMap],
+  );
 
   /* ─── Derived data ──────────────────────────────────────────────────── */
   const handleMarkCodPaid = useCallback(async (orderId: string) => {
@@ -443,29 +467,37 @@ export default function AdminOrdersPage() {
           getPaymentStatus(order) !== 'completed' &&
           order.status !== 'cancelled' &&
           order.status !== 'completed';
+        const hasRefundAction =
+          Boolean((order as { payment_id?: string | null }).payment_id) &&
+          ['owner', 'admin', 'super_admin', 'manager'].includes((actorRole || '').trim().toLowerCase());
         return {
           ...mapAdminOrder(order, actorRole, t),
-          additionalActions: (
-            <div className="inline-flex items-center gap-2">
-              {unpaidCod && (
-                <button
-                  type="button"
-                  data-testid={`mark-cod-paid-${order.id}`}
-                  disabled={codCollectingId === order.id}
-                  onClick={() => { void handleMarkCodPaid(order.id); }}
-                  className="rounded-md bg-emerald-600 px-2.5 py-1 text-xs font-semibold text-white hover:bg-emerald-700 disabled:opacity-50"
-                >
-                  {codCollectingId === order.id ? 'Đang thu...' : 'Thu tiền COD'}
-                </button>
-              )}
-              <ManualOrderRefund
-                order={order}
-                onRecorded={() => {
-                  loadOrdersAndSummary();
-                }}
-              />
-            </div>
-          ),
+          additionalActions:
+            unpaidCod || hasRefundAction ? (
+              <div className="inline-flex items-center gap-2">
+                {unpaidCod && (
+                  <button
+                    type="button"
+                    data-testid={`mark-cod-paid-${order.id}`}
+                    disabled={codCollectingId === order.id}
+                    onClick={() => { void handleMarkCodPaid(order.id); }}
+                    className="rounded-md bg-emerald-600 px-2.5 py-1 text-xs font-semibold text-white hover:bg-emerald-700 disabled:opacity-50"
+                  >
+                    {codCollectingId === order.id
+                      ? t('orderMgmt.codCollecting', { defaultValue: 'Đang thu...' })
+                      : t('orderMgmt.collectCod', { defaultValue: 'Thu tiền COD' })}
+                  </button>
+                )}
+                {hasRefundAction && (
+                  <ManualOrderRefund
+                    order={order}
+                    onRecorded={() => {
+                      loadOrdersAndSummary();
+                    }}
+                  />
+                )}
+              </div>
+            ) : undefined,
         };
       }),
     [orders, actorRole, canCollectCod, t, loadOrdersAndSummary, codCollectingId, handleMarkCodPaid],
@@ -544,7 +576,7 @@ export default function AdminOrdersPage() {
   const handleViewDetails = useCallback(
     (order: OrderData) => {
       const found = orderMap.get(order.id);
-      if (found) setDetailsOrder(found);
+      if (found) setDetailsOrderId(found.id);
     },
     [orderMap],
   );
@@ -594,13 +626,30 @@ export default function AdminOrdersPage() {
 
   const handlePrintOrder = useCallback((order: OrderData) => {
     const found = orderMap.get(order.id);
-    if (found) {
-      setDetailsOrder(found);
-      setPendingPrintOrderId(found.id);
-    } else if (typeof window !== 'undefined' && typeof window.print === 'function') {
-      window.print();
-    }
-  }, [orderMap]);
+    if (!found) return;
+    setPrintReceipt({
+      orderId: found.id,
+      createdAt: found.createdAt,
+      orderType: found.orderType,
+      tableName: found.tableNumber || found.tableId,
+      customerName: found.customer,
+      customerPhone: found.customerPhone,
+      customerAddress: found.customerAddress,
+      items: (found.itemsList && found.itemsList.length > 0
+        ? found.itemsList
+        : [{ name: t('terminal.items'), quantity: found.items || 1 }]),
+      subtotal: found.subtotal,
+      shippingFee: found.shippingFee,
+      serviceFee: found.serviceFee,
+      discount: found.discount,
+      cashbackUsed: found.cashbackUsed,
+      total: found.total,
+      paymentMethod: found.paymentMethod || found.payment,
+      paymentStatus: found.paymentStatus,
+      notes: found.notes,
+    });
+    setPendingPrintOrderId(found.id);
+  }, [orderMap, t]);
 
   const handleRefresh = useCallback(() => {
     setActionError(null);
@@ -610,6 +659,8 @@ export default function AdminOrdersPage() {
   /* ─── Render ────────────────────────────────────────────────────────── */
   return (
     <>
+      <ThermalReceipt receipt={printReceipt} />
+      <div className="print:hidden no-print">
       {actionError && (
         <div
           role="alert"
@@ -622,7 +673,7 @@ export default function AdminOrdersPage() {
             onClick={() => setActionError(null)}
             className="rounded px-2 py-0.5 text-xs font-semibold hover:bg-amber-500/20 cursor-pointer"
           >
-            Đóng / Dismiss
+            {t('orderMgmt.close', { defaultValue: 'Đóng' })}
           </button>
         </div>
       )}
@@ -671,7 +722,7 @@ export default function AdminOrdersPage() {
               </h2>
               <button
                 type="button"
-                onClick={() => setDetailsOrder(null)}
+                onClick={() => setDetailsOrderId(null)}
                 aria-label={t('orderMgmt.close')}
                 className="rounded p-1 hover:bg-white/10"
               >
@@ -695,7 +746,14 @@ export default function AdminOrdersPage() {
               </p>
               <p>
                 <strong>{t('orderMgmt.paymentLabel')}:</strong>{' '}
-                {detailsOrder.paymentMethod || '--'} ({detailsOrder.paymentStatus || '--'})
+                {detailsOrder.paymentMethod
+                  ? t(`orderMgmt.paymentMethod.${detailsOrder.paymentMethod}`, { defaultValue: detailsOrder.paymentMethod })
+                  : '--'}{' '}
+                (
+                {detailsOrder.paymentStatus
+                  ? t(`orderMgmt.paymentStatus.${detailsOrder.paymentStatus}`, { defaultValue: detailsOrder.paymentStatus })
+                  : '--'}
+                )
               </p>
               {(() => {
                 const rawRefund = detailsOrder as unknown as { refund_status?: string | null; refund_amount?: number | null };
@@ -703,7 +761,9 @@ export default function AdminOrdersPage() {
                 return (
                   <p>
                     <strong>{t('orderMgmt.refundLabel')}:</strong>{' '}
-                    {rawRefund.refund_status || '--'}
+                    {rawRefund.refund_status
+                      ? t(`orderMgmt.paymentStatus.${rawRefund.refund_status === 'completed' ? 'refunded' : rawRefund.refund_status === 'partial' ? 'partially_refunded' : rawRefund.refund_status}`, { defaultValue: rawRefund.refund_status })
+                      : '--'}
                     {typeof rawRefund.refund_amount === 'number' && rawRefund.refund_amount > 0
                       ? ` (${formatCurrency(rawRefund.refund_amount)})`
                       : ''}
@@ -718,7 +778,14 @@ export default function AdminOrdersPage() {
                 <ul className="space-y-1">
                   {(detailsOrder.itemsList || []).map((item, idx) => (
                     <li key={`${item.name}-${idx}`}>
-                      <div>x{item.quantity} {item.name}</div>
+                      <div className="flex items-baseline justify-between gap-2">
+                        <span>x{item.quantity} {item.name}</span>
+                        {typeof item.price === 'number' && Number.isFinite(item.price) && (
+                          <span className="font-mono text-xs text-white/70">
+                            {formatCurrency(item.price * item.quantity)}
+                          </span>
+                        )}
+                      </div>
                       {item.modifiers && item.modifiers.length > 0 && (
                         <div className="pl-4 text-xs text-white/60">+ {item.modifiers.join(', ')}</div>
                       )}
@@ -729,6 +796,28 @@ export default function AdminOrdersPage() {
                   ))}
                 </ul>
               </div>
+              {((detailsOrder.shippingFee ?? 0) > 0 || (detailsOrder.serviceFee ?? 0) > 0 || (detailsOrder.discount ?? 0) > 0) && (
+                <div className="space-y-1 border-t border-white/10 pt-2 text-xs text-white/75">
+                  {(detailsOrder.shippingFee ?? 0) > 0 && (
+                    <div className="flex justify-between">
+                      <span>{t('orderMgmt.shippingFee', { defaultValue: 'Phí giao hàng' })}</span>
+                      <span className="font-mono">+{formatCurrency(detailsOrder.shippingFee!)}</span>
+                    </div>
+                  )}
+                  {(detailsOrder.serviceFee ?? 0) > 0 && (
+                    <div className="flex justify-between">
+                      <span>{t('orderMgmt.serviceFee', { defaultValue: 'Phí dịch vụ' })}</span>
+                      <span className="font-mono">+{formatCurrency(detailsOrder.serviceFee!)}</span>
+                    </div>
+                  )}
+                  {(detailsOrder.discount ?? 0) > 0 && (
+                    <div className="flex justify-between text-emerald-300">
+                      <span>{t('orderMgmt.discount', { defaultValue: 'Giảm giá' })}</span>
+                      <span className="font-mono">-{formatCurrency(detailsOrder.discount!)}</span>
+                    </div>
+                  )}
+                </div>
+              )}
               <p className="border-t border-white/10 pt-2 text-base font-bold text-amber-300">
                 {t('terminal.total')}: {formatCurrency(detailsOrder.total)}
               </p>
@@ -736,7 +825,7 @@ export default function AdminOrdersPage() {
             <div className="mt-5 flex justify-end gap-2">
               <button
                 type="button"
-                onClick={() => setDetailsOrder(null)}
+                onClick={() => setDetailsOrderId(null)}
                 className="rounded-lg border border-white/15 px-4 py-2 text-xs font-semibold hover:bg-white/10"
               >
                 {t('orderMgmt.close')}
@@ -845,6 +934,7 @@ export default function AdminOrdersPage() {
           </div>
         </div>
       )}
+      </div>
     </>
   );
 }

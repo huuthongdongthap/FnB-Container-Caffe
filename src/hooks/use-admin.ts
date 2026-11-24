@@ -23,11 +23,18 @@ export interface AdminOrder {
   notes?: string;
   deliveryTime?: string;
   items: number;
-  itemsList?: Array<{ name: string; quantity: number; notes?: string; modifiers?: string[] }>;
+  itemsList?: Array<{ name: string; quantity: number; price?: number; notes?: string; modifiers?: string[] }>;
+  subtotal?: number;
+  shippingFee?: number;
+  discount?: number;
+  serviceFee?: number;
+  cashbackUsed?: number;
   total: number;
   status: string;
   payment: string;
   createdAt: string;
+  pendingLoyaltyReversal?: boolean;
+  pendingLoyaltyTransferRef?: string;
 }
 
 export interface AdminCustomer {

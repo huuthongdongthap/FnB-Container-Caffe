@@ -1,8 +1,10 @@
 import { createLogger } from '../../middleware/logger';
 import { resolvePilotStore, matchesTenantRow } from '../../middleware/tenant';
 import { createMetricsCollector } from '../../lib/metrics-collector';
+import { isHeldOutOfKds } from '../../../../packages/domain/kitchen/policies/kds-hold-policy';
 
 const SLA_MINUTES_DEFAULT = 15;
+const UNPAID_ONLINE_TTL_MINUTES_DEFAULT = 30;
 const log = createLogger({ route: 'cron' });
 
 export async function checkOverdueOrders(env: Record<string, unknown>, tenantOverride?: string): Promise<void> {
@@ -25,15 +27,15 @@ export async function checkOverdueOrders(env: Record<string, unknown>, tenantOve
     if (scoped && tenantId) {
       try {
         const scopedRes = await db.prepare(`
-          SELECT id, customer_name, status, created_at, tenant_id
+          SELECT id, customer_name, status, created_at, tenant_id,
+                 payment_method, payment_status, order_type, is_cod, notes, items
           FROM orders
           WHERE status IN ('pending', 'confirmed', 'preparing', 'Bep tiep nhan', 'Dang pha che')
             AND created_at < ?
             AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?
-            AND (notes IS NULL OR notes NOT LIKE '%[OVERDUE]%')
         `).bind(cutoff, tenantId).all<Record<string, unknown>>();
         overdue = (scopedRes.results || []).filter(
-          (row) => matchesTenantRow(row, tenantId)
+          (row) => matchesTenantRow(row, tenantId) && !isHeldOutOfKds(row)
         );
       } catch {
         if (tenantId === 'default') {
@@ -42,10 +44,9 @@ export async function checkOverdueOrders(env: Record<string, unknown>, tenantOve
             FROM orders
             WHERE status IN ('pending', 'confirmed', 'preparing', 'Bep tiep nhan', 'Dang pha che')
               AND created_at < ?
-              AND (notes IS NULL OR notes NOT LIKE '%[OVERDUE]%')
           `).bind(cutoff).all<Record<string, unknown>>();
           overdue = (unscoped.results || []).filter(
-            (row) => matchesTenantRow(row, tenantId)
+            (row) => matchesTenantRow(row, tenantId) && !isHeldOutOfKds(row)
           );
         } else {
           overdue = [];
@@ -54,14 +55,14 @@ export async function checkOverdueOrders(env: Record<string, unknown>, tenantOve
     } else {
       try {
         const withTenant = await db.prepare(`
-          SELECT id, customer_name, status, created_at, tenant_id
+          SELECT id, customer_name, status, created_at, tenant_id,
+                 payment_method, payment_status, order_type, is_cod, notes, items
           FROM orders
           WHERE status IN ('pending', 'confirmed', 'preparing', 'Bep tiep nhan', 'Dang pha che')
             AND created_at < ?
-            AND (notes IS NULL OR notes NOT LIKE '%[OVERDUE]%')
         `).bind(cutoff).all<Record<string, unknown>>();
         overdue = (withTenant.results || []).filter(
-          (row) => matchesTenantRow(row, tenantId)
+          (row) => matchesTenantRow(row, tenantId) && !isHeldOutOfKds(row)
         );
       } catch {
         const unscoped = await db.prepare(`
@@ -69,10 +70,9 @@ export async function checkOverdueOrders(env: Record<string, unknown>, tenantOve
           FROM orders
           WHERE status IN ('pending', 'confirmed', 'preparing', 'Bep tiep nhan', 'Dang pha che')
             AND created_at < ?
-            AND (notes IS NULL OR notes NOT LIKE '%[OVERDUE]%')
         `).bind(cutoff).all<Record<string, unknown>>();
         overdue = (unscoped.results || []).filter(
-          (row) => matchesTenantRow(row, tenantId)
+          (row) => matchesTenantRow(row, tenantId) && !isHeldOutOfKds(row)
         );
       }
     }
@@ -85,6 +85,7 @@ export async function checkOverdueOrders(env: Record<string, unknown>, tenantOve
     log.info('Found overdue orders', { count: overdue.length });
 
     // Metrics: record order_stuck count + raise a Telegram-dispatchable alert per concrete tenant.
+    // Do NOT mutate orders.notes with '[OVERDUE]' — customer/internal notes must remain clean.
     const resolveOrderTenant = (order: Record<string, unknown>): string => {
       const rawOrderTenant = typeof order.tenant_id === 'string' ? order.tenant_id.trim() : '';
       if (rawOrderTenant && rawOrderTenant !== '*' && rawOrderTenant.toLowerCase() !== 'hq') {
@@ -114,37 +115,60 @@ export async function checkOverdueOrders(env: Record<string, unknown>, tenantOve
         { severity: 'warning', cooldownMinutes: 30 }
       ).catch(() => {});
     }
-
-    const now = new Date().toISOString();
-    try {
-      const scopedStmts = overdue.map((order) => {
-        const orderTenant = resolveOrderTenant(order);
-        return db
-          .prepare(
-            "UPDATE orders SET notes = CASE WHEN notes IS NULL OR notes = '' THEN ? ELSE notes || ' | ' || ? END, updated_at = ? WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
-          )
-          .bind('[OVERDUE]', '[OVERDUE]', now, order.id, orderTenant);
-      });
-      await db.batch(scopedStmts);
-      return;
-    } catch {
-      if (tenantId && tenantId !== '*' && tenantId !== 'default') {
-        return;
-      }
-    }
-    const defaultOrders = overdue.filter((order) => resolveOrderTenant(order) === 'default');
-    if (defaultOrders.length > 0) {
-      const stmts = defaultOrders.map((order) =>
-        db
-          .prepare(
-            "UPDATE orders SET notes = CASE WHEN notes IS NULL OR notes = '' THEN ? ELSE notes || ' | ' || ? END, updated_at = ? WHERE id = ?"
-          )
-          .bind('[OVERDUE]', '[OVERDUE]', now, order.id)
-      );
-      await db.batch(stmts);
-    }
   } catch (err) {
     log.error('checkOverdueOrders error:', { message: (err as Error).message });
+  }
+}
+
+export async function expireUnpaidOnlineOrders(
+  env: Record<string, unknown>,
+  tenantOverride?: string,
+): Promise<number> {
+  const ttlMinutes =
+    Number.isFinite(Number(env.UNPAID_ONLINE_ORDER_TTL_MINUTES)) &&
+    Number(env.UNPAID_ONLINE_ORDER_TTL_MINUTES) > 0
+      ? Number(env.UNPAID_ONLINE_ORDER_TTL_MINUTES)
+      : UNPAID_ONLINE_TTL_MINUTES_DEFAULT;
+  const rawOverride = typeof tenantOverride === 'string' ? tenantOverride.trim() : '';
+  const normalizedOverride = rawOverride.toLowerCase() === 'hq' ? '*' : rawOverride;
+  const rawTenant = normalizedOverride || resolvePilotStore(env as unknown as Parameters<typeof resolvePilotStore>[0]);
+  const tenantId = rawTenant.toLowerCase() === 'hq' ? '*' : rawTenant;
+
+  try {
+    const db = env.AURA_DB as import('@cloudflare/workers-types').D1Database;
+    const cutoff = new Date(Date.now() - ttlMinutes * 60 * 1000).toISOString();
+    const now = new Date().toISOString();
+    const scoped = Boolean(tenantId && tenantId !== '*');
+
+    const result = scoped && tenantId
+      ? await db
+          .prepare(
+            `UPDATE orders
+             SET status = 'expired', updated_at = ?
+             WHERE LOWER(COALESCE(status, 'pending')) = 'pending'
+               AND LOWER(COALESCE(payment_method, '')) IN ('payos', 'bank_transfer', 'qr')
+               AND LOWER(COALESCE(payment_status, 'unpaid')) NOT IN ('paid', 'completed', 'refunded')
+               AND julianday(created_at) < julianday(?)
+               AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?`,
+          )
+          .bind(now, cutoff, tenantId)
+          .run()
+      : await db
+          .prepare(
+            `UPDATE orders
+             SET status = 'expired', updated_at = ?
+             WHERE LOWER(COALESCE(status, 'pending')) = 'pending'
+               AND LOWER(COALESCE(payment_method, '')) IN ('payos', 'bank_transfer', 'qr')
+               AND LOWER(COALESCE(payment_status, 'unpaid')) NOT IN ('paid', 'completed', 'refunded')
+               AND julianday(created_at) < julianday(?)`,
+          )
+          .bind(now, cutoff)
+          .run();
+
+    return Number(result.meta?.changes ?? 0);
+  } catch (err) {
+    log.error('expireUnpaidOnlineOrders error:', { message: (err as Error).message });
+    return 0;
   }
 }
 

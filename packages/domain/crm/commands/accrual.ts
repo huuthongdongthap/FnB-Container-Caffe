@@ -64,6 +64,7 @@ const INELIGIBLE_ORDER_STATUSES = new Set([
 const ELIGIBLE_ORDER_PAYMENT_STATUSES = new Set([
   'paid',
   'completed',
+  'partially_refunded',
 ]);
 
 function isMissingColumnError(err: unknown): boolean {
@@ -654,7 +655,7 @@ async function applyAccrualAttempt(db: D1Database, policy: LoyaltyPolicy, input:
     eligibility.push("LOWER(TRIM(COALESCE(status, ''))) NOT IN ('cancelled', 'canceled', 'rejected', 'failed', 'expired', 'refunded')");
   }
   if (order.payment_status !== undefined) {
-    eligibility.push("LOWER(TRIM(COALESCE(payment_status, ''))) IN ('paid', 'completed')");
+    eligibility.push("LOWER(TRIM(COALESCE(payment_status, ''))) IN ('paid', 'completed', 'partially_refunded')");
   }
   // A refund can commit after the eligibility read. Recheck order eligibility and
   // the exact refund_loyalty_work snapshot inside the same transaction as every

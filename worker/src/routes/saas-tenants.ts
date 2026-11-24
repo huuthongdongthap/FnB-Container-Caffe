@@ -240,6 +240,19 @@ export function createTenantRoutes() {
         await subscriptionStmt.run();
       }
 
+      // Brand-new tenants have zero legacy refund history — mark refund ledger ready immediately.
+      try {
+        await db
+          .prepare(
+            `INSERT OR IGNORE INTO refund_tenant_readiness (tenant_id, reconciled_at, reconciled_by, evidence)
+             VALUES (?, ?, ?, ?)`
+          )
+          .bind(id, now, ownerUserId, `new-tenant-api:${id}`)
+          .run();
+      } catch {
+        // Non-fatal if refund_tenant_readiness table is absent in legacy test schemas
+      }
+
       const row = await db.prepare('SELECT * FROM saas_tenants WHERE id = ?').bind(id).first<Record<string, unknown>>();
       return c.json({ ok: true, data: row ? mapRow(row) : null } as const, 201);
     } catch (_err) {

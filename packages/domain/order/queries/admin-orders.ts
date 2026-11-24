@@ -186,8 +186,7 @@ export async function getAdminOrders(request: Request, env: Record<string, unkno
     } catch {
       usedTableJoin = false;
       try {
-        const legacyJoinQuery = `SELECT o.id, o.table_id, o.status, o.total, o.payment_status, o.customer_name, o.customer_phone, o.created_at,
-           o.items, o.shipping_fee, o.discount,
+        const legacyJoinQuery = `SELECT o.*,
            p.id AS payment_id, p.method AS payment_method, p.refund_status, p.refund_amount, p.amount AS payment_amount
          FROM orders o
          LEFT JOIN payments p ON p.id = (
@@ -207,37 +206,6 @@ export async function getAdminOrders(request: Request, env: Record<string, unkno
         results = res.results ?? [];
       }
     }
-
-    const orders = results.map(order => {
-      let parsedItems: unknown[] = [];
-      if (Array.isArray(order.items)) {
-        parsedItems = order.items;
-      } else if (typeof order.items === 'string' && order.items) {
-        try {
-          parsedItems = JSON.parse(order.items);
-        } catch {
-          parsedItems = [];
-        }
-      }
-      const tableNumber = order.table_number ? String(order.table_number) : null;
-      return {
-        ...order,
-        items: parsedItems,
-        total: parseInt(order.total as string),
-        payment_id: order.payment_id || null,
-        payment_transaction_id: order.payment_transaction_id ? String(order.payment_transaction_id) : null,
-        payment_amount: order.payment_amount ? Number(order.payment_amount) : null,
-        refund_amount: order.refund_amount ? Number(order.refund_amount) : null,
-        shipping_fee: parseInt(String(order.shipping_fee || 0)),
-        discount: parseInt(String(order.discount || 0)),
-        order_type: order.order_type ? String(order.order_type) : (order.table_id ? 'dine_in' : 'takeaway'),
-        customer_address: order.customer_address ? String(order.customer_address) : null,
-        notes: order.notes ? String(order.notes) : null,
-        delivery_time: order.delivery_time ? String(order.delivery_time) : null,
-        table_number: tableNumber,
-        table_name: tableNumber,
-      };
-    });
 
     const runCountQuery = async (sql: string, params: unknown[]): Promise<number> => {
       const stmt = db.prepare(sql).bind(...params) as unknown as {
@@ -276,6 +244,71 @@ export async function getAdminOrders(request: Request, env: Record<string, unkno
       const countQuery = `SELECT COUNT(*) as total FROM orders o WHERE 1=1${fallbackClause}`;
       total = await runCountQuery(countQuery, fallbackParams);
     }
+
+    const pendingLoyaltyByOrder = new Map<string, string>();
+    const orderIds = results.map((r) => String(r.id ?? '')).filter(Boolean);
+    if (orderIds.length > 0) {
+      const CHUNK_SIZE = 80;
+      try {
+        for (let i = 0; i < orderIds.length; i += CHUNK_SIZE) {
+          const chunk = orderIds.slice(i, i + CHUNK_SIZE);
+          const placeholders = chunk.map(() => '?').join(', ');
+          const tenantClause = resolvedTenant !== '*' ? ' AND tenant_id = ?' : '';
+          const params = resolvedTenant !== '*' ? [...chunk, resolvedTenant] : chunk;
+          const lwRes = await db
+            .prepare(
+              `SELECT order_id, reversal_key
+               FROM refund_loyalty_work
+               WHERE status = 'pending'
+                 AND order_id IN (${placeholders})${tenantClause}
+               ORDER BY created_at DESC`,
+            )
+            .bind(...params)
+            .all<{ order_id: string; reversal_key: string }>();
+          for (const row of lwRes.results ?? []) {
+            if (row.order_id && row.reversal_key && !pendingLoyaltyByOrder.has(row.order_id)) {
+              pendingLoyaltyByOrder.set(row.order_id, row.reversal_key);
+            }
+          }
+        }
+      } catch {
+        // Non-fatal if refund_loyalty_work table is absent in legacy test schemas
+      }
+    }
+
+    const orders = results.map(order => {
+      let parsedItems: unknown[] = [];
+      if (Array.isArray(order.items)) {
+        parsedItems = order.items;
+      } else if (typeof order.items === 'string' && order.items) {
+        try {
+          parsedItems = JSON.parse(order.items);
+        } catch {
+          parsedItems = [];
+        }
+      }
+      const tableNumber = order.table_number ? String(order.table_number) : null;
+      const pendingTransferRef = pendingLoyaltyByOrder.get(String(order.id ?? '')) ?? null;
+      return {
+        ...order,
+        items: parsedItems,
+        total: parseInt(order.total as string),
+        payment_id: order.payment_id || null,
+        payment_transaction_id: order.payment_transaction_id ? String(order.payment_transaction_id) : null,
+        payment_amount: order.payment_amount ? Number(order.payment_amount) : null,
+        refund_amount: order.refund_amount ? Number(order.refund_amount) : null,
+        shipping_fee: parseInt(String(order.shipping_fee || 0)),
+        discount: parseInt(String(order.discount || 0)),
+        order_type: order.order_type ? String(order.order_type) : (order.table_id ? 'dine_in' : 'takeaway'),
+        customer_address: order.customer_address ? String(order.customer_address) : null,
+        notes: order.notes ? String(order.notes) : null,
+        delivery_time: order.delivery_time ? String(order.delivery_time) : null,
+        table_number: tableNumber,
+        table_name: tableNumber,
+        pending_loyalty_reversal: Boolean(pendingTransferRef),
+        pending_loyalty_transfer_ref: pendingTransferRef,
+      };
+    });
 
     return jsonResponse({
       success: true,

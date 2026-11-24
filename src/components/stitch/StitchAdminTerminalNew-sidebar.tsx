@@ -55,7 +55,7 @@ export const Sidebar = forwardRef<HTMLElement, SidebarProps>(
       <aside
         ref={ref}
         className={cn(
-          'fixed left-0 top-0 z-50 flex h-full w-72 flex-col border-r border-[var(--st-outline-variant, #44474d)]/20 bg-[var(--aura-noir-deep, #0A1A2E)]/95 md:bg-[var(--aura-noir-deep, #0A1A2E)]/40 py-6 backdrop-blur-xl shadow-[0_0_20px_rgba(205,127,50,0.15)] transition-transform duration-300',
+          'fixed left-0 top-0 z-50 flex h-full w-72 flex-col border-r border-[var(--st-outline-variant, #44474d)]/20 bg-[var(--aura-noir-deep, #0A1A2E)]/95 md:bg-[var(--aura-noir-deep, #0A1A2E)]/40 py-6 backdrop-blur-xl shadow-[0_0_20px_rgba(205,127,50,0.15)] transition-transform duration-300 print:hidden no-print',
           !isPosRoute && 'md:translate-x-0',
           open ? 'translate-x-0' : '-translate-x-full',
         )}

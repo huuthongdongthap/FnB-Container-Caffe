@@ -13,6 +13,8 @@ export {
   processErpnextRetryQueue,
   processErpnextProductSync,
   checkOverdueOrders,
+  expireUnpaidOnlineOrders,
+  retryPendingRefundLoyaltyWork,
   sendCashbackExpiryWarnings,
   runCampaignTriggers,
   syncMauticContacts,
