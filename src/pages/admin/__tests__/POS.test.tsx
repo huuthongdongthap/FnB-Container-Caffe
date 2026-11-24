@@ -1,6 +1,6 @@
 import React from 'react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { renderWithProviders, screen } from '@/test-utils';
+import { renderWithProviders, screen, fireEvent } from '@/test-utils';
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
@@ -23,12 +23,17 @@ vi.mock('@/hooks/use-offline-sync', () => ({
 }));
 
 vi.mock('@/components/stitch/StitchPOSNew', () => ({
-  StitchPOSNew: ({ menuItems, loading, error, brandName, onCompleteOrder }: any) => (
-    <div data-testid="stitch-pos">
+  StitchPOSNew: ({ menuItems, loading, error, brandName, onCompleteOrder, orderType, onOrderTypeChange }: any) => (
+    <div data-testid="stitch-pos" data-order-type={orderType}>
       {loading && <span data-testid="pos-loading">Loading menu</span>}
       {error && <span data-testid="pos-error">{error}</span>}
       <span data-testid="pos-brand">{brandName}</span>
       <span data-testid="pos-menu-count">{menuItems?.length ?? 0}</span>
+      {onOrderTypeChange && (
+        <button data-testid="pos-switch-delivery" onClick={() => onOrderTypeChange('delivery')}>
+          Switch Delivery
+        </button>
+      )}
       {onCompleteOrder && (
         <button data-testid="pos-checkout-btn" onClick={() => onCompleteOrder([], 0)}>
           Checkout
@@ -154,5 +159,15 @@ describe('AdminPOSPage', () => {
     } as any);
     renderWithProviders(<AdminPOSPage />);
     expect(screen.getByTestId('pos-quarantined-banner')).toBeTruthy();
+  });
+
+  it('delegates channel switcher state to StitchPOSNew without a fixed bottom-left overlay', () => {
+    const { container } = renderWithProviders(<AdminPOSPage />);
+    const pos = screen.getByTestId('stitch-pos');
+    expect(pos.getAttribute('data-order-type')).toBe('takeaway');
+    expect(container.querySelector('.fixed.bottom-4.left-4')).toBeNull();
+
+    fireEvent.click(screen.getByTestId('pos-switch-delivery'));
+    expect(pos.getAttribute('data-order-type')).toBe('delivery');
   });
 });

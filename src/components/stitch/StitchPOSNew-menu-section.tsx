@@ -5,7 +5,7 @@ import { cn } from '@/lib/cn';
 import { Search, Coffee } from 'lucide-react';
 import { MenuItemCard } from './StitchPOSNew-menu-item-card';
 import { AddOnChip } from './StitchPOSNew-add-on-chip';
-import type { POSNewMenuItem, POSNewAddOn } from './StitchPOSNew-types';
+import type { POSNewMenuItem, POSNewAddOn, POSOrderType } from './StitchPOSNew-types';
 import { MENU_CATEGORIES, resolvePosCategoryLabel } from './StitchPOSNew-types';
 
 interface MenuSectionProps {
@@ -21,6 +21,10 @@ interface MenuSectionProps {
   addToCart: (item: { id: string; name: string; price: number; category?: string }) => void;
   removeFromCart: (id: string) => void;
   cartOpen: boolean;
+  orderType?: POSOrderType;
+  onOrderTypeChange?: (type: POSOrderType) => void;
+  deliveryAddress?: string;
+  onDeliveryAddressChange?: (address: string) => void;
 }
 
 export function MenuSection({
@@ -36,6 +40,10 @@ export function MenuSection({
   addToCart,
   removeFromCart,
   cartOpen,
+  orderType,
+  onOrderTypeChange,
+  deliveryAddress = '',
+  onDeliveryAddressChange,
 }: MenuSectionProps) {
   const { t } = useTranslation();
   return (
@@ -46,19 +54,63 @@ export function MenuSection({
       )}
       aria-label={t('posNew.menuSection')}
     >
-      {/* Search & Filters */}
+      {/* Search, Order Channel & Category Filters */}
       <div className="flex flex-col gap-3 mb-4 shrink-0">
-        <div className="relative w-full max-w-2xl">
-          <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--aura-text-muted,#6b5d50)]" aria-hidden="true" />
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="relative flex-1 min-w-[220px] max-w-xl">
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--aura-text-muted,#8A8E96)]" aria-hidden="true" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => onSearchChange(e.target.value)}
+              placeholder={t('posNew.searchPlaceholder')}
+              className="w-full bg-[var(--aura-noir-void,#050814)]/60 border border-[var(--aura-chrome-light,#B8C5D0)]/15 rounded-lg py-2.5 pl-11 pr-4 text-[14px] text-[var(--aura-text-primary,#eae1db)] focus:outline-none focus:border-[var(--aura-chrome-light,#B8C5D0)]/45 transition-all placeholder:text-[var(--aura-text-muted,#8A8E96)] font-body"
+              aria-label={t('posNew.searchPlaceholder')}
+            />
+          </div>
+          {orderType && onOrderTypeChange && (
+            <div
+              role="group"
+              data-testid="pos-channel-switcher"
+              aria-label={t('orderMgmt.channelFilter', { defaultValue: 'Loại đơn' })}
+              className="flex items-center gap-1 rounded-xl border border-white/15 bg-[var(--aura-noir-deep,#0A1A2E)]/95 p-1 shadow-sm shrink-0"
+            >
+              {(
+                [
+                  { key: 'dine_in', label: t('orderMgmt.channel.dine_in', { defaultValue: 'Tại quán' }) },
+                  { key: 'takeaway', label: t('orderMgmt.channel.takeaway', { defaultValue: 'Mang đi' }) },
+                  { key: 'delivery', label: t('orderMgmt.channel.delivery', { defaultValue: 'Giao hàng' }) },
+                ] as const
+              ).map((opt) => (
+                <button
+                  key={opt.key}
+                  type="button"
+                  onClick={() => onOrderTypeChange(opt.key)}
+                  aria-pressed={orderType === opt.key}
+                  className={cn(
+                    'rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors whitespace-nowrap cursor-pointer',
+                    orderType === opt.key
+                      ? 'bg-amber-400/20 text-amber-200 border border-amber-400/40'
+                      : 'text-slate-300 border border-transparent hover:bg-white/10 hover:text-white'
+                  )}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+        {orderType === 'delivery' && onDeliveryAddressChange && (
           <input
             type="text"
-            value={searchQuery}
-            onChange={(e) => onSearchChange(e.target.value)}
-            placeholder={t('posNew.searchPlaceholder')}
-            className="w-full bg-[color-mix(in srgb,var(--aura-noir-void,rgba(var(--aura-noir-void),1)) 50%,transparent)] border border-[color-mix(in srgb,var(--aura-chrome-light,rgba(var(--aura-chrome-light),1)) 15%,transparent)] rounded-lg py-3 pl-11 pr-4 text-[14px] text-[var(--aura-text-primary,var(--aura-chrome-bright,#eae1db))] focus:outline-none focus:border-[color-mix(in srgb,var(--aura-chrome-light,rgba(var(--aura-chrome-light),1)) 40%,transparent)] transition-all placeholder:text-[var(--aura-text-muted,#6b5d50)] font-body"
-            aria-label={t('posNew.searchPlaceholder')}
+            data-testid="pos-delivery-address-input"
+            value={deliveryAddress}
+            onChange={(e) => onDeliveryAddressChange(e.target.value)}
+            placeholder={t('orderMgmt.searchField.address', { defaultValue: 'Địa chỉ giao hàng' })}
+            aria-label={t('orderMgmt.searchField.address', { defaultValue: 'Địa chỉ giao hàng' })}
+            className="w-full max-w-xl rounded-lg border border-white/15 bg-[var(--aura-noir-void,#050814)]/75 px-3.5 py-2 text-xs text-[var(--aura-text-primary,#eae1db)] placeholder:text-[var(--aura-text-muted,#8A8E96)] outline-none focus:border-amber-400"
           />
-        </div>
+        )}
         <div className="flex gap-2.5 overflow-x-auto pb-1.5 custom-scrollbar-pos" role="tablist" aria-label={t('posNew.categoryFilter')}>
           {categories.map((cat) => {
             const label = resolvePosCategoryLabel(cat, categoryLabels);
@@ -70,8 +122,8 @@ export function MenuSection({
                 className={cn(
                   'shrink-0 px-4 py-2 rounded-lg border text-[12px] font-semibold tracking-wide whitespace-nowrap active:scale-95 transition-all font-body cursor-pointer',
                   activeCategory === cat
-                    ? 'bg-[var(--aura-primary,var(--aura-chrome-light,#f2c08d))] text-[var(--aura-noir-void,#1a1008)] border-[var(--aura-primary,#f2c08d)]'
-                    : 'bg-[rgba(var(--aura-noir-void),0.55)] text-[var(--aura-text-muted,#b8a898)] border-[rgba(var(--aura-chrome-light),0.16)] hover:text-[var(--aura-text-primary,#eae1db)] hover:border-[rgba(var(--aura-chrome-light),0.35)]'
+                    ? 'bg-[#f2c08d] text-[#1a1008] border-[#f2c08d]'
+                    : 'bg-[var(--aura-noir-void,#050814)]/60 text-[var(--aura-text-muted,#b8a898)] border-[var(--aura-chrome-light,#B8C5D0)]/15 hover:text-[var(--aura-text-primary,#eae1db)] hover:border-[var(--aura-chrome-light,#B8C5D0)]/35'
                 )}
                 role="tab"
                 aria-selected={activeCategory === cat}
@@ -85,10 +137,10 @@ export function MenuSection({
       </div>
 
       {/* Menu Grid Area */}
-      <div className="flex-1 overflow-y-auto pr-2 pb-24 custom-scrollbar-pos">
+      <div className="flex-1 overflow-y-auto pr-2 pb-8 custom-scrollbar-pos">
         {filteredItems.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16 text-center">
-            <Coffee className="w-12 h-12 text-[color-mix(in srgb,var(--aura-chrome-light,rgba(var(--aura-chrome-light),1)) 12%,transparent)] mb-4" />
+            <Coffee className="w-12 h-12 text-[var(--aura-chrome-light,#B8C5D0)]/20 mb-4" />
             <p className="text-[14px] text-[var(--aura-text-muted,#8a7a6a)] font-body">
               {searchQuery ? t('posNew.noResults') : t('posNew.noItemsInCategory')}
             </p>

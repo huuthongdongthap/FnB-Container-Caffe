@@ -537,48 +537,6 @@ export default function AdminPOSPage() {
   /* ── Render ───────────────────────────────────────────────────────── */
   return (
     <div className="relative min-h-screen">
-      <div
-        role="group"
-        aria-label={t('orderMgmt.channelFilter', { defaultValue: 'Loại đơn' })}
-        className="fixed bottom-4 left-4 z-40 flex items-center gap-1 rounded-xl border border-white/15 bg-[#0A1A2E]/90 p-1 backdrop-blur-md shadow-lg"
-      >
-        {(
-          [
-            { key: 'dine_in', label: t('orderMgmt.channel.dine_in', { defaultValue: 'Tại quán' }) },
-            { key: 'takeaway', label: t('orderMgmt.channel.takeaway', { defaultValue: 'Mang đi' }) },
-            { key: 'delivery', label: t('orderMgmt.channel.delivery', { defaultValue: 'Giao hàng' }) },
-          ] as const
-        ).map((opt) => (
-          <button
-            key={opt.key}
-            type="button"
-            onClick={() => {
-              setOrderType(opt.key);
-              if (opt.key !== 'dine_in') {
-                setSelectedTableId(undefined);
-              }
-            }}
-            aria-pressed={orderType === opt.key}
-            className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors ${
-              orderType === opt.key
-                ? 'bg-amber-400/20 text-amber-200 border border-amber-400/40'
-                : 'text-slate-300 hover:bg-white/10'
-            }`}
-          >
-            {opt.label}
-          </button>
-        ))}
-        {orderType === 'delivery' && (
-          <input
-            type="text"
-            value={deliveryAddress}
-            onChange={(e) => setDeliveryAddress(e.target.value)}
-            placeholder={t('orderMgmt.searchField.address', { defaultValue: 'Địa chỉ giao hàng' })}
-            aria-label={t('orderMgmt.searchField.address', { defaultValue: 'Địa chỉ giao hàng' })}
-            className="ml-2 flex-1 min-w-[200px] max-w-sm rounded-lg border border-white/15 bg-white/5 px-3 py-1.5 text-xs text-white placeholder:text-slate-400 outline-none focus:border-amber-400"
-          />
-        )}
-      </div>
       <StitchPOSNew
         key={`${activeTenant}:${sessionVersion}`}
         menuItems={stitchMenuItems}
@@ -594,6 +552,15 @@ export default function AdminPOSPage() {
             setOrderType('takeaway');
           }
         }}
+        orderType={orderType}
+        onOrderTypeChange={(nextType) => {
+          setOrderType(nextType);
+          if (nextType !== 'dine_in') {
+            setSelectedTableId(undefined);
+          }
+        }}
+        deliveryAddress={deliveryAddress}
+        onDeliveryAddressChange={setDeliveryAddress}
         taxRate={0}
         staffName={user?.name || user?.email || undefined}
         staffRole={user?.role || undefined}
@@ -635,7 +602,7 @@ export default function AdminPOSPage() {
         <div
           role="alert"
           data-testid="pos-quarantined-banner"
-          className="fixed bottom-4 right-4 z-[95] flex items-center gap-3 px-4 py-3 shadow-lg rounded-[var(--md-sys-shape-corner-medium)] bg-[var(--md-sys-color-error-container)] text-[var(--md-sys-color-on-error-container)]"
+          className="fixed bottom-16 right-4 lg:right-[25rem] z-[95] flex items-center gap-3 px-4 py-3 shadow-lg rounded-[var(--md-sys-shape-corner-medium)] bg-[var(--md-sys-color-error-container)] text-[var(--md-sys-color-on-error-container)]"
         >
           <AlertCircle className="w-4 h-4 shrink-0 text-[var(--md-sys-color-primary)]" />
           <span className="m3-body-medium text-sm font-medium">

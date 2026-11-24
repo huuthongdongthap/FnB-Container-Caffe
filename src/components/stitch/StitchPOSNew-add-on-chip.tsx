@@ -9,15 +9,15 @@ export function AddOnChip({ addon, onAdd }: { addon: POSNewAddOn; onAdd: () => v
   const formattedAddonPrice = `+${formatPosPrice(addon.price)}`;
   return (
     <button
-     type="button"
+      type="button"
       onClick={onAdd}
-      className="glass-card px-4 py-2 rounded-lg flex items-center gap-2 cursor-pointer hover:bg-[rgba(var(--aura-noir-void),0.5)] transition-colors active:scale-95"
+      className="glass-card px-4 py-2 rounded-lg flex items-center gap-2 cursor-pointer hover:bg-[var(--aura-noir-void,#050814)]/70 transition-colors active:scale-95"
       aria-label={`${t('posNew.addOnPrefix')} ${addon.name}`}
     >
-      <Plus className="w-4 h-4 text-[var(--aura-primary, #f2c08d)]" />
+      <Plus className="w-4 h-4 text-[#f2c08d]" />
       <div className="text-left">
-        <p className="text-[13px] text-[var(--aura-text-primary, #eae1db)] font-body">{addon.name}</p>
-        <p className="text-[11px] text-[var(--aura-text-muted, #8A8E96)] font-body">
+        <p className="text-[13px] text-[var(--aura-text-primary,#eae1db)] font-body">{addon.name}</p>
+        <p className="text-[11px] text-[var(--aura-text-muted,#8A8E96)] font-body">
           {formattedAddonPrice}
         </p>
       </div>

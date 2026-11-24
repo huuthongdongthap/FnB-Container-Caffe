@@ -20,10 +20,10 @@ interface CustomerLookupProps {
 
 /* Tier badge color mapping — module-level to avoid per-render allocation */
 const TIER_COLORS: Record<string, string> = {
-  bronze: 'bg-[var(--aura-chrome-mid, #6B9FB8)]/20 text-[var(--aura-chrome-mid, #6B9FB8)]',
-  silver: 'bg-[var(--aura-text-secondary, #A0A8B0)]/20 text-[var(--aura-text-secondary, #A0A8B0)]',
-  gold: 'bg-[var(--aura-chrome-bright, #E8EEF3)]/20 text-[var(--aura-chrome-bright, #E8EEF3)]',
-  platinum: 'bg-[var(--aura-chrome-bright, #E8EEF3)]/20 text-[var(--aura-chrome-bright, #E8EEF3)]',
+  bronze: 'bg-[var(--aura-chrome-mid,#6B9FB8)]/20 text-[var(--aura-chrome-mid,#6B9FB8)]',
+  silver: 'bg-[var(--aura-text-secondary,#A0A8B0)]/20 text-[var(--aura-text-secondary,#A0A8B0)]',
+  gold: 'bg-[var(--aura-chrome-bright,#E8EEF3)]/20 text-[var(--aura-chrome-bright,#E8EEF3)]',
+  platinum: 'bg-[var(--aura-chrome-bright,#E8EEF3)]/20 text-[var(--aura-chrome-bright,#E8EEF3)]',
 };
 
 export function CustomerLookup({
@@ -120,7 +120,7 @@ export function CustomerLookup({
     const tierClass = TIER_COLORS[customer.loyalty_tier] || TIER_COLORS.bronze;
 
     return (
-      <div className="px-6 py-3 border-b border-[rgba(var(--aura-chrome-light),0.08)]">
+      <div className="px-6 py-3 border-b border-[var(--aura-chrome-light,#B8C5D0)]/12">
         <div className="flex items-center justify-between mb-2">
           <div className="flex items-center gap-2">
             <UserCheck className="w-4 h-4 text-emerald-400" />
@@ -129,31 +129,31 @@ export function CustomerLookup({
             </span>
           </div>
           <button
-           type="button"
+            type="button"
             onClick={() => { searchSeqRef.current += 1; onClearCustomer?.(); setQuery(''); setResults([]); }}
-            className="text-[var(--aura-text-muted, #8a7a6a)] hover:text-[var(--aura-text-primary, #eae1db)] transition-colors cursor-pointer"
+            className="text-[var(--aura-text-muted,#8a7a6a)] hover:text-[var(--aura-text-primary,#eae1db)] transition-colors cursor-pointer"
             aria-label={t('posNew.clearCustomer')}
           >
             <X className="w-4 h-4" />
           </button>
         </div>
-        <p className="text-[14px] text-[var(--aura-text-primary, #eae1db)] font-body font-semibold truncate">
+        <p className="text-[14px] text-[var(--aura-text-primary,#eae1db)] font-body font-semibold truncate">
           {customer.name}
         </p>
-        <p className="text-[12px] text-[var(--aura-text-muted, #8A8E96)] font-body mt-0.5">{customer.phone}</p>
+        <p className="text-[12px] text-[var(--aura-text-muted,#8A8E96)] font-body mt-0.5">{customer.phone}</p>
         <div className="flex items-center gap-2 mt-2">
           <span className={`text-[11px] px-2 py-0.5 rounded-sm font-body uppercase tracking-wide ${tierClass}`}>
             {customer.loyalty_tier_label}
           </span>
-          <span className="text-[11px] text-[var(--aura-primary, #f2c08d)] font-body">
+          <span className="text-[11px] text-[#f2c08d] font-body">
             {customer.loyalty_points} {t('posNew.loyaltyPoints')}
           </span>
         </div>
         <div className="flex gap-3 mt-1.5">
-          <span className="text-[11px] text-[var(--aura-text-muted, #8A8E96)] font-body">
+          <span className="text-[11px] text-[var(--aura-text-muted,#8A8E96)] font-body">
             {t('posNew.cashbackBalance')}: {customer.cashback_balance.toLocaleString('vi-VN')}₫
           </span>
-          <span className="text-[11px] text-[var(--aura-text-muted, #8A8E96)] font-body">
+          <span className="text-[11px] text-[var(--aura-text-muted,#8A8E96)] font-body">
             {t('posNew.visitCount')}: {customer.visit_count}
           </span>
         </div>
@@ -165,7 +165,7 @@ export function CustomerLookup({
             className={`mt-2 w-full px-3 py-1.5 rounded-sm text-[11px] font-semibold border transition-colors cursor-pointer ${
               useCashback
                 ? 'bg-emerald-500/20 border-emerald-500/40 text-emerald-300'
-                : 'bg-[rgba(var(--aura-chrome-light),0.08)] border-[rgba(var(--aura-chrome-light),0.2)] text-[var(--aura-primary, #f2c08d)] hover:bg-[rgba(var(--aura-chrome-light),0.14)]'
+                : 'bg-[var(--aura-chrome-light,#B8C5D0)]/10 border-[var(--aura-chrome-light,#B8C5D0)]/25 text-[#f2c08d] hover:bg-[var(--aura-chrome-light,#B8C5D0)]/20'
             }`}
           >
             {useCashback
@@ -179,8 +179,8 @@ export function CustomerLookup({
 
   /* ── Name or Phone lookup input ──────────────────────────────────── */
   return (
-    <div className="px-6 py-3 border-b border-[rgba(var(--aura-chrome-light),0.08)] relative">
-      <p className="text-[11px] text-[var(--aura-text-muted, #8A8E96)] uppercase tracking-wide font-body mb-2">
+    <div className="px-6 py-3 border-b border-[var(--aura-chrome-light,#B8C5D0)]/12 relative">
+      <p className="text-[11px] text-[var(--aura-text-muted,#8A8E96)] uppercase tracking-wide font-body mb-2">
         {t('posNew.lookupCustomer')}
       </p>
       <div className="flex gap-2">
@@ -190,13 +190,13 @@ export function CustomerLookup({
           onChange={(e) => setQuery(e.target.value)}
           onKeyDown={handleKeyDown}
           placeholder={t('posNew.customerSearchPlaceholder', { defaultValue: 'Tìm theo Tên hoặc SĐT khách hàng...' })}
-          className="flex-1 bg-[rgba(var(--aura-chrome-light),0.05)] border border-[rgba(var(--aura-chrome-light),0.12)] rounded-sm px-3 py-2 text-[13px] text-[var(--aura-text-primary, #eae1db)] placeholder:text-[var(--aura-text-muted, #5a4a3a)] font-body outline-none focus:border-[rgba(var(--aura-chrome-light),0.3)] transition-colors"
+          className="flex-1 bg-[var(--aura-chrome-light,#B8C5D0)]/10 border border-[var(--aura-chrome-light,#B8C5D0)]/20 rounded-sm px-3 py-2 text-[13px] text-[var(--aura-text-primary,#eae1db)] placeholder:text-[var(--aura-text-muted,#8A8E96)] font-body outline-none focus:border-[#f2c08d] transition-colors"
         />
         <button
-         type="button"
+          type="button"
           onClick={handleLookup}
           disabled={query.trim().length < 2 || lookupMutation.isPending}
-          className="px-4 py-2 bg-[rgba(var(--aura-chrome-light),0.1)] border border-[rgba(var(--aura-chrome-light),0.2)] rounded-sm text-[var(--aura-primary, #f2c08d)] active:scale-95 transition-transform disabled:opacity-40 cursor-pointer"
+          className="px-4 py-2 bg-[var(--aura-chrome-light,#B8C5D0)]/12 border border-[var(--aura-chrome-light,#B8C5D0)]/25 rounded-sm text-[#f2c08d] active:scale-95 transition-transform disabled:opacity-40 cursor-pointer"
           aria-label={t('posNew.lookupBtn')}
         >
           <Search className="w-4 h-4" />
@@ -206,7 +206,7 @@ export function CustomerLookup({
         <ul
           role="listbox"
           aria-label={t('posNew.lookupCustomer')}
-          className="mt-2 max-h-48 overflow-y-auto rounded-md border border-[rgba(var(--aura-chrome-light),0.15)] bg-[var(--aura-noir-void,#1a1008)] divide-y divide-[rgba(var(--aura-chrome-light),0.08)]"
+          className="mt-2 max-h-48 overflow-y-auto rounded-md border border-[var(--aura-chrome-light,#B8C5D0)]/20 bg-[var(--aura-noir-void,#050814)] divide-y divide-[var(--aura-chrome-light,#B8C5D0)]/10"
         >
           {results.map((item) => {
             const tierClass = TIER_COLORS[item.loyalty_tier] || TIER_COLORS.bronze;
@@ -215,7 +215,7 @@ export function CustomerLookup({
                 <button
                   type="button"
                   onClick={() => handleSelectCustomer(item)}
-                  className="w-full text-left px-3 py-2 hover:bg-[rgba(var(--aura-chrome-light),0.08)] transition-colors cursor-pointer"
+                  className="w-full text-left px-3 py-2 hover:bg-[var(--aura-chrome-light,#B8C5D0)]/10 transition-colors cursor-pointer"
                 >
                   <div className="flex items-center justify-between gap-2">
                     <span className="text-[13px] font-medium text-[var(--aura-text-primary,#eae1db)] truncate font-body">
@@ -227,7 +227,7 @@ export function CustomerLookup({
                   </div>
                   <div className="flex items-center justify-between text-[11px] text-[var(--aura-text-muted,#8A8E96)] mt-0.5 font-body">
                     <span>{item.phone}</span>
-                    <span className="text-[var(--aura-primary,#f2c08d)]">
+                    <span className="text-[#f2c08d]">
                       {item.loyalty_points} {t('posNew.loyaltyPoints')}
                     </span>
                   </div>
@@ -238,12 +238,12 @@ export function CustomerLookup({
         </ul>
       )}
       {lookupMutation.isError && (
-        <p className="text-[11px] text-[var(--aura-error, #FFB4AB)] mt-1.5 font-body">
+        <p className="text-[11px] text-[var(--aura-error,#FFB4AB)] mt-1.5 font-body">
           {lookupMutation.error?.message || t('posNew.phoneInvalid')}
         </p>
       )}
       {lookupMutation.isSuccess && lookupMutation.data && !lookupMutation.data.found && results.length === 0 && (
-        <p className="text-[11px] text-[var(--aura-text-muted, #8A8E96)] mt-1.5 font-body">
+        <p className="text-[11px] text-[var(--aura-text-muted,#8A8E96)] mt-1.5 font-body">
           {lookupMutation.data.message || t('posNew.customerNotFound')}
         </p>
       )}

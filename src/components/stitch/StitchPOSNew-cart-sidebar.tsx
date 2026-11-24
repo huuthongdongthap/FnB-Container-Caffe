@@ -93,7 +93,7 @@ export function CartSidebar({
   return (
     <aside
       className={cn(
-        'fixed right-0 top-0 h-full w-96 flex flex-col z-40 bg-[rgba(var(--aura-noir-void),0.7)] backdrop-blur-[8px] border-l border-[rgba(var(--aura-chrome-light),0.08)] shadow-xl transition-transform duration-300',
+        'fixed right-0 top-0 h-full w-96 flex flex-col z-40 bg-[var(--aura-noir-void,#050814)]/95 backdrop-blur-md border-l border-[var(--aura-chrome-light,#B8C5D0)]/15 shadow-xl transition-transform duration-300',
         'pt-16',
         cartOpen ? 'translate-x-0' : 'translate-x-full',
         'lg:translate-x-0'
@@ -101,12 +101,12 @@ export function CartSidebar({
       aria-label={t('posNew.cartSection')}
     >
       {/* Cart Header & Table Selector (#113) */}
-      <div className="px-6 py-4 border-b border-[rgba(var(--aura-chrome-light),0.08)]">
+      <div className="px-6 py-4 border-b border-[var(--aura-chrome-light,#B8C5D0)]/12">
         <div className="flex justify-between items-center mb-2">
-          <h2 className="text-[14px] text-[var(--aura-primary, #f2c08d)] font-semibold uppercase tracking-wider font-body">
+          <h2 className="text-[14px] text-[#f2c08d] font-semibold uppercase tracking-wider font-body">
             {t('posNew.orderSummary')}
           </h2>
-          <span className="bg-[rgba(var(--aura-chrome-light),0.08)] text-[var(--aura-primary, #f2c08d)] border border-[rgba(var(--aura-chrome-light),0.15)] px-2.5 py-0.5 rounded-sm text-[11px] font-body">
+          <span className="bg-[var(--aura-chrome-light,#B8C5D0)]/10 text-[#f2c08d] border border-[var(--aura-chrome-light,#B8C5D0)]/20 px-2.5 py-0.5 rounded-sm text-[11px] font-body">
             {resolvedTableBadge}
           </span>
         </div>
@@ -121,7 +121,7 @@ export function CartSidebar({
               value={selectedTableId || ''}
               onChange={(e) => onSelectTable(e.target.value || undefined)}
               aria-label={t('posNew.selectTable', { defaultValue: 'Chọn bàn phục vụ' })}
-              className="w-full bg-[rgba(var(--aura-noir-void),0.6)] border border-[rgba(var(--aura-chrome-light),0.18)] rounded-md px-3 py-2 text-[12px] text-[var(--aura-text-primary,#eae1db)] font-body outline-none focus:border-[var(--aura-primary,#f2c08d)] cursor-pointer"
+              className="w-full bg-[var(--aura-noir-deep,#0A1A2E)] border border-[var(--aura-chrome-light,#B8C5D0)]/20 rounded-md px-3 py-2 text-[12px] text-[var(--aura-text-primary,#eae1db)] font-body outline-none focus:border-[#f2c08d] cursor-pointer"
             >
               <option value="">
                 {t('posNew.takeawayOption', { defaultValue: 'Mang về (Takeaway)' })}
@@ -136,7 +136,7 @@ export function CartSidebar({
           </div>
         ) : (
           (guestLabel || orderNumber) && (
-            <p className="text-[12px] text-[var(--aura-text-muted, #8A8E96)] font-body">
+            <p className="text-[12px] text-[var(--aura-text-muted,#8A8E96)] font-body">
               {[guestLabel, orderNumber ? `${t('posNew.order')} #${orderNumber}` : ''].filter(Boolean).join(' • ')}
             </p>
           )
@@ -156,8 +156,8 @@ export function CartSidebar({
       <div className="flex-1 overflow-y-auto px-6 py-3 custom-scrollbar-pos">
         {cart.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full text-center">
-            <ShoppingCart className="w-10 h-10 text-[rgba(var(--aura-chrome-light),0.1)] mb-3" />
-            <p className="text-[13px] text-[var(--aura-text-muted, #8A8E96)] font-body">
+            <ShoppingCart className="w-10 h-10 text-[var(--aura-chrome-light,#B8C5D0)]/20 mb-3" />
+            <p className="text-[13px] text-[var(--aura-text-muted,#8A8E96)] font-body">
               {t('posNew.cartEmpty')}
             </p>
           </div>
@@ -165,18 +165,18 @@ export function CartSidebar({
           <div className="flex flex-col gap-2">
             {cart.map((item) => (
               <div key={item.id} className="flex items-center gap-3 py-2 group">
-                <div className="w-2 h-10 bg-[var(--aura-primary, #f2c08d)] opacity-0 group-hover:opacity-100 transition-opacity -ml-6 mr-0 rounded-r-sm" />
+                <div className="w-2 h-10 bg-[#f2c08d] opacity-0 group-hover:opacity-100 transition-opacity -ml-6 mr-0 rounded-r-sm" />
                 <div className="flex-1 min-w-0">
-                  <h4 className="text-[14px] text-[var(--aura-text-primary, #eae1db)] truncate font-body">
+                  <h4 className="text-[14px] text-[var(--aura-text-primary,#eae1db)] truncate font-body">
                     {item.name}
                   </h4>
-                  <p className="text-[12px] text-[var(--aura-text-muted, #8A8E96)] font-body">
+                  <p className="text-[12px] text-[var(--aura-text-muted,#8A8E96)] font-body">
                     {`${item.quantity} × ${formatPosPrice(item.price)}`}
                   </p>
                 </div>
                 <div className="flex items-center gap-1.5">
                   <button
-                   type="button"
+                    type="button"
                     onClick={() => removeFromCart(item.id)}
                     className="min-w-[44px] min-h-[44px] flex items-center justify-center rounded-sm glass-card active:scale-90 transition-transform"
                     aria-label={`${t('posNew.decrementQuantity')} ${item.name}`}
@@ -187,9 +187,9 @@ export function CartSidebar({
                     {item.quantity}
                   </span>
                   <button
-                   type="button"
+                    type="button"
                     onClick={() => addToCart(item)}
-                    className="min-w-[44px] min-h-[44px] flex items-center justify-center rounded-sm bg-[rgba(var(--aura-chrome-light),0.1)] text-[var(--aura-primary, #f2c08d)] border border-[rgba(var(--aura-chrome-light),0.18)] active:scale-90 transition-transform"
+                    className="min-w-[44px] min-h-[44px] flex items-center justify-center rounded-sm bg-[var(--aura-chrome-light,#B8C5D0)]/12 text-[#f2c08d] border border-[var(--aura-chrome-light,#B8C5D0)]/20 active:scale-90 transition-transform"
                     aria-label={`${t('posNew.incrementQuantity')} ${item.name}`}
                   >
                     <Plus className="w-3.5 h-3.5" />
@@ -202,18 +202,18 @@ export function CartSidebar({
       </div>
 
       {/* Calculation Area */}
-      <div className="px-6 py-4 bg-[rgba(var(--aura-noir-void),0.5)] border-t border-[rgba(var(--aura-chrome-light),0.08)] flex flex-col gap-2">
-        <div className="flex justify-between text-[13px] text-[var(--aura-text-muted, #8A8E96)] font-body">
+      <div className="px-6 py-4 bg-[var(--aura-noir-deep,#0A1A2E)]/80 border-t border-[var(--aura-chrome-light,#B8C5D0)]/12 flex flex-col gap-2">
+        <div className="flex justify-between text-[13px] text-[var(--aura-text-muted,#8A8E96)] font-body">
           <span>{t('posNew.subtotal')}</span>
           <span aria-label={formattedSubtotal}>{formattedSubtotal}</span>
         </div>
         {discount > 0 && (
-          <div className="flex justify-between text-[13px] text-[var(--aura-text-muted, #8A8E96)] font-body">
+          <div className="flex justify-between text-[13px] text-[var(--aura-text-muted,#8A8E96)] font-body">
             <span>{t('posNew.discount', { defaultValue: 'Discount' })}</span>
             <span>-{formatPosPrice(discount)}</span>
           </div>
         )}
-        <div className="flex justify-between text-[13px] text-[var(--aura-text-muted, #8A8E96)] font-body">
+        <div className="flex justify-between text-[13px] text-[var(--aura-text-muted,#8A8E96)] font-body">
           <span>{t('posNew.tax')}</span>
           <span>{formatPosPrice(tax)}</span>
         </div>
@@ -223,53 +223,53 @@ export function CartSidebar({
             <span>-{formatPosPrice(cashbackDeduction)}</span>
           </div>
         )}
-        <div className="flex justify-between items-center mt-2 pt-2 border-t border-[rgba(var(--aura-chrome-light),0.12)]">
+        <div className="flex justify-between items-center mt-2 pt-2 border-t border-[var(--aura-chrome-light,#B8C5D0)]/15">
           <span className="text-[15px] font-semibold uppercase tracking-widest font-body">
             {t('posNew.total')}
           </span>
-          <span className="text-[22px] text-[var(--aura-primary, #f2c08d)] font-bold font-body">
+          <span className="text-[22px] text-[#f2c08d] font-bold font-body">
             {formatPosPrice(payableTotal)}
           </span>
         </div>
         <div className="grid grid-cols-2 gap-3 mt-3">
           <button
-           type="button"
+            type="button"
             aria-pressed={paymentMethod === 'payos'}
             className={cn(
-              'industrial-gradient py-3 px-3 rounded-lg border flex flex-col items-center gap-1 active:brightness-110 transition-all bronze-glow',
+              'industrial-gradient py-3 px-3 rounded-lg border flex flex-col items-center gap-1 active:brightness-110 transition-all bronze-glow cursor-pointer',
               paymentMethod === 'payos'
-                ? 'border-[var(--aura-primary,#f2c08d)] ring-1 ring-[var(--aura-primary,#f2c08d)]'
-                : 'border-[rgba(var(--aura-chrome-light),0.15)]'
+                ? 'border-[#f2c08d] ring-1 ring-[#f2c08d]'
+                : 'border-[var(--aura-chrome-light,#B8C5D0)]/20'
             )}
             onClick={() => onPayment?.('payos')}
             aria-label={t('posNew.payos')}
           >
-            <CreditCard className="w-6 h-6 text-[var(--aura-primary, #f2c08d)]" />
-            <span className="text-[11px] text-[var(--aura-text-primary, #eae1db)] uppercase tracking-tight font-body">
+            <CreditCard className="w-6 h-6 text-[#f2c08d]" />
+            <span className="text-[11px] text-[var(--aura-text-primary,#eae1db)] uppercase tracking-tight font-body">
               {t('posNew.payos')}
             </span>
           </button>
           <button
-           type="button"
+            type="button"
             aria-pressed={paymentMethod === 'cod'}
             className={cn(
-              'industrial-gradient py-3 px-3 rounded-lg border flex flex-col items-center gap-1 active:brightness-110 transition-all bronze-glow',
+              'industrial-gradient py-3 px-3 rounded-lg border flex flex-col items-center gap-1 active:brightness-110 transition-all bronze-glow cursor-pointer',
               paymentMethod === 'cod'
-                ? 'border-[var(--aura-primary,#f2c08d)] ring-1 ring-[var(--aura-primary,#f2c08d)]'
-                : 'border-[rgba(var(--aura-chrome-light),0.15)]'
+                ? 'border-[#f2c08d] ring-1 ring-[#f2c08d]'
+                : 'border-[var(--aura-chrome-light,#B8C5D0)]/20'
             )}
             onClick={() => onPayment?.('cod')}
             aria-label={t('posNew.cod')}
           >
-            <Wallet className="w-6 h-6 text-[var(--aura-text-primary, #eae1db)]" />
-            <span className="text-[11px] text-[var(--aura-text-primary, #eae1db)] uppercase tracking-tight font-body">
+            <Wallet className="w-6 h-6 text-[var(--aura-text-primary,#eae1db)]" />
+            <span className="text-[11px] text-[var(--aura-text-primary,#eae1db)] uppercase tracking-tight font-body">
               {t('posNew.cod')}
             </span>
           </button>
         </div>
         <button
-         type="button"
-          className="w-full bg-[var(--aura-primary, #f2c08d)] py-4 rounded-xl flex items-center justify-center gap-2 text-[14px] font-semibold text-[var(--aura-noir-void, #1a1008)] uppercase tracking-widest active:scale-[0.97] transition-transform mt-3 shadow-[0_0_20px_rgba(var(--aura-chrome-light),0.15)] font-body"
+          type="button"
+          className="w-full bg-[#f2c08d] hover:bg-[#f6cda3] disabled:opacity-40 py-4 rounded-xl flex items-center justify-center gap-2 text-[14px] font-semibold text-[#1a1008] uppercase tracking-widest active:scale-[0.97] transition-all mt-3 shadow-[0_0_20px_rgba(242,192,141,0.18)] font-body cursor-pointer disabled:cursor-not-allowed"
           onClick={() => onCompleteOrder?.(cart, total)}
           disabled={cart.length === 0}
           aria-label={t('posNew.completeOrder')}
