@@ -1,6 +1,6 @@
 import { cn } from '@/lib/cn';
 import { DateRangePicker } from '@/components/admin/DateRangePicker';
-import { previousPeriodDates } from './date-helpers';
+import { previousPeriodDates, todayStr } from './date-helpers';
 import { Calendar, Filter, BarChart3 } from 'lucide-react';
 import type { Period, GroupBy } from './sales-report-types';
 
@@ -104,23 +104,31 @@ export function SalesReportControls({
       )}
 
       <div className="mt-3 text-[11px] text-[var(--aura-text-muted)] font-mono">
-        {from === to
+        {from === to && from === todayStr()
           ? t('salesReports.periodSummary.today', { from })
           : t('salesReports.periodSummary.range', {
               from,
               to,
-              days: Math.round(
-                (new Date(to).getTime() - new Date(from).getTime()) / 86400000 + 1,
+              days: Math.max(
+                1,
+                Math.round(
+                  (new Date(to).getTime() - new Date(from).getTime()) / 86400000 + 1,
+                ),
               ),
             })}
-        {compareMode && (
-          <span className="ml-2 opacity-60">
-            {t('salesReports.periodSummary.compare', {
-              prevFrom: previousPeriodDates(from, to).from,
-              prevTo: previousPeriodDates(from, to).to,
-            })}
-          </span>
-        )}
+        {compareMode && (() => {
+          const prev = previousPeriodDates(from, to);
+          return (
+            <span className="ml-2 opacity-60">
+              {t('salesReports.periodSummary.compare', {
+                from: prev.from,
+                to: prev.to,
+                prevFrom: prev.from,
+                prevTo: prev.to,
+              })}
+            </span>
+          );
+        })()}
       </div>
     </div>
   );

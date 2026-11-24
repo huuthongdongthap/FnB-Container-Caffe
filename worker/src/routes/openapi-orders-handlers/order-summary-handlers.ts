@@ -64,7 +64,7 @@ export async function handleGetOrderSummary(c: Context<{ Bindings: Env }>) {
     db.prepare(`SELECT COUNT(*) as total FROM orders ${whereClause}`).bind(...params).first(),
     (async () => {
       const nonRevenueFilterWithPayment =
-        "AND LOWER(COALESCE(status, '')) NOT IN ('cancelled', 'failed', 'rejected', 'expired') AND LOWER(COALESCE(status, '')) != 'canceled' AND LOWER(COALESCE(status, '')) != 'refunded' AND LOWER(COALESCE(payment_status, '')) != 'refunded'";
+        "AND LOWER(COALESCE(status, '')) NOT IN ('cancelled', 'failed', 'rejected', 'expired') AND LOWER(COALESCE(status, '')) != 'canceled' AND LOWER(COALESCE(status, '')) != 'refunded' AND LOWER(TRIM(COALESCE(payment_status, ''))) IN ('paid', 'partially_refunded')";
       const nonRevenueFilter =
         "AND LOWER(COALESCE(status, '')) NOT IN ('cancelled', 'failed', 'rejected', 'expired') AND LOWER(COALESCE(status, '')) != 'canceled' AND LOWER(COALESCE(status, '')) != 'refunded'";
       try {

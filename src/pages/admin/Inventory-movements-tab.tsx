@@ -23,6 +23,7 @@ export function InventoryMovementsTab({
   const typeLabels: Record<string, { label: string; badge: string }> = {
     in: { label: 'Nhập kho', badge: 'bg-emerald-500/20 text-emerald-300' },
     out: { label: 'Xuất kho', badge: 'bg-sky-500/20 text-sky-300' },
+    consumption: { label: 'Tiêu hao bán hàng', badge: 'bg-violet-500/20 text-violet-300' },
     adjustment: { label: 'Kiểm kê', badge: 'bg-amber-500/20 text-amber-300' },
     adjust: { label: 'Kiểm kê', badge: 'bg-amber-500/20 text-amber-300' },
     waste: { label: 'Hao hụt', badge: 'bg-rose-500/20 text-rose-300' },
@@ -31,7 +32,7 @@ export function InventoryMovementsTab({
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-2 overflow-x-auto pb-1">
-        {['ALL', 'in', 'out', 'adjustment', 'waste'].map((t) => (
+        {['ALL', 'in', 'out', 'consumption', 'adjustment', 'waste'].map((t) => (
           <button
             key={t}
             type="button"

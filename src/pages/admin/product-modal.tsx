@@ -118,17 +118,6 @@ export function ProductModal({
           <label htmlFor="product-available" className="text-sm font-medium text-foreground">{t('adminMenu.available')}</label>
         </div>
 
-        <div className="flex items-center gap-2">
-          <input
-            id="product-is-variable"
-            type="checkbox"
-            checked={form.is_variable_price}
-            onChange={(e) => onChange('is_variable_price', e.target.checked)}
-            className="h-4 w-4 rounded border-border"
-          />
-          <label htmlFor="product-is-variable" className="text-sm font-medium text-foreground">{t('adminMenu.variablePrice')}</label>
-        </div>
-
         <div className="flex justify-end gap-2 pt-2">
           <Button variant="secondary" onClick={onClose}>{t('common.cancel')}</Button>
           <Button onClick={onSave} disabled={saving}>

@@ -25,7 +25,6 @@ export interface ProductFormData {
   category_id: string;
   image_url: string;
   is_available: boolean;
-  is_variable_price: boolean;
   sort_order: string;
 }
 
@@ -88,7 +87,6 @@ export const EMPTY_PRODUCT: ProductFormData = {
   category_id: '',
   image_url: '',
   is_available: true,
-  is_variable_price: false,
   sort_order: '0',
 };
 
@@ -114,7 +112,12 @@ export const EMPTY_MODIFIER_CHOICE: ModifierChoiceFormData = {
 
 export interface Promotion {
   code: string;
+  tenant_id?: string;
   percent: number;
+  discount_type?: string | null;
+  type?: string | null;
+  discount_value?: number | null;
+  value?: number | null;
   max_discount: number;
   min_order: number;
   usage_limit: number;

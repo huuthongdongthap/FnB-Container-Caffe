@@ -242,6 +242,9 @@ export function registerIngredientHandlers(app: OpenAPIHono<{ Bindings: Env }>) 
     let total = 0;
     let itemResults: any[] = [];
     let sqlTenantScoped = false;
+    let usedInventoryItemsFallback = false;
+    let invWhere = '';
+    const invParams: (string | number)[] = [];
     try {
       if (tenantId !== '*') {
         try {
@@ -275,8 +278,7 @@ export function registerIngredientHandlers(app: OpenAPIHono<{ Bindings: Env }>) 
         }
       }
     } catch {
-      let invWhere = '';
-      const invParams: (string | number)[] = [];
+      usedInventoryItemsFallback = true;
       if (query.search) {
         invWhere += 'WHERE (name LIKE ? OR id LIKE ?) ';
         invParams.push(`%${query.search}%`, `%${query.search}%`);
@@ -320,13 +322,15 @@ export function registerIngredientHandlers(app: OpenAPIHono<{ Bindings: Env }>) 
       }
     }
 
+    let tenantVerifiedRows: Array<Record<string, unknown>> | null = null;
     if (tenantId !== '*' && itemResults.length > 0) {
-      const filtered: any[] = [];
+      const filtered: Array<Record<string, unknown>> = [];
       for (const item of itemResults) {
         if (await checkIngredientTenant(db, String(item.id), item, tenantId)) {
           filtered.push(item);
         }
       }
+      tenantVerifiedRows = filtered;
       if (!sqlTenantScoped || filtered.length !== itemResults.length || (offset === 0 && filtered.length < limit)) {
         total = filtered.length;
         itemResults = filtered.slice(offset, offset + limit);
@@ -335,10 +339,106 @@ export function registerIngredientHandlers(app: OpenAPIHono<{ Bindings: Env }>) 
       }
     }
 
+    // Compute full-catalog KPI summary across all matching rows (not limited to current page)
+    let summary: { totalItems: number; lowStockCount: number; outOfStockCount: number; totalValue: number } | undefined;
+    if (!sqlTenantScoped && tenantId !== '*') {
+      if (tenantId !== 'default') {
+        summary = { totalItems: 0, lowStockCount: 0, outOfStockCount: 0, totalValue: 0 };
+      } else {
+        const rowsForSummary = tenantVerifiedRows ?? [];
+        let lowStockCount = 0;
+        let outOfStockCount = 0;
+        let totalValue = 0;
+        for (const row of rowsForSummary) {
+          const stock = Number(row.current_stock ?? 0);
+          const minStock = Number(row.min_stock ?? 0);
+          const unitCost = Number(row.cost_per_unit ?? 0);
+          if (stock <= 0) {
+            outOfStockCount += 1;
+          } else if (stock <= minStock) {
+            lowStockCount += 1;
+          }
+          totalValue += stock * unitCost;
+        }
+        summary = {
+          totalItems: rowsForSummary.length,
+          lowStockCount,
+          outOfStockCount,
+          totalValue,
+        };
+      }
+    } else {
+      const parseKpiRow = (
+        kpiRow: { total_items?: number; out_of_stock?: number; low_stock?: number; total_value?: number } | null
+      ) => {
+        if (kpiRow && Number.isFinite(Number(kpiRow.total_items))) {
+          return {
+            totalItems: Number(kpiRow.total_items ?? total),
+            lowStockCount: Number(kpiRow.low_stock ?? 0),
+            outOfStockCount: Number(kpiRow.out_of_stock ?? 0),
+            totalValue: Number(kpiRow.total_value ?? 0),
+          };
+        }
+        return undefined;
+      };
+
+      if (!usedInventoryItemsFallback) {
+        try {
+          const kpiSql = sqlTenantScoped
+            ? `SELECT COUNT(*) as total_items,
+                      SUM(CASE WHEN COALESCE(current_stock, 0) <= 0 THEN 1 ELSE 0 END) as out_of_stock,
+                      SUM(CASE WHEN COALESCE(current_stock, 0) > 0 AND COALESCE(current_stock, 0) <= COALESCE(min_stock, 0) THEN 1 ELSE 0 END) as low_stock,
+                      COALESCE(SUM(COALESCE(current_stock, 0) * COALESCE(cost_per_unit, 0)), 0) as total_value
+               FROM ingredients ${scopedWhere}`
+            : `SELECT COUNT(*) as total_items,
+                      SUM(CASE WHEN COALESCE(current_stock, 0) <= 0 THEN 1 ELSE 0 END) as out_of_stock,
+                      SUM(CASE WHEN COALESCE(current_stock, 0) > 0 AND COALESCE(current_stock, 0) <= COALESCE(min_stock, 0) THEN 1 ELSE 0 END) as low_stock,
+                      COALESCE(SUM(COALESCE(current_stock, 0) * COALESCE(cost_per_unit, 0)), 0) as total_value
+               FROM ingredients ${whereClause}`;
+          const kpiBind = sqlTenantScoped ? [...params, tenantId] : params;
+          const kpiRow = (await db.prepare(kpiSql).bind(...kpiBind).first()) as {
+            total_items?: number;
+            out_of_stock?: number;
+            low_stock?: number;
+            total_value?: number;
+          } | null;
+          summary = parseKpiRow(kpiRow);
+        } catch {
+          usedInventoryItemsFallback = true;
+        }
+      }
+
+      if (usedInventoryItemsFallback && !summary) {
+        const scopedInvWhere = `${invWhere ? invWhere : 'WHERE 1=1 '}AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?`;
+        const invKpiWhere = sqlTenantScoped ? scopedInvWhere : invWhere;
+        const invKpiBind = sqlTenantScoped ? [...invParams, tenantId] : invParams;
+        for (const costExpr of ['COALESCE(cost_per_unit, unit_cost, 0)', 'COALESCE(unit_cost, 0)']) {
+          try {
+            const kpiSql = `SELECT COUNT(*) as total_items,
+                      SUM(CASE WHEN COALESCE(current_stock, 0) <= 0 THEN 1 ELSE 0 END) as out_of_stock,
+                      SUM(CASE WHEN COALESCE(current_stock, 0) > 0 AND COALESCE(current_stock, 0) <= COALESCE(min_stock, 0) THEN 1 ELSE 0 END) as low_stock,
+                      COALESCE(SUM(COALESCE(current_stock, 0) * ${costExpr}), 0) as total_value
+               FROM inventory_items ${invKpiWhere}`;
+            const kpiRow = (await db.prepare(kpiSql).bind(...invKpiBind).first()) as {
+              total_items?: number;
+              out_of_stock?: number;
+              low_stock?: number;
+              total_value?: number;
+            } | null;
+            summary = parseKpiRow(kpiRow);
+            if (summary) break;
+          } catch {
+            // Try next inventory_items cost column variant
+          }
+        }
+      }
+    }
+
     return c.json({
       success: true,
       data: itemResults,
       meta: { page, limit, total, totalPages: Math.ceil(total / limit) },
+      ...(summary ? { summary } : {}),
     });
   });
 

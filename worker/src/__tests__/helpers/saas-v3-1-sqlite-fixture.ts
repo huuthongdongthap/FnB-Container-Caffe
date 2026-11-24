@@ -183,8 +183,8 @@ export function seedTenantOrders(sqlite: DatabaseSync, tenantId: string, count: 
   for (let i = 1; i <= count; i++) {
     sqlite
       .prepare(
-        `INSERT INTO orders (id, customer_name, customer_phone, items, total, status, payment_method, tenant_id, created_at)
-         VALUES (?, 'Khách', '0900000001', '[]', 35000, 'completed', 'cod', ?, ?)`
+        `INSERT INTO orders (id, customer_name, customer_phone, items, total, status, payment_status, payment_method, tenant_id, created_at)
+         VALUES (?, 'Khách', '0900000001', '[]', 35000, 'completed', 'paid', 'cod', ?, ?)`
       )
       .run(`${prefix}_${tenantId}_${i}`, tenantId, createdAtIso);
   }

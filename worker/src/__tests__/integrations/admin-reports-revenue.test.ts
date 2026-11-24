@@ -161,7 +161,7 @@ describe('Admin Revenue Analytics & Grouped Sales Handlers', () => {
     expect(res.status).toBe(200);
     const json = await res.json() as { success: boolean; data: { groups: Array<{ label: string; value: number; count: number }> } };
     expect(json.success).toBe(true);
-    expect(json.data.groups).toEqual([{ label: 'Cà phê', value: 90000, count: 2 }]);
+    expect(json.data.groups).toEqual([{ label: 'Cà phê', value: 90000, count: 2, orderCount: 1, itemsCount: 2 }]);
   });
 
   it('isolates non-default tenant from NULL/default orders and customers across overview, daily, summary, customer-metrics, and CSV export', async () => {

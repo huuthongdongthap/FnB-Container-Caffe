@@ -193,11 +193,10 @@ export function mapOrderToInvoice(
     if (isNaN(taxAmountNum)) {
       taxAmountNum = 0;
     }
-  } else {
-    taxAmountNum = Math.round(subtotal * 0.1);
   }
 
-  let totalAmount = order.total_amount !== undefined ? parseFloat(String(order.total_amount)) : subtotal + taxAmountNum;
+  const rawTotal = order.total_amount ?? (order as OrderRecord & { total?: number | string }).total;
+  let totalAmount = rawTotal !== undefined && rawTotal !== null ? parseFloat(String(rawTotal)) : subtotal + taxAmountNum;
   if (isNaN(totalAmount)) {
     totalAmount = subtotal + taxAmountNum;
   }
