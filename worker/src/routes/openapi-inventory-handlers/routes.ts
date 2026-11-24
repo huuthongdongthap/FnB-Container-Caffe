@@ -8,8 +8,11 @@ import { registerPurchaseOrderHandlers } from './purchase-order-handlers';
 
 export const openApiInventoryRouter = new OpenAPIHono<{ Bindings: Env }>();
 
-// Auth middleware for all inventory routes
-openApiInventoryRouter.use('/api/inventory/*', requireAuth(['owner', 'manager', 'supervisor', 'staff', 'admin']));
+// Auth middleware for all inventory routes (per-handler role checks enforce write/outbound permissions)
+openApiInventoryRouter.use(
+  '/api/inventory/*',
+  requireAuth(['owner', 'manager', 'supervisor', 'staff', 'admin', 'kitchen', 'barista', 'chef', 'cashier', 'waiter'])
+);
 
 // Register all inventory sub-handlers
 registerIngredientHandlers(openApiInventoryRouter);

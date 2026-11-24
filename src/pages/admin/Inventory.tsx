@@ -37,7 +37,7 @@ export default function InventoryPage() {
   const [selectedIngredient, setSelectedIngredient] = useState<IngredientItem | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
-  const ingredientsQ = useQuery<{ success: boolean; data: IngredientItem[] }>({
+  const ingredientsQ = useQuery<{ success: boolean; data: IngredientItem[]; summary?: InventoryStats }>({
     queryKey: ['admin-inventory-ingredients', tenantScope, sessionVersion],
     queryFn: () => apiFetch('/api/inventory/ingredients?limit=100'),
   });
@@ -68,6 +68,9 @@ export default function InventoryPage() {
   const forecastItems = useMemo(() => forecastQ.data?.data || [], [forecastQ.data]);
 
   const stats: InventoryStats = useMemo(() => {
+    if (ingredientsQ.data?.summary) {
+      return ingredientsQ.data.summary;
+    }
     let low = 0;
     let out = 0;
     let val = 0;
@@ -77,7 +80,7 @@ export default function InventoryPage() {
       val += (it.current_stock || 0) * (it.cost_per_unit || 0);
     }
     return { totalItems: ingredients.length, lowStockCount: low, outOfStockCount: out, totalValue: val };
-  }, [ingredients]);
+  }, [ingredients, ingredientsQ.data?.summary]);
 
   const handleSubmitMovement = async (payload: {
     ingredientId: string;
@@ -117,6 +120,12 @@ export default function InventoryPage() {
               Theo dõi định mức tồn kho, lịch sử biến động và dự báo tiêu hao tự động
             </p>
           </div>
+
+          {ingredientsQ.isError && (
+            <div role="alert" className="rounded-xl border border-rose-500/30 bg-rose-500/10 px-4 py-3 text-xs text-rose-300">
+              Không thể tải dữ liệu kho hàng. Vui lòng thử lại.
+            </div>
+          )}
 
           <InventoryStatsCards stats={stats} loading={ingredientsQ.isLoading} />
 

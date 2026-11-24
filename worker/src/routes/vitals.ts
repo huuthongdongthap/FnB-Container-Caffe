@@ -8,7 +8,7 @@
 import { Hono } from 'hono';
 import { z } from 'zod';
 import type { Env } from '../types/env';
-import { resolvePublicTenantId } from '../middleware/tenant';
+import { resolvePilotStore } from '../middleware/tenant';
 
 // ─── Rate Limiting ──────────────────────────────────────────────────────────
 
@@ -16,28 +16,37 @@ const VITALS_RATE_LIMIT_MAX = 60;
 const VITALS_RATE_LIMIT_WINDOW_MS = 60_000;
 const vitalsRateBuckets = new Map<string, number[]>();
 
+const VALID_TENANT_RE = /^[a-zA-Z0-9_-]{1,64}$/;
+
+function isValidTenantId(value: unknown): value is string {
+  return typeof value === 'string' && value.trim() !== '' && value.trim() !== '*' && VALID_TENANT_RE.test(value.trim());
+}
+
 function resolveVitalsTenantId(
-  c: { env: Env; req: { query: (k: string) => string | undefined; header: (k: string) => string | undefined } },
-  bodyTenantId?: string
+  c: {
+    env: Env;
+    get?: (key: string) => unknown;
+    req: { header: (k: string) => string | undefined };
+  },
 ): string {
-  const candidates = [
-    bodyTenantId,
-    c.req.query('tenant_id'),
+  // Never trust body.tenant_id or query ?tenant_id= / ?store_id= on unauthenticated public beacon endpoint
+  const user = typeof c.get === 'function' ? (c.get('user') as { tenant_id?: unknown; tenantId?: unknown } | undefined) : undefined;
+  const contextCandidates: unknown[] = [
+    user?.tenant_id,
+    user?.tenantId,
+    typeof c.get === 'function' ? c.get('tenantId') : undefined,
+    typeof c.get === 'function' ? c.get('hostTenantId') : undefined,
     c.req.header('x-tenant-id'),
     c.req.header('X-Tenant-ID'),
   ];
-  for (const cand of candidates) {
-    if (typeof cand === 'string' && cand.trim() && cand.trim() !== '*') {
+  for (const cand of contextCandidates) {
+    if (isValidTenantId(cand)) {
       return cand.trim();
     }
   }
-  try {
-    const resolved = resolvePublicTenantId(c as unknown as Parameters<typeof resolvePublicTenantId>[0]);
-    if (resolved && resolved.trim() && resolved.trim() !== '*') {
-      return resolved.trim();
-    }
-  } catch {
-    // fallback to default
+  const pilot = resolvePilotStore(c.env);
+  if (isValidTenantId(pilot)) {
+    return pilot.trim();
   }
   return 'default';
 }
@@ -121,8 +130,8 @@ vitalsRouter.post('/', async(c) => {
     return c.json({ error: parsed.error.issues[0].message }, 400);
   }
 
-  const { name, value, rating, tenant_id: bodyTenantId } = parsed.data;
-  const tenantId = resolveVitalsTenantId(c, bodyTenantId);
+  const { name, value, rating } = parsed.data;
+  const tenantId = preBodyTenant;
 
   const writePromise = c.env?.AURA_DB
     ? c.env.AURA_DB.prepare(

@@ -19,6 +19,13 @@ export function formatDateTime(iso: string): string {
   }
 }
 
+export function escapeCsvCell(value: string | null | undefined): string {
+  const str = String(value ?? '');
+  const prefixed = (/^[\t\r\n ]*[=+\-@]/.test(str) || /^[=+\-@|]/.test(str.trimStart())) ? `'${str}` : str;
+  const safe = prefixed.replace(/([\r\n]+)(\s*[=+\-@|])/g, "$1'$2");
+  return `"${safe.replace(/"/g, '""')}"`;
+}
+
 export function buildCsv(entries: AuditEntry[], t: (key: string) => string): string {
   const header = [
     t('audit.csv.time'),
@@ -27,7 +34,7 @@ export function buildCsv(entries: AuditEntry[], t: (key: string) => string): str
     t('audit.csv.resourceType'),
     t('audit.csv.resourceId'),
     t('audit.csv.ip'),
-  ];
+  ].map((h) => escapeCsvCell(h));
   const rows = entries.map((e) =>
     [
       e.createdAt,
@@ -37,7 +44,7 @@ export function buildCsv(entries: AuditEntry[], t: (key: string) => string): str
       e.resourceId,
       e.ipAddress ?? '',
     ]
-      .map((v) => `"${v.replace(/"/g, '""')}"`)
+      .map((v) => escapeCsvCell(v))
       .join(','),
   );
   return [header.join(','), ...rows].join('\n');

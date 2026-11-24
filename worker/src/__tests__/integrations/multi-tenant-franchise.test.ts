@@ -3427,7 +3427,7 @@ describe('Multi-Tenant & Franchise Preparation Integration', () => {
       expect(waiterStaffRes.status).toBe(403);
 
       const supErpSyncRes = await app.fetch(await authRequest('POST', '/api/admin/erpnext-sync/customers', 'supervisor', 'default'), env);
-      expect(supErpSyncRes.status).toBe(200);
+      expect(supErpSyncRes.status).toBe(501);
       const waiterErpSyncRes = await app.fetch(await authRequest('POST', '/api/admin/erpnext-sync/customers', 'waiter', 'default'), env);
       expect(waiterErpSyncRes.status).toBe(403);
 

@@ -339,7 +339,7 @@ describe('Phase 49 Slice AV2 — Mobile POS, Check-in, Admin Sales/Metrics/Audit
       const okEnv = { ...createMockEnv(), AURA_DB: okDb as unknown as D1Database };
       const okRes = await app.fetch(new Request('https://test.aura/api/admin/metrics?range=24h'), okEnv);
       expect(okRes.status).toBe(200);
-      const latencyQuery = okQueries.find((q) => q.sql.includes('ORDER BY duration'));
+      const latencyQuery = okQueries.find((q) => q.sql.includes('ORDER BY created_at DESC'));
       expect(latencyQuery?.sql).toContain('LIMIT 5000');
     });
   });

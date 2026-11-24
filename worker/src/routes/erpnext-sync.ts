@@ -9,9 +9,12 @@
 
 import { createErpnextClient, createErpnextClientWithKv } from '../clients/erpnext-client';
 import { requireAuth } from '../middleware/auth';
+import { createLogger } from '../middleware/logger';
 import { getTenantId, matchesTenantRow } from '../lib/db';
 import { isHQSuperAdmin } from '../middleware/tenant';
 import type { Env } from '../types/env';
+
+const log = createLogger({ route: 'erpnext-sync' });
 
 export const FORBIDDEN_TENANT_SENTINEL = '__forbidden_tenant_override__';
 
@@ -445,7 +448,27 @@ export function erpnextSyncRoutes(app: import('hono').Hono<{ Bindings: Env }>): 
             }
           }
           const filteredLogs = (logRows?.results || []).filter((r) => matchesSyncLogTenant(r, tenantId)).slice(0, 20);
-          logs = filteredLogs.map(({ request_body: _req, response_body: _res, tenant_id: _tid, ...rest }) => rest);
+          logs = filteredLogs.map((r) => {
+            const endpoint = String(r.endpoint || '');
+            const entitySegment = endpoint.split('/').filter(Boolean).pop() || 'sync';
+            const entity = entitySegment === 'sync-all'
+              ? 'All'
+              : entitySegment.charAt(0).toUpperCase() + entitySegment.slice(1);
+            const hasError = Boolean(r.error);
+            const createdAt = String(r.created_at || '');
+            return {
+              id: String(r.id ?? ''),
+              entity,
+              action: entitySegment === 'sync-all' ? 'sync-all' : 'sync',
+              status: hasError ? 'error' : 'success',
+              message: hasError ? String(r.error) : `${String(r.method || 'POST')} ${endpoint}`,
+              timestamp: createdAt,
+              method: r.method,
+              endpoint: r.endpoint,
+              error: r.error ?? null,
+              created_at: createdAt,
+            };
+          });
 
           if (tenantId === '*') {
             const latestLog = await db
@@ -485,7 +508,27 @@ export function erpnextSyncRoutes(app: import('hono').Hono<{ Bindings: Env }>): 
               lastSync = (filteredLogs[0].created_at as string) || null;
               if (filteredLogs[0].error) errorMessage = String(filteredLogs[0].error);
             }
-            logs = filteredLogs.map(({ request_body: _req, response_body: _res, tenant_id: _tid, ...rest }) => rest);
+            logs = filteredLogs.map((r) => {
+              const endpoint = String(r.endpoint || '');
+              const entitySegment = endpoint.split('/').filter(Boolean).pop() || 'sync';
+              const entity = entitySegment === 'sync-all'
+                ? 'All'
+                : entitySegment.charAt(0).toUpperCase() + entitySegment.slice(1);
+              const hasError = Boolean(r.error);
+              const createdAt = String(r.created_at || '');
+              return {
+                id: String(r.id ?? ''),
+                entity,
+                action: entitySegment === 'sync-all' ? 'sync-all' : 'sync',
+                status: hasError ? 'error' : 'success',
+                message: hasError ? String(r.error) : `${String(r.method || 'POST')} ${endpoint}`,
+                timestamp: createdAt,
+                method: r.method,
+                endpoint: r.endpoint,
+                error: r.error ?? null,
+                created_at: createdAt,
+              };
+            });
           } catch {
             // Table may not exist in minimal test environment
           }
@@ -545,23 +588,66 @@ export function erpnextSyncRoutes(app: import('hono').Hono<{ Bindings: Env }>): 
     }
     const now = new Date().toISOString();
     const effectiveTenant = tenantId === '*' ? 'default' : tenantId;
+    const isNonDefaultTenant = effectiveTenant !== 'default';
+    const envForKv = isNonDefaultTenant
+      ? { ...c.env, ERPNEXT_URL: undefined, ERPNEXT_API_KEY: undefined, ERPNEXT_API_SECRET: undefined }
+      : c.env;
+    const client = await createErpnextClientWithKv(envForKv, effectiveTenant);
+    if (!client) {
+      return c.json(
+        {
+          success: false,
+          status: 'not_configured',
+          entity: 'all',
+          error: 'ERPNext integration is not configured for this tenant',
+        },
+        501,
+      );
+    }
+    const entities = ['orders', 'products', 'customers', 'inventory', 'invoices'] as const;
+    const doctypeMap: Record<(typeof entities)[number], string> = {
+      orders: 'Sales Order',
+      products: 'Item',
+      customers: 'Customer',
+      inventory: 'Bin',
+      invoices: 'Sales Invoice',
+    };
+    let synced = 0;
+    let failed = 0;
+    const errors: string[] = [];
+    for (const ent of entities) {
+      try {
+        await client.list(doctypeMap[ent], { fields: ['name'], limit: 1 });
+        synced++;
+      } catch (err: unknown) {
+        failed++;
+        const rawErr = err instanceof Error ? err.message : String(err);
+        log.error('[erpnext-sync] sync-all entity failed', { entity: ent, tenantId: effectiveTenant, error: rawErr });
+        errors.push(`${ent}: ${rawErr}`);
+      }
+    }
+    const errorSummary = errors.length > 0 ? errors.join('; ') : null;
     await writeSyncLog(
       c.env.AURA_DB,
       'POST',
       '/api/admin/erpnext-sync/sync-all',
-      JSON.stringify({ entities: ['orders', 'products', 'customers', 'inventory', 'invoices'], tenant_id: effectiveTenant }),
-      JSON.stringify({ synced: true, timestamp: now }),
-      null,
+      JSON.stringify({ entities, tenant_id: effectiveTenant }),
+      JSON.stringify({ synced, failed, timestamp: now }),
+      errorSummary,
       effectiveTenant
     );
-    return c.json({
-      success: true,
-      entity: 'all',
-      synced: 1,
-      failed: 0,
-      count: 1,
-      syncedAt: now,
-    });
+    return c.json(
+      {
+        success: failed === 0,
+        entity: 'all',
+        synced,
+        failed,
+        count: synced,
+        syncedAt: now,
+        ...(errorSummary ? { error: 'ERPNext sync failed for one or more entities' } : {}),
+      },
+      failed === entities.length ? 502 : 200,
+    );
   });
 
   // POST /api/admin/erpnext-sync/:entity — Trigger single entity sync
@@ -571,28 +657,67 @@ export function erpnextSyncRoutes(app: import('hono').Hono<{ Bindings: Env }>): 
       return c.json({ success: false, error: 'Cross-tenant access denied' }, 403);
     }
     const entity = String(c.req.param('entity') || '').toLowerCase();
-    const allowedEntities = ['orders', 'products', 'customers', 'inventory', 'invoices'];
-    if (!allowedEntities.includes(entity)) {
+    const doctypeMap: Record<string, string> = {
+      orders: 'Sales Order',
+      products: 'Item',
+      customers: 'Customer',
+      inventory: 'Bin',
+      invoices: 'Sales Invoice',
+    };
+    if (!doctypeMap[entity]) {
       return c.json({ success: false, error: `Unsupported sync entity: ${entity}` }, 400);
     }
     const now = new Date().toISOString();
     const effectiveTenant = tenantId === '*' ? 'default' : tenantId;
-    await writeSyncLog(
-      c.env.AURA_DB,
-      'POST',
-      `/api/admin/erpnext-sync/${entity}`,
-      JSON.stringify({ entity, tenant_id: effectiveTenant }),
-      JSON.stringify({ synced: true, timestamp: now }),
-      null,
-      effectiveTenant
-    );
-    return c.json({
-      success: true,
-      entity,
-      synced: 1,
-      failed: 0,
-      count: 1,
-      syncedAt: now,
-    });
+    const isNonDefaultTenant = effectiveTenant !== 'default';
+    const envForKv = isNonDefaultTenant
+      ? { ...c.env, ERPNEXT_URL: undefined, ERPNEXT_API_KEY: undefined, ERPNEXT_API_SECRET: undefined }
+      : c.env;
+    const client = await createErpnextClientWithKv(envForKv, effectiveTenant);
+    if (!client) {
+      return c.json(
+        {
+          success: false,
+          status: 'not_configured',
+          entity,
+          error: 'ERPNext integration is not configured for this tenant',
+        },
+        501,
+      );
+    }
+    try {
+      const res = await client.list(doctypeMap[entity], { fields: ['name'], limit: 100 });
+      const count = Array.isArray(res?.data) ? res.data.length : 0;
+      await writeSyncLog(
+        c.env.AURA_DB,
+        'POST',
+        `/api/admin/erpnext-sync/${entity}`,
+        JSON.stringify({ entity, tenant_id: effectiveTenant }),
+        JSON.stringify({ synced: count, timestamp: now }),
+        null,
+        effectiveTenant
+      );
+      return c.json({
+        success: true,
+        entity,
+        synced: count,
+        failed: 0,
+        count,
+        syncedAt: now,
+      });
+    } catch (err: unknown) {
+      const errMsg = err instanceof Error ? err.message : String(err);
+      log.error('[erpnext-sync] entity sync failed', { entity, tenantId: effectiveTenant, error: errMsg });
+      await writeSyncLog(
+        c.env.AURA_DB,
+        'POST',
+        `/api/admin/erpnext-sync/${entity}`,
+        JSON.stringify({ entity, tenant_id: effectiveTenant }),
+        null,
+        errMsg,
+        effectiveTenant
+      );
+      return c.json({ success: false, entity, synced: 0, failed: 1, error: 'ERPNext sync failed' }, 502);
+    }
   });
 }

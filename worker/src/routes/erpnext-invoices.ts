@@ -333,7 +333,7 @@ export async function handleErpnextInvoicesRequest(
         try {
           const res = await db.prepare(`
             SELECT m.id, m.local_id as order_id, m.erpnext_id, m.erpnext_model, m.sync_status,
-                   m.attempts, m.created_at, m.last_synced_at, o.customer_name, o.total_amount,
+                   m.attempts, m.created_at, m.last_synced_at, o.customer_name, o.total AS total_amount,
                    o.customer_email, o.customer_phone,
                    COALESCE(NULLIF(TRIM(m.tenant_id), ''), o.tenant_id) AS tenant_id
             FROM erpnext_mappings m
@@ -347,7 +347,7 @@ export async function handleErpnextInvoicesRequest(
           try {
             const res = await db.prepare(`
               SELECT m.id, m.local_id as order_id, m.erpnext_id, m.erpnext_model, m.sync_status,
-                     m.attempts, m.created_at, m.last_synced_at, o.customer_name, o.total_amount,
+                     m.attempts, m.created_at, m.last_synced_at, o.customer_name, o.total AS total_amount,
                      o.customer_email, o.customer_phone, o.tenant_id
               FROM erpnext_mappings m
               LEFT JOIN orders o ON o.id = m.local_id
@@ -359,7 +359,7 @@ export async function handleErpnextInvoicesRequest(
           } catch {
             const res = await db.prepare(`
               SELECT m.id, m.local_id as order_id, m.erpnext_id, m.erpnext_model, m.sync_status,
-                     m.attempts, m.created_at, m.last_synced_at, o.customer_name, o.total_amount,
+                     m.attempts, m.created_at, m.last_synced_at, o.customer_name, o.total AS total_amount,
                      o.customer_email, o.customer_phone, o.tenant_id
               FROM erpnext_mappings m
               LEFT JOIN orders o ON o.id = m.local_id
@@ -485,15 +485,37 @@ export async function handleErpnextInvoicesRequest(
       return json({ success: true, message: 'VAT status updated' });
     }
 
-    // GET /api/erpnext-invoices/:id/pdf — generate PDF
+    // GET /api/erpnext-invoices/:id/pdf — proxy authenticated PDF from ERPNext
     if (method === 'GET' && path.endsWith('/pdf')) {
-      const invoiceId = path.replace('/pdf', '').slice(1);
+      let invoiceId: string;
+      try {
+        invoiceId = decodeURIComponent(path.slice(1, -'/pdf'.length));
+      } catch {
+        return json({ success: false, error: 'Invalid invoice ID' }, 400);
+      }
+      if (!invoiceId || invoiceId.includes('..') || /[\x00-\x1f]/.test(invoiceId)) {
+        return json({ success: false, error: 'Invalid invoice ID' }, 400);
+      }
       if (!(await verifyInvoiceTenantOwnership(env.AURA_DB, invoiceId, tenantId))) {
         return json({ success: false, error: 'Invoice not found' }, 404);
       }
       if (!accountingClient) return json({ success: false, error: 'ERPNext accounting not configured' }, 503);
-      const pdfInfo = await accountingClient.generateInvoicePDF(invoiceId);
-      return json({ success: true, data: pdfInfo });
+      const upstream = await accountingClient.fetchInvoicePDF(invoiceId);
+      const upstreamContentType = (upstream.headers.get('content-type') || '').toLowerCase();
+      if (!upstream.ok || !upstreamContentType.includes('application/pdf')) {
+        return json({ success: false, error: 'ERPNext PDF fetch failed' }, 502);
+      }
+      const pdfBytes = await upstream.arrayBuffer();
+      const safeFileName = invoiceId.replace(/[^a-zA-Z0-9._-]/g, '_');
+      return new Response(pdfBytes, {
+        status: 200,
+        headers: {
+          'Content-Type': 'application/pdf',
+          'X-Content-Type-Options': 'nosniff',
+          'Content-Disposition': `inline; filename="${safeFileName}.pdf"`,
+          'Cache-Control': 'private, max-age=60',
+        },
+      });
     }
 
     if (!accountingClient) return json({ success: false, error: 'ERPNext accounting not configured' }, 503);

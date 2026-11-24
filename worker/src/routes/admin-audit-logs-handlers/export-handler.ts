@@ -11,6 +11,15 @@ const log = createLogger({ route: 'admin-audit-logs:export' });
 
 const AUDIT_EXPORT_ALLOWED_ROLES = ['owner', 'manager', 'admin'];
 
+const EXPORT_ACTION_VERB_MAP: Record<string, string[]> = {
+  CREATE: ['%.post', '%create%'],
+  UPDATE: ['%.put', '%.patch', '%update%'],
+  DELETE: ['%.delete', '%delete%'],
+  LOGIN: ['%login%', '%auth%'],
+  LOGOUT: ['%logout%'],
+  EXPORT: ['%export%'],
+};
+
 export function registerExportHandler(router: Hono<{ Bindings: Env }>): void {
   // GET /api/admin/audit-logs/export — export audit logs as CSV with filters
   router.get('/export', async (c) => {
@@ -19,8 +28,14 @@ export function registerExportHandler(router: Hono<{ Bindings: Env }>): void {
       return c.json({ success: false, error: 'Authentication required' }, 401);
     }
     const roleLower = String(user.role).toLowerCase();
-    const isAuthBearerSupervisor = roleLower === 'supervisor' && Boolean(c.req.header('Authorization') || c.req.header('authorization'));
-    if (!AUDIT_EXPORT_ALLOWED_ROLES.includes(roleLower) && !isAuthBearerSupervisor) {
+    const hasAuthCredential = Boolean(
+      c.req.header('Authorization') ||
+      c.req.header('authorization') ||
+      c.req.header('Cookie') ||
+      c.req.header('cookie')
+    );
+    const isAuthenticatedSupervisor = roleLower === 'supervisor' && hasAuthCredential;
+    if (!AUDIT_EXPORT_ALLOWED_ROLES.includes(roleLower) && !isAuthenticatedSupervisor) {
       return c.json({ success: false, error: 'Insufficient permissions' }, 403);
     }
     const rawTenantId = getTenantId(c as any);
@@ -82,7 +97,7 @@ export function registerExportHandler(router: Hono<{ Bindings: Env }>): void {
         : undefined;
 
       // Fetch all logs (large pageSize) for CSV export
-      const result = await auditLogger.query({
+      let result = await auditLogger.query({
         actorId: actorId || undefined,
         action: action || undefined,
         resourceType: resourceType || undefined,
@@ -93,6 +108,66 @@ export function registerExportHandler(router: Hono<{ Bindings: Env }>): void {
         maxPageSize: 10000,
         tenantId,
       });
+
+      // Fallback for case-insensitive / CRUD verb action filters (e.g. CREATE -> %.post)
+      if (action && result.rows.length === 0 && c.env.AURA_DB) {
+        try {
+          const conditions: string[] = [];
+          const params: unknown[] = [];
+          if (actorId) {
+            conditions.push('actor_id = ?');
+            params.push(actorId);
+          }
+          if (resourceType) {
+            conditions.push('resource_type = ?');
+            params.push(resourceType);
+          }
+          if (dateFrom) {
+            conditions.push('created_at >= ?');
+            params.push(dateFrom);
+          }
+          if (normalizedDateTo) {
+            conditions.push('created_at <= ?');
+            params.push(normalizedDateTo);
+          }
+
+          const upper = action.trim().toUpperCase();
+          const patterns = EXPORT_ACTION_VERB_MAP[upper] ?? [`%${action.trim().toLowerCase()}%`];
+          const actionOrClauses = ['LOWER(action) = LOWER(?)', ...patterns.map(() => 'LOWER(action) LIKE ?')];
+          conditions.push(`(${actionOrClauses.join(' OR ')})`);
+          params.push(action.trim(), ...patterns);
+
+          const baseConditions = [...conditions];
+          const baseParams = [...params];
+          if (tenantId !== '*') {
+            conditions.push("COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?");
+            params.push(tenantId);
+          }
+
+          let fallbackRes: { results?: Record<string, unknown>[] };
+          try {
+            const whereSql = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+            fallbackRes = await c.env.AURA_DB.prepare(
+              `SELECT * FROM audit_logs ${whereSql} ORDER BY created_at DESC LIMIT 10000`
+            ).bind(...params).all<Record<string, unknown>>();
+          } catch {
+            // Legacy schema fallback when audit_logs omits tenant_id column
+            const legacyWhereSql = baseConditions.length > 0 ? `WHERE ${baseConditions.join(' AND ')}` : '';
+            fallbackRes = await c.env.AURA_DB.prepare(
+              `SELECT * FROM audit_logs ${legacyWhereSql} ORDER BY created_at DESC LIMIT 10000`
+            ).bind(...baseParams).all<Record<string, unknown>>();
+          }
+          if (Array.isArray(fallbackRes.results) && fallbackRes.results.length > 0) {
+            result = {
+              ...result,
+              rows: fallbackRes.results as unknown as typeof result.rows,
+              total: fallbackRes.results.length,
+            };
+          }
+        } catch {
+          // Keep original empty result if fallback query fails
+        }
+      }
 
       const exportRows = tenantId === '*'
         ? result.rows

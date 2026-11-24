@@ -12,13 +12,6 @@ import type { SyncLogEntry } from './erpnext-sync-types';
 import { SyncEntityCard } from './sync-entity-card';
 import { SyncLogList } from './sync-log-list';
 
-const MOCK_LOGS: SyncLogEntry[] = [
-  { id: 'L001', entity: 'Orders', action: 'sync', status: 'success', message: 'mockSyncedOrders', timestamp: new Date(Date.now() - 300000).toISOString() },
-  { id: 'L002', entity: 'Products', action: 'sync', status: 'success', message: 'mockSyncedProducts', timestamp: new Date(Date.now() - 600000).toISOString() },
-  { id: 'L003', entity: 'Customers', action: 'sync', status: 'error', message: 'mockConnectionFailed', timestamp: new Date(Date.now() - 900000).toISOString() },
-  { id: 'L004', entity: 'Inventory', action: 'sync', status: 'success', message: 'mockInventoryUpdated', timestamp: new Date(Date.now() - 3600000).toISOString() },
-];
-
 export default function AdminERPNExtSyncPage() {
   const { t } = useTranslation('erpnextSync');
   const queryClient = useQueryClient();
@@ -28,18 +21,18 @@ export default function AdminERPNExtSyncPage() {
     enableCustomers: false,
   });
   const [syncLogs, setSyncLogs] = useState<SyncLogEntry[]>([]);
+  const [statusError, setStatusError] = useState<string | null>(null);
   const [syncingEntity, setSyncingEntity] = useState<string | null>(null);
   const [syncingAll, setSyncingAll] = useState(false);
 
   useEffect(() => {
-    const rawStatus = syncStatus as (typeof syncStatus & { logs?: SyncLogEntry[]; data?: { logs?: SyncLogEntry[] } }) | undefined;
+    const rawStatus = syncStatus as (typeof syncStatus & { logs?: SyncLogEntry[]; data?: { logs?: SyncLogEntry[] }; errorMessage?: string }) | undefined;
     const remoteLogs = rawStatus?.logs ?? rawStatus?.data?.logs;
     if (Array.isArray(remoteLogs)) {
       setSyncLogs(remoteLogs);
+      setStatusError(rawStatus?.errorMessage ?? null);
     } else if (!isLoadingSyncStatus && !syncStatus) {
-      setSyncLogs((prev) =>
-        prev.length > 0 ? prev : MOCK_LOGS.map((log) => ({ ...log, message: t(log.message) }))
-      );
+      setStatusError(t('syncAllConnectionError'));
     }
   }, [syncStatus, isLoadingSyncStatus, t]);
 
@@ -53,8 +46,12 @@ export default function AdminERPNExtSyncPage() {
   const triggerSync = async (entity: string) => {
     setSyncingEntity(entity);
     try {
-      const res = await apiFetch<{ count?: number; synced?: number; message?: string }>(`/api/admin/erpnext-sync/${entity.toLowerCase()}`, { method: 'POST' });
+      const res = await apiFetch<{ success?: boolean; count?: number; synced?: number; message?: string; error?: string }>(`/api/admin/erpnext-sync/${entity.toLowerCase()}`, { method: 'POST' });
       void queryClient.invalidateQueries({ queryKey: ['admin-sync-status'] });
+      if (res?.success === false) {
+        appendLog({ entity, action: 'sync', status: 'error', message: res.error || t('syncConnectionError', { entity }) });
+        return;
+      }
       const count = res?.count ?? res?.synced;
       appendLog({
         entity,
@@ -62,8 +59,9 @@ export default function AdminERPNExtSyncPage() {
         status: 'success',
         message: res?.message || t('syncSuccess', { entity, ...(count !== undefined ? { count } : {}) }),
       });
-    } catch {
-      appendLog({ entity, action: 'sync', status: 'error', message: t('syncConnectionError', { entity }) });
+    } catch (err: unknown) {
+      const errMsg = err instanceof Error && err.message ? err.message : t('syncConnectionError', { entity });
+      appendLog({ entity, action: 'sync', status: 'error', message: errMsg });
     } finally {
       setSyncingEntity(null);
     }
@@ -72,8 +70,12 @@ export default function AdminERPNExtSyncPage() {
   const handleSyncAll = async () => {
     setSyncingAll(true);
     try {
-      const res = await apiFetch<{ count?: number; synced?: number; message?: string }>('/api/admin/erpnext-sync/sync-all', { method: 'POST' });
+      const res = await apiFetch<{ success?: boolean; count?: number; synced?: number; message?: string; error?: string }>('/api/admin/erpnext-sync/sync-all', { method: 'POST' });
       void queryClient.invalidateQueries({ queryKey: ['admin-sync-status'] });
+      if (res?.success === false) {
+        appendLog({ entity: 'All', action: 'sync-all', status: 'error', message: res.error || t('syncAllConnectionError') });
+        return;
+      }
       const count = res?.count ?? res?.synced;
       appendLog({
         entity: 'All',
@@ -81,8 +83,9 @@ export default function AdminERPNExtSyncPage() {
         status: 'success',
         message: res?.message || t('syncAllSuccess', count !== undefined ? { count } : undefined),
       });
-    } catch {
-      appendLog({ entity: 'All', action: 'sync-all', status: 'error', message: t('syncAllConnectionError') });
+    } catch (err: unknown) {
+      const errMsg = err instanceof Error && err.message ? err.message : t('syncAllConnectionError');
+      appendLog({ entity: 'All', action: 'sync-all', status: 'error', message: errMsg });
     } finally {
       setSyncingAll(false);
     }
@@ -109,6 +112,11 @@ export default function AdminERPNExtSyncPage() {
             </CardHeader>
             <CardBody>
               <SyncStatus status={syncStatus} isLoading={isLoadingSyncStatus} />
+              {statusError && (
+                <p role="alert" className="mt-2 text-xs text-red-400">
+                  {statusError}
+                </p>
+              )}
             </CardBody>
           </Card>
 
