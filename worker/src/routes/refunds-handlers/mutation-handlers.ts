@@ -81,6 +81,7 @@ export async function handleRefund(c: Context<{ Bindings: Env }>, openApi = fals
       refund_amount?: number | null;
       tenant_id: string | null;
       customer_id: string | null;
+      order_status?: string | null;
       order_token?: string | null;
       guest_token_hash?: string | null;
       orderTokenVerified?: boolean;
@@ -89,7 +90,7 @@ export async function handleRefund(c: Context<{ Bindings: Env }>, openApi = fals
     try {
       payment = await db
         .prepare(
-          `SELECT p.*, o.tenant_id, o.customer_id, o.guest_token_hash
+          `SELECT p.*, o.tenant_id, o.customer_id, o.guest_token_hash, o.status AS order_status
            FROM payments p JOIN orders o ON o.id = p.order_id
            WHERE ${lookupColumn} = ? AND (? = '*' OR COALESCE(NULLIF(TRIM(o.tenant_id), ''), 'default') = ?)${orderByClause}`
         )
@@ -99,7 +100,7 @@ export async function handleRefund(c: Context<{ Bindings: Env }>, openApi = fals
       try {
         payment = await db
           .prepare(
-            `SELECT p.*, o.tenant_id, o.customer_id, o.order_token
+            `SELECT p.*, o.tenant_id, o.customer_id, o.order_token, o.status AS order_status
              FROM payments p JOIN orders o ON o.id = p.order_id
              WHERE ${lookupColumn} = ? AND (? = '*' OR COALESCE(NULLIF(TRIM(o.tenant_id), ''), 'default') = ?)${orderByClause}`
           )
@@ -108,7 +109,7 @@ export async function handleRefund(c: Context<{ Bindings: Env }>, openApi = fals
       } catch {
         payment = await db
           .prepare(
-            `SELECT p.*, o.tenant_id, o.customer_id
+            `SELECT p.*, o.tenant_id, o.customer_id, o.status AS order_status
              FROM payments p JOIN orders o ON o.id = p.order_id
              WHERE ${lookupColumn} = ? AND (? = '*' OR COALESCE(NULLIF(TRIM(o.tenant_id), ''), 'default') = ?)${orderByClause}`
           )
@@ -217,7 +218,7 @@ export async function handleRefund(c: Context<{ Bindings: Env }>, openApi = fals
               status = CASE WHEN LOWER(COALESCE(status, '')) NOT IN ('completed', 'cancelled') THEN 'cancelled' ELSE status END,
               updated_at = ?
           WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?
-            AND LOWER(COALESCE(payment_status, '')) IN ('paid', 'completed')`)
+            AND LOWER(COALESCE(payment_status, '')) IN ('paid', 'completed', 'partially_refunded')`)
           .bind(now, payment.order_id, effectivePaymentTenant),
           db.prepare(`INSERT INTO refund_mutation_guards (settlement_ok)
             VALUES (CASE WHEN changes() = 1 THEN 1 ELSE 0 END)`)] : []),
@@ -257,6 +258,8 @@ export async function handleRefund(c: Context<{ Bindings: Env }>, openApi = fals
             .bind(payment.order_id, effectivePaymentTenant)
             .first<PostRefundOrderRow>(),
         );
+      const preRefundOrderStatus =
+        typeof payment.order_status === 'string' ? payment.order_status.trim().toLowerCase() : '';
       const effectiveOrderStatus = String(postRefundOrder?.status || 'pending');
       const effectiveOrderPayStatus = String(postRefundOrder?.payment_status || 'paid');
 
@@ -268,6 +271,23 @@ export async function handleRefund(c: Context<{ Bindings: Env }>, openApi = fals
           .bind(now, payment.order_id, effectivePaymentTenant)
           .run()
           .catch(() => {});
+        // Idempotent inventory/BOM reversal mirroring order cancellation (pre-prep releases, post-prep spoils)
+        try {
+          const { restoreInventoryForOrder } = await import('@aura/domain-inventory');
+          const restoreEnv = { AURA_DB: db as unknown, ...(c.env || {}) } as Parameters<typeof restoreInventoryForOrder>[0];
+          if (['preparing', 'ready', 'served', 'completed'].includes(preRefundOrderStatus)) {
+            await restoreInventoryForOrder(restoreEnv, payment.order_id, effectivePaymentTenant, {
+              preCancelStatus: preRefundOrderStatus,
+            });
+          } else {
+            await restoreInventoryForOrder(restoreEnv, payment.order_id, effectivePaymentTenant);
+          }
+        } catch (invErr) {
+          log.error('Inventory restore error on full refund (non-blocking):', {
+            message: (invErr as Error).message,
+            orderId: payment.order_id,
+          });
+        }
         if (postRefundOrder?.table_id) {
           const { releaseTableIfNoActiveOrders } = await import('../../../../packages/domain/order/policies/table-occupancy-release');
           await releaseTableIfNoActiveOrders(db, String(postRefundOrder.table_id), effectivePaymentTenant).catch(() => {});

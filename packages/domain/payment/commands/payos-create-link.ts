@@ -12,6 +12,77 @@ import type { Env } from 'worker/src/types/env';
 const log = createLogger({ route: 'payment' });
 export const paymentRouter = new Hono<{ Bindings: Env }>();
 
+const PAYOS_REGEN_COOLDOWN_MS = 30_000;
+const PAYOS_REGEN_MAX_ATTEMPTS = 3;
+const PAYOS_REGEN_TTL_SECONDS = 3600;
+
+interface PayOSRegenRecord {
+  count: number;
+  lastAt: number;
+}
+
+const fallbackRegenByDb = new WeakMap<object, Map<string, PayOSRegenRecord>>();
+
+async function checkAndRecordGuestRegenerate(
+  db: object,
+  kv: import('@cloudflare/workers-types').KVNamespace | null | undefined,
+  tenantId: string,
+  orderId: string,
+): Promise<{ allowed: true } | { allowed: false; retryAfterSeconds: number; reason: 'cooldown' | 'max_attempts' }> {
+  const key = `payos:regen:${tenantId}:${orderId}`;
+  const now = Date.now();
+  let record: PayOSRegenRecord | null = null;
+
+  if (kv) {
+    try {
+      const raw = await kv.get(key);
+      if (raw) {
+        const parsed = JSON.parse(raw) as Partial<PayOSRegenRecord>;
+        if (typeof parsed.count === 'number' && typeof parsed.lastAt === 'number') {
+          record = { count: parsed.count, lastAt: parsed.lastAt };
+        }
+      }
+    } catch {
+      // Fall back to per-DB memory tracker if KV read fails
+    }
+  }
+  if (!record) {
+    record = fallbackRegenByDb.get(db)?.get(key) ?? null;
+  }
+
+  if (record) {
+    if (record.count >= PAYOS_REGEN_MAX_ATTEMPTS) {
+      return { allowed: false, retryAfterSeconds: PAYOS_REGEN_TTL_SECONDS, reason: 'max_attempts' };
+    }
+    const elapsed = now - record.lastAt;
+    if (elapsed < PAYOS_REGEN_COOLDOWN_MS) {
+      const retryAfterSeconds = Math.max(1, Math.ceil((PAYOS_REGEN_COOLDOWN_MS - elapsed) / 1000));
+      return { allowed: false, retryAfterSeconds, reason: 'cooldown' };
+    }
+  }
+
+  const nextRecord: PayOSRegenRecord = {
+    count: (record?.count ?? 0) + 1,
+    lastAt: now,
+  };
+  let map = fallbackRegenByDb.get(db);
+  if (!map) {
+    map = new Map<string, PayOSRegenRecord>();
+    fallbackRegenByDb.set(db, map);
+  }
+  map.set(key, nextRecord);
+
+  if (kv) {
+    try {
+      await kv.put(key, JSON.stringify(nextRecord), { expirationTtl: PAYOS_REGEN_TTL_SECONDS });
+    } catch {
+      // Non-fatal KV write failure
+    }
+  }
+
+  return { allowed: true };
+}
+
 function resolveSafePosRedirectUrl(rawUrl: unknown, baseUrl: string): string | null {
   if (typeof rawUrl !== 'string') return null;
   const trimmed = rawUrl.trim();
@@ -208,6 +279,25 @@ export const handleCreateLink = async (c: any, input?: unknown, openApi = false)
     const baseUrl = c.env.FE_BASE_URL || 'https://auraspace.cafe';
     const callerRole = String(user?.role || '').trim().toLowerCase();
     const canOverridePosRedirect = Boolean(user) && (callerRole === 'super_admin' || PAYMENT_ROLES.includes(callerRole));
+    if (parsed.data.regenerate === true && !canOverridePosRedirect) {
+      const regenGate = await checkAndRecordGuestRegenerate(db, c.env.AUTH_KV ?? null, orderTenant, order_id);
+      if (!regenGate.allowed) {
+        c.header('Retry-After', String(regenGate.retryAfterSeconds));
+        return c.json(
+          {
+            success: false,
+            code: 'PAYOS_REGENERATE_RATE_LIMITED',
+            error:
+              locale === 'en'
+                ? 'Too many QR regeneration requests. Please wait before trying again.'
+                : 'Bạn đã yêu cầu tạo lại mã QR quá nhiều lần. Vui lòng đợi ít phút rồi thử lại.',
+            retryable: regenGate.reason === 'cooldown',
+            retryAfter: regenGate.retryAfterSeconds,
+          },
+          429,
+        );
+      }
+    }
     const safePosReturnUrl = canOverridePosRedirect ? resolveSafePosRedirectUrl(requestedReturnUrl, baseUrl) : null;
     const safePosCancelUrl = canOverridePosRedirect ? resolveSafePosRedirectUrl(requestedCancelUrl, baseUrl) : null;
     // Resolve a trusted storefront slug for non-default tenants so redirect URLs never

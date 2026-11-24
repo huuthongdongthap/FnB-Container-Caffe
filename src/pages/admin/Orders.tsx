@@ -232,15 +232,20 @@ function computeNextAction(
   };
 }
 
+function getPaymentMethod(order: AdminOrder): string {
+  const raw = order as unknown as Record<string, unknown>;
+  return String(raw.payment_method ?? raw.paymentMethod ?? '').trim().toLowerCase();
+}
+
 function isCodMethod(order: AdminOrder): boolean {
   const raw = order as unknown as Record<string, unknown>;
-  const method = String(raw.payment_method ?? raw.paymentMethod ?? '').toLowerCase();
+  const method = getPaymentMethod(order);
   return method === 'cod' || method === 'cash' || raw.is_cod === 1;
 }
 
 function getPaymentStatus(order: AdminOrder): string {
   const raw = order as unknown as Record<string, unknown>;
-  return String(raw.payment_status ?? raw.paymentStatus ?? 'unpaid').toLowerCase();
+  return String(raw.payment_status ?? raw.paymentStatus ?? 'unpaid').trim().toLowerCase() || 'unpaid';
 }
 
 function mapAdminOrder(
@@ -601,17 +606,15 @@ export default function AdminOrdersPage() {
           payStatus !== 'completed' &&
           payStatus !== 'refunded' &&
           !isTerminal;
-        const unpaidOnline =
-          !isCodMethod(order) &&
-          payStatus !== 'paid' &&
-          payStatus !== 'completed' &&
-          payStatus !== 'refunded' &&
+        const canShowPayosQr =
+          getPaymentMethod(order) === 'payos' &&
+          (payStatus === 'pending' || payStatus === 'unpaid') &&
           !isTerminal;
         return {
           ...mapAdminOrder(order, actorRole, t),
           additionalActions: (
             <div className="inline-flex items-center gap-2">
-              {unpaidOnline && (
+              {canShowPayosQr && (
                 <button
                   type="button"
                   data-testid={`show-payos-qr-${order.id}`}

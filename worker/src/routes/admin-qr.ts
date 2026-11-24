@@ -300,26 +300,42 @@ async function fetchAlignedQrRows(
     return filterAligned(rows);
   }
 
-  const placeholders = allLookupKeys.map(() => '?').join(', ');
-  try {
-    const scopedRes = await db
-      .prepare(
-        `SELECT table_id, slug, tenant_id FROM table_qr_codes WHERE table_id IN (${placeholders}) AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?`
-      )
-      .bind(...allLookupKeys, requestScope)
-      .all<AdminQrCodeRow>();
-    rows = scopedRes.results || [];
-  } catch {
-    if (requestScope === 'default') {
+  if (allLookupKeys.length === 0) {
+    return [];
+  }
+
+  // Cloudflare D1 limits bound parameters to 100 per statement; chunk lookups so stores
+  // with many tables stay well under the parameter cap.
+  const MAX_QR_LOOKUP_CHUNK = 25;
+  let useLegacyUnscopedFallback = false;
+  for (let offset = 0; offset < allLookupKeys.length; offset += MAX_QR_LOOKUP_CHUNK) {
+    const chunk = allLookupKeys.slice(offset, offset + MAX_QR_LOOKUP_CHUNK);
+    const placeholders = chunk.map(() => '?').join(', ');
+    if (!useLegacyUnscopedFallback) {
       try {
-        const res = await db
-          .prepare(`SELECT table_id, slug FROM table_qr_codes WHERE table_id IN (${placeholders})`)
-          .bind(...allLookupKeys)
+        const scopedRes = await db
+          .prepare(
+            `SELECT table_id, slug, tenant_id FROM table_qr_codes WHERE table_id IN (${placeholders}) AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?`
+          )
+          .bind(...chunk, requestScope)
           .all<AdminQrCodeRow>();
-        rows = res.results || [];
+        rows.push(...(scopedRes.results || []));
+        continue;
       } catch {
-        rows = [];
+        if (requestScope !== 'default') {
+          break;
+        }
+        useLegacyUnscopedFallback = true;
       }
+    }
+    try {
+      const res = await db
+        .prepare(`SELECT table_id, slug FROM table_qr_codes WHERE table_id IN (${placeholders})`)
+        .bind(...chunk)
+        .all<AdminQrCodeRow>();
+      rows.push(...(res.results || []));
+    } catch {
+      break;
     }
   }
   return filterAligned(rows);

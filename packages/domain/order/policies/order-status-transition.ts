@@ -85,7 +85,7 @@ export async function transitionOrderStatus(
     currentOrder?: { id: string; status: string; payment_status?: string | null };
     paymentStatus?: string | null;
     allowPaidCompensation?: boolean;
-    fields?: { notes?: unknown; delivery_time?: unknown };
+    fields?: { notes?: unknown; delivery_time?: unknown; payment_method?: unknown };
   } = {},
 ): Promise<OrderStatusResult> {
   const rawTenantId = (options.tenantId ?? '').trim() || 'default';
@@ -206,10 +206,18 @@ export async function transitionOrderStatus(
             .first();
         }
       }
-      const method = String(paymentRow?.payment_method ?? '').trim().toLowerCase();
-      const rawPaymentStatus =
-        typeof paymentRow?.payment_status === 'string' ? paymentRow.payment_status.trim().toLowerCase() : '';
-      const isCodDelivery = method === 'cod' || Number(paymentRow?.is_cod ?? 0) === 1;
+      const incomingPaymentMethod =
+        typeof options.fields?.payment_method === 'string'
+          ? options.fields.payment_method.trim().toLowerCase()
+          : '';
+      const persistedMethod = String(paymentRow?.payment_method ?? '').trim().toLowerCase();
+      const method = incomingPaymentMethod || persistedMethod;
+      const rawPaymentStatus = String(
+        paymentRow?.payment_status ?? options.paymentStatus ?? options.currentOrder?.payment_status ?? '',
+      ).trim().toLowerCase();
+      const isCodDelivery = incomingPaymentMethod
+        ? method === 'cod'
+        : (persistedMethod === 'cod' || Number(paymentRow?.is_cod ?? 0) === 1);
       const isPrepaidOnline =
         method === 'payos' || method === 'bank_transfer' || method === 'qr' || method === 'vietqr';
       if (isPrepaidOnline && rawPaymentStatus && rawPaymentStatus !== 'paid') {
@@ -219,7 +227,7 @@ export async function transitionOrderStatus(
           statusCode: 409,
         };
       }
-      if (paymentRow?.order_type === 'delivery' && paymentRow?.payment_status !== 'paid' && !isCodDelivery) {
+      if (paymentRow?.order_type === 'delivery' && rawPaymentStatus !== 'paid' && !isCodDelivery) {
         return {
           success: false,
           error: 'Đơn giao tận nơi phải hoàn tất thanh toán trước khi chế biến',
@@ -271,10 +279,21 @@ export async function transitionOrderStatus(
     }
   }
 
-  const fields = Object.entries(options.fields ?? {}).filter(([, value]) => value !== undefined);
+  const allowedFieldKeys = new Set(['notes', 'delivery_time', 'payment_method']);
+  const fields = Object.entries(options.fields ?? {}).filter(
+    ([key, value]) => allowedFieldKeys.has(key) && value !== undefined,
+  );
   if (isNoOp && fields.length === 0) {
     return { success: true, idempotent: true, order: { id: orderId, status: targetStatus, previous_status: order.status } };
   }
+  const hasPaymentMethodField = fields.some(([key]) => key === 'payment_method');
+  const incomingPaymentMethod =
+    typeof options.fields?.payment_method === 'string'
+      ? options.fields.payment_method.trim().toLowerCase()
+      : '';
+  const paymentMethodGuard = hasPaymentMethodField
+    ? " AND LOWER(TRIM(COALESCE(payment_status, ''))) NOT IN ('paid', 'completed', 'refunded', 'partially_refunded')"
+    : '';
   const additions = fields.map(([key]) => `, ${key} = ?`).join('');
   const updateStatus = (guard = '') => db.prepare(
     `UPDATE orders SET status = ?, updated_at = ?${additions} WHERE id = ? AND status = ?${writeTenantClause}${guard}`,
@@ -285,21 +304,28 @@ export async function transitionOrderStatus(
     // Check persisted settlement in the same write that would close the order.
     const paid = "LOWER(TRIM(COALESCE(payment_status, ''))) = 'paid'";
     const notRefunded = "LOWER(TRIM(COALESCE(payment_status, ''))) <> 'refunded'";
+    const incomingCodOrCash = incomingPaymentMethod === 'cash' || incomingPaymentMethod === 'cod';
+    const closingGuard = incomingCodOrCash
+      ? ` AND ${notRefunded} AND ${paid}${paymentMethodGuard}`
+      : ` AND ${notRefunded} AND (LOWER(TRIM(COALESCE(payment_method, ''))) NOT IN ('cash', 'cod') OR ${paid})${paymentMethodGuard}`;
     try {
-      result = await updateStatus(` AND ${notRefunded} AND (LOWER(TRIM(COALESCE(payment_method, ''))) NOT IN ('cash', 'cod') OR ${paid})`);
+      result = await updateStatus(closingGuard);
     } catch (error) {
       if (!/no such column:\s*payment_method\b/i.test(String(error))) throw error;
-      result = await updateStatus(` AND ${notRefunded} AND (COALESCE(is_cod, 0) <> 1 OR ${paid})`);
+      const legacyClosingGuard = incomingCodOrCash
+        ? ` AND ${notRefunded} AND ${paid}${paymentMethodGuard}`
+        : ` AND ${notRefunded} AND (COALESCE(is_cod, 0) <> 1 OR ${paid})${paymentMethodGuard}`;
+      result = await updateStatus(legacyClosingGuard);
     }
   } else if (forwardStatuses.has(targetStatus)) {
     try {
-      result = await updateStatus(" AND LOWER(TRIM(COALESCE(payment_status, ''))) <> 'refunded'");
+      result = await updateStatus(` AND LOWER(TRIM(COALESCE(payment_status, ''))) <> 'refunded'${paymentMethodGuard}`);
     } catch (error) {
       if (!/no such column:\s*payment_status\b/i.test(String(error))) throw error;
       result = await updateStatus();
     }
   } else {
-    result = await updateStatus();
+    result = await updateStatus(paymentMethodGuard);
   }
   // D1 changes includes timestamp/audit trigger writes; this PK-scoped CAS still matches at most one order.
   if (changedRows(result) < 1) {

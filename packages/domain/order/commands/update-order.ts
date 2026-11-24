@@ -63,7 +63,7 @@ export async function updateOrder(
     } catch {
       try {
         const q = await db.prepare(
-          `SELECT id, status, items, total, payment_status, customer_name, customer_phone, table_id, created_at, tenant_id, session_id FROM orders WHERE id = ?${tenantClause}`
+          `SELECT id, status, items, total, payment_status, order_type, customer_name, customer_phone, table_id, created_at, tenant_id FROM orders WHERE id = ?${tenantClause}`
         ).bind(id, ...tenantBinds).all<Record<string, unknown>>();
         results = q.results ?? [];
       } catch {
@@ -127,7 +127,7 @@ export async function updateOrder(
         currentOrder: results[0] as { id: string; status: string; payment_status?: string | null },
         paymentStatus: String((results[0] as { payment_status?: unknown }).payment_status ?? 'unpaid'),
         allowPaidCompensation: canCompensatePaid,
-        fields: { notes: body.notes, delivery_time: body.delivery_time },
+        fields: { notes: body.notes, delivery_time: body.delivery_time, payment_method: body.payment_method },
       });
       if (!transition.success) return errorResponse(transition.error!, transition.statusCode || 400);
       if (transition.idempotent) return jsonResponse({ success: true, idempotent: true });
@@ -774,6 +774,13 @@ export async function updateOrder(
       }
       if (results[0]?.table_id) {
         await releaseTableIfNoActiveOrders(db, String(results[0].table_id), effectiveCancelTenant).catch(() => false);
+      }
+    } else if (body.payment_method !== undefined && body.payment_method !== 'payos') {
+      try {
+        const { cancelOpenPayOSAttemptForOrder } = await import('@aura/domain-payment');
+        await cancelOpenPayOSAttemptForOrder(db, env, id, effectiveEventTenant).catch(() => {});
+      } catch {
+        // Optional PayOS payment table/module in partial schemas
       }
     }
 
