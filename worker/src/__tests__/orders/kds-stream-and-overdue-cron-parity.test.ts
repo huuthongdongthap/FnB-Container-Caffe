@@ -205,6 +205,7 @@ describe('KDS SSE stream parity and cron overdue payment-hold fallbacks', () => 
     // Partial tenant schema missing order_type and is_cod
     const partial = new DatabaseSync(':memory:');
     partial.exec(`
+      CREATE TABLE _metrics (name TEXT, value REAL, tags TEXT, created_at TEXT);
       CREATE TABLE orders (
         id TEXT PRIMARY KEY, tenant_id TEXT, customer_name TEXT, status TEXT,
         created_at TEXT, updated_at TEXT, items TEXT, notes TEXT,
@@ -218,15 +219,20 @@ describe('KDS SSE stream parity and cron overdue payment-hold fallbacks', () => 
     await checkOverdueOrders({ AURA_DB: createSqliteD1(partial) }, 'store-a');
     const partialRows = partial.prepare('SELECT id, notes FROM orders ORDER BY id').all() as Array<{ id: string; notes: string | null }>;
     expect(partialRows).toEqual([
-      { id: 'ord-overdue-ok', notes: '[OVERDUE]' },
+      { id: 'ord-overdue-ok', notes: null },
       { id: 'ord-payos-held', notes: null },
       { id: 'ord-qr-empty', notes: 'Khách QR - cho don mon' },
+    ]);
+    const partialMetrics = partial.prepare('SELECT name, value, tags FROM _metrics').all() as Array<{ name: string; value: number; tags: string }>;
+    expect(partialMetrics).toEqual([
+      { name: 'order_stuck', value: 1, tags: JSON.stringify({ tenant_id: 'store-a' }) },
     ]);
     partial.close();
 
     // Legacy default schema missing tenant_id and is_cod
     const legacy = new DatabaseSync(':memory:');
     legacy.exec(`
+      CREATE TABLE _metrics (name TEXT, value REAL, tags TEXT, created_at TEXT);
       CREATE TABLE orders (
         id TEXT PRIMARY KEY, customer_name TEXT, status TEXT,
         created_at TEXT, updated_at TEXT, items TEXT, notes TEXT,
@@ -240,7 +246,11 @@ describe('KDS SSE stream parity and cron overdue payment-hold fallbacks', () => 
     const legacyRows = legacy.prepare('SELECT id, notes FROM orders ORDER BY id').all() as Array<{ id: string; notes: string | null }>;
     expect(legacyRows).toEqual([
       { id: 'ord-leg-held', notes: null },
-      { id: 'ord-leg-ok', notes: '[OVERDUE]' },
+      { id: 'ord-leg-ok', notes: null },
+    ]);
+    const legacyMetrics = legacy.prepare('SELECT name, value, tags FROM _metrics').all() as Array<{ name: string; value: number; tags: string }>;
+    expect(legacyMetrics).toEqual([
+      { name: 'order_stuck', value: 1, tags: JSON.stringify({ tenant_id: 'default' }) },
     ]);
     legacy.close();
   });
