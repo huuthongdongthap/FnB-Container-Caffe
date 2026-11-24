@@ -101,6 +101,7 @@ export async function createOrder(
       discountAmount: number;
       reservedInPlace?: boolean;
       customerKey?: string | null;
+      normalizedPromoPhone?: string;
       perCustomerLimit?: number;
     } | null = null;
     let appliedLoyaltyVoucher: LoyaltyVoucherRecord | null = null;
@@ -119,7 +120,7 @@ export async function createOrder(
         is_active?: number; type?: string | null; tenant_id?: string | null;
       };
       let promo = await db.prepare(
-        "SELECT id, code, percent, discount_type, discount_value, max_discount, max_discount_value, min_order, min_order_value, starts_at, valid_from, expires_at, valid_to, usage_limit, max_uses, usage_count, current_uses, usage_limit_per_customer, is_active, type, tenant_id FROM promotions WHERE UPPER(code) = ? AND (COALESCE(NULLIF(tenant_id, ''), 'default') = ? OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?2)"
+        "SELECT id, code, percent, discount_type, discount_value, value, max_discount, max_discount_value, min_order, min_order_value, starts_at, valid_from, expires_at, valid_to, usage_limit, max_uses, usage_count, current_uses, usage_limit_per_customer, is_active, type, tenant_id FROM promotions WHERE UPPER(code) = ? AND (COALESCE(NULLIF(tenant_id, ''), 'default') = ? OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?2)"
       ).bind(rawPromoCode, tenantId).first<PromoRow>().catch(() =>
         db.prepare(
           "SELECT * FROM promotions WHERE UPPER(code) = ? AND (COALESCE(NULLIF(tenant_id, ''), 'default') = ? OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?2)"
@@ -246,8 +247,8 @@ export async function createOrder(
       };
       let rawDiscount: number;
       if (isFixedType) {
-        const rawFixed = resolvePromoAmount(promo.discount_value, promo.value, promo.percent);
-        if (rawFixed < 0) {
+        const rawFixed = resolvePromoAmount(promo.discount_value, promo.value);
+        if (!Number.isFinite(rawFixed) || rawFixed <= 0) {
           return errorResponse('Giá trị giảm giá không hợp lệ', 400);
         }
         rawDiscount = Math.round(rawFixed);
@@ -282,7 +283,14 @@ export async function createOrder(
                AND (
                  pr.customer_id = ?
                  OR (? != '' AND pr.customer_id = ?)
-                 OR (? != '' AND o.customer_phone = ?)
+                 OR (? != '' AND (
+                   o.customer_phone = ?
+                   OR REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(o.customer_phone, ' ', ''), '-', ''), '+', ''), '.', ''), '(', ''), ')', '') = ?
+                   OR (
+                     REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(o.customer_phone, ' ', ''), '-', ''), '+', ''), '.', ''), '(', ''), ')', '') LIKE '84%'
+                     AND '0' || SUBSTR(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(o.customer_phone, ' ', ''), '-', ''), '+', ''), '.', ''), '(', ''), ')', ''), 3) = ?
+                   )
+                 ))
                )
                AND (o.status IS NULL OR o.status NOT IN ('cancelled', 'failed'))`
           ).bind(
@@ -290,6 +298,8 @@ export async function createOrder(
             String(promo.id ?? promo.code ?? ''),
             redemptionTenant,
             customerKey,
+            normalizedPromoPhone,
+            normalizedPromoPhone,
             normalizedPromoPhone,
             normalizedPromoPhone,
             normalizedPromoPhone,
@@ -303,15 +313,39 @@ export async function createOrder(
                 `SELECT COUNT(*) AS cnt
                  FROM promotion_redemptions
                  WHERE (UPPER(code) = ? OR promotion_id = ?)
-                   AND customer_id = ?`
+                   AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?
+                   AND (customer_id = ? OR (? != '' AND customer_id = ?))`
               ).bind(
                 String(promo.code || '').toUpperCase(),
                 String(promo.id ?? promo.code ?? ''),
-                customerKey
+                redemptionTenant,
+                customerKey,
+                normalizedPromoPhone,
+                normalizedPromoPhone
               ).first<{ cnt?: number }>();
             } catch (fallbackErr) {
               const fbMsg = String((fallbackErr as Error)?.message ?? '').toLowerCase();
-              if (!fbMsg.includes('no such table')) {
+              if (fbMsg.includes('no such column') && redemptionTenant === 'default') {
+                try {
+                  perCustRow = await db.prepare(
+                    `SELECT COUNT(*) AS cnt
+                     FROM promotion_redemptions
+                     WHERE (UPPER(code) = ? OR promotion_id = ?)
+                       AND (customer_id = ? OR (? != '' AND customer_id = ?))`
+                  ).bind(
+                    String(promo.code || '').toUpperCase(),
+                    String(promo.id ?? promo.code ?? ''),
+                    customerKey,
+                    normalizedPromoPhone,
+                    normalizedPromoPhone
+                  ).first<{ cnt?: number }>();
+                } catch (legacyErr) {
+                  const legMsg = String((legacyErr as Error)?.message ?? '').toLowerCase();
+                  if (!legMsg.includes('no such table')) {
+                    return errorResponse('Không thể kiểm tra giới hạn khuyến mãi, vui lòng thử lại', 503);
+                  }
+                }
+              } else if (!fbMsg.includes('no such table')) {
                 return errorResponse('Không thể kiểm tra giới hạn khuyến mãi, vui lòng thử lại', 503);
               }
             }
@@ -369,6 +403,7 @@ export async function createOrder(
         discountAmount: snapshot.discount,
         reservedInPlace,
         customerKey: resolvedCustomerId || normalizedPromoPhone || null,
+        normalizedPromoPhone,
         perCustomerLimit: Number.isFinite(perCustomerLimit) && perCustomerLimit > 0 ? perCustomerLimit : 0,
       };
       }
@@ -750,6 +785,7 @@ export async function createOrder(
           }
           await rollbackPreOrderReservations();
         };
+        const promoPhone = appliedPromo.normalizedPromoPhone || '';
         let postCountRow: { cnt?: number } | null = null;
         try {
           postCountRow = await db.prepare(
@@ -758,9 +794,36 @@ export async function createOrder(
              LEFT JOIN orders o ON o.id = pr.order_id
              WHERE (UPPER(pr.code) = ? OR pr.promotion_id = ?)
                AND COALESCE(NULLIF(TRIM(pr.tenant_id), ''), 'default') = ?
-               AND pr.customer_id = ?
-               AND (o.status IS NULL OR o.status NOT IN ('cancelled', 'failed'))`
-          ).bind(promoCodeUpper, promoIdStr, redemptionTenant, appliedPromo.customerKey)
+               AND (
+                 pr.customer_id = ?
+                 OR (? != '' AND pr.customer_id = ?)
+                 OR (? != '' AND (
+                   o.customer_phone = ?
+                   OR REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(o.customer_phone, ' ', ''), '-', ''), '+', ''), '.', ''), '(', ''), ')', '') = ?
+                   OR (
+                     REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(o.customer_phone, ' ', ''), '-', ''), '+', ''), '.', ''), '(', ''), ')', '') LIKE '84%'
+                     AND '0' || SUBSTR(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(o.customer_phone, ' ', ''), '-', ''), '+', ''), '.', ''), '(', ''), ')', ''), 3) = ?
+                   )
+                 ))
+               )
+               AND (o.status IS NULL OR o.status NOT IN ('cancelled', 'failed'))
+               AND pr.rowid <= COALESCE(
+                 (SELECT pr_self.rowid FROM promotion_redemptions pr_self WHERE pr_self.order_id = ? ORDER BY pr_self.rowid ASC LIMIT 1),
+                 9223372036854775807
+               )`
+          ).bind(
+            promoCodeUpper,
+            promoIdStr,
+            redemptionTenant,
+            appliedPromo.customerKey,
+            promoPhone,
+            promoPhone,
+            promoPhone,
+            promoPhone,
+            promoPhone,
+            promoPhone,
+            orderId
+          )
             .first<{ cnt?: number }>();
         } catch (joinErr) {
           const joinMsg = joinErr instanceof Error ? joinErr.message : String(joinErr);
@@ -768,11 +831,15 @@ export async function createOrder(
             try {
               postCountRow = await db.prepare(
                 `SELECT COUNT(*) AS cnt
-                 FROM promotion_redemptions
-                 WHERE (UPPER(code) = ? OR promotion_id = ?)
-                   AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?
-                   AND customer_id = ?`
-              ).bind(promoCodeUpper, promoIdStr, redemptionTenant, appliedPromo.customerKey)
+                 FROM promotion_redemptions pr
+                 WHERE (UPPER(pr.code) = ? OR pr.promotion_id = ?)
+                   AND COALESCE(NULLIF(TRIM(pr.tenant_id), ''), 'default') = ?
+                   AND (pr.customer_id = ? OR (? != '' AND pr.customer_id = ?))
+                   AND pr.rowid <= COALESCE(
+                     (SELECT pr_self.rowid FROM promotion_redemptions pr_self WHERE pr_self.order_id = ? ORDER BY pr_self.rowid ASC LIMIT 1),
+                     9223372036854775807
+                   )`
+              ).bind(promoCodeUpper, promoIdStr, redemptionTenant, appliedPromo.customerKey, promoPhone, promoPhone, orderId)
                 .first<{ cnt?: number }>();
             } catch (fallbackErr) {
               const fbMsg = fallbackErr instanceof Error ? fallbackErr.message : String(fallbackErr);

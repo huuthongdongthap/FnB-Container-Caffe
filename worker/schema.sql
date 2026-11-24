@@ -1744,7 +1744,7 @@ CREATE INDEX IF NOT EXISTS idx_loyalty_accounts_customer
 
 CREATE TABLE IF NOT EXISTS tier_configs (
     tenant_id TEXT NOT NULL DEFAULT 'default',
-  tier TEXT PRIMARY KEY,
+  tier TEXT NOT NULL,
   tier_name TEXT,
   min_points INTEGER NOT NULL DEFAULT 0,
   cashback_rate REAL NOT NULL DEFAULT 0.02,
@@ -1761,7 +1761,8 @@ CREATE TABLE IF NOT EXISTS tier_configs (
   expiry_days INTEGER DEFAULT 90,
   sort_order INTEGER NOT NULL DEFAULT 0,
   created_at TEXT DEFAULT (datetime('now')),
-  updated_at TEXT DEFAULT (datetime('now'))
+  updated_at TEXT DEFAULT (datetime('now')),
+  PRIMARY KEY (tenant_id, tier)
 );
 
 CREATE TABLE IF NOT EXISTS loyalty_redemptions (
@@ -1994,6 +1995,7 @@ ALTER TABLE promotions ADD COLUMN excluded_items TEXT;
 ALTER TABLE promotions ADD COLUMN updated_at TEXT;
 ALTER TABLE promotions ADD COLUMN start_date TEXT;
 ALTER TABLE promotions ADD COLUMN end_date TEXT;
+ALTER TABLE promotions ADD COLUMN usage_limit_per_customer INTEGER DEFAULT 0;
 ALTER TABLE purchase_order_items ADD COLUMN unit TEXT DEFAULT 'g';
 ALTER TABLE purchase_order_items ADD COLUMN po_id TEXT;
 ALTER TABLE purchase_order_items ADD COLUMN unit_cost REAL DEFAULT 0;

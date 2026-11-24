@@ -99,15 +99,16 @@ export function registerAuthHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
       }
     }
 
+    const normalizedCustomerPhone = String(body.phone || '').trim() || null;
     try {
       await db.prepare(
         'INSERT INTO customers (id, email, name, phone, loyalty_points, lifetime_points, loyalty_tier, tenant_id, created_at, updated_at) VALUES (?, ?, ?, ?, 0, 0, ?, ?, ?, ?)'
-      ).bind(id, normalizedEmail, body.name || 'Thành viên', body.phone || '', 'bronze', registerTenant, now, now).run();
+      ).bind(id, normalizedEmail, body.name || 'Thành viên', normalizedCustomerPhone, 'bronze', registerTenant, now, now).run();
     } catch {
       if (registerTenant === 'default') {
         await db.prepare(
           'INSERT INTO customers (id, email, name, phone, loyalty_points, loyalty_tier, created_at) VALUES (?, ?, ?, ?, 0, ?, ?)'
-        ).bind(id, normalizedEmail, body.name || 'Thành viên', body.phone || '', 'bronze', now).run().catch(() => {});
+        ).bind(id, normalizedEmail, body.name || 'Thành viên', normalizedCustomerPhone, 'bronze', now).run().catch(() => {});
       }
     }
 

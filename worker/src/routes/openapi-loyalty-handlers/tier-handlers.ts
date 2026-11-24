@@ -346,26 +346,25 @@ export function registerTierHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
         await db
           .prepare(
             `INSERT INTO loyalty_tier_configs (
-              id, tier, name, min_points, max_points, point_multiplier, discount_percent,
-              free_shipping, priority_support, birthday_bonus, color, icon, benefits, tenant_id, created_at, updated_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+              tenant_id, tier, name, min_points, max_points, point_multiplier, points_multiplier,
+              discount_percent, birthday_bonus, free_shipping, priority_support, benefits, color, icon, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
           )
           .bind(
-            insertId,
+            effectiveTenant,
             tier,
             existing.name ?? tier,
             existing.min_points ?? 0,
             existing.max_points ?? null,
             existing.point_multiplier ?? existing.points_multiplier ?? 1,
+            existing.points_multiplier ?? existing.point_multiplier ?? 1,
             existing.discount_percent ?? 0,
+            existing.birthday_bonus ?? 0,
             existing.free_shipping ?? 0,
             existing.priority_support ?? 0,
-            existing.birthday_bonus ?? 0,
+            typeof existing.benefits === 'string' ? existing.benefits : JSON.stringify(existing.benefits ?? []),
             existing.color ?? '#CD7F32',
             existing.icon ?? 'award',
-            typeof existing.benefits === 'string' ? existing.benefits : JSON.stringify(existing.benefits ?? []),
-            effectiveTenant,
-            now,
             now
           )
           .run();
@@ -391,29 +390,45 @@ export function registerTierHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
         await db
           .prepare(
             `INSERT INTO tier_configs (
-              id, tier, tier_name, display_name_vi, min_points, points_multiplier, point_multiplier,
-              cashback_rate, birthday_bonus, perks, color, tenant_id, created_at, updated_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+              tenant_id, tier, tier_name, display_name_vi, min_points, cashback_rate,
+              multiplier, point_multiplier, points_multiplier, birthday_discount,
+              benefits, perks, color, created_at, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
           )
           .bind(
-            insertId,
+            effectiveTenant,
             tier,
             existing.tier_name ?? existing.name ?? tier,
             existing.display_name_vi ?? existing.name ?? tier,
             existing.min_points ?? 0,
-            existing.points_multiplier ?? existing.point_multiplier ?? 1,
+            existing.cashback_rate ?? 0.02,
+            existing.multiplier ?? existing.point_multiplier ?? existing.points_multiplier ?? 1,
             existing.point_multiplier ?? existing.points_multiplier ?? 1,
-            existing.cashback_rate ?? 0,
-            existing.birthday_bonus ?? 0,
+            existing.points_multiplier ?? existing.point_multiplier ?? 1,
+            existing.birthday_discount ?? 0,
+            typeof existing.benefits === 'string' ? existing.benefits : JSON.stringify(existing.benefits ?? []),
             typeof existing.perks === 'string' ? existing.perks : JSON.stringify(existing.benefits ?? []),
             existing.color ?? '#CD7F32',
-            effectiveTenant,
             now,
             now
           )
           .run();
       } catch {
-        return c.json({ success: false, error: 'Failed to persist loyalty tier configuration' }, 500);
+        const rowCopy: Record<string, unknown> = { ...existing, tenant_id: effectiveTenant };
+        delete rowCopy.name;
+        if ('id' in rowCopy) rowCopy.id = insertId;
+        if ('updated_at' in rowCopy) rowCopy.updated_at = now;
+        if ('created_at' in rowCopy) rowCopy.created_at = now;
+        const cols = Object.keys(rowCopy);
+        const placeholders = cols.map(() => '?').join(', ');
+        try {
+          await db
+            .prepare(`INSERT INTO tier_configs (${cols.join(', ')}) VALUES (${placeholders})`)
+            .bind(...cols.map((k) => (rowCopy[k] as string | number | null) ?? null))
+            .run();
+        } catch {
+          return c.json({ success: false, error: 'Failed to persist loyalty tier configuration' }, 500);
+        }
       }
     }
 

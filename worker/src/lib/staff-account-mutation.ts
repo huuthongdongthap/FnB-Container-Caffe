@@ -10,7 +10,7 @@ export function staffManagementDenial(actor: { role?: string; tenantId?: string;
   const actorTenant = rawActorTenant || 'default';
   const isHqActor = (actor.role === 'owner' || actor.role === 'admin') && (actorTenant === '*' || actorTenant.toLowerCase() === 'hq');
   if (!isHqActor && staffTenant(target) !== actorTenant) return 'Không đủ quyền truy cập cửa hàng';
-  if ((target.role === 'owner' || nextRole === 'owner') && actor.role !== 'owner') return 'Chỉ owner được thay đổi tài khoản owner';
+  if ((target.role === 'owner' || nextRole === 'owner') && actor.role !== 'owner' && !isHqActor) return 'Chỉ owner được thay đổi tài khoản owner';
   if ((target.role === 'admin' || nextRole === 'admin') && actor.role !== 'admin') return 'Chỉ admin được thay đổi tài khoản admin';
   if (actor.role === 'manager' && (!managed.has(target.role) || (nextRole && !managed.has(nextRole)))) return 'Manager không được thay đổi tài khoản quản lý';
   return null;

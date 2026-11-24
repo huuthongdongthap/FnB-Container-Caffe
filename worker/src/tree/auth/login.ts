@@ -147,15 +147,16 @@ export async function loginUser(request: Request, env: Record<string, unknown>, 
             tenantId = custTenant;
           } else {
             const nowIso = new Date().toISOString();
+            const customerPhone = String(user.phone || '').trim() || null;
             try {
               await db.prepare(
                 'INSERT INTO customers (id, email, name, phone, loyalty_points, lifetime_points, loyalty_tier, tenant_id, created_at, updated_at) VALUES (?, ?, ?, ?, 0, 0, ?, ?, ?, ?)'
-              ).bind(user.id, email, user.name || 'Thành viên', user.phone || '', 'bronze', effectiveTenant, nowIso, nowIso).run();
+              ).bind(user.id, email, user.name || 'Thành viên', customerPhone, 'bronze', effectiveTenant, nowIso, nowIso).run();
             } catch {
               if (effectiveTenant === 'default') {
                 await db.prepare(
                   'INSERT INTO customers (id, email, name, phone, loyalty_points, loyalty_tier, created_at) VALUES (?, ?, ?, ?, 0, ?, ?)'
-                ).bind(user.id, email, user.name || 'Thành viên', user.phone || '', 'bronze', nowIso).run().catch(() => {});
+                ).bind(user.id, email, user.name || 'Thành viên', customerPhone, 'bronze', nowIso).run().catch(() => {});
               }
             }
             const walletId = `wal_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;

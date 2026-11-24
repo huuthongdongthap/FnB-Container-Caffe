@@ -114,15 +114,16 @@ const db = env.AURA_DB as unknown as { prepare(_sql: string): { bind(..._a: unkn
             }
           }
         } else {
+          const normalizedCustomerPhone = String(user.phone || '').trim() || null;
           try {
             await db.prepare(
               'INSERT INTO customers (id, email, name, phone, loyalty_points, lifetime_points, loyalty_tier, tenant_id, verified_at, created_at, updated_at) VALUES (?, ?, ?, ?, 0, 0, ?, ?, ?, ?, ?)'
-            ).bind(user.id, email, user.name || 'Thành viên', user.phone || '', 'bronze', tenantId, now, now, now).run();
+            ).bind(user.id, email, user.name || 'Thành viên', normalizedCustomerPhone, 'bronze', tenantId, now, now, now).run();
           } catch {
             if (tenantId === 'default') {
               await db.prepare(
                 'INSERT INTO customers (id, email, name, phone, loyalty_points, loyalty_tier, created_at) VALUES (?, ?, ?, ?, 0, ?, ?)'
-              ).bind(user.id, email, user.name || 'Thành viên', user.phone || '', 'bronze', now).run().catch(() => {});
+              ).bind(user.id, email, user.name || 'Thành viên', normalizedCustomerPhone, 'bronze', now).run().catch(() => {});
             }
           }
           const walletId = `wal_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;

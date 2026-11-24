@@ -6,8 +6,15 @@ import { DatabaseSync } from 'node:sqlite';
 import { OpenAPIHono } from '@hono/zod-openapi';
 import { loginUser } from '../../tree/auth/login';
 import { logoutUser } from '../../tree/auth/logout';
+import { registerUser } from '../../tree/auth/register';
+import { bootstrapOwner } from '../../tree/auth/bootstrap';
 import { hashPassword, verifyJWT } from '../../lib/jwt';
+import { findLoginUser, loadStaffAccountForLogin } from '../../lib/staff-login-identity';
+import { SessionUnavailableError } from '../../lib/staff-session';
 import { authEndpointsRouter } from '../../routes/auth-endpoints';
+import { registerWithVerification } from '../../routes/auth-register';
+import { verifyEmail } from '../../routes/auth-verify';
+import { registerAuthHandlers } from '../../routes/openapi-auth-handlers/auth-handlers';
 import { registerStaffHandlers } from '../../routes/openapi-staff-handlers/staff-handlers';
 import { registerTierHandlers } from '../../routes/openapi-loyalty-handlers/tier-handlers';
 import { createOrder } from '../../../../packages/domain/order/commands/create-order';
@@ -23,6 +30,12 @@ function createMemoryKv(initial: Record<string, string> = {}) {
     delete: vi.fn(async (key: string) => {
       store.delete(key);
     }),
+    list: vi.fn(async ({ prefix = '' }: { prefix?: string } = {}) => ({
+      keys: [...store.keys()]
+        .filter((k) => k.startsWith(prefix))
+        .map((name) => ({ name })),
+      list_complete: true,
+    })),
   };
 }
 
@@ -483,9 +496,9 @@ describe('P0 Regression: Multi-Tenant CRM & Loyalty (#197)', () => {
     expect(auditWritten).toBe(false);
   });
 
-  it('defines tenant-scoped composite keys in worker/schema.sql and migration 015', () => {
+  it('defines tenant-scoped composite keys in worker/schema.sql and tenant migration', () => {
     const schemaPath = resolve(__dirname, '../../../schema.sql');
-    const migrationPath = resolve(__dirname, '../../../migrations/015_tenant_scoped_unique_keys.sql');
+    const migrationPath = resolve(__dirname, '../../../db/migrations/20261124_02_tenant_scoped_unique_keys.sql');
     const schema = readFileSync(schemaPath, 'utf-8');
     const migration = readFileSync(migrationPath, 'utf-8');
 
@@ -500,28 +513,56 @@ describe('P0 Regression: Multi-Tenant CRM & Loyalty (#197)', () => {
     expect(migration).toContain('UNIQUE(tenant_id, email)');
   });
 
-  it('applies worker/schema.sql + migration 015 in real SQLite preserving columns, data, indexes, triggers, and tenant isolation', () => {
+  it('applies worker/schema.sql + tenant migration in real SQLite preserving columns, FKs, duplicate cleanup, indexes, triggers, and tenant isolation', () => {
     const schemaSql = readFileSync(resolve(__dirname, '../../../schema.sql'), 'utf-8');
     const migrationSql = readFileSync(
-      resolve(__dirname, '../../../migrations/015_tenant_scoped_unique_keys.sql'),
+      resolve(__dirname, '../../../db/migrations/20261124_02_tenant_scoped_unique_keys.sql'),
       'utf-8'
     );
     const sqlite = new DatabaseSync(':memory:');
-    sqlite.exec(schemaSql);
+    sqlite.exec('PRAGMA foreign_keys = ON;');
+    // Simulate pre-migration schema before composite UNIQUE(tenant_id, email) / UNIQUE(tenant_id, phone)
+    const preMigrationSchemaSql = schemaSql
+      .replace('UNIQUE(tenant_id, email),\n    UNIQUE(tenant_id, phone)', 'id_ check_noop TEXT')
+      .replace(',\n    id_ check_noop TEXT', '');
+    sqlite.exec(preMigrationSchemaSql);
 
-    // Seed data before migration
+    // Simulate pre-migration legacy duplicates and FK children before rebuild
     sqlite
       .prepare("INSERT INTO customers (id, tenant_id, email, phone, name, auth_version) VALUES (?, ?, ?, ?, ?, ?)")
       .run('c1', 'tenant-a', 'shared@example.com', '0909000111', 'Alice A', 3);
+    sqlite
+      .prepare("INSERT INTO customers (id, tenant_id, email, phone, name, auth_version) VALUES (?, ?, ?, ?, ?, ?)")
+      .run('c1_blank1', 'tenant-a', '', '', 'Blank 1', 1);
+    sqlite
+      .prepare("INSERT INTO customers (id, tenant_id, email, phone, name, auth_version) VALUES (?, ?, ?, ?, ?, ?)")
+      .run('c1_blank2', 'tenant-a', '   ', '', 'Blank 2', 1);
+    sqlite
+      .prepare("INSERT INTO cashback_wallets (id, customer_id, tenant_id, balance) VALUES (?, ?, ?, ?)")
+      .run('wal_fk_1', 'c1', 'tenant-a', 5000);
     sqlite
       .prepare("INSERT INTO promotions (id, code, percent, tenant_id, discount_type, discount_value) VALUES (?, ?, ?, ?, ?, ?)")
       .run('p1', 'WELCOME10', 10, 'tenant-a', 'percentage', 10);
     sqlite
       .prepare("INSERT INTO loyalty_tier_configs (tenant_id, tier, name, min_points) VALUES (?, ?, ?, ?)")
       .run('tenant-a', 'gold', 'Gold A', 1000);
+    sqlite
+      .prepare("INSERT INTO tier_configs (tenant_id, tier, tier_name, min_points) VALUES (?, ?, ?, ?)")
+      .run('tenant-a', 'gold', 'Gold A', 1000);
 
-    // Apply migration 015
+    // Apply migration
     sqlite.exec(migrationSql);
+
+    // Verify blank customer identifiers normalized to NULL and FK child preserved
+    const blanks = sqlite
+      .prepare("SELECT id, email, phone FROM customers WHERE id IN ('c1_blank1', 'c1_blank2') ORDER BY id")
+      .all() as Array<{ id: string; email: string | null; phone: string | null }>;
+    expect(blanks).toEqual([
+      { id: 'c1_blank1', email: null, phone: null },
+      { id: 'c1_blank2', email: null, phone: null },
+    ]);
+    const fkWallet = sqlite.prepare('SELECT customer_id, balance FROM cashback_wallets WHERE id = ?').get('wal_fk_1') as { customer_id: string; balance: number };
+    expect(fkWallet).toEqual({ customer_id: 'c1', balance: 5000 });
 
     // Verify cross-tenant inserts with same phone/email, promo code, and tier now succeed
     sqlite
@@ -532,6 +573,9 @@ describe('P0 Regression: Multi-Tenant CRM & Loyalty (#197)', () => {
       .run('p2', 'WELCOME10', 15, 'tenant-b', 'fixed_amount', 15000);
     sqlite
       .prepare("INSERT INTO loyalty_tier_configs (tenant_id, tier, name, min_points) VALUES (?, ?, ?, ?)")
+      .run('tenant-b', 'gold', 'Gold B', 2000);
+    sqlite
+      .prepare("INSERT INTO tier_configs (tenant_id, tier, tier_name, min_points) VALUES (?, ?, ?, ?)")
       .run('tenant-b', 'gold', 'Gold B', 2000);
 
     // Verify existing data & post-ALTER columns preserved
@@ -547,5 +591,488 @@ describe('P0 Regression: Multi-Tenant CRM & Loyalty (#197)', () => {
     expect(triggers).toContain('update_customers_timestamp');
 
     sqlite.close();
+  });
+
+  it('fails closed on D1 error with X-Tenant-ID and permits HQ super-admin login across tenants', async () => {
+    const kv = createMemoryKv();
+    const brokenDb = {
+      prepare: vi.fn(() => ({
+        bind: () => ({
+          first: async () => {
+            throw new Error('D1 outage');
+          },
+        }),
+      })),
+    };
+
+    await expect(
+      findLoginUser({ AURA_DB: brokenDb, AUTH_KV: kv } as never, 'staff@aura.vn', 'store-a')
+    ).rejects.toBeInstanceOf(SessionUnavailableError);
+    await expect(
+      loadStaffAccountForLogin(brokenDb as never, 'staff@aura.vn', 'store-a')
+    ).rejects.toBeInstanceOf(SessionUnavailableError);
+
+    const hqDb = {
+      prepare: vi.fn(() => ({
+        bind: (...args: unknown[]) => ({
+          first: async () => {
+            expect(args[0]).toBe('hq-owner@aura.vn');
+            expect(args[1]).toBe('store-a');
+            return { staff_id: 'hq_owner_1', tenant_id: 'hq', role: 'owner' };
+          },
+        }),
+      })),
+    };
+    const found = await findLoginUser({ AURA_DB: hqDb, AUTH_KV: kv } as never, 'HQ-Owner@aura.vn', 'store-a');
+    expect(found).toMatchObject({ id: 'hq_owner_1', email: 'hq-owner@aura.vn', tenant_id: 'hq' });
+  });
+
+  it('allows HQ admin to create, update, and soft-delete store owners while blocking store-bound admins and normalizing emails', async () => {
+    const schemaSql = readFileSync(resolve(__dirname, '../../../schema.sql'), 'utf-8');
+    const sqlite = new DatabaseSync(':memory:');
+    sqlite.exec(schemaSql);
+    sqlite.exec("INSERT INTO saas_tenants (id, slug, name, tier, status) VALUES ('store-a', 'store-a', 'Store A', 'PRO', 'active')");
+
+    const db = {
+      prepare: (sql: string) => ({
+        bind: (...args: unknown[]) => ({
+          first: async () => sqlite.prepare(sql).get(...(args as never[])) ?? null,
+          all: async () => ({ results: sqlite.prepare(sql).all(...(args as never[])) }),
+          run: async () => {
+            const info = sqlite.prepare(sql).run(...(args as never[]));
+            return { success: true, meta: { changes: Number(info.changes ?? 0) } };
+          },
+        }),
+      }),
+      batch: async (stmts: Array<{ run: () => Promise<unknown> }>) => {
+        const out: unknown[] = [];
+        for (const s of stmts) out.push(await s.run());
+        return out;
+      },
+    };
+
+    const kv = createMemoryKv();
+    let actor = { id: 'store_admin_1', role: 'admin', tenantId: 'store-a' };
+    const app = new OpenAPIHono();
+    app.use('*', async (c, next) => {
+      c.set('user' as never, actor as never);
+      c.set('tenantId' as never, actor.tenantId as never);
+      await next();
+    });
+    registerStaffHandlers(app as never);
+
+    // Store-bound admin cannot create owner
+    const deniedCreate = await app.fetch(
+      new Request('https://api.test/api/staff', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Tenant-ID': 'store-a' },
+        body: JSON.stringify({
+          name: 'Store Owner',
+          email: 'Owner.Mixed@StoreA.vn',
+          password: 'Password123!',
+          role: 'owner',
+        }),
+      }),
+      { AURA_DB: db, AUTH_KV: kv } as never
+    );
+    expect(deniedCreate.status).toBe(403);
+
+    // HQ super-admin (admin bound to hq) creates store owner with mixed-case email
+    actor = { id: 'hq_admin_1', role: 'admin', tenantId: 'hq' };
+    const hqCreate = await app.fetch(
+      new Request('https://api.test/api/staff', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Tenant-ID': 'store-a' },
+        body: JSON.stringify({
+          name: 'Store Owner',
+          email: 'Owner.Mixed@StoreA.vn',
+          password: 'Password123!',
+          role: 'owner',
+        }),
+      }),
+      { AURA_DB: db, AUTH_KV: kv } as never
+    );
+    expect(hqCreate.status).toBe(201);
+    const createdBody = (await hqCreate.json()) as { data: { id: string; email: string } };
+    expect(createdBody.data.email).toBe('owner.mixed@storea.vn');
+    expect(kv.store.has('user:owner.mixed@storea.vn')).toBe(true);
+
+    // Case-insensitive duplicate blocked
+    const dupRes = await app.fetch(
+      new Request('https://api.test/api/staff', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Tenant-ID': 'store-a' },
+        body: JSON.stringify({
+          name: 'Dup Staff',
+          email: 'owner.mixed@storea.vn',
+          password: 'Password123!',
+          role: 'staff',
+        }),
+      }),
+      { AURA_DB: db, AUTH_KV: kv } as never
+    );
+    expect(dupRes.status).toBe(409);
+
+    // HQ admin can PATCH and DELETE store owner while store-bound admin cannot
+    actor = { id: 'store_admin_1', role: 'admin', tenantId: 'store-a' };
+    const deniedPatch = await app.fetch(
+      new Request(`https://api.test/api/staff/${createdBody.data.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', 'X-Tenant-ID': 'store-a' },
+        body: JSON.stringify({ email: 'NewOwner@StoreA.vn' }),
+      }),
+      { AURA_DB: db, AUTH_KV: kv } as never
+    );
+    expect(deniedPatch.status).toBe(403);
+
+    actor = { id: 'hq_admin_1', role: 'admin', tenantId: 'hq' };
+    const hqPatch = await app.fetch(
+      new Request(`https://api.test/api/staff/${createdBody.data.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', 'X-Tenant-ID': 'store-a' },
+        body: JSON.stringify({ email: 'NewOwner@StoreA.vn' }),
+      }),
+      { AURA_DB: db, AUTH_KV: kv } as never
+    );
+    expect(hqPatch.status).toBe(200);
+    expect(kv.store.has('user:owner.mixed@storea.vn')).toBe(false);
+    expect(kv.store.has('user:newowner@storea.vn')).toBe(true);
+
+    // Add a second active owner so last-owner protection allows deactivating the first
+    sqlite.prepare("INSERT INTO users (id, name, role, tenant_id, is_active, password_hash) VALUES ('owner_backup', 'Backup', 'owner', 'store-a', 1, 'hash')").run();
+    const hqDelete = await app.fetch(
+      new Request(`https://api.test/api/staff/${createdBody.data.id}`, {
+        method: 'DELETE',
+        headers: { 'X-Tenant-ID': 'store-a' },
+      }),
+      { AURA_DB: db, AUTH_KV: kv } as never
+    );
+    expect(hqDelete.status).toBe(200);
+    sqlite.close();
+  });
+
+  it('normalizes blank customer phone to NULL on registration and verification without colliding under UNIQUE(tenant_id, phone)', async () => {
+    const schemaSql = readFileSync(resolve(__dirname, '../../../schema.sql'), 'utf-8');
+    const sqlite = new DatabaseSync(':memory:');
+    sqlite.exec(schemaSql);
+
+    const db = {
+      prepare: (sql: string) => ({
+        bind: (...args: unknown[]) => ({
+          first: async () => sqlite.prepare(sql).get(...(args as never[])) ?? null,
+          all: async () => ({ results: sqlite.prepare(sql).all(...(args as never[])) }),
+          run: async () => {
+            const info = sqlite.prepare(sql).run(...(args as never[]));
+            return { success: true, meta: { changes: Number(info.changes ?? 0) } };
+          },
+        }),
+      }),
+    };
+
+    const kv = createMemoryKv();
+    const app = new OpenAPIHono();
+    registerAuthHandlers(app as never);
+
+    for (const email of ['blank1@example.com', 'blank2@example.com']) {
+      const regRes = await app.fetch(
+        new Request('https://api.test/api/auth/register', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-Tenant-ID': 'store-a' },
+          body: JSON.stringify({ name: 'Guest', email, password: 'Password123!', phone: '' }),
+        }),
+        { AURA_DB: db, AUTH_KV: kv, JWT_SECRET: 'test-secret-1234567890' } as never
+      );
+      expect(regRes.status).toBe(201);
+    }
+
+    // Legacy registerUser and registerWithVerification + verifyEmail also store NULL for omitted phone
+    const legacyRes = await registerUser(
+      new Request('https://api.test/api/auth/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Tenant-ID': 'store-a' },
+        body: JSON.stringify({ name: 'Legacy', email: 'blank3@example.com', password: 'Password123!' }),
+      }),
+      { AURA_DB: db, AUTH_KV: kv, JWT_SECRET: 'test-secret-1234567890', JWT_EXPIRY_SECONDS: '3600' }
+    );
+    expect(legacyRes.status).toBe(201);
+
+    const verifyRegRes = await registerWithVerification(
+      new Request('https://api.test/api/auth/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Tenant-ID': 'store-a' },
+        body: JSON.stringify({ name: 'Verify', email: 'blank4@example.com', password: 'Password123!' }),
+      }),
+      { AURA_DB: db, AUTH_KV: kv }
+    );
+    expect(verifyRegRes.status).toBe(201);
+
+    const codeRow = sqlite.prepare("SELECT code FROM email_verifications WHERE email = 'blank4@example.com'").get() as { code: string };
+    const verifyRes = await verifyEmail(
+      new Request('https://api.test/api/auth/verify-email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: 'blank4@example.com', code: codeRow.code }),
+      }),
+      { AURA_DB: db, AUTH_KV: kv, JWT_SECRET: 'test-secret-1234567890', JWT_EXPIRY_SECONDS: '3600' }
+    );
+    expect(verifyRes.status).toBe(200);
+
+    const phones = sqlite
+      .prepare("SELECT email, phone FROM customers WHERE tenant_id = 'store-a' ORDER BY email")
+      .all() as Array<{ email: string; phone: string | null }>;
+    expect(phones.length).toBe(4);
+    expect(phones.every((row) => row.phone === null)).toBe(true);
+    sqlite.close();
+  });
+
+  it('rejects fixed_amount promo without valid value/discount_value, enforces normalized phone limits, and preserves winner in concurrent race', async () => {
+    const schemaSql = readFileSync(resolve(__dirname, '../../../schema.sql'), 'utf-8');
+    const sqlite = new DatabaseSync(':memory:');
+    sqlite.exec(schemaSql);
+    sqlite.prepare("INSERT INTO categories (id, name, slug, tenant_id) VALUES ('cat_coffee', 'Coffee', 'coffee', 'default')").run();
+    sqlite.prepare("INSERT INTO products (id, category_id, name, price, available, is_available, tenant_id) VALUES ('item_1', 'cat_coffee', 'Latte', 50000, 1, 1, 'default')").run();
+    sqlite.prepare("INSERT INTO menu_items (id, category, name, price, available, tenant_id) VALUES ('item_1', 'coffee', 'Latte', 50000, 1, 'default')").run();
+    sqlite.prepare("INSERT INTO promotions (id, code, percent, discount_type, discount_value, value, is_active, usage_limit_per_customer, tenant_id) VALUES ('p_bad_fixed', 'BADFIXED', 25, 'fixed_amount', 0, 0, 1, NULL, 'default')").run();
+    sqlite.prepare("INSERT INTO promotions (id, code, percent, discount_type, discount_value, value, is_active, usage_limit_per_customer, tenant_id) VALUES ('p_once_norm', 'ONCENORM', 0, 'fixed_amount', 10000, 10000, 1, 1, 'default')").run();
+    sqlite.prepare("INSERT INTO promotions (id, code, percent, discount_type, discount_value, value, is_active, usage_limit_per_customer, tenant_id) VALUES ('p_race', 'RACEONCE', 0, 'fixed_amount', 10000, 10000, 1, 1, 'default')").run();
+
+    const db = {
+      prepare: (sql: string) => ({
+        bind: (...args: unknown[]) => ({
+          first: async () => sqlite.prepare(sql).get(...(args as never[])) ?? null,
+          all: async () => ({ results: sqlite.prepare(sql).all(...(args as never[])) }),
+          run: async () => {
+            const info = sqlite.prepare(sql).run(...(args as never[]));
+            return { success: true, meta: { changes: Number(info.changes ?? 0) } };
+          },
+        }),
+      }),
+      batch: async (stmts: Array<{ run: () => Promise<unknown> }>) => {
+        const out: unknown[] = [];
+        for (const s of stmts) out.push(await s.run());
+        return out;
+      },
+    };
+
+    // 1. fixed_amount with discount_value=0 and value=0 must NOT use percent=25
+    const badFixedRes = await createOrder(
+      new Request('https://api.test/api/orders', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          items: [{ id: 'item_1', name: 'Latte', price: 50000, quantity: 1 }],
+          total: 50000,
+          promo_code: 'BADFIXED',
+          payment_method: 'cod',
+          customer_name: 'Bob',
+          customer_phone: '0901234567',
+        }),
+      }),
+      { AURA_DB: db } as never
+    );
+    expect(badFixedRes.status).toBe(400);
+    const badFixedBody = (await badFixedRes.json()) as { error?: string };
+    expect(badFixedBody.error).toContain('Giá trị giảm giá không hợp lệ');
+
+    // 2. First redemption with +84901234567 succeeds; second with 0901234567 is blocked
+    const firstRedeem = await createOrder(
+      new Request('https://api.test/api/orders', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          items: [{ id: 'item_1', name: 'Latte', price: 50000, quantity: 1 }],
+          total: 50000,
+          promo_code: 'ONCENORM',
+          payment_method: 'cod',
+          customer_name: 'Bob',
+          customer_phone: '+84901234567',
+        }),
+      }),
+      { AURA_DB: db } as never
+    );
+    expect(firstRedeem.status).toBe(201);
+
+    const secondRedeem = await createOrder(
+      new Request('https://api.test/api/orders', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          items: [{ id: 'item_1', name: 'Latte', price: 50000, quantity: 1 }],
+          total: 50000,
+          promo_code: 'ONCENORM',
+          payment_method: 'cod',
+          customer_name: 'Bob',
+          customer_phone: '0901234567',
+        }),
+      }),
+      { AURA_DB: db } as never
+    );
+    expect(secondRedeem.status).toBe(400);
+    const secondRedeemBody = (await secondRedeem.json()) as { error?: string };
+    expect(secondRedeemBody.error).toContain('Bạn đã sử dụng hết lượt');
+    const activeRedemptions = sqlite.prepare("SELECT COUNT(*) AS cnt FROM promotion_redemptions WHERE promotion_id = 'p_once_norm'").get() as { cnt: number };
+    expect(activeRedemptions.cnt).toBe(1);
+
+    // 3. Concurrent race preserves exactly 1 winner and rolls back the loser
+    const raceResults = await Promise.all([
+      createOrder(
+        new Request('https://api.test/api/orders', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            items: [{ id: 'item_1', name: 'Latte', price: 50000, quantity: 1 }],
+            total: 50000,
+            promo_code: 'RACEONCE',
+            payment_method: 'cod',
+            customer_name: 'Race',
+            customer_phone: '0908887777',
+          }),
+        }),
+        { AURA_DB: db } as never
+      ),
+      createOrder(
+        new Request('https://api.test/api/orders', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            items: [{ id: 'item_1', name: 'Latte', price: 50000, quantity: 1 }],
+            total: 50000,
+            promo_code: 'RACEONCE',
+            payment_method: 'cod',
+            customer_name: 'Race',
+            customer_phone: '+84908887777',
+          }),
+        }),
+        { AURA_DB: db } as never
+      ),
+    ]);
+    const raceStatuses = raceResults.map((r) => r.status).sort((a, b) => a - b);
+    expect(raceStatuses).toEqual([201, 400]);
+    const raceRedemptions = sqlite.prepare("SELECT COUNT(*) AS cnt FROM promotion_redemptions WHERE promotion_id = 'p_race'").get() as { cnt: number };
+    expect(raceRedemptions.cnt).toBe(1);
+    sqlite.close();
+  });
+
+  it('inserts tenant-scoped loyalty_tier_configs and tier_configs cleanly against real schema', async () => {
+    const schemaSql = readFileSync(resolve(__dirname, '../../../schema.sql'), 'utf-8');
+    const sqlite = new DatabaseSync(':memory:');
+    sqlite.exec(schemaSql);
+    sqlite.prepare("INSERT INTO loyalty_tier_configs (tenant_id, tier, name, min_points) VALUES ('default', 'gold', 'Gold', 1000)").run();
+
+    const db = {
+      prepare: (sql: string) => ({
+        bind: (...args: unknown[]) => ({
+          first: async () => sqlite.prepare(sql).get(...(args as never[])) ?? null,
+          all: async () => ({ results: sqlite.prepare(sql).all(...(args as never[])) }),
+          run: async () => {
+            const info = sqlite.prepare(sql).run(...(args as never[]));
+            return { success: true, meta: { changes: Number(info.changes ?? 0) } };
+          },
+        }),
+      }),
+    };
+
+    const app = new OpenAPIHono();
+    app.use('*', async (c, next) => {
+      c.set('user' as never, { id: 'owner_t2', role: 'owner', tenantId: 'tenant_2' } as never);
+      c.set('tenantId' as never, 'tenant_2' as never);
+      await next();
+    });
+    registerTierHandlers(app as never);
+
+    const patchRes = await app.fetch(
+      new Request('https://api.test/api/loyalty/tiers/gold', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: 'Gold T2', minPoints: 1500 }),
+      }),
+      { AURA_DB: db } as never
+    );
+    expect(patchRes.status).toBe(200);
+    const row = sqlite.prepare("SELECT name, min_points FROM loyalty_tier_configs WHERE tenant_id = 'tenant_2' AND tier = 'gold'").get() as { name: string; min_points: number };
+    expect(row).toEqual({ name: 'Gold T2', min_points: 1500 });
+
+    // Exercise tier_configs canonical insert path as well
+    sqlite.exec('DROP TABLE loyalty_tier_configs');
+    sqlite.prepare("INSERT INTO tier_configs (tenant_id, tier, tier_name, min_points) VALUES ('default', 'silver', 'Silver', 500)").run();
+    const patchCanonical = await app.fetch(
+      new Request('https://api.test/api/loyalty/tiers/silver', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: 'Silver T2', minPoints: 700 }),
+      }),
+      { AURA_DB: db } as never
+    );
+    expect(patchCanonical.status).toBe(200);
+    const canonicalRow = sqlite.prepare("SELECT tier_name, min_points FROM tier_configs WHERE tenant_id = 'tenant_2' AND tier = 'silver'").get() as { tier_name: string; min_points: number };
+    expect(canonicalRow).toEqual({ tier_name: 'Silver T2', min_points: 700 });
+    sqlite.close();
+  });
+
+  it('partitions auth rate-limit buckets per endpoint, skips charging successful logins, and uses canonical reset-password hint', async () => {
+    const kv = createMemoryKv();
+    const passwordHash = await hashPassword('Secret123!');
+    await kv.put(
+      'user:owner@aura.vn',
+      JSON.stringify({
+        id: 'owner_1',
+        email: 'owner@aura.vn',
+        name: 'Owner',
+        role: 'owner',
+        tenant_id: 'default',
+        password: passwordHash,
+        auth_version: 1,
+      })
+    );
+
+    const env = {
+      AUTH_KV: kv,
+      JWT_SECRET: 'test-secret-1234567890',
+      JWT_EXPIRY_SECONDS: '3600',
+    };
+
+    // Bootstrap hint points to /api/auth/operator-reset-password
+    const bootstrapRes = await bootstrapOwner(
+      new Request('https://api.test/api/auth/bootstrap-owner', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: 'newowner@aura.vn', password: 'Password123!' }),
+      }),
+      env
+    );
+    expect(bootstrapRes.status).toBe(409);
+    const bootstrapBody = (await bootstrapRes.json()) as { hint?: string };
+    expect(bootstrapBody.hint).toContain('/api/auth/operator-reset-password');
+
+    // Over 20 successful logins from the same IP must not trigger 429
+    const db = {
+      prepare: vi.fn((sql: string) => ({
+        bind: () => ({
+          first: async () => {
+            if (sql.includes('FROM staff_login_identities')) return null;
+            if (sql.includes('FROM users WHERE id =')) {
+              return { id: 'owner_1', name: 'Owner', role: 'owner', tenant_id: 'default', is_active: 1, auth_version: 1 };
+            }
+            return null;
+          },
+          all: async () => ({ results: [] }),
+          run: async () => ({ success: true, meta: { changes: 1 } }),
+        }),
+      })),
+    };
+    const app = new OpenAPIHono();
+    app.route('/api/auth', authEndpointsRouter);
+    for (let i = 0; i < 22; i++) {
+      const loginRes = await app.fetch(
+        new Request('https://api.test/api/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'CF-Connecting-IP': '203.113.10.1' },
+          body: JSON.stringify({ email: 'owner@aura.vn', password: 'Secret123!' }),
+        }),
+        { ...env, AURA_DB: db } as never
+      );
+      expect(loginRes.status).toBe(200);
+    }
+    expect(kv.store.get('rate:auth:login:203.113.10.1')).toBeUndefined();
   });
 });

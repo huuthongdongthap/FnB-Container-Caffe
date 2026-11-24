@@ -36,11 +36,22 @@ export async function findLoginUser(
     let identity: { staff_id: string; tenant_id?: string | null } | null = null;
     if (requestedTenant) {
       identity = await env.AURA_DB.prepare(
-        "SELECT sli.staff_id, u.tenant_id FROM staff_login_identities sli JOIN users u ON u.id = sli.staff_id WHERE LOWER(sli.email) = ? AND COALESCE(NULLIF(TRIM(u.tenant_id), ''), 'default') = ? LIMIT 1"
+        `SELECT sli.staff_id, u.tenant_id
+         FROM staff_login_identities sli
+         JOIN users u ON u.id = sli.staff_id
+         WHERE LOWER(sli.email) = ?
+           AND (
+             COALESCE(NULLIF(TRIM(u.tenant_id), ''), 'default') = ?
+             OR (
+               LOWER(TRIM(COALESCE(u.role, ''))) IN ('owner', 'admin')
+               AND LOWER(TRIM(COALESCE(u.tenant_id, ''))) IN ('hq', '*')
+             )
+           )
+         ORDER BY CASE WHEN COALESCE(NULLIF(TRIM(u.tenant_id), ''), 'default') = ? THEN 0 ELSE 1 END
+         LIMIT 1`
       )
-        .bind(normalizedEmail, requestedTenant)
-        .first<{ staff_id: string; tenant_id?: string | null }>()
-        .catch(() => null);
+        .bind(normalizedEmail, requestedTenant, requestedTenant)
+        .first<{ staff_id: string; tenant_id?: string | null }>();
     }
     if (!identity && !requestedTenant) {
       identity = await env.AURA_DB.prepare('SELECT staff_id FROM staff_login_identities WHERE LOWER(email) = ?')
@@ -68,8 +79,12 @@ export async function findLoginUser(
   }
   if (kvFailed) throw new SessionUnavailableError();
   if (legacy && requestedTenant) {
+    const legacyRole = String(legacy.role || '').trim().toLowerCase();
     const legacyTenant = String(legacy.tenant_id || legacy.tenantId || '').trim() || 'default';
-    if (legacyTenant !== requestedTenant) {
+    const isLegacyHqSuperAdmin =
+      (legacyRole === 'owner' || legacyRole === 'admin') &&
+      (legacyTenant.toLowerCase() === 'hq' || legacyTenant === '*');
+    if (!isLegacyHqSuperAdmin && legacyTenant !== requestedTenant) {
       return null;
     }
   }
@@ -92,22 +107,36 @@ export async function loadStaffAccountForLogin(
     rawTenant && rawTenant !== '*' && rawTenant.toLowerCase() !== 'hq'
       ? rawTenant
       : undefined;
-  if (requestedTenant) {
-    return db
+  try {
+    if (requestedTenant) {
+      return await db
+        .prepare(
+          `SELECT u.*
+           FROM staff_login_identities sli
+           JOIN users u ON u.id = sli.staff_id
+           WHERE LOWER(sli.email) = ?
+             AND (
+               COALESCE(NULLIF(TRIM(u.tenant_id), ''), 'default') = ?
+               OR (
+                 LOWER(TRIM(COALESCE(u.role, ''))) IN ('owner', 'admin')
+                 AND LOWER(TRIM(COALESCE(u.tenant_id, ''))) IN ('hq', '*')
+               )
+             )
+           ORDER BY CASE WHEN COALESCE(NULLIF(TRIM(u.tenant_id), ''), 'default') = ? THEN 0 ELSE 1 END
+           LIMIT 1`
+        )
+        .bind(normalizedEmail, requestedTenant, requestedTenant)
+        .first<Record<string, any>>();
+    }
+    return await db
       .prepare(
-        "SELECT u.* FROM staff_login_identities sli JOIN users u ON u.id = sli.staff_id WHERE LOWER(sli.email) = ? AND COALESCE(NULLIF(TRIM(u.tenant_id), ''), 'default') = ? LIMIT 1"
+        'SELECT u.* FROM staff_login_identities sli JOIN users u ON u.id = sli.staff_id WHERE LOWER(sli.email) = ? LIMIT 1'
       )
-      .bind(normalizedEmail, requestedTenant)
-      .first<Record<string, any>>()
-      .catch(() => null);
+      .bind(normalizedEmail)
+      .first<Record<string, any>>();
+  } catch {
+    throw new SessionUnavailableError();
   }
-  return db
-    .prepare(
-      'SELECT u.* FROM staff_login_identities sli JOIN users u ON u.id = sli.staff_id WHERE LOWER(sli.email) = ? LIMIT 1'
-    )
-    .bind(normalizedEmail)
-    .first<Record<string, any>>()
-    .catch(() => null);
 }
 
 export async function createStaffIdentity(env: Env, user: {
