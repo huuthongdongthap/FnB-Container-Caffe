@@ -29,12 +29,16 @@ function normalizeDashboardStats(body: Record<string, unknown> | null | undefine
       : todayOrders > 0
         ? Math.round(todayRevenue / todayOrders)
         : 0;
-  const activeCustomers = Number(src.activeCustomers ?? src.active_customers ?? todayOrders);
+  const activeCustomers = Number(src.activeCustomers ?? src.active_customers ?? src.distinct_customers_today ?? 0);
+  const rawRevenueChangePercent = src.revenueChangePercent ?? src.revenue_change_percent;
+  const revenueChangePercent =
+    typeof rawRevenueChangePercent === 'number' ? Number(rawRevenueChangePercent) : null;
   return {
     todayRevenue,
     todayOrders,
     avgOrderValue,
     activeCustomers,
+    revenueChangePercent,
   };
 }
 
@@ -50,7 +54,7 @@ export const useAdminDashboardStore = create<AdminDashboardState>((set) => ({
     set({ loading: true, error: null });
     try {
       const endpoint = period ? `/api/stats?period=${encodeURIComponent(period)}` : '/api/stats';
-      const body = await apiFetch<any>(endpoint);
+      const body = await apiFetch<Record<string, unknown>>(endpoint);
       if (seq !== latestFetchDashboardSeq) return;
       set({
         stats: normalizeDashboardStats(body),

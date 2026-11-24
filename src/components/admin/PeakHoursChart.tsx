@@ -31,7 +31,7 @@ function PeakHoursError({ message, onRetry }: { message: string; onRetry?: () =>
   return (
     <div className="rounded-xl border border-[var(--glass-border)] bg-[var(--glass-bg)] backdrop-blur-[var(--glass-blur)] p-5">
       <h3 className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--aura-chrome-light)] mb-4">
-        Gio cao diem
+        Giờ cao điểm
       </h3>
       <div className="flex flex-col items-center justify-center py-6 text-center">
         <svg className="w-8 h-8 text-[var(--aura-danger)] mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
@@ -45,7 +45,7 @@ function PeakHoursError({ message, onRetry }: { message: string; onRetry?: () =>
               border border-[var(--aura-chrome-light)] text-[var(--aura-chrome-light)]
               hover:bg-[rgba(201,214,223,0.08)] transition-all duration-300"
           >
-            Thu lai
+            Thử lại
           </button>
         )}
       </div>
@@ -59,13 +59,13 @@ function PeakHoursEmpty() {
   return (
     <div className="rounded-xl border border-[var(--glass-border)] bg-[var(--glass-bg)] backdrop-blur-[var(--glass-blur)] p-5">
       <h3 className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--aura-chrome-light)] mb-4">
-        Gio cao diem
+        Giờ cao điểm
       </h3>
       <div className="flex flex-col items-center justify-center py-8 text-center">
         <svg className="w-8 h-8 text-[var(--aura-text-muted)] mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
           <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" />
         </svg>
-        <p className="text-sm text-[var(--aura-text-muted)]">Chua co du lieu gio cao diem</p>
+        <p className="text-sm text-[var(--aura-text-muted)]">Chưa có dữ liệu giờ cao điểm</p>
       </div>
     </div>
   );
@@ -88,7 +88,7 @@ export function PeakHoursChart({ data, loading, error, onRetry, className }: Pea
       className,
     )}>
       <h3 className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--aura-chrome-light)] mb-4">
-        Gio cao diem
+        Giờ cao điểm
       </h3>
 
       {/* 24-hour bar chart */}
@@ -123,7 +123,7 @@ export function PeakHoursChart({ data, loading, error, onRetry, className }: Pea
 
       <div className="mt-3 text-center">
         <span className="text-[11px] text-[var(--aura-text-muted)]">
-          {data.filter((h) => h.order_count > 0).length} khung gio co don hang
+          {data.filter((h) => h.order_count > 0).length} khung giờ có đơn hàng
         </span>
       </div>
     </div>

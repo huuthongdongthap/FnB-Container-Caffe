@@ -3,10 +3,11 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { apiFetch } from '@/lib/api-client';
+import { useClientSessionScope } from '@/lib/client-session';
 import { Card } from '@/components/ui/card';
 import { HelmetHead } from '@/components/seo/HelmetHead';
 import { StatsCard } from '@/components/admin/StatsCard';
-import { DollarSign, LayoutGrid, TrendingUp } from 'lucide-react';
+import { AlertTriangle, DollarSign, LayoutGrid, TrendingUp } from 'lucide-react';
 
 interface FranchiseLocationItem {
   id: string;
@@ -40,18 +41,19 @@ function formatVnd(amount: number): string {
 }
 
 export default function FranchiseReportsPage() {
+  const session = useClientSessionScope();
   const [startDate, setStartDate] = useState(() => defaultStoreDate(-29));
   const [endDate, setEndDate] = useState(() => defaultStoreDate(0));
 
   const locationsQuery = useQuery<{ success: boolean; data: FranchiseLocationItem[] }>({
-    queryKey: ['admin-franchise-locations'],
+    queryKey: ['admin-franchise-locations', session.tenantId, session.userScope],
     queryFn: () => apiFetch('/api/franchise/locations'),
   });
 
   const locations = locationsQuery.data?.data ?? [];
 
-  const metricsQuery = useQuery<FranchiseLocationMetrics[]>({
-    queryKey: ['admin-franchise-metrics', locations.map((l) => l.id).join(','), startDate, endDate],
+  const metricsQuery = useQuery<{ rows: FranchiseLocationMetrics[]; failedLocations: string[] }>({
+    queryKey: ['admin-franchise-metrics', session.tenantId, session.userScope, locations.map((l) => l.id).join(','), startDate, endDate],
     enabled: locations.length > 0,
     queryFn: async () => {
       const settled = await Promise.allSettled(
@@ -62,13 +64,22 @@ export default function FranchiseReportsPage() {
           return res.data;
         })
       );
-      return settled
-        .filter((r): r is PromiseFulfilledResult<FranchiseLocationMetrics> => r.status === 'fulfilled' && Boolean(r.value))
-        .map((r) => r.value);
+      const rows: FranchiseLocationMetrics[] = [];
+      const failedLocations: string[] = [];
+      settled.forEach((r, idx) => {
+        if (r.status === 'fulfilled' && r.value) {
+          rows.push(r.value);
+        } else {
+          const loc = locations[idx];
+          failedLocations.push(loc ? `${loc.name} (${loc.code})` : `#${idx + 1}`);
+        }
+      });
+      return { rows, failedLocations };
     },
   });
 
-  const rows = metricsQuery.data ?? [];
+  const rows = metricsQuery.data?.rows ?? [];
+  const failedLocations = metricsQuery.data?.failedLocations ?? [];
   const totalGross = rows.reduce((sum, r) => sum + r.gross_sales, 0);
   const totalRoyalty = rows.reduce((sum, r) => sum + r.royalty_amount, 0);
   const totalNetPayout = rows.reduce((sum, r) => sum + r.net_franchisee_payout, 0);
@@ -107,6 +118,21 @@ export default function FranchiseReportsPage() {
           />
         </div>
       </div>
+
+      {failedLocations.length > 0 && (
+        <div
+          role="alert"
+          className="flex items-start gap-3 rounded-xl border border-amber-500/40 bg-amber-500/10 p-4 text-sm text-amber-200"
+        >
+          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-400" />
+          <div>
+            <p className="font-semibold">
+              Không thể tải dữ liệu cho {failedLocations.length} chi nhánh:
+            </p>
+            <p className="text-xs text-amber-200/80">{failedLocations.join(', ')}</p>
+          </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <StatsCard

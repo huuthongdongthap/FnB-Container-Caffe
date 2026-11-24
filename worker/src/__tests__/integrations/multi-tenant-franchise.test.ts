@@ -2305,9 +2305,9 @@ describe('Multi-Tenant & Franchise Preparation Integration', () => {
             if (args[0] === 'loc-def-1') return locDefault;
             if (args[0] === 'loc-sad-1') return locSadec;
           }
-          if (/SELECT COUNT\(\*\) as order_count, COALESCE\(SUM\(total\), 0\) as gross_sales/i.test(sql)) {
+          if (/SELECT COUNT\(\*\) as order_count[\s\S]*as gross_sales/i.test(sql)) {
             // Verify COALESCE(NULLIF(tenant_id, ''), 'default') = ? is used so legacy NULL tenant_id orders are counted
-            expect(sql).toContain("COALESCE(NULLIF(tenant_id, ''), 'default') = ?");
+            expect(sql).toMatch(/COALESCE\(NULLIF\((?:o\.)?tenant_id, ''\), 'default'\) = \?/);
             return { order_count: 4, gross_sales: 400000 };
           }
           return null;

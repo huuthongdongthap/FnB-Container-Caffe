@@ -232,9 +232,9 @@ describe('Phase 51 Slice AX2 — Grouped Sales Reports, Tree Analytics UTC+7 / T
       const catRes = await app.request('/sales-by-category?from=2026-11-03&to=2026-11-03', {}, env);
       expect(catRes.status).toBe(200);
       const catJson = (await catRes.json()) as {
-        data: { groups: Array<{ label: string; value: number; count: number }> };
+        data: { groups: Array<{ label: string; value: number; count: number; itemsCount?: number; orderCount?: number }> };
       };
-      expect(catJson.data.groups).toEqual([{ label: 'Coffee', value: 50000, count: 1 }]);
+      expect(catJson.data.groups).toEqual([{ label: 'Coffee', value: 50000, count: 1, itemsCount: 1, orderCount: 1 }]);
 
       const payRes = await app.request('/sales-by-payment?from=2026-11-03&to=2026-11-03', {}, env);
       expect(payRes.status).toBe(200);
@@ -358,7 +358,7 @@ describe('Phase 51 Slice AX2 — Grouped Sales Reports, Tree Analytics UTC+7 / T
         data: { groups: Array<{ label: string; value: number; count: number }> };
       };
       // Must NOT resolve 'Secret Rival Category' from store-b
-      expect(json.data.groups).toEqual([{ label: 'Món khác', value: 45000, count: 1 }]);
+      expect(json.data.groups).toEqual([{ label: 'Món khác', value: 45000, count: 1, orderCount: 1, itemsCount: 1 }]);
     });
   });
 
@@ -441,8 +441,8 @@ describe('Phase 51 Slice AX2 — Grouped Sales Reports, Tree Analytics UTC+7 / T
     it('excludes all non-revenue statuses in getOrdersInRange and neutralizes leading pipe, whitespace-prefixed, and multiline formulas in escapeCsvField', async () => {
       const { db, sqlite } = createReportsFixture();
       const insertOrder = sqlite.prepare(`
-        INSERT INTO orders (id, customer_name, customer_phone, total, status, payment_method, items, created_at, tenant_id)
-        VALUES (?, ?, ?, ?, ?, 'cash', '[]', '2026-11-03 10:00:00', 'store-a')
+        INSERT INTO orders (id, customer_name, customer_phone, total, status, payment_status, payment_method, items, created_at, tenant_id)
+        VALUES (?, ?, ?, ?, ?, 'paid', 'cash', '[]', '2026-11-03 10:00:00', 'store-a')
       `);
       insertOrder.run('ord-ok', 'Alice', '0901111111', 45000, 'completed');
       insertOrder.run('ord-ref', 'Bob', '0902222222', 55000, 'refunded');

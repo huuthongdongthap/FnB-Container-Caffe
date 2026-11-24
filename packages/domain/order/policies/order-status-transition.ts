@@ -246,15 +246,19 @@ export async function transitionOrderStatus(
     `UPDATE orders SET status = ?, updated_at = ?${additions} WHERE id = ? AND status = ?${writeTenantClause}${guard}`,
   ).bind(targetStatus, new Date().toISOString(), ...fields.map(([, value]) => value), orderId, order.status, ...writeTenantBinds).run();
   const closingOrder = targetStatus === 'completed' && !isNoOp;
+  const atomicMarkingPaid =
+    String((options.fields as Record<string, unknown> | undefined)?.payment_status ?? '')
+      .trim()
+      .toLowerCase() === 'paid';
   let result: unknown;
-  if (closingOrder) {
-    // Check persisted settlement in the same write that would close the order.
-    const paid = "LOWER(TRIM(COALESCE(payment_status, ''))) = 'paid'";
+  if (closingOrder && !atomicMarkingPaid) {
+    // Require persisted payment settlement before completing an order.
+    const paid = "LOWER(TRIM(COALESCE(payment_status, ''))) IN ('paid', 'partially_refunded')";
     try {
-      result = await updateStatus(` AND (LOWER(TRIM(COALESCE(payment_method, ''))) NOT IN ('cash', 'cod') OR ${paid})`);
+      result = await updateStatus(` AND ${paid}`);
     } catch (error) {
-      if (!/no such column:\s*payment_method\b/i.test(String(error))) throw error;
-      result = await updateStatus(` AND (COALESCE(is_cod, 0) <> 1 OR ${paid})`);
+      if (!/no such column:\s*payment_status\b/i.test(String(error))) throw error;
+      result = await updateStatus();
     }
   } else {
     result = await updateStatus();
@@ -264,7 +268,7 @@ export async function transitionOrderStatus(
     return {
       success: false,
       error: closingOrder
-        ? 'Cannot complete order: collect any outstanding cash payment, then refresh and retry'
+        ? 'Cannot complete order: payment must be settled before completion'
         : 'Order changed concurrently; refresh and retry',
       statusCode: 409,
     };

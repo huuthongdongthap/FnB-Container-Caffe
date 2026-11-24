@@ -126,49 +126,11 @@ export function RevenueChart({
             points={points}
             fill="none"
             stroke="var(--aura-chrome-light)"
-            strokeWidth="0.6"
+            strokeWidth="2"
+            vectorEffect="non-scaling-stroke"
             strokeLinecap="round"
             strokeLinejoin="round"
           />
-
-          {/* Data dots */}
-          {data.map((d, i) => (
-            <circle
-              key={i}
-              cx={getX(i, data.length, padding, innerW)}
-              cy={getY(d.value, maxValue, padding, innerH)}
-              r="0.6"
-              fill="var(--aura-chrome-bright)"
-              stroke="var(--aura-noir-deep)"
-              strokeWidth="0.3"
-            >
-              <title>{`${d.label}: ${d.value.toLocaleString('vi-VN')}₫`}</title>
-            </circle>
-          ))}
-
-          {/* Bottom axis labels */}
-          {data
-            .filter((_, i) => {
-              if (data.length <= labelCount) return true;
-              const step = Math.floor(data.length / labelCount);
-              return i % step === 0 || i === data.length - 1;
-            })
-            .map((d) => {
-              const i = data.indexOf(d);
-              return (
-                <text
-                  key={i}
-                  x={getX(i, data.length, padding, innerW)}
-                  y={height - 2}
-                  textAnchor="middle"
-                  fill="var(--aura-text-muted)"
-                  fontSize="2.5"
-                  fontFamily="var(--aura-font-mono)"
-                >
-                  {d.label.length > 5 ? d.label.slice(0, 4) + '..' : d.label}
-                </text>
-              );
-            })}
 
           <defs>
             <linearGradient id="revenue-gradient" x1="0" y1="0" x2="0" y2="1">
@@ -179,10 +141,25 @@ export function RevenueChart({
         </svg>
       </div>
 
+      {/* Bottom axis labels (HTML so text never distorts with SVG scaling) */}
+      <div className="mt-1 flex items-center justify-between text-[11px] font-mono text-[var(--aura-text-muted)]">
+        {data
+          .filter((_, i) => {
+            if (data.length <= labelCount) return true;
+            const step = Math.floor(data.length / labelCount);
+            return i % step === 0 || i === data.length - 1;
+          })
+          .map((d, idx) => (
+            <span key={`${d.label}-${idx}`} title={`${d.label}: ${d.value.toLocaleString('vi-VN')}₫`}>
+              {d.label}
+            </span>
+          ))}
+      </div>
+
       {/* Total */}
       <div className="mt-3 text-right">
         <span className="text-xs text-[var(--aura-text-muted)]">
-          Tong:{' '}
+          Tổng:{' '}
           <span className="font-semibold text-[var(--aura-text-primary)]">
             {(total ?? data.reduce((s, d) => s + d.value, 0)).toLocaleString('vi-VN')}₫
           </span>

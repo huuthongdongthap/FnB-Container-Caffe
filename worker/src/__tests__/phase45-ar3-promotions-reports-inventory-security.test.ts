@@ -628,13 +628,15 @@ describe('Phase 45 Slice AR3: Promotions, Grouped Sales Reports, Order Read/Summ
           label: 'Coffee',
           value: 2 * 35000 + 3 * 40000,
           count: 5, // Numeric 2 + 3 = 5, never string concatenation "023"
+          orderCount: 1,
+          itemsCount: 5,
         },
       ]);
       expect(
         capturedSqls.every(
           (s) =>
             !s.includes('FROM orders') ||
-            s.includes("NOT IN ('cancelled', 'failed', 'rejected', 'expired')")
+            s.includes("NOT IN ('cancelled', 'canceled', 'refunded', 'failed', 'rejected', 'expired')")
         )
       ).toBe(true);
     });
