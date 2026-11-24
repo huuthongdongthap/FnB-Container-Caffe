@@ -103,12 +103,26 @@ export function registerPostsHandler(router: Hono<{ Bindings: MixpostEnv }>): vo
       }
 
       const scheduledAt = data.scheduled_at ?? data.scheduledAt;
+      if (scheduledAt && Number.isNaN(new Date(scheduledAt).getTime())) {
+        return c.json({ success: false, error: 'Invalid scheduled_at datetime' }, 400);
+      }
+
       const result = await client.createPost({
         content: data.content,
         accounts: data.accounts,
         scheduledAt,
         mediaIds
       });
+
+      const nestedData =
+        result && typeof result === 'object' && 'data' in result && result.data && typeof result.data === 'object'
+          ? (result.data as Record<string, unknown>)
+          : undefined;
+      const postId = result?.id ?? nestedData?.id;
+      if (postId === undefined || postId === null || String(postId).trim() === '') {
+        log.error('mixpost_publish_missing_id', { hasResult: Boolean(result) });
+        return c.json({ success: false, error: 'Failed to publish post' }, 502);
+      }
 
       if (env.AURA_DB) {
         const rawTenantId = getTenantId(c as unknown as Parameters<typeof getTenantId>[0]).trim() || 'default';
@@ -148,7 +162,7 @@ export function registerPostsHandler(router: Hono<{ Bindings: MixpostEnv }>): vo
         }
       }
 
-      return c.json({ success: true, postId: result.id });
+      return c.json({ success: true, postId });
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : String(e);
       log.error('mixpost_publish_failed', { error: msg });
@@ -235,8 +249,17 @@ export function registerPostsHandler(router: Hono<{ Bindings: MixpostEnv }>): vo
     }
 
     try {
-      const accounts = await client.listAccounts();
-      return c.json({ success: true, data: accounts });
+      const rawAccounts = await client.listAccounts();
+      const accountList = Array.isArray(rawAccounts)
+        ? rawAccounts
+        : Array.isArray((rawAccounts as { data?: unknown })?.data)
+          ? (rawAccounts as { data: Array<Record<string, unknown>> }).data
+          : [];
+      const providerFilter = (c.req.query('provider') || '').trim().toLowerCase();
+      const filteredAccounts = providerFilter
+        ? accountList.filter((acc) => String(acc?.provider || '').toLowerCase().includes(providerFilter))
+        : accountList;
+      return c.json({ success: true, data: filteredAccounts });
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : String(e);
       log.error('mixpost_fetch_accounts_failed', { error: msg });

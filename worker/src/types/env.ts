@@ -81,6 +81,7 @@ export interface Env {
   ZALO_ACCESS_TOKEN?: string;
   ZALO_REFRESH_TOKEN?: string;
   ZALO_OA_TOKEN?: string;
+  ZALO_ZNS_TEMPLATE_GENERAL_PROMOTION?: string;
 
   // Mautic
   MAUTIC_API_URL?: string;

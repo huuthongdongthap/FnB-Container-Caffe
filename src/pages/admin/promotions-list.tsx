@@ -13,6 +13,7 @@ interface PromotionsListProps {
   onRefetch: () => void;
   onEdit: (promo: Promotion) => void;
   onDelete: (code: string) => void;
+  onNotify?: (promo: Promotion) => void;
   onAdd: () => void;
 }
 
@@ -35,6 +36,7 @@ export function PromotionsList({
   onRefetch,
   onEdit,
   onDelete,
+  onNotify,
   onAdd,
 }: PromotionsListProps) {
   const { t } = useTranslation('adminPromotions');
@@ -118,6 +120,11 @@ export function PromotionsList({
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex items-center justify-end gap-2">
+                      {onNotify && (
+                        <Button size="sm" variant="secondary" onClick={() => onNotify(promo)}>
+                          {t('notify')}
+                        </Button>
+                      )}
                       <Button size="sm" variant="ghost" onClick={() => onEdit(promo)}>
                         {t('edit')}
                       </Button>

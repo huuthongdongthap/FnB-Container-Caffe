@@ -3,6 +3,7 @@ import type { Env } from '../../types/env';
 import { sendEmail } from '../../lib/email';
 import { sendSMS } from '../../lib/speedsms-client';
 import { sendZNS } from '../../tree/zalo/zns-sender';
+import { resolveTemplateId } from '../../tree/zalo/zns-templates';
 import { createLogger } from '../../utils/logger';
 import { broadcastSendSchema, zodErrorResponse } from '../../lib/validators';
 import { getTenantId, isHQSuperAdmin } from '../../middleware/tenant';
@@ -308,11 +309,15 @@ export function registerSendHandler(router: Hono<{ Bindings: Env }>): void {
       return c.json({ success: false, error: 'Không có khách hàng nào trong phân khúc này' }, 400);
     }
 
-    // Skip channels where env is not configured
+    // Skip channels where env or required template is not configured
     const env = c.env as Record<string, string | undefined>;
     const skipReasons: Record<string, string> = {};
-    if (activeChannels.includes('zns') && !env.ZALO_ACCESS_TOKEN) {
-      skipReasons.zns = 'ZALO_ACCESS_TOKEN not configured';
+    if (activeChannels.includes('zns')) {
+      if (!env.ZALO_ACCESS_TOKEN) {
+        skipReasons.zns = 'ZALO_ACCESS_TOKEN not configured';
+      } else if (!resolveTemplateId('general_promotion', env)) {
+        skipReasons.zns = 'ZALO_ZNS_TEMPLATE_GENERAL_PROMOTION not configured';
+      }
     }
     if (activeChannels.includes('sms') && !env.SPEEDSMS_API_KEY) {
       skipReasons.sms = 'SPEEDSMS_API_KEY not configured';
@@ -324,9 +329,13 @@ export function registerSendHandler(router: Hono<{ Bindings: Env }>): void {
     const sendChannels = activeChannels.filter((ch) => !skipReasons[ch]);
 
     if (sendChannels.length === 0) {
+      const errorMessage =
+        activeChannels.length === 1 && skipReasons.zns === 'ZALO_ZNS_TEMPLATE_GENERAL_PROMOTION not configured'
+          ? 'Chưa cấu hình mẫu Zalo ZNS ưu đãi (ZALO_ZNS_TEMPLATE_GENERAL_PROMOTION).'
+          : 'Không có kênh nào được cấu hình. Vui lòng cấu hình API key.';
       return c.json({
         success: false,
-        error: 'Không có kênh nào được cấu hình. Vui lòng cấu hình API key.',
+        error: errorMessage,
         skipReasons
       }, 400);
     }
@@ -348,15 +357,18 @@ export function registerSendHandler(router: Hono<{ Bindings: Env }>): void {
               if (ch === 'zns') {
                 if (customer.phone) {
                   const result = await sendZNS(
-                    env as unknown as { ZALO_ACCESS_TOKEN?: string; AURA_DB?: import('@cloudflare/workers-types').D1Database },
+                    c.env as unknown as { ZALO_ACCESS_TOKEN?: string; AURA_DB?: import('@cloudflare/workers-types').D1Database; [key: string]: unknown },
                     {
                       phone: customer.phone,
                       template_key: 'general_promotion',
                       data: {
                         name: customer.name || '',
                         title: body.title ?? '',
-                        message: body.message
-                      } as Record<string, string>,
+                        message: body.message,
+                        promo_code: body.promo_code ?? '',
+                        discount: body.discount ?? '',
+                        expires_at: body.expires_at ?? ''
+                      },
                       tenantId:
                         customer.tenant_id && String(customer.tenant_id).trim() && String(customer.tenant_id).trim() !== '*'
                           ? String(customer.tenant_id).trim()

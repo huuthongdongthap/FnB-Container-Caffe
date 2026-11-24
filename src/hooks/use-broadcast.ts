@@ -18,6 +18,9 @@ export interface BroadcastPayload {
   channel: 'zns' | 'sms' | 'email' | 'all';
   title: string;
   message: string;
+  promo_code?: string;
+  discount?: string;
+  expires_at?: string;
 }
 
 export interface BroadcastResult {
@@ -33,13 +36,14 @@ export interface BroadcastResult {
 /**
  * Fetch all customer segments with counts.
  */
-export function useSegments() {
+export function useSegments(enabled = true) {
   const session = useClientSessionScope();
   return useQuery<Segment[]>({
     queryKey: ['broadcast-segments', session.tenantId, session.userScope],
     queryFn: () =>
       apiFetch<{ data: Segment[] }>('/api/customers/segments').then((r) => r.data),
     staleTime: 60_000,
+    enabled,
   });
 }
 
