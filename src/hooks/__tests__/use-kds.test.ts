@@ -52,6 +52,33 @@ describe('useKDS authoritative session cache', () => {
     act(() => snapshot([]));
     await waitFor(() => expect(result.current.orders).toHaveLength(0));
   });
+  it('prunes expired cancelled alerts when subsequent SSE snapshot omits them', async () => {
+    vi.mocked(apiFetch).mockResolvedValueOnce({
+      data: [
+        ticket,
+        {
+          id: 'ORD_CANCELLED',
+          status: 'cancelled',
+          cancel_alert: true,
+          items: [{ name: 'Tea', quantity: 1 }],
+        },
+      ],
+    });
+    const { result } = setup();
+    await waitFor(() => expect(result.current.orders.map(o => o.id)).toEqual(['ORD_1', 'ORD_CANCELLED']));
+    const [, snapshot] = vi.mocked(consumeKdsStream).mock.calls[0]!;
+    act(() =>
+      snapshot([
+        {
+          id: 'ORD_1',
+          status: 'ready',
+          items: [{ product_name: 'Coffee', quantity: 1 }],
+          created_at: new Date().toISOString(),
+        },
+      ]),
+    );
+    await waitFor(() => expect(result.current.orders.map(o => o.id)).toEqual(['ORD_1']));
+  });
   it('aborts old stream, removes private cache and isolates a different actor/tenant', async () => {
     const { result } = setup();
     await waitFor(() => expect(result.current.orders).toHaveLength(1));

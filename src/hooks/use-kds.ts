@@ -56,14 +56,7 @@ export function useKDS(station: string = 'all'): KDSResult {
     if (enabled) {
       void consumeKdsStream(controller.signal, payload => {
         if (!controller.signal.aborted) {
-          const incoming = mapStreamOrders(payload as KdsStreamOrder[]);
-          queryClient.setQueryData<KDSOrder[]>(queryKey, (prev = []) => {
-            const incomingIds = new Set(incoming.map((o) => o.id));
-            const preservedCancelled = prev.filter(
-              (o) => o.status === 'cancelled' && !incomingIds.has(o.id),
-            );
-            return preservedCancelled.length > 0 ? [...incoming, ...preservedCancelled] : incoming;
-          });
+          queryClient.setQueryData<KDSOrder[]>(queryKey, mapStreamOrders(payload as KdsStreamOrder[]));
         }
       }, station);
     }

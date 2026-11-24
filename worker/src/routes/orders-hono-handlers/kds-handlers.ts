@@ -117,34 +117,41 @@ export async function handleGetKdsOrders(c: Context<{ Bindings: Env }>) {
     return c.json({ success: false, error: 'Cross-tenant KDS access denied' }, 403);
   }
   const db = getDatabase(c as unknown as { env: Record<string, unknown> });
-  const stationId = c.req.query('station_id') || c.req.query('station');
+  const rawStation = (c.req.query('station_id') || c.req.query('station') || '').trim();
+  const stationId = rawStation && rawStation.toLowerCase() !== 'all' ? rawStation : '';
   const tenantId = tenantCheck.tenantId;
 
   let categoryIndex: Map<string, { station_id: string; station_name: string | null }> | null = null;
   if (stationId) {
     try {
       let mappings: Record<string, unknown>[] = [];
+      let loadedMappings = false;
       if (tenantId === '*') {
         const res = await db.prepare(
           'SELECT cs.category_id, cs.station_id, ks.name AS station_name FROM category_stations cs JOIN kitchen_stations ks ON ks.id = cs.station_id'
         ).all<Record<string, unknown>>();
         mappings = res.results || [];
+        loadedMappings = true;
       } else {
         try {
           const res = await db.prepare(
             "SELECT cs.category_id, cs.station_id, ks.name AS station_name, ks.tenant_id FROM category_stations cs JOIN kitchen_stations ks ON ks.id = cs.station_id WHERE COALESCE(NULLIF(TRIM(ks.tenant_id), ''), 'default') = ?"
           ).bind(tenantId).all<Record<string, unknown>>();
           mappings = res.results || [];
+          loadedMappings = true;
         } catch {
           if (tenantId === 'default') {
             const res = await db.prepare(
               'SELECT cs.category_id, cs.station_id, ks.name AS station_name FROM category_stations cs JOIN kitchen_stations ks ON ks.id = cs.station_id'
             ).all<Record<string, unknown>>();
             mappings = res.results || [];
+            loadedMappings = true;
           }
         }
       }
-      categoryIndex = buildIndexFromDbRows(mappings);
+      if (loadedMappings) {
+        categoryIndex = buildIndexFromDbRows(mappings);
+      }
     } catch {
       // Table unseeded or mock DB
     }
@@ -185,13 +192,27 @@ export async function handleGetKdsOrders(c: Context<{ Bindings: Env }>) {
   const nowMs = Date.now();
   let recentCancelled: OrderRecord[] = [];
   try {
-    const cancelledStatement = db.prepare(
-      `SELECT * FROM orders WHERE status = 'cancelled' AND cancelled_at IS NOT NULL AND datetime(cancelled_at) >= datetime(?)${tenantClause ? tenantClause.replace('?1', '?2') : ''} LIMIT 20`
-    );
     const cutoff = new Date(nowMs - CANCEL_ALERT_WINDOW_MS).toISOString().replace('T', ' ').slice(0, 19);
-    const cancelledRes = await (tenantId === '*'
-      ? cancelledStatement.bind(cutoff)
-      : cancelledStatement.bind(cutoff, tenantId)).all<OrderRecord>();
+    let cancelledRes: { results?: OrderRecord[] } | undefined;
+    try {
+      const cancelledJoined = db.prepare(
+        `SELECT o.*, COALESCE(NULLIF(TRIM(t.table_number), ''), NULLIF(TRIM(t.name), ''), o.table_id) AS table_name
+         FROM orders o
+         LEFT JOIN cafe_tables t ON t.id = o.table_id
+           AND COALESCE(NULLIF(TRIM(t.tenant_id), ''), 'default') = COALESCE(NULLIF(TRIM(o.tenant_id), ''), 'default')
+         WHERE o.status = 'cancelled' AND o.cancelled_at IS NOT NULL AND datetime(o.cancelled_at) >= datetime(?)${tenantClauseO ? tenantClauseO.replace('?1', '?2') : ''} LIMIT 20`
+      );
+      cancelledRes = await (tenantId === '*'
+        ? cancelledJoined.bind(cutoff)
+        : cancelledJoined.bind(cutoff, tenantId)).all<OrderRecord>();
+    } catch {
+      const cancelledStatement = db.prepare(
+        `SELECT * FROM orders WHERE status = 'cancelled' AND cancelled_at IS NOT NULL AND datetime(cancelled_at) >= datetime(?)${tenantClause ? tenantClause.replace('?1', '?2') : ''} LIMIT 20`
+      );
+      cancelledRes = await (tenantId === '*'
+        ? cancelledStatement.bind(cutoff)
+        : cancelledStatement.bind(cutoff, tenantId)).all<OrderRecord>();
+    }
     const activeIds = new Set((results || []).map((o) => o.id));
     recentCancelled = (cancelledRes?.results || []).filter(
       (o) => !activeIds.has(o.id) && isRecentPrepCancellation(o as unknown as Record<string, unknown>, nowMs)

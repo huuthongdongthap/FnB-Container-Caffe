@@ -253,33 +253,39 @@ kdsStreamRouter.get('/stream', async(c) => {
   }
 
   const rawStation = (c.req.query('station_id') || c.req.query('station') || '').trim();
-  const stationId = rawStation && rawStation !== 'all' ? rawStation : '';
+  const stationId = rawStation && rawStation.toLowerCase() !== 'all' ? rawStation : '';
 
   let categoryIndex: Map<string, { station_id: string; station_name: string | null }> | null = null;
   if (stationId) {
     try {
       let mappings: Record<string, unknown>[] = [];
+      let loadedMappings = false;
       if (tenantId === '*') {
         const res = await db.prepare(
           'SELECT cs.category_id, cs.station_id, ks.name AS station_name FROM category_stations cs JOIN kitchen_stations ks ON ks.id = cs.station_id'
         ).all<Record<string, unknown>>();
         mappings = res.results || [];
+        loadedMappings = true;
       } else {
         try {
           const res = await db.prepare(
             "SELECT cs.category_id, cs.station_id, ks.name AS station_name, ks.tenant_id FROM category_stations cs JOIN kitchen_stations ks ON ks.id = cs.station_id WHERE COALESCE(NULLIF(TRIM(ks.tenant_id), ''), 'default') = ?"
           ).bind(tenantId).all<Record<string, unknown>>();
           mappings = res.results || [];
+          loadedMappings = true;
         } catch {
           if (tenantId === 'default') {
             const res = await db.prepare(
               'SELECT cs.category_id, cs.station_id, ks.name AS station_name FROM category_stations cs JOIN kitchen_stations ks ON ks.id = cs.station_id'
             ).all<Record<string, unknown>>();
             mappings = res.results || [];
+            loadedMappings = true;
           }
         }
       }
-      categoryIndex = buildIndexFromDbRows(mappings);
+      if (loadedMappings) {
+        categoryIndex = buildIndexFromDbRows(mappings);
+      }
     } catch {
       // Table unseeded or mock DB
     }
@@ -334,50 +340,65 @@ kdsStreamRouter.get('/stream', async(c) => {
           : tenantId === 'default'
             ? " AND (TRIM(tenant_id) = ? OR tenant_id IS NULL OR TRIM(tenant_id) = '')"
             : ' AND TRIM(tenant_id) = ?';
+        const activeQueries = [
+          `SELECT o.id, o.customer_name, o.table_id, COALESCE(NULLIF(TRIM(t.table_number), ''), NULLIF(TRIM(t.name), ''), o.table_id) AS table_name, o.order_number, o.items, o.notes, o.status, o.order_type, o.payment_status, o.payment_method, o.is_cod, o.created_at, o.updated_at, o.started_at, o.ready_at FROM orders o
+           LEFT JOIN cafe_tables t ON t.id = o.table_id
+             AND COALESCE(NULLIF(TRIM(t.tenant_id), ''), 'default') = COALESCE(NULLIF(TRIM(o.tenant_id), ''), 'default')
+           WHERE o.status IN ('pending', 'confirmed', 'preparing', 'ready')
+           ${tenantClauseO}
+           AND NOT (TRIM(COALESCE(o.notes, '')) LIKE 'Khách QR - cho don mon%' AND TRIM(COALESCE(o.items, '')) = '[]')
+           ORDER BY CASE WHEN o.status = 'ready' THEN 1 ELSE 0 END ASC, o.created_at ASC LIMIT 200`,
+          `SELECT o.id, o.customer_name, o.table_id, COALESCE(NULLIF(TRIM(t.table_number), ''), NULLIF(TRIM(t.name), ''), o.table_id) AS table_name, o.order_number, o.items, o.notes, o.status, o.order_type, o.payment_status, o.payment_method, o.is_cod, o.created_at, o.updated_at FROM orders o
+           LEFT JOIN cafe_tables t ON t.id = o.table_id
+             AND COALESCE(NULLIF(TRIM(t.tenant_id), ''), 'default') = COALESCE(NULLIF(TRIM(o.tenant_id), ''), 'default')
+           WHERE o.status IN ('pending', 'confirmed', 'preparing', 'ready')
+           ${tenantClauseO}
+           AND NOT (TRIM(COALESCE(o.notes, '')) LIKE 'Khách QR - cho don mon%' AND TRIM(COALESCE(o.items, '')) = '[]')
+           ORDER BY CASE WHEN o.status = 'ready' THEN 1 ELSE 0 END ASC, o.created_at ASC LIMIT 200`,
+          `SELECT id, customer_name, table_id, order_number, items, notes, status, order_type, payment_status, payment_method, is_cod, created_at, updated_at, started_at, ready_at FROM orders
+           WHERE status IN ('pending', 'confirmed', 'preparing', 'ready')
+           ${tenantClause}
+           AND NOT (TRIM(COALESCE(notes, '')) LIKE 'Khách QR - cho don mon%' AND TRIM(COALESCE(items, '')) = '[]')
+           ORDER BY CASE WHEN status = 'ready' THEN 1 ELSE 0 END ASC, created_at ASC LIMIT 200`,
+          `SELECT id, customer_name, table_id, items, notes, status, order_type, payment_status, payment_method, is_cod, created_at FROM orders
+           WHERE status IN ('pending', 'confirmed', 'preparing', 'ready')
+           ${tenantClause}
+           AND NOT (TRIM(COALESCE(notes, '')) LIKE 'Khách QR - cho don mon%' AND TRIM(COALESCE(items, '')) = '[]')
+           ORDER BY CASE WHEN status = 'ready' THEN 1 ELSE 0 END ASC, created_at ASC LIMIT 200`,
+          `SELECT id, customer_name, table_id, items, notes, status, order_type, payment_status, payment_method, created_at FROM orders
+           WHERE status IN ('pending', 'confirmed', 'preparing', 'ready')
+           ${tenantClause}
+           AND NOT (TRIM(COALESCE(notes, '')) LIKE 'Khách QR - cho don mon%' AND TRIM(COALESCE(items, '')) = '[]')
+           ORDER BY CASE WHEN status = 'ready' THEN 1 ELSE 0 END ASC, created_at ASC LIMIT 200`,
+          `SELECT id, customer_name, table_id, items, notes, status, payment_status, payment_method, created_at FROM orders
+           WHERE status IN ('pending', 'confirmed', 'preparing', 'ready')
+           ${tenantClause}
+           AND NOT (TRIM(COALESCE(notes, '')) LIKE 'Khách QR - cho don mon%' AND TRIM(COALESCE(items, '')) = '[]')
+           ORDER BY CASE WHEN status = 'ready' THEN 1 ELSE 0 END ASC, created_at ASC LIMIT 200`,
+          `SELECT id, customer_name, table_id, items, notes, status, order_type, payment_status, created_at FROM orders
+           WHERE status IN ('pending', 'confirmed', 'preparing', 'ready')
+           ${tenantClause}
+           AND NOT (TRIM(COALESCE(notes, '')) LIKE 'Khách QR - cho don mon%' AND TRIM(COALESCE(items, '')) = '[]')
+           ORDER BY CASE WHEN status = 'ready' THEN 1 ELSE 0 END ASC, created_at ASC LIMIT 200`,
+          `SELECT id, customer_name, table_id, items, notes, status, created_at FROM orders
+           WHERE status IN ('pending', 'confirmed', 'preparing', 'ready')
+           ${tenantClause}
+           AND NOT (TRIM(COALESCE(notes, '')) LIKE 'Khách QR - cho don mon%' AND TRIM(COALESCE(items, '')) = '[]')
+           ORDER BY CASE WHEN status = 'ready' THEN 1 ELSE 0 END ASC, created_at ASC LIMIT 200`,
+        ];
         let results: OrderRecord[] | undefined;
-        try {
-          const statement = db.prepare(
-            `SELECT o.id, o.customer_name, o.table_id, COALESCE(NULLIF(TRIM(t.table_number), ''), NULLIF(TRIM(t.name), ''), o.table_id) AS table_name, o.order_number, o.items, o.notes, o.status, o.order_type, o.payment_status, o.payment_method, o.is_cod, o.created_at, o.updated_at FROM orders o
-             LEFT JOIN cafe_tables t ON t.id = o.table_id
-               AND COALESCE(NULLIF(TRIM(t.tenant_id), ''), 'default') = COALESCE(NULLIF(TRIM(o.tenant_id), ''), 'default')
-             WHERE o.status IN ('pending', 'confirmed', 'preparing', 'ready')
-             ${tenantClauseO}
-             AND NOT (TRIM(COALESCE(o.notes, '')) LIKE 'Khách QR - cho don mon%' AND TRIM(COALESCE(o.items, '')) = '[]')
-             ORDER BY CASE WHEN o.status = 'ready' THEN 1 ELSE 0 END ASC, o.created_at ASC LIMIT 200`
-          );
-          ({ results } = await (tenantId === '*' ? statement : statement.bind(tenantId)).all<OrderRecord>());
-        } catch {
+        let lastActiveQueryError: unknown;
+        for (const sql of activeQueries) {
           try {
-            const statement = db.prepare(
-              `SELECT id, customer_name, table_id, items, notes, status, order_type, payment_status, payment_method, is_cod, created_at FROM orders
-               WHERE status IN ('pending', 'confirmed', 'preparing', 'ready')
-               ${tenantClause}
-               AND NOT (TRIM(COALESCE(notes, '')) LIKE 'Khách QR - cho don mon%' AND TRIM(COALESCE(items, '')) = '[]')
-               ORDER BY CASE WHEN status = 'ready' THEN 1 ELSE 0 END ASC, created_at ASC LIMIT 200`
-            );
+            const statement = db.prepare(sql);
             ({ results } = await (tenantId === '*' ? statement : statement.bind(tenantId)).all<OrderRecord>());
-          } catch {
-            try {
-              const statement = db.prepare(
-                `SELECT id, customer_name, table_id, items, notes, status, order_type, payment_status, created_at FROM orders
-                 WHERE status IN ('pending', 'confirmed', 'preparing', 'ready')
-                 ${tenantClause}
-                 AND NOT (TRIM(COALESCE(notes, '')) LIKE 'Khách QR - cho don mon%' AND TRIM(COALESCE(items, '')) = '[]')
-                 ORDER BY CASE WHEN status = 'ready' THEN 1 ELSE 0 END ASC, created_at ASC LIMIT 200`
-              );
-              ({ results } = await (tenantId === '*' ? statement : statement.bind(tenantId)).all<OrderRecord>());
-            } catch {
-              const statement = db.prepare(
-                `SELECT id, customer_name, table_id, items, notes, status, created_at FROM orders
-                 WHERE status IN ('pending', 'confirmed', 'preparing', 'ready')
-                 ${tenantClause}
-                 AND NOT (TRIM(COALESCE(notes, '')) LIKE 'Khách QR - cho don mon%' AND TRIM(COALESCE(items, '')) = '[]')
-                 ORDER BY CASE WHEN status = 'ready' THEN 1 ELSE 0 END ASC, created_at ASC LIMIT 200`
-              );
-              ({ results } = await (tenantId === '*' ? statement : statement.bind(tenantId)).all<OrderRecord>());
-            }
+            lastActiveQueryError = undefined;
+            break;
+          } catch (err) {
+            lastActiveQueryError = err;
           }
         }
+        if (lastActiveQueryError) throw lastActiveQueryError;
         const activeOrders: KdsStreamOrder[] = [];
         for (const r of results || []) {
           if (isHeldOutOfKds(r as unknown as Record<string, unknown>)) continue;
@@ -405,17 +426,52 @@ kdsStreamRouter.get('/stream', async(c) => {
         const nowMs = Date.now();
         let recentCancelled: KdsStreamOrder[] = [];
         try {
-          const cancelledStatement = db.prepare(
-            `SELECT * FROM orders WHERE status = 'cancelled' AND cancelled_at IS NOT NULL AND datetime(cancelled_at) >= datetime(?)${tenantClause} LIMIT 20`
-          );
           const cutoff = new Date(nowMs - CANCEL_ALERT_WINDOW_MS).toISOString().replace('T', ' ').slice(0, 19);
-          const cancelledRes = await (tenantId === '*'
-            ? cancelledStatement.bind(cutoff)
-            : cancelledStatement.bind(cutoff, tenantId)).all<OrderRecord>();
+          let cancelledRes: { results?: OrderRecord[] } | undefined;
+          try {
+            const cancelledJoined = db.prepare(
+              `SELECT o.*, COALESCE(NULLIF(TRIM(t.table_number), ''), NULLIF(TRIM(t.name), ''), o.table_id) AS table_name
+               FROM orders o
+               LEFT JOIN cafe_tables t ON t.id = o.table_id
+                 AND COALESCE(NULLIF(TRIM(t.tenant_id), ''), 'default') = COALESCE(NULLIF(TRIM(o.tenant_id), ''), 'default')
+               WHERE o.status = 'cancelled' AND o.cancelled_at IS NOT NULL AND datetime(o.cancelled_at) >= datetime(?)${tenantClauseO} LIMIT 20`
+            );
+            cancelledRes = await (tenantId === '*'
+              ? cancelledJoined.bind(cutoff)
+              : cancelledJoined.bind(cutoff, tenantId)).all<OrderRecord>();
+          } catch {
+            const cancelledStatement = db.prepare(
+              `SELECT * FROM orders WHERE status = 'cancelled' AND cancelled_at IS NOT NULL AND datetime(cancelled_at) >= datetime(?)${tenantClause} LIMIT 20`
+            );
+            cancelledRes = await (tenantId === '*'
+              ? cancelledStatement.bind(cutoff)
+              : cancelledStatement.bind(cutoff, tenantId)).all<OrderRecord>();
+          }
           const activeIds = new Set(activeOrders.map((o) => o.id));
-          recentCancelled = (cancelledRes?.results || [])
-            .filter((o) => !activeIds.has(o.id) && isRecentPrepCancellation(o as unknown as Record<string, unknown>, nowMs))
-            .map((o) => mapKdsOrder(o, true));
+          for (const o of cancelledRes?.results || []) {
+            if (activeIds.has(o.id) || !isRecentPrepCancellation(o as unknown as Record<string, unknown>, nowMs)) {
+              continue;
+            }
+            if (stationId && categoryIndex) {
+              let parsedItems: Array<Record<string, unknown>> = [];
+              if (Array.isArray(o.items)) {
+                parsedItems = o.items as Array<Record<string, unknown>>;
+              } else {
+                try {
+                  const parsed = JSON.parse(o.items);
+                  if (Array.isArray(parsed)) parsedItems = parsed;
+                } catch { /* keep empty */ }
+              }
+              const stationItems = parsedItems.filter((item) => {
+                const catId = String(item.category_id ?? item.categoryId ?? '');
+                return categoryIndex!.get(catId)?.station_id === stationId;
+              });
+              if (stationItems.length === 0) continue;
+              recentCancelled.push(mapKdsOrder(o, true, stationItems));
+            } else {
+              recentCancelled.push(mapKdsOrder(o, true));
+            }
+          }
         } catch {
           // cancelled_at / previous_status absent in minimal schemas: no cancel alerts
         }
