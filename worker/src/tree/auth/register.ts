@@ -53,14 +53,15 @@ export async function registerUser(request: Request, env: Record<string, unknown
     try {
       const customerId = generateId('CUS_');
       const now = new Date().toISOString();
+      const normalizedCustomerPhone = String(phone || '').trim() || null;
       try {
         await db.prepare(
           'INSERT OR IGNORE INTO customers (id, email, name, phone, loyalty_points, loyalty_tier, tenant_id, created_at, updated_at) VALUES (?, ?, ?, ?, 0, \'bronze\', ?, ?, ?)'
-        ).bind(customerId, email, name || '', phone || '', storeTenant, now, now).run();
+        ).bind(customerId, email, name || '', normalizedCustomerPhone, storeTenant, now, now).run();
       } catch {
         await db.prepare(
           'INSERT OR IGNORE INTO customers (id, email, name, phone, loyalty_points, loyalty_tier, created_at, updated_at) VALUES (?, ?, ?, ?, 0, \'bronze\', ?, ?)'
-        ).bind(customerId, email, name || '', phone || '', now, now).run();
+        ).bind(customerId, email, name || '', normalizedCustomerPhone, now, now).run();
       }
     } catch { /* non-fatal */ }
 

@@ -479,6 +479,7 @@ describe('Loyalty, Referrals, Inventory PO, Customer Events & Audit Cutover (202
     for (const migration of [
       '20261121_01_refund_manual_transfer_ledger.sql',
       '20261121_03_refund_atomicity_and_loyalty_work.sql',
+      '20261124_02_tenant_scoped_unique_keys.sql',
     ]) {
       sqlite.exec(readFileSync(resolve(__dirname, '../../../db/migrations', migration), 'utf8'));
     }

@@ -115,8 +115,8 @@ CREATE TABLE IF NOT EXISTS staff_login_identities (
 CREATE TABLE IF NOT EXISTS customers (
     id                TEXT PRIMARY KEY,
     tenant_id         TEXT NOT NULL DEFAULT 'default',
-    phone             TEXT UNIQUE,
-    email             TEXT UNIQUE,
+    phone             TEXT,
+    email             TEXT,
     name              TEXT,
     tier              TEXT NOT NULL DEFAULT 'bronze',
     loyalty_tier      TEXT NOT NULL DEFAULT 'bronze',
@@ -140,7 +140,9 @@ CREATE TABLE IF NOT EXISTS customers (
     referral_code     TEXT,
     referred_by       TEXT,
     created_at        TEXT NOT NULL DEFAULT (datetime('now')),
-    updated_at        TEXT NOT NULL DEFAULT (datetime('now'))
+    updated_at        TEXT NOT NULL DEFAULT (datetime('now')),
+    UNIQUE(tenant_id, email),
+    UNIQUE(tenant_id, phone)
 );
 
 CREATE TABLE IF NOT EXISTS rewards (
@@ -279,8 +281,12 @@ CREATE INDEX IF NOT EXISTS idx_payments_transaction_id ON payments(transaction_i
 -- 8. PROMOTIONS (Discount Codes)
 -- ─────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS promotions (
-    code           TEXT PRIMARY KEY,
-    percent        INTEGER NOT NULL,          -- e.g. 10, 20
+    id             TEXT,
+    code           TEXT NOT NULL,
+    name           TEXT,
+    type           TEXT DEFAULT 'percent',
+    value          REAL,
+    percent        INTEGER NOT NULL DEFAULT 0, -- e.g. 10, 20
     max_discount   INTEGER DEFAULT 0,          -- VND cap; 0 = no cap
     min_order      INTEGER DEFAULT 0,          -- VND minimum order
     usage_limit    INTEGER DEFAULT 0,          -- 0 = unlimited
@@ -288,8 +294,11 @@ CREATE TABLE IF NOT EXISTS promotions (
     starts_at      TEXT,
     expires_at     TEXT,
     is_active      INTEGER DEFAULT 1,
+    applicable_items TEXT,
+    applicable_tiers TEXT,
     tenant_id      TEXT NOT NULL DEFAULT 'default',
-    created_at     TEXT DEFAULT (datetime('now'))
+    created_at     TEXT DEFAULT (datetime('now')),
+    PRIMARY KEY (tenant_id, code)
 );
 
 CREATE INDEX IF NOT EXISTS idx_promo_active ON promotions(is_active);
@@ -456,7 +465,7 @@ CREATE TABLE IF NOT EXISTS loyalty_audit_log ( id TEXT PRIMARY KEY, customer_id 
 CREATE TABLE IF NOT EXISTS loyalty_point_logs ( tenant_id TEXT NOT NULL DEFAULT 'default',  id TEXT PRIMARY KEY, customer_id TEXT NOT NULL, order_id TEXT, points_change INTEGER NOT NULL, points INTEGER DEFAULT 0, reason TEXT, balance_after INTEGER NOT NULL, description TEXT, created_at DATETIME DEFAULT CURRENT_TIMESTAMP, FOREIGN KEY (customer_id) REFERENCES customers(id) );
 CREATE TABLE IF NOT EXISTS loyalty_redemptions ( tenant_id TEXT NOT NULL DEFAULT 'default',  id TEXT PRIMARY KEY, customer_id TEXT NOT NULL, reward_id TEXT NOT NULL, code TEXT, points_spent INTEGER NOT NULL DEFAULT 0, order_id TEXT, status TEXT DEFAULT 'active', voucher_code TEXT, expires_at TEXT, redeemed_at TEXT DEFAULT (datetime('now')), used_at TEXT, created_at TEXT DEFAULT (datetime('now')) );
 CREATE TABLE IF NOT EXISTS loyalty_rewards ( tenant_id TEXT NOT NULL DEFAULT 'default',  id TEXT PRIMARY KEY, name TEXT NOT NULL, name_en TEXT, description TEXT, points_cost INTEGER NOT NULL DEFAULT 100, points_required INTEGER NOT NULL DEFAULT 100, type TEXT NOT NULL DEFAULT 'voucher', reward_type TEXT NOT NULL DEFAULT 'voucher', value REAL DEFAULT 0, reward_value TEXT DEFAULT '0', menu_item_id TEXT, min_tier TEXT DEFAULT 'bronze', max_redemptions INTEGER, stock INTEGER, current_redemptions INTEGER DEFAULT 0, redeemed_count INTEGER DEFAULT 0, valid_from TEXT, valid_to TEXT, valid_until TEXT, image_url TEXT, terms TEXT, is_active INTEGER NOT NULL DEFAULT 1, created_at TEXT DEFAULT (datetime('now')), updated_at TEXT DEFAULT (datetime('now')) );
-CREATE TABLE IF NOT EXISTS loyalty_tier_configs ( tenant_id TEXT NOT NULL DEFAULT 'default',  tier TEXT PRIMARY KEY, name TEXT NOT NULL, min_points INTEGER NOT NULL DEFAULT 0, max_points INTEGER, point_multiplier REAL NOT NULL DEFAULT 1.0, points_multiplier REAL NOT NULL DEFAULT 1.0, discount_percent REAL DEFAULT 0, birthday_bonus INTEGER DEFAULT 500, free_shipping INTEGER DEFAULT 0, priority_support INTEGER DEFAULT 0, benefits TEXT DEFAULT '[]', color TEXT, icon TEXT, updated_at TEXT DEFAULT (datetime('now')) );
+CREATE TABLE IF NOT EXISTS loyalty_tier_configs ( tenant_id TEXT NOT NULL DEFAULT 'default',  tier TEXT NOT NULL, name TEXT NOT NULL, min_points INTEGER NOT NULL DEFAULT 0, max_points INTEGER, point_multiplier REAL NOT NULL DEFAULT 1.0, points_multiplier REAL NOT NULL DEFAULT 1.0, discount_percent REAL DEFAULT 0, birthday_bonus INTEGER DEFAULT 500, free_shipping INTEGER DEFAULT 0, priority_support INTEGER DEFAULT 0, benefits TEXT DEFAULT '[]', color TEXT, icon TEXT, updated_at TEXT DEFAULT (datetime('now')), PRIMARY KEY (tenant_id, tier) );
 CREATE TABLE IF NOT EXISTS loyalty_tiers ( tenant_id TEXT NOT NULL DEFAULT 'default',  tier_name TEXT PRIMARY KEY, min_points INTEGER NOT NULL, cashback_rate REAL NOT NULL DEFAULT 0.02, point_multiplier REAL NOT NULL DEFAULT 1.0, birthday_discount INTEGER DEFAULT 0, display_name_vi TEXT, min_spent_vnd INTEGER DEFAULT 0, max_spent_vnd INTEGER, expiry_days INTEGER, sort_order INTEGER DEFAULT 0, created_at TEXT DEFAULT (datetime('now')) , points_multiplier REAL DEFAULT 1.0, perks TEXT DEFAULT '[]', color TEXT DEFAULT '#CD7F32', updated_at TEXT);
 CREATE TABLE IF NOT EXISTS loyalty_transactions ( tenant_id TEXT NOT NULL DEFAULT 'default',  id TEXT PRIMARY KEY, account_id TEXT, customer_id TEXT, type TEXT NOT NULL, points INTEGER NOT NULL DEFAULT 0, balance_after INTEGER NOT NULL DEFAULT 0, order_id TEXT, reward_id TEXT, description TEXT, reason TEXT, idempotency_key TEXT, created_by TEXT, created_at TEXT DEFAULT (datetime('now')) );
 CREATE TABLE IF NOT EXISTS menu_modifiers ( tenant_id TEXT NOT NULL DEFAULT 'default', id TEXT PRIMARY KEY, group_id TEXT NOT NULL, option_name TEXT NOT NULL, price_delta INTEGER NOT NULL DEFAULT 0, available INTEGER NOT NULL DEFAULT 1, updated_at TEXT DEFAULT (datetime('now')));
@@ -502,7 +511,7 @@ CREATE TABLE IF NOT EXISTS table_sessions ( tenant_id TEXT NOT NULL DEFAULT 'def
 CREATE TABLE IF NOT EXISTS table_zones ( id TEXT PRIMARY KEY, slug TEXT NOT NULL, name TEXT NOT NULL, description TEXT, sort_order INTEGER DEFAULT 0, is_active INTEGER DEFAULT 1, location_id TEXT DEFAULT 'default', tenant_id TEXT DEFAULT 'default', metadata TEXT DEFAULT '{}', created_at TEXT DEFAULT (datetime('now')), updated_at TEXT DEFAULT (datetime('now')) );
 CREATE TABLE IF NOT EXISTS ti_menu_cache ( tenant_id TEXT NOT NULL DEFAULT 'default',  id TEXT PRIMARY KEY, name TEXT NOT NULL, sku TEXT, price REAL DEFAULT 0, active INTEGER DEFAULT 1, cached_at TEXT DEFAULT (datetime('now')) );
 CREATE TABLE IF NOT EXISTS ti_order_bridge ( id TEXT PRIMARY KEY, local_order_id TEXT NOT NULL, ti_order_id TEXT, status TEXT NOT NULL, error TEXT, synced_at TEXT, tenant_id TEXT NOT NULL DEFAULT 'default', created_at TEXT DEFAULT (datetime('now')) );
-CREATE TABLE IF NOT EXISTS tier_configs ( tenant_id TEXT NOT NULL DEFAULT 'default',  tier TEXT PRIMARY KEY, tier_name TEXT, min_points INTEGER NOT NULL DEFAULT 0, cashback_rate REAL NOT NULL DEFAULT 0.02, multiplier REAL NOT NULL DEFAULT 1.0, point_multiplier REAL NOT NULL DEFAULT 1.0, points_multiplier REAL NOT NULL DEFAULT 1.0, birthday_discount INTEGER DEFAULT 0, benefits TEXT DEFAULT '[]', perks TEXT DEFAULT '[]', color TEXT DEFAULT '#CD7F32', display_name_vi TEXT, min_spent_vnd INTEGER NOT NULL DEFAULT 0, max_spent_vnd INTEGER, expiry_days INTEGER DEFAULT 90, sort_order INTEGER NOT NULL DEFAULT 0, created_at TEXT DEFAULT (datetime('now')), updated_at TEXT DEFAULT (datetime('now')) );
+CREATE TABLE IF NOT EXISTS tier_configs ( tenant_id TEXT NOT NULL DEFAULT 'default',  tier TEXT NOT NULL, tier_name TEXT, min_points INTEGER NOT NULL DEFAULT 0, cashback_rate REAL NOT NULL DEFAULT 0.02, multiplier REAL NOT NULL DEFAULT 1.0, point_multiplier REAL NOT NULL DEFAULT 1.0, points_multiplier REAL NOT NULL DEFAULT 1.0, birthday_discount INTEGER DEFAULT 0, benefits TEXT DEFAULT '[]', perks TEXT DEFAULT '[]', color TEXT DEFAULT '#CD7F32', display_name_vi TEXT, min_spent_vnd INTEGER NOT NULL DEFAULT 0, max_spent_vnd INTEGER, expiry_days INTEGER DEFAULT 90, sort_order INTEGER NOT NULL DEFAULT 0, created_at TEXT DEFAULT (datetime('now')), updated_at TEXT DEFAULT (datetime('now')), PRIMARY KEY (tenant_id, tier) );
 CREATE TABLE IF NOT EXISTS trusted_devices ( tenant_id TEXT NOT NULL DEFAULT 'default',  id TEXT PRIMARY KEY, user_id TEXT NOT NULL, device_id TEXT, device_name TEXT, fingerprint TEXT, name TEXT, platform TEXT, browser TEXT, ip TEXT, is_trusted INTEGER NOT NULL DEFAULT 1, trusted_at TEXT DEFAULT (datetime('now')), last_used_at TEXT DEFAULT (datetime('now')), created_at TEXT DEFAULT (datetime('now')), expires_at TEXT, UNIQUE(user_id, device_id) );
 CREATE TABLE IF NOT EXISTS user_rewards ( tenant_id TEXT NOT NULL DEFAULT 'default',  id TEXT PRIMARY KEY, customer_id TEXT NOT NULL, reward_id TEXT NOT NULL, code TEXT NOT NULL, status TEXT DEFAULT 'active', expires_at DATETIME, created_at DATETIME DEFAULT CURRENT_TIMESTAMP, redeemed_at TEXT, FOREIGN KEY (customer_id) REFERENCES customers(id), FOREIGN KEY (reward_id) REFERENCES rewards(id) );
 CREATE TABLE IF NOT EXISTS visits ( tenant_id TEXT NOT NULL DEFAULT 'default',  id TEXT PRIMARY KEY, customer_id TEXT NOT NULL, visited_at TEXT NOT NULL, channel TEXT NOT NULL DEFAULT 'in_store', order_id TEXT, spent INTEGER, created_at DATETIME DEFAULT CURRENT_TIMESTAMP, table_id TEXT, amount REAL DEFAULT 0, points_earned INTEGER DEFAULT 0, FOREIGN KEY (customer_id) REFERENCES customers(id) );
@@ -572,12 +581,6 @@ ALTER TABLE products ADD COLUMN category TEXT;
 ALTER TABLE promotion_redemptions ADD COLUMN created_at TEXT DEFAULT (datetime('now'));
 ALTER TABLE promotion_usages ADD COLUMN idempotency_key TEXT;
 ALTER TABLE promotion_usages ADD COLUMN used_at TEXT;
-ALTER TABLE promotions ADD COLUMN id TEXT;
-ALTER TABLE promotions ADD COLUMN name TEXT;
-ALTER TABLE promotions ADD COLUMN type TEXT DEFAULT 'percent';
-ALTER TABLE promotions ADD COLUMN value REAL;
-ALTER TABLE promotions ADD COLUMN applicable_items TEXT;
-ALTER TABLE promotions ADD COLUMN applicable_tiers TEXT;
 ALTER TABLE promotions ADD COLUMN description TEXT;
 ALTER TABLE promotions ADD COLUMN discount_value REAL DEFAULT 0;
 ALTER TABLE promotions ADD COLUMN discount_type TEXT DEFAULT 'percentage';
@@ -592,6 +595,7 @@ ALTER TABLE promotions ADD COLUMN excluded_items TEXT;
 ALTER TABLE promotions ADD COLUMN updated_at TEXT;
 ALTER TABLE promotions ADD COLUMN start_date TEXT;
 ALTER TABLE promotions ADD COLUMN end_date TEXT;
+ALTER TABLE promotions ADD COLUMN usage_limit_per_customer INTEGER DEFAULT 0;
 ALTER TABLE reservations ADD COLUMN customer_phone TEXT;
 ALTER TABLE reservations ADD COLUMN guest_count INTEGER DEFAULT 2;
 ALTER TABLE reservations ADD COLUMN date TEXT;
