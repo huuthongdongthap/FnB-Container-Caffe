@@ -121,7 +121,7 @@ describe('Payment Webhook Lifecycle Contract', () => {
     expect(orderUpdate).toBeDefined();
     expect(orderUpdate?.sql).toContain("SET status = 'expired'");
     expect(orderUpdate?.sql).toContain("LOWER(COALESCE(status, 'pending')) = 'pending'");
-    expect(orderUpdate?.sql).toContain("NOT IN ('paid', 'completed', 'refunded')");
+    expect(orderUpdate?.sql).toContain("NOT IN ('paid', 'completed', 'partially_refunded', 'refunded')");
   });
 
   it('handles duplicate callback idempotently when payment is already completed', async () => {
