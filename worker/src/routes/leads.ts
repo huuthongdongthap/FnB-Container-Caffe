@@ -7,6 +7,7 @@ import { z } from 'zod';
 import type { Env } from '../types/env';
 import { createLogger } from '../middleware/logger';
 import { rateLimitMiddleware, type RateLimitConfig } from '../middleware/rate-limit';
+import { resolvePublicTenantId } from '../middleware/tenant';
 
 const log = createLogger({ route: 'leads' });
 
@@ -41,7 +42,8 @@ leadsRouter.post('/', rateLimitMiddleware(LEADS_RATE_LIMIT), async (c) => {
   const normalizedEmail = parsed.data.email.toLowerCase();
   const source = parsed.data.source || 'promotions_newsletter';
   const subscribedAt = new Date().toISOString();
-  const tenantId = (c.req.header('X-Tenant-ID') || 'default').trim() || 'default';
+  const rawTenantId = resolvePublicTenantId(c);
+  const tenantId = /^[a-zA-Z0-9_-]{1,64}$/.test(rawTenantId) ? rawTenantId : 'default';
 
   const record = {
     email: normalizedEmail,
@@ -73,7 +75,8 @@ leadsRouter.post('/', rateLimitMiddleware(LEADS_RATE_LIMIT), async (c) => {
       await c.env.AURA_DB.prepare(
         `INSERT INTO leads (id, email, source, tenant_id, created_at)
          VALUES (?, ?, ?, ?, ?)
-         ON CONFLICT(email) DO UPDATE SET source = excluded.source`,
+         ON CONFLICT(email) DO UPDATE SET source = excluded.source
+         WHERE COALESCE(NULLIF(TRIM(leads.tenant_id), ''), 'default') = excluded.tenant_id`,
       )
         .bind(`lead_${crypto.randomUUID().slice(0, 12)}`, normalizedEmail, source, tenantId, subscribedAt)
         .run();

@@ -22,10 +22,15 @@ function rowMatchesTenant(row: unknown, tenantId?: string): boolean {
   return normalized === normTenant;
 }
 
+function isMissingSchemaError(err: unknown): boolean {
+  const msg = err instanceof Error ? err.message : String(err ?? '');
+  return /no such (table|column)/i.test(msg);
+}
+
 /**
  * Exclude erased/anonymized customers and customers who explicitly revoked or
- * denied marketing consent. Schema-safe: if `anonymized_at` or `consents` is
- * absent in a minimal test DB, fails open for that check only.
+ * denied marketing consent. Schema-safe: ignores missing legacy column/table
+ * errors only, and fails closed (excludes the batch) on unexpected DB errors.
  */
 async function filterEligibleMarketingCandidates(
   db: D1Database,
@@ -33,7 +38,7 @@ async function filterEligibleMarketingCandidates(
   tenantId?: string
 ): Promise<CampaignCustomer[]> {
   if (candidates.length === 0) return [];
-  const ids = candidates.map((c) => c.id).filter(Boolean);
+  const ids = Array.from(new Set(candidates.map((c) => c.id).filter(Boolean)));
   if (ids.length === 0) return [];
 
   const excludedIds = new Set<string>();
@@ -54,14 +59,19 @@ async function filterEligibleMarketingCandidates(
       for (const r of res.results || []) {
         if (r.id) excludedIds.add(r.id);
       }
-    } catch {
-      // anonymized_at column absent in legacy schema
+    } catch (err) {
+      if (!isMissingSchemaError(err)) {
+        for (const id of batch) excludedIds.add(id);
+        continue;
+      }
     }
 
     // 2. Exclude customers who explicitly revoked or denied marketing consent
     try {
-      const res = hasScopedTenant && normTenant
-        ? await db
+      let consentRows: Array<{ customer_id: string; granted?: number | boolean | null; revoked_at?: string | null }> = [];
+      if (hasScopedTenant && normTenant) {
+        try {
+          const res = await db
             .prepare(
               `SELECT customer_id, granted, revoked_at FROM consents
                WHERE customer_id IN (${placeholders})
@@ -69,17 +79,35 @@ async function filterEligibleMarketingCandidates(
                  AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?`
             )
             .bind(...batch, normTenant)
-            .all<{ customer_id: string; granted?: number | boolean | null; revoked_at?: string | null }>()
-        : await db
-            .prepare(
-              `SELECT customer_id, granted, revoked_at FROM consents
-               WHERE customer_id IN (${placeholders})
-                 AND purpose = 'marketing'`
-            )
-            .bind(...batch)
             .all<{ customer_id: string; granted?: number | boolean | null; revoked_at?: string | null }>();
+          consentRows = res.results || [];
+        } catch (err) {
+          if (isMissingSchemaError(err) && normTenant === 'default') {
+            const fallback = await db
+              .prepare(
+                `SELECT customer_id, granted, revoked_at FROM consents
+                 WHERE customer_id IN (${placeholders})
+                   AND purpose = 'marketing'`
+              )
+              .bind(...batch)
+              .all<{ customer_id: string; granted?: number | boolean | null; revoked_at?: string | null }>();
+            consentRows = fallback.results || [];
+          } else {
+            throw err;
+          }
+        }
+      } else {
+        const res = await db
+          .prepare(
+            `SELECT customer_id, granted, revoked_at FROM consents
+             WHERE customer_id IN (${placeholders})
+               AND purpose = 'marketing'`
+          )
+          .bind(...batch)
+          .all<{ customer_id: string; granted?: number | boolean | null; revoked_at?: string | null }>();
+        consentRows = res.results || [];
+      }
 
-      const consentRows = res.results || [];
       const byCustomer = new Map<string, Array<{ granted?: number | boolean | null; revoked_at?: string | null }>>();
       for (const row of consentRows) {
         if (!row.customer_id) continue;
@@ -93,8 +121,10 @@ async function filterEligibleMarketingCandidates(
           excludedIds.add(cid);
         }
       }
-    } catch {
-      // consents table absent in minimal test schema
+    } catch (err) {
+      if (!isMissingSchemaError(err)) {
+        for (const id of batch) excludedIds.add(id);
+      }
     }
   }
 

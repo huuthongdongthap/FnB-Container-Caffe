@@ -3,7 +3,6 @@ import type { Env } from '../types/env';
 import { requireAuth, optionalAuth } from '../middleware/auth';
 import { isHQSuperAdmin } from '../middleware/tenant';
 import { isStaffRole, issueStaffSession, loadStaffAccount } from '../lib/staff-session';
-import { generateJWT } from '../lib/jwt';
 
 export type SaasTenant = {
   id: string;
@@ -296,8 +295,7 @@ export function createTenantRoutes() {
       const existingOwned = await db
         .prepare('SELECT id FROM saas_tenants WHERE owner_user_id = ? LIMIT 1')
         .bind(currentUser.id)
-        .first<{ id: string }>()
-        .catch(() => null);
+        .first<{ id: string }>();
       if (existingOwned && !isHQSuperAdmin(currentUser)) {
         return c.json({ ok: false, error: 'already_has_tenant', tenantId: existingOwned.id } as const, 409);
       }
@@ -368,23 +366,6 @@ export function createTenantRoutes() {
             }
           } catch {
             token = null;
-          }
-          if (!token) {
-            try {
-              token = await generateJWT(
-                {
-                  sub: ownerUserId,
-                  id: ownerUserId,
-                  name: (currentUser as { name?: string }).name || currentUser.email || rawName,
-                  email: currentUser.email,
-                  role: nextRole,
-                  tenantId: id,
-                },
-                c.env.JWT_SECRET
-              );
-            } catch {
-              token = null;
-            }
           }
         }
       }
