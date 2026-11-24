@@ -43,15 +43,13 @@ export async function getCustomerMetrics(
   const validOrderWhere = `status != 'cancelled'
           AND status NOT IN ('cancelled', 'refunded', 'failed', 'rejected', 'expired')
           AND LOWER(COALESCE(TRIM(status), '')) NOT IN ('cancelled', 'canceled', 'refunded', 'failed', 'rejected', 'expired')
-          AND COALESCE(payment_status, '') != 'refunded'
-          AND LOWER(COALESCE(TRIM(payment_status), '')) NOT IN ('refunded', 'failed', 'cancelled', 'canceled')
+          AND LOWER(COALESCE(TRIM(payment_status), '')) IN ('paid', 'partially_refunded', 'completed')
           AND NOT (COALESCE(TRIM(notes), '') = 'Khách QR - cho don mon' AND COALESCE(TRIM(items), '[]') IN ('', '[]'))`;
 
   const noNotesOrderWhere = `status != 'cancelled'
           AND status NOT IN ('cancelled', 'refunded', 'failed', 'rejected', 'expired')
           AND LOWER(COALESCE(TRIM(status), '')) NOT IN ('cancelled', 'canceled', 'refunded', 'failed', 'rejected', 'expired')
-          AND COALESCE(payment_status, '') != 'refunded'
-          AND LOWER(COALESCE(TRIM(payment_status), '')) NOT IN ('refunded', 'failed', 'cancelled', 'canceled')`;
+          AND LOWER(COALESCE(TRIM(payment_status), '')) IN ('paid', 'partially_refunded', 'completed')`;
 
   const minimalOrderWhere = `status != 'cancelled'
           AND status NOT IN ('cancelled', 'refunded', 'failed', 'rejected', 'expired')

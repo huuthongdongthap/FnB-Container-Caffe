@@ -65,7 +65,7 @@ describe('KDS new-order sound', () => {
 
   it('passes disabled sound to the hook when the toggle is off', () => {
     render(<KDSPage />);
-    fireEvent.click(screen.getByRole('button', { name: /mute alerts|alerts/i }));
+    fireEvent.click(screen.getByRole('button', { name: /mute alerts|alerts|tắt âm báo|âm báo/i }));
     expect(playBeep.mock.calls.at(-1)?.[1]).toBe(false);
   });
 

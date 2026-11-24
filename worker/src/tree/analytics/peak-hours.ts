@@ -35,8 +35,7 @@ export async function getPeakHours(
         AND o.status != 'cancelled'
         AND o.status NOT IN ('cancelled', 'refunded', 'failed', 'rejected', 'expired')
         AND LOWER(COALESCE(TRIM(o.status), '')) NOT IN ('cancelled', 'canceled', 'refunded', 'failed', 'rejected', 'expired')
-        AND COALESCE(o.payment_status, '') != 'refunded'
-        AND LOWER(COALESCE(TRIM(o.payment_status), '')) NOT IN ('refunded', 'failed', 'cancelled', 'canceled')
+        AND LOWER(COALESCE(TRIM(o.payment_status), '')) IN ('paid', 'partially_refunded', 'completed')
         AND NOT (COALESCE(TRIM(o.notes), '') = 'Khách QR - cho don mon' AND COALESCE(TRIM(o.items), '[]') IN ('', '[]'))${tenantClause}
       GROUP BY hour
       ORDER BY hour
@@ -54,8 +53,7 @@ export async function getPeakHours(
           AND o.status != 'cancelled'
           AND o.status NOT IN ('cancelled', 'refunded', 'failed', 'rejected', 'expired')
           AND LOWER(COALESCE(TRIM(o.status), '')) NOT IN ('cancelled', 'canceled', 'refunded', 'failed', 'rejected', 'expired')
-          AND COALESCE(o.payment_status, '') != 'refunded'
-          AND LOWER(COALESCE(TRIM(o.payment_status), '')) NOT IN ('refunded', 'failed', 'cancelled', 'canceled')${tenantClause}
+          AND LOWER(COALESCE(TRIM(o.payment_status), '')) IN ('paid', 'partially_refunded', 'completed')${tenantClause}
         GROUP BY hour
         ORDER BY hour
       `).bind(...binds).all<PeakHourRow>();

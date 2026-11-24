@@ -3,6 +3,8 @@ import type { Env } from '../../types/env';
 import { authenticateRequest } from '../../middleware/auth';
 import { getTenantId } from '../../middleware/tenant';
 import {
+  VALID_REVENUE_ORDER_ALIAS_SQL,
+  VALID_REVENUE_ORDER_SQL,
   buildTenantClause,
   isStrictHQReportAdmin,
   validateDateRangeWindow,
@@ -45,14 +47,12 @@ function buildTenantFilter(tenantId: string, alias?: string, c?: Context<{ Bindi
   return { clause: and, binds };
 }
 
-const NON_REVENUE_STATUS_SQL =
-  "LOWER(COALESCE(status, '')) NOT IN ('cancelled', 'failed', 'rejected', 'expired') AND LOWER(COALESCE(status, '')) NOT IN ('cancelled', 'canceled', 'refunded', 'failed', 'rejected', 'expired') AND LOWER(COALESCE(payment_status, '')) NOT IN ('refunded', 'failed', 'cancelled', 'canceled')";
+const NON_REVENUE_STATUS_SQL = VALID_REVENUE_ORDER_SQL;
 const NON_REVENUE_STATUS_FALLBACK_SQL =
-  "LOWER(COALESCE(status, '')) NOT IN ('cancelled', 'failed', 'rejected', 'expired') AND LOWER(COALESCE(status, '')) NOT IN ('cancelled', 'canceled', 'refunded', 'failed', 'rejected', 'expired')";
-const NON_REVENUE_ORDER_ALIAS_STATUS_SQL =
-  "LOWER(COALESCE(o.status, '')) NOT IN ('cancelled', 'failed', 'rejected', 'expired') AND LOWER(COALESCE(o.status, '')) NOT IN ('cancelled', 'canceled', 'refunded', 'failed', 'rejected', 'expired') AND LOWER(COALESCE(o.payment_status, '')) NOT IN ('refunded', 'failed', 'cancelled', 'canceled')";
+  "LOWER(TRIM(COALESCE(status, ''))) NOT IN ('cancelled', 'canceled', 'refunded', 'failed', 'rejected', 'expired')";
+const NON_REVENUE_ORDER_ALIAS_STATUS_SQL = VALID_REVENUE_ORDER_ALIAS_SQL;
 const NON_REVENUE_ORDER_ALIAS_STATUS_FALLBACK_SQL =
-  "LOWER(COALESCE(o.status, '')) NOT IN ('cancelled', 'failed', 'rejected', 'expired') AND LOWER(COALESCE(o.status, '')) NOT IN ('cancelled', 'canceled', 'refunded', 'failed', 'rejected', 'expired')";
+  "LOWER(TRIM(COALESCE(o.status, ''))) NOT IN ('cancelled', 'canceled', 'refunded', 'failed', 'rejected', 'expired')";
 
 export async function resolveReportScope(
   c: Context<{ Bindings: Env }>
@@ -190,6 +190,17 @@ export async function handleOverview(c: Context<{ Bindings: Env }>) {
     todayOrders,
     yesterdayOrders,
     avgOrderValue,
+    periodRevenue: todayRevenue,
+    previousPeriodRevenue: yesterdayRevenue,
+    periodOrders: todayOrders,
+    previousPeriodOrders: yesterdayOrders,
+    range: {
+      from,
+      to,
+      prevFrom: prevStart,
+      prevTo: prevEnd,
+      days: diffDays,
+    },
   };
 
   return c.json({ success: true, data });
@@ -326,44 +337,50 @@ export function registerGroupedSalesHandlers(app: Hono<{ Bindings: Env }>) {
     let results: GroupedSalesGroup[] = [];
     try {
       const res = await db.prepare(`
-        SELECT c.name as label,
+        SELECT COALESCE(c.name, 'Món khác') as label,
                COALESCE(SUM(oi.subtotal), 0) as value,
-               SUM(oi.quantity) as count
+               SUM(oi.quantity) as count,
+               COUNT(DISTINCT oi.order_id) as orderCount,
+               SUM(oi.quantity) as itemsCount
         FROM order_items oi
         JOIN orders o ON o.id = oi.order_id
-        JOIN products p ON p.id = oi.product_id AND COALESCE(NULLIF(TRIM(p.tenant_id), ''), 'default') = COALESCE(NULLIF(TRIM(o.tenant_id), ''), 'default')
-        JOIN categories c ON c.id = p.category_id AND COALESCE(NULLIF(TRIM(c.tenant_id), ''), 'default') = COALESCE(NULLIF(TRIM(o.tenant_id), ''), 'default')
+        LEFT JOIN products p ON p.id = oi.product_id AND COALESCE(NULLIF(TRIM(p.tenant_id), ''), 'default') = COALESCE(NULLIF(TRIM(o.tenant_id), ''), 'default')
+        LEFT JOIN categories c ON c.id = p.category_id AND COALESCE(NULLIF(TRIM(c.tenant_id), ''), 'default') = COALESCE(NULLIF(TRIM(o.tenant_id), ''), 'default')
         WHERE ${NON_REVENUE_ORDER_ALIAS_STATUS_SQL} AND DATE(datetime(o.created_at, '+7 hours')) BETWEEN ? AND ?${tenantOrderClause}
-        GROUP BY c.name ORDER BY value DESC
+        GROUP BY COALESCE(c.name, 'Món khác') ORDER BY value DESC
       `).bind(from, to, ...tenantBinds).all<GroupedSalesGroup>();
       results = res.results || [];
     } catch {
       try {
         const res = await db.prepare(`
-          SELECT c.name as label,
+          SELECT COALESCE(c.name, 'Món khác') as label,
                  COALESCE(SUM(oi.subtotal), 0) as value,
-                 SUM(oi.quantity) as count
+                 SUM(oi.quantity) as count,
+                 COUNT(DISTINCT oi.order_id) as orderCount,
+                 SUM(oi.quantity) as itemsCount
           FROM order_items oi
           JOIN orders o ON o.id = oi.order_id
-          JOIN products p ON p.id = oi.product_id AND COALESCE(NULLIF(TRIM(p.tenant_id), ''), 'default') = COALESCE(NULLIF(TRIM(o.tenant_id), ''), 'default')
-          JOIN categories c ON c.id = p.category_id AND COALESCE(NULLIF(TRIM(c.tenant_id), ''), 'default') = COALESCE(NULLIF(TRIM(o.tenant_id), ''), 'default')
+          LEFT JOIN products p ON p.id = oi.product_id AND COALESCE(NULLIF(TRIM(p.tenant_id), ''), 'default') = COALESCE(NULLIF(TRIM(o.tenant_id), ''), 'default')
+          LEFT JOIN categories c ON c.id = p.category_id AND COALESCE(NULLIF(TRIM(c.tenant_id), ''), 'default') = COALESCE(NULLIF(TRIM(o.tenant_id), ''), 'default')
           WHERE ${NON_REVENUE_ORDER_ALIAS_STATUS_FALLBACK_SQL} AND DATE(o.created_at) BETWEEN ? AND ?${tenantOrderClause}
-          GROUP BY c.name ORDER BY value DESC
+          GROUP BY COALESCE(c.name, 'Món khác') ORDER BY value DESC
         `).bind(from, to, ...tenantBinds).all<GroupedSalesGroup>();
         results = res.results || [];
       } catch {
-        if (tenantId === 'default') {
+        if (tenantId === 'default' || tenantId === '*') {
           try {
             const res = await db.prepare(`
-              SELECT c.name as label,
+              SELECT COALESCE(c.name, 'Món khác') as label,
                      COALESCE(SUM(oi.subtotal), 0) as value,
-                     SUM(oi.quantity) as count
+                     SUM(oi.quantity) as count,
+                     COUNT(DISTINCT oi.order_id) as orderCount,
+                     SUM(oi.quantity) as itemsCount
               FROM order_items oi
-              JOIN products p ON p.id = oi.product_id
-              JOIN categories c ON c.id = p.category_id
               JOIN orders o ON o.id = oi.order_id
+              LEFT JOIN products p ON p.id = oi.product_id
+              LEFT JOIN categories c ON c.id = p.category_id
               WHERE ${NON_REVENUE_ORDER_ALIAS_STATUS_FALLBACK_SQL} AND DATE(o.created_at) BETWEEN ? AND ?${tenantOrderClause}
-              GROUP BY c.name ORDER BY value DESC
+              GROUP BY COALESCE(c.name, 'Món khác') ORDER BY value DESC
             `).bind(from, to, ...tenantBinds).all<GroupedSalesGroup>();
             results = res.results || [];
           } catch {
@@ -374,7 +391,7 @@ export function registerGroupedSalesHandlers(app: Hono<{ Bindings: Env }>) {
     }
 
     if (results && results.length > 0) {
-      return c.json({ success: true, data: { groups: results } });
+      return c.json({ success: true, data: { groups: results, unit: 'items' } });
     }
 
     let rawOrders: Array<{ items: string }> = [];
@@ -423,21 +440,25 @@ export function registerGroupedSalesHandlers(app: Hono<{ Bindings: Env }>) {
     }
 
     const productCategoryMap = new Map<string, string>();
-    if (needsCatalogLookup && tenantId !== '*') {
+    if (needsCatalogLookup) {
       try {
-        const prodRes = await db.prepare(
-          `SELECT id, category_id FROM products WHERE COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?`
-        ).bind(tenantId).all<{ id: string; category_id: string }>();
-        const catRes = await db.prepare(
-          `SELECT id, name FROM categories WHERE COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?`
-        ).bind(tenantId).all<{ id: string; name: string }>();
+        const prodRes = tenantId === '*'
+          ? await db.prepare(`SELECT id, category_id FROM products`).all<{ id: string; category_id: string }>()
+          : await db.prepare(
+              `SELECT id, category_id FROM products WHERE COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?`
+            ).bind(tenantId).all<{ id: string; category_id: string }>();
+        const catRes = tenantId === '*'
+          ? await db.prepare(`SELECT id, name FROM categories`).all<{ id: string; name: string }>()
+          : await db.prepare(
+              `SELECT id, name FROM categories WHERE COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?`
+            ).bind(tenantId).all<{ id: string; name: string }>();
         const catNameById = new Map((catRes.results || []).map((cat) => [String(cat.id), cat.name]));
         for (const p of prodRes.results || []) {
           const cName = catNameById.get(String(p.category_id));
           if (cName) productCategoryMap.set(String(p.id), cName);
         }
       } catch {
-        if (tenantId === 'default') {
+        if (tenantId === 'default' || tenantId === '*') {
           try {
             const prodRes = await db.prepare(`SELECT id, category_id FROM products`).all<{ id: string; category_id: string }>();
             const catRes = await db.prepare(`SELECT id, name FROM categories`).all<{ id: string; name: string }>();
@@ -453,8 +474,9 @@ export function registerGroupedSalesHandlers(app: Hono<{ Bindings: Env }>) {
       }
     }
 
-    const catMap = new Map<string, { value: number; count: number }>();
+    const catMap = new Map<string, { value: number; count: number; orderCount: number }>();
     for (const items of parsedOrderItems) {
+      const seenCategoriesInOrder = new Set<string>();
       for (const it of items) {
         const pid = String(it.product_id || it.id || '');
         const resolvedCat = it.category || it.category_name || (pid ? productCategoryMap.get(pid) : undefined);
@@ -465,18 +487,28 @@ export function registerGroupedSalesHandlers(app: Hono<{ Bindings: Env }>) {
         if (qty <= 0) continue;
         const rawPrice = Number(it.price ?? it.unit_price ?? 0);
         const price = Number.isFinite(rawPrice) && rawPrice > 0 ? rawPrice : 0;
-        const cur = catMap.get(cat) || { value: 0, count: 0 };
+        const cur = catMap.get(cat) || { value: 0, count: 0, orderCount: 0 };
         cur.value += price * qty;
         cur.count += qty;
+        if (!seenCategoriesInOrder.has(cat)) {
+          cur.orderCount += 1;
+          seenCategoriesInOrder.add(cat);
+        }
         catMap.set(cat, cur);
       }
     }
 
     const groups: GroupedSalesGroup[] = [...catMap.entries()]
-      .map(([label, d]) => ({ label, value: d.value, count: d.count }))
+      .map(([label, d]) => ({
+        label,
+        value: d.value,
+        count: d.count,
+        orderCount: d.orderCount,
+        itemsCount: d.count,
+      }))
       .sort((a, b) => b.value - a.value);
 
-    return c.json({ success: true, data: { groups } });
+    return c.json({ success: true, data: { groups, unit: 'items' } });
   });
 
   app.get('/sales-by-payment', async (c) => {
@@ -502,22 +534,22 @@ export function registerGroupedSalesHandlers(app: Hono<{ Bindings: Env }>) {
     let results: GroupedSalesGroup[] = [];
     try {
       const res = await db.prepare(`
-        SELECT COALESCE(payment_method, 'other') as label,
+        SELECT LOWER(TRIM(COALESCE(NULLIF(TRIM(payment_method), ''), 'other'))) as label,
                COALESCE(SUM(total), 0) as value,
                COUNT(*) as count
         FROM orders
         WHERE DATE(datetime(created_at, '+7 hours')) BETWEEN ? AND ? AND ${NON_REVENUE_STATUS_SQL}${tenantClause}
-        GROUP BY payment_method ORDER BY value DESC
+        GROUP BY LOWER(TRIM(COALESCE(NULLIF(TRIM(payment_method), ''), 'other'))) ORDER BY value DESC
       `).bind(from, to, ...tenantBinds).all<GroupedSalesGroup>();
       results = res.results || [];
     } catch {
       const res = await db.prepare(`
-        SELECT COALESCE(payment_method, 'other') as label,
+        SELECT LOWER(TRIM(COALESCE(NULLIF(TRIM(payment_method), ''), 'other'))) as label,
                COALESCE(SUM(total), 0) as value,
                COUNT(*) as count
         FROM orders
         WHERE DATE(created_at) BETWEEN ? AND ? AND ${NON_REVENUE_STATUS_FALLBACK_SQL}${tenantClause}
-        GROUP BY payment_method ORDER BY value DESC
+        GROUP BY LOWER(TRIM(COALESCE(NULLIF(TRIM(payment_method), ''), 'other'))) ORDER BY value DESC
       `).bind(from, to, ...tenantBinds).all<GroupedSalesGroup>();
       results = res.results || [];
     }

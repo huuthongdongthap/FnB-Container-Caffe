@@ -124,31 +124,6 @@ export function ChartSvg({
           );
         })}
 
-        {/* Bottom axis labels */}
-        {current
-          .filter((_, i) => {
-            if (current.length <= labelCount) return true;
-            const step = Math.floor(current.length / labelCount);
-            return i % step === 0 || i === current.length - 1;
-          })
-          .map((d, _, _arr) => {
-            const i = current.indexOf(d);
-            const x = PADDING.left + (i / Math.max(current.length - 1, 1)) * INNER_W;
-            return (
-              <text
-                key={i}
-                x={x}
-                y={CHART_HEIGHT - 2}
-                textAnchor="middle"
-                fill="var(--aura-text-muted)"
-                fontSize="2.5"
-                fontFamily="var(--aura-font-mono)"
-              >
-                {d.date.length > 5 ? d.date.slice(0, 4) + '..' : d.date}
-              </text>
-            );
-          })}
-
         <defs>
           <linearGradient id="period-current-gradient" x1="0" y1="0" x2="0" y2="1">
             <stop offset="0%" stopColor="var(--aura-chrome-silver)" stopOpacity="0.7" />
@@ -156,6 +131,27 @@ export function ChartSvg({
           </linearGradient>
         </defs>
       </svg>
+
+      {/* Bottom axis labels (HTML so dates never stretch or truncate to '2026..') */}
+      <div className="mt-1 flex items-center justify-between text-[10px] font-mono text-[var(--aura-text-muted)]">
+        {current
+          .filter((_, i) => {
+            if (current.length <= labelCount) return true;
+            const step = Math.floor(current.length / labelCount);
+            return i % step === 0 || i === current.length - 1;
+          })
+          .map((d, idx) => {
+            const formatted =
+              /^\d{4}-\d{2}-\d{2}$/.test(d.date)
+                ? `${d.date.slice(8, 10)}/${d.date.slice(5, 7)}`
+                : d.date;
+            return (
+              <span key={`${d.date}-${idx}`} title={`${d.date}: ${d.revenue.toLocaleString('vi-VN')}₫`}>
+                {formatted}
+              </span>
+            );
+          })}
+      </div>
     </div>
   );
 }

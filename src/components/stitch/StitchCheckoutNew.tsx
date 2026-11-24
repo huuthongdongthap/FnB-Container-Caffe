@@ -94,13 +94,20 @@ function getInitialCheckoutForm(): {
     }
 
     if (booking) {
-      const table = booking.tableNumber || '';
+      const physicalRe = /^(?:(?:bàn|ban|table|t)\s*[-#]?\s*)?0*([1-9]\d*)(?:[-_][a-z0-9]+)?$/i;
+      const rawTableNum = (booking.tableNumber || '').trim();
+      const rawTableId = ((booking as unknown as { tableId?: string }).tableId || '').trim();
+      const physicalTable = physicalRe.test(rawTableNum)
+        ? rawTableNum
+        : physicalRe.test(rawTableId)
+          ? rawTableId
+          : '';
       merged.orderType = 'dine_in';
       if (booking.fullName) merged.fullName = booking.fullName;
       if (booking.phone) merged.phone = booking.phone;
-      if (table) merged.tableNumber = table;
+      if (physicalTable) merged.tableNumber = physicalTable;
       if (!merged.notes && booking.zone) {
-        merged.notes = `[Đặt trước bàn: ${table} - ${booking.zone}]`;
+        merged.notes = `[Đặt trước bàn: ${physicalTable || rawTableNum} - ${booking.zone}]`;
       }
     }
 
@@ -405,7 +412,12 @@ export function StitchCheckoutNew({
               <div className="grid grid-cols-3 gap-3">
                 <button
                   type="button"
-                  onClick={() => { setOrderType('delivery'); updateField('orderType', 'delivery'); }}
+                  onClick={() => {
+                    setOrderType('delivery');
+                    updateField('orderType', 'delivery');
+                    updateField('tableNumber', '');
+                    updateField('notes', (form.notes || '').replace(/^\[Đặt trước bàn:[^\]]*\]\s*(?:\|\s*)?/, '').trim());
+                  }}
                   className={cn(
                     'py-3.5 px-3 rounded-xl border text-sm font-medium transition-all text-center flex flex-col items-center gap-1.5 cursor-pointer',
                     orderType === 'delivery'
@@ -420,7 +432,12 @@ export function StitchCheckoutNew({
 
                 <button
                   type="button"
-                  onClick={() => { setOrderType('takeaway'); updateField('orderType', 'takeaway'); }}
+                  onClick={() => {
+                    setOrderType('takeaway');
+                    updateField('orderType', 'takeaway');
+                    updateField('tableNumber', '');
+                    updateField('notes', (form.notes || '').replace(/^\[Đặt trước bàn:[^\]]*\]\s*(?:\|\s*)?/, '').trim());
+                  }}
                   className={cn(
                     'py-3.5 px-3 rounded-xl border text-sm font-medium transition-all text-center flex flex-col items-center gap-1.5 cursor-pointer',
                     orderType === 'takeaway'

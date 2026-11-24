@@ -738,7 +738,7 @@ export async function createOrder(
       const tblClause = tenantId === 'default'
         ? "AND (tenant_id = ? OR tenant_id IS NULL OR tenant_id = '' OR TRIM(tenant_id) = '')"
         : 'AND (tenant_id = ? OR TRIM(tenant_id) = ?2)';
-      const tableOccupySql = `UPDATE cafe_tables SET status = 'Occupied' WHERE id = ? ${tblClause} AND status = 'Available'`;
+      const tableOccupySql = `UPDATE cafe_tables SET status = 'Occupied' WHERE id = ? ${tblClause} AND LOWER(TRIM(COALESCE(status, ''))) = 'available'`;
       statements.push(db.prepare(tableOccupySql).bind(resolvedTableId, tenantId));
       noGuestHashStatements.push(db.prepare(tableOccupySql).bind(resolvedTableId, tenantId));
       legacyStatements.push(db.prepare(tableOccupySql).bind(resolvedTableId, tenantId));

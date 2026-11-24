@@ -51,6 +51,7 @@ export interface Env {
   MIXPOST_API_URL?: string;
   MIXPOST_API_TOKEN?: string;
   MIXPOST_ACCOUNTS?: string;
+  MIXPOST_TENANT_ACCOUNTS_JSON?: string;
 
   // pretix
   PRETIX_API_URL?: string;
@@ -81,6 +82,7 @@ export interface Env {
   ZALO_ACCESS_TOKEN?: string;
   ZALO_REFRESH_TOKEN?: string;
   ZALO_OA_TOKEN?: string;
+  ZALO_ZNS_TEMPLATE_GENERAL_PROMOTION?: string;
 
   // Mautic
   MAUTIC_API_URL?: string;

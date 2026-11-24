@@ -2,7 +2,13 @@ import type { Hono } from 'hono';
 import type { Env } from '../../types/env';
 import { authenticateRequest } from '../../middleware/auth';
 import { getTenantId } from '../../middleware/tenant';
-import { buildTenantClause, isStrictHQReportAdmin } from './analytics-handlers';
+import {
+  VALID_REVENUE_ORDER_ALIAS_SQL,
+  VALID_REVENUE_ORDER_SQL,
+  buildTenantClause,
+  isStrictHQReportAdmin,
+  validateDateRangeWindow,
+} from './analytics-handlers';
 import type {
   OrderExportRow,
   RevenueExportRow,
@@ -45,13 +51,13 @@ function createCsvResponse(csvString: string, filename: string): Response {
   });
 }
 
-export const VALID_EXPORT_ORDER_SQL =
-  "LOWER(COALESCE(status, '')) NOT IN ('cancelled', 'canceled', 'refunded', 'failed', 'rejected', 'expired') AND LOWER(COALESCE(payment_status, '')) NOT IN ('refunded', 'failed', 'cancelled', 'canceled') AND NOT (COALESCE(total, 0) = 0 AND (COALESCE(customer_name, '') = 'Khách QR - cho don mon' OR COALESCE(items, '') IN ('', '[]')))";
+const ICT_OFFSET_MS = 7 * 3600_000;
+
+export const VALID_EXPORT_ORDER_SQL = VALID_REVENUE_ORDER_SQL;
 
 export function registerExportHandlers(app: Hono<{ Bindings: Env }>) {
-  const EXPORT_ALLOWED_ROLES = new Set(['owner', 'manager', 'admin']);
-  const VALID_JOINED_ORDER_SQL =
-    "LOWER(COALESCE(o.status, '')) NOT IN ('cancelled', 'canceled', 'refunded', 'failed', 'rejected', 'expired') AND LOWER(COALESCE(o.payment_status, '')) NOT IN ('refunded', 'failed', 'cancelled', 'canceled') AND NOT (COALESCE(o.total, 0) = 0 AND (COALESCE(o.customer_name, '') = 'Khách QR - cho don mon' OR COALESCE(o.items, '') IN ('', '[]')))";
+  const EXPORT_ALLOWED_ROLES = new Set(['owner', 'manager', 'supervisor', 'admin']);
+  const VALID_JOINED_ORDER_SQL = VALID_REVENUE_ORDER_ALIAS_SQL;
   const VALID_CUSTOMER_EXPORT_PHONE_SQL =
     "TRIM(COALESCE(c.phone, '')) NOT IN ('', '0', '000000000', '0000000000', '00000000000', 'guest', 'walk-in', 'pos')";
 
@@ -118,25 +124,18 @@ export function registerExportHandlers(app: Hono<{ Bindings: Env }>) {
 
     const db = c.env.AURA_DB;
     const { and: tenantClause, binds: tenantBinds } = buildTenantClause(tenantId);
-    const from = c.req.query('from') || new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10);
-    const to = c.req.query('to') || new Date().toISOString().slice(0, 10);
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(from) || !/^\d{4}-\d{2}-\d{2}$/.test(to)) {
-      return c.json({ success: false, error: 'Invalid date range' }, 400);
-    }
-    const startMs = Date.parse(`${from}T00:00:00.000Z`);
-    const endMs = Date.parse(`${to}T00:00:00.000Z`);
-    const daySpan = Math.floor((endMs - startMs) / 86400000);
-    if (
-      !Number.isFinite(startMs) ||
-      !Number.isFinite(endMs) ||
-      new Date(startMs).toISOString().slice(0, 10) !== from ||
-      new Date(endMs).toISOString().slice(0, 10) !== to ||
-      !(daySpan >= 0 && daySpan <= 366)
-    ) {
+    const from = c.req.query('from') || new Date(Date.now() + ICT_OFFSET_MS - 30 * 86400000).toISOString().slice(0, 10);
+    const to = c.req.query('to') || new Date(Date.now() + ICT_OFFSET_MS).toISOString().slice(0, 10);
+    const rangeErr = validateDateRangeWindow(from, to);
+    const daySpan = Math.floor((Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / 86400000);
+    if (rangeErr || !Number.isFinite(daySpan) || daySpan < 0 || !(daySpan <= 366)) {
       return c.json({ success: false, error: 'Invalid date range' }, 400);
     }
     const type = c.req.query('type') || 'orders';
-    const maskPii = c.req.query('mask_pii') === '1' || c.req.query('mask_pii') === 'true';
+    if (role === 'supervisor' && type === 'customers') {
+      return c.json({ success: false, error: 'Forbidden' }, 403);
+    }
+    const maskPii = role === 'supervisor' || c.req.query('mask_pii') === '1' || c.req.query('mask_pii') === 'true';
     const maskPhone = (val: string | null | undefined) => {
       if (!maskPii) return val || '';
       const s = String(val || '').trim();
@@ -171,28 +170,59 @@ export function registerExportHandlers(app: Hono<{ Bindings: Env }>) {
     };
 
     if (type === 'orders') {
+      const { and: oTenantClause, binds: oTenantBinds } = buildTenantClause(tenantId, 'o');
+      const { and: pTenantClause, binds: pTenantBinds } = buildTenantClause(tenantId);
       let results: OrderExportRow[] = [];
       try {
         const res = await db.prepare(
-          `SELECT id, customer_name, customer_phone, total, status, payment_method,
-                  DATE(datetime(created_at, '+7 hours')) as ict_date, created_at
-           FROM orders WHERE DATE(datetime(created_at, '+7 hours')) BETWEEN ? AND ? AND ${VALID_EXPORT_ORDER_SQL}${tenantClause} ORDER BY created_at LIMIT 5000`
-        ).bind(from, to, ...tenantBinds).all<OrderExportRow & { ict_date?: string }>();
+          `SELECT o.id, o.customer_name, o.customer_phone,
+                  COALESCE(o.shipping_fee, 0) as shipping_fee,
+                  COALESCE(o.service_fee, 0) as service_fee,
+                  COALESCE(o.tip_amount, 0) as tip_amount,
+                  o.total,
+                  COALESCE(p.refund_amount, 0) as refund_amount,
+                  o.status, o.payment_method,
+                  DATE(datetime(o.created_at, '+7 hours')) as ict_date, o.created_at
+           FROM orders o
+           LEFT JOIN (
+             SELECT order_id, SUM(COALESCE(refund_amount, 0)) as refund_amount
+             FROM payments
+             WHERE 1=1${pTenantClause}
+             GROUP BY order_id
+           ) p ON p.order_id = o.id
+           WHERE DATE(datetime(o.created_at, '+7 hours')) BETWEEN ? AND ? AND ${VALID_JOINED_ORDER_SQL}${oTenantClause} ORDER BY o.created_at LIMIT 5000`
+        ).bind(...pTenantBinds, from, to, ...oTenantBinds).all<OrderExportRow & { ict_date?: string }>();
         results = res.results || [];
       } catch {
         const res = await db.prepare(
           `SELECT id, customer_name, customer_phone, total, status, payment_method, created_at
-           FROM orders WHERE DATE(created_at) BETWEEN ? AND ? AND ${VALID_EXPORT_ORDER_SQL}${tenantClause} ORDER BY created_at LIMIT 5000`
+           FROM orders WHERE DATE(datetime(created_at, '+7 hours')) BETWEEN ? AND ? AND ${VALID_EXPORT_ORDER_SQL}${tenantClause} ORDER BY created_at LIMIT 5000`
         ).bind(from, to, ...tenantBinds).all<OrderExportRow>();
         results = res.results || [];
       }
 
-      const headers = ['id', 'customer_name', 'customer_phone', 'total', 'status', 'payment_method', 'created_at'];
+      const headers = [
+        'id',
+        'customer_name',
+        'customer_phone',
+        'shipping_fee',
+        'service_fee',
+        'tip',
+        'total',
+        'refund_amount',
+        'status',
+        'payment_method',
+        'created_at',
+      ];
       const rows = (results || []).map((r) => [
         r.id || '',
         maskPii && r.customer_name ? `${r.customer_name.slice(0, 1)}***` : (r.customer_name || ''),
         maskPhone(r.customer_phone),
+        r.shipping_fee ?? 0,
+        r.service_fee ?? 0,
+        r.tip_amount ?? 0,
         r.total ?? 0,
+        r.refund_amount ?? 0,
         r.status || '',
         r.payment_method || '',
         (r as OrderExportRow & { ict_date?: string }).ict_date || (r.created_at || '').slice(0, 10)
@@ -212,7 +242,7 @@ export function registerExportHandlers(app: Hono<{ Bindings: Env }>) {
           `SELECT DATE(datetime(created_at, '+7 hours')) as date,
                   COUNT(*) as orders,
                   COALESCE(SUM(total), 0) as revenue,
-                  CASE WHEN COUNT(*) > 0 THEN COALESCE(SUM(total), 0) / COUNT(*) ELSE 0 END as avg_order_value
+                  CASE WHEN COUNT(*) > 0 THEN ROUND(CAST(COALESCE(SUM(total), 0) AS REAL) / COUNT(*)) ELSE 0 END as avg_order_value
            FROM orders
            WHERE DATE(datetime(created_at, '+7 hours')) BETWEEN ? AND ? AND ${VALID_EXPORT_ORDER_SQL}${tenantClause}
            GROUP BY DATE(datetime(created_at, '+7 hours')) ORDER BY date LIMIT 5000`
@@ -223,7 +253,7 @@ export function registerExportHandlers(app: Hono<{ Bindings: Env }>) {
           `SELECT DATE(created_at) as date,
                   COUNT(*) as orders,
                   COALESCE(SUM(total), 0) as revenue,
-                  CASE WHEN COUNT(*) > 0 THEN COALESCE(SUM(total), 0) / COUNT(*) ELSE 0 END as avg_order_value
+                  CASE WHEN COUNT(*) > 0 THEN ROUND(CAST(COALESCE(SUM(total), 0) AS REAL) / COUNT(*)) ELSE 0 END as avg_order_value
            FROM orders
            WHERE DATE(created_at) BETWEEN ? AND ? AND ${VALID_EXPORT_ORDER_SQL}${tenantClause}
            GROUP BY DATE(created_at) ORDER BY date LIMIT 5000`

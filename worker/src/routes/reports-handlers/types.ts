@@ -21,8 +21,15 @@ export interface OrderExportRow {
   id: string;
   customer_name: string;
   customer_phone: string;
+  subtotal?: number;
+  discount?: number;
+  shipping_fee?: number;
+  service_fee?: number;
+  tip_amount?: number;
   total: number;
+  refund_amount?: number;
   status: string;
+  payment_status?: string;
   payment_method: string;
   created_at: string;
 }
@@ -100,10 +107,13 @@ export interface GroupedSalesGroup {
   label: string;
   value: number;
   count: number;
+  orderCount?: number;
+  itemsCount?: number;
 }
 
 export interface GroupedSalesData {
   groups: GroupedSalesGroup[];
+  unit?: 'orders' | 'items';
 }
 
 export interface RevenueOverviewData {
@@ -113,5 +123,16 @@ export interface RevenueOverviewData {
   todayOrders: number;
   yesterdayOrders: number;
   avgOrderValue: number;
+  periodRevenue?: number;
+  previousPeriodRevenue?: number;
+  periodOrders?: number;
+  previousPeriodOrders?: number;
+  range?: {
+    from: string;
+    to: string;
+    prevFrom: string;
+    prevTo: string;
+    days: number;
+  };
 }
 

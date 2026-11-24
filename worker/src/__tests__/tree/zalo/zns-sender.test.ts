@@ -3,17 +3,33 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 // Inject a test-only template ID so sendZNS bypasses the YOUR_ guard and
 // actually calls fetch / audit code. Vitest hoists this before imports.
 // @ts-ignore hoisted mock factory
-vi.mock('../../../tree/zalo/zns-templates.js', () => ({
-  TEMPLATE_IDS: {
+vi.mock('../../../tree/zalo/zns-templates.js', () => {
+  const TEMPLATE_IDS: Record<string, string> = {
     welcome_signup: 'YOUR_WELCOME_TEMPLATE_ID',
     cashback_earned: 'YOUR_CASHBACK_TEMPLATE_ID',
     tier_upgrade: 'YOUR_TIER_TEMPLATE_ID',
     cashback_expiry_warning: 'YOUR_EXPIRY_TEMPLATE_ID',
     general_promotion: 'YOUR_GENERAL_PROMO_TEMPLATE_ID',
     _test_cfg: 'ZNS_TEST_TMPL_ID'
-  },
-  buildTemplateData: () => ({})
-}));
+  };
+  return {
+    TEMPLATE_IDS,
+    resolveTemplateId: (templateKey: string, env?: Record<string, unknown>) => {
+      const normalizedKey = String(templateKey || '').trim();
+      if (!normalizedKey) return null;
+      const envVal = env?.[`ZALO_ZNS_TEMPLATE_${normalizedKey.toUpperCase()}`];
+      if (typeof envVal === 'string' && envVal.trim() && !envVal.trim().startsWith('YOUR_')) {
+        return envVal.trim();
+      }
+      const fallback = TEMPLATE_IDS[normalizedKey];
+      if (typeof fallback === 'string' && fallback.trim() && !fallback.trim().startsWith('YOUR_')) {
+        return fallback.trim();
+      }
+      return null;
+    },
+    buildTemplateData: () => ({})
+  };
+});
 
 import { sendZNS } from '../../../tree/zalo/zns-sender.js';
 import type { ZnsData } from '../../../tree/zalo/types.js';
@@ -121,15 +137,18 @@ describe('sendZNS', () => {
   // --- fetch body & auth ---
 
   describe('fetch body & auth', () => {
-    it('builds JSON body with the correct phone payload', async() => {
+    it('builds JSON body with the correct phone payload and unique UUID tracking_id', async() => {
       const { getCalls } = mockFetchOK();
       await sendZNS(makeZaloEnv(), makeParams({ template_key: '_test_cfg' }));
-      const call = getCalls()[0];
-      const body = JSON.parse(call.body);
-      expect(body.phone).toBe('84912345678');
-      expect(body.template_id).toBe('ZNS_TEST_TMPL_ID');
-      expect(typeof body.tracking_id).toBe('string');
-      expect(body.tracking_id.startsWith('aura_')).toBe(true);
+      await sendZNS(makeZaloEnv(), makeParams({ template_key: '_test_cfg' }));
+      const call1 = getCalls()[0];
+      const call2 = getCalls()[1];
+      const body1 = JSON.parse(call1.body);
+      const body2 = JSON.parse(call2.body);
+      expect(body1.phone).toBe('84912345678');
+      expect(body1.template_id).toBe('ZNS_TEST_TMPL_ID');
+      expect(body1.tracking_id).toMatch(/^aura_[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i);
+      expect(body2.tracking_id).not.toBe(body1.tracking_id);
     });
 
     it('forwards ZALO_ACCESS_TOKEN via access_token header', async() => {

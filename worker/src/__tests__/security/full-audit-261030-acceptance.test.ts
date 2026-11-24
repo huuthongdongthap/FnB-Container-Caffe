@@ -7367,7 +7367,7 @@ describe('Phase 39 acceptance (AL1..AL4)', () => {
     expect(kdsTransitionSrc).toContain("type = 'spend'");
     expect(kdsTransitionSrc).toContain("'refund'");
     expect(tablesSrc).toContain('includeSignedQr');
-    expect(reservationsSrc).toContain("AND status = 'Available'");
+    expect(reservationsSrc).toContain("AND LOWER(TRIM(COALESCE(status, ''))) = 'available'");
     expect(staffTipsSrc).toContain("'owner', 'manager', 'supervisor', 'admin', 'cashier'");
   });
 
@@ -8592,7 +8592,7 @@ describe('Phase 48 (AU1..AU4) — Loyalty Tiers/Phone Auth/Referral Reversal, Mo
     expect(exportHandlersSrc).toContain("const EXPORT_ALLOWED_ROLES = new Set(['owner', 'manager', 'admin']);");
     expect(exportHandlersSrc).toContain('Date range cannot exceed 366 days');
     expect(analyticsSummarySrc).toContain("AND status NOT IN ('cancelled', 'refunded', 'failed', 'rejected', 'expired')");
-    expect(analyticsSummarySrc).toContain("AND COALESCE(payment_status, '') != 'refunded'");
+    expect(analyticsSummarySrc).toContain("AND LOWER(COALESCE(TRIM(payment_status), '')) IN ('paid', 'partially_refunded', 'completed')");
     expect(csvExportSrc).toContain('substr(created_at, 1, 10) >= ?');
     expect(csvExportSrc).toContain('LIMIT 10000');
 
@@ -8825,10 +8825,10 @@ describe('Phase 49 (AV1..AV4) — Loyalty/Referrals, Mobile POS/Checkin/Admin Me
     expect(poHandlersSrc).toContain("const PO_MUTATION_ROLES = ['owner', 'manager', 'admin'];");
     expect(poHandlersSrc).toContain('verifyPurchaseOrderAccess');
     expect(reportsAnalyticsSrc).toContain(
-      "COALESCE(status, '') NOT IN ('cancelled', 'refunded', 'failed', 'expired') AND COALESCE(payment_status, '') NOT IN ('refunded', 'failed', 'cancelled', 'canceled') AND LOWER(COALESCE(status, '')) NOT IN ('cancelled', 'canceled', 'refunded', 'failed', 'rejected', 'expired') AND LOWER(COALESCE(payment_status, '')) NOT IN ('refunded', 'failed', 'cancelled', 'canceled') AND NOT (COALESCE(total, 0) = 0 AND (COALESCE(customer_name, '') = 'Khách QR - cho don mon' OR COALESCE(items, '') IN ('', '[]')))"
+      "LOWER(TRIM(COALESCE(status, ''))) NOT IN ('cancelled', 'canceled', 'refunded', 'failed', 'rejected', 'expired') AND LOWER(TRIM(COALESCE(payment_status, ''))) IN ('paid', 'partially_refunded', 'completed') AND NOT (COALESCE(total, 0) = 0 AND (COALESCE(customer_name, '') = 'Khách QR - cho don mon' OR COALESCE(items, '') IN ('', '[]')))"
     );
     expect(reportsAnalyticsSrc).toContain('verifyReportAnalyticsAccess');
-    expect(reportsExportSrc).toContain("const EXPORT_ALLOWED_ROLES = new Set(['owner', 'manager', 'admin']);");
+    expect(reportsExportSrc).toContain("const EXPORT_ALLOWED_ROLES = new Set(['owner', 'manager', 'supervisor', 'admin']);");
     expect(reportsExportSrc).toContain('VALID_EXPORT_ORDER_SQL');
   });
 
@@ -9109,10 +9109,10 @@ describe('Phase 51 (AX1..AX4) — Auth/Devices/Franchise, Reports/Analytics/Shif
     expect(listStaffSrc).toContain('Cross-tenant staff access denied');
     expect(staffAuthSrc).toContain("UPDATE users SET auth_version = auth_version + 1, updated_at = ? WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?");
     expect(franchiseLocationsSrc).toContain(
-      "AND LOWER(COALESCE(status, '')) NOT IN ('cancelled', 'canceled', 'refunded', 'failed', 'rejected', 'expired')"
+      "AND LOWER(TRIM(COALESCE(o.status, ''))) NOT IN ('cancelled', 'canceled', 'refunded', 'failed', 'rejected', 'expired')"
     );
     expect(franchiseLocationsSrc).toContain(
-      "AND LOWER(COALESCE(payment_status, '')) NOT IN ('refunded', 'failed', 'cancelled', 'canceled')"
+      "AND LOWER(TRIM(COALESCE(o.payment_status, ''))) IN ('paid', 'partially_refunded')"
     );
   });
 
@@ -9150,7 +9150,7 @@ describe('Phase 51 (AX1..AX4) — Auth/Devices/Franchise, Reports/Analytics/Shif
     const { escapeCsvField } = await import('../../tree/analytics/csv-export');
 
     expect(groupedSalesSrc).toContain('NON_REVENUE_STATUS_SQL');
-    expect(groupedSalesSrc).toContain("AND LOWER(COALESCE(payment_status, '')) NOT IN ('refunded', 'failed', 'cancelled', 'canceled')");
+    expect(groupedSalesSrc).toContain('VALID_REVENUE_ORDER_SQL');
     expect(analyticsSummarySrc).toContain("COALESCE(NULLIF(TRIM(p.tenant_id), ''), 'default') = COALESCE(NULLIF(TRIM(o.tenant_id), ''), 'default')");
     expect(topProductsSrc).toContain("COALESCE(NULLIF(TRIM(p.tenant_id), ''), 'default') = COALESCE(NULLIF(TRIM(o.tenant_id), ''), 'default')");
     expect(zoneAnalyticsSrc).toContain("COALESCE(NULLIF(TRIM(ct.tenant_id), ''), 'default') = COALESCE(NULLIF(TRIM(o.tenant_id), ''), 'default')");

@@ -89,15 +89,24 @@ export function createMixpostClient(apiUrl: string, apiToken: string, options: M
     return res.json() as Promise<Record<string, unknown>>;
   }
 
+  const ICT_OFFSET_MS = 7 * 3600_000;
+
+  function formatIctDateTime(d: Date): { date: string; time: string } {
+    const ict = new Date(d.getTime() + ICT_OFFSET_MS);
+    const year = ict.getUTCFullYear();
+    const month = String(ict.getUTCMonth() + 1).padStart(2, '0');
+    const day = String(ict.getUTCDate()).padStart(2, '0');
+    const hours = String(ict.getUTCHours()).padStart(2, '0');
+    const minutes = String(ict.getUTCMinutes()).padStart(2, '0');
+    return { date: `${year}-${month}-${day}`, time: `${hours}:${minutes}` };
+  }
+
   function parseScheduledAt(isoString: string): { date: string; time: string } {
     const d = new Date(isoString);
     if (isNaN(d.getTime())) {
       throw new Error(`Invalid scheduledAt datetime: ${isoString}`);
     }
-    const date = d.toISOString().split('T')[0];
-    const hours = String(d.getHours()).padStart(2, '0');
-    const minutes = String(d.getMinutes()).padStart(2, '0');
-    return { date, time: `${hours}:${minutes}` };
+    return formatIctDateTime(d);
   }
 
   return {
@@ -113,7 +122,7 @@ export function createMixpostClient(apiUrl: string, apiToken: string, options: M
       const payload = {
         accounts,
         tags: tags || [],
-        date: postDate || new Date().toISOString().split('T')[0],
+        date: postDate || formatIctDateTime(new Date()).date,
         time: postTime || '09:00',
         versions: [
           {

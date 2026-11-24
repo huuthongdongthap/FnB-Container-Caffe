@@ -196,6 +196,8 @@ CREATE TABLE orders (
     tenant_id TEXT NOT NULL DEFAULT 'default',
     cod_paid_at TEXT,
     placed_at TEXT,
+    started_at TEXT,
+    ready_at TEXT,
     served_at TEXT,
     completed_at TEXT,
     cancelled_at TEXT,

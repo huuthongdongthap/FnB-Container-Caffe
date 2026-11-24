@@ -5,6 +5,7 @@ export interface MixpostEnv {
   MIXPOST_API_URL?: string;
   MIXPOST_API_TOKEN?: string;
   MIXPOST_ACCOUNTS?: string;
+  MIXPOST_TENANT_ACCOUNTS_JSON?: string;
   [key: string]: unknown;
 }
 
@@ -19,6 +20,10 @@ export interface PromotionRow {
   id: string | null;
   code: string;
   percent: number;
+  discount_type?: string | null;
+  type?: string | null;
+  discount_value?: number | null;
+  value?: number | null;
   is_active: number;
 }
 

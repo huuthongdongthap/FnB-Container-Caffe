@@ -134,7 +134,9 @@ adminMetrics.get('/', async(c) => {
 
   const hours = getRangeHours(range as Range);
   const db = (c.env.AURA_DB ?? (c.env as Record<string, unknown>).DB) as D1Database;
-  const since = new Date(Date.now() - hours * 3600000).toISOString();
+  // _metrics.created_at is stored in SQLite datetime('now') format ('YYYY-MM-DD HH:MM:SS')
+  const sinceIso = new Date(Date.now() - hours * 3600000).toISOString();
+  const since = sinceIso.slice(0, 19).replace('T', ' ');
 
   // If filter param is provided, query by metric name prefix using getMetricSummary
   if (filter) {
@@ -204,7 +206,7 @@ adminMetrics.get('/', async(c) => {
         const durationRows = await queryMetricsAll<LatencyRow>(
           db,
           'SELECT COALESCE(CAST(json_extract(tags, \'$.duration\') AS REAL), value) as duration FROM _metrics WHERE name IN (\'request\', \'request_duration_ms\') AND created_at >= ?',
-          'ORDER BY duration LIMIT 5000',
+          'ORDER BY created_at DESC LIMIT 5000',
           [since],
           tenantId
         );
@@ -214,9 +216,9 @@ adminMetrics.get('/', async(c) => {
           .filter((d) => Number.isFinite(d) && d >= 0)
           .sort((a, b) => a - b);
 
-        const p50 = durations.length > 0 ? durations[Math.floor(durations.length * 0.5)] : 0;
-        const p95 = durations.length > 0 ? durations[Math.floor(durations.length * 0.95)] : 0;
-        const p99 = durations.length > 0 ? durations[Math.floor(durations.length * 0.99)] : 0;
+        const p50 = durations.length > 0 ? durations[Math.min(durations.length - 1, Math.floor(durations.length * 0.5))] : 0;
+        const p95 = durations.length > 0 ? durations[Math.min(durations.length - 1, Math.floor(durations.length * 0.95))] : 0;
+        const p99 = durations.length > 0 ? durations[Math.min(durations.length - 1, Math.floor(durations.length * 0.99))] : 0;
 
         const dailyRows = await queryMetricsAll<{ date: string; count: number }>(
           db,
@@ -262,11 +264,11 @@ adminMetrics.get('/', async(c) => {
       queryMetricsFirst<{ total: number }>(db, 'SELECT COALESCE(SUM(value), 0) as total FROM _metrics WHERE name = \'revenue\' AND created_at >= ?', [since], tenantId)
     ]);
 
-    // Latency: get all durations for p50/p95 calculation
+    // Latency: sample recent durations (not fastest-only) for p50/p95 calculation
     const latencyRows = await queryMetricsAll<LatencyRow>(
       db,
       'SELECT CAST(json_extract(tags, \'$.duration\') AS REAL) as duration FROM _metrics WHERE name = \'request\' AND created_at >= ? AND json_extract(tags, \'$.duration\') IS NOT NULL',
-      'ORDER BY duration LIMIT 5000',
+      'ORDER BY created_at DESC LIMIT 5000',
       [since],
       tenantId
     );
@@ -276,8 +278,8 @@ adminMetrics.get('/', async(c) => {
       .filter((d) => typeof d === 'number' && !isNaN(d))
       .sort((a, b) => a - b);
 
-    const p50 = durations.length > 0 ? durations[Math.floor(durations.length * 0.5)] : 0;
-    const p95 = durations.length > 0 ? durations[Math.floor(durations.length * 0.95)] : 0;
+    const p50 = durations.length > 0 ? durations[Math.min(durations.length - 1, Math.floor(durations.length * 0.5))] : 0;
+    const p95 = durations.length > 0 ? durations[Math.min(durations.length - 1, Math.floor(durations.length * 0.95))] : 0;
 
     // Top paths
     const topPathRows = await queryMetricsAll<TopPathRow>(

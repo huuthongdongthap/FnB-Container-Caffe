@@ -1,6 +1,6 @@
 import type { D1Database } from '@cloudflare/workers-types';
 import type { ZnsData, ZnsResult } from './types';
-import { TEMPLATE_IDS, buildTemplateData } from './zns-templates';
+import { buildTemplateData, resolveTemplateId } from './zns-templates';
 
 const ZALO_ZNS_URL = 'https://business.openapi.zalo.me/message/template';
 
@@ -8,20 +8,29 @@ function normalizePhone(phone: string): string {
   return String(phone || '').replace(/^\+?84/, '').replace(/^0/, '');
 }
 
+export interface ZnsSenderEnv {
+  ZALO_ACCESS_TOKEN?: string;
+  ZALO_ZNS_TEMPLATE_GENERAL_PROMOTION?: string;
+  AURA_DB?: D1Database;
+}
+
 /**
  * Send a single ZNS message.
  * Returns { ok, channel } — never throws.
  */
 export async function sendZNS(
-  env: { ZALO_ACCESS_TOKEN?: string; AURA_DB?: D1Database },
+  env: ZnsSenderEnv,
   params: { phone: string; template_key: string; data: ZnsData; tenantId?: string }
 ): Promise<ZnsResult> {
   if (!env.ZALO_ACCESS_TOKEN) {
     return { ok: false, channel: 'zalo', reason: 'no_token' };
   }
 
-  const template_id = TEMPLATE_IDS[params.template_key];
-  if (!template_id || template_id.startsWith('YOUR_')) {
+  const template_id = resolveTemplateId(
+    params.template_key,
+    env as unknown as Record<string, unknown>
+  );
+  if (!template_id) {
     return { ok: false, channel: 'zalo', reason: 'template_not_configured' };
   }
 
@@ -41,7 +50,7 @@ export async function sendZNS(
         phone: normalized,
         template_id,
         template_data: buildTemplateData(params.template_key, params.data),
-        tracking_id: `aura_${Date.now()}`
+        tracking_id: `aura_${crypto.randomUUID()}`
       })
     });
 

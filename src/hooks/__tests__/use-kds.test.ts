@@ -32,11 +32,11 @@ describe('useKDS authoritative session cache', () => {
     await waitFor(() => expect(result.current.orders[0]?.id).toBe('ORD_1'));
     expect(apiFetch).toHaveBeenCalledWith('/api/kds/orders', { signal: expect.any(AbortSignal) });
   });
-  it('filters by station and uses REST for filtered queues', async () => {
+  it('filters by station and subscribes to station-scoped SSE stream', async () => {
     const { result } = setup('drinks');
     await waitFor(() => expect(result.current.orders).toHaveLength(1));
     expect(apiFetch).toHaveBeenCalledWith('/api/kds/orders?station=drinks', expect.any(Object));
-    expect(consumeKdsStream).not.toHaveBeenCalled();
+    expect(consumeKdsStream).toHaveBeenCalledWith(expect.any(AbortSignal), expect.any(Function), 'drinks');
   });
   it('removes completed tickets absent from the next authoritative REST queue', async () => {
     const { result } = setup();
@@ -51,6 +51,33 @@ describe('useKDS authoritative session cache', () => {
     const [, snapshot] = vi.mocked(consumeKdsStream).mock.calls[0]!;
     act(() => snapshot([]));
     await waitFor(() => expect(result.current.orders).toHaveLength(0));
+  });
+  it('prunes expired cancelled alerts when subsequent SSE snapshot omits them', async () => {
+    vi.mocked(apiFetch).mockResolvedValueOnce({
+      data: [
+        ticket,
+        {
+          id: 'ORD_CANCELLED',
+          status: 'cancelled',
+          cancel_alert: true,
+          items: [{ name: 'Tea', quantity: 1 }],
+        },
+      ],
+    });
+    const { result } = setup();
+    await waitFor(() => expect(result.current.orders.map(o => o.id)).toEqual(['ORD_1', 'ORD_CANCELLED']));
+    const [, snapshot] = vi.mocked(consumeKdsStream).mock.calls[0]!;
+    act(() =>
+      snapshot([
+        {
+          id: 'ORD_1',
+          status: 'ready',
+          items: [{ product_name: 'Coffee', quantity: 1 }],
+          created_at: new Date().toISOString(),
+        },
+      ]),
+    );
+    await waitFor(() => expect(result.current.orders.map(o => o.id)).toEqual(['ORD_1']));
   });
   it('aborts old stream, removes private cache and isolates a different actor/tenant', async () => {
     const { result } = setup();

@@ -783,8 +783,10 @@ describe('Phase 51 Slice AX1 — Auth, Staff Device, Customer Takeover & Franchi
                   if (o.tenant_id !== tenantParam) return false;
                   if (excludedStatuses.has(o.status.toLowerCase())) return false;
                   if (excludedPaymentStatuses.has(o.payment_status.toLowerCase())) return false;
-                  if (startParam && o.created_at < startParam) return false;
-                  if (endParam && o.created_at > endParam) return false;
+                  const usesIctDate = sql.includes("DATE(datetime(o.created_at, '+7 hours'))");
+                  const orderDay = o.created_at.slice(0, 10);
+                  if (startParam && (usesIctDate ? orderDay < startParam : o.created_at < startParam)) return false;
+                  if (endParam && (usesIctDate ? orderDay > endParam : o.created_at > endParam)) return false;
                   return true;
                 });
                 const gross = matching.reduce((sum, o) => sum + o.total, 0);
@@ -835,8 +837,8 @@ describe('Phase 51 Slice AX1 — Auth, Staff Device, Customer Takeover & Franchi
       };
       expect(body.success).toBe(true);
       expect(executedMetricsSql).toContain("NOT IN ('cancelled', 'canceled', 'refunded', 'failed', 'rejected', 'expired')");
-      expect(executedMetricsSql).toContain("LOWER(COALESCE(payment_status, '')) NOT IN ('refunded', 'failed', 'cancelled', 'canceled')");
-      expect(executedMetricsParams).toEqual(['store_a', '2026-10-01', '2026-10-31T23:59:59.999Z']);
+      expect(executedMetricsSql).toContain("IN ('paid', 'partially_refunded')");
+      expect(executedMetricsParams).toEqual(['store_a', '2026-10-01', '2026-10-31']);
       expect(body.data.order_count).toBe(2);
       expect(body.data.gross_sales).toBe(300000);
       expect(body.data.royalty_amount).toBe(15000);

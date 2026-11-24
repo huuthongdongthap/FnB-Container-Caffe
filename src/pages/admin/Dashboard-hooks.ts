@@ -12,7 +12,7 @@ import type { Period } from './Dashboard-constants';
 const ICT_OFFSET_MS = 7 * 3600_000;
 
 export function getPeriodStoreDateRange(period: Period, nowMs = Date.now()): { from: string; to: string; days: number } {
-  const days = period === 'weekly' ? 7 : period === 'monthly' ? 90 : 30;
+  const days = period === 'daily' ? 1 : period === 'weekly' ? 7 : 30;
   const to = new Date(nowMs + ICT_OFFSET_MS).toISOString().slice(0, 10);
   const from = new Date(nowMs + ICT_OFFSET_MS - (days - 1) * 86400_000).toISOString().slice(0, 10);
   return { from, to, days };

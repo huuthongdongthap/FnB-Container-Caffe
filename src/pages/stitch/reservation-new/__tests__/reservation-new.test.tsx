@@ -62,4 +62,70 @@ describe('ReservationNewPage', () => {
     expect(screen.getByLabelText(/HỌ VÀ TÊN/i)).toHaveValue('Guest');
   });
 
+  it('matches Vietnamese tenant zone labels (Trong nhà / Sân vườn / Cabin) and custom fallback zones', async () => {
+    vi.mocked(useReservations).mockReturnValue({
+      tables: [
+        { id: 'tbl-vi-in', table_number: '1', available: true, zone: 'Trong nhà', capacity: 4 },
+        { id: 'tbl-vi-out', table_number: '2', available: true, zone: 'Sân vườn', capacity: 4 },
+      ],
+      isLoadingTables: false,
+      availabilityError: null,
+      createReservation: vi.fn(),
+      createReservationAsync: createBooking,
+      isCreating: false,
+      createError: null,
+      refetchAvailability: vi.fn(),
+    });
+    renderWithProviders(<ReservationNewPage />);
+    fireEvent.click(screen.getByText('Sân Thượng Rooftop'));
+    fireEvent.change(screen.getByLabelText(/HỌ VÀ TÊN/i), { target: { value: 'Lan' } });
+    fireEvent.change(screen.getByLabelText(/SỐ ĐIỆN THOẠI/i), { target: { value: '0946013633' } });
+    fireEvent.click(screen.getByRole('button', { name: /Xác Nhận Đặt Bàn Ngay/i }));
+
+    expect(await screen.findByText('ĐẶT BÀN THÀNH CÔNG')).toBeInTheDocument();
+    expect(createBooking).toHaveBeenCalledWith(expect.objectContaining({ table_id: 'tbl-vi-out' }));
+  });
+
+  it('falls back to custom uncategorized tenant zones while refusing cross-zone booking when selected zone is full', async () => {
+    vi.mocked(useReservations).mockReturnValue({
+      tables: [{ id: 'tbl-custom', table_number: '9', available: true, zone: 'Khu A', capacity: 4 }],
+      isLoadingTables: false,
+      availabilityError: null,
+      createReservation: vi.fn(),
+      createReservationAsync: createBooking,
+      isCreating: false,
+      createError: null,
+      refetchAvailability: vi.fn(),
+    });
+    const { unmount } = renderWithProviders(<ReservationNewPage />);
+    fireEvent.change(screen.getByLabelText(/HỌ VÀ TÊN/i), { target: { value: 'Minh' } });
+    fireEvent.change(screen.getByLabelText(/SỐ ĐIỆN THOẠI/i), { target: { value: '0946013633' } });
+    fireEvent.click(screen.getByRole('button', { name: /Xác Nhận Đặt Bàn Ngay/i }));
+    expect(await screen.findByText('ĐẶT BÀN THÀNH CÔNG')).toBeInTheDocument();
+    expect(createBooking).toHaveBeenCalledWith(expect.objectContaining({ table_id: 'tbl-custom' }));
+    unmount();
+
+    createBooking.mockClear();
+    vi.mocked(useReservations).mockReturnValue({
+      tables: [
+        { id: 'tbl-out-full', table_number: '2', available: false, zone: 'Sân vườn', capacity: 4 },
+        { id: 'tbl-in-open', table_number: '1', available: true, zone: 'Trong nhà', capacity: 4 },
+      ],
+      isLoadingTables: false,
+      availabilityError: null,
+      createReservation: vi.fn(),
+      createReservationAsync: createBooking,
+      isCreating: false,
+      createError: null,
+      refetchAvailability: vi.fn(),
+    });
+    renderWithProviders(<ReservationNewPage />);
+    fireEvent.click(screen.getByText('Sân Thượng Rooftop'));
+    fireEvent.change(screen.getByLabelText(/HỌ VÀ TÊN/i), { target: { value: 'Minh' } });
+    fireEvent.change(screen.getByLabelText(/SỐ ĐIỆN THOẠI/i), { target: { value: '0946013633' } });
+    fireEvent.click(screen.getByRole('button', { name: /Xác Nhận Đặt Bàn Ngay/i }));
+    expect(await screen.findByRole('alert')).toBeInTheDocument();
+    expect(createBooking).not.toHaveBeenCalled();
+  });
+
 });
