@@ -21,7 +21,8 @@ export async function loginUser(request: Request, env: Record<string, unknown>, 
       const first = parsed.error.issues[0];
       return errorResponse(first.message, 400);
     }
-    const { email, password } = parsed.data;
+    const { email: rawEmail, password } = parsed.data;
+    const email = rawEmail.trim().toLowerCase();
 
     const authKV = env.AUTH_KV as import('@cloudflare/workers-types').KVNamespace;
     const emailRateKey = `rl:login:email:${email.toLowerCase()}`;
@@ -165,7 +166,29 @@ export async function loginUser(request: Request, env: Record<string, unknown>, 
           }
         }
       } catch { /* Customer enrichment keeps its pre-existing optional contract. */ }
-      const authVersion = Number(user.auth_version || 1);
+      let d1AuthVer = 0;
+      let kvAuthVer = 0;
+      try {
+        const db = (env as unknown as Env).AURA_DB;
+        if (db?.prepare && user.id) {
+          const verRow = await db
+            .prepare('SELECT auth_version FROM customers WHERE id = ? LIMIT 1')
+            .bind(user.id)
+            .first<{ auth_version?: number | null }>()
+            .catch(() => null);
+          d1AuthVer = Number(verRow?.auth_version || 0);
+        }
+      } catch {
+        // Ignore optional D1 auth_version read failure
+      }
+      try {
+        if (authKV?.get && user.id) {
+          kvAuthVer = Number((await authKV.get(`cust_auth_ver:${user.id}`)) || 0);
+        }
+      } catch {
+        // Ignore optional KV auth_version read failure
+      }
+      const authVersion = Math.max(Number(user.auth_version || 1), d1AuthVer, kvAuthVer);
       user.auth_version = authVersion;
       token = await generateJWT({ email, name: user.name, id: user.id, role: 'customer', tenantId, tier, sessionId: crypto.randomUUID(), authVersion, emailVerified: Boolean(user.email_verified) }, env.JWT_SECRET as string, env.JWT_EXPIRY_SECONDS as string);
       sessionUser = { id: user.id, email: user.email, name: user.name, phone: user.phone, role: 'customer', tenantId };

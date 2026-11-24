@@ -238,9 +238,38 @@ export function registerStaffHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
       rawRows = rows.results || [];
     }
 
+    const typedRows = rawRows as Array<Record<string, unknown> & { id?: string; email?: string | null }>;
+    const missingEmailIds = typedRows
+      .filter((r) => !String(r?.email || '').trim() && r?.id)
+      .map((r) => String(r.id));
+    if (missingEmailIds.length > 0) {
+      try {
+        const placeholders = missingEmailIds.map(() => '?').join(', ');
+        const idRows = (await db
+          .prepare(`SELECT staff_id, email FROM staff_login_identities WHERE staff_id IN (${placeholders})`)
+          .bind(...missingEmailIds)
+          .all()) as { results?: Array<{ staff_id: string; email?: string | null }> };
+        const emailById = new Map<string, string>();
+        for (const row of idRows.results || []) {
+          if (row?.staff_id && row?.email) {
+            emailById.set(row.staff_id, row.email);
+          }
+        }
+        if (emailById.size > 0) {
+          rawRows = typedRows.map((r) =>
+            !String(r?.email || '').trim() && emailById.has(String(r.id))
+              ? { ...r, email: emailById.get(String(r.id)) }
+              : r
+          );
+        }
+      } catch {
+        // Ignore when staff_login_identities table is absent in minimal test schemas
+      }
+    }
+
     const caller = c.get('user');
     const canViewUnmaskedPii = Boolean(
-      caller?.role && ['owner', 'admin', 'manager'].includes(String(caller.role).toLowerCase())
+      caller?.role && ['owner', 'admin', 'manager', 'hq_admin'].includes(String(caller.role).toLowerCase())
     );
     const staff = rawRows.map((s: any) => ({
       ...s,
@@ -288,6 +317,19 @@ export function registerStaffHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
 
     if (!staff) {
       return c.json({ success: false, error: 'Staff not found' }, 404);
+    }
+    if (!String(staff.email || '').trim()) {
+      try {
+        const identity = await db
+          .prepare('SELECT email FROM staff_login_identities WHERE staff_id = ? LIMIT 1')
+          .bind(id)
+          .first<{ email?: string | null }>();
+        if (identity?.email) {
+          staff = { ...staff, email: identity.email };
+        }
+      } catch {
+        // Ignore when staff_login_identities table is absent in minimal test schemas
+      }
     }
 
     const targetStaffTenant = (account.account.tenant_id || '').trim() || 'default';
@@ -346,10 +388,10 @@ export function registerStaffHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
     const user = c.get('user');
     const now = new Date().toISOString();
 
-    if (!['owner', 'manager', 'admin'].includes(user?.role)) {
+    if (!['owner', 'manager', 'admin', 'hq_admin'].includes(user?.role)) {
       return c.json({ success: false, error: 'Không đủ quyền tạo tài khoản nhân viên' }, 403);
     }
-    if (body.role === 'owner' && user?.role !== 'owner' && user?.role !== 'admin') {
+    if (body.role === 'owner' && user?.role !== 'owner' && user?.role !== 'hq_admin') {
       return c.json({ success: false, error: 'Only owners can create owner accounts' }, 403);
     }
     if (body.role === 'admin' && user?.role !== 'admin') {
@@ -542,9 +584,10 @@ export function registerStaffHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
     return c.json({
       success: true,
       data: {
+        ...created,
         id,
-        name: body.name,
-        email: created?.email ?? body.email,
+        name: created?.name ?? body.name,
+        email: created?.email || body.email,
         phone: created?.phone ?? body.phone ?? null,
         role: created?.role ?? body.role,
         tenant_id: staffTenant,
@@ -553,7 +596,6 @@ export function registerStaffHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
         hireDate: created?.hire_date ?? body.hireDate ?? now.slice(0, 10),
         createdAt: created?.created_at ?? now,
         updatedAt: created?.updated_at ?? now,
-        ...created,
       },
     }, 201);
   });

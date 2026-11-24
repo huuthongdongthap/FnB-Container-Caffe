@@ -63,6 +63,6 @@ authEndpointsRouter.post('/verify-email', authRateLimit, (c) => verifyEmail(c.re
 authEndpointsRouter.post('/register-staff', requireAuth(['owner', 'admin']), audit('register_staff'), (c) => registerStaff(c.req.raw, c.env));
 authEndpointsRouter.get('/staff', requireAuth(['owner', 'manager', 'supervisor', 'admin']), audit('list_staff'), (c) => listStaff(c.req.raw, c.env));
 authEndpointsRouter.post('/bootstrap-owner', authRateLimit, (c) => bootstrapOwner(c.req.raw, c.env));
-authEndpointsRouter.post('/reset-password', authRateLimit, (c) => resetPassword(c.req.raw, c.env));
-authEndpointsRouter.post('/forgot-password', authRateLimit, (c) => resetPassword(c.req.raw, c.env));
+// Operator password reset (requires X-Reset-Key); self-service /forgot-password & /reset-password live on openApiAuthRouter
+authEndpointsRouter.post('/operator-reset-password', authRateLimit, (c) => resetPassword(c.req.raw, c.env));
 authEndpointsRouter.post('/change-password', passwordRotationRateLimit, (c) => changePassword(c.req.raw, c.env));

@@ -95,19 +95,27 @@ export async function createOrder(
     const resolvedCustomerId = ownership.customerId;
     const now = new Date().toISOString();
     const rawPromoCode = (data.promo_code || data.promotion_code || '').trim().toUpperCase();
-    let appliedPromo: { id: string; code: string; discountAmount: number; reservedInPlace?: boolean } | null = null;
+    let appliedPromo: {
+      id: string;
+      code: string;
+      discountAmount: number;
+      reservedInPlace?: boolean;
+      customerKey?: string | null;
+      perCustomerLimit?: number;
+    } | null = null;
     let appliedLoyaltyVoucher: LoyaltyVoucherRecord | null = null;
     if (rawPromoCode) {
       const isWelcome = rawPromoCode === 'WELCOME';
       type PromoRow = {
         id: string; code: string;
-        percent?: number | null; discount_type?: string | null; discount_value?: number | null;
+        percent?: number | null; discount_type?: string | null; discount_value?: number | null; value?: number | null;
         max_discount?: number | null; max_discount_value?: number | null;
         min_order?: number | null; min_order_value?: number | null;
         starts_at?: string | null; valid_from?: string | null;
         expires_at?: string | null; valid_to?: string | null;
         usage_limit?: number | null; max_uses?: number | null;
         usage_count?: number | null; current_uses?: number | null;
+        usage_limit_per_customer?: number | null; max_uses_per_customer?: number | null; per_customer_limit?: number | null;
         is_active?: number; type?: string | null; tenant_id?: string | null;
       };
       let promo = await db.prepare(
@@ -214,6 +222,107 @@ export async function createOrder(
           return errorResponse('Mã WELCOME chỉ áp dụng cho khách hàng mới lần đầu đến quán', 400);
         }
       }
+      const rawPromoPhone = String(data.customer_phone || '').trim();
+      const promoPhoneDigits = rawPromoPhone.replace(/\D/g, '');
+      const normalizedPromoPhone =
+        promoPhoneDigits.startsWith('84') && promoPhoneDigits.length >= 10
+          ? '0' + promoPhoneDigits.slice(2)
+          : promoPhoneDigits;
+      const promoType = String(promo.discount_type ?? promo.type ?? '').trim().toLowerCase();
+      const isFixedType = promoType === 'fixed' || promoType === 'fixed_amount' || promoType === 'amount';
+      const isPercentType = promoType === '' || promoType === 'percent' || promoType === 'percentage';
+      if (!isFixedType && !isPercentType) {
+        return errorResponse('Loại khuyến mãi không hợp lệ', 400);
+      }
+      const resolvePromoAmount = (...candidates: Array<number | null | undefined>): number => {
+        for (const c of candidates) {
+          if (c !== null && c !== undefined) {
+            const n = Number(c);
+            if (!Number.isFinite(n) || n < 0) return -1;
+            if (n > 0) return n;
+          }
+        }
+        return 0;
+      };
+      let rawDiscount: number;
+      if (isFixedType) {
+        const rawFixed = resolvePromoAmount(promo.discount_value, promo.value, promo.percent);
+        if (rawFixed < 0) {
+          return errorResponse('Giá trị giảm giá không hợp lệ', 400);
+        }
+        rawDiscount = Math.round(rawFixed);
+      } else {
+        const rawPct = resolvePromoAmount(promo.percent, promo.discount_value, promo.value);
+        if (rawPct < 0) {
+          return errorResponse('Giá trị giảm giá phần trăm không hợp lệ', 400);
+        }
+        const pct = isWelcome ? (rawPct || 10) : rawPct;
+        if (!Number.isFinite(pct) || pct <= 0 || pct > 100) {
+          return errorResponse('Giá trị giảm giá phần trăm không hợp lệ', 400);
+        }
+        rawDiscount = Math.round((snapshot.subtotal * pct) / 100);
+      }
+      const perCustomerLimit = Number(
+        promo.usage_limit_per_customer ?? promo.max_uses_per_customer ?? promo.per_customer_limit ?? 0
+      );
+      if (Number.isFinite(perCustomerLimit) && perCustomerLimit > 0) {
+        const customerKey = resolvedCustomerId || normalizedPromoPhone || '';
+        if (!customerKey) {
+          return errorResponse('Mã khuyến mãi này yêu cầu thông tin khách hàng', 400);
+        }
+        const redemptionTenant = tenantId === '*' ? 'default' : (tenantId || 'default');
+        let perCustRow: { cnt?: number } | null = null;
+        try {
+          perCustRow = await db.prepare(
+            `SELECT COUNT(*) AS cnt
+             FROM promotion_redemptions pr
+             LEFT JOIN orders o ON o.id = pr.order_id
+             WHERE (UPPER(pr.code) = ? OR pr.promotion_id = ?)
+               AND COALESCE(NULLIF(TRIM(pr.tenant_id), ''), 'default') = ?
+               AND (
+                 pr.customer_id = ?
+                 OR (? != '' AND pr.customer_id = ?)
+                 OR (? != '' AND o.customer_phone = ?)
+               )
+               AND (o.status IS NULL OR o.status NOT IN ('cancelled', 'failed'))`
+          ).bind(
+            String(promo.code || '').toUpperCase(),
+            String(promo.id ?? promo.code ?? ''),
+            redemptionTenant,
+            customerKey,
+            normalizedPromoPhone,
+            normalizedPromoPhone,
+            normalizedPromoPhone,
+            normalizedPromoPhone
+          ).first<{ cnt?: number }>();
+        } catch (err) {
+          const msg = String((err as Error)?.message ?? '').toLowerCase();
+          if (msg.includes('no such column') || msg.includes('no such table')) {
+            try {
+              perCustRow = await db.prepare(
+                `SELECT COUNT(*) AS cnt
+                 FROM promotion_redemptions
+                 WHERE (UPPER(code) = ? OR promotion_id = ?)
+                   AND customer_id = ?`
+              ).bind(
+                String(promo.code || '').toUpperCase(),
+                String(promo.id ?? promo.code ?? ''),
+                customerKey
+              ).first<{ cnt?: number }>();
+            } catch (fallbackErr) {
+              const fbMsg = String((fallbackErr as Error)?.message ?? '').toLowerCase();
+              if (!fbMsg.includes('no such table')) {
+                return errorResponse('Không thể kiểm tra giới hạn khuyến mãi, vui lòng thử lại', 503);
+              }
+            }
+          } else {
+            return errorResponse('Không thể kiểm tra giới hạn khuyến mãi, vui lòng thử lại', 503);
+          }
+        }
+        if (Number(perCustRow?.cnt ?? 0) >= perCustomerLimit) {
+          return errorResponse('Bạn đã sử dụng hết lượt cho mã khuyến mãi này', 400);
+        }
+      }
       let reservedInPlace = false;
       if (!isWelcome || promo.id !== 'promo_welcome') {
         const reserveSql =
@@ -250,20 +359,18 @@ export async function createOrder(
         }
         reservedInPlace = true;
       }
-      const promoType = String(promo.discount_type ?? promo.type ?? '').toLowerCase();
-      let rawDiscount: number;
-      if (promoType === 'fixed') {
-        rawDiscount = Math.round(Number(promo.discount_value ?? promo.percent ?? 0));
-      } else {
-        const rawPct = Number(promo.percent ?? promo.discount_value ?? 0);
-        const pct = isWelcome ? (rawPct || 10) : rawPct;
-        rawDiscount = Math.round((snapshot.subtotal * pct) / 100);
-      }
       const maxDiscount = promo.max_discount ?? promo.max_discount_value ?? (isWelcome ? 30000 : null);
       const cappedDisc = maxDiscount != null && Number(maxDiscount) > 0 ? Math.min(rawDiscount, Number(maxDiscount)) : rawDiscount;
       snapshot.discount = Math.min(snapshot.subtotal, Math.max(0, cappedDisc));
       snapshot.total = Math.max(0, snapshot.subtotal - snapshot.discount) + (snapshot.service_fee ?? 0) + snapshot.shipping_fee + snapshot.tip_amount;
-      appliedPromo = { id: promo.id ?? promo.code, code: promo.code, discountAmount: snapshot.discount, reservedInPlace };
+      appliedPromo = {
+        id: promo.id ?? promo.code,
+        code: promo.code,
+        discountAmount: snapshot.discount,
+        reservedInPlace,
+        customerKey: resolvedCustomerId || normalizedPromoPhone || null,
+        perCustomerLimit: Number.isFinite(perCustomerLimit) && perCustomerLimit > 0 ? perCustomerLimit : 0,
+      };
       }
     }
     // Redeem customer loyalty points atomically (1 point = 100 VND => 100 points = 10,000 VND)
@@ -584,7 +691,7 @@ export async function createOrder(
         `INSERT INTO promotion_redemptions
           (promotion_id, code, order_id, customer_id, discount_amount, order_total, tenant_id, redeemed_at)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
-      ).bind(appliedPromo.id, appliedPromo.code, orderId, resolvedCustomerId ?? null,
+      ).bind(appliedPromo.id, appliedPromo.code, orderId, resolvedCustomerId ?? appliedPromo.customerKey ?? null,
         appliedPromo.discountAmount, snapshot.subtotal, redemptionTenant, now);
       statements.push(scopedPromoStmt);
       noGuestHashStatements.push(scopedPromoStmt);
@@ -621,6 +728,48 @@ export async function createOrder(
           await db.batch(legacyStatements);
         } else {
           throw batchErr;
+        }
+      }
+      if (appliedPromo?.perCustomerLimit && appliedPromo.perCustomerLimit > 0 && appliedPromo.customerKey) {
+        const redemptionTenant = tenantId === '*' ? 'default' : (tenantId || 'default');
+        const promoCodeUpper = String(appliedPromo.code || '').toUpperCase();
+        const promoIdStr = String(appliedPromo.id || '');
+        const postCountRow = await db.prepare(
+          `SELECT COUNT(*) AS cnt
+           FROM promotion_redemptions pr
+           LEFT JOIN orders o ON o.id = pr.order_id
+           WHERE (UPPER(pr.code) = ? OR pr.promotion_id = ?)
+             AND COALESCE(NULLIF(TRIM(pr.tenant_id), ''), 'default') = ?
+             AND pr.customer_id = ?
+             AND (o.status IS NULL OR o.status NOT IN ('cancelled', 'failed'))`
+        ).bind(promoCodeUpper, promoIdStr, redemptionTenant, appliedPromo.customerKey)
+          .first<{ cnt?: number }>()
+          .catch(() =>
+            db.prepare(
+              `SELECT COUNT(*) AS cnt
+               FROM promotion_redemptions
+               WHERE (UPPER(code) = ? OR promotion_id = ?)
+                 AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?
+                 AND customer_id = ?`
+            ).bind(promoCodeUpper, promoIdStr, redemptionTenant, appliedPromo.customerKey)
+              .first<{ cnt?: number }>()
+              .catch(() => null)
+          );
+        if (postCountRow && Number(postCountRow.cnt ?? 0) > appliedPromo.perCustomerLimit) {
+          await db.prepare('DELETE FROM order_items WHERE order_id = ?').bind(orderId).run().catch(() => {});
+          await db.prepare('DELETE FROM payments WHERE order_id = ?').bind(orderId).run().catch(() => {});
+          await db.prepare('DELETE FROM loyalty_transactions WHERE order_id = ?').bind(orderId).run().catch(() => {});
+          await db.prepare('DELETE FROM cashback_transactions WHERE order_id = ?').bind(orderId).run().catch(() => {});
+          await db.prepare('DELETE FROM promotion_redemptions WHERE order_id = ?').bind(orderId).run().catch(() => {});
+          await db.prepare('DELETE FROM orders WHERE id = ?').bind(orderId).run().catch(() => {});
+          if (resolvedTableId) {
+            await db.prepare(
+              `UPDATE cafe_tables SET status = 'Available' WHERE id = ? AND status = 'Occupied'
+               AND NOT EXISTS (SELECT 1 FROM orders WHERE table_id = ? AND status NOT IN ('completed', 'cancelled', 'failed'))`
+            ).bind(resolvedTableId, resolvedTableId).run().catch(() => {});
+          }
+          await rollbackPreOrderReservations();
+          return errorResponse('Bạn đã sử dụng hết lượt cho mã khuyến mãi này', 400);
         }
       }
     }

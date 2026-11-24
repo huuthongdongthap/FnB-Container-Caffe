@@ -2,8 +2,9 @@ import type { Env } from '../types/env';
 import { SessionUnavailableError } from './staff-session';
 
 export async function staffEmailInUse(env: Env, email: string, staffId?: string) {
+  const normalizedEmail = String(email || '').trim().toLowerCase();
   try {
-    const raw = await env.AUTH_KV?.get(`user:${email}`);
+    const raw = await env.AUTH_KV?.get(`user:${normalizedEmail}`);
     if (!raw) return false;
     const existing = JSON.parse(raw);
     return !staffId || existing.id !== staffId;
@@ -16,6 +17,7 @@ export async function findLoginUser(
   email: string,
   tenantId?: string
 ): Promise<Record<string, any> | null> {
+  const normalizedEmail = String(email || '').trim().toLowerCase();
   const rawTenant = typeof tenantId === 'string' ? tenantId.trim() : '';
   const requestedTenant =
     rawTenant && rawTenant !== '*' && rawTenant.toLowerCase() !== 'hq'
@@ -24,27 +26,31 @@ export async function findLoginUser(
 
   let legacy: Record<string, any> | null = null;
   let kvFailed = false;
-  try { legacy = JSON.parse(await env.AUTH_KV.get(`user:${email}`) || 'null'); }
+  try {
+    const rawKv = (await env.AUTH_KV.get(`user:${normalizedEmail}`))
+      || (normalizedEmail !== email ? await env.AUTH_KV.get(`user:${email}`) : null);
+    legacy = JSON.parse(rawKv || 'null');
+  }
   catch { kvFailed = true; }
   try {
     let identity: { staff_id: string; tenant_id?: string | null } | null = null;
     if (requestedTenant) {
       identity = await env.AURA_DB.prepare(
-        "SELECT sli.staff_id, u.tenant_id FROM staff_login_identities sli JOIN users u ON u.id = sli.staff_id WHERE sli.email = ? AND COALESCE(NULLIF(TRIM(u.tenant_id), ''), 'default') = ? LIMIT 1"
+        "SELECT sli.staff_id, u.tenant_id FROM staff_login_identities sli JOIN users u ON u.id = sli.staff_id WHERE LOWER(sli.email) = ? AND COALESCE(NULLIF(TRIM(u.tenant_id), ''), 'default') = ? LIMIT 1"
       )
-        .bind(email, requestedTenant)
+        .bind(normalizedEmail, requestedTenant)
         .first<{ staff_id: string; tenant_id?: string | null }>()
         .catch(() => null);
     }
     if (!identity && !requestedTenant) {
-      identity = await env.AURA_DB.prepare('SELECT staff_id FROM staff_login_identities WHERE email = ?')
-        .bind(email).first<{ staff_id: string }>();
+      identity = await env.AURA_DB.prepare('SELECT staff_id FROM staff_login_identities WHERE LOWER(email) = ?')
+        .bind(normalizedEmail).first<{ staff_id: string }>();
     }
     if (identity?.staff_id) {
       return {
         ...legacy,
         id: identity.staff_id,
-        email,
+        email: normalizedEmail,
         role: 'staff',
         ...(requestedTenant ? { tenant_id: identity.tenant_id ?? requestedTenant } : {}),
         password: legacy?.id === identity.staff_id ? legacy.password : '',
@@ -53,7 +59,7 @@ export async function findLoginUser(
     if (legacy?.role && legacy.role !== 'customer') {
       const canonical = await env.AURA_DB.prepare('SELECT email FROM staff_login_identities WHERE staff_id = ?')
         .bind(legacy.id).first<{ email: string }>();
-      if (canonical?.email && canonical.email !== email) return null;
+      if (canonical?.email && canonical.email.trim().toLowerCase() !== normalizedEmail) return null;
     }
   } catch {
     // Customer authentication keeps its existing optional-D1 contract. Staff
