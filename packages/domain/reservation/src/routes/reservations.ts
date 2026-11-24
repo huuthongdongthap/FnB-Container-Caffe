@@ -77,11 +77,26 @@ function isPastTimeToday(date: string, time: string): boolean {
   return rsvMin < getNowVNMinutes() - 5;
 }
 
+function isSameReservationTime(a: string, b: string): boolean {
+  const trimA = a.trim();
+  const trimB = b.trim();
+  if (trimA === trimB) return true;
+  const minA = parseTimeToMinutes(trimA);
+  const minB = parseTimeToMinutes(trimB);
+  return minA !== null && minB !== null && minA === minB;
+}
+
+function isNoSuchColumnError(err: unknown): boolean {
+  const msg = err instanceof Error ? err.message : String(err);
+  return /no such column/i.test(msg);
+}
+
 async function ensureActiveTableSession(
   db: D1Database,
   tableId: string,
   tenantId: string,
-  guestCount = 2
+  guestCount = 2,
+  reservationId?: string
 ): Promise<string | null> {
   const normTenant = tenantId && tenantId !== '*' && tenantId.toLowerCase() !== 'hq' ? tenantId : 'default';
   try {
@@ -93,35 +108,59 @@ async function ensureActiveTableSession(
       .first<{ id?: string }>()
       .catch(() => null);
     let sessionId = existing?.id ? String(existing.id) : '';
+    let sessionReady = Boolean(sessionId);
     if (!sessionId) {
       const rand = new Uint8Array(3);
       crypto.getRandomValues(rand);
       sessionId = `ts_${Date.now()}_${Array.from(rand, (b) => b.toString(16).padStart(2, '0')).join('')}`;
       const now = new Date().toISOString();
-      await db
+      const sessionNote = reservationId
+        ? `reservation:${reservationId}`
+        : Number.isFinite(guestCount) && guestCount > 0
+          ? `party_size:${guestCount}`
+          : null;
+      const inserted = await db
         .prepare(
-          "INSERT INTO table_sessions (id, table_id, status, guest_count, tenant_id, started_at, created_at, updated_at) VALUES (?, ?, 'active', ?, ?, ?, ?, ?)"
+          "INSERT INTO table_sessions (id, table_id, status, notes, tenant_id, started_at, created_at, updated_at) VALUES (?, ?, 'active', ?, ?, ?, ?, ?)"
         )
-        .bind(sessionId, tableId, guestCount, normTenant, now, now, now)
+        .bind(sessionId, tableId, sessionNote, normTenant, now, now, now)
         .run()
+        .then(() => true)
         .catch(() =>
           db
-            .prepare("INSERT INTO table_sessions (id, table_id, status, tenant_id) VALUES (?, ?, 'active', ?)")
-            .bind(sessionId, tableId, normTenant)
+            .prepare(
+              "INSERT INTO table_sessions (id, table_id, status, tenant_id, started_at, created_at, updated_at) VALUES (?, ?, 'active', ?, ?, ?, ?)"
+            )
+            .bind(sessionId, tableId, normTenant, now, now, now)
             .run()
-            .catch(() => undefined)
+            .then(() => true)
+            .catch(() =>
+              db
+                .prepare("INSERT INTO table_sessions (id, table_id, status, tenant_id) VALUES (?, ?, 'active', ?)")
+                .bind(sessionId, tableId, normTenant)
+                .run()
+                .then(() => true)
+                .catch(() => false)
+            )
         );
+      sessionReady = inserted;
+      if (!inserted) {
+        sessionId = '';
+      }
     }
-    await db
-      .prepare("UPDATE cafe_tables SET current_session_id = ? WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?")
-      .bind(sessionId, tableId, normTenant)
-      .run()
-      .catch(() =>
-        normTenant === 'default'
-          ? db.prepare('UPDATE cafe_tables SET current_session_id = ? WHERE id = ?').bind(sessionId, tableId).run().catch(() => undefined)
-          : undefined
-      );
-    return sessionId;
+    if (sessionReady && sessionId) {
+      await db
+        .prepare("UPDATE cafe_tables SET current_session_id = ? WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?")
+        .bind(sessionId, tableId, normTenant)
+        .run()
+        .catch(() =>
+          normTenant === 'default'
+            ? db.prepare('UPDATE cafe_tables SET current_session_id = ? WHERE id = ?').bind(sessionId, tableId).run().catch(() => undefined)
+            : undefined
+        );
+      return sessionId;
+    }
+    return null;
   } catch {
     return null;
   }
@@ -734,8 +773,33 @@ reservationsRouter.get('/', requireReservationStaff() as any, async (c) => {
 async function hasActiveTableSession(
   db: D1Database,
   tableIdStr: string,
-  targetTenant: string
+  targetTenant: string,
+  ignoreOwnedReservationId?: string
 ): Promise<boolean> {
+  const activeStatuses = ['active', 'ordering', 'paying', 'occupied', 'seated'];
+  if (ignoreOwnedReservationId) {
+    const ownedNote = `reservation:${ignoreOwnedReservationId}`;
+    try {
+      const res = await db
+        .prepare(
+          "SELECT id, status, notes, tenant_id FROM table_sessions WHERE table_id = ? AND LOWER(COALESCE(status, '')) IN ('active', 'ordering', 'paying', 'occupied', 'seated') AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
+        )
+        .bind(tableIdStr, targetTenant)
+        .all<Record<string, unknown>>();
+      for (const row of res?.results || []) {
+        if ('status' in row && !activeStatuses.includes(String(row.status || '').toLowerCase())) {
+          continue;
+        }
+        if (!matchesTenantRow(row, targetTenant)) continue;
+        if (String(row.notes ?? '').trim() !== ownedNote) {
+          return true;
+        }
+      }
+      return false;
+    } catch {
+      // Cannot verify session ownership (e.g. missing notes column); fall through to fail closed.
+    }
+  }
   try {
     const row = await db
       .prepare(
@@ -744,7 +808,7 @@ async function hasActiveTableSession(
       .bind(tableIdStr, targetTenant)
       .first<Record<string, unknown>>();
     if (row && ('id' in row || 'status' in row)) {
-      if ('status' in row && !['active', 'ordering', 'paying', 'occupied', 'seated'].includes(String(row.status || '').toLowerCase())) {
+      if ('status' in row && !activeStatuses.includes(String(row.status || '').toLowerCase())) {
         return false;
       }
       if (!matchesTenantRow(row, targetTenant)) return false;
@@ -761,7 +825,7 @@ async function hasActiveTableSession(
       .first<Record<string, unknown>>()
       .catch(() => null);
     if (row && ('id' in row || 'status' in row)) {
-      if ('status' in row && !['active', 'ordering', 'paying', 'occupied', 'seated'].includes(String(row.status || '').toLowerCase())) {
+      if ('status' in row && !activeStatuses.includes(String(row.status || '').toLowerCase())) {
         return false;
       }
       return true;
@@ -803,29 +867,31 @@ async function closeActiveTableSessionsForRelease(
   db: D1Database,
   tableIdStr: string,
   targetTenant: string,
+  reservationId: string,
 ): Promise<void> {
+  const ownedNote = `reservation:${reservationId}`;
   const nowIso = new Date().toISOString();
   try {
     await db
       .prepare(
-        "UPDATE table_sessions SET status = 'completed', closed_at = ?, updated_at = ? WHERE table_id = ? AND LOWER(COALESCE(status, '')) IN ('active', 'ordering', 'paying', 'occupied', 'seated') AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
+        "UPDATE table_sessions SET status = 'completed', closed_at = ?, updated_at = ? WHERE table_id = ? AND notes = ? AND LOWER(COALESCE(status, '')) IN ('active', 'ordering', 'paying', 'occupied', 'seated') AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
       )
-      .bind(nowIso, nowIso, tableIdStr, targetTenant)
+      .bind(nowIso, nowIso, tableIdStr, ownedNote, targetTenant)
       .run()
       .catch(() =>
         db
           .prepare(
-            "UPDATE table_sessions SET status = 'completed', closed_at = ? WHERE table_id = ? AND LOWER(COALESCE(status, '')) IN ('active', 'ordering', 'paying', 'occupied', 'seated') AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
+            "UPDATE table_sessions SET status = 'completed', closed_at = ? WHERE table_id = ? AND notes = ? AND LOWER(COALESCE(status, '')) IN ('active', 'ordering', 'paying', 'occupied', 'seated') AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
           )
-          .bind(nowIso, tableIdStr, targetTenant)
+          .bind(nowIso, tableIdStr, ownedNote, targetTenant)
           .run()
           .catch(() =>
             targetTenant === 'default'
               ? db
                   .prepare(
-                    "UPDATE table_sessions SET status = 'completed', closed_at = ? WHERE table_id = ? AND LOWER(COALESCE(status, '')) IN ('active', 'ordering', 'paying', 'occupied', 'seated')"
+                    "UPDATE table_sessions SET status = 'completed', closed_at = ? WHERE table_id = ? AND notes = ? AND LOWER(COALESCE(status, '')) IN ('active', 'ordering', 'paying', 'occupied', 'seated')"
                   )
-                  .bind(nowIso, tableIdStr)
+                  .bind(nowIso, tableIdStr, ownedNote)
                   .run()
                   .catch(() => undefined)
               : undefined
@@ -840,13 +906,13 @@ async function canResetTableToAvailableOnCancel(
   db: D1Database,
   rsv: Record<string, unknown>,
   rsvTenant: string | null,
-  opts?: { allowOccupiedRelease?: boolean }
+  opts?: { allowOccupiedRelease?: boolean; ignoreOwnedReservationId?: string }
 ): Promise<boolean> {
   if (!rsv.table_id) return false;
   const targetTenant = rsvTenant || 'default';
   const tableIdStr = String(rsv.table_id);
 
-  if (await hasActiveTableSession(db, tableIdStr, targetTenant)) {
+  if (await hasActiveTableSession(db, tableIdStr, targetTenant, opts?.ignoreOwnedReservationId)) {
     return false;
   }
 
@@ -887,7 +953,7 @@ async function canResetTableToAvailableOnCancel(
     }
     if (rawStatus === 'occupied') {
       const rsvStatus = String(rsv.status ?? '').trim().toLowerCase();
-      if (rsvStatus !== 'seated') {
+      if (rsvStatus !== 'seated' || (rsvDate && rsvDate !== todayVN)) {
         return false;
       }
       if (!opts?.allowOccupiedRelease) {
@@ -971,15 +1037,24 @@ async function releaseTableIfEligible(
   if (!rsv.table_id) return;
   const targetTenant = rsvTenant || 'default';
   const tableIdStr = String(rsv.table_id);
+  const rsvId = String(rsv.id ?? '').trim();
   const rsvStatus = String(rsv.status ?? '').trim().toLowerCase();
-  if (opts?.allowOccupiedRelease && rsvStatus === 'seated') {
-    if (await hasUnpaidActiveOrderOnTable(db, tableIdStr, targetTenant)) {
-      return;
-    }
-    await closeActiveTableSessionsForRelease(db, tableIdStr, targetTenant);
-  }
-  if (!(await canResetTableToAvailableOnCancel(db, rsv, rsvTenant, opts))) {
+  const rsvDate = String(rsv.date ?? rsv.reservation_date ?? rsv.reserved_date ?? '').trim();
+  const isOwnedOccupiedRelease = Boolean(
+    opts?.allowOccupiedRelease &&
+    rsvStatus === 'seated' &&
+    (!rsvDate || rsvDate === getTodayVN())
+  );
+  if (
+    !(await canResetTableToAvailableOnCancel(db, rsv, rsvTenant, {
+      ...opts,
+      ignoreOwnedReservationId: isOwnedOccupiedRelease && rsvId ? rsvId : undefined,
+    }))
+  ) {
     return;
+  }
+  if (isOwnedOccupiedRelease && rsvId) {
+    await closeActiveTableSessionsForRelease(db, tableIdStr, targetTenant, rsvId);
   }
   const targetStatus = 'Available';
   if (rsvTenant) {
@@ -1152,7 +1227,37 @@ reservationsRouter.patch('/:id', optionalAuth() as any, requireReservationStaff(
         }
       }
     }
-    if ((body.date !== undefined || body.reservation_date !== undefined || body.reserved_date !== undefined || body.time !== undefined || body.reservation_time !== undefined || body.reserved_time !== undefined) && nextDate && nextTime) {
+    const pickNonEmpty = (...vals: unknown[]): string => {
+      for (const v of vals) {
+        if (v !== undefined && v !== null && String(v).trim() !== '') {
+          return String(v).trim();
+        }
+      }
+      return '';
+    };
+    const prevDate = pickNonEmpty(
+      body.date !== undefined ? rsv.date : undefined,
+      body.reservation_date !== undefined ? rsv.reservation_date : undefined,
+      body.reserved_date !== undefined ? rsv.reserved_date : undefined,
+      rsv.date,
+      rsv.reservation_date,
+      rsv.reserved_date
+    );
+    const prevTime = pickNonEmpty(
+      body.time !== undefined ? rsv.time : undefined,
+      body.reservation_time !== undefined ? rsv.reservation_time : undefined,
+      body.reserved_time !== undefined ? rsv.reserved_time : undefined,
+      rsv.time,
+      rsv.reservation_time,
+      rsv.reserved_time
+    );
+    const isDateChanged =
+      (body.date !== undefined || body.reservation_date !== undefined || body.reserved_date !== undefined) &&
+      nextDate !== prevDate;
+    const isTimeChanged =
+      (body.time !== undefined || body.reservation_time !== undefined || body.reserved_time !== undefined) &&
+      !isSameReservationTime(nextTime, prevTime);
+    if ((isDateChanged || isTimeChanged || isReopeningCancelled) && nextDate && nextTime) {
       if ((/^\d{4}-\d{2}-\d{2}$/.test(nextDate) && nextDate < getTodayVN()) || isPastTimeToday(nextDate, nextTime)) {
         return c.json({ success: false, error: 'Cannot book a reservation in the past' }, 400);
       }
@@ -1239,64 +1344,138 @@ reservationsRouter.patch('/:id', optionalAuth() as any, requireReservationStaff(
   if (customerEdits.length && !(rsvTenant && hasTenantColumn) && !(!hasTenantColumn && (!rsvTenant || rsvTenant === 'default'))) {
     throw new Error('Reservation tenant scope required for customer update');
   }
-  if (rsvTenant) {
-    try {
-      if (hasPartySizeUpdate || hasDateUpdate || hasTimeUpdate) {
-        await db
-          .prepare(
-            "UPDATE reservations SET status = ?, table_id = COALESCE(?, table_id), guest_count = COALESCE(?, guest_count), date = COALESCE(?, date), time = COALESCE(?, time), updated_at = ? WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
-          )
-          .bind(
-            effectiveStatus,
-            body.table_id !== undefined ? canonicalNextTableId : null,
-            hasPartySizeUpdate ? nextPartySize : null,
-            hasDateUpdate ? nextDate : null,
-            hasTimeUpdate ? nextTime : null,
-            now,
-            id,
-            rsvTenant
-          )
-          .run()
-          .catch(() =>
-            db
-              .prepare(
-                "UPDATE reservations SET status = ?, table_id = COALESCE(?, table_id), party_size = COALESCE(?, party_size), reservation_date = COALESCE(?, reservation_date), reservation_time = COALESCE(?, reservation_time), updated_at = ? WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
-              )
-              .bind(
-                effectiveStatus,
-                body.table_id !== undefined ? canonicalNextTableId : null,
-                hasPartySizeUpdate ? nextPartySize : null,
-                hasDateUpdate ? nextDate : null,
-                hasTimeUpdate ? nextTime : null,
-                now,
-                id,
-                rsvTenant
-              )
-              .run()
-          )
-          .catch(() =>
-            db
-              .prepare(
-                "UPDATE reservations SET status = ?, table_id = COALESCE(?, table_id), updated_at = ? WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
-              )
-              .bind(effectiveStatus, body.table_id !== undefined ? canonicalNextTableId : null, now, id, rsvTenant)
-              .run()
-          );
-      } else {
-        await db
-          .prepare("UPDATE reservations SET status = ?, table_id = COALESCE(?, table_id), updated_at = ? WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?")
-          .bind(effectiveStatus, body.table_id !== undefined ? canonicalNextTableId : null, now, id, rsvTenant)
-          .run();
+  if (hasPartySizeUpdate || hasDateUpdate || hasTimeUpdate) {
+    const knownPartyCols = (['guest_count', 'party_size', 'pax'] as const).filter((col) => col in rsv);
+    const knownDateCols = (['date', 'reservation_date', 'reserved_date'] as const).filter((col) => col in rsv);
+    const knownTimeCols = (['time', 'reservation_time', 'reserved_time'] as const).filter((col) => col in rsv);
+    const hasExactRsvCols =
+      (!hasPartySizeUpdate || knownPartyCols.length > 0) &&
+      (!hasDateUpdate || knownDateCols.length > 0) &&
+      (!hasTimeUpdate || knownTimeCols.length > 0);
+    const slotVariants: Array<{
+      partyCols: readonly string[];
+      dateCols: readonly string[];
+      timeCols: readonly string[];
+    }> = hasExactRsvCols
+      ? [{ partyCols: knownPartyCols, dateCols: knownDateCols, timeCols: knownTimeCols }]
+      : [
+          { partyCols: ['guest_count'], dateCols: ['date'], timeCols: ['time'] },
+          { partyCols: ['party_size'], dateCols: ['reservation_date'], timeCols: ['reservation_time'] },
+          { partyCols: ['party_size'], dateCols: ['reserved_date'], timeCols: ['reserved_time'] },
+        ];
+
+    let updated = false;
+    let lastErr: unknown;
+    for (const variant of slotVariants) {
+      const setClauses = ['status = ?', 'table_id = COALESCE(?, table_id)'];
+      const binds: unknown[] = [effectiveStatus, body.table_id !== undefined ? canonicalNextTableId : null];
+      if (hasPartySizeUpdate) {
+        for (const col of variant.partyCols) {
+          setClauses.push(`${col} = COALESCE(?, ${col})`);
+          binds.push(nextPartySize);
+        }
       }
-    } catch (err) {
-      if (rsvTenant !== 'default') throw err;
+      if (hasDateUpdate) {
+        for (const col of variant.dateCols) {
+          setClauses.push(`${col} = COALESCE(?, ${col})`);
+          binds.push(nextDate);
+        }
+      }
+      if (hasTimeUpdate) {
+        for (const col of variant.timeCols) {
+          setClauses.push(`${col} = COALESCE(?, ${col})`);
+          binds.push(nextTime);
+        }
+      }
+      setClauses.push('updated_at = ?');
+      binds.push(now);
+      const setSql = setClauses.join(', ');
+      try {
+        if (rsvTenant) {
+          try {
+            await db
+              .prepare(`UPDATE reservations SET ${setSql} WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?`)
+              .bind(...binds, id, rsvTenant)
+              .run();
+          } catch (innerErr) {
+            if (isSlotUniqueViolation(innerErr)) {
+              return slotAlreadyBooked(c);
+            }
+            if (rsvTenant !== 'default' || !isNoSuchColumnError(innerErr) || hasTenantColumn) {
+              throw innerErr;
+            }
+            await db
+              .prepare(`UPDATE reservations SET ${setSql} WHERE id = ?`)
+              .bind(...binds, id)
+              .run();
+          }
+        } else {
+          await db
+            .prepare(`UPDATE reservations SET ${setSql} WHERE id = ?`)
+            .bind(...binds, id)
+            .run();
+        }
+        updated = true;
+        break;
+      } catch (err) {
+        if (isSlotUniqueViolation(err)) {
+          return slotAlreadyBooked(c);
+        }
+        lastErr = err;
+        if (!isNoSuchColumnError(err)) {
+          throw err;
+        }
+      }
+    }
+    if (!updated && lastErr) {
+      throw lastErr;
+    }
+  } else if (rsvTenant) {
+    try {
       await db
-        .prepare('UPDATE reservations SET status = ?, updated_at = ? WHERE id = ?')
-        .bind(effectiveStatus, now, id)
+        .prepare("UPDATE reservations SET status = ?, table_id = COALESCE(?, table_id), updated_at = ? WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?")
+        .bind(effectiveStatus, body.table_id !== undefined ? canonicalNextTableId : null, now, id, rsvTenant)
         .run();
+    } catch (err) {
+      if (isSlotUniqueViolation(err)) {
+        return slotAlreadyBooked(c);
+      }
+      if (rsvTenant !== 'default') throw err;
+      try {
+        if (body.table_id !== undefined && 'table_id' in rsv) {
+          await db
+            .prepare('UPDATE reservations SET status = ?, table_id = COALESCE(?, table_id), updated_at = ? WHERE id = ?')
+            .bind(effectiveStatus, canonicalNextTableId, now, id)
+            .run();
+        } else {
+          await db
+            .prepare('UPDATE reservations SET status = ?, updated_at = ? WHERE id = ?')
+            .bind(effectiveStatus, now, id)
+            .run();
+        }
+      } catch (fallbackErr) {
+        if (isSlotUniqueViolation(fallbackErr)) {
+          return slotAlreadyBooked(c);
+        }
+        throw fallbackErr;
+      }
     }
   } else {
-    await db.prepare('UPDATE reservations SET status = ?, updated_at = ? WHERE id = ?').bind(effectiveStatus, now, id).run();
+    try {
+      if (body.table_id !== undefined && 'table_id' in rsv) {
+        await db
+          .prepare('UPDATE reservations SET status = ?, table_id = COALESCE(?, table_id), updated_at = ? WHERE id = ?')
+          .bind(effectiveStatus, canonicalNextTableId, now, id)
+          .run();
+      } else {
+        await db.prepare('UPDATE reservations SET status = ?, updated_at = ? WHERE id = ?').bind(effectiveStatus, now, id).run();
+      }
+    } catch (err) {
+      if (isSlotUniqueViolation(err)) {
+        return slotAlreadyBooked(c);
+      }
+      throw err;
+    }
   }
   // Keep tenant-scoped customer edits separate from legacy slot-column fallbacks.
   if (customerEdits.length) {
@@ -1351,7 +1530,7 @@ reservationsRouter.patch('/:id', optionalAuth() as any, requireReservationStaff(
           ? db.prepare("UPDATE cafe_tables SET status = 'Occupied' WHERE id = ?").bind(canonicalNextTableId).run()
           : undefined
       );
-    await ensureActiveTableSession(db, canonicalNextTableId, targetTenant, nextPartySize || 2);
+    await ensureActiveTableSession(db, canonicalNextTableId, targetTenant, nextPartySize || 2, id);
   }
 
   return c.json({
@@ -1450,7 +1629,7 @@ reservationsRouter.patch('/:id/status', optionalAuth() as any, requireReservatio
           ? db.prepare("UPDATE cafe_tables SET status = 'Occupied' WHERE id = ?").bind(rsv.table_id).run()
           : undefined
       );
-    await ensureActiveTableSession(db, String(rsv.table_id), targetTenant, Number(rsv.guest_count ?? rsv.party_size ?? 2));
+    await ensureActiveTableSession(db, String(rsv.table_id), targetTenant, Number(rsv.guest_count ?? rsv.party_size ?? 2), id);
   }
 
   return c.json({ success: true, data: { id, status: nextStatus } });
@@ -1634,7 +1813,13 @@ reservationsRouter.post('/waitlist/:id/seat', requireReservationStaff() as any, 
       if (effectiveTenant !== 'default') throw err;
       return db.prepare("UPDATE cafe_tables SET status = 'Occupied' WHERE id = ?").bind(canonicalTableId).run();
     });
-  await ensureActiveTableSession(db, canonicalTableId, effectiveTenant, partySize || 2);
+  await ensureActiveTableSession(
+    db,
+    canonicalTableId,
+    effectiveTenant,
+    partySize || 2,
+    sourceTable === 'reservations' ? id : undefined
+  );
 
   return c.json({
     success: true,

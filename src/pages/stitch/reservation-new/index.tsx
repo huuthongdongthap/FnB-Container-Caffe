@@ -22,6 +22,56 @@ export function parseGuestCount(label: string): number {
   return Number.isFinite(maxNum) && maxNum > 0 ? maxNum : 2;
 }
 
+/** Normalize DB/template table zone names (EN/VI variants) to reservation zone categories. */
+export function normalizeTableZone(rawZone?: string | null): 'indoor' | 'outdoor' | 'vip' | null {
+  const raw = String(rawZone ?? '').trim().toLowerCase();
+  if (!raw) return null;
+  const ascii = raw
+    .normalize('NFD')
+    .replace(/\p{Diacritic}/gu, '')
+    .replace(/đ/g, 'd');
+  if (
+    ascii === 'vip' ||
+    ascii.includes('vip') ||
+    ascii.includes('cabin') ||
+    ascii.includes('phong rieng') ||
+    ascii.includes('private')
+  ) {
+    return 'vip';
+  }
+  if (
+    ascii === 'outdoor' ||
+    ascii.includes('outdoor') ||
+    ascii.includes('san vuon') ||
+    ascii.includes('san thuong') ||
+    ascii.includes('ngoai troi') ||
+    ascii.includes('garden') ||
+    ascii.includes('rooftop') ||
+    ascii.includes('patio') ||
+    ascii.includes('terrace') ||
+    ascii.includes('balcony')
+  ) {
+    return 'outdoor';
+  }
+  if (
+    ascii === 'indoor' ||
+    ascii.includes('indoor') ||
+    ascii.includes('trong nha') ||
+    ascii.includes('lounge') ||
+    ascii.includes('quay bar') ||
+    ascii === 'bar' ||
+    ascii === 'main' ||
+    ascii.includes('main hall') ||
+    ascii.includes('san khau') ||
+    ascii.includes('container') ||
+    ascii.includes('tang tret') ||
+    ascii.includes('may lanh')
+  ) {
+    return 'indoor';
+  }
+  return null;
+}
+
 /** Parse "YYYY-MM-DD" or "DD/MM" → ISO date "YYYY-MM-DD" in Asia/Ho_Chi_Minh (handles year rollover) */
 export function parseDateToISO(dateInput: string, nowMs = Date.now()): string {
   const trimmed = dateInput.trim();
@@ -83,15 +133,24 @@ export default function ReservationNew() {
       (Number(a.capacity) || 999) - (Number(b.capacity) || 999);
 
     const targetDbZone = currentZoneObj.dbZone.toLowerCase();
+    const targetCardName = currentZoneObj.name.trim().toLowerCase();
+    const matchesTargetZone = (rawZone?: string | null) => {
+      const trimmed = String(rawZone ?? '').trim().toLowerCase();
+      if (!trimmed) return false;
+      if (trimmed === targetDbZone || trimmed === targetCardName) return true;
+      return normalizeTableZone(rawZone) === targetDbZone;
+    };
     const zoneMatches = tables
-      .filter((t) => t.available && fitsCapacity(t) && String(t.zone || '').trim().toLowerCase() === targetDbZone)
+      .filter((t) => t.available && fitsCapacity(t) && matchesTargetZone(t.zone))
       .sort(bySmallestCapacity);
 
     const anyCapacityMatches = tables
       .filter((t) => t.available && fitsCapacity(t))
       .sort(bySmallestCapacity);
 
-    const matchedTable = zoneMatches[0] ?? null;
+    const hasConfiguredTargetZone = tables.some((t) => matchesTargetZone(t.zone));
+    const unmappedZoneMatches = anyCapacityMatches.filter((t) => normalizeTableZone(t.zone) === null);
+    const matchedTable = zoneMatches[0] ?? (!hasConfiguredTargetZone ? (unmappedZoneMatches[0] ?? null) : null);
 
     if (!matchedTable) {
       if (anyCapacityMatches.length > 0) {

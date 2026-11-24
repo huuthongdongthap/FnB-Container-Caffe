@@ -39,7 +39,7 @@ export async function releaseTableIfNoActiveOrders(
 
     const sameTable = `(table_id = cafe_tables.id OR CAST(table_id AS TEXT) = TRIM(CAST(cafe_tables.table_number AS TEXT)))`;
     const sameTenant = (alias: string) => `COALESCE(NULLIF(TRIM(${alias}.tenant_id), ''), 'default') = ?`;
-    const release = (reservationDate: string, reservationTime: string | null) => {
+    const release = (reservationDate: string, reservationTime: string | null, clearCurrentSessionId = true) => {
       const timeGuard = reservationTime
         ? `AND (
                    ${reservationTime} IS NULL OR TRIM(${reservationTime}) = ''
@@ -49,8 +49,9 @@ export async function releaseTableIfNoActiveOrders(
                    ) BETWEEN -30 AND 60
                  )`
         : '';
+      const sessionReset = clearCurrentSessionId ? ', current_session_id = NULL' : '';
       return db.prepare(
-        `UPDATE cafe_tables SET status = 'Available'
+        `UPDATE cafe_tables SET status = 'Available'${sessionReset}
        WHERE id = ? AND LOWER(TRIM(COALESCE(status, ''))) IN ('occupied', 'overdue')
          AND ${sameTenant('cafe_tables')}
          AND NOT EXISTS (
@@ -77,15 +78,18 @@ export async function releaseTableIfNoActiveOrders(
 
     let dateExpr = "COALESCE(NULLIF(TRIM(r.date), ''), r.reservation_date)";
     let timeExpr: string | null = "COALESCE(NULLIF(TRIM(r.time), ''), r.reservation_time)";
+    let clearCurrentSessionId = true;
     let result: unknown;
-    for (let attempt = 0; attempt < 5; attempt++) {
+    for (let attempt = 0; attempt < 6; attempt++) {
       try {
-        result = await release(dateExpr, timeExpr);
+        result = await release(dateExpr, timeExpr, clearCurrentSessionId);
         break;
       } catch (error) {
-        // Some schemas expose only one of the date/time columns (or omit time). Never remove guards.
+        // Some schemas expose only one of the date/time columns (or omit time/current_session_id). Never remove guards.
         const message = String(error);
-        if (/no such column:\s*r\.reservation_date\b/i.test(message) && dateExpr.includes('r.reservation_date')) {
+        if (/no such column:\s*(?:cafe_tables\.)?current_session_id\b/i.test(message) && clearCurrentSessionId) {
+          clearCurrentSessionId = false;
+        } else if (/no such column:\s*r\.reservation_date\b/i.test(message) && dateExpr.includes('r.reservation_date')) {
           dateExpr = 'r.date';
         } else if (/no such column:\s*r\.date\b/i.test(message) && dateExpr.includes('r.date')) {
           dateExpr = 'r.reservation_date';

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { parseGuestCount, parseDateToISO } from '../index';
+import { parseGuestCount, parseDateToISO, normalizeTableZone } from '../index';
 
 describe('Reservation parsing regressions (#180)', () => {
   it('parses guest counts including 8+ and localized labels without NaN', () => {
@@ -20,5 +20,20 @@ describe('Reservation parsing regressions (#180)', () => {
     // Dec 31 -> 02/01 year rollover (VN time)
     const dec31Ms = Date.UTC(2026, 11, 31, 5, 0, 0);
     expect(parseDateToISO('02/01', dec31Ms)).toBe('2027-01-02');
+  });
+
+  it('normalizes localized and English table zone labels into canonical buckets', () => {
+    expect(normalizeTableZone('Indoor')).toBe('indoor');
+    expect(normalizeTableZone('Trong nhà')).toBe('indoor');
+    expect(normalizeTableZone('Lounge')).toBe('indoor');
+    expect(normalizeTableZone('Main')).toBe('indoor');
+    expect(normalizeTableZone('Sân vườn')).toBe('outdoor');
+    expect(normalizeTableZone('Sân thượng')).toBe('outdoor');
+    expect(normalizeTableZone('ROOFTOP')).toBe('outdoor');
+    expect(normalizeTableZone('VIP')).toBe('vip');
+    expect(normalizeTableZone('Cabin yên tĩnh')).toBe('vip');
+    expect(normalizeTableZone('Phòng riêng')).toBe('vip');
+    expect(normalizeTableZone('Khu A')).toBeNull();
+    expect(normalizeTableZone('')).toBeNull();
   });
 });

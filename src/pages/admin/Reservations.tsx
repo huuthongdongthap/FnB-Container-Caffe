@@ -359,7 +359,7 @@ export default function AdminReservationsPage() {
           )}
 
           {editing && (
-            <Card className="mb-6">
+            <Card key={editing.id} className="mb-6">
               <CardBody className="p-5">
                 <h2 className="text-lg font-semibold mb-4">{t('adminReservations.editTitle')}</h2>
                 <form

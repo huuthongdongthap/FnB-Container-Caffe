@@ -434,15 +434,84 @@ floorPlanRouter.post('/:id/no-show', async (c) => {
     }
   }
 
-  // Mark any matching active reservation for this table as no_show.
+  // Mark only the targeted or active current reservation for this table as no_show.
+  let targetReservationId =
+    typeof body.reservation_id === 'string' && body.reservation_id.trim()
+      ? body.reservation_id.trim()
+      : typeof body.reservationId === 'string' && body.reservationId.trim()
+        ? body.reservationId.trim()
+        : '';
+  if (!targetReservationId && session?.id) {
+    try {
+      const sessionMeta = await db.prepare(
+        "SELECT notes FROM table_sessions WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
+      ).bind(session.id, effectiveTableTenant).first<{ notes?: string | null }>().catch(() => null);
+      const rawNote = typeof sessionMeta?.notes === 'string' ? sessionMeta.notes.trim() : '';
+      if (rawNote.startsWith('reservation:')) {
+        targetReservationId = rawNote.slice('reservation:'.length).trim();
+      }
+    } catch {
+      // notes column optional in minimal schemas
+    }
+  }
   try {
-    await db.prepare(
-      "UPDATE reservations SET status = 'no_show', updated_at = ? WHERE table_id = ? AND LOWER(COALESCE(status, '')) IN ('confirmed', 'pending', 'approved', 'seated') AND (LOWER(COALESCE(status, '')) = 'seated' OR COALESCE(NULLIF(TRIM(date), ''), reservation_date) = DATE('now', '+7 hours')) AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
-    ).bind(now, id, effectiveTableTenant).run().catch(() =>
-      db.prepare(
-        "UPDATE reservations SET status = 'no_show', updated_at = ? WHERE table_id = ? AND LOWER(COALESCE(status, '')) IN ('confirmed', 'pending', 'approved', 'seated') AND (LOWER(COALESCE(status, '')) = 'seated' OR date = DATE('now', '+7 hours')) AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
-      ).bind(now, id, effectiveTableTenant).run().catch(() => undefined)
-    );
+    if (targetReservationId) {
+      await db.prepare(
+        "UPDATE reservations SET status = 'no_show', updated_at = ? WHERE id = ? AND table_id = ? AND LOWER(COALESCE(status, '')) IN ('confirmed', 'pending', 'approved', 'seated') AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
+      ).bind(now, targetReservationId, id, effectiveTableTenant).run().catch(() => undefined);
+    } else {
+      const nowMinExpr = "(CAST(strftime('%H', 'now', '+7 hours') AS INTEGER) * 60 + CAST(strftime('%M', 'now', '+7 hours') AS INTEGER))";
+      const buildScopedNoShowSql = (dateExpr: string, timeExpr: string) => {
+        const trimmedTime = `TRIM(${timeExpr})`;
+        const hasClock = `(${timeExpr} IS NOT NULL AND ${trimmedTime} != '' AND instr(${trimmedTime}, ':') > 0)`;
+        const slotMinExpr = `(CAST(substr(${trimmedTime}, 1, instr(${trimmedTime}, ':') - 1) AS INTEGER) * 60 + CAST(substr(${trimmedTime}, instr(${trimmedTime}, ':') + 1, 2) AS INTEGER))`;
+        return `UPDATE reservations SET status = 'no_show', updated_at = ?
+         WHERE id = (
+           SELECT id FROM reservations
+           WHERE table_id = ?
+             AND LOWER(COALESCE(status, '')) IN ('confirmed', 'pending', 'approved', 'seated')
+             AND (
+               LOWER(COALESCE(status, '')) = 'seated'
+               OR (
+                 ${dateExpr} = DATE('now', '+7 hours')
+                 AND (NOT ${hasClock} OR (${slotMinExpr} - ${nowMinExpr}) <= 60)
+               )
+             )
+             AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?
+           ORDER BY
+             CASE
+               WHEN LOWER(COALESCE(status, '')) = 'seated' THEN 0
+               WHEN ${hasClock} AND ${slotMinExpr} <= ${nowMinExpr} THEN 1
+               WHEN ${hasClock} THEN 2
+               ELSE 3
+             END ASC,
+             CASE
+               WHEN ${hasClock} AND ${slotMinExpr} <= ${nowMinExpr} THEN -(${slotMinExpr})
+               WHEN ${hasClock} THEN ${slotMinExpr}
+               ELSE 9999
+             END ASC,
+             id ASC
+           LIMIT 1
+         )
+         AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?`;
+      };
+      const variants: Array<[string, string]> = [
+        ["COALESCE(NULLIF(TRIM(date), ''), reservation_date)", "COALESCE(NULLIF(TRIM(time), ''), reservation_time)"],
+        ['date', 'time'],
+        ['reservation_date', 'reservation_time'],
+      ];
+      for (const [dateExpr, timeExpr] of variants) {
+        try {
+          await db
+            .prepare(buildScopedNoShowSql(dateExpr, timeExpr))
+            .bind(now, id, effectiveTableTenant, effectiveTableTenant)
+            .run();
+          break;
+        } catch {
+          // Try alternate reservation date/time column naming
+        }
+      }
+    }
   } catch {
     // reservations table optional in minimal schemas
   }

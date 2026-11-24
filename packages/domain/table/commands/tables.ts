@@ -431,18 +431,28 @@ async function updateTable(db: Env['AURA_DB'], id: string, status: string, tenan
         .first<{ id?: string }>()
         .catch(() => null);
       let sessId = existingSess?.id ? String(existingSess.id) : '';
+      let sessionReady = Boolean(sessId);
       if (!sessId) {
         const rand = new Uint8Array(3);
         crypto.getRandomValues(rand);
         sessId = `ts_${Date.now()}_${Array.from(rand, (b) => b.toString(16).padStart(2, '0')).join('')}`;
         const nowIso = new Date().toISOString();
-        await db
-          .prepare("INSERT INTO table_sessions (id, table_id, status, guest_count, tenant_id, started_at, created_at, updated_at) VALUES (?, ?, 'active', 2, ?, ?, ?, ?)")
+        const inserted = await db
+          .prepare("INSERT INTO table_sessions (id, table_id, status, tenant_id, started_at, created_at, updated_at) VALUES (?, ?, 'active', ?, ?, ?, ?)")
           .bind(sessId, id, sessTenant, nowIso, nowIso, nowIso)
           .run()
-          .catch(() => undefined);
+          .then(() => true)
+          .catch(() =>
+            db
+              .prepare("INSERT INTO table_sessions (id, table_id, status, tenant_id) VALUES (?, ?, 'active', ?)")
+              .bind(sessId, id, sessTenant)
+              .run()
+              .then(() => true)
+              .catch(() => false)
+          );
+        sessionReady = inserted;
       }
-      if (sessId) {
+      if (sessionReady && sessId) {
         if (effectiveTableTenant !== '*') {
           const tblTenantClause = effectiveTableTenant === 'default'
             ? "AND (tenant_id IS NULL OR TRIM(tenant_id) = '' OR tenant_id = ?)"
