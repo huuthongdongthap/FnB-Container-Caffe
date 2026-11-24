@@ -39,9 +39,19 @@ export async function releaseTableIfNoActiveOrders(
 
     const sameTable = `(table_id = cafe_tables.id OR CAST(table_id AS TEXT) = TRIM(CAST(cafe_tables.table_number AS TEXT)))`;
     const sameTenant = (alias: string) => `COALESCE(NULLIF(TRIM(${alias}.tenant_id), ''), 'default') = ?`;
-    const release = (reservationDate: string) => db.prepare(
-      `UPDATE cafe_tables SET status = 'Available'
-       WHERE id = ? AND LOWER(TRIM(COALESCE(status, ''))) = 'occupied'
+    const release = (reservationDate: string, reservationTime: string | null) => {
+      const timeGuard = reservationTime
+        ? `AND (
+                   ${reservationTime} IS NULL OR TRIM(${reservationTime}) = ''
+                   OR (
+                     (CAST(substr(TRIM(${reservationTime}), 1, instr(TRIM(${reservationTime}), ':') - 1) AS INTEGER) * 60 + CAST(substr(TRIM(${reservationTime}), instr(TRIM(${reservationTime}), ':') + 1, 2) AS INTEGER))
+                     - (CAST(strftime('%H', 'now', '+7 hours') AS INTEGER) * 60 + CAST(strftime('%M', 'now', '+7 hours') AS INTEGER))
+                   ) BETWEEN -30 AND 60
+                 )`
+        : '';
+      return db.prepare(
+        `UPDATE cafe_tables SET status = 'Available'
+       WHERE id = ? AND LOWER(TRIM(COALESCE(status, ''))) IN ('occupied', 'overdue')
          AND ${sameTenant('cafe_tables')}
          AND NOT EXISTS (
            SELECT 1 FROM orders o WHERE ${sameTable} AND ${sameTenant('o')}
@@ -49,24 +59,44 @@ export async function releaseTableIfNoActiveOrders(
          )
          AND NOT EXISTS (
            SELECT 1 FROM table_sessions s WHERE ${sameTable} AND ${sameTenant('s')}
-             AND LOWER(COALESCE(s.status, 'active')) NOT IN ('closed', 'completed', 'no_show', 'abandoned', 'cancelled', 'canceled')
+             AND LOWER(COALESCE(s.status, 'active')) NOT IN ('closed', 'completed', 'paid', 'no_show', 'abandoned', 'cancelled', 'canceled')
          )
          AND NOT EXISTS (
            SELECT 1 FROM reservations r WHERE ${sameTable} AND ${sameTenant('r')}
-             AND ${reservationDate} = DATE('now', '+7 hours')
-             AND LOWER(COALESCE(r.status, 'pending')) IN ('pending', 'confirmed', 'approved', 'seated')
+             AND LOWER(COALESCE(r.status, 'pending')) NOT IN ('cancelled', 'canceled', 'rejected', 'completed', 'no_show')
+             AND (
+               LOWER(COALESCE(r.status, '')) = 'seated'
+               OR (
+                 ${reservationDate} = DATE('now', '+7 hours')
+                 ${timeGuard}
+               )
+             )
          )`,
-    ).bind(table.id, normTenant, normTenant, normTenant, normTenant).run();
+      ).bind(table.id, normTenant, normTenant, normTenant, normTenant).run();
+    };
 
+    let dateExpr = "COALESCE(NULLIF(TRIM(r.date), ''), r.reservation_date)";
+    let timeExpr: string | null = "COALESCE(NULLIF(TRIM(r.time), ''), r.reservation_time)";
     let result: unknown;
-    try {
-      result = await release("COALESCE(NULLIF(TRIM(r.date), ''), r.reservation_date)");
-    } catch (error) {
-      // Some schemas expose only one of the two date columns. Never remove guards.
-      const message = String(error);
-      if (/no such column:\s*r\.reservation_date\b/i.test(message)) result = await release('r.date');
-      else if (/no such column:\s*r\.date\b/i.test(message)) result = await release('r.reservation_date');
-      else throw error;
+    for (let attempt = 0; attempt < 5; attempt++) {
+      try {
+        result = await release(dateExpr, timeExpr);
+        break;
+      } catch (error) {
+        // Some schemas expose only one of the date/time columns (or omit time). Never remove guards.
+        const message = String(error);
+        if (/no such column:\s*r\.reservation_date\b/i.test(message) && dateExpr.includes('r.reservation_date')) {
+          dateExpr = 'r.date';
+        } else if (/no such column:\s*r\.date\b/i.test(message) && dateExpr.includes('r.date')) {
+          dateExpr = 'r.reservation_date';
+        } else if (/no such column:\s*r\.reservation_time\b/i.test(message) && timeExpr?.includes('r.reservation_time')) {
+          timeExpr = timeExpr.includes('r.time') ? 'r.time' : null;
+        } else if (/no such column:\s*r\.time\b/i.test(message) && timeExpr?.includes('r.time')) {
+          timeExpr = timeExpr.includes('r.reservation_time') ? 'r.reservation_time' : null;
+        } else {
+          throw error;
+        }
+      }
     }
     const write = result as { meta?: { changes?: number }; changes?: number } | null;
     return (write?.meta?.changes ?? write?.changes ?? 0) > 0;

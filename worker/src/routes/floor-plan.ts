@@ -283,10 +283,10 @@ floorPlanRouter.get('/', async (c) => {
 
   const summary = {
     total: tables.length,
-    available: tables.filter((t) => t.status === 'Available').length,
-    occupied: tables.filter((t) => t.status === 'Occupied').length,
-    reserved: tables.filter((t) => t.status === 'Reserved').length,
-    overdue: tables.filter((t) => t.status === 'Overdue').length,
+    available: tables.filter((t) => String(t.status || '').toLowerCase() === 'available').length,
+    occupied: tables.filter((t) => String(t.status || '').toLowerCase() === 'occupied').length,
+    reserved: tables.filter((t) => String(t.status || '').toLowerCase() === 'reserved').length,
+    overdue: tables.filter((t) => String(t.status || '').toLowerCase() === 'overdue').length,
     with_active_session: tables.filter((t) => t.active_session).length,
   };
 
@@ -337,7 +337,7 @@ floorPlanRouter.post('/:id/no-show', async (c) => {
       return c.json({ success: false, error: 'timeout_minutes must be a finite number between 1 and 1440' }, 400);
     }
   }
-  const timeoutMinutes = body.timeout_minutes !== undefined && body.timeout_minutes !== null
+  const _timeoutMinutes = body.timeout_minutes !== undefined && body.timeout_minutes !== null
     ? Math.floor(Number(body.timeout_minutes))
     : 30;
 
@@ -432,25 +432,37 @@ floorPlanRouter.post('/:id/no-show', async (c) => {
         }
       }
     }
+  }
+
+  // Mark any matching active reservation for this table as no_show.
+  try {
     await db.prepare(
+      "UPDATE reservations SET status = 'no_show', updated_at = ? WHERE table_id = ? AND LOWER(COALESCE(status, '')) IN ('confirmed', 'pending', 'approved', 'seated') AND (LOWER(COALESCE(status, '')) = 'seated' OR COALESCE(NULLIF(TRIM(date), ''), reservation_date) = DATE('now', '+7 hours')) AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
+    ).bind(now, id, effectiveTableTenant).run().catch(() =>
+      db.prepare(
+        "UPDATE reservations SET status = 'no_show', updated_at = ? WHERE table_id = ? AND LOWER(COALESCE(status, '')) IN ('confirmed', 'pending', 'approved', 'seated') AND (LOWER(COALESCE(status, '')) = 'seated' OR date = DATE('now', '+7 hours')) AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
+      ).bind(now, id, effectiveTableTenant).run().catch(() => undefined)
+    );
+  } catch {
+    // reservations table optional in minimal schemas
+  }
+
+  // Release the table unconditionally so state matches the response even when no session row existed.
+  await db.prepare(
+    "UPDATE cafe_tables SET status = 'Available', current_order_id = NULL, current_session_id = NULL WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
+  ).bind(id, effectiveTableTenant).run().catch(() =>
+    db.prepare(
       "UPDATE cafe_tables SET status = 'Available', current_order_id = NULL WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
     ).bind(id, effectiveTableTenant).run().catch(() =>
       canRunUnscopedFallback
         ? db.prepare("UPDATE cafe_tables SET status = 'Available', current_order_id = NULL WHERE id = ?").bind(id).run().catch(() => null)
         : null
-    );
-    await db.prepare(
-      "UPDATE cafe_tables SET status = 'Available' WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
-    ).bind(id, effectiveTableTenant).run().catch(() =>
-      canRunUnscopedFallback
-        ? db.prepare('UPDATE cafe_tables SET status = \'Available\' WHERE id = ?').bind(id).run()
-        : null
-    );
-  }
+    )
+  );
 
   return c.json({
     success: true,
-    message: `Table ${id} marked no-show; freed after ${timeoutMinutes} min`,
+    message: `Table ${id} marked no-show and released`,
     released_at: now,
   });
 });
