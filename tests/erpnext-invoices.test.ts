@@ -14,6 +14,7 @@ const mockAccountingClient = {
   getInvoiceByOrderId: vi.fn(),
   updateInvoiceVAT: vi.fn(),
   generateInvoicePDF: vi.fn(),
+  fetchInvoicePDF: vi.fn(),
 };
 
 vi.mock('../worker/src/clients/erpnext-accounting-client', () => ({
@@ -138,17 +139,23 @@ describe('POST /:id/vat', () => {
 });
 
 describe('GET /:id/pdf', () => {
-  test('generates PDF invoice', async () => {
-    mockAccountingClient.generateInvoicePDF.mockResolvedValue({ url: 'https://erp.test/pdf/INV-001.pdf' });
+  test('proxies PDF invoice from ERPNext', async () => {
+    const pdfBytes = new Uint8Array([0x25, 0x50, 0x44, 0x46]); // %PDF
+    mockAccountingClient.fetchInvoicePDF.mockResolvedValue(
+      new Response(pdfBytes, {
+        status: 200,
+        headers: { 'Content-Type': 'application/pdf' },
+      })
+    );
     await mountHandler();
 
     const req = new Request('https://test/api/erpnext-invoices/INV-001/pdf', { method: 'GET' });
     const res = await handleErpnextInvoicesRequest(req, configuredEnv);
 
     expect(res.status).toBe(200);
-    const body = await res.json();
-    expect(body.success).toBe(true);
-    expect(body.data.url).toContain('INV-001.pdf');
+    expect(res.headers.get('Content-Type')).toBe('application/pdf');
+    expect(res.headers.get('Content-Disposition')).toContain('INV-001.pdf');
+    expect(mockAccountingClient.fetchInvoicePDF).toHaveBeenCalledWith('INV-001');
   });
 });
 

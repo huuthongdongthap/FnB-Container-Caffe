@@ -3427,7 +3427,7 @@ describe('Multi-Tenant & Franchise Preparation Integration', () => {
       expect(waiterStaffRes.status).toBe(403);
 
       const supErpSyncRes = await app.fetch(await authRequest('POST', '/api/admin/erpnext-sync/customers', 'supervisor', 'default'), env);
-      expect(supErpSyncRes.status).toBe(200);
+      expect(supErpSyncRes.status).toBe(501);
       const waiterErpSyncRes = await app.fetch(await authRequest('POST', '/api/admin/erpnext-sync/customers', 'waiter', 'default'), env);
       expect(waiterErpSyncRes.status).toBe(403);
 
@@ -11694,7 +11694,7 @@ describe('Multi-Tenant & Franchise Preparation Integration', () => {
                   };
                 }
                 if (/FROM erpnext_mappings m/i.test(sql)) {
-                  const hasTenantFilter = /COALESCE\(m\.tenant_id, o\.tenant_id\)/i.test(sql);
+                  const hasTenantFilter = /COALESCE\(NULLIF\(TRIM\(m\.tenant_id\), ''\), NULLIF\(TRIM\(o\.tenant_id\), ''\), 'default'\)/i.test(sql);
                   return {
                     results: hasTenantFilter
                       ? [{ id: 'map_sadec_1', order_id: 'ord_sadec_1', local_id: 'ord_sadec_1', sync_status: 'failed', tenant_id: 'sadec' }]

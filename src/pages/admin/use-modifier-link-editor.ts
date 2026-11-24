@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useClientSessionScope } from '@/lib/client-session';
 import { apiFetch } from './menu-api';
@@ -23,6 +24,7 @@ export function useProductGroups(productId: string | null) {
 }
 
 export function useModifierLinkEditor() {
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
   const session = useClientSessionScope();
   const [productId, setProductId] = useState<string>('');
@@ -63,7 +65,7 @@ export function useModifierLinkEditor() {
 
   function toggleLink(groupId: string) {
     if (!productId) {
-      setErrors({ _form: 'adminMenu.productLinksNeedProduct' });
+      setErrors({ _form: t('adminMenu.productLinksNeedProduct') });
       return;
     }
     setErrors({});
