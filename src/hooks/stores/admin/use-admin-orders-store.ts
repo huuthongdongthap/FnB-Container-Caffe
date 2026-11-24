@@ -50,26 +50,45 @@ interface AdminOrdersState {
   clearMutationError: () => void;
 }
 
-function normalizeAdminOrder(raw: Record<string, unknown>): AdminOrder {
+export function stripSystemOrderNotes(notes?: string | null): string | undefined {
+  if (typeof notes !== 'string') return undefined;
+  const cleaned = notes
+    .replace(/\s*\|\s*\[OVERDUE\]/gi, '')
+    .replace(/\[OVERDUE\]\s*\|\s*/gi, '')
+    .replace(/\[OVERDUE\]/gi, '')
+    .trim();
+  return cleaned || undefined;
+}
+
+export function normalizeAdminOrder(raw: Record<string, unknown>): AdminOrder {
   if (
     typeof raw.customer === 'string' &&
     typeof raw.items === 'number' &&
     typeof raw.payment === 'string' &&
     typeof raw.createdAt === 'string'
   ) {
-    return raw as unknown as AdminOrder;
+    return {
+      ...(raw as unknown as AdminOrder),
+      notes: stripSystemOrderNotes(typeof raw.notes === 'string' ? raw.notes : undefined),
+    };
   }
   let itemsCount = 1;
-  let itemsList: Array<{ name: string; quantity: number; notes?: string; modifiers?: string[] }> | undefined;
+  let itemsList: Array<{ name: string; quantity: number; price?: number; notes?: string; modifiers?: string[] }> | undefined;
   const extractItems = (arr: unknown[]) =>
     arr.map((entry) => {
       const it = (entry ?? {}) as Record<string, unknown>;
       const rawMods = Array.isArray(it.modifiers)
         ? it.modifiers.map((m) => (typeof m === 'string' ? m : String((m as Record<string, unknown>)?.name ?? ''))).filter(Boolean)
         : undefined;
+      const rawPrice = it.price ?? it.unit_price ?? it.unitPrice;
+      const parsedPrice =
+        rawPrice !== undefined && rawPrice !== null && rawPrice !== '' && Number.isFinite(Number(rawPrice))
+          ? Number(rawPrice)
+          : undefined;
       return {
         name: String(it.name ?? it.product_name ?? it.title ?? 'Item'),
         quantity: typeof it.quantity === 'number' ? it.quantity : typeof it.qty === 'number' ? it.qty : 1,
+        ...(parsedPrice !== undefined ? { price: parsedPrice } : {}),
         ...(typeof it.notes === 'string' && it.notes.trim() ? { notes: it.notes.trim() } : {}),
         ...(rawMods && rawMods.length > 0 ? { modifiers: rawMods } : {}),
       };
@@ -90,6 +109,14 @@ function normalizeAdminOrder(raw: Record<string, unknown>): AdminOrder {
       itemsCount = 1;
     }
   }
+  const toOptionalNumber = (...vals: unknown[]): number | undefined => {
+    for (const v of vals) {
+      if (v !== undefined && v !== null && v !== '' && Number.isFinite(Number(v))) {
+        return Number(v);
+      }
+    }
+    return undefined;
+  };
   return {
     ...(raw as unknown as AdminOrder),
     id: String(raw.id ?? ''),
@@ -102,14 +129,27 @@ function normalizeAdminOrder(raw: Record<string, unknown>): AdminOrder {
     tableZone: typeof raw.tableZone === 'string' ? raw.tableZone : typeof raw.table_zone === 'string' ? raw.table_zone : undefined,
     paymentMethod: typeof raw.paymentMethod === 'string' ? raw.paymentMethod : typeof raw.payment_method === 'string' ? raw.payment_method : undefined,
     paymentStatus: typeof raw.paymentStatus === 'string' ? raw.paymentStatus : typeof raw.payment_status === 'string' ? raw.payment_status : undefined,
-    notes: typeof raw.notes === 'string' ? raw.notes : undefined,
+    notes: stripSystemOrderNotes(typeof raw.notes === 'string' ? raw.notes : undefined),
     deliveryTime: typeof raw.deliveryTime === 'string' ? raw.deliveryTime : typeof raw.delivery_time === 'string' ? raw.delivery_time : undefined,
     items: itemsCount,
     ...(itemsList ? { itemsList } : {}),
+    subtotal: toOptionalNumber(raw.subtotal),
+    shippingFee: toOptionalNumber(raw.shippingFee, raw.shipping_fee),
+    discount: toOptionalNumber(raw.discount),
+    serviceFee: toOptionalNumber(raw.serviceFee, raw.service_fee),
+    cashbackUsed: toOptionalNumber(raw.cashbackUsed, raw.cashback_used),
     total: Number(raw.total ?? 0),
     status: String(raw.status ?? 'pending'),
     payment: String(raw.payment ?? raw.paymentMethod ?? raw.payment_method ?? 'cash'),
     createdAt: String(raw.createdAt ?? raw.created_at ?? ''),
+    pendingLoyaltyReversal: Boolean(raw.pendingLoyaltyReversal ?? raw.pending_loyalty_reversal),
+    pendingLoyaltyTransferRef:
+      typeof raw.pendingLoyaltyTransferRef === 'string'
+        ? raw.pendingLoyaltyTransferRef
+        : typeof raw.pending_loyalty_transfer_ref === 'string'
+          ? raw.pending_loyalty_transfer_ref
+          : undefined,
+    pendingLoyaltyRefundAmount: toOptionalNumber(raw.pendingLoyaltyRefundAmount, raw.pending_loyalty_refund_amount),
   };
 }
 

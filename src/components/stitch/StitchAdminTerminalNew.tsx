@@ -40,7 +40,7 @@ export function StitchAdminTerminalNew({
       {/* Mobile Sidebar Overlay */}
       {sidebarOpen && (
         <button type="button"
-          className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm md:hidden"
+          className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm md:hidden print:hidden no-print"
           onClick={() => setSidebarOpen(false)}
           aria-label={tTerminal('closeSidebar')}
         />
@@ -66,7 +66,7 @@ export function StitchAdminTerminalNew({
       {/* Main Content (routed via Outlet or children) */}
       <main
         className={cn(
-          'min-h-screen',
+          'min-h-screen print:min-h-0 print:ml-0 print:pt-0 print:px-0 print:pb-0',
           isPosRoute ? 'p-0' : 'pt-24 px-4 pb-8 md:px-10 md:ml-72',
         )}
         aria-label={tTerminal('mainContent')}

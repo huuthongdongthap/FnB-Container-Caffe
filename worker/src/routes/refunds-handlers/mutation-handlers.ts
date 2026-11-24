@@ -148,8 +148,10 @@ export async function handleRefund(c: Context<{ Bindings: Env }>, openApi = fals
       ).bind(effectivePaymentTenant, manualTransferRef)
         .first<{ payment_id: string; amount: number; reason: string; loyalty_status: string | null }>();
       if (existingTransfer) {
+        // A `failed` row is terminal for automated retries only: an operator replay with the
+        // same transfer reference must still be able to settle it.
         if (existingTransfer.payment_id !== payment.id || (body.amount !== undefined && body.amount !== existingTransfer.amount)
-          || existingTransfer.loyalty_status !== 'pending') {
+          || !['pending', 'failed'].includes(String(existingTransfer.loyalty_status ?? ''))) {
           return c.json({ success: false, error: 'Transfer reference already recorded' }, 409);
         }
         const loyalty = await processRefundLoyalty(db, c.env, { tenantId: effectivePaymentTenant,
@@ -213,15 +215,15 @@ export async function handleRefund(c: Context<{ Bindings: Env }>, openApi = fals
           .bind(effectivePaymentTenant, manualTransferRef, payment.id, payment.order_id, amount),
         db.prepare(`INSERT INTO refund_mutation_guards (settlement_ok)
           VALUES (CASE WHEN changes() = 1 THEN 1 ELSE 0 END)`),
-        ...(fullRefund ? [db.prepare(`UPDATE orders
-          SET payment_status = 'refunded',
-              status = CASE WHEN LOWER(COALESCE(status, '')) NOT IN ('completed', 'cancelled') THEN 'cancelled' ELSE status END,
+        db.prepare(`UPDATE orders
+          SET payment_status = ?,
+              status = CASE WHEN ? = 1 AND LOWER(COALESCE(status, '')) NOT IN ('completed', 'cancelled') THEN 'cancelled' ELSE status END,
               updated_at = ?
           WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?
             AND LOWER(COALESCE(payment_status, '')) IN ('paid', 'completed', 'partially_refunded')`)
-          .bind(now, payment.order_id, effectivePaymentTenant),
-          db.prepare(`INSERT INTO refund_mutation_guards (settlement_ok)
-            VALUES (CASE WHEN changes() = 1 THEN 1 ELSE 0 END)`)] : []),
+          .bind(fullRefund ? 'refunded' : 'partially_refunded', fullRefund ? 1 : 0, now, payment.order_id, effectivePaymentTenant),
+        db.prepare(`INSERT INTO refund_mutation_guards (settlement_ok)
+          VALUES (CASE WHEN changes() = 1 THEN 1 ELSE 0 END)`),
         db.prepare('DELETE FROM refund_mutation_guards'),
       ];
       try {

@@ -106,7 +106,7 @@ export interface StitchPOSNewProps {
   /** Header/Footer action callbacks */
   onOpenSchedule?: () => void;
   onOpenDrawer?: () => void;
-  onPrintReceipt?: () => void;
+  onPrintReceipt?: (cartSnapshot?: { items: POSNewCartItem[]; subtotal: number; total: number }) => void;
   onEndShift?: () => void;
   /** Incrementing key that clears the POS cart when changed */
   cartResetKey?: number;

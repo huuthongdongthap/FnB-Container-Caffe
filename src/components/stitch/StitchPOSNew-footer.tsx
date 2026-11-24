@@ -52,7 +52,7 @@ export function POSFooter({
         )}
         <button
           type="button"
-          onClick={() => (onPrintReceipt ? onPrintReceipt() : window.print())}
+          onClick={() => onPrintReceipt?.()}
           className="inline-flex items-center gap-1.5 shrink-0 whitespace-nowrap bg-white/5 text-[var(--aura-text-primary,#eae1db)] px-3.5 sm:px-5 py-1.5 min-h-[36px] border border-[var(--aura-chrome-light,#B8C5D0)]/25 rounded-full text-[11px] font-medium hover:border-[var(--aura-chrome-light,#B8C5D0)]/50 hover:bg-white/10 transition-all active:scale-95 font-body cursor-pointer"
           aria-label={t('posNew.printReceipt')}
         >

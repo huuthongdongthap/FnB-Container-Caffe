@@ -60,7 +60,7 @@ export async function handleGetOrderSummary(c: Context<{ Bindings: Env }>) {
     params.push(dateTo === 'today' ? vnToday : dateTo);
   }
 
-  const [totalResult, revenueResult, statusResult, paymentResult] = await Promise.all([
+  const [totalResult, revenueResult, statusResult, paymentResult, leadTimeResult] = await Promise.all([
     db.prepare(`SELECT COUNT(*) as total FROM orders ${whereClause}`).bind(...params).first(),
     (async () => {
       const nonRevenueFilterWithPayment =
@@ -131,6 +131,23 @@ export async function handleGetOrderSummary(c: Context<{ Bindings: Env }>) {
         return await db.prepare(`SELECT COALESCE(order_type, 'dine_in') as source, COUNT(*) as count FROM orders ${whereClause} GROUP BY COALESCE(order_type, 'dine_in')`).bind(...params).all();
       }
     })(),
+    (async () => {
+      try {
+        return await db
+          .prepare(
+            `SELECT AVG((julianday(updated_at) - julianday(created_at)) * 1440.0) as avg_lead_time_minutes
+             FROM orders ${whereClause}
+             AND status = 'completed'
+             AND updated_at IS NOT NULL
+             AND created_at IS NOT NULL
+             AND julianday(updated_at) >= julianday(created_at)`,
+          )
+          .bind(...params)
+          .first();
+      } catch {
+        return null;
+      }
+    })(),
   ]);
 
   const totalRow = totalResult as any;
@@ -159,6 +176,14 @@ export async function handleGetOrderSummary(c: Context<{ Bindings: Env }>) {
       ? Math.max(0, Number(revRow.valid_orders))
       : Math.max(0, totalOrders - excludedOrderCount);
 
+  const rawAvgLeadTime = (leadTimeResult as Record<string, unknown> | null)?.avg_lead_time_minutes;
+  const avgLeadTimeMinutes =
+    rawAvgLeadTime !== null &&
+    rawAvgLeadTime !== undefined &&
+    Number.isFinite(Number(rawAvgLeadTime))
+      ? Math.max(0, Math.round(Number(rawAvgLeadTime)))
+      : null;
+
   return c.json({
     success: true,
     data: {
@@ -167,6 +192,7 @@ export async function handleGetOrderSummary(c: Context<{ Bindings: Env }>) {
       averageOrderValue: validOrderCount > 0 ? Math.round(totalRevenue / validOrderCount) : 0,
       ordersByStatus: statusCounts,
       ordersByPaymentMethod: paymentCounts,
+      avgLeadTimeMinutes,
     },
   });
 }

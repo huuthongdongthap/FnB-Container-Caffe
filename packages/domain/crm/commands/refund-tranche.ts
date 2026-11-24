@@ -29,9 +29,18 @@ export async function reverseRefundTranche(
 async function reverseSnapshot(db: D1Database, policy: LoyaltyPolicy, input: RefundTrancheInput): Promise<RefundTrancheResult> {
   const tenant = input.tenantId;
   const key = input.reversalKey;
-  const work = await db.prepare(`SELECT status, amount, order_id, customer_id FROM refund_loyalty_work
-    WHERE tenant_id = ? AND reversal_key = ?`).bind(tenant, key)
-    .first<{ status: string; amount: number; order_id: string; customer_id: string | null }>();
+  let work: { status: string; amount: number; order_id: string; customer_id: string | null } | null = null;
+  let hasRetryColumns = true;
+  try {
+    work = await db.prepare(`SELECT status, amount, order_id, customer_id, attempts FROM refund_loyalty_work
+      WHERE tenant_id = ? AND reversal_key = ?`).bind(tenant, key)
+      .first<{ status: string; amount: number; order_id: string; customer_id: string | null }>();
+  } catch {
+    hasRetryColumns = false;
+    work = await db.prepare(`SELECT status, amount, order_id, customer_id FROM refund_loyalty_work
+      WHERE tenant_id = ? AND reversal_key = ?`).bind(tenant, key)
+      .first<{ status: string; amount: number; order_id: string; customer_id: string | null }>();
+  }
   if (!work || work.amount !== input.refundAmountVnd || work.order_id !== input.orderId) return { ok: false, reason: 'order_not_found' };
   if (work.status === 'completed') return { ok: false, reason: 'already_reversed' };
   const order = await db.prepare(`SELECT total, points_earned, cashback_earned, customer_id FROM orders
@@ -79,10 +88,18 @@ async function reverseSnapshot(db: D1Database, policy: LoyaltyPolicy, input: Ref
   const add = (sql: string, ...args: unknown[]) => statements.push(db.prepare(sql).bind(...args));
   const assertChanged = () => add(`INSERT INTO refund_mutation_guards (reversal_ok)
     VALUES (CASE WHEN changes() = 1 THEN 1 ELSE 0 END)`);
-  add(`UPDATE refund_loyalty_work SET status = 'completed', customer_id = ?, points_reversed = ?, cashback_reversed = ?, completed_at = ?
-    WHERE tenant_id = ? AND reversal_key = ? AND status = 'pending'
-      AND (SELECT COUNT(*) FROM refund_loyalty_work WHERE tenant_id = ? AND order_id = ? AND status = 'completed') = ?`,
-    input.customerId, points, cashback, now, tenant, key, tenant, input.orderId, Number(prior?.count ?? 0));
+  if (hasRetryColumns) {
+    add(`UPDATE refund_loyalty_work SET status = 'completed', customer_id = ?, points_reversed = ?, cashback_reversed = ?, completed_at = ?,
+      updated_at = ?, last_error = NULL
+      WHERE tenant_id = ? AND reversal_key = ? AND status IN ('pending', 'failed')
+        AND (SELECT COUNT(*) FROM refund_loyalty_work WHERE tenant_id = ? AND order_id = ? AND status = 'completed') = ?`,
+      input.customerId, points, cashback, now, now, tenant, key, tenant, input.orderId, Number(prior?.count ?? 0));
+  } else {
+    add(`UPDATE refund_loyalty_work SET status = 'completed', customer_id = ?, points_reversed = ?, cashback_reversed = ?, completed_at = ?
+      WHERE tenant_id = ? AND reversal_key = ? AND status IN ('pending', 'failed')
+        AND (SELECT COUNT(*) FROM refund_loyalty_work WHERE tenant_id = ? AND order_id = ? AND status = 'completed') = ?`,
+      input.customerId, points, cashback, now, tenant, key, tenant, input.orderId, Number(prior?.count ?? 0));
+  }
   assertChanged();
   add(`UPDATE orders SET points_earned = MAX(0, COALESCE(points_earned, 0) - ?), cashback_earned = MAX(0, COALESCE(cashback_earned, 0) - ?)
     WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?

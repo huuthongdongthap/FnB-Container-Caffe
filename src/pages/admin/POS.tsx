@@ -27,6 +27,7 @@ import { brandConfig } from '@/config/brand-types';
 import { StitchPOSNew } from '@/components/stitch/StitchPOSNew';
 import { ShiftHandoverModal } from '@/components/admin/ShiftHandoverModal';
 import { deriveShiftSlotLabel } from '@/pages/admin/staff-utils';
+import { ThermalReceipt, type ThermalReceiptData } from '@/components/receipt/ThermalReceipt';
 import type {
   POSNewMenuItem,
   POSNewCartItem,
@@ -189,6 +190,8 @@ export default function AdminPOSPage() {
   const [isRetryingPayOS, setIsRetryingPayOS] = useState(false);
   const [isCancellingOrder, setIsCancellingOrder] = useState(false);
   const [cartResetKey, setCartResetKey] = useState(0);
+  const [lastCompletedReceipt, setLastCompletedReceipt] = useState<ThermalReceiptData | null>(null);
+  const [activePrintReceipt, setActivePrintReceipt] = useState<ThermalReceiptData | null>(null);
   const [, setIsCompleting] = useState(false);
   const isCompletingRef = useRef(false);
   const successTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -211,6 +214,8 @@ export default function AdminPOSPage() {
     setCheckoutSuccess(false);
     setPendingCodOrder(null);
     setCodCollectedOrderId(null);
+    setLastCompletedReceipt(null);
+    setActivePrintReceipt(null);
   }, [activeTenant, sessionVersion]);
 
   const handleMarkCodPaid = useCallback(async (orderId: string) => {
@@ -226,6 +231,9 @@ export default function AdminPOSPage() {
       }
       setPendingCodOrder(null);
       setCodCollectedOrderId(orderId);
+      setLastCompletedReceipt((prev) =>
+        prev && prev.orderId === orderId ? { ...prev, paymentStatus: 'paid' } : prev,
+      );
       setCheckoutSuccess(true);
       if (successTimerRef.current) clearTimeout(successTimerRef.current);
       successTimerRef.current = setTimeout(() => {
@@ -298,6 +306,9 @@ export default function AdminPOSPage() {
           setPaymentQrPayload(null);
           setQrInvalidated(false);
           setPendingPayOSOrder(null);
+          setLastCompletedReceipt((prev) =>
+            prev && prev.orderId === orderId ? { ...prev, paymentStatus: 'paid' } : prev,
+          );
           setCheckoutError(null);
           setCartResetKey((k) => k + 1);
           setCheckoutSuccess(true);
@@ -452,6 +463,33 @@ export default function AdminPOSPage() {
           let resolvedQrCode: string | null = null;
           const createdOrderId = result.order_id || result.order?.id;
           const serverTotal = Math.round(result.order?.total ?? result.order?.totalAmount ?? payableTotal);
+          const resolvedTable = resolvedTableId
+            ? tables.find((tbl) => tbl.id === resolvedTableId)
+            : undefined;
+          const receiptSnapshot: ThermalReceiptData = {
+            orderId: createdOrderId || `POS-${Date.now().toString().slice(-6)}`,
+            createdAt: new Date().toISOString(),
+            customerName: customer?.name || t('adminPOS.customerDefaultName'),
+            customerPhone: customer?.phone || undefined,
+            customerAddress:
+              orderType === 'delivery' ? deliveryAddress.trim() || undefined : undefined,
+            orderType: resolvedTableId ? 'dine_in' : orderType,
+            tableName: resolvedTable?.name,
+            cashierName: user?.name || user?.email || undefined,
+            items: cart.map((ci) => ({
+              name: ci.name,
+              quantity: ci.quantity,
+              price: ci.price,
+            })),
+            subtotal,
+            serviceFee,
+            cashbackUsed: appliedCashback,
+            total: serverTotal,
+            paymentMethod,
+            paymentStatus: serverTotal === 0 ? 'paid' : 'pending',
+            isProForma: false,
+          };
+          setLastCompletedReceipt(receiptSnapshot);
 
           if (effectiveMethod === 'payos' && serverTotal > 0) {
             if (!createdOrderId) {
@@ -547,8 +585,64 @@ export default function AdminPOSPage() {
         setIsCompleting(false);
       }
     },
-    [paymentMethod, orderType, deliveryAddress, checkoutMutation.mutateAsync, payOSMutation.mutateAsync, customer, useCashback, selectedTableId, canCollectCod, queryClient, t, navigate],
+    [paymentMethod, orderType, deliveryAddress, checkoutMutation.mutateAsync, payOSMutation.mutateAsync, customer, useCashback, selectedTableId, tables, user?.name, user?.email, canCollectCod, queryClient, t, navigate],
   );
+
+  const handlePrintReceipt = useCallback(
+    (cartSnapshot?: { items: POSNewCartItem[]; subtotal: number; total: number }) => {
+      let receiptToPrint: ThermalReceiptData | null = null;
+      if (cartSnapshot && cartSnapshot.items.length > 0) {
+        const resolvedTable = selectedTableId
+          ? tables.find((tbl) => tbl.id === selectedTableId)
+          : undefined;
+        receiptToPrint = {
+          orderId: 'TAM-TINH',
+          createdAt: new Date().toISOString(),
+          customerName: customer?.name || t('adminPOS.customerDefaultName'),
+          customerPhone: customer?.phone || undefined,
+          customerAddress:
+            orderType === 'delivery' ? deliveryAddress.trim() || undefined : undefined,
+          orderType: selectedTableId ? 'dine_in' : orderType,
+          tableName: resolvedTable?.name,
+          cashierName: user?.name || user?.email || undefined,
+          items: cartSnapshot.items.map((ci) => ({
+            name: ci.name,
+            quantity: ci.quantity,
+            price: ci.price,
+          })),
+          subtotal: cartSnapshot.subtotal,
+          total: cartSnapshot.total,
+          paymentMethod,
+          paymentStatus: 'pending',
+          isProForma: true,
+        };
+      } else if (lastCompletedReceipt) {
+        receiptToPrint = lastCompletedReceipt;
+      }
+
+      if (!receiptToPrint) {
+        setCheckoutError(
+          t('adminPOS.noReceiptToPrint', {
+            defaultValue: 'Chưa có đơn hàng hoặc sản phẩm trong giỏ để in hóa đơn.',
+          }),
+        );
+        return;
+      }
+
+      setCheckoutError(null);
+      setActivePrintReceipt({ ...receiptToPrint });
+    },
+    [selectedTableId, tables, customer, orderType, deliveryAddress, user?.name, user?.email, paymentMethod, lastCompletedReceipt, t],
+  );
+
+  useEffect(() => {
+    if (!activePrintReceipt) return;
+    if (typeof window !== 'undefined' && typeof window.print === 'function') {
+      const rafId = requestAnimationFrame(() => window.print());
+      return () => cancelAnimationFrame(rafId);
+    }
+    return undefined;
+  }, [activePrintReceipt]);
 
   const handleRetryPayOSLink = useCallback(async () => {
     if (!pendingPayOSOrder || isRetryingPayOS) return;
@@ -636,7 +730,8 @@ export default function AdminPOSPage() {
 
   /* ── Render ───────────────────────────────────────────────────────── */
   return (
-    <div className="relative min-h-screen">
+    <div className="relative min-h-screen print:min-h-0">
+      <ThermalReceipt receipt={activePrintReceipt} />
       <StitchPOSNew
         key={`${activeTenant}:${sessionVersion}`}
         menuItems={stitchMenuItems}
@@ -690,6 +785,7 @@ export default function AdminPOSPage() {
         useCashback={useCashback}
         onToggleCashback={setUseCashback}
         onOpenSchedule={() => navigate('/admin/staff')}
+        onPrintReceipt={handlePrintReceipt}
         onEndShift={() => {
           setShiftModalMode(activeShift ? 'close' : 'open');
           setShiftHandoverOpen(true);
@@ -697,21 +793,23 @@ export default function AdminPOSPage() {
         cartResetKey={cartResetKey}
       />
 
-      <ShiftHandoverModal
-        isOpen={shiftHandoverOpen}
-        mode={shiftModalMode}
-        onClose={() => setShiftHandoverOpen(false)}
-        onCompleted={() => {
-          void refetchShifts();
-        }}
-      />
+      <div className="print:hidden no-print">
+        <ShiftHandoverModal
+          isOpen={shiftHandoverOpen}
+          mode={shiftModalMode}
+          onClose={() => setShiftHandoverOpen(false)}
+          onCompleted={() => {
+            void refetchShifts();
+          }}
+        />
+      </div>
 
       {/* ── Quarantined Offline Orders Alert (MD3 Strict) ──────────────── */}
       {quarantinedCount > 0 && (
         <div
           role="alert"
           data-testid="pos-quarantined-banner"
-          className="fixed bottom-16 right-4 lg:right-[25rem] z-[95] flex items-center gap-3 px-4 py-3 shadow-lg rounded-[var(--md-sys-shape-corner-medium)] bg-[var(--md-sys-color-error-container)] text-[var(--md-sys-color-on-error-container)]"
+          className="fixed bottom-16 right-4 lg:right-[25rem] z-[95] flex items-center gap-3 px-4 py-3 shadow-lg rounded-[var(--md-sys-shape-corner-medium)] bg-[var(--md-sys-color-error-container)] text-[var(--md-sys-color-on-error-container)] print:hidden no-print"
         >
           <AlertCircle className="w-4 h-4 shrink-0 text-[var(--md-sys-color-primary)]" />
           <span className="m3-body-medium text-sm font-medium">
@@ -726,7 +824,7 @@ export default function AdminPOSPage() {
       {/* ── Success Banner Overlay ─────────────────────────────────────── */}
       {(checkoutSuccess || pendingCodOrder) && (
         <div
-          className="fixed top-20 left-1/2 -translate-x-1/2 z-[100] flex items-center gap-3 px-5 py-3 rounded-lg shadow-lg"
+          className="fixed top-20 left-1/2 -translate-x-1/2 z-[100] flex items-center gap-3 px-5 py-3 rounded-lg shadow-lg print:hidden no-print"
           style={{
             backgroundColor: 'rgba(76,175,80,0.95)',
             color: '#fff',
@@ -738,6 +836,16 @@ export default function AdminPOSPage() {
               ? `Đã thu tiền mặt đơn #${codCollectedOrderId.slice(0, 8)}!`
               : t('adminPOS.orderCreatedSuccess', { defaultValue: 'Tạo đơn thành công!' })}
           </span>
+          {lastCompletedReceipt && (
+            <button
+              type="button"
+              data-testid="pos-banner-print-receipt-btn"
+              onClick={() => handlePrintReceipt()}
+              className="inline-flex items-center gap-1 rounded-md bg-white/20 px-2.5 py-1 text-xs font-semibold text-white hover:bg-white/30 cursor-pointer"
+            >
+              {t('adminPOS.printReceipt', { defaultValue: 'In hóa đơn' })}
+            </button>
+          )}
           {pendingCodOrder && (
             <>
               {!activeShift && (
@@ -808,7 +916,7 @@ export default function AdminPOSPage() {
       {checkoutError && !payOSModalOpen && (
         <div
           role="alert"
-          className="fixed top-20 left-1/2 -translate-x-1/2 z-[110] flex items-center gap-3 px-5 py-3 rounded-lg shadow-lg max-w-xl"
+          className="fixed top-20 left-1/2 -translate-x-1/2 z-[110] flex items-center gap-3 px-5 py-3 rounded-lg shadow-lg max-w-xl print:hidden no-print"
           style={{
             backgroundColor: 'rgba(220,53,69,0.95)',
             color: '#fff',
@@ -849,7 +957,7 @@ export default function AdminPOSPage() {
       {/* ── PayOS Payment Link Modal (replaces window.open) ─────────── */}
       {payOSModalOpen && paymentUrl && (
         <div
-          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/65 p-4"
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/65 p-4 print:hidden no-print"
           role="dialog"
           aria-modal="true"
           aria-label="Thanh toán PayOS"
@@ -950,6 +1058,16 @@ export default function AdminPOSPage() {
             >
               <ExternalLink className="w-4 h-4" /> Mở trang thanh toán
             </a>
+            {lastCompletedReceipt && (
+              <button
+                type="button"
+                data-testid="pos-payos-print-receipt-btn"
+                onClick={() => handlePrintReceipt()}
+                className="px-3 py-1.5 rounded-full bg-white/10 hover:bg-white/20 text-xs font-semibold text-white cursor-pointer"
+              >
+                {t('adminPOS.printReceipt', { defaultValue: 'In hóa đơn' })}
+              </button>
+            )}
             {pendingPayOSOrder && (
               <div className="flex items-center gap-2 mt-1">
                 <button

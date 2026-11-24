@@ -16,7 +16,7 @@ export function StatusBadge({ status }: { status: OrderStatus }) {
   return (
     <span
       className={cn(
-        'rounded px-2 py-0.5 font-sans text-[10px] font-bold uppercase tracking-[0.1em] border',
+        'shrink-0 whitespace-nowrap rounded px-2 py-0.5 font-sans text-[10px] font-bold uppercase tracking-[0.1em] border',
         c.bg,
         c.text,
         c.border,
@@ -48,15 +48,15 @@ export function OrderActionButton({
       disabled={disabled}
       onClick={onClick}
       className={cn(
-        'font-sans text-[12px] font-bold uppercase tracking-[0.1em] py-3 transition-all rounded-lg',
+        'flex h-full min-h-[42px] w-full items-center justify-center rounded-lg px-3 py-2.5 text-center font-sans text-[12px] font-bold uppercase leading-tight tracking-[0.08em] transition-all',
         disabled &&
-          'cursor-not-allowed bg-[var(--aura-noir-steel, #343536)] text-[var(--aura-text-secondary, #a0a8b0)]/50',
+          'cursor-not-allowed bg-[var(--aura-noir-steel,#343536)] text-[var(--aura-text-secondary,#a0a8b0)]/50',
         !disabled && primary
-          ? 'bg-[var(--aura-primary, #c6c6c7)] text-[var(--aura-noir-deep, #0c1c30)] hover:brightness-110 active:scale-[0.97]'
+          ? 'bg-[var(--aura-primary,#c6c6c7)] text-[var(--aura-noir-deep,#0c1c30)] hover:brightness-110 active:scale-[0.97]'
           : '',
         !disabled &&
           !primary &&
-          'border border-white/10 bg-white/5 text-[var(--aura-text-primary, #e8e8e8)] hover:bg-white/10 active:scale-[0.97]',
+          'border border-white/10 bg-white/5 text-[var(--aura-text-primary,#e8e8e8)] hover:bg-white/10 active:scale-[0.97]',
       )}
       aria-label={label}
     >
