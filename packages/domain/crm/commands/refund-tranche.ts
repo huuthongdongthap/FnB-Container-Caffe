@@ -79,10 +79,11 @@ async function reverseSnapshot(db: D1Database, policy: LoyaltyPolicy, input: Ref
   const add = (sql: string, ...args: unknown[]) => statements.push(db.prepare(sql).bind(...args));
   const assertChanged = () => add(`INSERT INTO refund_mutation_guards (reversal_ok)
     VALUES (CASE WHEN changes() = 1 THEN 1 ELSE 0 END)`);
-  add(`UPDATE refund_loyalty_work SET status = 'completed', customer_id = ?, points_reversed = ?, cashback_reversed = ?, completed_at = ?
-    WHERE tenant_id = ? AND reversal_key = ? AND status = 'pending'
+  add(`UPDATE refund_loyalty_work SET status = 'completed', customer_id = ?, points_reversed = ?, cashback_reversed = ?, completed_at = ?,
+    updated_at = ?, last_error = NULL
+    WHERE tenant_id = ? AND reversal_key = ? AND status IN ('pending', 'failed')
       AND (SELECT COUNT(*) FROM refund_loyalty_work WHERE tenant_id = ? AND order_id = ? AND status = 'completed') = ?`,
-    input.customerId, points, cashback, now, tenant, key, tenant, input.orderId, Number(prior?.count ?? 0));
+    input.customerId, points, cashback, now, now, tenant, key, tenant, input.orderId, Number(prior?.count ?? 0));
   assertChanged();
   add(`UPDATE orders SET points_earned = MAX(0, COALESCE(points_earned, 0) - ?), cashback_earned = MAX(0, COALESCE(cashback_earned, 0) - ?)
     WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?

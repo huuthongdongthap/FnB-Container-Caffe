@@ -693,7 +693,7 @@ async function applyAccrualAttempt(db: D1Database, policy: LoyaltyPolicy, input:
                  cashback_reversed = ?,
                  completed_at = COALESCE(completed_at, ?)
              WHERE tenant_id = ? AND reversal_key = ? AND order_id = ?
-               AND status IN ('pending', 'completed') AND amount = ?
+               AND status IN ('pending', 'completed', 'failed') AND amount = ?
                AND COALESCE(points_reversed, 0) = 0 AND COALESCE(cashback_reversed, 0) = 0`,
           )
           .bind(

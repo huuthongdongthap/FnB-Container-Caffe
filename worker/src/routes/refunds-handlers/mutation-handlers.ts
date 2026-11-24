@@ -147,8 +147,10 @@ export async function handleRefund(c: Context<{ Bindings: Env }>, openApi = fals
       ).bind(effectivePaymentTenant, manualTransferRef)
         .first<{ payment_id: string; amount: number; reason: string; loyalty_status: string | null }>();
       if (existingTransfer) {
+        // A `failed` row is terminal for automated retries only: an operator replay with the
+        // same transfer reference must still be able to settle it.
         if (existingTransfer.payment_id !== payment.id || (body.amount !== undefined && body.amount !== existingTransfer.amount)
-          || existingTransfer.loyalty_status !== 'pending') {
+          || !['pending', 'failed'].includes(String(existingTransfer.loyalty_status ?? ''))) {
           return c.json({ success: false, error: 'Transfer reference already recorded' }, 409);
         }
         const loyalty = await processRefundLoyalty(db, c.env, { tenantId: effectivePaymentTenant,

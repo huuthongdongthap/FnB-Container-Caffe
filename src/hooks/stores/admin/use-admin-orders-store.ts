@@ -149,6 +149,7 @@ export function normalizeAdminOrder(raw: Record<string, unknown>): AdminOrder {
         : typeof raw.pending_loyalty_transfer_ref === 'string'
           ? raw.pending_loyalty_transfer_ref
           : undefined,
+    pendingLoyaltyRefundAmount: toOptionalNumber(raw.pendingLoyaltyRefundAmount, raw.pending_loyalty_refund_amount),
   };
 }
 

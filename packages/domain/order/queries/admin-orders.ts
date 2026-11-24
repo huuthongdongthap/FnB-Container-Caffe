@@ -22,6 +22,70 @@ const ALLOWED_SEARCH_FIELDS: ReadonlySet<AdminOrderSearchField> = new Set([
 ]);
 const ALLOWED_ORDER_TYPES: ReadonlySet<string> = new Set(['dine_in', 'takeaway', 'delivery']);
 
+/**
+ * Response allowlist. Never expand this to `o.*`: the orders table holds guest/order
+ * secrets (`guest_token_hash`, `order_token`, `guest_token`, `payment_secret`) that must
+ * never reach an admin list payload, including on legacy-schema fallbacks.
+ */
+const ORDER_RESPONSE_FIELDS = [
+  'id',
+  'table_id',
+  'status',
+  'total',
+  'payment_status',
+  'customer_name',
+  'customer_phone',
+  'created_at',
+  'items',
+  'shipping_fee',
+  'discount',
+  'order_type',
+  'customer_address',
+  'notes',
+  'delivery_time',
+  'payment_method',
+  'table_number',
+  'table_zone',
+  'payment_id',
+  'refund_status',
+  'refund_amount',
+  'payment_amount',
+  'payment_transaction_id',
+] as const;
+
+/**
+ * Progressive column projections for databases created before the current canonical
+ * schema. Each entry must stay an explicit allowlist so legacy rows cannot leak secrets.
+ */
+const LEGACY_ORDER_PROJECTIONS: readonly Array<{ cols: string; hasPaymentMethod: boolean }> = [
+  {
+    cols: `o.id, o.table_id, o.status, o.total, o.payment_status, o.customer_name, o.customer_phone, o.created_at,
+   o.items, o.shipping_fee, o.discount, o.order_type, o.customer_address, o.notes, o.delivery_time`,
+    hasPaymentMethod: true,
+  },
+  {
+    cols: `o.id, o.table_id, o.status, o.total, o.payment_status, o.customer_name, o.customer_phone, o.created_at,
+   o.items, o.shipping_fee, o.discount`,
+    hasPaymentMethod: false,
+  },
+  {
+    cols: `o.id, o.status, o.total, o.payment_status, o.customer_name, o.customer_phone, o.created_at, o.items`,
+    hasPaymentMethod: false,
+  },
+  {
+    cols: `o.id, o.status, o.total, o.payment_status, o.customer_name, o.customer_phone, o.created_at`,
+    hasPaymentMethod: false,
+  },
+];
+
+function pickOrderResponseFields(order: Record<string, unknown>): Record<string, unknown> {
+  const picked: Record<string, unknown> = {};
+  for (const field of ORDER_RESPONSE_FIELDS) {
+    picked[field] = order[field] ?? null;
+  }
+  return picked;
+}
+
 function escapeLike(value: string): string {
   return value.replace(/\\/g, '\\\\').replace(/%/g, '\\%').replace(/_/g, '\\_');
 }
@@ -185,25 +249,52 @@ export async function getAdminOrders(request: Request, env: Record<string, unkno
       results = res.results ?? [];
     } catch {
       usedTableJoin = false;
-      try {
-        const legacyJoinQuery = `SELECT o.*,
-           p.id AS payment_id, p.method AS payment_method, p.refund_status, p.refund_amount, p.amount AS payment_amount
-         FROM orders o
-         LEFT JOIN payments p ON p.id = (
-           SELECT p2.id FROM payments p2
-           WHERE p2.order_id = o.id
-             AND p2.status IN ('paid', 'completed', 'refunded', 'partially_refunded')
-             AND COALESCE(NULLIF(TRIM(p2.tenant_id), ''), 'default') = COALESCE(NULLIF(TRIM(o.tenant_id), ''), 'default')
-           ORDER BY p2.created_at DESC, p2.rowid DESC
-           LIMIT 1
-         )
-         WHERE 1=1${fallbackClause}${tail}`;
-        const res = await db.prepare(legacyJoinQuery).bind(...fallbackParams).all<Record<string, unknown>>();
-        results = res.results ?? [];
-      } catch {
-        const fallbackQuery = `SELECT o.* FROM orders o WHERE 1=1${fallbackClause}${tail}`;
-        const res = await db.prepare(fallbackQuery).bind(...fallbackParams).all<Record<string, unknown>>();
-        results = res.results ?? [];
+      let loadedLegacy = false;
+      for (const projection of LEGACY_ORDER_PROJECTIONS) {
+        try {
+          const paymentMethodSelect = projection.hasPaymentMethod
+            ? 'COALESCE(o.payment_method, p.method) AS payment_method'
+            : 'p.method AS payment_method';
+          const legacyJoinQuery = `SELECT ${projection.cols},
+             p.id AS payment_id, ${paymentMethodSelect}, p.refund_status, p.refund_amount, p.amount AS payment_amount
+           FROM orders o
+           LEFT JOIN payments p ON p.id = (
+             SELECT p2.id FROM payments p2
+             WHERE p2.order_id = o.id
+               AND p2.status IN ('paid', 'completed', 'refunded', 'partially_refunded')
+               AND COALESCE(NULLIF(TRIM(p2.tenant_id), ''), 'default') = COALESCE(NULLIF(TRIM(o.tenant_id), ''), 'default')
+             ORDER BY p2.created_at DESC, p2.rowid DESC
+             LIMIT 1
+           )
+           WHERE 1=1${fallbackClause}${tail}`;
+          const res = await db.prepare(legacyJoinQuery).bind(...fallbackParams).all<Record<string, unknown>>();
+          results = res.results ?? [];
+          loadedLegacy = true;
+          break;
+        } catch {
+          // Try narrower projection
+        }
+      }
+      if (!loadedLegacy) {
+        for (let idx = 0; idx < LEGACY_ORDER_PROJECTIONS.length; idx++) {
+          const projection = LEGACY_ORDER_PROJECTIONS[idx]!;
+          const selectCols = projection.hasPaymentMethod
+            ? `${projection.cols}, o.payment_method`
+            : projection.cols;
+          const fallbackQuery = `SELECT ${selectCols} FROM orders o WHERE 1=1${fallbackClause}${tail}`;
+          if (idx === LEGACY_ORDER_PROJECTIONS.length - 1) {
+            const res = await db.prepare(fallbackQuery).bind(...fallbackParams).all<Record<string, unknown>>();
+            results = res.results ?? [];
+          } else {
+            try {
+              const res = await db.prepare(fallbackQuery).bind(...fallbackParams).all<Record<string, unknown>>();
+              results = res.results ?? [];
+              break;
+            } catch {
+              // Try narrower projection
+            }
+          }
+        }
       }
     }
 
@@ -245,7 +336,7 @@ export async function getAdminOrders(request: Request, env: Record<string, unkno
       total = await runCountQuery(countQuery, fallbackParams);
     }
 
-    const pendingLoyaltyByOrder = new Map<string, string>();
+    const pendingLoyaltyByOrder = new Map<string, { transferRef: string; amount: number | null }>();
     const orderIds = results.map((r) => String(r.id ?? '')).filter(Boolean);
     if (orderIds.length > 0) {
       const CHUNK_SIZE = 80;
@@ -257,17 +348,21 @@ export async function getAdminOrders(request: Request, env: Record<string, unkno
           const params = resolvedTenant !== '*' ? [...chunk, resolvedTenant] : chunk;
           const lwRes = await db
             .prepare(
-              `SELECT order_id, reversal_key
+              `SELECT order_id, reversal_key, amount
                FROM refund_loyalty_work
-               WHERE status = 'pending'
+               WHERE status IN ('pending', 'failed')
                  AND order_id IN (${placeholders})${tenantClause}
                ORDER BY created_at DESC`,
             )
             .bind(...params)
-            .all<{ order_id: string; reversal_key: string }>();
+            .all<{ order_id: string; reversal_key: string; amount?: number | null }>();
           for (const row of lwRes.results ?? []) {
             if (row.order_id && row.reversal_key && !pendingLoyaltyByOrder.has(row.order_id)) {
-              pendingLoyaltyByOrder.set(row.order_id, row.reversal_key);
+              const rawAmount = Number(row.amount);
+              pendingLoyaltyByOrder.set(row.order_id, {
+                transferRef: row.reversal_key,
+                amount: Number.isFinite(rawAmount) && rawAmount > 0 ? rawAmount : null,
+              });
             }
           }
         }
@@ -288,9 +383,10 @@ export async function getAdminOrders(request: Request, env: Record<string, unkno
         }
       }
       const tableNumber = order.table_number ? String(order.table_number) : null;
-      const pendingTransferRef = pendingLoyaltyByOrder.get(String(order.id ?? '')) ?? null;
+      const pendingLoyalty = pendingLoyaltyByOrder.get(String(order.id ?? '')) ?? null;
+      const safeOrder = pickOrderResponseFields(order);
       return {
-        ...order,
+        ...safeOrder,
         items: parsedItems,
         total: parseInt(order.total as string),
         payment_id: order.payment_id || null,
@@ -305,8 +401,9 @@ export async function getAdminOrders(request: Request, env: Record<string, unkno
         delivery_time: order.delivery_time ? String(order.delivery_time) : null,
         table_number: tableNumber,
         table_name: tableNumber,
-        pending_loyalty_reversal: Boolean(pendingTransferRef),
-        pending_loyalty_transfer_ref: pendingTransferRef,
+        pending_loyalty_reversal: Boolean(pendingLoyalty),
+        pending_loyalty_transfer_ref: pendingLoyalty?.transferRef ?? null,
+        pending_loyalty_refund_amount: pendingLoyalty?.amount ?? null,
       };
     });
 

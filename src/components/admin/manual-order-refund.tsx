@@ -15,6 +15,7 @@ type RefundOrder = AdminOrder & {
   refund_status?: string | null;
   pending_loyalty_reversal?: boolean | null;
   pending_loyalty_transfer_ref?: string | null;
+  pending_loyalty_refund_amount?: number | null;
 };
 
 interface RefundApiResponse {
@@ -33,11 +34,21 @@ interface RefundApiResponse {
   };
 }
 
+interface UnreconciledRefundSummary {
+  payment_id: string;
+  order_id: string;
+  amount: number;
+  refund_amount: number | null;
+  refund_status: string | null;
+  refunded_at: string | null;
+}
+
 interface ReadinessApiResponse {
   success?: boolean;
   data?: {
     ready?: boolean;
     unreconciledCount?: number;
+    unreconciledRefunds?: UnreconciledRefundSummary[];
   };
 }
 
@@ -77,6 +88,15 @@ function RefundSession({ order, onRecorded }: { order: AdminOrder; onRecorded: (
   const remaining = paid - refunded;
   const persistedPendingRef =
     order.pendingLoyaltyTransferRef ?? payment.pending_loyalty_transfer_ref ?? null;
+  const rawPersistedPendingAmount = Number(
+    order.pendingLoyaltyRefundAmount ?? payment.pending_loyalty_refund_amount,
+  );
+  const persistedPendingAmount =
+    Number.isSafeInteger(rawPersistedPendingAmount) && rawPersistedPendingAmount > 0
+      ? rawPersistedPendingAmount
+      : refunded > 0
+        ? refunded
+        : paid;
   const hasPersistedPendingLoyalty = Boolean(
     (order.pendingLoyaltyReversal ?? payment.pending_loyalty_reversal) && persistedPendingRef,
   );
@@ -95,7 +115,7 @@ function RefundSession({ order, onRecorded }: { order: AdminOrder; onRecorded: (
   const [loyaltyRetryPayload, setLoyaltyRetryPayload] = useState<LoyaltyRetryPayload | null>(
     hasPersistedPendingLoyalty && persistedPendingRef
       ? {
-          amount: refunded > 0 ? refunded : paid,
+          amount: persistedPendingAmount,
           reason: t('orderMgmt.refund.retryLoyaltyReason', { defaultValue: 'Thu hồi lại điểm loyalty sau hoàn tiền' }),
           reference: persistedPendingRef,
         }
@@ -103,6 +123,12 @@ function RefundSession({ order, onRecorded }: { order: AdminOrder; onRecorded: (
   );
   const [reconciling, setReconciling] = useState(false);
   const [reconcileNotice, setReconcileNotice] = useState('');
+  const [readinessInspection, setReadinessInspection] = useState<{
+    inspected: boolean;
+    unreconciledCount: number;
+    unreconciledRefunds: UnreconciledRefundSummary[];
+  } | null>(null);
+  const [acknowledgeLegacyChecked, setAcknowledgeLegacyChecked] = useState(false);
   const locked = useRef(false);
 
   const canManageRefund = Boolean(role && ['owner', 'manager', 'admin', 'super_admin'].includes(role));
@@ -207,14 +233,38 @@ function RefundSession({ order, onRecorded }: { order: AdminOrder; onRecorded: (
     setReconciling(true);
     setReconcileNotice('');
     try {
+      const requiresLegacyAck =
+        readinessInspection?.inspected === true && readinessInspection.unreconciledCount > 0;
+
+      if (!requiresLegacyAck) {
+        const checkRes = await apiFetch<ReadinessApiResponse>('/api/payments/refund-readiness');
+        const list = Array.isArray(checkRes?.data?.unreconciledRefunds)
+          ? checkRes.data.unreconciledRefunds
+          : [];
+        const count = Math.max(Number(checkRes?.data?.unreconciledCount ?? 0), list.length);
+        if (count > 0) {
+          setReadinessInspection({
+            inspected: true,
+            unreconciledCount: count,
+            unreconciledRefunds: list,
+          });
+          setAcknowledgeLegacyChecked(false);
+          return;
+        }
+      } else if (!acknowledgeLegacyChecked) {
+        return;
+      }
+
       const res = await apiFetch<ReadinessApiResponse>('/api/payments/refund-readiness/reconcile', {
         method: 'POST',
-        body: JSON.stringify({ acknowledgeLegacy: true }),
+        body: JSON.stringify(requiresLegacyAck ? { acknowledgeLegacy: true } : {}),
       });
       if (res?.success) {
         setStatus('idle');
         setError('');
         setErrorCode(undefined);
+        setReadinessInspection(null);
+        setAcknowledgeLegacyChecked(false);
         setReconcileNotice(
           t('orderMgmt.refund.reconcileSuccess', {
             defaultValue: 'Đã hoàn tất đối soát lịch sử hoàn tiền. Bạn có thể bấm xác nhận lại.',
@@ -306,6 +356,8 @@ function RefundSession({ order, onRecorded }: { order: AdminOrder; onRecorded: (
                     setStatus('idle');
                     setError('');
                     setErrorCode(undefined);
+                    setReadinessInspection(null);
+                    setAcknowledgeLegacyChecked(false);
                   }
                   setOpen(false);
                 }}
@@ -418,18 +470,67 @@ function RefundSession({ order, onRecorded }: { order: AdminOrder; onRecorded: (
                     <p>
                       {t('orderMgmt.refund.unreconciledError', {
                         defaultValue:
-                          'Lịch sử hoàn tiền của cửa hàng chưa được đối soát (REFUND_HISTORY_UNRECONCILED). Vui lòng xác nhận đối soát để bật tính năng ghi nhận hoàn tiền.',
+                          'Lịch sử hoàn tiền của cửa hàng chưa được đối soát (REFUND_HISTORY_UNRECONCILED). Vui lòng kiểm tra và xác nhận đối soát để bật tính năng ghi nhận hoàn tiền.',
                       })}
                     </p>
+                    {readinessInspection?.inspected && readinessInspection.unreconciledCount > 0 && (
+                      <div className="space-y-2 rounded border border-amber-400/40 bg-amber-500/10 p-2 text-amber-100">
+                        <p className="font-semibold">
+                          {t('orderMgmt.refund.unreconciledLegacyCount', {
+                            defaultValue: `Phát hiện ${readinessInspection.unreconciledCount} giao dịch hoàn tiền cũ chưa có chứng từ chuyển khoản:`,
+                            count: readinessInspection.unreconciledCount,
+                          })}
+                        </p>
+                        {readinessInspection.unreconciledRefunds.length > 0 && (
+                          <ul className="max-h-28 list-disc space-y-1 overflow-y-auto pl-4 text-[11px] text-amber-200">
+                            {readinessInspection.unreconciledRefunds.map((item) => (
+                              <li key={item.payment_id}>
+                                #{item.order_id} ({item.payment_id}) —{' '}
+                                {Number(item.refund_amount ?? item.amount ?? 0).toLocaleString('vi-VN')} ₫ (
+                                {item.refund_status ?? 'legacy'})
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+                        <label className="flex items-start gap-2 text-xs text-amber-100">
+                          <input
+                            type="checkbox"
+                            className="mt-0.5"
+                            checked={acknowledgeLegacyChecked}
+                            disabled={reconciling}
+                            onChange={(e) => setAcknowledgeLegacyChecked(e.target.checked)}
+                          />
+                          <span>
+                            {t('orderMgmt.refund.acknowledgeLegacyConfirm', {
+                              defaultValue:
+                                'Tôi đã rà soát các giao dịch hoàn tiền cũ nêu trên và xác nhận cho phép đối soát lịch sử',
+                            })}
+                          </span>
+                        </label>
+                      </div>
+                    )}
                     <button
                       type="button"
-                      disabled={reconciling}
+                      disabled={
+                        reconciling ||
+                        Boolean(
+                          readinessInspection?.inspected &&
+                            readinessInspection.unreconciledCount > 0 &&
+                            !acknowledgeLegacyChecked,
+                        )
+                      }
                       onClick={handleReconcileReadiness}
                       className="rounded border border-amber-400/50 bg-amber-500/20 px-3 py-1.5 text-xs font-semibold text-amber-100 hover:bg-amber-500/30 disabled:opacity-50"
                     >
                       {reconciling
                         ? t('orderMgmt.refund.reconciling', { defaultValue: 'Đang đối soát...' })
-                        : t('orderMgmt.refund.reconcileNow', { defaultValue: 'Xác nhận đối soát lịch sử hoàn tiền' })}
+                        : readinessInspection?.inspected && readinessInspection.unreconciledCount > 0
+                          ? t('orderMgmt.refund.confirmLegacyReconcile', {
+                              defaultValue: 'Xác nhận đã kiểm tra và hoàn tất đối soát',
+                            })
+                          : t('orderMgmt.refund.reconcileNow', {
+                              defaultValue: 'Kiểm tra & đối soát lịch sử hoàn tiền',
+                            })}
                     </button>
                   </>
                 ) : (
@@ -456,6 +557,8 @@ function RefundSession({ order, onRecorded }: { order: AdminOrder; onRecorded: (
                     setStatus('idle');
                     setError('');
                     setErrorCode(undefined);
+                    setReadinessInspection(null);
+                    setAcknowledgeLegacyChecked(false);
                   }
                   setOpen(false);
                 }}

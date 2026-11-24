@@ -11,6 +11,9 @@ export type RefundLoyaltyOutcome = {
   retryable?: boolean;
 };
 
+/** Automatic retries stop after this many failed attempts; operators can still replay manually. */
+export const MAX_LOYALTY_WORK_ATTEMPTS = 5;
+
 /** Settlement has already persisted the work; failed processing stays pending. */
 export async function processRefundLoyalty(db: D1Database, env: Env, input: {
   tenantId: string; reference: string; paymentId: string; orderId: string;
@@ -25,11 +28,11 @@ export async function processRefundLoyalty(db: D1Database, env: Env, input: {
     if (!customerId) {
       // Only zero-accrual orders may complete without a recipient. Missing ledger
       // evidence for a nonzero accrual must remain actionable, never silently skip.
-      const result = await db.prepare(`UPDATE refund_loyalty_work SET status = 'completed', completed_at = ?
-        WHERE tenant_id = ? AND reversal_key = ? AND status = 'pending'
+      const result = await db.prepare(`UPDATE refund_loyalty_work SET status = 'completed', completed_at = ?, updated_at = ?, last_error = NULL
+        WHERE tenant_id = ? AND reversal_key = ? AND status IN ('pending', 'failed')
           AND EXISTS (SELECT 1 FROM orders WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?
             AND COALESCE(points_earned, 0) = 0 AND COALESCE(cashback_earned, 0) = 0)`)
-        .bind(new Date().toISOString(), input.tenantId, input.reference, input.orderId, input.tenantId).run();
+        .bind(new Date().toISOString(), new Date().toISOString(), input.tenantId, input.reference, input.orderId, input.tenantId).run();
       return result.meta.changes > 0 ? { status: 'skipped', reason: 'no_points_to_reverse' }
         : { status: 'failed', reason: 'accrual_recipient_missing', retryable: true };
     }
@@ -54,9 +57,18 @@ interface PendingLoyaltyWorkRow {
   order_id: string;
   customer_id: string | null;
   amount: number;
+  attempts: number | null;
 }
 
-/** Scheduled retry worker for pending refund_loyalty_work rows. */
+/**
+ * Scheduled retry worker for refund_loyalty_work rows.
+ *
+ * `completed_at` only ever records a real reversal, so retries are tracked on their own
+ * columns: `attempts` counts automated failures, `last_error` keeps the last reason, and
+ * `updated_at` is the rotation timestamp. Rows that reach `MAX_LOYALTY_WORK_ATTEMPTS`
+ * become terminal `'failed'`, which keeps them visible for operators and eligible for a
+ * manual replay without competing with the automated queue.
+ */
 export async function retryPendingRefundLoyaltyWork(
   env: Env,
   limit = 25,
@@ -68,13 +80,14 @@ export async function retryPendingRefundLoyaltyWork(
   try {
     const res = await db
       .prepare(
-        `SELECT tenant_id, reversal_key, payment_id, order_id, customer_id, amount
+        `SELECT tenant_id, reversal_key, payment_id, order_id, customer_id, amount,
+                COALESCE(attempts, 0) AS attempts
          FROM refund_loyalty_work
-         WHERE status = 'pending'
-         ORDER BY COALESCE(completed_at, created_at) ASC, created_at ASC
+         WHERE status = 'pending' AND COALESCE(attempts, 0) < ?
+         ORDER BY COALESCE(updated_at, created_at) ASC, created_at ASC
          LIMIT ?`,
       )
-      .bind(limit)
+      .bind(MAX_LOYALTY_WORK_ATTEMPTS, limit)
       .all<PendingLoyaltyWorkRow>();
     rows = res.results ?? [];
   } catch (err) {
@@ -98,31 +111,43 @@ export async function retryPendingRefundLoyaltyWork(
     });
     if (outcome.status === 'reversed' || outcome.status === 'skipped') {
       succeeded += 1;
-    } else {
-      failed += 1;
-      log.error('[refund-loyalty-work] retry failed', {
+      continue;
+    }
+
+    failed += 1;
+    const attempt = Number(row.attempts ?? 0) + 1;
+    const exhausted = attempt >= MAX_LOYALTY_WORK_ATTEMPTS;
+    log.error('[refund-loyalty-work] retry failed', {
+      tenantId: row.tenant_id,
+      orderId: row.order_id,
+      reversalKey: row.reversal_key,
+      attempt,
+      exhausted,
+      reason: outcome.reason ?? 'unknown',
+    });
+    try {
+      // Only the retry bookkeeping moves; completed_at stays NULL unless a reversal succeeded.
+      await db
+        .prepare(
+          `UPDATE refund_loyalty_work
+           SET attempts = ?, last_error = ?, updated_at = ?, status = ?
+           WHERE tenant_id = ? AND reversal_key = ? AND status = 'pending'`,
+        )
+        .bind(
+          attempt,
+          outcome.reason ?? 'unknown',
+          new Date().toISOString(),
+          exhausted ? 'failed' : 'pending',
+          row.tenant_id,
+          row.reversal_key,
+        )
+        .run();
+    } catch (bumpErr) {
+      log.error('[refund-loyalty-work] failed to record retry attempt', {
         tenantId: row.tenant_id,
-        orderId: row.order_id,
         reversalKey: row.reversal_key,
-        reason: outcome.reason ?? 'unknown',
+        error: bumpErr instanceof Error ? bumpErr.message : String(bumpErr),
       });
-      // Push failed row to back of retry queue by bumping completed_at (only used as retry timestamp while status='pending')
-      try {
-        await db
-          .prepare(
-            `UPDATE refund_loyalty_work
-             SET completed_at = ?
-             WHERE tenant_id = ? AND reversal_key = ? AND status = 'pending'`,
-          )
-          .bind(new Date().toISOString(), row.tenant_id, row.reversal_key)
-          .run();
-      } catch (bumpErr) {
-        log.error('[refund-loyalty-work] failed to bump retry timestamp', {
-          tenantId: row.tenant_id,
-          reversalKey: row.reversal_key,
-          error: bumpErr instanceof Error ? bumpErr.message : String(bumpErr),
-        });
-      }
     }
   }
 

@@ -36,6 +36,7 @@ export interface AdminOrder {
   createdAt: string;
   pendingLoyaltyReversal?: boolean;
   pendingLoyaltyTransferRef?: string;
+  pendingLoyaltyRefundAmount?: number;
 }
 
 export interface AdminCustomer {
@@ -148,6 +149,11 @@ export function useAdmin(options: UseAdminOptions = {}): AdminResult {
                 itemCount = 0;
               }
             }
+            const rawPendingAmount = raw?.pendingLoyaltyRefundAmount ?? raw?.pending_loyalty_refund_amount;
+            const parsedPendingAmount =
+              rawPendingAmount !== undefined && rawPendingAmount !== null && rawPendingAmount !== '' && Number.isFinite(Number(rawPendingAmount))
+                ? Number(rawPendingAmount)
+                : undefined;
             return {
               ...raw,
               id: String(raw?.id ?? ''),
@@ -157,6 +163,14 @@ export function useAdmin(options: UseAdminOptions = {}): AdminResult {
               status: String(raw?.status ?? 'pending'),
               payment: String(raw?.payment ?? raw?.payment_method ?? 'cash'),
               createdAt: String(raw?.createdAt ?? raw?.created_at ?? ''),
+              pendingLoyaltyReversal: Boolean(raw?.pendingLoyaltyReversal ?? raw?.pending_loyalty_reversal),
+              pendingLoyaltyTransferRef:
+                typeof raw?.pendingLoyaltyTransferRef === 'string'
+                  ? raw.pendingLoyaltyTransferRef
+                  : typeof raw?.pending_loyalty_transfer_ref === 'string'
+                    ? raw.pending_loyalty_transfer_ref
+                    : undefined,
+              ...(parsedPendingAmount !== undefined ? { pendingLoyaltyRefundAmount: parsedPendingAmount } : {}),
             } as AdminOrder;
           }),
       ),
