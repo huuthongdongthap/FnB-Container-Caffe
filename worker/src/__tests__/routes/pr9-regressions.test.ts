@@ -7,12 +7,16 @@ import { pauseSubscription, resumeSubscription } from '../../tree/subscriptions/
 import { registerCheckoutHandlers } from '../../routes/dindin-handlers/checkout-handlers';
 import { resolveStaffPushRequestedRole, STAFF_PUSH_ROLE } from '../../tree/push/roles';
 import { sendPushToStaff } from '../../tree/push/notifier';
-import { createTenantRoutes } from '../../routes/saas-tenants';
+import { createTenantRoutes, generateSlug } from '../../routes/saas-tenants';
 import { leadsRouter } from '../../routes/leads';
 import { runCampaignTriggers } from '../../tree/campaigns/cron-handler';
 import { generateJWT } from '../../lib/jwt';
 import { issueStaffSession } from '../../lib/staff-session';
-import { detectWelcomeCandidates } from '@aura/domain-crm';
+import {
+  detectWelcomeCandidates,
+  detectBirthdayCandidates,
+  hasMarketingConsentForChannel,
+} from '@aura/domain-crm';
 
 vi.mock('web-push', () => ({
   default: {
@@ -257,6 +261,8 @@ describe('PR-9 regressions (#196, #198, #200)', () => {
       INSERT INTO customers VALUES ('c_ok', 'Good', '0901111111', NULL, 'bronze', '${recent}', 'default', NULL);
       INSERT INTO customers VALUES ('c_erased', 'Erased', '0902222222', NULL, 'bronze', '${recent}', 'default', '2026-11-20T00:00:00Z');
       INSERT INTO customers VALUES ('c_revoked', 'Revoked', '0903333333', NULL, 'bronze', '${recent}', 'default', NULL);
+      INSERT INTO customers VALUES ('c_no_consent', 'NoConsent', '0904444444', NULL, 'bronze', '${recent}', 'default', NULL);
+      INSERT INTO consents VALUES ('con_ok', 'c_ok', 'marketing', 1, NULL, 'default');
       INSERT INTO consents VALUES ('con_1', 'c_revoked', 'marketing', 0, '2026-11-21T00:00:00Z', 'default');
       INSERT INTO campaign_configs VALUES ('default', 'welcome', 0, '["sms"]');
     `);
@@ -499,5 +505,424 @@ describe('PR-9 regressions (#196, #198, #200)', () => {
     expect(res.status).toBe(409);
     const json = await res.json() as { code?: string };
     expect(json.code).toBe('D04');
+  });
+
+  it('#200: generateSlug normalizes Vietnamese đ/Đ and trims trailing dashes after 40-char truncation', () => {
+    expect(generateSlug('Đà Nẵng Điền')).toBe('da-nang-dien');
+    const longWithBoundaryDash = `${'a'.repeat(39)} bbbbb`;
+    const slug = generateSlug(longWithBoundaryDash);
+    expect(slug.length).toBeLessThanOrEqual(40);
+    expect(slug.endsWith('-')).toBe(false);
+    expect(slug).toBe('a'.repeat(39));
+  });
+
+  it('#200: POST /api/saas/tenants/self-serve enforces reserved slugs, role/active guards, duplicate owner 409, cookie auth, and Set-Cookie session emission', async () => {
+    const sqlite = new DatabaseSync(':memory:');
+    sqlite.exec(`
+      CREATE TABLE users (
+        id TEXT PRIMARY KEY,
+        email TEXT,
+        name TEXT,
+        phone TEXT,
+        role TEXT,
+        tenant_id TEXT DEFAULT 'default',
+        is_active INTEGER DEFAULT 1,
+        auth_version INTEGER DEFAULT 1,
+        updated_at TEXT
+      );
+      INSERT INTO users VALUES ('cust_cookie_1', 'cookie@example.com', 'Cookie Founder', '0909123456', 'customer', 'default', 1, 1, '2026-11-24T00:00:00Z');
+      INSERT INTO users VALUES ('staff_existing_1', 'staff@example.com', 'Existing Staff', NULL, 'staff', 'default', 1, 1, '2026-11-24T00:00:00Z');
+      INSERT INTO users VALUES ('inactive_cust_1', 'inactive@example.com', 'Inactive User', NULL, 'customer', 'default', 0, 1, '2026-11-24T00:00:00Z');
+      CREATE TABLE saas_tenants (
+        id TEXT PRIMARY KEY,
+        slug TEXT UNIQUE,
+        name TEXT,
+        tier TEXT,
+        status TEXT,
+        owner_user_id TEXT,
+        trial_ends_at TEXT,
+        current_period_end TEXT,
+        created_at TEXT,
+        updated_at TEXT
+      );
+      CREATE TABLE tenant_subscriptions (
+        id TEXT PRIMARY KEY,
+        tenant_id TEXT,
+        tier TEXT,
+        status TEXT,
+        trial_ends_at TEXT,
+        current_period_end TEXT,
+        created_at TEXT,
+        updated_at TEXT
+      );
+    `);
+
+    const jwtSecret = 'test-secret-for-pr9-selfserve-hardening-32b';
+    const cookieToken = await generateJWT(
+      { id: 'cust_cookie_1', sub: 'cust_cookie_1', email: 'cookie@example.com', role: 'customer', tenantId: 'default' },
+      jwtSecret,
+      3600
+    );
+    const staffClaimAsCustomerToken = await generateJWT(
+      { id: 'staff_existing_1', sub: 'staff_existing_1', email: 'staff@example.com', role: 'customer', tenantId: 'default' },
+      jwtSecret,
+      3600
+    );
+    const inactiveToken = await generateJWT(
+      { id: 'inactive_cust_1', sub: 'inactive_cust_1', email: 'inactive@example.com', role: 'customer', tenantId: 'default' },
+      jwtSecret,
+      3600
+    );
+
+    const app = new Hono<{ Bindings: Env }>();
+    app.route('/api/saas/tenants', createTenantRoutes());
+    const env = { AURA_DB: makeSqliteD1(sqlite), AUTH_KV: makeKV(), JWT_SECRET: jwtSecret } as unknown as Env;
+
+    // 0. Cookie-only write request is blocked by CSRF guard (403)
+    const cookieWriteRes = await app.fetch(
+      new Request('http://localhost/api/saas/tenants/self-serve', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Cookie: `access_token=${cookieToken}` },
+        body: JSON.stringify({ name: 'Cookie Blocked Store' }),
+      }),
+      env
+    );
+    expect(cookieWriteRes.status).toBe(403);
+
+    // 1. Reserved slug rejected with 400
+    const reservedRes = await app.fetch(
+      new Request('http://localhost/api/saas/tenants/self-serve', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${cookieToken}` },
+        body: JSON.stringify({ name: 'Admin Store', slug: 'admin' }),
+      }),
+      env
+    );
+    expect(reservedRes.status).toBe(400);
+    expect((await reservedRes.json() as { error: string }).error).toBe('invalid_slug');
+
+    // 2. Persisted staff account in D1 cannot escalate via forged customer role claim
+    const staffRes = await app.fetch(
+      new Request('http://localhost/api/saas/tenants/self-serve', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${staffClaimAsCustomerToken}` },
+        body: JSON.stringify({ name: 'Staff Store' }),
+      }),
+      env
+    );
+    expect(staffRes.status).toBe(403);
+
+    // 3. Inactive user in D1 rejected with 401/403 (auth middleware rejects inactive D1 user with 401 SESSION_REVOKED)
+    const inactiveRes = await app.fetch(
+      new Request('http://localhost/api/saas/tenants/self-serve', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${inactiveToken}` },
+        body: JSON.stringify({ name: 'Inactive Store' }),
+      }),
+      env
+    );
+    expect([401, 403]).toContain(inactiveRes.status);
+
+    // 4. Bearer-authenticated self-serve succeeds, sets HttpOnly cookie, returns owner user + token, and GET /my accepts that cookie
+    const okRes = await app.fetch(
+      new Request('http://localhost/api/saas/tenants/self-serve', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${cookieToken}` },
+        body: JSON.stringify({ name: 'Đà Nẵng Specialty' }),
+      }),
+      env
+    );
+    expect(okRes.status).toBe(201);
+    const setCookie = okRes.headers.get('Set-Cookie') || '';
+    expect(setCookie).toContain('access_token=');
+    expect(setCookie).toContain('HttpOnly');
+    const okJson = await okRes.json() as {
+      ok: boolean;
+      token: string | null;
+      user: { id: string; role: string; tenantId: string } | null;
+      data: { id: string; slug: string };
+    };
+    expect(okJson.ok).toBe(true);
+    expect(okJson.data.slug).toBe('da-nang-specialty');
+    expect(okJson.user?.role).toBe('owner');
+    expect(okJson.user?.tenantId).toBe(okJson.data.id);
+
+    const cookieReadMyRes = await app.fetch(
+      new Request('http://localhost/api/saas/tenants/my', {
+        headers: { Cookie: `access_token=${okJson.token}` },
+      }),
+      env
+    );
+    expect(cookieReadMyRes.status).toBe(200);
+
+    // 5. Second attempt with the pre-onboarding token returns 409 already_has_tenant and preserves original tenant
+    const dupRes = await app.fetch(
+      new Request('http://localhost/api/saas/tenants/self-serve', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${cookieToken}` },
+        body: JSON.stringify({ name: 'Second Store' }),
+      }),
+      env
+    );
+    expect(dupRes.status).toBe(409);
+    const dupJson = await dupRes.json() as { error: string; tenantId?: string };
+    expect(dupJson.error).toBe('already_has_tenant');
+    expect(dupJson.tenantId).toBe(okJson.data.id);
+  });
+
+  it('#201: POST /api/leads supports phone-only, email+phone merge, tenant uniqueness isolation, and rejects hq/* tenant headers', async () => {
+    const sqlite = new DatabaseSync(':memory:');
+    sqlite.exec(`
+      CREATE TABLE leads (
+        id TEXT PRIMARY KEY,
+        tenant_id TEXT NOT NULL DEFAULT 'default',
+        email TEXT,
+        phone TEXT,
+        source TEXT NOT NULL DEFAULT 'promotions_newsletter',
+        created_at TEXT NOT NULL DEFAULT (datetime('now')),
+        updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+        UNIQUE (tenant_id, email),
+        UNIQUE (tenant_id, phone)
+      );
+    `);
+    const kv = makeKV();
+    const app = new Hono<{ Bindings: Env }>();
+    app.route('/api/leads', leadsRouter);
+    const env = { AURA_DB: makeSqliteD1(sqlite), AUTH_KV: kv } as unknown as Env;
+
+    // 1. Phone-only submission normalizes digits and persists to KV + D1
+    const phoneRes = await app.fetch(
+      new Request('http://localhost/api/leads', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Tenant-ID': 'sadec_01' },
+        body: JSON.stringify({ phone: '+84 901 234 567', source: 'promotions_newsletter' }),
+      }),
+      env
+    );
+    expect(phoneRes.status).toBe(201);
+    const phoneJson = await phoneRes.json() as { success: boolean; data: { phone?: string; tenantId: string } };
+    expect(phoneJson.data.phone).toBe('84901234567');
+    expect(phoneJson.data.tenantId).toBe('sadec_01');
+    expect(await kv.get('lead:sadec_01:phone:84901234567')).toContain('84901234567');
+
+    // 2. Same phone under different tenant succeeds without conflict
+    const otherTenantPhoneRes = await app.fetch(
+      new Request('http://localhost/api/leads', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Tenant-ID': 'caolanh_02' },
+        body: JSON.stringify({ phone: '+84 901 234 567' }),
+      }),
+      env
+    );
+    expect(otherTenantPhoneRes.status).toBe(201);
+
+    // 3. Privileged tenant headers ('hq', '*') fall back to 'default'
+    const hqHeaderRes = await app.fetch(
+      new Request('http://localhost/api/leads', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Tenant-ID': 'hq' },
+        body: JSON.stringify({ email: 'member@auracafe.vn' }),
+      }),
+      env
+    );
+    expect(hqHeaderRes.status).toBe(201);
+    const hqJson = await hqHeaderRes.json() as { data: { tenantId: string } };
+    expect(hqJson.data.tenantId).toBe('default');
+
+    // 4. Re-submitting same email in same tenant with a phone merges phone onto existing row
+    const mergeRes = await app.fetch(
+      new Request('http://localhost/api/leads', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Tenant-ID': 'hq' },
+        body: JSON.stringify({ email: 'member@auracafe.vn', phone: '0912345678', source: 'vip_popup' }),
+      }),
+      env
+    );
+    expect(mergeRes.status).toBe(201);
+    const d1Rows = sqlite.prepare('SELECT tenant_id, email, phone, source FROM leads WHERE tenant_id = ?').all('default') as Array<{
+      tenant_id: string;
+      email: string | null;
+      phone: string | null;
+      source: string;
+    }>;
+    expect(d1Rows).toHaveLength(1);
+    expect(d1Rows[0]).toEqual({
+      tenant_id: 'default',
+      email: 'member@auracafe.vn',
+      phone: '0912345678',
+      source: 'vip_popup',
+    });
+  });
+
+  it('#198: channel-scoped PDPA consent honors zns->zalo alias, chronological global revocation override, and fail-closed tenant_id check', async () => {
+    const sqlite = new DatabaseSync(':memory:');
+    const todayMmDd = new Date().toISOString().slice(5, 10);
+    sqlite.exec(`
+      CREATE TABLE customers (
+        id TEXT PRIMARY KEY,
+        name TEXT,
+        phone TEXT,
+        email TEXT,
+        date_of_birth TEXT,
+        loyalty_tier TEXT,
+        total_spent REAL DEFAULT 0,
+        tenant_id TEXT DEFAULT 'default',
+        anonymized_at TEXT
+      );
+      CREATE TABLE campaign_logs (
+        id TEXT PRIMARY KEY,
+        customer_id TEXT,
+        trigger TEXT,
+        channel TEXT,
+        sent_at TEXT,
+        status TEXT,
+        tenant_id TEXT DEFAULT 'default'
+      );
+      CREATE TABLE consents (
+        id TEXT PRIMARY KEY,
+        customer_id TEXT,
+        purpose TEXT,
+        channel TEXT DEFAULT 'all',
+        granted INTEGER,
+        granted_at TEXT,
+        revoked_at TEXT,
+        updated_at TEXT,
+        tenant_id TEXT DEFAULT 'default'
+      );
+      INSERT INTO customers VALUES ('c_sms_revoked', 'SMS Revoked', '0901000001', 'a@cafe.vn', '1995-${todayMmDd}', 'gold', 500000, 'default', NULL);
+      INSERT INTO customers VALUES ('c_global_revoked', 'Global Revoked', '0901000002', 'b@cafe.vn', '1995-${todayMmDd}', 'gold', 500000, 'default', NULL);
+      INSERT INTO customers VALUES ('c_zns_only', 'ZNS Only', '0901000003', 'c@cafe.vn', '1995-${todayMmDd}', 'gold', 500000, 'default', NULL);
+      INSERT INTO customers VALUES ('c_global_regrant', 'Global Regrant', '0901000004', 'd@cafe.vn', '1995-${todayMmDd}', 'gold', 500000, 'default', NULL);
+
+      -- c_sms_revoked: granted 'all' at t1, revoked 'sms' at t2 -> allowed for email & zalo, blocked for sms
+      INSERT INTO consents VALUES ('con_a1', 'c_sms_revoked', 'marketing', 'all', 1, '2026-11-01T00:00:00Z', NULL, '2026-11-01T00:00:00Z', 'default');
+      INSERT INTO consents VALUES ('con_a2', 'c_sms_revoked', 'marketing', 'sms', 0, '2026-11-01T00:00:00Z', '2026-11-02T00:00:00Z', '2026-11-02T00:00:00Z', 'default');
+
+      -- c_global_revoked: granted 'zns' at t1, revoked 'all' at t2 -> blocked for zalo and all channels
+      INSERT INTO consents VALUES ('con_b1', 'c_global_revoked', 'marketing', 'zns', 1, '2026-11-01T00:00:00Z', NULL, '2026-11-01T00:00:00Z', 'default');
+      INSERT INTO consents VALUES ('con_b2', 'c_global_revoked', 'marketing', 'all', 0, '2026-11-01T00:00:00Z', '2026-11-03T00:00:00Z', '2026-11-03T00:00:00Z', 'default');
+
+      -- c_zns_only: granted 'zns' -> allowed for zalo, blocked for sms
+      INSERT INTO consents VALUES ('con_c1', 'c_zns_only', 'marketing', 'zns', 1, '2026-11-01T00:00:00Z', NULL, '2026-11-01T00:00:00Z', 'default');
+
+      -- c_global_regrant: revoked 'zns' at t1, granted 'all' at t2 -> global re-grant restores zalo & sms
+      INSERT INTO consents VALUES ('con_d1', 'c_global_regrant', 'marketing', 'zns', 0, NULL, '2026-11-01T00:00:00Z', '2026-11-01T00:00:00Z', 'default');
+      INSERT INTO consents VALUES ('con_d2', 'c_global_regrant', 'marketing', 'all', 1, '2026-11-04T00:00:00Z', NULL, '2026-11-04T00:00:00Z', 'default');
+    `);
+    const db = makeSqliteD1(sqlite) as unknown as import('@cloudflare/workers-types').D1Database;
+
+    expect(await hasMarketingConsentForChannel(db, 'c_sms_revoked', 'sms', 'default')).toBe(false);
+    expect(await hasMarketingConsentForChannel(db, 'c_sms_revoked', 'email', 'default')).toBe(true);
+    expect(await hasMarketingConsentForChannel(db, 'c_sms_revoked', 'zalo', 'default')).toBe(true);
+    expect(await hasMarketingConsentForChannel(db, 'c_global_revoked', 'zalo', 'default')).toBe(false);
+    expect(await hasMarketingConsentForChannel(db, 'c_zns_only', 'zalo', 'default')).toBe(true);
+    expect(await hasMarketingConsentForChannel(db, 'c_zns_only', 'sms', 'default')).toBe(false);
+    expect(await hasMarketingConsentForChannel(db, 'c_global_regrant', 'zalo', 'default')).toBe(true);
+    expect(await hasMarketingConsentForChannel(db, 'c_global_regrant', 'sms', 'default')).toBe(true);
+
+    const smsBirthday = await detectBirthdayCandidates(db, 'default', 'sms');
+    expect(smsBirthday.map((c) => c.id)).toEqual(['c_global_regrant']);
+
+    const zaloBirthday = await detectBirthdayCandidates(db, 'default', 'zalo');
+    expect(zaloBirthday.map((c) => c.id)).toEqual(['c_sms_revoked', 'c_zns_only', 'c_global_regrant']);
+
+    const multiChannelBirthday = await detectBirthdayCandidates(db, 'default', ['sms', 'email']);
+    expect(multiChannelBirthday.map((c) => c.id)).toEqual(['c_sms_revoked', 'c_global_regrant']);
+
+    // Legacy schema without consents.tenant_id fails closed for non-default tenant
+    const legacySqlite = new DatabaseSync(':memory:');
+    legacySqlite.exec(`
+      CREATE TABLE customers (id TEXT PRIMARY KEY, name TEXT, phone TEXT, email TEXT, loyalty_tier TEXT, date_of_birth TEXT, tenant_id TEXT);
+      CREATE TABLE campaign_logs (id TEXT PRIMARY KEY, customer_id TEXT, trigger TEXT, channel TEXT, sent_at TEXT, status TEXT, tenant_id TEXT);
+      CREATE TABLE consents (id TEXT PRIMARY KEY, customer_id TEXT, purpose TEXT, granted INTEGER, revoked_at TEXT);
+      INSERT INTO customers VALUES ('c_fran', 'Fran', '0909999999', NULL, 'silver', '1995-${todayMmDd}', 'tenant_b');
+      INSERT INTO consents VALUES ('con_f1', 'c_fran', 'marketing', 1, NULL);
+    `);
+    const legacyDb = makeSqliteD1(legacySqlite) as unknown as import('@cloudflare/workers-types').D1Database;
+    expect(await detectBirthdayCandidates(legacyDb, 'tenant_b', 'sms')).toEqual([]);
+  });
+
+  it('#198: runCampaignTriggers defaults unconfigured triggers to inactive, merges tenant_campaign_configs over campaign_configs, and skips unconsented fallback channels', async () => {
+    const sqlite = new DatabaseSync(':memory:');
+    const recent = new Date().toISOString();
+    sqlite.exec(`
+      CREATE TABLE customers (
+        id TEXT PRIMARY KEY,
+        name TEXT,
+        phone TEXT,
+        email TEXT,
+        loyalty_tier TEXT,
+        created_at TEXT,
+        tenant_id TEXT DEFAULT 'default',
+        anonymized_at TEXT
+      );
+      CREATE TABLE campaign_logs (
+        id TEXT PRIMARY KEY,
+        customer_id TEXT,
+        trigger TEXT,
+        channel TEXT,
+        sent_at TEXT,
+        status TEXT,
+        error TEXT,
+        tenant_id TEXT DEFAULT 'default'
+      );
+      CREATE TABLE consents (
+        id TEXT PRIMARY KEY,
+        customer_id TEXT,
+        purpose TEXT,
+        channel TEXT DEFAULT 'all',
+        granted INTEGER,
+        revoked_at TEXT,
+        updated_at TEXT,
+        tenant_id TEXT DEFAULT 'default'
+      );
+      CREATE TABLE campaign_configs (
+        tenant_id TEXT DEFAULT 'default',
+        trigger TEXT PRIMARY KEY,
+        is_active INTEGER DEFAULT 1,
+        channels TEXT DEFAULT '["sms","email"]'
+      );
+      CREATE TABLE tenant_campaign_configs (
+        tenant_id TEXT NOT NULL,
+        trigger TEXT NOT NULL,
+        is_active INTEGER DEFAULT 1,
+        channels TEXT DEFAULT '["sms","email"]',
+        PRIMARY KEY (tenant_id, trigger)
+      );
+      INSERT INTO customers VALUES ('c_email_only', 'Email OptIn', '0908888888', 'emailonly@cafe.vn', 'silver', '${recent}', 'tenant_a', NULL);
+      INSERT INTO consents VALUES ('con_e1', 'c_email_only', 'marketing', 'email', 1, NULL, '2026-11-24T00:00:00Z', 'tenant_a');
+    `);
+    const db = makeSqliteD1(sqlite);
+
+    // 1. With no campaign_configs rows configured, triggers default to inactive
+    const unconfiguredRes = await runCampaignTriggers({ AURA_DB: db, PILOT_TENANT_ID: 'tenant_a' });
+    expect(unconfiguredRes).toEqual({ triggered: 0, sent: 0 });
+
+    // 2. Base campaign_configs enables welcome (sms + email), while tenant_campaign_configs overrides only birthday for tenant_a.
+    //    welcome remains active from base config; processTrigger skips unconsented 'sms' and attempts 'email'.
+    sqlite.exec(`
+      INSERT INTO campaign_configs (tenant_id, trigger, is_active, channels)
+      VALUES ('default', 'welcome', 1, '["sms","email"]');
+      INSERT INTO tenant_campaign_configs (tenant_id, trigger, is_active, channels)
+      VALUES ('tenant_a', 'birthday', 0, '["sms"]');
+    `);
+
+    const mergedRes = await runCampaignTriggers({ AURA_DB: db, PILOT_TENANT_ID: 'tenant_a' });
+    expect(mergedRes.triggered).toBe(1);
+    const logRows = sqlite.prepare('SELECT customer_id, trigger, channel, tenant_id FROM campaign_logs').all() as Array<{
+      customer_id: string;
+      trigger: string;
+      channel: string;
+      tenant_id: string;
+    }>;
+    // Only email channel was attempted/logged because sms had no consent
+    expect(logRows).toEqual([
+      {
+        customer_id: 'c_email_only',
+        trigger: 'welcome',
+        channel: 'email',
+        tenant_id: 'tenant_a',
+      },
+    ]);
   });
 });

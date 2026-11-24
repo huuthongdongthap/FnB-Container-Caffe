@@ -14,7 +14,7 @@ export function NewsletterSection() {
     if (!trimmed || submitting) return;
     const isEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed);
     const digits = trimmed.replace(/\D/g, '');
-    const isPhone = digits.length >= 9 && digits.length <= 12;
+    const isPhone = !isEmail && !/[a-zA-Z]/.test(trimmed) && digits.length >= 9 && digits.length <= 15;
     if (!isEmail && !isPhone) {
       setError('Vui lòng nhập email hoặc số điện thoại hợp lệ.');
       return;
@@ -27,17 +27,14 @@ export function NewsletterSection() {
       } catch {
         // ignore storage errors
       }
-      if (isPhone) {
-        await apiFetch('/api/loyalty/phone-auth', {
-          method: 'POST',
-          body: JSON.stringify({ phone: digits }),
-        });
-      } else {
-        await apiFetch('/api/leads', {
-          method: 'POST',
-          body: JSON.stringify({ email: trimmed, source: 'promotions_newsletter' }),
-        });
-      }
+      await apiFetch('/api/leads', {
+        method: 'POST',
+        body: JSON.stringify(
+          isPhone
+            ? { phone: digits, source: 'promotions_newsletter' }
+            : { email: trimmed, source: 'promotions_newsletter' }
+        ),
+      });
       setSubmitted(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Đăng ký thất bại. Vui lòng thử lại.');

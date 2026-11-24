@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { apiFetch } from '@/lib/api-client';
+import { readClientSession, saveClientSession, type ClientSessionUser } from '@/lib/client-session';
+import { useAuthStore, type AuthUser } from '@/hooks/stores/use-auth-store';
 
 const TenantCreatePage: React.FC = () => {
   const [name, setName] = useState('');
@@ -26,9 +28,10 @@ const TenantCreatePage: React.FC = () => {
       const data = await apiFetch<{
         error?: string;
         message?: string;
-        data?: { id?: string; token?: string | null };
+        data?: { id?: string; token?: string | null; user?: ClientSessionUser | null };
         tenantId?: string;
         token?: string | null;
+        user?: ClientSessionUser | null;
       }>('/api/saas/tenants/self-serve', {
         method: 'POST',
         body: JSON.stringify({ name: name.trim() }),
@@ -45,12 +48,33 @@ const TenantCreatePage: React.FC = () => {
         return;
       }
 
+      const newTenantId = data.data?.id || data.tenantId;
       const refreshedToken = data.token || data.data?.token;
+      const returnedUser = data.user || data.data?.user;
       if (refreshedToken) {
-        localStorage.setItem('aura_auth_token', refreshedToken);
+        const existingUser = readClientSession().user || useAuthStore.getState().user;
+        const resolvedTenantId =
+          returnedUser?.tenantId ||
+          returnedUser?.tenant_id ||
+          newTenantId ||
+          existingUser?.tenantId;
+        const nextUser: ClientSessionUser = {
+          id: returnedUser?.id || existingUser?.id || 'owner',
+          name: returnedUser?.name || existingUser?.name || name.trim(),
+          email: returnedUser?.email || existingUser?.email,
+          phone: returnedUser?.phone || existingUser?.phone,
+          role: returnedUser?.role || 'owner',
+          ...(resolvedTenantId ? { tenantId: resolvedTenantId, tenant_id: resolvedTenantId } : {}),
+        };
+        saveClientSession(refreshedToken, nextUser);
+        useAuthStore.setState((state) => ({
+          user: nextUser as AuthUser,
+          loading: false,
+          error: null,
+          sessionVersion: state.sessionVersion + 1,
+        }));
       }
 
-      const newTenantId = data.data?.id || data.tenantId;
       if (newTenantId) {
         localStorage.setItem('aura_tenant_id', newTenantId);
         setTenantId(newTenantId);

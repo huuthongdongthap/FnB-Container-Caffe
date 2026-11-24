@@ -12,7 +12,7 @@ import { GRACE_DAYS, SAAS_PLANS, TRIAL_DAYS, normalizeSaasPlanId, type SaasPlanI
 import { addDaysIso } from './saas-entitlement';
 import { SAAS_TEMPLATES, isValidTemplateId, type SaasTemplateId } from './saas-templates';
 
-const RESERVED_SLUGS = new Set([
+export const RESERVED_SLUGS = new Set([
   'default',
   'hq',
   'admin',
@@ -504,6 +504,18 @@ export async function provisionSelfServeTenant(
       );
     }
     throw new ProvisionError(500, 'provisioning_failed', 'Không thể khởi tạo quán lúc này. Vui lòng thử lại sau.');
+  }
+
+  try {
+    await db
+      .prepare(
+        `INSERT OR IGNORE INTO refund_tenant_readiness (tenant_id, reconciled_at, reconciled_by, evidence)
+         VALUES (?, ?, ?, ?)`
+      )
+      .bind(tenantId, nowIso, ownerId, `new-tenant-provisioning:${tenantId}`)
+      .run();
+  } catch {
+    // Non-fatal in minimal test schemas without refund_tenant_readiness
   }
 
   return {

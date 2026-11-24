@@ -14,6 +14,7 @@ import {
   detectPostVisitCandidates,
   detectCashbackExpiry,
   markExpiryNotified,
+  hasMarketingConsentForChannel,
 } from '@aura/domain-crm';
 import { sendCampaignSms } from './channels/sms';
 import { sendCampaignEmail } from './channels/email';
@@ -91,46 +92,65 @@ async function loadTriggerConfigs(
   tenantId: string
 ): Promise<Map<CampaignTrigger, ResolvedTriggerConfig>> {
   const configs = new Map<CampaignTrigger, ResolvedTriggerConfig>();
-  const rows: Array<{ trigger: string; is_active: number | boolean; channels?: string | null }> = [];
+  const applyRows = (rows: Array<{ trigger: string; is_active: number | boolean; channels?: string | null }>) => {
+    for (const row of rows) {
+      const trigger = row.trigger as CampaignTrigger;
+      const defaults = CHANNEL_PRIORITY[trigger]?.map((c) => c.channel) ?? ['sms'];
+      configs.set(trigger, {
+        isActive: Boolean(row.is_active),
+        channels: parseChannelsJson(row.channels, defaults),
+      });
+    }
+  };
+
   try {
-    const res = await db.prepare(
-      "SELECT trigger, is_active, channels FROM tenant_campaign_configs WHERE COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
-    ).bind(tenantId).all<{ trigger: string; is_active: number | boolean; channels?: string | null }>();
-    if (res.results && res.results.length > 0) {
-      rows.push(...res.results);
+    const baseRes = await db
+      .prepare(
+        "SELECT trigger, is_active, channels FROM campaign_configs WHERE COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
+      )
+      .bind('default')
+      .all<{ trigger: string; is_active: number | boolean; channels?: string | null }>();
+    if (baseRes.results) {
+      applyRows(baseRes.results);
+    }
+    if (tenantId !== 'default') {
+      const tenantBaseRes = await db
+        .prepare(
+          "SELECT trigger, is_active, channels FROM campaign_configs WHERE COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
+        )
+        .bind(tenantId)
+        .all<{ trigger: string; is_active: number | boolean; channels?: string | null }>();
+      if (tenantBaseRes.results) {
+        applyRows(tenantBaseRes.results);
+      }
     }
   } catch {
-    // tenant_campaign_configs table may not exist; fall back to campaign_configs
-  }
-  if (rows.length === 0) {
     try {
-      const res = await db.prepare(
-        "SELECT trigger, is_active, channels FROM campaign_configs WHERE COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
-      ).bind(tenantId).all<{ trigger: string; is_active: number | boolean; channels?: string | null }>();
-      if (res.results && res.results.length > 0) {
-        rows.push(...res.results);
+      const legacyRes = await db
+        .prepare('SELECT trigger, is_active, channels FROM campaign_configs')
+        .all<{ trigger: string; is_active: number | boolean; channels?: string | null }>();
+      if (legacyRes.results) {
+        applyRows(legacyRes.results);
       }
     } catch {
-      try {
-        if (tenantId === 'default') {
-          const res = await db.prepare(
-            'SELECT trigger, is_active, channels FROM campaign_configs'
-          ).all<{ trigger: string; is_active: number | boolean; channels?: string | null }>();
-          if (res.results) rows.push(...res.results);
-        }
-      } catch {
-        // campaign_configs table absent in minimal test schemas
-      }
+      // campaign_configs table absent in minimal test schemas
     }
   }
-  for (const row of rows) {
-    const trigger = row.trigger as CampaignTrigger;
-    const defaults = CHANNEL_PRIORITY[trigger]?.map((c) => c.channel) ?? ['sms'];
-    configs.set(trigger, {
-      isActive: Boolean(row.is_active),
-      channels: parseChannelsJson(row.channels, defaults),
-    });
+
+  try {
+    const res = await db
+      .prepare(
+        "SELECT trigger, is_active, channels FROM tenant_campaign_configs WHERE COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
+      )
+      .bind(tenantId)
+      .all<{ trigger: string; is_active: number | boolean; channels?: string | null }>();
+    if (res.results) {
+      applyRows(res.results);
+    }
+  } catch {
+    // tenant_campaign_configs table may not exist yet
   }
+
   return configs;
 }
 
@@ -180,6 +200,10 @@ async function processTrigger(
       let customerSent = false;
 
       for (const { channel, to } of channels) {
+        const hasConsent = await hasMarketingConsentForChannel(db, customer.id, channel, effectiveTenant);
+        if (!hasConsent) {
+          continue;
+        }
         const recipient = to(customer);
         if (!recipient) {
           continue;
@@ -272,26 +296,26 @@ export async function runCampaignTriggers(
 
   const triggerDetectors: Array<{
     trigger: CampaignTrigger;
-    detect: (tenantId: string) => Promise<CampaignCustomer[]>;
+    detect: (tenantId: string, channels: CampaignChannel[]) => Promise<CampaignCustomer[]>;
   }> = [
-    { trigger: 'welcome', detect: (tid) => detectWelcomeCandidates(db, tid) },
-    { trigger: 'birthday', detect: (tid) => detectBirthdayCandidates(db, tid) },
-    { trigger: 'winback', detect: (tid) => detectWinbackCandidates(db, tid) },
-    { trigger: 'post_visit', detect: (tid) => detectPostVisitCandidates(db, tid) },
-    { trigger: 'cashback_expiry', detect: (tid) => detectCashbackExpiry(db, tid) },
+    { trigger: 'welcome', detect: (tid, channels) => detectWelcomeCandidates(db, tid, channels) },
+    { trigger: 'birthday', detect: (tid, channels) => detectBirthdayCandidates(db, tid, channels) },
+    { trigger: 'winback', detect: (tid, channels) => detectWinbackCandidates(db, tid, channels) },
+    { trigger: 'post_visit', detect: (tid, channels) => detectPostVisitCandidates(db, tid, channels) },
+    { trigger: 'cashback_expiry', detect: (tid, channels) => detectCashbackExpiry(db, tid, channels) },
   ];
 
   for (const tenantId of tenants) {
     const configMap = await loadTriggerConfigs(db, tenantId);
     for (const { trigger, detect } of triggerDetectors) {
       const cfg = configMap.get(trigger);
-      if (cfg && !cfg.isActive) {
+      if (!cfg || !cfg.isActive) {
         continue;
       }
       try {
-        const candidates = await detect(tenantId);
+        const candidates = await detect(tenantId, cfg.channels);
         if (candidates.length > 0) {
-          const result = await processTrigger(env, db, trigger, candidates, tenantId, cfg?.channels);
+          const result = await processTrigger(env, db, trigger, candidates, tenantId, cfg.channels);
           totalTriggered += result.triggered;
           totalSent += result.sent;
         }
