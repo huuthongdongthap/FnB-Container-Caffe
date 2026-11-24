@@ -23,7 +23,7 @@ export async function settlePayOS(
         db.prepare(`UPDATE orders SET status = 'expired', updated_at = ?
           WHERE id = ? AND payment_method = 'payos'
           AND LOWER(COALESCE(status, 'pending')) = 'pending'
-          AND LOWER(COALESCE(payment_status, 'unpaid')) NOT IN ('paid', 'completed', 'refunded')
+          AND LOWER(COALESCE(payment_status, 'unpaid')) NOT IN ('paid', 'completed', 'partially_refunded', 'refunded')
           AND NOT EXISTS (
             SELECT 1 FROM payments other
             WHERE other.order_id = ? AND other.id != ?
@@ -48,7 +48,7 @@ export async function settlePayOS(
         AND other.status IN ('completed', 'paid', 'refunded'))`)
       .bind(...(withReference ? [now, reference] : [now]), payment.id, payment.order_id, payment.id),
     db.prepare(`UPDATE orders SET payment_status = 'paid', updated_at = ?
-      WHERE id = ? AND payment_method = 'payos' AND payment_status NOT IN ('paid', 'completed', 'refunded')
+      WHERE id = ? AND payment_method = 'payos' AND payment_status NOT IN ('paid', 'completed', 'partially_refunded', 'refunded')
       AND LOWER(COALESCE(status, 'pending')) NOT IN ('cancelled', 'canceled', 'rejected', 'failed', 'expired', 'refunded')
       AND EXISTS (SELECT 1 FROM payments WHERE id = ? AND status = 'completed')`)
       .bind(now, payment.order_id, payment.id),

@@ -147,7 +147,7 @@ export async function expireUnpaidOnlineOrders(
              SET status = 'expired', updated_at = ?
              WHERE LOWER(COALESCE(status, 'pending')) = 'pending'
                AND LOWER(COALESCE(payment_method, '')) IN ('payos', 'bank_transfer', 'qr')
-               AND LOWER(COALESCE(payment_status, 'unpaid')) NOT IN ('paid', 'completed', 'refunded')
+               AND LOWER(COALESCE(payment_status, 'unpaid')) NOT IN ('paid', 'completed', 'partially_refunded', 'refunded')
                AND julianday(created_at) < julianday(?)
                AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?`,
           )
@@ -159,7 +159,7 @@ export async function expireUnpaidOnlineOrders(
              SET status = 'expired', updated_at = ?
              WHERE LOWER(COALESCE(status, 'pending')) = 'pending'
                AND LOWER(COALESCE(payment_method, '')) IN ('payos', 'bank_transfer', 'qr')
-               AND LOWER(COALESCE(payment_status, 'unpaid')) NOT IN ('paid', 'completed', 'refunded')
+               AND LOWER(COALESCE(payment_status, 'unpaid')) NOT IN ('paid', 'completed', 'partially_refunded', 'refunded')
                AND julianday(created_at) < julianday(?)`,
           )
           .bind(now, cutoff)
