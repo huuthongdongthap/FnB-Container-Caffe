@@ -18,7 +18,9 @@ export function computeChartMetrics(current: PeriodDataPoint[], previous: Period
   const changePercent =
     previousTotal > 0
       ? ((currentTotal - previousTotal) / previousTotal) * 100
-      : 0;
+      : currentTotal > 0
+        ? 100
+        : 0;
 
   const allValues = [...current.map((d) => d.revenue), ...previous.map((d) => d.revenue)];
   const maxValue = Math.max(...allValues, 1);

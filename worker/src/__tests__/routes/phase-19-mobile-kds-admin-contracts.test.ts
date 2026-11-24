@@ -276,9 +276,10 @@ describe('Phase 19: Mobile Staff, KDS Lifecycle & Admin Integrations Contracts',
         }),
         { AURA_DB: mockDb, JWT_SECRET: TEST_JWT_SECRET }
       );
-      expect(syncAllRes.status).toBe(200);
+      expect(syncAllRes.status).toBe(501);
       const syncAllData = await syncAllRes.json() as any;
-      expect(syncAllData.success).toBe(true);
+      expect(syncAllData.success).toBe(false);
+      expect(syncAllData.status).toBe('not_configured');
       expect(syncAllData.entity).toBe('all');
 
       const syncOrdersRes = await app.fetch(
@@ -288,9 +289,10 @@ describe('Phase 19: Mobile Staff, KDS Lifecycle & Admin Integrations Contracts',
         }),
         { AURA_DB: mockDb, JWT_SECRET: TEST_JWT_SECRET }
       );
-      expect(syncOrdersRes.status).toBe(200);
+      expect(syncOrdersRes.status).toBe(501);
       const syncOrdersData = await syncOrdersRes.json() as any;
-      expect(syncOrdersData.success).toBe(true);
+      expect(syncOrdersData.success).toBe(false);
+      expect(syncOrdersData.status).toBe('not_configured');
       expect(syncOrdersData.entity).toBe('orders');
     });
   });

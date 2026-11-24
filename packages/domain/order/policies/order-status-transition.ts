@@ -85,7 +85,7 @@ export async function transitionOrderStatus(
     currentOrder?: { id: string; status: string; payment_status?: string | null };
     paymentStatus?: string | null;
     allowPaidCompensation?: boolean;
-    fields?: { notes?: unknown; delivery_time?: unknown; payment_method?: unknown };
+    fields?: { notes?: unknown; delivery_time?: unknown; payment_method?: unknown; payment_status?: unknown };
   } = {},
 ): Promise<OrderStatusResult> {
   const rawTenantId = (options.tenantId ?? '').trim() || 'default';
@@ -279,7 +279,7 @@ export async function transitionOrderStatus(
     }
   }
 
-  const allowedFieldKeys = new Set(['notes', 'delivery_time', 'payment_method']);
+  const allowedFieldKeys = new Set(['notes', 'delivery_time', 'payment_method', 'payment_status']);
   const fields = Object.entries(options.fields ?? {}).filter(
     ([key, value]) => allowedFieldKeys.has(key) && value !== undefined,
   );
@@ -287,10 +287,6 @@ export async function transitionOrderStatus(
     return { success: true, idempotent: true, order: { id: orderId, status: targetStatus, previous_status: order.status } };
   }
   const hasPaymentMethodField = fields.some(([key]) => key === 'payment_method');
-  const incomingPaymentMethod =
-    typeof options.fields?.payment_method === 'string'
-      ? options.fields.payment_method.trim().toLowerCase()
-      : '';
   const paymentMethodGuard = hasPaymentMethodField
     ? " AND LOWER(TRIM(COALESCE(payment_status, ''))) NOT IN ('paid', 'completed', 'refunded', 'partially_refunded')"
     : '';
@@ -299,23 +295,19 @@ export async function transitionOrderStatus(
     `UPDATE orders SET status = ?, updated_at = ?${additions} WHERE id = ? AND status = ?${writeTenantClause}${guard}`,
   ).bind(targetStatus, new Date().toISOString(), ...fields.map(([, value]) => value), orderId, order.status, ...writeTenantBinds).run();
   const closingOrder = targetStatus === 'completed' && !isNoOp;
+  const atomicMarkingPaid =
+    String((options.fields as Record<string, unknown> | undefined)?.payment_status ?? '')
+      .trim()
+      .toLowerCase() === 'paid';
   let result: unknown;
-  if (closingOrder) {
-    // Check persisted settlement in the same write that would close the order.
-    const paid = "LOWER(TRIM(COALESCE(payment_status, ''))) = 'paid'";
-    const notRefunded = "LOWER(TRIM(COALESCE(payment_status, ''))) <> 'refunded'";
-    const incomingCodOrCash = incomingPaymentMethod === 'cash' || incomingPaymentMethod === 'cod';
-    const closingGuard = incomingCodOrCash
-      ? ` AND ${notRefunded} AND ${paid}${paymentMethodGuard}`
-      : ` AND ${notRefunded} AND (LOWER(TRIM(COALESCE(payment_method, ''))) NOT IN ('cash', 'cod') OR ${paid})${paymentMethodGuard}`;
+  if (closingOrder && !atomicMarkingPaid) {
+    // Require persisted payment settlement before completing an order.
+    const paid = "LOWER(TRIM(COALESCE(payment_status, ''))) IN ('paid', 'partially_refunded')";
     try {
-      result = await updateStatus(closingGuard);
+      result = await updateStatus(` AND ${paid}${paymentMethodGuard}`);
     } catch (error) {
-      if (!/no such column:\s*payment_method\b/i.test(String(error))) throw error;
-      const legacyClosingGuard = incomingCodOrCash
-        ? ` AND ${notRefunded} AND ${paid}${paymentMethodGuard}`
-        : ` AND ${notRefunded} AND (COALESCE(is_cod, 0) <> 1 OR ${paid})${paymentMethodGuard}`;
-      result = await updateStatus(legacyClosingGuard);
+      if (!/no such column:\s*payment_status\b/i.test(String(error))) throw error;
+      result = await updateStatus();
     }
   } else if (forwardStatuses.has(targetStatus)) {
     try {
@@ -325,14 +317,19 @@ export async function transitionOrderStatus(
       result = await updateStatus();
     }
   } else {
-    result = await updateStatus(paymentMethodGuard);
+    try {
+      result = await updateStatus(paymentMethodGuard);
+    } catch (error) {
+      if (!/no such column:\s*payment_status\b/i.test(String(error))) throw error;
+      result = await updateStatus();
+    }
   }
   // D1 changes includes timestamp/audit trigger writes; this PK-scoped CAS still matches at most one order.
   if (changedRows(result) < 1) {
     return {
       success: false,
       error: closingOrder
-        ? 'Cannot complete order: collect any outstanding cash payment, then refresh and retry'
+        ? 'Cannot complete order: payment must be settled before completion'
         : 'Order changed concurrently; refresh and retry',
       statusCode: 409,
     };

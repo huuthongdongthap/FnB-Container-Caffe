@@ -1,4 +1,4 @@
-import { useEffect, useCallback } from 'react';
+import { useEffect, useCallback, useState } from 'react';
 import { Download, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { HelmetHead } from '@/components/seo/HelmetHead';
@@ -6,7 +6,6 @@ import { useAuditStore } from '@/hooks/stores/admin/use-audit-store';
 import { API_BASE } from '@/lib/api-client';
 import { getAuthHeaders } from '@/hooks/stores/admin/admin-utils';
 import { useTranslation } from 'react-i18next';
-import { buildCsv } from './AuditLogViewer-types';
 import { FilterPanel } from './AuditLogViewer-filter-panel';
 import { AuditTable } from './AuditLogViewer-table';
 import { Pagination } from './AuditLogViewer-pagination';
@@ -40,8 +39,11 @@ export default function AuditLogViewerPage() {
     if (hasNext) setFilter('page', filters.page + 1);
   }, [hasNext, setFilter, filters.page]);
 
+  const [exportError, setExportError] = useState<string | null>(null);
+
   /* ── Export CSV ── */
   const handleExport = useCallback(async () => {
+    setExportError(null);
     let csv = '';
     try {
       const params = new URLSearchParams();
@@ -54,14 +56,18 @@ export default function AuditLogViewerPage() {
         credentials: 'include',
         headers: getAuthHeaders(),
       });
-      if (res.ok) {
-        csv = await res.text();
+      if (!res.ok) {
+        setExportError(`Export failed (HTTP ${res.status})`);
+        return;
       }
-    } catch {
-      csv = '';
+      csv = await res.text();
+    } catch (err: unknown) {
+      setExportError(err instanceof Error ? err.message : 'Export failed');
+      return;
     }
     if (!csv) {
-      csv = buildCsv(entries, t);
+      setExportError('Export returned empty response');
+      return;
     }
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
@@ -70,7 +76,7 @@ export default function AuditLogViewerPage() {
     a.download = `audit-logs-${new Date().toISOString().slice(0, 10)}.csv`;
     a.click();
     URL.revokeObjectURL(url);
-  }, [entries, filters, t]);
+  }, [filters]);
 
   /* ── Date range validation ── */
   const dateRangeInvalid = !!(
@@ -104,6 +110,13 @@ export default function AuditLogViewerPage() {
               </Button>
             </div>
           </div>
+
+          {/* ── Export error ── */}
+          {exportError && (
+            <div role="alert" className="mb-4 rounded-xl border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-300">
+              {exportError}
+            </div>
+          )}
 
           {/* ── Date range warning ── */}
           {dateRangeInvalid && (

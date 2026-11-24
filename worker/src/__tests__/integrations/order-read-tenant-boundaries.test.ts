@@ -19,9 +19,9 @@ const fixture = (role: string) => {
 };
 afterEach(() => { for (const { sqlite } of fixtures.splice(0)) sqlite.close(); });
 function seed(sqlite: ReturnType<typeof orderCreationFixture>['sqlite']) {
-  sqlite.exec(`INSERT INTO orders (id,items,total,status,customer_name,customer_phone,payment_method,table_id,tenant_id) VALUES
-    ('order-a','[]',20000,'pending','A customer','0900000010','cod','table-a','cafe-a'),
-    ('order-b','[]',90000,'pending','PRIVATE B CUSTOMER','0999999999','cod','table-b','cafe-b');`);
+  sqlite.exec(`INSERT INTO orders (id,items,total,status,payment_status,customer_name,customer_phone,payment_method,table_id,tenant_id) VALUES
+    ('order-a','[]',20000,'pending','paid','A customer','0900000010','cod','table-a','cafe-a'),
+    ('order-b','[]',90000,'pending','paid','PRIVATE B CUSTOMER','0999999999','cod','table-b','cafe-b');`);
 }
 async function get(env: any, path: string, tenantId = 'cafe-a', role = 'waiter', headerTenant = tenantId) {
   const issuedAt = Math.floor(Date.now() / 1000);
