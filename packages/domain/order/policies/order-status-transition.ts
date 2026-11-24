@@ -290,10 +290,38 @@ export async function transitionOrderStatus(
   const paymentMethodGuard = hasPaymentMethodField
     ? " AND LOWER(TRIM(COALESCE(payment_status, ''))) NOT IN ('paid', 'completed', 'refunded', 'partially_refunded')"
     : '';
+  const nowIso = new Date().toISOString();
+  const fieldKeys = new Set(fields.map(([key]) => key));
+  const prepTimestampAddition =
+    !isNoOp && targetStatus === 'preparing' && !fieldKeys.has('started_at')
+      ? ', started_at = COALESCE(started_at, ?2)'
+      : !isNoOp && targetStatus === 'ready' && !fieldKeys.has('ready_at')
+        ? ', ready_at = COALESCE(ready_at, ?2)'
+        : '';
   const additions = fields.map(([key]) => `, ${key} = ?`).join('');
-  const updateStatus = (guard = '') => db.prepare(
-    `UPDATE orders SET status = ?, updated_at = ?${additions} WHERE id = ? AND status = ?${writeTenantClause}${guard}`,
-  ).bind(targetStatus, new Date().toISOString(), ...fields.map(([, value]) => value), orderId, order.status, ...writeTenantBinds).run();
+  const updateStatus = (guard = '', includePrepTimestamp = true) => db.prepare(
+    `UPDATE orders SET status = ?, updated_at = ?${includePrepTimestamp ? prepTimestampAddition : ''}${additions} WHERE id = ? AND status = ?${writeTenantClause}${guard}`,
+  ).bind(targetStatus, nowIso, ...fields.map(([, value]) => value), orderId, order.status, ...writeTenantBinds).run();
+  const runUpdateWithCompatFallback = async (initialGuard: string): Promise<unknown> => {
+    let guard = initialGuard;
+    let includePrepTimestamp = Boolean(prepTimestampAddition);
+    for (;;) {
+      try {
+        return await updateStatus(guard, includePrepTimestamp);
+      } catch (error) {
+        const msg = String(error);
+        if (includePrepTimestamp && /no such column:\s*(started_at|ready_at)\b/i.test(msg)) {
+          includePrepTimestamp = false;
+          continue;
+        }
+        if (guard && /no such column:\s*payment_status\b/i.test(msg)) {
+          guard = '';
+          continue;
+        }
+        throw error;
+      }
+    }
+  };
   const closingOrder = targetStatus === 'completed' && !isNoOp;
   const atomicMarkingPaid =
     String((options.fields as Record<string, unknown> | undefined)?.payment_status ?? '')
@@ -303,26 +331,13 @@ export async function transitionOrderStatus(
   if (closingOrder && !atomicMarkingPaid) {
     // Require persisted payment settlement before completing an order.
     const paid = "LOWER(TRIM(COALESCE(payment_status, ''))) IN ('paid', 'partially_refunded')";
-    try {
-      result = await updateStatus(` AND ${paid}${paymentMethodGuard}`);
-    } catch (error) {
-      if (!/no such column:\s*payment_status\b/i.test(String(error))) throw error;
-      result = await updateStatus();
-    }
+    result = await runUpdateWithCompatFallback(` AND ${paid}${paymentMethodGuard}`);
   } else if (forwardStatuses.has(targetStatus)) {
-    try {
-      result = await updateStatus(` AND LOWER(TRIM(COALESCE(payment_status, ''))) <> 'refunded'${paymentMethodGuard}`);
-    } catch (error) {
-      if (!/no such column:\s*payment_status\b/i.test(String(error))) throw error;
-      result = await updateStatus();
-    }
+    result = await runUpdateWithCompatFallback(
+      ` AND LOWER(TRIM(COALESCE(payment_status, ''))) <> 'refunded'${paymentMethodGuard}`,
+    );
   } else {
-    try {
-      result = await updateStatus(paymentMethodGuard);
-    } catch (error) {
-      if (!/no such column:\s*payment_status\b/i.test(String(error))) throw error;
-      result = await updateStatus();
-    }
+    result = await runUpdateWithCompatFallback(paymentMethodGuard);
   }
   // D1 changes includes timestamp/audit trigger writes; this PK-scoped CAS still matches at most one order.
   if (changedRows(result) < 1) {

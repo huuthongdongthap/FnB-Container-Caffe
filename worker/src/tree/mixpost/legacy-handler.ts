@@ -2,6 +2,7 @@ import { matchesTenantRow } from '../../lib/db';
 import { createMixpostClient } from '../../lib/mixpost-client';
 import { isSafeMixpostMediaUrl } from '../../lib/validators/mixpost';
 import { createLogger } from '../../utils/logger.js';
+import { resolveTenantMixpostAccountPolicy } from './account-policy';
 import { resolveTemplate } from './template-resolver';
 import type { MixpostEnv, MixpostPostInput, AutoPostTemplate } from './types';
 
@@ -62,10 +63,16 @@ export async function handleMixpostRequest(request: Request, env: MixpostEnv, re
       return json({ success: false, error: 'Invalid or unsafe media URL' }, 400);
     }
 
+    const accounts = Array.isArray(body.accounts) ? body.accounts : [];
+    const accountPolicy = await resolveTenantMixpostAccountPolicy(env, tenantId);
+    if (accounts.some((id) => !accountPolicy.isAccountAllowed(Number(id)))) {
+      return json({ success: false, error: 'Account not authorized for this tenant' }, 403);
+    }
+
     try {
       const result = await client.createPost({
         content: body.content,
-        accounts: body.accounts || [],
+        accounts,
         mediaIds: body.mediaUrls,
         scheduledAt: body.scheduledAt
       });
@@ -170,11 +177,17 @@ export async function handleMixpostRequest(request: Request, env: MixpostEnv, re
             ? ((template as unknown as Record<string, unknown>).tenant_id as string).trim()
             : 'default';
           const effectiveTenant = tenantId === '*' ? rawTplTenant : tenantId;
+          const templateAccounts: number[] = template.accounts ? JSON.parse(template.accounts) : [];
+          const accountPolicy = await resolveTenantMixpostAccountPolicy(env, effectiveTenant);
+          if (templateAccounts.some((id) => !accountPolicy.isAccountAllowed(Number(id)))) {
+            errors.push(`Template ${template.id}: Account not authorized for tenant`);
+            continue;
+          }
           const content = await resolveTemplate(template.content_template, env, effectiveTenant);
 
           const _result = await client.createPost({
             content,
-            accounts: template.accounts ? JSON.parse(template.accounts) : []
+            accounts: templateAccounts
           });
 
           const nowIso = new Date().toISOString();
@@ -245,7 +258,16 @@ export async function handleMixpostRequest(request: Request, env: MixpostEnv, re
     }
 
     try {
-      const accounts = await client.listAccounts();
+      const accountPolicy = await resolveTenantMixpostAccountPolicy(env, tenantId);
+      const rawAccounts = await client.listAccounts();
+      const accountList = Array.isArray(rawAccounts)
+        ? rawAccounts
+        : Array.isArray((rawAccounts as { data?: unknown })?.data)
+          ? (rawAccounts as { data: Array<Record<string, unknown>> }).data
+          : [];
+      const accounts = accountList.filter((acc) =>
+        accountPolicy.isAccountAllowed(Number(acc?.id))
+      );
       return json({ success: true, data: accounts });
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : String(e);

@@ -9,29 +9,48 @@ interface DateTimePickerProps {
   onSelectTime: (time: string) => void;
 }
 
+function getVNNow(): Date {
+  return new Date(Date.now() + 7 * 3600_000);
+}
+
+function getTodayVNISO(): string {
+  return getVNNow().toISOString().slice(0, 10);
+}
+
+function isPastTimeSlotToday(selectedDate: string, timeSlot: string): boolean {
+  const vnNow = getVNNow();
+  const todayISO = vnNow.toISOString().slice(0, 10);
+  const todayDDMM = `${String(vnNow.getUTCDate()).padStart(2, '0')}/${String(vnNow.getUTCMonth() + 1).padStart(2, '0')}`;
+  if (selectedDate !== todayISO && selectedDate !== todayDDMM) return false;
+  const [hStr, mStr] = timeSlot.split(':');
+  const slotMin = Number(hStr) * 60 + Number(mStr);
+  const nowMin = vnNow.getUTCHours() * 60 + vnNow.getUTCMinutes();
+  return slotMin < nowMin - 5;
+}
+
 export function DateTimePicker({
   selectedDate,
   onSelectDate,
   selectedTime,
   onSelectTime,
 }: DateTimePickerProps) {
-  // Generate next 7 days from today
+  // Generate next 7 days from today in Asia/Ho_Chi_Minh (UTC+7)
   const upcomingDays = useMemo(() => {
     const days = [];
-    const now = new Date();
+    const vnNow = getVNNow();
     const dayNames = ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'];
 
     for (let i = 0; i < 7; i++) {
-      const d = new Date(now);
-      d.setDate(now.getDate() + i);
-
-      const dayNum = d.getDate();
-      const monthNum = d.getMonth() + 1;
+      const d = new Date(Date.UTC(vnNow.getUTCFullYear(), vnNow.getUTCMonth(), vnNow.getUTCDate() + i));
+      const isoDate = d.toISOString().slice(0, 10);
+      const dayNum = d.getUTCDate();
+      const monthNum = d.getUTCMonth() + 1;
       const dateStr = `${dayNum < 10 ? '0' + dayNum : dayNum}/${monthNum < 10 ? '0' + monthNum : monthNum}`;
-      const weekday = i === 0 ? 'Hôm nay' : i === 1 ? 'Ngày mai' : dayNames[d.getDay()];
+      const weekday = i === 0 ? 'Hôm nay' : i === 1 ? 'Ngày mai' : dayNames[d.getUTCDay()];
 
       days.push({
-        id: dateStr,
+        id: isoDate,
+        ddmm: dateStr,
         dayNum: String(dayNum),
         weekday,
         fullLabel: `${weekday}, ${dateStr}`,
@@ -39,6 +58,8 @@ export function DateTimePicker({
     }
     return days;
   }, []);
+
+  const todayISO = getTodayVNISO();
 
   return (
     <section className="grid grid-cols-1 md:grid-cols-12 gap-8">
@@ -52,7 +73,7 @@ export function DateTimePicker({
         </div>
         <div className="grid grid-cols-4 sm:grid-cols-7 gap-2.5">
           {upcomingDays.map((day) => {
-            const isSelected = selectedDate === day.id;
+            const isSelected = selectedDate === day.id || selectedDate === day.ddmm;
             return (
               <button
                 key={day.id}
@@ -88,16 +109,20 @@ export function DateTimePicker({
         <div className="grid grid-cols-3 gap-2.5">
           {TIMES.map((t) => {
             const isSelected = selectedTime === t;
+            const isPast = isPastTimeSlotToday(selectedDate || todayISO, t);
             return (
               <button
                 key={t}
                 type="button"
+                disabled={isPast}
                 aria-pressed={isSelected}
-                onClick={() => onSelectTime(t)}
-                className={`py-3 min-h-[44px] inline-flex items-center justify-center rounded-xl text-center font-body text-xs font-bold tracking-wider transition-all cursor-pointer border ${
-                  isSelected
-                    ? 'bg-[var(--aura-chrome-bright)] text-[#0A1A2E] border-[var(--aura-chrome-bright)] shadow-lg scale-105'
-                    : 'bg-white/5 border-white/10 text-[var(--aura-chrome-soft)] hover:border-[var(--aura-chrome-mid)] hover:text-white'
+                onClick={() => !isPast && onSelectTime(t)}
+                className={`py-3 min-h-[44px] inline-flex items-center justify-center rounded-xl text-center font-body text-xs font-bold tracking-wider transition-all border ${
+                  isPast
+                    ? 'bg-white/[0.02] border-white/5 text-white/25 cursor-not-allowed line-through'
+                    : isSelected
+                      ? 'bg-[var(--aura-chrome-bright)] text-[#0A1A2E] border-[var(--aura-chrome-bright)] shadow-lg scale-105 cursor-pointer'
+                      : 'bg-white/5 border-white/10 text-[var(--aura-chrome-soft)] hover:border-[var(--aura-chrome-mid)] hover:text-white cursor-pointer'
                 }`}
               >
                 {t}

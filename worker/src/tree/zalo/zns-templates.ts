@@ -13,6 +13,38 @@ export const TEMPLATE_IDS: Record<string, string> = {
   general_promotion: 'YOUR_GENERAL_PROMO_TEMPLATE_ID'
 };
 
+/**
+ * Resolve an approved Zalo ZNS template ID.
+ * Prefers environment secret `ZALO_ZNS_TEMPLATE_<UPPER_KEY>`, falling back to TEMPLATE_IDS.
+ * Returns null when unconfigured or still using a placeholder `YOUR_` value.
+ */
+export function resolveTemplateId(
+  template_key: string,
+  env?: Record<string, unknown>
+): string | null {
+  const normalizedKey = String(template_key || '').trim();
+  if (!normalizedKey) return null;
+
+  const envKey = `ZALO_ZNS_TEMPLATE_${normalizedKey.toUpperCase()}`;
+  const envValue = env?.[envKey];
+  if (typeof envValue === 'string') {
+    const trimmedEnv = envValue.trim();
+    if (trimmedEnv && !trimmedEnv.startsWith('YOUR_')) {
+      return trimmedEnv;
+    }
+  }
+
+  const fallback = TEMPLATE_IDS[normalizedKey];
+  if (typeof fallback === 'string') {
+    const trimmedFallback = fallback.trim();
+    if (trimmedFallback && !trimmedFallback.startsWith('YOUR_')) {
+      return trimmedFallback;
+    }
+  }
+
+  return null;
+}
+
 export function buildTemplateData(template_key: string, data: ZnsData): Record<string, string> {
   switch (template_key) {
   case 'welcome_signup':
@@ -42,6 +74,15 @@ export function buildTemplateData(template_key: string, data: ZnsData): Record<s
       customer_name: data.name || '',
       expiring_amount: `${(data.amount || 0).toLocaleString('vi-VN')}đ`,
       days_remaining: String(data.days || 7)
+    };
+  case 'general_promotion':
+    return {
+      customer_name: data.name || '',
+      title: data.title || '',
+      message: data.message || '',
+      promo_code: data.promo_code || '',
+      discount: data.discount || '',
+      expires_at: data.expires_at || ''
     };
   default:
     return {};

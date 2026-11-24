@@ -7367,7 +7367,7 @@ describe('Phase 39 acceptance (AL1..AL4)', () => {
     expect(kdsTransitionSrc).toContain("type = 'spend'");
     expect(kdsTransitionSrc).toContain("'refund'");
     expect(tablesSrc).toContain('includeSignedQr');
-    expect(reservationsSrc).toContain("AND status = 'Available'");
+    expect(reservationsSrc).toContain("AND LOWER(TRIM(COALESCE(status, ''))) = 'available'");
     expect(staffTipsSrc).toContain("'owner', 'manager', 'supervisor', 'admin', 'cashier'");
   });
 

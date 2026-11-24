@@ -550,6 +550,8 @@ ALTER TABLE orders ADD COLUMN happy_hour_applied INTEGER DEFAULT 0;
 ALTER TABLE orders ADD COLUMN channel TEXT DEFAULT 'dine_in';
 ALTER TABLE orders ADD COLUMN source TEXT DEFAULT 'pos';
 ALTER TABLE orders ADD COLUMN placed_at TEXT;
+ALTER TABLE orders ADD COLUMN started_at TEXT;
+ALTER TABLE orders ADD COLUMN ready_at TEXT;
 ALTER TABLE orders ADD COLUMN served_at TEXT;
 ALTER TABLE orders ADD COLUMN completed_at TEXT;
 ALTER TABLE orders ADD COLUMN cancelled_at TEXT;

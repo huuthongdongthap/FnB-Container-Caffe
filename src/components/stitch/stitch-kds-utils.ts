@@ -4,13 +4,43 @@
  * Format helpers and visual config for ticket status badges.
  */
 
-import type { TicketStatus, StatusBadgeConfig } from './stitch-kds-types';
+import type { Ticket, TicketStatus, StatusBadgeConfig } from './stitch-kds-types';
 
-/** Format seconds into mm:ss display string */
+/** Format seconds into mm:ss (<1h), HH:MM:SS (1h-24h), or Xd Yh (>=24h). */
 export function formatTime(seconds: number): string {
-  const m = Math.floor(seconds / 60);
-  const s = seconds % 60;
+  const safe = Number.isFinite(seconds) && seconds > 0 ? Math.floor(seconds) : 0;
+  if (safe >= 86_400) {
+    const days = Math.floor(safe / 86_400);
+    const hours = Math.floor((safe % 86_400) / 3_600);
+    return `${days}d ${hours}h`;
+  }
+  if (safe >= 3_600) {
+    const h = Math.floor(safe / 3_600);
+    const m = Math.floor((safe % 3_600) / 60);
+    const s = safe % 60;
+    return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+  }
+  const m = Math.floor(safe / 60);
+  const s = safe % 60;
   return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+}
+
+/** Priority rank for KDS ticket ordering: overdue -> preparing -> pending -> ready. */
+function getTicketPriorityRank(ticket: Ticket): number {
+  const opStatus = ticket.rawStatus ?? ticket.status;
+  if (opStatus === 'ready') return 3;
+  if (ticket.isOverdue || ticket.status === 'overdue') return 0;
+  if (opStatus === 'preparing') return 1;
+  return 2;
+}
+
+/** Sort KDS tickets by operational urgency, then FIFO (longest elapsed first). */
+export function sortKdsTickets(tickets: readonly Ticket[]): Ticket[] {
+  return [...tickets].sort((a, b) => {
+    const rankDiff = getTicketPriorityRank(a) - getTicketPriorityRank(b);
+    if (rankDiff !== 0) return rankDiff;
+    return b.elapsedSeconds - a.elapsedSeconds;
+  });
 }
 
 /** Status badge visual configuration. */

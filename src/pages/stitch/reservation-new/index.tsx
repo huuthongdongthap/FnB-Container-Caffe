@@ -14,25 +14,84 @@ import { useReservations } from '@/hooks/use-reservations';
 export type { Zone } from './reservation-new-constants';
 export { GUEST_OPTIONS, TIMES, WEEK_DAYS, ZONES } from './reservation-new-constants';
 
-/** Parse "2 khách" → 2, "Nhóm 10+" → 10 */
-function parseGuestCount(label: string): number {
-  const n = parseInt(label.replace(/\D/g, ''), 10);
-  return Number.isFinite(n) && n > 0 ? n : 2;
+/** Parse "2 khách" → 2, "3 - 4 khách" → 4, "5 - 8 khách" → 8, "Nhóm 10+" → 10 */
+export function parseGuestCount(label: string): number {
+  const nums = label.match(/\d+/g);
+  if (!nums || nums.length === 0) return 2;
+  const maxNum = Math.max(...nums.map((v) => parseInt(v, 10)).filter((n) => Number.isFinite(n) && n > 0));
+  return Number.isFinite(maxNum) && maxNum > 0 ? maxNum : 2;
 }
 
-/** Parse "DD/MM" + current year → ISO date "YYYY-MM-DD" */
-function parseDateToISO(ddmm: string): string {
-  const [dd, mm] = ddmm.split('/');
-  const year = new Date().getFullYear();
+/** Normalize DB/template table zone names (EN/VI variants) to reservation zone categories. */
+export function normalizeTableZone(rawZone?: string | null): 'indoor' | 'outdoor' | 'vip' | null {
+  const raw = String(rawZone ?? '').trim().toLowerCase();
+  if (!raw) return null;
+  const ascii = raw
+    .normalize('NFD')
+    .replace(/\p{Diacritic}/gu, '')
+    .replace(/đ/g, 'd');
+  if (
+    ascii === 'vip' ||
+    ascii.includes('vip') ||
+    ascii.includes('cabin') ||
+    ascii.includes('phong rieng') ||
+    ascii.includes('private')
+  ) {
+    return 'vip';
+  }
+  if (
+    ascii === 'outdoor' ||
+    ascii.includes('outdoor') ||
+    ascii.includes('san vuon') ||
+    ascii.includes('san thuong') ||
+    ascii.includes('ngoai troi') ||
+    ascii.includes('garden') ||
+    ascii.includes('rooftop') ||
+    ascii.includes('patio') ||
+    ascii.includes('terrace') ||
+    ascii.includes('balcony')
+  ) {
+    return 'outdoor';
+  }
+  if (
+    ascii === 'indoor' ||
+    ascii.includes('indoor') ||
+    ascii.includes('trong nha') ||
+    ascii.includes('lounge') ||
+    ascii.includes('quay bar') ||
+    ascii === 'bar' ||
+    ascii === 'main' ||
+    ascii.includes('main hall') ||
+    ascii.includes('san khau') ||
+    ascii.includes('container') ||
+    ascii.includes('tang tret') ||
+    ascii.includes('may lanh')
+  ) {
+    return 'indoor';
+  }
+  return null;
+}
+
+/** Parse "YYYY-MM-DD" or "DD/MM" → ISO date "YYYY-MM-DD" in Asia/Ho_Chi_Minh (handles year rollover) */
+export function parseDateToISO(dateInput: string, nowMs = Date.now()): string {
+  const trimmed = dateInput.trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) return trimmed;
+  const [dd, mm, yyyy] = trimmed.split('/');
+  if (yyyy && /^\d{4}$/.test(yyyy.trim())) {
+    return `${yyyy.trim()}-${String(mm).padStart(2, '0')}-${String(dd).padStart(2, '0')}`;
+  }
+  const vnNow = new Date(nowMs + 7 * 3600_000);
+  const currentYear = vnNow.getUTCFullYear();
+  const currentMonth = vnNow.getUTCMonth() + 1;
+  const targetMonth = parseInt(mm || '1', 10);
+  const year = currentMonth === 12 && targetMonth === 1 ? currentYear + 1 : currentYear;
   return `${year}-${String(mm).padStart(2, '0')}-${String(dd).padStart(2, '0')}`;
 }
 
 export default function ReservationNew() {
   const todayStr = useMemo(() => {
-    const d = new Date();
-    const day = d.getDate();
-    const m = d.getMonth() + 1;
-    return `${day < 10 ? '0' + day : day}/${m < 10 ? '0' + m : m}`;
+    const vnNow = new Date(Date.now() + 7 * 3600_000);
+    return vnNow.toISOString().slice(0, 10);
   }, []);
 
   const [selectedParty, setSelectedParty] = useState('2 khách');
@@ -45,7 +104,7 @@ export default function ReservationNew() {
 
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [bookingCode, setBookingCode] = useState('');
-  const [savedBooking, setSavedBooking] = useState<{ reservationId: string; tableId: string; tableNumber: string } | null>(null);
+  const [savedBooking, setSavedBooking] = useState<{ reservationId: string; tableId: string; tableNumber: string; zone: string } | null>(null);
   const [submissionError, setSubmissionError] = useState('');
 
   const currentZoneObj = ZONES.find((z) => z.id === selectedZone) ?? ZONES[0]!;
@@ -67,37 +126,62 @@ export default function ReservationNew() {
       return;
     }
 
-    // Find a table matching the selected zone (prefer available ones)
-    const zoneLabel = currentZoneObj.name.toLowerCase();
-    const matchedTable = tables.find(
-      (t) => t.available && t.zone?.toLowerCase().includes(zoneLabel),
-    ) ?? tables.find((t) => t.available) ?? null;
+    const guestCount = parseGuestCount(selectedParty);
+    const fitsCapacity = (t: { capacity?: number }) =>
+      t.capacity === undefined || t.capacity === null || Number(t.capacity) <= 0 || Number(t.capacity) >= guestCount;
+    const bySmallestCapacity = (a: { capacity?: number }, b: { capacity?: number }) =>
+      (Number(a.capacity) || 999) - (Number(b.capacity) || 999);
 
-    if (matchedTable) {
-      const reservationPayload = {
-        table_id: matchedTable.id,
-        customer_name: fullName,
-        customer_phone: phone,
-        guest_count: parseGuestCount(selectedParty),
-        date: parseDateToISO(selectedDate),
-        time: selectedTime,
-        notes: note.trim() || undefined,
-      };
-      try {
-        const result = await createReservationAsync(reservationPayload);
-        if (result?.success !== true || typeof result.data?.id !== 'string' || !result.data.id.trim()) {
-          throw new Error(result?.error || 'Không thể xác nhận đặt bàn. Vui lòng thử lại.');
-        }
-        const tableNumber = String(result.data.table_number ?? matchedTable.table_number);
-        setSavedBooking({ reservationId: result.data.id, tableId: matchedTable.id, tableNumber });
-        setBookingCode(result.data.id);
-        setSubmissionError('');
-      } catch (error) {
-        setSubmissionError(error instanceof Error ? error.message : 'Lỗi kết nối. Vui lòng thử lại.');
-        return;
+    const targetDbZone = currentZoneObj.dbZone.toLowerCase();
+    const targetCardName = currentZoneObj.name.trim().toLowerCase();
+    const matchesTargetZone = (rawZone?: string | null) => {
+      const trimmed = String(rawZone ?? '').trim().toLowerCase();
+      if (!trimmed) return false;
+      if (trimmed === targetDbZone || trimmed === targetCardName) return true;
+      return normalizeTableZone(rawZone) === targetDbZone;
+    };
+    const zoneMatches = tables
+      .filter((t) => t.available && fitsCapacity(t) && matchesTargetZone(t.zone))
+      .sort(bySmallestCapacity);
+
+    const anyCapacityMatches = tables
+      .filter((t) => t.available && fitsCapacity(t))
+      .sort(bySmallestCapacity);
+
+    const hasConfiguredTargetZone = tables.some((t) => matchesTargetZone(t.zone));
+    const unmappedZoneMatches = anyCapacityMatches.filter((t) => normalizeTableZone(t.zone) === null);
+    const matchedTable = zoneMatches[0] ?? (!hasConfiguredTargetZone ? (unmappedZoneMatches[0] ?? null) : null);
+
+    if (!matchedTable) {
+      if (anyCapacityMatches.length > 0) {
+        setSubmissionError(`Khu vực "${currentZoneObj.name}" hiện không còn bàn phù hợp cho ${guestCount} khách vào khung giờ này. Vui lòng chọn khu vực hoặc khung giờ khác.`);
+      } else {
+        setSubmissionError(`Không còn bàn đơn phù hợp cho ${guestCount} khách vào khung giờ này. Vui lòng chọn giờ khác hoặc liên hệ quán để ghép bàn.`);
       }
-    } else {
-      setSubmissionError('Không còn bàn trống. Vui lòng chọn giờ khác hoặc thử lại.');
+      return;
+    }
+
+    const reservationPayload = {
+      table_id: matchedTable.id,
+      customer_name: fullName,
+      customer_phone: phone,
+      guest_count: guestCount,
+      date: parseDateToISO(selectedDate),
+      time: selectedTime,
+      notes: note.trim() || undefined,
+    };
+    try {
+      const result = await createReservationAsync(reservationPayload);
+      if (result?.success !== true || typeof result.data?.id !== 'string' || !result.data.id.trim()) {
+        throw new Error(result?.error || 'Không thể xác nhận đặt bàn. Vui lòng thử lại.');
+      }
+      const tableNumber = String(result.data.table_number ?? matchedTable.table_number);
+      const assignedZone = String(result.data.zone || matchedTable.zone || currentZoneObj.name);
+      setSavedBooking({ reservationId: result.data.id, tableId: matchedTable.id, tableNumber, zone: assignedZone });
+      setBookingCode(result.data.id);
+      setSubmissionError('');
+    } catch (error) {
+      setSubmissionError(error instanceof Error ? error.message : 'Lỗi kết nối. Vui lòng thử lại.');
       return;
     }
 
@@ -119,7 +203,7 @@ export default function ReservationNew() {
   return (
     <div className="relative min-h-screen bg-[#0A1A2E] text-[var(--aura-chrome-bright)] font-body selection:bg-[var(--aura-chrome-mid)] selection:text-[#0A1A2E] overflow-x-hidden">
       <HelmetHead
-        title="Đặt Bàn Trực Tuyến — AURA CAFE"
+        title="Đặt Bàn Trực Tuyến"
         description="Đặt bàn trước tại AURA CAFE Sa Đéc. Chọn vị trí yêu thích: Quầy Bar, Lounge Thủy Mộc, Sân Thượng Rooftop hoặc Cabin Yên Tĩnh."
         canonical="/table-reservation"
       />
@@ -140,7 +224,7 @@ export default function ReservationNew() {
               Cảm Ơn Quý Khách!
             </h1>
             <p className="text-[var(--aura-chrome-soft)] text-sm max-w-md mx-auto mb-4 font-light leading-relaxed">
-              Yêu cầu đặt bàn của quý khách đã được ghi nhận. Đội ngũ AURA CAFE sẽ liên hệ qua điện thoại để xác nhận trong ít phút.
+              Đặt bàn của quý khách đã được xác nhận. Quý khách có thể đặt món trước hoặc đến trực tiếp đúng giờ đã chọn.
             </p>
 
 
@@ -167,8 +251,10 @@ export default function ReservationNew() {
                 <span className="text-white font-medium">{selectedParty}</span>
               </div>
               <div className="flex justify-between items-center text-sm">
-                <span className="text-[var(--aura-chrome-soft)]">Khu vực:</span>
-                <span className="text-[#4A7C59] font-medium">{currentZoneObj.name}</span>
+                <span className="text-[var(--aura-chrome-soft)]">Bàn & Khu vực:</span>
+                <span className="text-[#4A7C59] font-medium">
+                  {savedBooking?.tableNumber ? `Bàn ${savedBooking.tableNumber} • ` : ''}{savedBooking?.zone || currentZoneObj.name}
+                </span>
               </div>
               {note && (
                 <div className="pt-2 text-xs text-[var(--aura-chrome-soft)] italic border-t border-white/5">
@@ -182,13 +268,15 @@ export default function ReservationNew() {
                 type="button"
                 onClick={() => {
                   if (!savedBooking) return;
+                  const physicalTable = savedBooking.tableNumber || savedBooking.tableId;
                   const bookingData = {
                     reservationId: savedBooking.reservationId,
+                    reservationCode: savedBooking.reservationId,
                     tableId: savedBooking.tableId,
                     fullName,
                     phone,
-                    tableNumber: savedBooking.tableNumber,
-                    zone: currentZoneObj.name,
+                    tableNumber: physicalTable,
+                    zone: savedBooking.zone || currentZoneObj.name,
                     time: `${selectedTime} • ${selectedDate}`,
                     guestCount: selectedParty,
                     timestamp: Date.now(),
@@ -199,7 +287,7 @@ export default function ReservationNew() {
                   } catch {
                     /* ignore storage errors */
                   }
-                  window.location.href = `/menu?table=${encodeURIComponent(savedBooking.tableNumber)}`;
+                  window.location.href = `/menu?table=${encodeURIComponent(physicalTable)}`;
                 }}
                 className="px-6 py-3.5 min-h-[44px] rounded-full bg-[var(--aura-chrome-bright)] text-[#0A1A2E] text-xs font-bold uppercase tracking-wider inline-flex items-center justify-center gap-2 hover:opacity-90 active:scale-95 transition-all cursor-pointer shadow-lg"
               >

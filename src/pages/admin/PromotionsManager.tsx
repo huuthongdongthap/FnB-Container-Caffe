@@ -1,12 +1,16 @@
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { HelmetHead } from '@/components/seo/HelmetHead';
 import { usePromotionsManager } from './use-promotions-manager';
 import { PromotionsList } from './promotions-list';
 import { PromotionFormModal } from './promotion-form-modal';
 import { ConfirmDeleteModal } from './confirm-delete-modal';
+import { PromotionNotifyModal } from './promotion-notify-modal';
+import type { Promotion } from './types';
 
 export default function PromotionsManagerPage() {
   const { t } = useTranslation('adminPromotions');
+  const [notifyPromo, setNotifyPromo] = useState<Promotion | null>(null);
   const {
     query,
     modalOpen,
@@ -51,6 +55,7 @@ export default function PromotionsManagerPage() {
             onRefetch={() => query.refetch()}
             onEdit={openEditModal}
             onDelete={(code) => setDeleteCode(code)}
+            onNotify={(promo) => setNotifyPromo(promo)}
             onAdd={openAddModal}
           />
         </div>
@@ -65,6 +70,11 @@ export default function PromotionsManagerPage() {
         onSave={handleSave}
         onClose={closeModal}
         saving={saveMutation.isPending}
+      />
+
+      <PromotionNotifyModal
+        promotion={notifyPromo}
+        onClose={() => setNotifyPromo(null)}
       />
 
       <ConfirmDeleteModal

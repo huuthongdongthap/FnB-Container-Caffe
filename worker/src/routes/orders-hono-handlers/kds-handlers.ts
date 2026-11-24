@@ -6,7 +6,7 @@ import { requireAuth } from '../../middleware/auth';
 import { getTenantId } from '../../middleware/tenant';
 import { getDatabase } from '../../lib/db';
 import { audit } from '../../middleware/audit-log';
-import { buildOrderTail, publishOrderEvent } from '@aura/domain-order';
+import { publishOrderEvent } from '@aura/domain-order';
 import { executeKdsStatusTransition, buildIndexFromDbRows, isHeldOutOfKds } from '@aura/domain-kitchen';
 import { type OrderRecord, type OrderItem, type KdsOrder } from './types';
 
@@ -117,59 +117,102 @@ export async function handleGetKdsOrders(c: Context<{ Bindings: Env }>) {
     return c.json({ success: false, error: 'Cross-tenant KDS access denied' }, 403);
   }
   const db = getDatabase(c as unknown as { env: Record<string, unknown> });
-  const stationId = c.req.query('station_id') || c.req.query('station');
+  const rawStation = (c.req.query('station_id') || c.req.query('station') || '').trim();
+  const stationId = rawStation && rawStation.toLowerCase() !== 'all' ? rawStation : '';
   const tenantId = tenantCheck.tenantId;
 
   let categoryIndex: Map<string, { station_id: string; station_name: string | null }> | null = null;
   if (stationId) {
     try {
       let mappings: Record<string, unknown>[] = [];
+      let loadedMappings = false;
       if (tenantId === '*') {
         const res = await db.prepare(
           'SELECT cs.category_id, cs.station_id, ks.name AS station_name FROM category_stations cs JOIN kitchen_stations ks ON ks.id = cs.station_id'
         ).all<Record<string, unknown>>();
         mappings = res.results || [];
+        loadedMappings = true;
       } else {
         try {
           const res = await db.prepare(
             "SELECT cs.category_id, cs.station_id, ks.name AS station_name, ks.tenant_id FROM category_stations cs JOIN kitchen_stations ks ON ks.id = cs.station_id WHERE COALESCE(NULLIF(TRIM(ks.tenant_id), ''), 'default') = ?"
           ).bind(tenantId).all<Record<string, unknown>>();
           mappings = res.results || [];
+          loadedMappings = true;
         } catch {
           if (tenantId === 'default') {
             const res = await db.prepare(
               'SELECT cs.category_id, cs.station_id, ks.name AS station_name FROM category_stations cs JOIN kitchen_stations ks ON ks.id = cs.station_id'
             ).all<Record<string, unknown>>();
             mappings = res.results || [];
+            loadedMappings = true;
           }
         }
       }
-      categoryIndex = buildIndexFromDbRows(mappings);
+      if (loadedMappings) {
+        categoryIndex = buildIndexFromDbRows(mappings);
+      }
     } catch {
       // Table unseeded or mock DB
     }
   }
 
+  const tenantClauseO = tenantId === '*'
+    ? ''
+    : tenantId === 'default'
+      ? " AND (o.tenant_id = ? OR o.tenant_id IS NULL OR o.tenant_id = '' OR TRIM(o.tenant_id) = '')"
+      : ' AND (o.tenant_id = ? OR TRIM(o.tenant_id) = ?1)';
   const tenantClause = tenantId === '*'
     ? ''
     : tenantId === 'default'
       ? " AND (tenant_id = ? OR tenant_id IS NULL OR tenant_id = '' OR TRIM(tenant_id) = '')"
       : ' AND (tenant_id = ? OR TRIM(tenant_id) = ?1)';
-  const statement = db.prepare(
-    `SELECT * FROM orders WHERE status IN ('pending', 'confirmed', 'preparing', 'ready')${tenantClause}${buildOrderTail({ sort: 'created_at', order: 'ASC', limit: 50 })}`
-  );
-  const { results } = await (tenantId === '*' ? statement : statement.bind(tenantId)).all<OrderRecord>();
+  let results: OrderRecord[] | undefined;
+  try {
+    const joinedStmt = db.prepare(
+      `SELECT o.*, COALESCE(NULLIF(TRIM(t.table_number), ''), NULLIF(TRIM(t.name), ''), o.table_id) AS table_name
+       FROM orders o
+       LEFT JOIN cafe_tables t ON t.id = o.table_id
+         AND COALESCE(NULLIF(TRIM(t.tenant_id), ''), 'default') = COALESCE(NULLIF(TRIM(o.tenant_id), ''), 'default')
+       WHERE o.status IN ('pending', 'confirmed', 'preparing', 'ready')${tenantClauseO}
+         AND NOT (TRIM(COALESCE(o.notes, '')) LIKE 'Khách QR - cho don mon%' AND TRIM(COALESCE(o.items, '')) = '[]')
+       ORDER BY CASE WHEN o.status = 'ready' THEN 1 ELSE 0 END ASC, o.created_at ASC LIMIT 200`
+    );
+    ({ results } = await (tenantId === '*' ? joinedStmt : joinedStmt.bind(tenantId)).all<OrderRecord>());
+  } catch {
+    const statement = db.prepare(
+      `SELECT * FROM orders
+       WHERE status IN ('pending', 'confirmed', 'preparing', 'ready')${tenantClause}
+         AND NOT (TRIM(COALESCE(notes, '')) LIKE 'Khách QR - cho don mon%' AND TRIM(COALESCE(items, '')) = '[]')
+       ORDER BY CASE WHEN status = 'ready' THEN 1 ELSE 0 END ASC, created_at ASC LIMIT 200`
+    );
+    ({ results } = await (tenantId === '*' ? statement : statement.bind(tenantId)).all<OrderRecord>());
+  }
 
   const nowMs = Date.now();
   let recentCancelled: OrderRecord[] = [];
   try {
-    const cancelledStatement = db.prepare(
-      `SELECT * FROM orders WHERE status = 'cancelled' AND cancelled_at IS NOT NULL AND datetime(cancelled_at) >= datetime(?)${tenantClause ? tenantClause.replace('?1', '?2') : ''} LIMIT 20`
-    );
     const cutoff = new Date(nowMs - CANCEL_ALERT_WINDOW_MS).toISOString().replace('T', ' ').slice(0, 19);
-    const cancelledRes = await (tenantId === '*'
-      ? cancelledStatement.bind(cutoff)
-      : cancelledStatement.bind(cutoff, tenantId)).all<OrderRecord>();
+    let cancelledRes: { results?: OrderRecord[] } | undefined;
+    try {
+      const cancelledJoined = db.prepare(
+        `SELECT o.*, COALESCE(NULLIF(TRIM(t.table_number), ''), NULLIF(TRIM(t.name), ''), o.table_id) AS table_name
+         FROM orders o
+         LEFT JOIN cafe_tables t ON t.id = o.table_id
+           AND COALESCE(NULLIF(TRIM(t.tenant_id), ''), 'default') = COALESCE(NULLIF(TRIM(o.tenant_id), ''), 'default')
+         WHERE o.status = 'cancelled' AND o.cancelled_at IS NOT NULL AND datetime(o.cancelled_at) >= datetime(?)${tenantClauseO ? tenantClauseO.replace('?1', '?2') : ''} LIMIT 20`
+      );
+      cancelledRes = await (tenantId === '*'
+        ? cancelledJoined.bind(cutoff)
+        : cancelledJoined.bind(cutoff, tenantId)).all<OrderRecord>();
+    } catch {
+      const cancelledStatement = db.prepare(
+        `SELECT * FROM orders WHERE status = 'cancelled' AND cancelled_at IS NOT NULL AND datetime(cancelled_at) >= datetime(?)${tenantClause ? tenantClause.replace('?1', '?2') : ''} LIMIT 20`
+      );
+      cancelledRes = await (tenantId === '*'
+        ? cancelledStatement.bind(cutoff)
+        : cancelledStatement.bind(cutoff, tenantId)).all<OrderRecord>();
+    }
     const activeIds = new Set((results || []).map((o) => o.id));
     recentCancelled = (cancelledRes?.results || []).filter(
       (o) => !activeIds.has(o.id) && isRecentPrepCancellation(o as unknown as Record<string, unknown>, nowMs)
@@ -195,8 +238,9 @@ export async function handleGetKdsOrders(c: Context<{ Bindings: Env }>) {
 
     if (stationId && categoryIndex) {
       items = items.filter((item) => {
-        const catId = (item.category_id || (item as any).categoryId || '') as string;
-        return categoryIndex!.get(catId)?.station_id === stationId;
+        const catId = String(item.category_id || (item as unknown as Record<string, unknown>).categoryId || '');
+        const mappedStation = categoryIndex!.get(catId)?.station_id;
+        return mappedStation === stationId;
       });
       if (items.length === 0) continue;
     }
@@ -208,16 +252,45 @@ export async function handleGetKdsOrders(c: Context<{ Bindings: Env }>) {
     const orderType = typeof rawOrder.order_type === 'string' && rawOrder.order_type.trim()
       ? rawOrder.order_type.trim()
       : undefined;
-    const entry: KdsOrder & { order_type?: string; cancel_alert?: boolean; kds_alert?: string } = {
+    const tableName = typeof rawOrder.table_name === 'string' && rawOrder.table_name.trim()
+      ? rawOrder.table_name.trim()
+      : undefined;
+    const orderNumber = typeof rawOrder.order_number === 'string' && rawOrder.order_number.trim()
+      ? rawOrder.order_number.trim()
+      : undefined;
+    const updatedAt = typeof rawOrder.updated_at === 'string' && rawOrder.updated_at.trim()
+      ? rawOrder.updated_at.trim()
+      : undefined;
+    const startedAt = typeof rawOrder.started_at === 'string' && rawOrder.started_at.trim()
+      ? rawOrder.started_at.trim()
+      : undefined;
+    const readyAt = typeof rawOrder.ready_at === 'string' && rawOrder.ready_at.trim()
+      ? rawOrder.ready_at.trim()
+      : undefined;
+    const entry: KdsOrder & {
+      table_name?: string;
+      order_number?: string;
+      order_type?: string;
+      updated_at?: string;
+      started_at?: string;
+      ready_at?: string;
+      cancel_alert?: boolean;
+      kds_alert?: string;
+    } = {
       id: order.id,
       customer_name: order.customer_name,
       table_id: order.table_id,
+      ...(tableName ? { table_name: tableName } : {}),
+      ...(orderNumber ? { order_number: orderNumber } : {}),
       ...(orderType ? { order_type: orderType } : {}),
       items,
       ...(order.notes ? { notes: order.notes } : {}),
       status: order.status,
       elapsed_minutes: elapsed,
       created_at: order.created_at,
+      ...(updatedAt ? { updated_at: updatedAt } : {}),
+      ...(startedAt ? { started_at: startedAt } : {}),
+      ...(readyAt ? { ready_at: readyAt } : {}),
       ...(isCancelAlert ? { cancel_alert: true, kds_alert: 'cancelled' } : {}),
     };
     kdsOrders.push(entry as KdsOrder);
