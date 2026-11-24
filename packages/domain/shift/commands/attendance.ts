@@ -1,4 +1,4 @@
-import type { ShiftRow } from '../model/shift-types';
+import { deriveShiftSlot, type ShiftRow } from '../model/shift-types';
 import { businessDate, shiftTarget, ShiftContractError, type ShiftScope } from './shift-access';
 import { ACTIVE_ATTENDANCE_SQL, getShift } from './shift-repository';
 
@@ -45,18 +45,19 @@ export async function clockIn(scope: ShiftScope, staffId?: string, notes?: strin
       id = String(scheduled.id);
     } else {
       const resolvedOpeningCash = openingCash ?? 0;
+      const shiftSlotCode = deriveShiftSlot(now).code;
       let result;
       try {
         result = await db.prepare(`INSERT INTO staff_shifts
           (tenant_id, staff_id, staff_name, role, date, shift, clock_in, attendance_state, notes, opening_cash)
-          VALUES (?, ?, ?, ?, ?, 'attendance', ?, 'active', ?, ?)`)
-          .bind(targetTenant, staff.id, staff.name, staff.role, businessDate(), now, notes ?? null, resolvedOpeningCash).run();
+          VALUES (?, ?, ?, ?, ?, ?, ?, 'active', ?, ?)`)
+          .bind(targetTenant, staff.id, staff.name, staff.role, businessDate(), shiftSlotCode, now, notes ?? null, resolvedOpeningCash).run();
       } catch (err) {
         if (resolvedOpeningCash === 0 && /no such column:\s*opening_cash|has no column named\s+opening_cash/i.test(String(err))) {
           result = await db.prepare(`INSERT INTO staff_shifts
             (tenant_id, staff_id, staff_name, role, date, shift, clock_in, attendance_state, notes)
-            VALUES (?, ?, ?, ?, ?, 'attendance', ?, 'active', ?)`)
-            .bind(targetTenant, staff.id, staff.name, staff.role, businessDate(), now, notes ?? null).run();
+            VALUES (?, ?, ?, ?, ?, ?, ?, 'active', ?)`)
+            .bind(targetTenant, staff.id, staff.name, staff.role, businessDate(), shiftSlotCode, now, notes ?? null).run();
         } else {
           throw err;
         }
@@ -78,12 +79,12 @@ export async function clockOut(scope: ShiftScope, staffId?: string, attendanceId
     ? String(attendanceId).trim()
     : undefined;
   const resolvedNotes = notes;
-  const preloaded = resolvedAttendanceId ? await getShift({ ...scope, canManage: true }, resolvedAttendanceId) : undefined;
+  const preloaded = resolvedAttendanceId ? await getShift(scope, resolvedAttendanceId) : undefined;
   const checkStaffId = staffId || (!scope.canManage ? scope.actor.id : undefined);
   if (preloaded && checkStaffId && String(preloaded.staff_id) !== String(checkStaffId).trim()) {
     throw new ShiftContractError('Attendance record does not match staff member', 409);
   }
-  const staff = await shiftTarget(scope, staffId || preloaded?.staff_id), db = scope.env.AURA_DB;
+  const staff = await shiftTarget(scope, staffId || preloaded?.staff_id, { allowInactiveTarget: true }), db = scope.env.AURA_DB;
   const targetTenant = (typeof staff.tenant_id === 'string' && staff.tenant_id.trim()) || (scope.tenantId === '*' ? 'default' : scope.tenantId);
   const targetScope: ShiftScope = { ...scope, tenantId: targetTenant };
   const scopedPreloaded = resolvedAttendanceId ? await getShift(targetScope, resolvedAttendanceId) : undefined;
@@ -98,9 +99,20 @@ export async function clockOut(scope: ShiftScope, staffId?: string, attendanceId
   if (!Number.isFinite(elapsed) || elapsed < 0) throw new ShiftContractError('Invalid clock-in timestamp', 409);
   const hours = Math.round(elapsed / 3600000 * 100) / 100;
   const mergedNotes = resolvedNotes ? [active.notes, resolvedNotes].filter(Boolean).join('; ') : active.notes;
-  const saved = await db.prepare(`UPDATE staff_shifts SET clock_out = ?, hours_worked = ?, attendance_state = 'completed', notes = ?
-    WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ? AND staff_id = ? AND clock_in = ? AND clock_out IS NULL`)
-    .bind(now.toISOString(), hours, mergedNotes, active.id, targetTenant, staff.id, active.clock_in).run();
+  let saved;
+  try {
+    saved = await db.prepare(`UPDATE staff_shifts SET clock_out = ?, hours_worked = ?, attendance_state = 'completed', status = 'closed', notes = ?
+      WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ? AND staff_id = ? AND clock_in = ? AND clock_out IS NULL`)
+      .bind(now.toISOString(), hours, mergedNotes, active.id, targetTenant, staff.id, active.clock_in).run();
+  } catch (err) {
+    if (/no such column:\s*status|has no column named\s+status/i.test(String(err))) {
+      saved = await db.prepare(`UPDATE staff_shifts SET clock_out = ?, hours_worked = ?, attendance_state = 'completed', notes = ?
+        WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ? AND staff_id = ? AND clock_in = ? AND clock_out IS NULL`)
+        .bind(now.toISOString(), hours, mergedNotes, active.id, targetTenant, staff.id, active.clock_in).run();
+    } else {
+      throw err;
+    }
+  }
   if (!saved.meta.changes) throw new ShiftContractError('Shift already closed or changed', 409);
   return getShift(targetScope, String(active.id));
 }

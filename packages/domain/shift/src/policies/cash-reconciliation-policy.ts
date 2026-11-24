@@ -126,27 +126,54 @@ async function getCashPaymentsForShift(
   const now = asOf || new Date().toISOString();
   const endTime = shift.clock_out || now;
   try {
-    const rows = await db.prepare(`SELECT p.id, p.amount, a.shift_id,
-        (SELECT COUNT(*) FROM staff_shifts s
-         WHERE COALESCE(NULLIF(TRIM(s.tenant_id), ''), 'default') = ?
-         AND julianday(COALESCE(a.settled_at, p.updated_at, p.created_at)) >= julianday(s.clock_in)
-         AND julianday(COALESCE(a.settled_at, p.updated_at, p.created_at)) <= julianday(COALESCE(s.clock_out, ?))) AS candidates
-      FROM payments p LEFT JOIN cash_payment_attributions a ON a.payment_id = p.id AND a.tenant_id = COALESCE(NULLIF(TRIM(p.tenant_id), ''), 'default')
-      WHERE p.method IN ('cash', 'cod') AND p.status = 'completed'
-      AND COALESCE(NULLIF(TRIM(p.tenant_id), ''), 'default') = ?
-      AND julianday(COALESCE(a.settled_at, p.updated_at, p.created_at)) >= julianday(?)
-      AND julianday(COALESCE(a.settled_at, p.updated_at, p.created_at)) <= julianday(?)`)
-      .bind(tenant, now, tenant, shift.clock_in, endTime)
-      .all<{ id: string; amount: number; shift_id: string | null; candidates: number }>();
+    const queryAttributionRows = (includeAttendanceState: boolean) =>
+      db.prepare(`SELECT p.id, p.amount, a.shift_id,
+          (SELECT COUNT(*) FROM staff_shifts s
+           WHERE COALESCE(NULLIF(TRIM(s.tenant_id), ''), 'default') = ?
+           AND s.clock_in IS NOT NULL
+           ${includeAttendanceState ? "AND LOWER(COALESCE(s.attendance_state, 'active')) <> 'cancelled'" : ''}
+           AND LOWER(COALESCE(s.role, '')) NOT IN ('barista', 'kitchen', 'chef')
+           AND julianday(COALESCE(p.updated_at, p.created_at)) >= julianday(s.clock_in)
+           AND julianday(COALESCE(p.updated_at, p.created_at)) <= julianday(COALESCE(s.clock_out, ?))) AS candidates
+        FROM payments p LEFT JOIN cash_payment_attributions a ON a.payment_id = p.id AND a.tenant_id = COALESCE(NULLIF(TRIM(p.tenant_id), ''), 'default')
+        WHERE p.method IN ('cash', 'cod') AND p.status = 'completed'
+        AND COALESCE(NULLIF(TRIM(p.tenant_id), ''), 'default') = ?
+        AND (a.shift_id = ? OR (a.shift_id IS NULL
+          AND julianday(COALESCE(p.updated_at, p.created_at)) >= julianday(?)
+          AND julianday(COALESCE(p.updated_at, p.created_at)) <= julianday(?)))`)
+        .bind(tenant, now, tenant, shiftId, shift.clock_in, endTime)
+        .all<{ id: string; amount: number; shift_id: string | null; candidates: number }>();
+
+    let rows: { results?: Array<{ id: string; amount: number; shift_id: string | null; candidates: number }> };
+    try {
+      rows = await queryAttributionRows(true);
+    } catch (innerErr) {
+      if (/no such column:.*attendance_state/i.test(String(innerErr))) {
+        rows = await queryAttributionRows(false);
+      } else {
+        throw innerErr;
+      }
+    }
+
     if (Array.isArray(rows?.results) && (rows.results.length > 0 || Boolean(shift.staff_id))) {
       let total = 0;
+      const ambiguousPaymentIds: string[] = [];
       for (const row of rows.results) {
         if (row.shift_id !== null && row.shift_id !== undefined) {
           if (String(row.shift_id) === String(shiftId)) total += row.amount;
+        } else if (row.candidates !== 1) {
+          ambiguousPaymentIds.push(String(row.id));
         } else {
-          if (row.candidates !== 1) throw new ShiftContractError('Ambiguous cash payment responsibility; assign collecting shift before reconciliation', 409);
           total += row.amount;
         }
+      }
+      if (ambiguousPaymentIds.length > 0) {
+        throw new ShiftContractError(
+          'Ambiguous cash payment responsibility; assign collecting shift before reconciliation',
+          409,
+          'AMBIGUOUS_CASH_PAYMENTS',
+          { ambiguous_payment_ids: ambiguousPaymentIds },
+        );
       }
       return total;
     }
@@ -391,6 +418,103 @@ export async function reconcileShiftCash(
   const variance = actualCash - expectedCash;
   const varianceStatus = determineVarianceStatus(variance);
 
+  const hasRemitted = input.remitted_cash !== undefined;
+  const hasClosing = input.closing_float !== undefined;
+
+  if (hasRemitted && (typeof input.remitted_cash !== 'number' || !Number.isFinite(input.remitted_cash))) {
+    throw new ShiftContractError('Invalid remitted_cash: must be a finite number', 400);
+  }
+  if (hasClosing && (typeof input.closing_float !== 'number' || !Number.isFinite(input.closing_float))) {
+    throw new ShiftContractError('Invalid closing_float: must be a finite number', 400);
+  }
+
+  let remittedCash: number;
+  let closingFloat: number;
+
+  if (hasRemitted && hasClosing) {
+    remittedCash = input.remitted_cash as number;
+    closingFloat = input.closing_float as number;
+  } else if (hasRemitted) {
+    remittedCash = input.remitted_cash as number;
+    closingFloat = Math.max(0, actualCash - remittedCash);
+  } else if (hasClosing) {
+    closingFloat = input.closing_float as number;
+    remittedCash = actualCash - closingFloat;
+  } else {
+    remittedCash = 0;
+    closingFloat = actualCash;
+  }
+
+  if (remittedCash < 0 || remittedCash > actualCash) {
+    throw new ShiftContractError('Invalid remitted_cash: must be between 0 and actual_cash', 400);
+  }
+  if (closingFloat < 0 || closingFloat > actualCash) {
+    throw new ShiftContractError('Invalid closing_float: must be between 0 and actual_cash', 400);
+  }
+  if (remittedCash + closingFloat !== actualCash) {
+    throw new ShiftContractError(
+      'Invalid cash split: remitted_cash + closing_float must equal actual_cash',
+      400,
+    );
+  }
+
+  let handoverToStaffId: string | null = null;
+  if (input.handover_to_staff_id !== undefined && input.handover_to_staff_id !== null) {
+    if (typeof input.handover_to_staff_id !== 'string') {
+      throw new ShiftContractError('Invalid handover_to_staff_id', 400);
+    }
+    const trimmedHandoverTo = input.handover_to_staff_id.trim();
+    if (trimmedHandoverTo.length > 120) {
+      throw new ShiftContractError('Invalid handover_to_staff_id: exceeds 120 characters', 400);
+    }
+    if (trimmedHandoverTo) {
+      if (shiftWindow.staff_id) {
+        let recipient: { tenant_id?: string | null; role: string; is_active: number } | null = null;
+        try {
+          recipient = await db
+            .prepare('SELECT tenant_id, role, is_active FROM users WHERE id = ?')
+            .bind(trimmedHandoverTo)
+            .first<{ tenant_id: string | null; role: string; is_active: number }>();
+        } catch (err) {
+          if (/no such column:.*tenant_id/i.test(String(err))) {
+            const legacyRecipient = await db
+              .prepare('SELECT role, is_active FROM users WHERE id = ?')
+              .bind(trimmedHandoverTo)
+              .first<{ role: string; is_active: number }>();
+            recipient = legacyRecipient ? { ...legacyRecipient, tenant_id: 'default' } : null;
+          } else {
+            throw err;
+          }
+        }
+        const validStaffRoles = ['staff', 'cashier', 'waiter', 'barista', 'chef', 'kitchen', 'shipper', 'rider', 'supervisor', 'manager', 'owner', 'admin'];
+        const recipientTenant = (recipient?.tenant_id?.trim() || 'default').toLowerCase();
+        const isHqRecipient = Boolean(recipient && ['owner', 'admin'].includes(recipient.role) && (recipientTenant === 'hq' || recipientTenant === '*'));
+        const sameTenantRecipient = Boolean(recipient && (recipient.tenant_id?.trim() || 'default') === effectiveReconTenant);
+        if (!recipient || recipient.is_active !== 1 || !validStaffRoles.includes(recipient.role) || (!isHqRecipient && !sameTenantRecipient)) {
+          throw new ShiftContractError('Invalid handover recipient staff member', 400);
+        }
+      }
+      handoverToStaffId = trimmedHandoverTo;
+    }
+  }
+
+  let onlineSalesTotal = 0;
+  try {
+    const onlineRow = await db
+      .prepare(
+        `SELECT COALESCE(SUM(amount), 0) AS total FROM payments
+         WHERE method = 'payos' AND status = 'completed'
+           AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?
+           AND julianday(COALESCE(updated_at, created_at)) >= julianday(?)
+           AND julianday(COALESCE(updated_at, created_at)) <= julianday(?)`,
+      )
+      .bind(effectiveReconTenant, shiftWindow.clock_in, shiftWindow.clock_out || reconciliationTime)
+      .first<{ total: number }>();
+    onlineSalesTotal = onlineRow?.total || 0;
+  } catch {
+    onlineSalesTotal = 0;
+  }
+
   const reconciliation: ShiftReconciliation = {
     id: `recon_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`,
     shift_id: input.shift_id,
@@ -403,9 +527,21 @@ export async function reconcileShiftCash(
     denominations: input.denominations,
     cash_payment_total: cashPayments,
     cash_payout_total: cashPayouts,
+    remitted_cash: remittedCash,
+    closing_float: closingFloat,
+    handover_to_staff_id: handoverToStaffId,
+    online_sales_total: onlineSalesTotal,
     notes: input.notes ?? null,
     created_at: reconciliationTime,
   };
+
+  const storedDenominationsJson = JSON.stringify({
+    ...input.denominations,
+    remitted_cash: remittedCash,
+    closing_float: closingFloat,
+    handover_to_staff_id: handoverToStaffId,
+    online_sales_total: onlineSalesTotal,
+  });
 
   try {
     const insert = db.prepare(`INSERT INTO shift_reconciliations (
@@ -416,7 +552,7 @@ export async function reconcileShiftCash(
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
       .bind(
         reconciliation.id, input.shift_id, reconciliation.staff_id, authoritativeOpeningFloat,
-        expectedCash, actualCash, variance, varianceStatus, JSON.stringify(input.denominations),
+        expectedCash, actualCash, variance, varianceStatus, storedDenominationsJson,
         cashPayments, cashPayouts, reconciliation.notes, effectiveReconTenant, reconciliation.created_at,
         staffId, authoritativeOpeningFloat, variance, varianceStatus, cashPayments
       );
@@ -447,7 +583,7 @@ export async function reconcileShiftCash(
           ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
           .bind(
             reconciliation.id, input.shift_id, reconciliation.staff_id, authoritativeOpeningFloat,
-            expectedCash, actualCash, variance, varianceStatus, JSON.stringify(input.denominations),
+            expectedCash, actualCash, variance, varianceStatus, storedDenominationsJson,
             cashPayments, cashPayouts, reconciliation.notes, reconciliation.created_at
           ).run();
       } catch (legacyErr) {
@@ -596,11 +732,25 @@ export async function getReconciliationForShift(
     }
   }
 
+  const parsedDenom = typeof row.denominations === 'string'
+    ? (JSON.parse(row.denominations) as Record<string, unknown>)
+    : (row.denominations as Record<string, unknown> | null);
+
+  const cleanDenominations = {
+    denominations: Array.isArray(parsedDenom?.denominations)
+      ? parsedDenom.denominations
+      : [],
+  } as ShiftReconciliation['denominations'];
+
   return {
     ...(row as unknown as ShiftReconciliation),
-    denominations: typeof row.denominations === 'string'
-      ? JSON.parse(row.denominations)
-      : row.denominations as ShiftReconciliation['denominations'],
+    denominations: cleanDenominations,
+    ...(typeof parsedDenom?.remitted_cash === 'number' ? { remitted_cash: parsedDenom.remitted_cash } : {}),
+    ...(typeof parsedDenom?.closing_float === 'number' ? { closing_float: parsedDenom.closing_float } : {}),
+    ...(typeof parsedDenom?.handover_to_staff_id === 'string' || parsedDenom?.handover_to_staff_id === null
+      ? { handover_to_staff_id: parsedDenom.handover_to_staff_id as string | null }
+      : {}),
+    ...(typeof parsedDenom?.online_sales_total === 'number' ? { online_sales_total: parsedDenom.online_sales_total } : {}),
   };
 }
 

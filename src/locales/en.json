@@ -2340,6 +2340,7 @@
     "preparing": "Start Preparing",
     "ready": "Mark Ready",
     "serve": "Serve",
+    "dispatch": "Dispatch Delivery",
     "deliver": "Mark Delivered",
     "complete": "Complete",
     "completed": "Completed",

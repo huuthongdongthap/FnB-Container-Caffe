@@ -152,9 +152,11 @@ describe('createOrderSchema', () => {
     expect(data.customer_email).toBe('a@b.com');
   });
 
-  it('requires customer_address and payos payment_method for delivery orders', () => {
+  it('requires customer_address and accepts payos or cod payment_method for delivery orders', () => {
     expect(() => createOrderSchema.parse({ ...validOrder, order_type: 'delivery', payment_method: 'payos', table_id: undefined })).toThrow(/customer_address/);
-    expect(() => createOrderSchema.parse({ ...validOrder, order_type: 'delivery', payment_method: 'cod', customer_address: '39 Nguyễn Tất Thành', table_id: undefined })).toThrow(/PayOS/);
+    const okCod = createOrderSchema.parse({ ...validOrder, order_type: 'delivery', payment_method: 'cod', customer_address: '39 Nguyễn Tất Thành', table_id: undefined });
+    expect(okCod.order_type).toBe('delivery');
+    expect(okCod.payment_method).toBe('cod');
     const ok = createOrderSchema.parse({ ...validOrder, order_type: 'delivery', payment_method: 'payos', customer_address: '39 Nguyễn Tất Thành', table_id: undefined });
     expect(ok.order_type).toBe('delivery');
     expect(ok.payment_method).toBe('payos');

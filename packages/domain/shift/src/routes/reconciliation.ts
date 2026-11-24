@@ -25,6 +25,7 @@ const RECONCILIATION_ROLES = new Set([
   'chef',
   'kitchen',
   'shipper',
+  'rider',
 ]);
 const HQ_ROLES = new Set(['owner', 'admin']);
 
@@ -143,11 +144,23 @@ export function reconciliationRoutes(app: Hono<{ Bindings: Env; Variables: { use
         ? (body.denominations as ReconciliationInput['denominations'])
         : { denominations: [] };
 
+    if (
+      body.handover_to_staff_id !== undefined &&
+      body.handover_to_staff_id !== null &&
+      typeof body.handover_to_staff_id !== 'string'
+    ) {
+      return c.json({ success: false, error: 'Invalid handover_to_staff_id' }, 400);
+    }
+    const trimmedHandoverTo = typeof body.handover_to_staff_id === 'string' ? body.handover_to_staff_id.trim() : undefined;
+
     const input: ReconciliationInput & { actual_cash_counted?: unknown } = {
       shift_id: shiftId,
       opening_float: Number(body.opening_float ?? 0),
       denominations,
       notes: typeof body.notes === 'string' ? body.notes : undefined,
+      ...(typeof body.remitted_cash === 'number' ? { remitted_cash: body.remitted_cash } : {}),
+      ...(typeof body.closing_float === 'number' ? { closing_float: body.closing_float } : {}),
+      ...(trimmedHandoverTo ? { handover_to_staff_id: trimmedHandoverTo } : {}),
       ...(body.actual_cash_counted !== undefined ? { actual_cash_counted: body.actual_cash_counted } : {}),
     };
 
@@ -155,7 +168,21 @@ export function reconciliationRoutes(app: Hono<{ Bindings: Env; Variables: { use
       const result = await reconcileShiftCash(c.env, input, staffId, scope.tenantId, String(user.role || ''));
       return c.json({ success: true, data: result }, 201);
     } catch (err) {
-      if (err instanceof ShiftContractError) return c.json({ success: false, error: err.message }, err.status);
+      if (err instanceof ShiftContractError) {
+        const ambiguousPaymentIds = Array.isArray(err.details?.ambiguous_payment_ids)
+          ? err.details.ambiguous_payment_ids
+          : undefined;
+        return c.json(
+          {
+            success: false,
+            error: err.message,
+            ...(err.code ? { code: err.code } : {}),
+            ...(err.details ? { details: err.details } : {}),
+            ...(ambiguousPaymentIds ? { ambiguous_payment_ids: ambiguousPaymentIds } : {}),
+          },
+          err.status,
+        );
+      }
       log.error('Unexpected shift reconciliation error', {
         shiftId,
         message: err instanceof Error ? err.message : String(err),

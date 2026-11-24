@@ -1413,7 +1413,7 @@ describe('Phase 68 Security Regression Suite (BO1..BO4)', () => {
 
       const envObj = buildEnv(db);
 
-      // Staff A2 attempting to clockOut attendance id '1' (which belongs to staff-a1) must be rejected with 409
+      // Non-manager Staff A2 attempting to clockOut attendance id '1' (which belongs to staff-a1) must be rejected with 404 (no existence oracle)
       await expect(
         clockOut(
           {
@@ -1421,6 +1421,21 @@ describe('Phase 68 Security Regression Suite (BO1..BO4)', () => {
             tenantId: 'store-a',
             actor: { id: 'staff-a2', role: 'waiter', tenant_id: 'store-a', is_active: 1, auth_version: 1 },
             canManage: false,
+          },
+          'staff-a2',
+          '1',
+          undefined
+        )
+      ).rejects.toMatchObject({ status: 404 });
+
+      // Manager attempting to clockOut attendance id '1' (staff-a1) with mismatched staffId 'staff-a2' must be rejected with 409
+      await expect(
+        clockOut(
+          {
+            env: envObj,
+            tenantId: 'store-a',
+            actor: { id: 'hq-owner', role: 'owner', tenant_id: 'hq', is_active: 1, auth_version: 1 },
+            canManage: true,
           },
           'staff-a2',
           '1',

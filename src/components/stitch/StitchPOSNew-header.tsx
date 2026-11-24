@@ -2,14 +2,14 @@
 
 import { useTranslation } from 'react-i18next';
 import { Clock, Home, LayoutDashboard, ClipboardList, ChefHat, UserCheck, AlertTriangle } from 'lucide-react';
+import { formatTime } from '@/pages/admin/staff-utils';
 import type { POSActiveShift } from './StitchPOSNew-types';
 import { LiveClock } from './StitchPOSNew-live-clock';
 
 function formatShiftStartTime(iso?: string | null): string {
   if (!iso) return '';
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return '';
-  return d.toLocaleTimeString('vi-VN', { hour12: false, hour: '2-digit', minute: '2-digit' });
+  const formatted = formatTime(iso);
+  return formatted === '—' ? '' : formatted;
 }
 
 export function POSHeader({

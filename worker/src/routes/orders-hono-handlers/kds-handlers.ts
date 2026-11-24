@@ -90,7 +90,7 @@ function verifyKdsOrderTenant(
 }
 
 const CANCEL_ALERT_WINDOW_MS = 10 * 60_000;
-const PREP_HISTORY_STATUSES = new Set(['preparing', 'ready', 'served', 'completed']);
+const PREP_HISTORY_STATUSES = new Set(['preparing', 'ready', 'delivering', 'served', 'delivered', 'completed']);
 
 function parseUtcTimestampMs(raw: unknown): number {
   if (typeof raw !== 'string' || !raw.trim()) return NaN;
@@ -309,7 +309,7 @@ export async function handleUpdateOrderStatus(c: Context<{ Bindings: Env }>, for
   const body = typeof forcedStatus === 'string' ? { status: forcedStatus } : await c.req.json().catch(() => null);
   const parsed = updateOrderStatusSchema.safeParse(body);
   if (!parsed.success) return zodErrorResponse(c, parsed.error);
-  const { status } = parsed.data;
+  const { status, assigned_shipper_id, shipper_name, failure_reason } = parsed.data;
   const user = c.get('user' as any) as { role?: string } | undefined;
 
   let waitUntilFn: ((p: Promise<unknown>) => void) | undefined;
@@ -317,11 +317,17 @@ export async function handleUpdateOrderStatus(c: Context<{ Bindings: Env }>, for
     if (c.executionCtx) waitUntilFn = (p) => c.executionCtx.waitUntil(p);
   } catch { /* absent in test harness */ }
 
+  const deliveryFields: Record<string, unknown> = {};
+  if (assigned_shipper_id !== undefined) deliveryFields.assigned_shipper_id = assigned_shipper_id.trim() || null;
+  if (shipper_name !== undefined) deliveryFields.shipper_name = shipper_name.trim() || null;
+  if (failure_reason !== undefined) deliveryFields.failure_reason = failure_reason.trim() || null;
+
   const result = await executeKdsStatusTransition(db, id, status, user?.role, {
     tenantId: tenantCheck.tenantId,
     kv: c.env.AUTH_KV,
     env: c.env as unknown as Record<string, unknown>,
     waitUntil: waitUntilFn,
+    ...(Object.keys(deliveryFields).length > 0 ? { fields: deliveryFields } : {}),
   });
 
   if (!result.success) return c.json({ success: false, error: result.error }, (result.statusCode || 400) as any);
@@ -499,10 +505,10 @@ export async function handleMarkCodPaid(c: Context<{ Bindings: Env }>) {
  * KDS queue router, and this file all guard with the same set.
  */
 export const KDS_ROLES = ['owner', 'manager', 'supervisor', 'staff', 'waiter', 'cashier', 'admin', 'kitchen', 'barista', 'chef'];
-export const COD_COLLECTION_ROLES = ['owner', 'manager', 'supervisor', 'cashier', 'admin', 'waiter', 'shipper'];
+export const COD_COLLECTION_ROLES = ['owner', 'manager', 'supervisor', 'cashier', 'admin', 'waiter', 'shipper', 'rider'];
 
 export function registerKdsHandlers(app: Hono<{ Bindings: Env }>) {
   app.get('/kds', requireAuth(KDS_ROLES), handleGetKdsOrders);
-  app.patch('/:id/status', requireAuth([...KDS_ROLES, 'shipper']), audit('order_status_change'), (c) => handleUpdateOrderStatus(c));
+  app.patch('/:id/status', requireAuth([...KDS_ROLES, 'shipper', 'rider']), audit('order_status_change'), (c) => handleUpdateOrderStatus(c));
   app.patch('/:id/mark-cod-paid', requireAuth(COD_COLLECTION_ROLES), audit('order_cod_paid'), handleMarkCodPaid);
 }

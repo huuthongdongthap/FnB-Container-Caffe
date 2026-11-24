@@ -23,6 +23,12 @@ export const ISSUED_EINVOICE_CANCEL_ERROR = 'Cannot cancel an order with an issu
 
 const ISSUED_INVOICE_SYNC_STATUSES = ['synced', 'submitted', 'issued', 'completed'] as const;
 
+/** Terminal void statuses share the same money/invoice/rollback obligations. */
+export const VOID_STATUSES = ['cancelled', 'failed', 'expired'] as const;
+export function isVoidStatus(status: unknown): boolean {
+  return (VOID_STATUSES as readonly string[]).includes(String(status ?? '').trim().toLowerCase());
+}
+
 export async function hasIssuedEInvoiceForOrder(db: OrderStatusDb, orderId: string): Promise<boolean> {
   const placeholders = ISSUED_INVOICE_SYNC_STATUSES.map(() => '?').join(', ');
   const queries: Array<{ sql: string; binds: unknown[] }> = [
@@ -239,7 +245,7 @@ export async function transitionOrderStatus(
     }
   }
 
-  if (targetStatus === 'cancelled' && !isNoOp) {
+  if (isVoidStatus(targetStatus) && !isNoOp) {
     const canProbeIssuedInvoice =
       !options.currentOrder ||
       'payment_status' in options.currentOrder ||
@@ -279,7 +285,16 @@ export async function transitionOrderStatus(
     }
   }
 
-  const allowedFieldKeys = new Set(['notes', 'delivery_time', 'payment_method', 'payment_status']);
+  const allowedFieldKeys = new Set([
+    'notes',
+    'delivery_time',
+    'payment_method',
+    'payment_status',
+    'assigned_shipper_id',
+    'shipper_name',
+    'failure_reason',
+  ]);
+  const optionalDeliveryKeys = new Set(['assigned_shipper_id', 'shipper_name', 'failure_reason']);
   const fields = Object.entries(options.fields ?? {}).filter(
     ([key, value]) => allowedFieldKeys.has(key) && value !== undefined,
   );
@@ -298,20 +313,30 @@ export async function transitionOrderStatus(
       : !isNoOp && targetStatus === 'ready' && !fieldKeys.has('ready_at')
         ? ', ready_at = COALESCE(ready_at, ?2)'
         : '';
-  const additions = fields.map(([key]) => `, ${key} = ?`).join('');
-  const updateStatus = (guard = '', includePrepTimestamp = true) => db.prepare(
-    `UPDATE orders SET status = ?, updated_at = ?${includePrepTimestamp ? prepTimestampAddition : ''}${additions} WHERE id = ? AND status = ?${writeTenantClause}${guard}`,
-  ).bind(targetStatus, nowIso, ...fields.map(([, value]) => value), orderId, order.status, ...writeTenantBinds).run();
+  const updateStatus = (guard = '', includePrepTimestamp = true, activeFields = fields) => {
+    const additions = activeFields.map(([key]) => `, ${key} = ?`).join('');
+    return db.prepare(
+      `UPDATE orders SET status = ?, updated_at = ?${includePrepTimestamp ? prepTimestampAddition : ''}${additions} WHERE id = ? AND status = ?${writeTenantClause}${guard}`,
+    ).bind(targetStatus, nowIso, ...activeFields.map(([, value]) => value), orderId, order.status, ...writeTenantBinds).run();
+  };
   const runUpdateWithCompatFallback = async (initialGuard: string): Promise<unknown> => {
     let guard = initialGuard;
     let includePrepTimestamp = Boolean(prepTimestampAddition);
+    let activeFields = fields;
     for (;;) {
       try {
-        return await updateStatus(guard, includePrepTimestamp);
+        return await updateStatus(guard, includePrepTimestamp, activeFields);
       } catch (error) {
         const msg = String(error);
         if (includePrepTimestamp && /no such column:\s*(started_at|ready_at)\b/i.test(msg)) {
           includePrepTimestamp = false;
+          continue;
+        }
+        if (
+          activeFields.some(([key]) => optionalDeliveryKeys.has(key)) &&
+          /no such column:\s*(assigned_shipper_id|shipper_name|failure_reason)\b/i.test(msg)
+        ) {
+          activeFields = activeFields.filter(([key]) => !optionalDeliveryKeys.has(key));
           continue;
         }
         if (guard && /no such column:\s*payment_status\b/i.test(msg)) {

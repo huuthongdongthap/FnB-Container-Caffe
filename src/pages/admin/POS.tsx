@@ -26,6 +26,7 @@ import type { PaymentMethod } from '@/lib/validators';
 import { brandConfig } from '@/config/brand-types';
 import { StitchPOSNew } from '@/components/stitch/StitchPOSNew';
 import { ShiftHandoverModal } from '@/components/admin/ShiftHandoverModal';
+import { deriveShiftSlotLabel } from '@/pages/admin/staff-utils';
 import { ThermalReceipt, type ThermalReceiptData } from '@/components/receipt/ThermalReceipt';
 import type {
   POSNewMenuItem,
@@ -148,20 +149,11 @@ export default function AdminPOSPage() {
   const activeShift = useMemo<POSActiveShift | null>(() => {
     const shifts = Array.isArray(todayShiftsRes?.data) ? todayShiftsRes.data : [];
     const openShifts = shifts.filter((s) => Boolean(s.clock_in) && !s.clock_out);
-    const mine = user?.id ? openShifts.find((s) => s.staff_id === user.id) : undefined;
-    const chosen = mine ?? openShifts[0];
+    const chosen = user?.id ? openShifts.find((s) => s.staff_id === user.id) : openShifts[0];
     if (!chosen) return null;
-    const clockInHour = chosen.clock_in ? new Date(chosen.clock_in).getHours() : NaN;
-    const derivedShiftName = Number.isFinite(clockInHour)
-      ? clockInHour < 12
-        ? 'Ca sáng'
-        : clockInHour < 18
-          ? 'Ca chiều'
-          : 'Ca tối'
-      : 'Ca làm việc';
     return {
       id: chosen.id,
-      shiftName: derivedShiftName,
+      shiftName: deriveShiftSlotLabel(chosen.clock_in, chosen.shift),
       clockIn: chosen.clock_in,
       staffName: chosen.staff_name,
     };
@@ -184,6 +176,7 @@ export default function AdminPOSPage() {
   const [codCollecting, setCodCollecting] = useState(false);
   const [codCollectedOrderId, setCodCollectedOrderId] = useState<string | null>(null);
   const [shiftHandoverOpen, setShiftHandoverOpen] = useState(false);
+  const [shiftModalMode, setShiftModalMode] = useState<'open' | 'close' | 'auto'>('auto');
   const [checkoutError, setCheckoutError] = useState<string | null>(null);
   const [paymentUrl, setPaymentUrl] = useState<string | null>(null);
   const [paymentQrPayload, setPaymentQrPayload] = useState<string | null>(null);
@@ -769,7 +762,10 @@ export default function AdminPOSPage() {
         staffName={user?.name || user?.email || undefined}
         staffRole={user?.role || undefined}
         activeShift={activeShift}
-        onShiftAction={() => setShiftHandoverOpen(true)}
+        onShiftAction={() => {
+          setShiftModalMode(activeShift ? 'close' : 'open');
+          setShiftHandoverOpen(true);
+        }}
         onNavigate={(path) => navigate(path)}
         paymentMethod={paymentMethod === 'cod' ? 'cod' : 'payos'}
         loading={menuLoading}
@@ -790,13 +786,17 @@ export default function AdminPOSPage() {
         onToggleCashback={setUseCashback}
         onOpenSchedule={() => navigate('/admin/staff')}
         onPrintReceipt={handlePrintReceipt}
-        onEndShift={() => setShiftHandoverOpen(true)}
+        onEndShift={() => {
+          setShiftModalMode(activeShift ? 'close' : 'open');
+          setShiftHandoverOpen(true);
+        }}
         cartResetKey={cartResetKey}
       />
 
       <div className="print:hidden no-print">
         <ShiftHandoverModal
           isOpen={shiftHandoverOpen}
+          mode={shiftModalMode}
           onClose={() => setShiftHandoverOpen(false)}
           onCompleted={() => {
             void refetchShifts();
@@ -834,7 +834,7 @@ export default function AdminPOSPage() {
           <span className="text-sm font-medium">
             {codCollectedOrderId
               ? `Đã thu tiền mặt đơn #${codCollectedOrderId.slice(0, 8)}!`
-              : 'Order created successfully!'}
+              : t('adminPOS.orderCreatedSuccess', { defaultValue: 'Tạo đơn thành công!' })}
           </span>
           {lastCompletedReceipt && (
             <button
@@ -848,6 +848,11 @@ export default function AdminPOSPage() {
           )}
           {pendingCodOrder && (
             <>
+              {!activeShift && (
+                <span className="text-xs text-amber-100 underline" data-testid="pos-cod-no-shift-warning">
+                  Chưa mở ca — mở ca để ghi nhận đối soát tiền mặt
+                </span>
+              )}
               <button
                 type="button"
                 data-testid="pos-mark-cod-paid-btn"

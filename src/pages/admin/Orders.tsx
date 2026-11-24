@@ -54,9 +54,11 @@ const TRANSITION_ALLOWED_ROLES: Record<string, ReadonlySet<CanonicalRole>> = {
   'confirmed->preparing': new Set(['admin', 'manager', 'staff', 'kitchen']),
   'preparing->ready': new Set(['admin', 'manager', 'staff', 'kitchen']),
   'ready->served': new Set(['admin', 'manager', 'staff', 'kitchen']),
-  'ready->delivering': new Set(['admin', 'manager']),
+  'ready->delivering': new Set(['admin', 'manager', 'staff', 'rider']),
   'ready->delivered': new Set(['admin', 'manager', 'rider']),
-  'delivering->delivered': new Set(['admin', 'manager']),
+  'delivering->delivered': new Set(['admin', 'manager', 'rider']),
+  'delivering->failed': new Set(['admin', 'manager', 'rider']),
+  'delivering->cancelled': new Set(['admin', 'manager', 'rider']),
   'served->completed': new Set(['admin', 'manager', 'staff']),
   'delivered->completed': new Set(['admin', 'manager', 'rider']),
 };
@@ -193,11 +195,11 @@ function computeNextAction(
     };
   }
   if (status === 'ready') {
-    const nextStatus = orderType === 'delivery' ? 'delivered' : 'served';
+    const nextStatus = orderType === 'delivery' ? 'delivering' : 'served';
     const allowed = canRoleTransition(role, 'ready', nextStatus);
     return {
       nextStatus,
-      label: orderType === 'delivery' ? t('terminal.deliver') : t('terminal.serve'),
+      label: orderType === 'delivery' ? t('terminal.dispatch') : t('terminal.serve'),
       disabled: !allowed,
       tooltip: !allowed ? t('orderMgmt.roleRestricted') : undefined,
       canConfirm: false,
@@ -591,7 +593,13 @@ export default function AdminOrdersPage() {
           orderObj?.payment_status ?? orderObj?.paymentStatus ?? orderObj?.payment?.status ?? '',
         ).toLowerCase();
         const ordStatus = String(orderObj?.status ?? '').toLowerCase();
-        if (payStatus === 'paid' || payStatus === 'completed' || ordStatus === 'cancelled') {
+        if (
+          payStatus === 'paid' ||
+          payStatus === 'completed' ||
+          ordStatus === 'cancelled' ||
+          ordStatus === 'failed' ||
+          ordStatus === 'expired'
+        ) {
           setQrOrder(null);
           setQrCheckoutUrl(null);
           setQrEmvcoPayload(null);
@@ -611,7 +619,7 @@ export default function AdminOrdersPage() {
 
   const canCollectCod = useMemo(() => {
     const normalizedRole = (actorRole || '').trim().toLowerCase();
-    return ['owner', 'manager', 'supervisor', 'cashier', 'admin', 'waiter', 'shipper'].includes(normalizedRole);
+    return ['owner', 'manager', 'supervisor', 'cashier', 'admin', 'waiter', 'shipper', 'rider'].includes(normalizedRole);
   }, [actorRole]);
 
   const stitchOrders: OrderData[] = useMemo(

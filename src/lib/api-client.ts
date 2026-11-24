@@ -8,19 +8,25 @@ interface ApiError {
   message: string;
   errors?: Record<string, string[]>;
   code?: string;
+  details?: Record<string, unknown>;
+  ambiguous_payment_ids?: string[];
 }
 
 export class ApiClientError extends Error {
   status: number;
   errors?: Record<string, string[]>;
   code?: string;
+  details?: Record<string, unknown>;
+  ambiguous_payment_ids?: string[];
 
-  constructor({ status, message, errors, code }: ApiError) {
+  constructor({ status, message, errors, code, details, ambiguous_payment_ids }: ApiError) {
     super(message);
     this.name = 'ApiClientError';
     this.status = status;
     this.errors = errors;
     this.code = code;
+    this.details = details;
+    this.ambiguous_payment_ids = ambiguous_payment_ids;
   }
 }
 
@@ -148,6 +154,12 @@ export async function apiFetch<T = unknown>(
       message,
       errors: body.errors,
       code: body.code,
+      details: body.details,
+      ambiguous_payment_ids: Array.isArray(body.ambiguous_payment_ids)
+        ? body.ambiguous_payment_ids.map(String)
+        : Array.isArray(body.details?.ambiguous_payment_ids)
+          ? (body.details.ambiguous_payment_ids as unknown[]).map(String)
+          : undefined,
     });
     const presentedToken = headers.Authorization?.replace(/^Bearer /, '');
     const publicAuthAction = /\/(?:auth|mobile)\/(?:login|register|bootstrap-owner|reset-password|forgot-password|verify-email)(?:[?]|$)/.test(path);

@@ -143,7 +143,9 @@ export function ShiftsTab() {
   const [handoverOpen, setHandoverOpen] = useState(false);
 
   useEffect(() => {
-    fetchStaff();
+    if (canManage) {
+      fetchStaff();
+    }
     fetchToday();
     fetchHistory();
     if (canManage) {
@@ -165,8 +167,9 @@ export function ShiftsTab() {
     }
   }, [fetchStaff, fetchToday, fetchHistory, canManage]);
 
+  const activeStaff = staff.filter((m) => m.isActive !== false);
   const defaultManageStaffId =
-    (user?.id && staff.some((m) => m.id === user.id) ? user.id : staff[0]?.id) || user?.id || '';
+    (user?.id && activeStaff.some((m) => m.id === user.id) ? user.id : activeStaff[0]?.id) || user?.id || '';
   const effectiveStaffId = canManage ? selectedStaffId || defaultManageStaffId : user?.id || '';
   const scheduledShifts = todayShifts.filter(
     (s) => !s.clock_in && !s.clock_out && (s.attendance_state === 'scheduled' || s.status === 'scheduled'),
@@ -277,7 +280,7 @@ export function ShiftsTab() {
                   }}
                   className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm"
                 >
-                  {staff.map((m) => (
+                  {activeStaff.map((m) => (
                     <option key={m.id} value={m.id}>
                       {m.name}
                     </option>

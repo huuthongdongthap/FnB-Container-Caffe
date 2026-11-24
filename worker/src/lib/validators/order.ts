@@ -34,6 +34,10 @@ export const createOrderSchema = z.object({
   /** Order type: 'dine_in', 'takeaway', or 'delivery'.
    *  Dine-in strictly requires a valid table_id. Omitted order_type keeps legacy behavior. */
   order_type: z.enum(['dine_in', 'takeaway', 'delivery']).optional(),
+  /** Counter cash tendered amount (POS pay-now flow). */
+  cash_tendered: z.number().nonnegative().optional(),
+  /** Whether counter cash is collected immediately on creation (default true for takeaway). */
+  pay_now: z.boolean().optional(),
   tip_amount: z.number().nonnegative().optional().default(0),
   service_fee: z.number().nonnegative().optional().default(0),
   redeem_points: z.number().int().min(0).max(100000).optional(),
@@ -48,13 +52,6 @@ export const createOrderSchema = z.object({
       code: z.ZodIssueCode.custom,
       path: ['customer_address'],
       message: 'Địa chỉ giao hàng là bắt buộc với đơn giao tận nơi',
-    });
-  }
-  if (data.order_type === 'delivery' && data.payment_method !== 'payos') {
-    ctx.addIssue({
-      code: z.ZodIssueCode.custom,
-      path: ['payment_method'],
-      message: 'Đơn giao tận nơi yêu cầu thanh toán trả trước qua PayOS',
     });
   }
   if (data.order_type === 'dine_in' && !(data.table_id ?? '').trim()) {
@@ -94,7 +91,10 @@ export const adminOrdersQuerySchema = z.object({
 
 // ── Order status update ──
 export const updateOrderStatusSchema = z.object({
-  status: z.enum(['pending', 'confirmed', 'preparing', 'ready', 'served', 'delivered', 'completed', 'cancelled', 'failed', 'expired'])
+  status: z.enum(['pending', 'confirmed', 'preparing', 'ready', 'served', 'delivering', 'delivered', 'completed', 'cancelled', 'failed', 'expired']),
+  assigned_shipper_id: z.string().max(120).optional(),
+  shipper_name: z.string().max(120).optional(),
+  failure_reason: z.string().max(500).optional(),
 });
 
 // ── Simple order create input ──

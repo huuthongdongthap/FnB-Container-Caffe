@@ -7,7 +7,7 @@ import { jsonResponse, errorResponse } from 'worker/src/middleware/cors';
 import { createLogger } from 'worker/src/middleware/logger';
 import { parseJSON } from '../model/helpers';
 import { isTerminal } from '../model/order-state-machine';
-import { transitionOrderStatus, changedRows } from '../policies/order-status-transition';
+import { transitionOrderStatus, changedRows, isVoidStatus } from '../policies/order-status-transition';
 import { releaseTableIfNoActiveOrders } from '../policies/table-occupancy-release';
 import {
   dispatchOrderBroadcast,
@@ -20,7 +20,7 @@ import type { ErpnextEnv } from 'worker/src/clients/erpnext-client';
 import type { WorkerEnv } from 'worker/src/clients/erpnext-accounting-client';
 
 const log = createLogger({ route: 'orders' });
-const ORDER_FIELD_STAFF_ROLES = ['owner', 'manager', 'supervisor', 'admin', 'cashier', 'waiter', 'staff'];
+const ORDER_FIELD_STAFF_ROLES = ['owner', 'manager', 'supervisor', 'admin', 'cashier', 'waiter', 'staff', 'rider'];
 
 export async function updateOrder(
   request: Request,
@@ -120,7 +120,7 @@ export async function updateOrder(
 
     if (body.status !== undefined) {
       const canCompensatePaid =
-        String(body.status) === 'cancelled' &&
+        isVoidStatus(body.status) &&
         ['owner', 'admin', 'manager', 'supervisor'].includes(normalizedRole);
       const transition = await transitionOrderStatus(db, id, String(body.status), actorRole, {
         tenantId,
@@ -224,7 +224,7 @@ export async function updateOrder(
       }
     }
 
-    if (body.status === 'cancelled') {
+    if (isVoidStatus(body.status)) {
       const rawOrderTenantForCancel = (results[0] as Record<string, unknown> | undefined)?.tenant_id;
       const orderTenantForCancel =
         typeof rawOrderTenantForCancel === 'string' && rawOrderTenantForCancel.trim()
@@ -234,7 +234,14 @@ export async function updateOrder(
       // Restore inventory (idempotent — no-op if no reserves exist; spoils stock if already preparing/ready)
       try {
         const { restoreInventoryForOrder } = await import('@aura/domain-inventory');
-        if (currentStatus === 'preparing' || currentStatus === 'ready' || currentStatus === 'served' || currentStatus === 'completed') {
+        if (
+          currentStatus === 'preparing' ||
+          currentStatus === 'ready' ||
+          currentStatus === 'delivering' ||
+          currentStatus === 'delivered' ||
+          currentStatus === 'served' ||
+          currentStatus === 'completed'
+        ) {
           await restoreInventoryForOrder(env as any, id, orderTenantForCancel, { preCancelStatus: currentStatus });
         } else {
           await restoreInventoryForOrder(env as any, id, orderTenantForCancel);

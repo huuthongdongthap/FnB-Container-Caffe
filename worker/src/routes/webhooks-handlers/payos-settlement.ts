@@ -47,5 +47,30 @@ export async function settlePayOS(
     results = await db.batch(buildBatch(false));
   }
   if (results.length !== 2 || results.some((result) => !result.success)) throw new Error('Payment settlement transaction failed');
-  return { paymentChanged: (results[0].meta?.changes ?? 0) > 0, orderChanged: (results[1].meta?.changes ?? 0) > 0 };
+  const paymentChanged = (results[0].meta?.changes ?? 0) > 0;
+  const orderChanged = (results[1].meta?.changes ?? 0) > 0;
+  if (paymentChanged && payment.amount > 0) {
+    try {
+      await db
+        .prepare(
+          `UPDATE staff_shifts
+           SET online_sales = COALESCE(online_sales, 0) + ?,
+               total_sales = COALESCE(total_sales, 0) + ?,
+               order_count = COALESCE(order_count, 0) + 1
+           WHERE id = (
+             SELECT s.id FROM staff_shifts s
+             INNER JOIN orders o ON o.id = ?
+             WHERE COALESCE(NULLIF(TRIM(s.tenant_id), ''), 'default') = COALESCE(NULLIF(TRIM(o.tenant_id), ''), 'default')
+               AND s.clock_in IS NOT NULL AND s.clock_out IS NULL
+             ORDER BY CASE WHEN LOWER(COALESCE(s.role, '')) IN ('owner', 'admin', 'manager', 'supervisor', 'cashier') THEN 0 ELSE 1 END, s.clock_in DESC
+             LIMIT 1
+           )`,
+        )
+        .bind(payment.amount, payment.amount, payment.order_id)
+        .run();
+    } catch {
+      // Best-effort shift online_sales sync; never fail PayOS settlement on legacy schemas
+    }
+  }
+  return { paymentChanged, orderChanged };
 }

@@ -3,7 +3,7 @@
  * Single server-authoritative status transition executor for all KDS channels.
  */
 
-import { transitionOrderStatus, type OrderStatusDb, type OrderStatusResult } from '../../order/policies/order-status-transition';
+import { transitionOrderStatus, isVoidStatus, type OrderStatusDb, type OrderStatusResult } from '../../order/policies/order-status-transition';
 import { releaseTableIfNoActiveOrders } from '../../order/policies/table-occupancy-release';
 import { restoreLoyaltyVoucherForOrder } from '../../order/loyalty-voucher';
 
@@ -17,6 +17,7 @@ export interface KdsTransitionOptions {
   env?: Record<string, unknown>;
   skipCancelSideEffects?: boolean;
   allowPaidCompensation?: boolean;
+  fields?: Record<string, unknown>;
 }
 
 /**
@@ -38,12 +39,13 @@ export async function executeKdsStatusTransition(
   const result = await transitionOrderStatus(db, orderId, targetStatus, userRole, {
     tenantId: options?.tenantId,
     allowPaidCompensation: options?.allowPaidCompensation,
+    fields: options?.fields,
   });
   if (!result.success || result.idempotent) return result;
   const order = result.order!;
   const now = new Date().toISOString();
 
-  if (targetStatus === 'cancelled' && !options?.skipCancelSideEffects) {
+  if (isVoidStatus(targetStatus) && !options?.skipCancelSideEffects) {
     const rawDb = db as unknown as import('@cloudflare/workers-types').D1Database;
     const rawRequestedCancelTenant = options?.tenantId && options.tenantId.trim() ? options.tenantId.trim() : undefined;
     const requestedCancelTenant =

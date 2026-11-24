@@ -221,6 +221,9 @@ CREATE TABLE IF NOT EXISTS orders (
     customer_id TEXT,
     tenant_id TEXT NOT NULL DEFAULT 'default',
     cod_paid_at TEXT,
+    assigned_shipper_id TEXT,
+    shipper_name TEXT,
+    failure_reason TEXT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (table_id) REFERENCES cafe_tables(id)

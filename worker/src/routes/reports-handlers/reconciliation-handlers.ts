@@ -117,6 +117,17 @@ export function registerReconciliationHandlers(app: Hono<{ Bindings: Env }>) {
       const dateStr = Number.isFinite(parsedMs)
         ? new Date(parsedMs + ICT_OFFSET_MS).toISOString().slice(0, 10)
         : createdRaw.slice(0, 10);
+      const hasDenominations = (() => {
+        if (!r.denominations) return false;
+        try {
+          const parsed = typeof r.denominations === 'string'
+            ? (JSON.parse(r.denominations) as { denominations?: unknown[] })
+            : (r.denominations as { denominations?: unknown[] });
+          return Array.isArray(parsed?.denominations) && parsed.denominations.length > 0;
+        } catch {
+          return false;
+        }
+      })();
       return {
         shift_id: String(r.shift_id || ''),
         date: dateStr,
@@ -127,7 +138,7 @@ export function registerReconciliationHandlers(app: Hono<{ Bindings: Env }>) {
         actual_cash: r.actual_cash !== null && r.actual_cash !== undefined ? Number(r.actual_cash) : null,
         variance: r.variance !== null && r.variance !== undefined ? Number(r.variance) : null,
         status: String(r.variance_status || 'balanced'),
-        denominated: Boolean(r.denominations && String(r.denominations) !== '{"denominations":[]}'),
+        denominated: hasDenominations,
       };
     });
 
