@@ -7,6 +7,7 @@ export interface AdminStats {
   todayOrders: number;
   avgOrderValue: number;
   activeCustomers: number;
+  revenueChangePercent?: number | null;
 }
 
 export interface AdminOrder {

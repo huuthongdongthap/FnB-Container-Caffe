@@ -65,7 +65,7 @@ export function GroupedSalesError({
               border border-[var(--aura-chrome-light)] text-[var(--aura-chrome-light)]
               hover:bg-[rgba(201,214,223,0.08)] transition-all duration-300"
           >
-            Thu lai
+            Thử lại
           </button>
         )}
       </div>

@@ -29,7 +29,7 @@ export function PeriodComparisonChart({
 }: PeriodComparisonChartProps) {
   if (loading && !data) return <PeriodComparisonSkeleton />;
   if (error) return <PeriodComparisonError message={error} onRetry={onRetry} />;
-  if (!data || data.current.length === 0 || data.previous.length === 0) {
+  if (!data || (data.current.length === 0 && data.previous.length === 0)) {
     return <PeriodComparisonEmpty />;
   }
 
@@ -52,7 +52,7 @@ export function PeriodComparisonChart({
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
         <h3 className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--aura-chrome-light)]">
-          So sanh doanh thu
+          So sánh doanh thu
         </h3>
         <ChangeBadge value={changePercent} />
       </div>
@@ -62,13 +62,13 @@ export function PeriodComparisonChart({
         <div className="flex items-center gap-1.5">
           <span className="w-3 h-[2px] rounded-full bg-[var(--aura-chrome-silver)]" />
           <span className="text-[10px] text-[var(--aura-text-muted)]">
-            Ky nay <span className="font-mono">/ This period</span>
+            Kỳ này
           </span>
         </div>
         <div className="flex items-center gap-1.5">
           <span className="w-3 h-[2px] rounded-full bg-[var(--aura-text-muted)]" />
           <span className="text-[10px] text-[var(--aura-text-muted)]">
-            Ky truoc <span className="font-mono">/ Previous period</span>
+            Kỳ trước
           </span>
         </div>
       </div>

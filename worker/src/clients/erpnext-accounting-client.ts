@@ -86,7 +86,7 @@ export class ErpnextAccountingClient {
     const db = env.AURA_DB || this.auraDb;
 
     const existingMapping = await this._findMapping(order.id, db, tenantId);
-    if (existingMapping) {
+    if (existingMapping && existingMapping.sync_status === 'synced' && existingMapping.erpnext_id) {
       return {
         success: true,
         fromCache: true,
@@ -116,7 +116,9 @@ export class ErpnextAccountingClient {
         throw new Error('Failed to create Sales Invoice: no name returned from ERPNext');
       }
 
-      const mappingId = await this._createMapping(order.id, invoiceName, 'synced', db, tenantId);
+      const mappingId = existingMapping
+        ? await this._markMappingSynced(existingMapping.id, order.id, invoiceName, db, tenantId)
+        : await this._createMapping(order.id, invoiceName, 'synced', db, tenantId);
 
       return {
         success: true,
@@ -165,6 +167,20 @@ export class ErpnextAccountingClient {
       invoiceId,
       generatedAt: new Date().toISOString()
     };
+  }
+
+  async fetchInvoicePDF(invoiceId: string): Promise<Response> {
+    const path = `/api/method/frappe.utils.print_format.download_pdf?doctype=Sales+Invoice&name=${encodeURIComponent(invoiceId)}`;
+    const url = `${this.client.url}${path}`;
+    return fetch(url, {
+      method: 'GET',
+      redirect: 'manual',
+      signal: AbortSignal.timeout(15_000),
+      headers: {
+        Authorization: this.client.getAuthHeader(),
+        Accept: 'application/pdf',
+      },
+    });
   }
 
   // =====================================================================
@@ -238,14 +254,59 @@ export class ErpnextAccountingClient {
     return result?.id || null;
   }
 
+  private async _markMappingSynced(
+    mappingId: number,
+    orderId: string,
+    erpnextId: string,
+    db: D1Database | null,
+    tenantId?: string,
+  ): Promise<number | null> {
+    if (!db) {
+      return mappingId;
+    }
+    const now = new Date().toISOString();
+    const effectiveTenant = tenantId && tenantId.trim() && tenantId.trim() !== '*' ? tenantId.trim() : 'default';
+    if (tenantId !== '*') {
+      try {
+        await db.prepare(`
+          UPDATE erpnext_mappings
+          SET erpnext_id = ?,
+              sync_status = 'synced',
+              error_message = NULL,
+              attempts = attempts + 1,
+              last_synced_at = ?,
+              updated_at = datetime('now')
+          WHERE id = ? AND local_type = ? AND local_id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?
+        `).bind(erpnextId, now, mappingId, 'order', orderId, effectiveTenant).run();
+        return mappingId;
+      } catch {
+        if (effectiveTenant !== 'default') {
+          return mappingId;
+        }
+      }
+    }
+    await db.prepare(`
+      UPDATE erpnext_mappings
+      SET erpnext_id = ?,
+          sync_status = 'synced',
+          error_message = NULL,
+          attempts = attempts + 1,
+          last_synced_at = ?,
+          updated_at = datetime('now')
+      WHERE id = ? AND local_type = ? AND local_id = ?
+    `).bind(erpnextId, now, mappingId, 'order', orderId).run();
+    return mappingId;
+  }
+
   private async _markMappingFailed(orderId: string, error: string, db: D1Database | null, tenantId?: string): Promise<void> {
     if (!db) {
       return;
     }
     const effectiveTenant = tenantId && tenantId.trim() && tenantId.trim() !== '*' ? tenantId.trim() : 'default';
+    let updatedChanges = -1;
     if (tenantId !== '*') {
       try {
-        await db.prepare(`
+        const res = await db.prepare(`
           UPDATE erpnext_mappings
           SET sync_status = 'failed',
               error_message = ?,
@@ -253,23 +314,42 @@ export class ErpnextAccountingClient {
               last_synced_at = datetime('now'),
               updated_at = datetime('now')
           WHERE local_type = ? AND local_id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?
-        `).bind(error, 'order', orderId, effectiveTenant).run();
-        return;
+        `).bind(error, 'order', orderId, effectiveTenant).run() as D1Result & { meta?: { changes?: number } };
+        updatedChanges = typeof res?.meta?.changes === 'number' ? res.meta.changes : 1;
       } catch {
         if (effectiveTenant !== 'default') {
           return;
         }
       }
     }
-    await db.prepare(`
-      UPDATE erpnext_mappings
-      SET sync_status = 'failed',
-          error_message = ?,
-          attempts = attempts + 1,
-          last_synced_at = datetime('now'),
-          updated_at = datetime('now')
-      WHERE local_type = ? AND local_id = ?
-    `).bind(error, 'order', orderId).run();
+    if (updatedChanges < 0) {
+      const res = await db.prepare(`
+        UPDATE erpnext_mappings
+        SET sync_status = 'failed',
+            error_message = ?,
+            attempts = attempts + 1,
+            last_synced_at = datetime('now'),
+            updated_at = datetime('now')
+        WHERE local_type = ? AND local_id = ?
+      `).bind(error, 'order', orderId).run() as D1Result & { meta?: { changes?: number } };
+      updatedChanges = typeof res?.meta?.changes === 'number' ? res.meta.changes : 1;
+    }
+    if (updatedChanges === 0) {
+      try {
+        await db.prepare(`
+          INSERT INTO erpnext_mappings (local_type, local_id, erpnext_id, erpnext_model, sync_status, error_message, attempts, last_synced_at, created_at, updated_at, tenant_id)
+          VALUES (?, ?, '', 'Sales Invoice', 'failed', ?, 1, datetime('now'), datetime('now'), datetime('now'), ?)
+        `).bind('order', orderId, error, effectiveTenant).run();
+      } catch {
+        if (effectiveTenant !== 'default') {
+          return;
+        }
+        await db.prepare(`
+          INSERT INTO erpnext_mappings (local_type, local_id, erpnext_id, erpnext_model, sync_status, error_message, attempts, last_synced_at, created_at, updated_at)
+          VALUES (?, ?, '', 'Sales Invoice', 'failed', ?, 1, datetime('now'), datetime('now'), datetime('now'))
+        `).bind('order', orderId, error).run();
+      }
+    }
   }
 
   // =====================================================================

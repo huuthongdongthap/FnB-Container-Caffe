@@ -73,7 +73,7 @@ export function GroupedSalesChart({
                         ? '0 0 6px rgba(201,214,223,0.25)'
                         : 'none',
                   }}
-                  title={`${group.label}: ${formatVnd(group.value)} - ${group.count} don`}
+                  title={`${group.label}: ${formatVnd(group.value)} - ${group.count} ${groupBy === 'category' ? 'sản phẩm' : 'đơn'}`}
                 />
               </div>
 
@@ -81,7 +81,9 @@ export function GroupedSalesChart({
               <span className="text-[11px] text-[var(--aura-text-muted)] w-24 text-right shrink-0 leading-tight font-mono">
                 {formatVnd(group.value)}
                 <br />
-                <span className="text-[10px]">{group.count} don</span>
+                <span className="text-[10px]">
+                  {group.count} {groupBy === 'category' ? 'sản phẩm' : 'đơn'}
+                </span>
               </span>
             </div>
           );
@@ -89,13 +91,13 @@ export function GroupedSalesChart({
       </div>
 
       {/* ─── Desktop: vertical bars ─── */}
-      <div className="hidden md:flex items-end gap-3 h-44">
+      <div className="hidden md:flex items-end gap-3 h-44 overflow-x-auto pb-1">
         {data.groups.map((group, idx) => {
           const barHeight = (group.value / maxValue) * 100;
           return (
             <div
               key={idx}
-              className="flex-1 flex flex-col items-center justify-end h-full min-w-0"
+              className="flex-1 flex flex-col items-center justify-end h-full min-w-[44px]"
             >
               {/* Value label */}
               <span className="text-[9px] text-[var(--aura-text-muted)] font-mono mb-1 leading-tight text-center">
@@ -113,14 +115,14 @@ export function GroupedSalesChart({
                       ? '0 0 6px rgba(201,214,223,0.2)'
                       : 'none',
                 }}
-                title={`${group.label}: ${formatVnd(group.value)} - ${group.count} don`}
+                title={`${group.label}: ${formatVnd(group.value)} - ${group.count} ${groupBy === 'category' ? 'sản phẩm' : 'đơn'}`}
               />
 
               {/* Label + count */}
               <span className="text-[10px] text-[var(--aura-text-muted)] mt-1.5 text-center leading-tight">
                 <span className="block truncate max-w-[6rem]">{group.label}</span>
                 <span className="block text-[9px] text-[var(--aura-text-muted)] opacity-70">
-                  {group.count} don
+                  {group.count} {groupBy === 'category' ? 'sản phẩm' : 'đơn'}
                 </span>
               </span>
             </div>
@@ -131,10 +133,10 @@ export function GroupedSalesChart({
       {/* Summary */}
       <div className="mt-3 pt-3 border-t border-[var(--glass-border)] flex justify-between text-[11px] text-[var(--aura-text-muted)]">
         <span>
-          Tong: <span className="font-semibold text-[var(--aura-text-primary)]">{formatVnd(totalValue)}</span>
+          Tổng: <span className="font-semibold text-[var(--aura-text-primary)]">{formatVnd(totalValue)}</span>
         </span>
         <span>
-          {totalCount} don hang
+          {totalCount} {groupBy === 'category' ? 'sản phẩm' : 'đơn hàng'}
         </span>
       </div>
     </div>

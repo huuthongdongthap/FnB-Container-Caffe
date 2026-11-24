@@ -40,8 +40,7 @@ export async function getTopProducts(
       WHERE o.status != 'cancelled'
         AND o.status NOT IN ('cancelled', 'refunded', 'failed', 'rejected', 'expired')
         AND LOWER(COALESCE(TRIM(o.status), '')) NOT IN ('cancelled', 'canceled', 'refunded', 'failed', 'rejected', 'expired')
-        AND COALESCE(o.payment_status, '') != 'refunded'
-        AND LOWER(COALESCE(TRIM(o.payment_status), '')) NOT IN ('refunded', 'failed', 'cancelled', 'canceled')
+        AND LOWER(COALESCE(TRIM(o.payment_status), '')) IN ('paid', 'partially_refunded', 'completed')
         AND NOT (COALESCE(TRIM(o.notes), '') = 'Khách QR - cho don mon' AND COALESCE(TRIM(o.items), '[]') IN ('', '[]'))${orderAliasClause}
       GROUP BY oi.product_id, p.name
       ORDER BY total_qty DESC

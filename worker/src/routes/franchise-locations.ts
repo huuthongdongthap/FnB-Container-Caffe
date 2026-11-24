@@ -9,6 +9,7 @@ import { requireAuth } from '../middleware/auth';
 import { getTenantId, isHQSuperAdmin } from '../middleware/tenant';
 import { matchesTenantRow } from '../lib/db';
 import { createLogger } from '../middleware/logger';
+import { validateDateRangeWindow } from './reports-handlers/analytics-handlers';
 import type { FranchiseLocation } from '../types/api';
 
 const log = createLogger({ route: 'franchise-locations' });
@@ -25,12 +26,6 @@ const createLocationSchema = z.object({
   royalty_percentage: z.number().min(0).max(100).optional().default(5.0),
   status: z.enum(['active', 'suspended', 'closed']).optional().default('active'),
 });
-
-const ISO_DATE_FILTER_RE = /^\d{4}-\d{2}-\d{2}(?:[T\s]\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?(?:Z|[+-]\d{2}:?\d{2})?)?$/;
-
-function isValidDateFilter(value: string): boolean {
-  return ISO_DATE_FILTER_RE.test(value) && !Number.isNaN(Date.parse(value));
-}
 
 function extractFranchiseTenantCandidates(c: any): string[] {
   return [
@@ -214,8 +209,14 @@ franchiseRouter.get('/locations/:id/metrics', requireAuth(['owner', 'admin', 'ma
 
   const startDate = c.req.query('start_date');
   const endDate = c.req.query('end_date');
-  if ((startDate && !isValidDateFilter(startDate)) || (endDate && !isValidDateFilter(endDate))) {
-    return c.json({ success: false, error: 'Invalid date filter' }, 400);
+  if (startDate !== undefined || endDate !== undefined) {
+    const rangeErr =
+      startDate !== undefined && endDate !== undefined
+        ? validateDateRangeWindow(startDate, endDate)
+        : validateDateRangeWindow((startDate ?? endDate) as string, (startDate ?? endDate) as string);
+    if (rangeErr) {
+      return c.json({ success: false, error: rangeErr }, 400);
+    }
   }
 
   const targetTenant = resolveFranchiseTargetTenant(c, user);
@@ -248,34 +249,50 @@ franchiseRouter.get('/locations/:id/metrics', requireAuth(['owner', 'admin', 'ma
 
   const rawLocTenant = (typeof location.tenant_id === 'string' && location.tenant_id.trim()) || 'default';
   const locTenant = rawLocTenant === '*' || rawLocTenant.toLowerCase() === 'hq' ? 'default' : rawLocTenant;
-  const normalizedEndDate = endDate && /^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(endDate)
-    ? `${endDate}T23:59:59.999Z`
-    : endDate;
+  const isStartDateOnly = Boolean(startDate && /^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(startDate));
+  const isEndDateOnly = Boolean(endDate && /^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(endDate));
 
   let dateClause = '';
+  let dateClauseAlias = '';
   const dateParams: unknown[] = [];
   if (startDate) {
-    dateClause += ' AND created_at >= ?';
+    dateClause += isStartDateOnly ? " AND DATE(datetime(created_at, '+7 hours')) >= ?" : ' AND datetime(created_at) >= datetime(?)';
+    dateClauseAlias += isStartDateOnly ? " AND DATE(datetime(o.created_at, '+7 hours')) >= ?" : ' AND datetime(o.created_at) >= datetime(?)';
     dateParams.push(startDate);
   }
-  if (normalizedEndDate) {
-    dateClause += ' AND created_at <= ?';
-    dateParams.push(normalizedEndDate);
+  if (endDate) {
+    dateClause += isEndDateOnly ? " AND DATE(datetime(created_at, '+7 hours')) <= ?" : ' AND datetime(created_at) <= datetime(?)';
+    dateClauseAlias += isEndDateOnly ? " AND DATE(datetime(o.created_at, '+7 hours')) <= ?" : ' AND datetime(o.created_at) <= datetime(?)';
+    dateParams.push(endDate);
   }
 
   const primaryQuery = `
+    SELECT COUNT(*) as order_count,
+           COALESCE(SUM(MAX(0, COALESCE(o.total, 0) - COALESCE(o.shipping_fee, 0) - COALESCE(o.service_fee, 0) - COALESCE(o.tip_amount, 0) - COALESCE(p.refund_amount, 0))), 0) as gross_sales
+    FROM orders o
+    LEFT JOIN (
+      SELECT order_id, SUM(COALESCE(refund_amount, 0)) as refund_amount
+      FROM payments
+      WHERE (COALESCE(NULLIF(tenant_id, ''), 'default') = ?1 OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?1)
+      GROUP BY order_id
+    ) p ON p.order_id = o.id
+    WHERE (COALESCE(NULLIF(o.tenant_id, ''), 'default') = ?1 OR COALESCE(NULLIF(TRIM(o.tenant_id), ''), 'default') = ?1)
+      AND LOWER(TRIM(COALESCE(o.status, ''))) NOT IN ('cancelled', 'canceled', 'refunded', 'failed', 'rejected', 'expired')
+      AND LOWER(TRIM(COALESCE(o.payment_status, ''))) IN ('paid', 'partially_refunded')
+      AND NOT (COALESCE(o.total, 0) = 0 AND (COALESCE(o.customer_name, '') = 'Khách QR - cho don mon' OR COALESCE(o.items, '') IN ('', '[]')))${dateClauseAlias}
+  `;
+  const paidFallbackQuery = `
     SELECT COUNT(*) as order_count, COALESCE(SUM(total), 0) as gross_sales
     FROM orders
     WHERE (COALESCE(NULLIF(tenant_id, ''), 'default') = ? OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?1)
-      AND LOWER(COALESCE(status, '')) NOT IN ('cancelled', 'canceled', 'refunded', 'failed', 'rejected', 'expired')
-      AND LOWER(COALESCE(payment_status, '')) NOT IN ('refunded', 'failed', 'cancelled', 'canceled')
-      AND NOT (COALESCE(total, 0) = 0 AND (COALESCE(customer_name, '') = 'Khách QR - cho don mon' OR COALESCE(items, '') IN ('', '[]')))${dateClause}
+      AND LOWER(TRIM(COALESCE(status, ''))) NOT IN ('cancelled', 'canceled', 'refunded', 'failed', 'rejected', 'expired')
+      AND LOWER(TRIM(COALESCE(payment_status, ''))) IN ('paid', 'partially_refunded')${dateClause}
   `;
   const statusOnlyScopedQuery = `
     SELECT COUNT(*) as order_count, COALESCE(SUM(total), 0) as gross_sales
     FROM orders
     WHERE (COALESCE(NULLIF(tenant_id, ''), 'default') = ? OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?1)
-      AND LOWER(COALESCE(status, '')) NOT IN ('cancelled', 'canceled', 'refunded', 'failed', 'rejected', 'expired')${dateClause}
+      AND LOWER(TRIM(COALESCE(status, ''))) NOT IN ('cancelled', 'canceled', 'refunded', 'failed', 'rejected', 'expired')${dateClause}
   `;
 
   let stats: { order_count: number; gross_sales: number } | null = null;
@@ -283,9 +300,13 @@ franchiseRouter.get('/locations/:id/metrics', requireAuth(['owner', 'admin', 'ma
     stats = await db.prepare(primaryQuery).bind(locTenant, ...dateParams).first<{ order_count: number; gross_sales: number }>();
   } catch {
     try {
-      stats = await db.prepare(statusOnlyScopedQuery).bind(locTenant, ...dateParams).first<{ order_count: number; gross_sales: number }>();
+      stats = await db.prepare(paidFallbackQuery).bind(locTenant, ...dateParams).first<{ order_count: number; gross_sales: number }>();
     } catch {
-      stats = { order_count: 0, gross_sales: 0 };
+      try {
+        stats = await db.prepare(statusOnlyScopedQuery).bind(locTenant, ...dateParams).first<{ order_count: number; gross_sales: number }>();
+      } catch {
+        stats = { order_count: 0, gross_sales: 0 };
+      }
     }
   }
   const grossSales = Number(stats?.gross_sales || 0);

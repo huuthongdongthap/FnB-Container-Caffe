@@ -30,8 +30,8 @@ it('counts only settled digital orders in the store’s ICT order-date window', 
     });
     expect(response.status).toBe(200);
     const { data } = await response.json();
-    expect(data.totals).toMatchObject({ digital_payments: 90000, revenue: 155000, order_count: 4 });
-    expect(data.payment_methods).toContainEqual({ method: 'payos', count: 2, total: 110000 });
+    expect(data.totals).toMatchObject({ digital_payments: 90000, revenue: 110000, order_count: 3 });
+    expect(data.payment_methods).toContainEqual({ method: 'payos', count: 1, total: 65000 });
   } finally {
     sqlite.close();
   }

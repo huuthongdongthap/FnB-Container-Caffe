@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { useClientSessionScope } from '@/lib/client-session';
 import { apiFetch } from '@/lib/api-client';
 import { Card } from '@/components/ui/card';
 import { HelmetHead } from '@/components/seo/HelmetHead';
@@ -57,11 +58,12 @@ function formatVnd(amount: number): string {
 }
 
 export default function RevenueAccountingPage() {
+  const session = useClientSessionScope();
   const [from, setFrom] = useState(() => defaultStoreDate(-29));
   const [to, setTo] = useState(() => defaultStoreDate(0));
 
   const pnlQuery = useQuery<{ success: boolean; data: PnlSummaryReport }>({
-    queryKey: ['admin-pnl-report', from, to],
+    queryKey: ['admin-pnl-report', session.tenantId, session.userScope, from, to],
     queryFn: () => apiFetch(`/api/reports/pnl?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`),
   });
 
@@ -147,6 +149,24 @@ export default function RevenueAccountingPage() {
           </button>
         </div>
       </div>
+
+      {pnlQuery.isError && (
+        <div
+          role="alert"
+          className="flex items-center justify-between gap-4 rounded-xl border border-red-500/40 bg-red-500/10 p-4 text-sm text-red-200"
+        >
+          <span>
+            Không thể tải báo cáo Lãi/Lỗ (P&L). Vui lòng thử lại.
+          </span>
+          <button
+            type="button"
+            onClick={() => pnlQuery.refetch()}
+            className="rounded-lg border border-red-400/40 px-3 py-1 text-xs font-medium hover:bg-red-500/20"
+          >
+            Thử lại
+          </button>
+        </div>
+      )}
 
       {totals && (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">

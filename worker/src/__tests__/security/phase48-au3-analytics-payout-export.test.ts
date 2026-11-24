@@ -182,7 +182,7 @@ describe('Phase 48 Slice AU3 — Analytics Summary, Payout Financial Arithmetic,
       expect(orderQueries.length).toBeGreaterThanOrEqual(8);
       for (const q of orderQueries) {
         expect(q).toContain("status NOT IN ('cancelled', 'refunded', 'failed', 'rejected', 'expired')");
-        expect(q).toMatch(/COALESCE\((?:o\.)?payment_status,\s*''\)\s*!=\s*'refunded'/);
+        expect(q).toMatch(/COALESCE\((?:TRIM\()?(?:o\.)?payment_status(?:\))?,\s*''\)\)\s*IN\s*\('paid',\s*'partially_refunded'/);
       }
 
       const categoryQuery = sqlLog.find((s) => /JOIN categories c/i.test(s));
