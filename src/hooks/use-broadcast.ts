@@ -28,6 +28,8 @@ export interface BroadcastResult {
   sent_count?: number;
   failed_count?: number;
   total?: number;
+  queued?: number;
+  truncated?: boolean;
   pending?: boolean;
   channels?: string[];
   skipped?: Record<string, string>;

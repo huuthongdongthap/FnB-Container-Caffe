@@ -197,6 +197,12 @@ describe('MKT Promotion Notifications (Zalo ZNS & Facebook Page)', () => {
     fireEvent.change(screen.getByRole('combobox'), { target: { value: 'vip' } });
     fireEvent.click(screen.getByRole('button', { name: /broadcast\.send/i }));
 
+    // Step 1 opens inline confirmation before firing paid ZNS send
+    expect(broadcastPayload).toBeNull();
+    expect(screen.getByText('broadcast.confirmTitle')).toBeTruthy();
+
+    fireEvent.click(screen.getByRole('button', { name: /broadcast\.confirm$/i }));
+
     await waitFor(() => {
       expect(broadcastPayload).not.toBeNull();
     });
@@ -255,5 +261,93 @@ describe('MKT Promotion Notifications (Zalo ZNS & Facebook Page)', () => {
       expect(screen.getByText('broadcast.fbPublishError')).toBeTruthy();
     });
     expect(screen.queryByText(/broadcast\.fbPublishSuccess/)).toBeNull();
+  });
+
+  it('formats fixed-amount VND promotions as currency and refreshes modal draft when promotion fields change in place', async () => {
+    const fixedPromo = {
+      code: 'CASH15K',
+      tenant_id: 't1',
+      percent: 0,
+      discount_type: 'fixed',
+      discount_value: 15000,
+      max_discount: 0,
+      min_order: 50000,
+      usage_limit: 50,
+      usage_count: 2,
+      starts_at: '2026-06-01T00:00:00Z',
+      expires_at: '2026-08-31T23:59:59Z',
+      is_active: 1,
+      created_at: '2026-06-01T00:00:00Z',
+    };
+
+    globalThis.fetch = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes('/api/promotions')) {
+        return jsonResponse({ success: true, data: [fixedPromo] });
+      }
+      if (url.includes('/api/customers/segments')) {
+        return jsonResponse({ data: MOCK_SEGMENTS });
+      }
+      return jsonResponse({ success: true, data: [] });
+    }) as unknown as typeof fetch;
+
+    renderWithProviders(<PromotionsManagerPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText('CASH15K')).toBeTruthy();
+    });
+    expect(screen.getByText('15.000đ')).toBeTruthy();
+    expect(screen.queryByText('0%')).toBeNull();
+
+    fireEvent.click(screen.getByRole('button', { name: 'notify' }));
+
+    await waitFor(() => {
+      expect(screen.getByDisplayValue('Ưu đãi CASH15K — Giảm 15.000đ')).toBeTruthy();
+    });
+    expect(screen.getByDisplayValue(/Nhập mã CASH15K để giảm 15\.000đ tại AURA CAFE/)).toBeTruthy();
+  });
+
+  it('shows inline schedule validation error instead of throwing when schedule datetime is invalid', async () => {
+    const postSpy = vi.fn();
+    globalThis.fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.includes('/api/customers/segments')) {
+        return jsonResponse({ data: MOCK_SEGMENTS });
+      }
+      if (url.includes('/api/promotions')) {
+        return jsonResponse({ data: MOCK_PROMOS });
+      }
+      if (url.includes('/api/mixpost/accounts')) {
+        return jsonResponse({
+          success: true,
+          data: [{ id: 7, name: 'AURA Cafe Page', provider: 'facebook_page' }],
+        });
+      }
+      if (url.includes('/api/mixpost/posts') && init?.method === 'POST') {
+        postSpy();
+        return jsonResponse({ success: true, postId: 'fb_post_99' });
+      }
+      return jsonResponse({ success: false, error: 'Unexpected request' }, 404);
+    }) as unknown as typeof fetch;
+
+    renderWithProviders(<BroadcastPage />);
+    fireEvent.click(screen.getByRole('tab', { name: /broadcast\.tabFacebookPage/i }));
+
+    await waitFor(() => {
+      expect(screen.getByText('AURA Cafe Page')).toBeTruthy();
+    });
+
+    fireEvent.click(screen.getByText('SUMMER20 (-20%)'));
+    const scheduleInput = screen.getByLabelText('broadcast.fbScheduleLabel') as HTMLInputElement;
+    // Bypass HTML datetime-local input sanitization in jsdom to exercise invalid date guard
+    scheduleInput.type = 'text';
+    fireEvent.change(scheduleInput, { target: { value: 'not-a-valid-datetime' } });
+
+    fireEvent.click(screen.getByRole('button', { name: /broadcast\.fbSchedulePost/i }));
+
+    await waitFor(() => {
+      expect(screen.getByText('broadcast.fbInvalidSchedule')).toBeTruthy();
+    });
+    expect(postSpy).not.toHaveBeenCalled();
   });
 });

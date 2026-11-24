@@ -990,6 +990,7 @@
     "fbScheduleSuccess": "Scheduled for Facebook Page (Post ID: {{postId}}).",
     "fbPublishError": "Facebook publish failed",
     "fbPublishMissingId": "Mixpost did not return a post ID. Please verify status in Mixpost.",
+    "fbInvalidSchedule": "Invalid schedule date/time. Please verify and try again.",
     "fbPromoPrefillLabel": "Quick-fill from active promotions",
     "fbPromoPrefillEmpty": "No active promotions found.",
     "znsConfigHint": "Sends via the approved Zalo ZNS promotion template (only to customers with active marketing consent).",

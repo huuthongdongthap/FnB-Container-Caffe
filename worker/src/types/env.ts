@@ -51,6 +51,7 @@ export interface Env {
   MIXPOST_API_URL?: string;
   MIXPOST_API_TOKEN?: string;
   MIXPOST_ACCOUNTS?: string;
+  MIXPOST_TENANT_ACCOUNTS_JSON?: string;
 
   // pretix
   PRETIX_API_URL?: string;

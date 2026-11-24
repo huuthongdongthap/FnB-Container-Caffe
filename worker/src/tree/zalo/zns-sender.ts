@@ -1,32 +1,11 @@
 import type { D1Database } from '@cloudflare/workers-types';
 import type { ZnsData, ZnsResult } from './types';
-import { TEMPLATE_IDS, buildTemplateData } from './zns-templates';
+import { buildTemplateData, resolveTemplateId } from './zns-templates';
 
 const ZALO_ZNS_URL = 'https://business.openapi.zalo.me/message/template';
 
 function normalizePhone(phone: string): string {
   return String(phone || '').replace(/^\+?84/, '').replace(/^0/, '');
-}
-
-function getConfiguredTemplateId(
-  templateKey: string,
-  env: Record<string, unknown>
-): string | null {
-  const normalizedKey = String(templateKey || '').trim();
-  if (!normalizedKey) return null;
-  const envKey = `ZALO_ZNS_TEMPLATE_${normalizedKey.toUpperCase()}`;
-  const envVal = env[envKey];
-  if (typeof envVal === 'string') {
-    const trimmed = envVal.trim();
-    if (trimmed && !trimmed.startsWith('YOUR_')) {
-      return trimmed;
-    }
-  }
-  const fallback = TEMPLATE_IDS[normalizedKey];
-  if (fallback && !fallback.startsWith('YOUR_')) {
-    return fallback;
-  }
-  return null;
 }
 
 export interface ZnsSenderEnv {
@@ -47,7 +26,7 @@ export async function sendZNS(
     return { ok: false, channel: 'zalo', reason: 'no_token' };
   }
 
-  const template_id = getConfiguredTemplateId(
+  const template_id = resolveTemplateId(
     params.template_key,
     env as unknown as Record<string, unknown>
   );
@@ -71,7 +50,7 @@ export async function sendZNS(
         phone: normalized,
         template_id,
         template_data: buildTemplateData(params.template_key, params.data),
-        tracking_id: `aura_${Date.now()}`
+        tracking_id: `aura_${crypto.randomUUID()}`
       })
     });
 

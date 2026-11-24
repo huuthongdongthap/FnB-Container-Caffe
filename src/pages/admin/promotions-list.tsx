@@ -4,6 +4,7 @@ import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { formatCurrency, formatDate } from './use-promotions-manager';
+import { formatPromotionBaseDiscount, isFixedDiscountPromotion } from './promotion-announcement-helpers';
 import type { Promotion } from './types';
 
 interface PromotionsListProps {
@@ -92,13 +93,13 @@ export function PromotionsList({
               )}
 
               {!isLoading && !isError && promotions.map((promo) => (
-                <tr key={promo.code} className="hover:bg-muted/5 transition-colors">
+                <tr key={`${promo.tenant_id || 'default'}:${promo.code}`} className="hover:bg-muted/5 transition-colors">
                   <td className="px-4 py-3">
                     <span className="font-mono text-sm font-semibold">{promo.code}</span>
                   </td>
                   <td className="px-4 py-3 text-sm">
-                    {promo.percent}%
-                    {promo.max_discount > 0 && (
+                    {formatPromotionBaseDiscount(promo)}
+                    {!isFixedDiscountPromotion(promo) && promo.max_discount > 0 && (
                       <span className="text-xs text-muted ml-1">
                         {t('maxDiscount', { value: formatCurrency(promo.max_discount) })}
                       </span>

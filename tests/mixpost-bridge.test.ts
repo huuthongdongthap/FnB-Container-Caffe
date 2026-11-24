@@ -255,6 +255,25 @@ describe('MixpostClient', () => {
     expect(url).toContain('/api/mixpost/accounts/5');
     expect(result).toEqual({ id: 5, name: 'Instagram' });
   });
+
+  test('createPost converts scheduledAt ISO datetime to Asia/Ho_Chi_Minh (UTC+7) date and time', async () => {
+    mockFetchResponse({ id: 77 });
+
+    const { createMixpostClient } = await import('../worker/src/lib/mixpost-client.ts');
+    const client = createMixpostClient(env.MIXPOST_API_URL, env.MIXPOST_API_TOKEN);
+
+    // 2026-08-01T18:30:00.000Z is 2026-08-02 01:30 in Vietnam (UTC+7)
+    await client.createPost({
+      accounts: [1],
+      content: 'Scheduled in Vietnam time',
+      scheduledAt: '2026-08-01T18:30:00.000Z',
+    });
+
+    const [, opts] = mockFetch.mock.calls[0] as [string, RequestInit];
+    const body = JSON.parse(opts.body as string);
+    expect(body.date).toBe('2026-08-02');
+    expect(body.time).toBe('01:30');
+  });
 });
 
 // ── Route: POST /api/mixpost/posts ───────────────────────────────
@@ -530,7 +549,7 @@ describe('GET /api/mixpost/posts', () => {
     mixpostRouter = (mod as any).mixpostRouter;
   }
 
-  test('proxies to Mixpost API and returns posts', async () => {
+  test('proxies to Mixpost API and returns posts when D1 table is unavailable', async () => {
     const posts = [
       { id: 10, status: 'scheduled', date: '2026-07-02' },
       { id: 11, status: 'published', date: '2026-07-01' },
@@ -538,7 +557,7 @@ describe('GET /api/mixpost/posts', () => {
     mockFetchResponse(posts);
     await mountRouter();
 
-    const res = await mixpostRouter.request('/posts', { method: 'GET' }, env);
+    const res = await mixpostRouter.request('/posts', { method: 'GET' }, { ...env, AURA_DB: undefined });
 
     expect(res.status).toBe(200);
     const body = await res.json();
@@ -547,6 +566,17 @@ describe('GET /api/mixpost/posts', () => {
     expect(mockFetch).toHaveBeenCalledTimes(1);
     const [url] = mockFetch.mock.calls[0];
     expect(url).toContain('/api/mixpost/posts');
+  });
+
+  test('returns tenant-scoped D1 posts without falling back to unfiltered Mixpost listPosts when D1 query succeeds with zero rows', async () => {
+    await mountRouter();
+
+    const res = await mixpostRouter.request('/posts', { method: 'GET' }, env);
+
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body).toEqual({ success: true, data: [], source: 'd1' });
+    expect(mockFetch).not.toHaveBeenCalled();
   });
 });
 

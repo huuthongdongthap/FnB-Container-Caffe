@@ -990,6 +990,7 @@
     "fbScheduleSuccess": "Đã lên lịch đăng bài lên Facebook Page (Mã bài: {{postId}}).",
     "fbPublishError": "Đăng bài Facebook thất bại",
     "fbPublishMissingId": "Mixpost không trả về mã bài đăng. Vui lòng kiểm tra trạng thái trên Mixpost.",
+    "fbInvalidSchedule": "Thời gian hẹn đăng không hợp lệ. Vui lòng kiểm tra lại.",
     "fbPromoPrefillLabel": "Chọn nhanh từ khuyến mãi đang chạy",
     "fbPromoPrefillEmpty": "Chưa có mã khuyến mãi đang chạy.",
     "znsConfigHint": "Gửi qua mẫu Zalo ZNS ưu đãi đã duyệt (chỉ gửi đến khách hàng đã đồng ý nhận tin tiếp thị).",

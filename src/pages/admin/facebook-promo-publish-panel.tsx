@@ -18,7 +18,10 @@ import {
   usePublishMixpostPost,
 } from '@/hooks/use-mixpost-social';
 import type { Promotion } from './types';
-import { buildPromotionFacebookDraft } from './promotion-announcement-helpers';
+import {
+  buildPromotionFacebookDraft,
+  formatPromotionBaseDiscount,
+} from './promotion-announcement-helpers';
 
 interface FacebookPromoPublishPanelProps {
   promotion?: Promotion | null;
@@ -39,6 +42,7 @@ export function FacebookPromoPublishPanel({
     initialContent || (promotion ? buildPromotionFacebookDraft(promotion) : ''),
   );
   const [scheduledLocal, setScheduledLocal] = useState<string>('');
+  const [scheduleError, setScheduleError] = useState<string>('');
   const [selectedAccounts, setSelectedAccounts] = useState<number[]>([]);
 
   const accountsQuery = useMixpostAccounts(enabled);
@@ -53,7 +57,17 @@ export function FacebookPromoPublishPanel({
       setContent(buildPromotionFacebookDraft(promotion));
       publishMutation.reset();
     }
-  }, [promotion?.code]);
+  }, [
+    promotion?.code,
+    promotion?.percent,
+    promotion?.discount_type,
+    promotion?.type,
+    promotion?.discount_value,
+    promotion?.value,
+    promotion?.max_discount,
+    promotion?.min_order,
+    promotion?.expires_at,
+  ]);
 
   useEffect(() => {
     const firstAccount = fbAccounts[0];
@@ -87,7 +101,16 @@ export function FacebookPromoPublishPanel({
 
   const handlePublish = () => {
     if (selectedAccounts.length === 0 || !content.trim()) return;
-    const scheduledAtIso = scheduledLocal ? new Date(scheduledLocal).toISOString() : undefined;
+    let scheduledAtIso: string | undefined;
+    if (scheduledLocal.trim()) {
+      const parsed = new Date(scheduledLocal);
+      if (Number.isNaN(parsed.getTime())) {
+        setScheduleError(t('broadcast.fbInvalidSchedule'));
+        return;
+      }
+      scheduledAtIso = parsed.toISOString();
+    }
+    setScheduleError('');
     publishMutation.mutate({
       content: content.trim(),
       accounts: selectedAccounts,
@@ -118,7 +141,7 @@ export function FacebookPromoPublishPanel({
           <div className="flex flex-wrap gap-2">
             {availablePromotions.slice(0, 8).map((promo) => (
               <button
-                key={promo.code}
+                key={`${promo.tenant_id || 'default'}:${promo.code}`}
                 type="button"
                 onClick={() => handleSelectPromo(promo)}
                 className={`rounded-md border px-2.5 py-1 text-xs font-mono transition-colors ${
@@ -127,7 +150,7 @@ export function FacebookPromoPublishPanel({
                     : 'border-border bg-surface text-foreground hover:bg-muted/10'
                 }`}
               >
-                {promo.code} (-{promo.percent}%)
+                {promo.code} (-{formatPromotionBaseDiscount(promo)})
               </button>
             ))}
           </div>
@@ -226,7 +249,11 @@ export function FacebookPromoPublishPanel({
         label={t('broadcast.fbScheduleLabel')}
         type="datetime-local"
         value={scheduledLocal}
-        onChange={(e) => setScheduledLocal(e.target.value)}
+        error={scheduleError || undefined}
+        onChange={(e) => {
+          setScheduledLocal(e.target.value);
+          if (scheduleError) setScheduleError('');
+        }}
       />
 
       {/* Publish error or success */}

@@ -12,9 +12,25 @@ export interface PromotionZnsDraft {
   expires_at: string;
 }
 
+const FIXED_DISCOUNT_TYPES = new Set(['fixed', 'fixed_amount', 'amount']);
+
+export function isFixedDiscountPromotion(promo: Promotion): boolean {
+  const rawType = String(promo.discount_type ?? promo.type ?? '').trim().toLowerCase();
+  return FIXED_DISCOUNT_TYPES.has(rawType);
+}
+
+export function formatPromotionBaseDiscount(promo: Promotion): string {
+  if (isFixedDiscountPromotion(promo)) {
+    const rawValue = Number(promo.discount_value ?? promo.value ?? promo.percent ?? 0);
+    return `${Math.round(rawValue).toLocaleString('vi-VN')}đ`;
+  }
+  const pct = Number(promo.percent ?? promo.discount_value ?? promo.value ?? 0);
+  return `${pct}%`;
+}
+
 export function formatPromotionDiscount(promo: Promotion): string {
-  const base = `${promo.percent}%`;
-  if (promo.max_discount > 0) {
+  const base = formatPromotionBaseDiscount(promo);
+  if (!isFixedDiscountPromotion(promo) && promo.max_discount > 0) {
     return `${base} (tối đa ${promo.max_discount.toLocaleString('vi-VN')}đ)`;
   }
   return base;
@@ -32,6 +48,7 @@ export function formatPromotionExpiry(expiresAt: string | null): string {
 }
 
 export function buildPromotionZnsDraft(promo: Promotion): PromotionZnsDraft {
+  const baseDiscount = formatPromotionBaseDiscount(promo);
   const discount = formatPromotionDiscount(promo);
   const expiresAt = formatPromotionExpiry(promo.expires_at);
   const conditions: string[] = [];
@@ -43,7 +60,7 @@ export function buildPromotionZnsDraft(promo: Promotion): PromotionZnsDraft {
   }
   const suffix = conditions.length > 0 ? ` ${conditions.join(' ')}` : '';
   return {
-    title: `Ưu đãi ${promo.code} — Giảm ${promo.percent}%`,
+    title: `Ưu đãi ${promo.code} — Giảm ${baseDiscount}`,
     message: `Nhập mã ${promo.code} để giảm ${discount} tại AURA CAFE.${suffix}`,
     promo_code: promo.code,
     discount,

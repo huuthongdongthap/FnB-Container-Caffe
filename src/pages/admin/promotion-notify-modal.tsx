@@ -29,6 +29,7 @@ export function PromotionNotifyModal({ promotion, onClose }: PromotionNotifyModa
   const [segment, setSegment] = useState('');
   const [title, setTitle] = useState('');
   const [message, setMessage] = useState('');
+  const [confirmingZalo, setConfirmingZalo] = useState(false);
   const [promoMeta, setPromoMeta] = useState<{ promo_code: string; discount: string; expires_at: string }>({
     promo_code: '',
     discount: '',
@@ -45,19 +46,37 @@ export function PromotionNotifyModal({ promotion, onClose }: PromotionNotifyModa
     setSegment('');
     setTitle(draft.title);
     setMessage(draft.message);
+    setConfirmingZalo(false);
     setPromoMeta({
       promo_code: draft.promo_code,
       discount: draft.discount,
       expires_at: draft.expires_at,
     });
     sendMutation.reset();
-  }, [promotion?.code]);
+  }, [
+    promotion?.code,
+    promotion?.percent,
+    promotion?.discount_type,
+    promotion?.type,
+    promotion?.discount_value,
+    promotion?.value,
+    promotion?.max_discount,
+    promotion?.min_order,
+    promotion?.expires_at,
+  ]);
 
   const segments = segmentsQuery.data ?? [];
+  const selectedSegment = segments.find((s) => s.id === segment);
   const canSendZalo = Boolean(segment && message.trim() && !sendMutation.isPending);
+
+  const handleRequestZaloConfirm = () => {
+    if (!canSendZalo) return;
+    setConfirmingZalo(true);
+  };
 
   const handleSendZalo = () => {
     if (!canSendZalo) return;
+    setConfirmingZalo(false);
     sendMutation.mutate({
       segment,
       channel: 'zns',
@@ -125,7 +144,10 @@ export function PromotionNotifyModal({ promotion, onClose }: PromotionNotifyModa
                   <select
                     id="promo-zns-segment"
                     value={segment}
-                    onChange={(e) => setSegment(e.target.value)}
+                    onChange={(e) => {
+                      setSegment(e.target.value);
+                      setConfirmingZalo(false);
+                    }}
                     className="w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-foreground"
                   >
                     <option value="">{t('broadcast.selectSegment')}</option>
@@ -186,19 +208,45 @@ export function PromotionNotifyModal({ promotion, onClose }: PromotionNotifyModa
                 </div>
               )}
 
-              <div className="flex justify-end gap-2 pt-2">
-                <Button variant="secondary" onClick={onClose}>
-                  {tPromo('cancel')}
-                </Button>
-                <Button
-                  onClick={handleSendZalo}
-                  disabled={!canSendZalo}
-                  loading={sendMutation.isPending}
+              {confirmingZalo ? (
+                <div
+                  role="region"
+                  aria-label={t('broadcast.confirmTitle')}
+                  className="space-y-3 rounded-lg border border-amber-500/40 bg-amber-500/10 p-3"
                 >
-                  <Send size={15} aria-hidden="true" className="mr-1.5 inline-block" />
-                  {sendMutation.isPending ? t('broadcast.sending') : t('broadcast.send')}
-                </Button>
-              </div>
+                  <p className="text-sm font-semibold text-amber-200">{t('broadcast.confirmTitle')}</p>
+                  <p className="text-xs text-amber-100">
+                    {t('broadcast.confirmWarning', { count: selectedSegment?.count ?? 0 })}
+                  </p>
+                  <div className="flex justify-end gap-2">
+                    <Button variant="secondary" onClick={() => setConfirmingZalo(false)}>
+                      {t('broadcast.cancel')}
+                    </Button>
+                    <Button
+                      onClick={handleSendZalo}
+                      disabled={!canSendZalo}
+                      loading={sendMutation.isPending}
+                    >
+                      <Send size={15} aria-hidden="true" className="mr-1.5 inline-block" />
+                      {t('broadcast.confirm')}
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex justify-end gap-2 pt-2">
+                  <Button variant="secondary" onClick={onClose}>
+                    {tPromo('cancel')}
+                  </Button>
+                  <Button
+                    onClick={handleRequestZaloConfirm}
+                    disabled={!canSendZalo}
+                    loading={sendMutation.isPending}
+                  >
+                    <Send size={15} aria-hidden="true" className="mr-1.5 inline-block" />
+                    {sendMutation.isPending ? t('broadcast.sending') : t('broadcast.send')}
+                  </Button>
+                </div>
+              )}
             </div>
           ) : (
             <FacebookPromoPublishPanel promotion={promotion} enabled={isOpen && activeTab === 'facebook'} />
