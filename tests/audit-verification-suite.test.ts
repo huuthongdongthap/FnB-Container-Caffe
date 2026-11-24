@@ -74,6 +74,10 @@ describe('End-to-End Domain Integrity, Concurrency, Security & Privacy Verificat
     sqlite.prepare("INSERT INTO payments (id, order_id, method, amount, status, transaction_id, payment_url, tenant_id) VALUES ('payos:ord_exp', 'ord_exp', 'payos', 40000, 'expired', '70001', 'https://pay.payos.vn/web/old', 'default')").run();
     vi.spyOn(globalThis, 'fetch').mockImplementation(async (url, init) => {
       if (String(url).includes('/cancel')) return new Response(JSON.stringify({ code: '00' }), { status: 200 });
+      if (!init?.method || init.method === 'GET') {
+        const expData = { id: 'exp_link', orderCode: 70001, amount: 40000, status: 'EXPIRED' };
+        return new Response(JSON.stringify({ code: '00', data: expData, signature: signPayOS(expData, 'chk_1') }), { status: 200 });
+      }
       const body = JSON.parse(String(init?.body));
       const d = { orderCode: body.orderCode, amount: 40000, status: 'PENDING', paymentLinkId: 'rot_1', checkoutUrl: 'https://pay.payos.vn/web/rot_1' };
       return new Response(JSON.stringify({ code: '00', data: d, signature: signPayOS(d, 'chk_1') }), { status: 200 });

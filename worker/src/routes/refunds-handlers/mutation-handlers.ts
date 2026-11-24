@@ -274,7 +274,7 @@ export async function handleRefund(c: Context<{ Bindings: Env }>, openApi = fals
         // Idempotent inventory/BOM reversal mirroring order cancellation (pre-prep releases, post-prep spoils)
         try {
           const { restoreInventoryForOrder } = await import('@aura/domain-inventory');
-          const restoreEnv = { AURA_DB: db as unknown, ...(c.env || {}) } as Parameters<typeof restoreInventoryForOrder>[0];
+          const restoreEnv = { ...(c.env || {}), AURA_DB: db } as unknown as Parameters<typeof restoreInventoryForOrder>[0];
           if (['preparing', 'ready', 'served', 'completed'].includes(preRefundOrderStatus)) {
             await restoreInventoryForOrder(restoreEnv, payment.order_id, effectivePaymentTenant, {
               preCancelStatus: preRefundOrderStatus,

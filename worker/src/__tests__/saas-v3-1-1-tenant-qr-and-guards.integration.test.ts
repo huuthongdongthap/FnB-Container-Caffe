@@ -734,4 +734,74 @@ describe('SaaS v3.1.1 — Tenant Permanent Table QR, Isolation, PayOS Cancel & L
       .get(shop.tenantId) as { c: number };
     expect(remainingLoginCapableOwners.c).toBe(1);
   });
+
+  it('chunks admin QR table lookups below D1 bound-parameter limit when a store has more than 60 tables', async () => {
+    const { db, sqlite } = createMigratedD1();
+    const maxBindsSeen: number[] = [];
+    const checkedDb = new Proxy(db, {
+      get(target, prop, receiver) {
+        if (prop === 'prepare') {
+          return (sql: string) => {
+            const stmt = target.prepare(sql);
+            const origBind = stmt.bind.bind(stmt);
+            stmt.bind = (...args: unknown[]) => {
+              maxBindsSeen.push(args.length);
+              if (args.length > 100) {
+                throw new Error(`D1 bound parameter limit exceeded: ${args.length}`);
+              }
+              return origBind(...args);
+            };
+            return stmt;
+          };
+        }
+        return Reflect.get(target, prop, receiver);
+      },
+    }) as D1Database;
+
+    const env = buildEnv(checkedDb);
+    const largeShop = await signupTenant(env, {
+      slug: 'large-qr-shop',
+      shopName: 'Large QR Shop',
+      ownerEmail: 'large-qr@brew.vn',
+    });
+
+    // Seed 65 tables + QR rows (>130 distinct lookup keys across table.id and table_number/code)
+    for (let i = 1; i <= 65; i++) {
+      const code = `B${String(i).padStart(2, '0')}`;
+      const tblId = `tbl_large_${i}`;
+      sqlite
+        .prepare(
+          `INSERT INTO cafe_tables (id, table_number, code, name, capacity, zone, is_active, status, tenant_id)
+           VALUES (?, ?, ?, ?, 4, 'Main', 1, 'Available', ?)`,
+        )
+        .run(tblId, code, code, `Bàn ${code}`, largeShop.tenantId);
+      sqlite
+        .prepare(
+          `INSERT INTO table_qr_codes (table_id, slug, tenant_id)
+           VALUES (?, ?, ?)`,
+        )
+        .run(tblId, `large-qr-${i}`, largeShop.tenantId);
+    }
+
+    maxBindsSeen.length = 0;
+    const res = await app.fetch(
+      new Request('https://auraspace.cafe/api/admin/qr/tables', {
+        headers: { Authorization: `Bearer ${largeShop.token}` },
+      }),
+      env,
+      dummyCtx,
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      data: Array<{ id: string; slug: string | null; qr_mode: string }>;
+    };
+    expect(body.data.length).toBeGreaterThanOrEqual(65);
+    const seededRow = body.data.find((r) => r.id === 'tbl_large_65');
+    expect(seededRow).toMatchObject({
+      id: 'tbl_large_65',
+      slug: 'large-qr-65',
+      qr_mode: 'tenant_permanent',
+    });
+    expect(Math.max(...maxBindsSeen)).toBeLessThanOrEqual(100);
+  });
 });
