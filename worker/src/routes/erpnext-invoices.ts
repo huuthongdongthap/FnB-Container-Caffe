@@ -195,39 +195,36 @@ async function verifyInvoiceTenantOwnership(
   invoiceId: string,
   tenantId: string,
 ): Promise<boolean> {
+  if (!invoiceId || !invoiceId.trim()) return false;
   if (!db || tenantId === '*') return true;
   const scopedTenant = tenantId.trim() || 'default';
   const queries: Array<{ sql: string; binds: unknown[] }> = [
     {
-      sql: "SELECT COALESCE(NULLIF(TRIM(m.tenant_id), ''), o.tenant_id) AS tenant_id FROM erpnext_mappings m LEFT JOIN orders o ON o.id = m.local_id WHERE (m.erpnext_id = ? OR m.local_id = ?) AND COALESCE(NULLIF(TRIM(COALESCE(m.tenant_id, o.tenant_id)), ''), 'default') = ? LIMIT 1",
-      binds: [invoiceId, invoiceId, scopedTenant],
-    },
-    {
-      sql: "SELECT COALESCE(NULLIF(TRIM(m.tenant_id), ''), o.tenant_id) AS tenant_id FROM erpnext_mappings m LEFT JOIN orders o ON o.id = m.local_id WHERE m.erpnext_name = ? AND COALESCE(NULLIF(TRIM(COALESCE(m.tenant_id, o.tenant_id)), ''), 'default') = ? LIMIT 1",
+      sql: "SELECT COALESCE(NULLIF(TRIM(m.tenant_id), ''), NULLIF(TRIM(o.tenant_id), ''), 'default') AS tenant_id FROM erpnext_mappings m LEFT JOIN orders o ON o.id = m.local_id WHERE NULLIF(TRIM(m.erpnext_id), '') = ? AND COALESCE(NULLIF(TRIM(m.tenant_id), ''), NULLIF(TRIM(o.tenant_id), ''), 'default') = ? LIMIT 1",
       binds: [invoiceId, scopedTenant],
     },
     {
-      sql: "SELECT o.tenant_id AS tenant_id FROM erpnext_mappings m LEFT JOIN orders o ON o.id = m.local_id WHERE (m.erpnext_id = ? OR m.local_id = ?) AND COALESCE(NULLIF(TRIM(o.tenant_id), ''), 'default') = ? LIMIT 1",
-      binds: [invoiceId, invoiceId, scopedTenant],
-    },
-    {
-      sql: "SELECT o.tenant_id AS tenant_id FROM erpnext_mappings m LEFT JOIN orders o ON o.id = m.local_id WHERE m.erpnext_name = ? AND COALESCE(NULLIF(TRIM(o.tenant_id), ''), 'default') = ? LIMIT 1",
+      sql: "SELECT COALESCE(NULLIF(TRIM(m.tenant_id), ''), NULLIF(TRIM(o.tenant_id), ''), 'default') AS tenant_id FROM erpnext_mappings m LEFT JOIN orders o ON o.id = m.local_id WHERE NULLIF(TRIM(m.erpnext_name), '') = ? AND COALESCE(NULLIF(TRIM(m.tenant_id), ''), NULLIF(TRIM(o.tenant_id), ''), 'default') = ? LIMIT 1",
       binds: [invoiceId, scopedTenant],
     },
     {
-      sql: "SELECT tenant_id FROM erpnext_mappings WHERE erpnext_name = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ? LIMIT 1",
+      sql: "SELECT o.tenant_id AS tenant_id FROM erpnext_mappings m LEFT JOIN orders o ON o.id = m.local_id WHERE NULLIF(TRIM(m.erpnext_id), '') = ? AND COALESCE(NULLIF(TRIM(o.tenant_id), ''), 'default') = ? LIMIT 1",
       binds: [invoiceId, scopedTenant],
     },
     {
-      sql: "SELECT tenant_id FROM erpnext_mappings WHERE erpnext_id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ? LIMIT 1",
+      sql: "SELECT o.tenant_id AS tenant_id FROM erpnext_mappings m LEFT JOIN orders o ON o.id = m.local_id WHERE NULLIF(TRIM(m.erpnext_name), '') = ? AND COALESCE(NULLIF(TRIM(o.tenant_id), ''), 'default') = ? LIMIT 1",
       binds: [invoiceId, scopedTenant],
     },
     {
-      sql: "SELECT tenant_id FROM erpnext_mappings WHERE erpnext_invoice_id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ? LIMIT 1",
+      sql: "SELECT tenant_id FROM erpnext_mappings WHERE NULLIF(TRIM(erpnext_name), '') = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ? LIMIT 1",
       binds: [invoiceId, scopedTenant],
     },
     {
-      sql: "SELECT tenant_id FROM orders WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ? LIMIT 1",
+      sql: "SELECT tenant_id FROM erpnext_mappings WHERE NULLIF(TRIM(erpnext_id), '') = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ? LIMIT 1",
+      binds: [invoiceId, scopedTenant],
+    },
+    {
+      sql: "SELECT tenant_id FROM erpnext_mappings WHERE NULLIF(TRIM(erpnext_invoice_id), '') = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ? LIMIT 1",
       binds: [invoiceId, scopedTenant],
     },
   ];
@@ -335,11 +332,11 @@ export async function handleErpnextInvoicesRequest(
             SELECT m.id, m.local_id as order_id, m.erpnext_id, m.erpnext_model, m.sync_status,
                    m.attempts, m.created_at, m.last_synced_at, o.customer_name, o.total AS total_amount,
                    o.customer_email, o.customer_phone,
-                   COALESCE(NULLIF(TRIM(m.tenant_id), ''), o.tenant_id) AS tenant_id
+                   COALESCE(NULLIF(TRIM(m.tenant_id), ''), NULLIF(TRIM(o.tenant_id), ''), 'default') AS tenant_id
             FROM erpnext_mappings m
             LEFT JOIN orders o ON o.id = m.local_id
             WHERE m.local_type = ?
-              AND (? = '*' OR COALESCE(NULLIF(TRIM(COALESCE(m.tenant_id, o.tenant_id)), ''), 'default') = ?)
+              AND (? = '*' OR COALESCE(NULLIF(TRIM(m.tenant_id), ''), NULLIF(TRIM(o.tenant_id), ''), 'default') = ?)
             ORDER BY m.created_at DESC LIMIT 100
           `).bind('order', tenantId, tenantId).all<Record<string, unknown>>();
           results = res.results;
@@ -397,7 +394,7 @@ export async function handleErpnextInvoicesRequest(
         let res: { results?: Array<{ local_id: string; tenant_id?: string | null }> };
         try {
           res = await db.prepare(
-            "SELECT m.local_id, COALESCE(NULLIF(TRIM(m.tenant_id), ''), o.tenant_id) AS tenant_id FROM erpnext_mappings m LEFT JOIN orders o ON o.id = m.local_id WHERE m.sync_status = 'failed' AND m.attempts < 5 AND (? = '*' OR COALESCE(NULLIF(TRIM(COALESCE(m.tenant_id, o.tenant_id)), ''), 'default') = ?) ORDER BY m.created_at ASC LIMIT 10"
+            "SELECT m.local_id, COALESCE(NULLIF(TRIM(m.tenant_id), ''), NULLIF(TRIM(o.tenant_id), ''), 'default') AS tenant_id FROM erpnext_mappings m LEFT JOIN orders o ON o.id = m.local_id WHERE m.sync_status = 'failed' AND m.attempts < 5 AND (? = '*' OR COALESCE(NULLIF(TRIM(m.tenant_id), ''), NULLIF(TRIM(o.tenant_id), ''), 'default') = ?) ORDER BY m.created_at ASC LIMIT 10"
           ).bind(tenantId, tenantId).all<{ local_id: string; tenant_id?: string | null }>();
         } catch {
           try {
@@ -500,12 +497,28 @@ export async function handleErpnextInvoicesRequest(
         return json({ success: false, error: 'Invoice not found' }, 404);
       }
       if (!accountingClient) return json({ success: false, error: 'ERPNext accounting not configured' }, 503);
-      const upstream = await accountingClient.fetchInvoicePDF(invoiceId);
+      const MAX_PDF_BYTES = 10 * 1024 * 1024;
+      let upstream: Response;
+      try {
+        upstream = await accountingClient.fetchInvoicePDF(invoiceId);
+      } catch {
+        return json({ success: false, error: 'ERPNext PDF fetch failed' }, 502);
+      }
       const upstreamContentType = (upstream.headers.get('content-type') || '').toLowerCase();
       if (!upstream.ok || !upstreamContentType.includes('application/pdf')) {
         return json({ success: false, error: 'ERPNext PDF fetch failed' }, 502);
       }
+      const contentLengthHeader = upstream.headers.get('content-length');
+      if (contentLengthHeader !== null) {
+        const parsedLength = Number(contentLengthHeader);
+        if (Number.isFinite(parsedLength) && parsedLength > MAX_PDF_BYTES) {
+          return json({ success: false, error: 'Invoice PDF exceeds maximum allowed size' }, 413);
+        }
+      }
       const pdfBytes = await upstream.arrayBuffer();
+      if (pdfBytes.byteLength > MAX_PDF_BYTES) {
+        return json({ success: false, error: 'Invoice PDF exceeds maximum allowed size' }, 413);
+      }
       const safeFileName = invoiceId.replace(/[^a-zA-Z0-9._-]/g, '_');
       return new Response(pdfBytes, {
         status: 200,

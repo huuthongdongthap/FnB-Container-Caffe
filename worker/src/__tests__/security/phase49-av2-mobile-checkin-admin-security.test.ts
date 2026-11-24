@@ -745,14 +745,14 @@ describe('Phase 49 Slice AV2 — Mobile POS, Check-in, Admin Sales/Metrics/Audit
   });
 
   describe('6. vitals.ts hardening', () => {
-    it('scopes web_vitals inserts by tenant and returns 429 when per-IP/tenant rate limit is exceeded on POST /api/vitals', async () => {
+    it('ignores unauthenticated X-Tenant-ID, scopes authenticated user tenant, and enforces IP-only rate limit on POST /api/vitals', async () => {
       const app = new Hono<{ Bindings: Env }>();
       registerVitalsRoute(app);
 
       const { db, executedQueries } = createStatefulSqlMock();
       const env = { ...createMockEnv(), AURA_DB: db as unknown as D1Database };
 
-      // 60 requests from the same IP + tenant succeed with 204
+      // 60 unauthenticated requests from the same IP succeed with 204 and default to 'default' even with X-Tenant-ID header
       for (let i = 0; i < 60; i++) {
         const res = await app.fetch(
           new Request('https://test.aura/api/vitals', {
@@ -769,25 +769,48 @@ describe('Phase 49 Slice AV2 — Mobile POS, Check-in, Admin Sales/Metrics/Audit
         expect(res.status).toBe(204);
       }
 
-      // Verify tenant_id is persisted inside _metrics tags JSON
+      // Unauthenticated X-Tenant-ID must NOT be trusted — persisted as 'default'
       const insertMetric = executedQueries.find((q) => q.sql.includes('INSERT INTO _metrics'));
       expect(insertMetric).toBeDefined();
-      expect(String(insertMetric?.args[2] ?? '')).toContain('"tenant_id":"store-vitals-1"');
+      expect(String(insertMetric?.args[2] ?? '')).toContain('"tenant_id":"default"');
 
-      // 61st request within the same minute from same IP + tenant returns 429
+      // 61st request within the same minute from same IP with a rotated X-Tenant-ID still returns 429
       const blockedRes = await app.fetch(
         new Request('https://test.aura/api/vitals', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
             'CF-Connecting-IP': '203.0.113.77',
-            'X-Tenant-ID': 'store-vitals-1',
+            'X-Tenant-ID': 'store-vitals-rotated',
           },
           body: JSON.stringify({ name: 'LCP', value: 1900, rating: 'good' }),
         }),
         env
       );
       expect(blockedRes.status).toBe(429);
+
+      // Authenticated user context scopes vitals insert to user's tenant
+      const authApp = new Hono<{ Bindings: Env }>();
+      authApp.use('*', async (c, next) => {
+        c.set('user' as never, { id: 'u-1', role: 'staff', tenantId: 'store-vitals-1' } as never);
+        await next();
+      });
+      registerVitalsRoute(authApp);
+
+      const authRes = await authApp.fetch(
+        new Request('https://test.aura/api/vitals', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'CF-Connecting-IP': '203.0.113.88',
+          },
+          body: JSON.stringify({ name: 'LCP', value: 1300, rating: 'good' }),
+        }),
+        env
+      );
+      expect(authRes.status).toBe(204);
+      const authInsert = executedQueries.filter((q) => q.sql.includes('INSERT INTO _metrics')).pop();
+      expect(String(authInsert?.args[2] ?? '')).toContain('"tenant_id":"store-vitals-1"');
     });
   });
 });

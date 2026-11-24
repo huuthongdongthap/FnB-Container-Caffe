@@ -16,6 +16,23 @@ import type { Env } from '../types/env';
 
 const log = createLogger({ route: 'erpnext-sync' });
 
+function sanitizeSyncError(raw: unknown): string {
+  const str = String(raw ?? '')
+    .replace(/[\r\n\t]+/g, ' ')
+    .replace(/https?:\/\/\S+/gi, '[url]')
+    .replace(/\b(?:token|bearer|basic)\s+[A-Za-z0-9._:/-]+/gi, '[redacted]')
+    .replace(/\b(?:api_?key|api_?secret|secret|password|token)\s*[:=]\s*\S+/gi, '[redacted]')
+    .replace(/\bat\s+\S+(?:\s*\([^)]*\))?/g, '')
+    .replace(/\b(?:SELECT|INSERT|UPDATE|DELETE)\b[^;]*/gi, '[sql]')
+    .replace(/\/[\w./-]+\.(?:ts|js|mjs|cjs|sql):\d+(?::\d+)?/g, '[path]')
+    .replace(/\s{2,}/g, ' ')
+    .trim();
+  if (!str) {
+    return 'ERPNext sync error';
+  }
+  return str.length > 160 ? `${str.slice(0, 157)}...` : str;
+}
+
 export const FORBIDDEN_TENANT_SENTINEL = '__forbidden_tenant_override__';
 
 export function resolveErpnextTenant(c: import('hono').Context<{ Bindings: Env }>): string {
@@ -397,7 +414,8 @@ export function erpnextSyncRoutes(app: import('hono').Hono<{ Bindings: Env }>): 
       return c.json({ success: true, synced, failed, total: uniqueTransactions.length, mock: client.isMock });
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
-      return c.json({ success: false, error: msg, mock: false }, 500);
+      log.error('erpnext_inventory_sync_failed', { error: msg });
+      return c.json({ success: false, error: 'Inventory sync failed', mock: false }, 500);
     }
   };
 
@@ -455,17 +473,18 @@ export function erpnextSyncRoutes(app: import('hono').Hono<{ Bindings: Env }>): 
               ? 'All'
               : entitySegment.charAt(0).toUpperCase() + entitySegment.slice(1);
             const hasError = Boolean(r.error);
+            const safeError = hasError ? sanitizeSyncError(r.error) : null;
             const createdAt = String(r.created_at || '');
             return {
               id: String(r.id ?? ''),
               entity,
               action: entitySegment === 'sync-all' ? 'sync-all' : 'sync',
               status: hasError ? 'error' : 'success',
-              message: hasError ? String(r.error) : `${String(r.method || 'POST')} ${endpoint}`,
+              message: safeError ?? `${String(r.method || 'POST')} ${endpoint}`,
               timestamp: createdAt,
               method: r.method,
               endpoint: r.endpoint,
-              error: r.error ?? null,
+              error: safeError,
               created_at: createdAt,
             };
           });
@@ -475,10 +494,10 @@ export function erpnextSyncRoutes(app: import('hono').Hono<{ Bindings: Env }>): 
               .prepare('SELECT created_at, error FROM erpnext_sync_logs ORDER BY created_at DESC LIMIT 1')
               .first<{ created_at?: string; error?: string | null }>();
             if (latestLog?.created_at) lastSync = latestLog.created_at;
-            if (latestLog?.error) errorMessage = latestLog.error;
+            if (latestLog?.error) errorMessage = sanitizeSyncError(latestLog.error);
           } else if (filteredLogs.length > 0) {
             lastSync = (filteredLogs[0].created_at as string) || null;
-            if (filteredLogs[0].error) errorMessage = String(filteredLogs[0].error);
+            if (filteredLogs[0].error) errorMessage = sanitizeSyncError(filteredLogs[0].error);
           }
         } catch {
           try {
@@ -506,7 +525,7 @@ export function erpnextSyncRoutes(app: import('hono').Hono<{ Bindings: Env }>): 
             const filteredLogs = (logRows?.results || []).filter((r) => matchesSyncLogTenant(r, tenantId));
             if (filteredLogs.length > 0) {
               lastSync = (filteredLogs[0].created_at as string) || null;
-              if (filteredLogs[0].error) errorMessage = String(filteredLogs[0].error);
+              if (filteredLogs[0].error) errorMessage = sanitizeSyncError(filteredLogs[0].error);
             }
             logs = filteredLogs.map((r) => {
               const endpoint = String(r.endpoint || '');
@@ -515,17 +534,18 @@ export function erpnextSyncRoutes(app: import('hono').Hono<{ Bindings: Env }>): 
                 ? 'All'
                 : entitySegment.charAt(0).toUpperCase() + entitySegment.slice(1);
               const hasError = Boolean(r.error);
+              const safeError = hasError ? sanitizeSyncError(r.error) : null;
               const createdAt = String(r.created_at || '');
               return {
                 id: String(r.id ?? ''),
                 entity,
                 action: entitySegment === 'sync-all' ? 'sync-all' : 'sync',
                 status: hasError ? 'error' : 'success',
-                message: hasError ? String(r.error) : `${String(r.method || 'POST')} ${endpoint}`,
+                message: safeError ?? `${String(r.method || 'POST')} ${endpoint}`,
                 timestamp: createdAt,
                 method: r.method,
                 endpoint: r.endpoint,
-                error: r.error ?? null,
+                error: safeError,
                 created_at: createdAt,
               };
             });

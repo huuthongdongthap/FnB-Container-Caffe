@@ -20,6 +20,10 @@ const EXPORT_ACTION_VERB_MAP: Record<string, string[]> = {
   EXPORT: ['%export%'],
 };
 
+function escapeLikePattern(value: string): string {
+  return value.replace(/[\\%_]/g, '\\$&');
+}
+
 export function registerExportHandler(router: Hono<{ Bindings: Env }>): void {
   // GET /api/admin/audit-logs/export — export audit logs as CSV with filters
   router.get('/export', async (c) => {
@@ -132,8 +136,8 @@ export function registerExportHandler(router: Hono<{ Bindings: Env }>): void {
           }
 
           const upper = action.trim().toUpperCase();
-          const patterns = EXPORT_ACTION_VERB_MAP[upper] ?? [`%${action.trim().toLowerCase()}%`];
-          const actionOrClauses = ['LOWER(action) = LOWER(?)', ...patterns.map(() => 'LOWER(action) LIKE ?')];
+          const patterns = EXPORT_ACTION_VERB_MAP[upper] ?? [`%${escapeLikePattern(action.trim().toLowerCase())}%`];
+          const actionOrClauses = ['LOWER(action) = LOWER(?)', ...patterns.map(() => "LOWER(action) LIKE ? ESCAPE '\\'")];
           conditions.push(`(${actionOrClauses.join(' OR ')})`);
           params.push(action.trim(), ...patterns);
 
@@ -151,11 +155,15 @@ export function registerExportHandler(router: Hono<{ Bindings: Env }>): void {
               `SELECT * FROM audit_logs ${whereSql} ORDER BY created_at DESC LIMIT 10000`
             ).bind(...params).all<Record<string, unknown>>();
           } catch {
-            // Legacy schema fallback when audit_logs omits tenant_id column
-            const legacyWhereSql = baseConditions.length > 0 ? `WHERE ${baseConditions.join(' AND ')}` : '';
-            fallbackRes = await c.env.AURA_DB.prepare(
-              `SELECT * FROM audit_logs ${legacyWhereSql} ORDER BY created_at DESC LIMIT 10000`
-            ).bind(...baseParams).all<Record<string, unknown>>();
+            // Legacy schema fallback when audit_logs omits tenant_id column — only permitted for default/HQ scope
+            if (tenantId === 'default' || tenantId === '*') {
+              const legacyWhereSql = baseConditions.length > 0 ? `WHERE ${baseConditions.join(' AND ')}` : '';
+              fallbackRes = await c.env.AURA_DB.prepare(
+                `SELECT * FROM audit_logs ${legacyWhereSql} ORDER BY created_at DESC LIMIT 10000`
+              ).bind(...baseParams).all<Record<string, unknown>>();
+            } else {
+              fallbackRes = { results: [] };
+            }
           }
           if (Array.isArray(fallbackRes.results) && fallbackRes.results.length > 0) {
             result = {

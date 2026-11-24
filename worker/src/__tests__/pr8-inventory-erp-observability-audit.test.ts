@@ -431,4 +431,325 @@ describe('PR-8 regression tests (#190, #191, #193)', () => {
       );
     });
   });
+
+  describe('Security & correctness regressions', () => {
+    it('ignores unauthenticated X-Tenant-ID on POST /api/vitals and keys rate limiting by client IP only', async () => {
+      const sqlite = new DatabaseSync(':memory:');
+      sqlite.exec(`
+        CREATE TABLE _metrics (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          name TEXT,
+          value REAL,
+          tags TEXT,
+          created_at TEXT
+        );
+      `);
+      const d1 = createSqliteD1(sqlite);
+      const app = new Hono<{ Bindings: Env }>();
+      registerVitalsRoute(app);
+      const env = { ...createMockEnv(), AURA_DB: d1 as unknown as D1Database };
+
+      const res = await app.fetch(
+        new Request('https://test.aura/api/vitals', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'CF-Connecting-IP': '198.51.100.77',
+            'X-Tenant-ID': 'victim-header-tenant',
+          },
+          body: JSON.stringify({ name: 'LCP', value: 1100, rating: 'good' }),
+        }),
+        env,
+      );
+      expect(res.status).toBe(204);
+      const row = sqlite.prepare('SELECT tags FROM _metrics LIMIT 1').get() as { tags: string };
+      expect(JSON.parse(row.tags).tenant_id).toBe('default');
+
+      // Exhaust remaining 59 requests from same IP while rotating X-Tenant-ID
+      for (let i = 1; i < 60; i++) {
+        const r = await app.fetch(
+          new Request('https://test.aura/api/vitals', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'CF-Connecting-IP': '198.51.100.77',
+              'X-Tenant-ID': `tenant-rot-${i}`,
+            },
+            body: JSON.stringify({ name: 'LCP', value: 1100 + i, rating: 'good' }),
+          }),
+          env,
+        );
+        expect(r.status).toBe(204);
+      }
+
+      const rateLimited = await app.fetch(
+        new Request('https://test.aura/api/vitals', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'CF-Connecting-IP': '198.51.100.77',
+            'X-Tenant-ID': 'tenant-rot-final',
+          },
+          body: JSON.stringify({ name: 'LCP', value: 1200, rating: 'good' }),
+        }),
+        env,
+      );
+      expect(rateLimited.status).toBe(429);
+    });
+
+    it('enforces PDF size cap, empty-string m.tenant_id fallback, and blocks unmapped local order_id on PDF proxy', async () => {
+      const sqlite = new DatabaseSync(':memory:');
+      sqlite.exec(`
+        CREATE TABLE orders (
+          id TEXT PRIMARY KEY,
+          customer_name TEXT,
+          total REAL,
+          customer_email TEXT,
+          customer_phone TEXT,
+          tenant_id TEXT
+        );
+        CREATE TABLE erpnext_mappings (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          local_type TEXT,
+          local_id TEXT,
+          erpnext_id TEXT,
+          erpnext_model TEXT,
+          sync_status TEXT,
+          attempts INTEGER DEFAULT 0,
+          created_at TEXT,
+          last_synced_at TEXT,
+          tenant_id TEXT
+        );
+      `);
+      sqlite.prepare("INSERT INTO orders (id, customer_name, total, tenant_id) VALUES ('ord-empty-m', 'Alice', 50000, 'store-a')").run();
+      sqlite.prepare("INSERT INTO orders (id, customer_name, total, tenant_id) VALUES ('ord-unmapped', 'Bob', 60000, 'store-a')").run();
+      // m.tenant_id is empty string '' — must fall back to o.tenant_id = 'store-a'
+      sqlite.prepare("INSERT INTO erpnext_mappings (local_type, local_id, erpnext_id, erpnext_model, sync_status, tenant_id) VALUES ('order', 'ord-empty-m', 'SINV-STORE-A-1', 'Sales Invoice', 'synced', '')").run();
+      const d1 = createSqliteD1(sqlite);
+
+      const kv = createMockKV();
+      await kv.put('erpnext:store-a:api_url', 'https://erp.example.com');
+      await kv.put('erpnext:store-a:api_key', 'key');
+      await kv.put('erpnext:store-a:api_secret', 'secret');
+      const env = {
+        ...createMockEnv(),
+        AUTH_KV: kv,
+        AURA_DB: d1 as unknown as D1Database,
+        ERPNEXT_URL: 'https://erp.example.com',
+        ERPNEXT_API_KEY: 'key',
+        ERPNEXT_API_SECRET: 'secret',
+      };
+
+      // 1. /list includes mapping where m.tenant_id = '' and o.tenant_id = 'store-a'
+      const listRes = await handleErpnextInvoicesRequest(
+        new Request('https://test.aura/api/erpnext-invoices/list', {
+          method: 'GET',
+          headers: { 'X-Tenant-ID': 'store-a' },
+        }),
+        env as never,
+        'store-a',
+      );
+      expect(listRes.status).toBe(200);
+      const listBody = (await listRes.json()) as { data: Array<{ erpnext_id: string }> };
+      expect(listBody.data.map((r) => r.erpnext_id)).toContain('SINV-STORE-A-1');
+
+      const fetchSpy = vi.spyOn(globalThis, 'fetch');
+
+      // 2. Local order_id without mapped erpnext_id must NOT be proxied to ERPNext
+      const unmappedPdfRes = await handleErpnextInvoicesRequest(
+        new Request('https://test.aura/api/erpnext-invoices/ord-unmapped/pdf', {
+          method: 'GET',
+        }),
+        env as never,
+        'store-a',
+      );
+      expect(unmappedPdfRes.status).toBe(404);
+      expect(fetchSpy).not.toHaveBeenCalled();
+
+      // 3. Oversized Content-Length (>10MB) is rejected with 413
+      fetchSpy.mockResolvedValueOnce(
+        new Response(new Uint8Array([0x25, 0x50, 0x44, 0x46]), {
+          status: 200,
+          headers: {
+            'Content-Type': 'application/pdf',
+            'Content-Length': String(10 * 1024 * 1024 + 1),
+          },
+        }),
+      );
+      const oversizedRes = await handleErpnextInvoicesRequest(
+        new Request('https://test.aura/api/erpnext-invoices/SINV-STORE-A-1/pdf', {
+          method: 'GET',
+        }),
+        env as never,
+        'store-a',
+      );
+      expect(oversizedRes.status).toBe(413);
+      expect(fetchSpy).toHaveBeenCalledWith(
+        expect.stringContaining('SINV-STORE-A-1'),
+        expect.objectContaining({ signal: expect.any(AbortSignal) }),
+      );
+    });
+
+    it('sanitizes raw row.error on GET /api/admin/erpnext-sync/status so internal URLs, tokens, and SQL do not leak', async () => {
+      const issuedAt = Math.floor(Date.now() / 1000);
+      const token = await generateJWT(
+        { id: 'admin-1', email: 'admin@aura.test', name: 'Admin', role: 'admin', tenantId: 'default', tenant_id: 'default', authVersion: 1, authTime: issuedAt, sessionType: 'staff-web' },
+        TEST_JWT_SECRET,
+        28800,
+        issuedAt,
+      );
+      const sqlite = new DatabaseSync(':memory:');
+      sqlite.exec(`
+        CREATE TABLE users (id TEXT PRIMARY KEY, name TEXT, phone TEXT, role TEXT, status TEXT DEFAULT 'active', is_active INTEGER DEFAULT 1, auth_version INTEGER DEFAULT 1, tenant_id TEXT DEFAULT 'default');
+        CREATE TABLE erpnext_sync_logs (id TEXT PRIMARY KEY, method TEXT, endpoint TEXT, request_body TEXT, response_body TEXT, error TEXT, created_at TEXT, tenant_id TEXT DEFAULT 'default');
+      `);
+      sqlite.prepare("INSERT INTO users (id, name, phone, role, status, is_active, auth_version, tenant_id) VALUES ('admin-1', 'Admin', '0901000001', 'admin', 'active', 1, 1, 'default')").run();
+      sqlite.prepare(
+        "INSERT INTO erpnext_sync_logs (id, method, endpoint, request_body, response_body, error, created_at, tenant_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
+      ).run(
+        'log-1',
+        'POST',
+        '/api/admin/erpnext-sync/orders',
+        '{"tenant_id":"default"}',
+        null,
+        'Request to https://internal.erp.local/api?api_key=secret123 failed with token abc:xyz\nat fetchOrder (/app/worker/src/client.ts:42:5)\nSELECT * FROM secrets',
+        '2026-11-01T10:00:00Z',
+        'default',
+      );
+      const d1 = createSqliteD1(sqlite);
+      const app = new Hono<{ Bindings: Env }>();
+      erpnextSyncRoutes(app);
+
+      const res = await app.fetch(
+        new Request('https://api.test/api/admin/erpnext-sync/status', {
+          headers: { Authorization: `Bearer ${token}` },
+        }),
+        { ...createMockEnv(), AUTH_KV: createMockKV(), AURA_DB: d1 as unknown as D1Database } as unknown as Env,
+      );
+      expect(res.status).toBe(200);
+      const body = (await res.json()) as { errorMessage?: string; logs: Array<{ error: string | null; message: string }> };
+      expect(body.errorMessage).toBeDefined();
+      expect(body.errorMessage).not.toContain('https://internal.erp.local');
+      expect(body.errorMessage).not.toContain('secret123');
+      expect(body.errorMessage).not.toContain('abc:xyz');
+      expect(body.errorMessage).not.toContain('SELECT * FROM secrets');
+      expect(body.logs[0].error).not.toContain('https://internal.erp.local');
+      expect(body.logs[0].message).not.toContain('secret123');
+    });
+
+    it('escapes LIKE wildcards and blocks unscoped legacy fallback for non-default tenants on audit-logs export', async () => {
+      const sqlite = new DatabaseSync(':memory:');
+      sqlite.exec(`
+        CREATE TABLE audit_logs (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          actor_id TEXT,
+          actor_name TEXT,
+          action TEXT,
+          resource_type TEXT,
+          resource_id TEXT,
+          details TEXT,
+          ip_address TEXT,
+          created_at TEXT DEFAULT (datetime('now'))
+        );
+      `);
+      sqlite
+        .prepare("INSERT INTO audit_logs (actor_id, actor_name, action, resource_type, resource_id, details, ip_address) VALUES (?, ?, ?, ?, ?, ?, ?)")
+        .run('u1', 'User 1', 'orders.post', 'order', 'ord-1', 'created', '127.0.0.1');
+      sqlite
+        .prepare("INSERT INTO audit_logs (actor_id, actor_name, action, resource_type, resource_id, details, ip_address) VALUES (?, ?, ?, ?, ?, ?, ?)")
+        .run('u1', 'User 1', '100%_literal', 'order', 'ord-lit', 'literal', '127.0.0.1');
+
+      const d1 = createSqliteD1(sqlite);
+
+      // 1. Non-default tenant must NOT receive rows from legacy audit_logs without tenant_id column
+      const nonDefaultApp = new Hono<{ Bindings: Env }>();
+      nonDefaultApp.use('*', async (c, next) => {
+        c.set('user' as never, { id: 'u2', role: 'admin', tenantId: 'store-b' } as never);
+        c.set('tenantId' as never, 'store-b' as never);
+        await next();
+      });
+      registerExportHandler(nonDefaultApp);
+
+      const nonDefaultRes = await nonDefaultApp.fetch(
+        new Request('https://api.test/export?action=orders.post', {
+          headers: { Authorization: 'Bearer tok', 'X-Tenant-ID': 'store-b' },
+        }),
+        { AURA_DB: d1 as unknown as D1Database } as Env,
+      );
+      expect(nonDefaultRes.status).toBe(200);
+      const nonDefaultCsv = await nonDefaultRes.text();
+      expect(nonDefaultCsv).not.toContain('ord-1');
+
+      // 2. Wildcard action=% on default tenant must NOT match 'orders.post'
+      const defaultApp = new Hono<{ Bindings: Env }>();
+      defaultApp.use('*', async (c, next) => {
+        c.set('user' as never, { id: 'u1', role: 'admin', tenantId: 'default' } as never);
+        await next();
+      });
+      registerExportHandler(defaultApp);
+
+      const wildcardRes = await defaultApp.fetch(
+        new Request('https://api.test/export?action=%25', {
+          headers: { Authorization: 'Bearer tok' },
+        }),
+        { AURA_DB: d1 as unknown as D1Database } as Env,
+      );
+      expect(wildcardRes.status).toBe(200);
+      const wildcardCsv = await wildcardRes.text();
+      expect(wildcardCsv).not.toContain('ord-1');
+      expect(wildcardCsv).toContain('ord-lit');
+    });
+
+    it('preserves inventory_items fallback for summary KPIs when ingredients table is unavailable', async () => {
+      const sqlite = new DatabaseSync(':memory:');
+      sqlite.exec(`
+        CREATE TABLE users (id TEXT PRIMARY KEY, name TEXT, phone TEXT, role TEXT, status TEXT DEFAULT 'active', is_active INTEGER DEFAULT 1, auth_version INTEGER DEFAULT 1, tenant_id TEXT DEFAULT 'default');
+        CREATE TABLE inventory_items (
+          id TEXT PRIMARY KEY,
+          name TEXT,
+          category TEXT,
+          unit TEXT,
+          unit_cost REAL,
+          current_stock REAL,
+          min_stock REAL,
+          is_active INTEGER DEFAULT 1,
+          tenant_id TEXT DEFAULT 'default'
+        );
+      `);
+      sqlite.prepare("INSERT INTO users (id, name, phone, role, status, is_active, auth_version, tenant_id) VALUES ('mgr-1', 'Mgr', '0901000003', 'manager', 'active', 1, 1, 'default')").run();
+      const ins = sqlite.prepare('INSERT INTO inventory_items (id, name, category, unit, unit_cost, current_stock, min_stock, tenant_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)');
+      ins.run('inv-1', 'Espresso Beans', 'coffee', 'g', 200, 50, 10, 'default');
+      ins.run('inv-2', 'Oat Milk', 'dairy', 'ml', 50, 5, 20, 'default');
+
+      const issuedAt = Math.floor(Date.now() / 1000);
+      const token = await generateJWT(
+        { id: 'mgr-1', email: 'mgr@aura.test', name: 'Mgr', role: 'manager', tenantId: 'default', tenant_id: 'default', authVersion: 1, authTime: issuedAt, sessionType: 'staff-web' },
+        TEST_JWT_SECRET,
+        28800,
+        issuedAt,
+      );
+      const d1 = createSqliteD1(sqlite);
+      const app = new Hono<{ Bindings: Env }>();
+      app.route('/', openApiInventoryRouter);
+
+      const res = await app.fetch(
+        new Request('https://api.test/api/inventory/ingredients?limit=1', {
+          headers: { Authorization: `Bearer ${token}` },
+        }),
+        { ...createMockEnv(), AUTH_KV: createMockKV(), AURA_DB: d1 as unknown as D1Database, DB: d1 as unknown as D1Database } as unknown as Env,
+      );
+      expect(res.status).toBe(200);
+      const body = (await res.json()) as {
+        data: unknown[];
+        summary?: { totalItems: number; lowStockCount: number; outOfStockCount: number; totalValue: number };
+      };
+      expect(body.data).toHaveLength(1);
+      expect(body.summary).toEqual({
+        totalItems: 2,
+        lowStockCount: 1,
+        outOfStockCount: 0,
+        totalValue: 10250,
+      });
+    });
+  });
 });

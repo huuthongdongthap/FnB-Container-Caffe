@@ -175,6 +175,7 @@ export class ErpnextAccountingClient {
     return fetch(url, {
       method: 'GET',
       redirect: 'manual',
+      signal: AbortSignal.timeout(15_000),
       headers: {
         Authorization: this.client.getAuthHeader(),
         Accept: 'application/pdf',

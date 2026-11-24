@@ -8,7 +8,6 @@
 import { Hono } from 'hono';
 import { z } from 'zod';
 import type { Env } from '../types/env';
-import { resolvePilotStore } from '../middleware/tenant';
 
 // ─── Rate Limiting ──────────────────────────────────────────────────────────
 
@@ -29,24 +28,20 @@ function resolveVitalsTenantId(
     req: { header: (k: string) => string | undefined };
   },
 ): string {
-  // Never trust body.tenant_id or query ?tenant_id= / ?store_id= on unauthenticated public beacon endpoint
+  // Never trust unauthenticated headers, query params, or body.tenant_id on public beacon endpoint
   const user = typeof c.get === 'function' ? (c.get('user') as { tenant_id?: unknown; tenantId?: unknown } | undefined) : undefined;
-  const contextCandidates: unknown[] = [
-    user?.tenant_id,
-    user?.tenantId,
+  if (!user) {
+    return 'default';
+  }
+  const authCandidates: unknown[] = [
+    user.tenant_id,
+    user.tenantId,
     typeof c.get === 'function' ? c.get('tenantId') : undefined,
-    typeof c.get === 'function' ? c.get('hostTenantId') : undefined,
-    c.req.header('x-tenant-id'),
-    c.req.header('X-Tenant-ID'),
   ];
-  for (const cand of contextCandidates) {
+  for (const cand of authCandidates) {
     if (isValidTenantId(cand)) {
       return cand.trim();
     }
-  }
-  const pilot = resolvePilotStore(c.env);
-  if (isValidTenantId(pilot)) {
-    return pilot.trim();
   }
   return 'default';
 }
@@ -64,11 +59,10 @@ function resolveClientIp(c: { req: { header: (k: string) => string | undefined }
 
 async function isVitalsRateLimited(
   env: Env | undefined,
-  tenantId: string,
   clientIp: string
 ): Promise<boolean> {
   const now = Date.now();
-  const key = `${tenantId}:${clientIp}`;
+  const key = clientIp;
   const cutoff = now - VITALS_RATE_LIMIT_WINDOW_MS;
   const existing = (vitalsRateBuckets.get(key) || []).filter((ts) => ts > cutoff);
 
@@ -115,10 +109,10 @@ const vitalsRouter = new Hono<{ Bindings: Env }>();
 
 vitalsRouter.post('/', async(c) => {
   const clientIp = resolveClientIp(c);
-  const preBodyTenant = resolveVitalsTenantId(c);
-  if (await isVitalsRateLimited(c.env, preBodyTenant, clientIp)) {
+  if (await isVitalsRateLimited(c.env, clientIp)) {
     return c.json({ error: 'Too many requests' }, 429);
   }
+  const preBodyTenant = resolveVitalsTenantId(c);
 
   const body = await c.req.json().catch(() => null);
   if (!body) {
