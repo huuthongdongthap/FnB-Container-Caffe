@@ -6,14 +6,17 @@
 
 'use client';
 
+import { useTranslation } from 'react-i18next';
+
 export function LoadingState() {
+  const { t } = useTranslation();
   return (
     <div className="grid grid-cols-1 gap-gutter md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
       {Array.from({ length: 4 }).map((_, i) => (
         <div
           key={i}
           className="min-h-[400px] animate-pulse rounded-lg bg-[var(--aura-surface-container)]/40"
-          aria-label="Loading ticket"
+          aria-label={t('kds.loadingTicket', 'Loading ticket')}
         >
           <div className="h-1 w-full rounded-t-lg bg-[var(--aura-chrome-soft)]/20" />
           <div className="space-y-4 p-6">

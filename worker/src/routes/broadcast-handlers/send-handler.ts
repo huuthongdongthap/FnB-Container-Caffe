@@ -3,6 +3,7 @@ import type { Env } from '../../types/env';
 import { sendEmail } from '../../lib/email';
 import { sendSMS } from '../../lib/speedsms-client';
 import { sendZNS } from '../../tree/zalo/zns-sender';
+import { resolveTemplateId } from '../../tree/zalo/zns-templates';
 import { createLogger } from '../../utils/logger';
 import { broadcastSendSchema, zodErrorResponse } from '../../lib/validators';
 import { getTenantId, isHQSuperAdmin } from '../../middleware/tenant';
@@ -11,6 +12,18 @@ import { segmentSQL, type BroadcastCustomer } from './types';
 
 const log = createLogger({ route: 'broadcast' });
 const BROADCAST_ADMIN_ROLES = ['owner', 'manager', 'supervisor', 'admin'];
+const MAX_DELIVERIES_PER_REQUEST = 200;
+const DELIVERY_BATCH_CONCURRENCY = 10;
+
+async function runTasksInBatches(
+  tasks: Array<() => Promise<void>>,
+  concurrency = DELIVERY_BATCH_CONCURRENCY
+): Promise<void> {
+  for (let i = 0; i < tasks.length; i += concurrency) {
+    const batch = tasks.slice(i, i + concurrency);
+    await Promise.allSettled(batch.map((task) => task()));
+  }
+}
 
 function escapeHtml(raw: string): string {
   return raw
@@ -271,16 +284,22 @@ export function registerSendHandler(router: Hono<{ Bindings: Env }>): void {
         consentFilterActive = true;
         for (const row of consentRows) {
           const cid = String(row.customer_id);
-          const chKey = row.channel && String(row.channel).trim() !== ''
+          const rawCh = row.channel && String(row.channel).trim() !== ''
             ? String(row.channel).trim().toLowerCase()
             : 'all';
+          const chKey = rawCh === 'zalo' ? 'zns' : rawCh;
           let perCh = customerChannelMap.get(cid);
           if (!perCh) {
             perCh = new Map<string, boolean>();
             customerChannelMap.set(cid, perCh);
           }
           const isActiveGrant = Number(row.granted) === 1 && !row.revoked_at;
-          perCh.set(chKey, isActiveGrant);
+          if (chKey === 'all' && !isActiveGrant) {
+            perCh.clear();
+            perCh.set('all', false);
+          } else {
+            perCh.set(chKey, isActiveGrant);
+          }
         }
         customers = customers.filter((cust) => {
           const perCh = customerChannelMap.get(String(cust.id));
@@ -308,11 +327,15 @@ export function registerSendHandler(router: Hono<{ Bindings: Env }>): void {
       return c.json({ success: false, error: 'Không có khách hàng nào trong phân khúc này' }, 400);
     }
 
-    // Skip channels where env is not configured
+    // Skip channels where env or required template is not configured
     const env = c.env as Record<string, string | undefined>;
     const skipReasons: Record<string, string> = {};
-    if (activeChannels.includes('zns') && !env.ZALO_ACCESS_TOKEN) {
-      skipReasons.zns = 'ZALO_ACCESS_TOKEN not configured';
+    if (activeChannels.includes('zns')) {
+      if (!env.ZALO_ACCESS_TOKEN) {
+        skipReasons.zns = 'ZALO_ACCESS_TOKEN not configured';
+      } else if (!resolveTemplateId('general_promotion', env)) {
+        skipReasons.zns = 'ZALO_ZNS_TEMPLATE_GENERAL_PROMOTION not configured';
+      }
     }
     if (activeChannels.includes('sms') && !env.SPEEDSMS_API_KEY) {
       skipReasons.sms = 'SPEEDSMS_API_KEY not configured';
@@ -324,80 +347,90 @@ export function registerSendHandler(router: Hono<{ Bindings: Env }>): void {
     const sendChannels = activeChannels.filter((ch) => !skipReasons[ch]);
 
     if (sendChannels.length === 0) {
+      const errorMessage =
+        activeChannels.length === 1 && skipReasons.zns === 'ZALO_ZNS_TEMPLATE_GENERAL_PROMOTION not configured'
+          ? 'Chưa cấu hình mẫu Zalo ZNS ưu đãi (ZALO_ZNS_TEMPLATE_GENERAL_PROMOTION).'
+          : 'Không có kênh nào được cấu hình. Vui lòng cấu hình API key.';
       return c.json({
         success: false,
-        error: 'Không có kênh nào được cấu hình. Vui lòng cấu hình API key.',
+        error: errorMessage,
         skipReasons
       }, 400);
     }
 
-    // ── Send messages (non-blocking via waitUntil or Promise.allSettled) ──
+    // ── Send messages (non-blocking via waitUntil or batched Promise.allSettled) ──
     let sentCount = 0;
     let failedCount = 0;
+    let truncated = false;
 
-    const sendTasks: Promise<void>[] = [];
+    const sendTasks: Array<() => Promise<void>> = [];
 
-    for (const customer of customers) {
+    outerLoop: for (const customer of customers) {
       for (const ch of sendChannels) {
         if (!isCustomerChannelAllowed(String(customer.id), ch)) {
           continue;
         }
-        sendTasks.push(
-          (async (): Promise<void> => {
-            try {
-              if (ch === 'zns') {
-                if (customer.phone) {
-                  const result = await sendZNS(
-                    env as unknown as { ZALO_ACCESS_TOKEN?: string; AURA_DB?: import('@cloudflare/workers-types').D1Database },
-                    {
-                      phone: customer.phone,
-                      template_key: 'general_promotion',
-                      data: {
-                        name: customer.name || '',
-                        title: body.title ?? '',
-                        message: body.message
-                      } as Record<string, string>,
-                      tenantId:
-                        customer.tenant_id && String(customer.tenant_id).trim() && String(customer.tenant_id).trim() !== '*'
-                          ? String(customer.tenant_id).trim()
-                          : tenantId !== '*'
-                            ? tenantId
-                            : 'default'
-                    }
-                  );
-                  if (result.ok) {
-                    sentCount++; return;
+        if (sendTasks.length >= MAX_DELIVERIES_PER_REQUEST) {
+          truncated = true;
+          break outerLoop;
+        }
+        sendTasks.push(async (): Promise<void> => {
+          try {
+            if (ch === 'zns') {
+              if (customer.phone) {
+                const result = await sendZNS(
+                  c.env as unknown as { ZALO_ACCESS_TOKEN?: string; AURA_DB?: import('@cloudflare/workers-types').D1Database; [key: string]: unknown },
+                  {
+                    phone: customer.phone,
+                    template_key: 'general_promotion',
+                    data: {
+                      name: customer.name || '',
+                      title: body.title ?? '',
+                      message: body.message,
+                      promo_code: body.promo_code ?? '',
+                      discount: body.discount ?? '',
+                      expires_at: body.expires_at ?? ''
+                    },
+                    tenantId:
+                      customer.tenant_id && String(customer.tenant_id).trim() && String(customer.tenant_id).trim() !== '*'
+                        ? String(customer.tenant_id).trim()
+                        : tenantId !== '*'
+                          ? tenantId
+                          : 'default'
                   }
-                  log.warn('zns_broadcast_failed', { customerId: customer.id, reason: result.reason });
+                );
+                if (result.ok) {
+                  sentCount++; return;
                 }
-              } else if (ch === 'sms') {
-                if (customer.phone) {
-                  const result = await sendSMS(env, { phone: customer.phone, message });
-                  if (result.success) {
-                    sentCount++; return;
-                  }
-                  log.warn('sms_broadcast_failed', { customerId: customer.id });
-                }
-              } else if (ch === 'email') {
-                if (customer.email) {
-                  const result = await sendEmail(env, {
-                    to: customer.email,
-                    subject: title || 'AURA CAFE',
-                    html: escapeHtml(message).replace(/\n/g, '<br>')
-                  });
-                  if (result) {
-                    sentCount++; return;
-                  }
-                  log.warn('email_broadcast_failed', { customerId: customer.id });
-                }
+                log.warn('zns_broadcast_failed', { customerId: customer.id, reason: result.reason });
               }
-              failedCount++;
-            } catch (err) {
-              log.error('broadcast_send_error', { customerId: customer.id, channel: ch, error: (err as Error).message });
-              failedCount++;
+            } else if (ch === 'sms') {
+              if (customer.phone) {
+                const result = await sendSMS(env, { phone: customer.phone, message });
+                if (result.success) {
+                  sentCount++; return;
+                }
+                log.warn('sms_broadcast_failed', { customerId: customer.id });
+              }
+            } else if (ch === 'email') {
+              if (customer.email) {
+                const result = await sendEmail(env, {
+                  to: customer.email,
+                  subject: title || 'AURA CAFE',
+                  html: escapeHtml(message).replace(/\n/g, '<br>')
+                });
+                if (result) {
+                  sentCount++; return;
+                }
+                log.warn('email_broadcast_failed', { customerId: customer.id });
+              }
             }
-          })()
-        );
+            failedCount++;
+          } catch (err) {
+            log.error('broadcast_send_error', { customerId: customer.id, channel: ch, error: (err as Error).message });
+            failedCount++;
+          }
+        });
       }
     }
 
@@ -406,7 +439,8 @@ export function registerSendHandler(router: Hono<{ Bindings: Env }>): void {
       channel,
       customerCount: customers.length,
       sendChannels,
-      taskCount: sendTasks.length
+      taskCount: sendTasks.length,
+      truncated
     });
 
     // Non-blocking: use waitUntil when available, else fall back to blocking
@@ -419,23 +453,27 @@ export function registerSendHandler(router: Hono<{ Bindings: Env }>): void {
       // Sub-request or unit context without ExecutionContext falls back to blocking
     }
     if (waitUntilFn) {
-      waitUntilFn(Promise.allSettled(sendTasks));
+      waitUntilFn(runTasksInBatches(sendTasks));
       return c.json({
         success: true,
         pending: true,
         total: customers.length,
+        queued: sendTasks.length,
+        truncated,
         channels: sendChannels,
         skipped: skipReasons
       });
     }
 
     // Blocking fallback
-    await Promise.allSettled(sendTasks);
+    await runTasksInBatches(sendTasks);
     return c.json({
       success: true,
       sent_count: sentCount,
       failed_count: failedCount,
       total: customers.length,
+      queued: sendTasks.length,
+      truncated,
       channels: sendChannels,
       skipped: skipReasons
     });

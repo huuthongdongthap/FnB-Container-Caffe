@@ -280,11 +280,12 @@ export function createStoreMockDb() {  const customers = new Map<string, { id: s
                 const o = orders.get(id);
                 return { results: (o ? [{ ...o }] : []) as unknown as T[] };
               }
-              if (sql.includes('FROM orders') && sql.includes('customer_name') && sql.includes('ORDER BY created_at')) {
+              if (sql.includes('FROM orders') && sql.includes('customer_name') && (sql.includes('ORDER BY created_at') || sql.includes('ORDER BY o.created_at'))) {
                 // Row-level export SELECT: apply the same WHERE clauses SQLite would,
                 // but only the ones present in the SQL text the handler actually sent.
-                const from = String(args[0]);
-                const to = String(args[1]);
+                const dateArgs = args.map(String).filter((a) => /^\d{4}-\d{2}-\d{2}$/.test(a));
+                const from = dateArgs[0] || String(args[0]);
+                const to = dateArgs[1] || String(args[1]);
                 const badStatuses = ['cancelled', 'canceled', 'refunded', 'failed', 'rejected', 'expired'];
                 const badPayStatuses = ['refunded', 'failed', 'cancelled', 'canceled'];
                 const enforcesValidity = sql.includes("'cancelled'") && sql.includes('payment_status');
@@ -983,10 +984,10 @@ describe('Store Operations Go-Live Readiness Suite', () => {
       expect(day?.shipping_fee).toBe(15000);
       expect(day?.service_fee).toBe(10000);
       expect(day?.tip_amount).toBe(5000);
-      // pure F&B net_revenue = total_collected - shipping - service - tip
-      expect(day?.net_revenue).toBe(Math.max(0, 250000 - 15000 - 10000 - 5000));
-      // gross_sales = net_revenue + discounts
-      expect(day?.gross_sales).toBe((day?.net_revenue ?? 0) + 10000);
+      // pure F&B net_revenue = total_collected - shipping - service - tip - refunds
+      expect(day?.net_revenue).toBe(Math.max(0, 250000 - 15000 - 10000 - 5000 - 40000));
+      // gross_sales = baseNetBeforeRefunds + discounts
+      expect(day?.gross_sales).toBe(250000 - 15000 - 10000 - 5000 + 10000);
       // refund aggregated from payments (no refunds table)
       expect(day?.refunds).toBe(40000);
       expect(body.data.totals.refunds).toBe(40000);

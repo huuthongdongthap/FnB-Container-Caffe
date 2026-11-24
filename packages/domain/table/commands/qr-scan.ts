@@ -3,11 +3,11 @@
  * Extracted from worker/src/routes/tables.ts (qrRouter portion).
  */
 import { Hono } from 'hono';
-import QRCode from 'qrcode';
 import { verifyQRSignature } from 'worker/src/tree/qr/signer';
 import { matchesTenantRow } from 'worker/src/middleware/tenant';
 import type { Env } from 'worker/src/types/env';
 import type { CafeTable } from '../model/table-types';
+import { encodeQrToPngBytes } from '../lib/qr-png-encoder';
 
 export const qrRouter = new Hono<{ Bindings: Env }>();
 
@@ -231,8 +231,7 @@ qrRouter.get('/:slug', async (c) => {
       ? `&tenant=${encodeURIComponent(resolvedTableTenant)}`
       : '';
   const qrPayload = `${origin}?table=${encodeURIComponent(slug)}${tenantQuery}`;
-  const pngBuffer = await QRCode.toBuffer(qrPayload, {
-    type: 'png',
+  const pngBuffer = encodeQrToPngBytes(qrPayload, {
     width: 400,
     margin: 2,
     errorCorrectionLevel: 'M',

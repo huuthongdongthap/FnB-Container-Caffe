@@ -1,48 +1,12 @@
 import type { Hono } from 'hono';
 import type { MixpostEnv } from '../../types/env';
 import { getTenantId, matchesTenantRow } from '../../middleware/tenant';
-import { mixpostCreatePostSchema, zodErrorResponse } from '../../lib/validators';
+import { isSafeMixpostMediaUrl, mixpostCreatePostSchema, zodErrorResponse } from '../../lib/validators';
+import { resolveTenantMixpostAccountPolicy } from '../../tree/mixpost/account-policy';
 import { createLogger } from '../../utils/logger.js';
 import { getMixpostClient, type PostRecord } from './types';
 
 const log = createLogger({ route: 'mixpost:posts' });
-
-function isSafeMixpostMediaUrl(rawUrl: string): boolean {
-  let parsed: URL;
-  try {
-    parsed = new URL(rawUrl);
-  } catch {
-    return false;
-  }
-  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
-    return false;
-  }
-  const hostname = parsed.hostname.replace(/^\[|\]$/g, '').toLowerCase();
-  if (
-    !hostname ||
-    hostname === 'localhost' ||
-    hostname === '127.0.0.1' ||
-    hostname === '0.0.0.0' ||
-    hostname === '::1' ||
-    hostname === '169.254.169.254' ||
-    hostname === 'metadata.google.internal' ||
-    hostname.endsWith('.local') ||
-    hostname.endsWith('.internal')
-  ) {
-    return false;
-  }
-  if (/^127\./.test(hostname) || /^10\./.test(hostname) || /^192\.168\./.test(hostname) || /^169\.254\./.test(hostname)) {
-    return false;
-  }
-  const octets = hostname.split('.');
-  if (octets.length === 4 && octets.every((o) => /^\d+$/.test(o))) {
-    const [a, b] = octets.map(Number);
-    if (a === 172 && b >= 16 && b <= 31) {
-      return false;
-    }
-  }
-  return true;
-}
 
 export function registerPostsHandler(router: Hono<{ Bindings: MixpostEnv }>): void {
   // POST /posts — create and publish a post
@@ -64,6 +28,7 @@ export function registerPostsHandler(router: Hono<{ Bindings: MixpostEnv }>): vo
     if (user && rawTenantId === '*') {
       return c.json({ success: false, error: 'Concrete tenant context required to publish post' }, 400);
     }
+    const effectiveTenantId = rawTenantId === '*' ? 'default' : rawTenantId;
     const client = getMixpostClient(env);
     if (!client) {
       return c.json({ success: false, error: 'Mixpost not configured' }, 503);
@@ -81,6 +46,12 @@ export function registerPostsHandler(router: Hono<{ Bindings: MixpostEnv }>): vo
     }
     const data = parsed.data;
 
+    const accountPolicy = await resolveTenantMixpostAccountPolicy(env, effectiveTenantId);
+    const allAccountsAllowed = data.accounts.every((id) => accountPolicy.isAccountAllowed(Number(id)));
+    if (!allAccountsAllowed) {
+      return c.json({ success: false, error: 'Account not authorized for this tenant' }, 403);
+    }
+
     try {
       const mediaIds: Array<string | number> = [];
       const mediaUrls = data.media_urls ?? data.mediaUrls ?? [];
@@ -93,16 +64,29 @@ export function registerPostsHandler(router: Hono<{ Bindings: MixpostEnv }>): vo
         for (const url of mediaUrls) {
           try {
             const media = await client.uploadMediaFromUrl(url);
-            if (media.id) {
-              mediaIds.push(media.id as string | number);
+            const mediaId =
+              media?.id ??
+              (media && typeof media === 'object' && 'data' in media && media.data && typeof media.data === 'object'
+                ? (media.data as Record<string, unknown>).id
+                : undefined);
+            if (mediaId === undefined || mediaId === null || String(mediaId).trim() === '') {
+              log.error('mixpost_media_upload_missing_id', { url });
+              return c.json({ success: false, error: 'Failed to upload media to Mixpost' }, 502);
             }
-          } catch {
-            // media upload fails silently
+            mediaIds.push(mediaId as string | number);
+          } catch (uploadErr: unknown) {
+            const msg = uploadErr instanceof Error ? uploadErr.message : String(uploadErr);
+            log.error('mixpost_media_upload_failed', { url, error: msg });
+            return c.json({ success: false, error: 'Failed to upload media to Mixpost' }, 502);
           }
         }
       }
 
       const scheduledAt = data.scheduled_at ?? data.scheduledAt;
+      if (scheduledAt && Number.isNaN(new Date(scheduledAt).getTime())) {
+        return c.json({ success: false, error: 'Invalid scheduled_at datetime' }, 400);
+      }
+
       const result = await client.createPost({
         content: data.content,
         accounts: data.accounts,
@@ -110,9 +94,18 @@ export function registerPostsHandler(router: Hono<{ Bindings: MixpostEnv }>): vo
         mediaIds
       });
 
+      const nestedData =
+        result && typeof result === 'object' && 'data' in result && result.data && typeof result.data === 'object'
+          ? (result.data as Record<string, unknown>)
+          : undefined;
+      const postId = result?.id ?? nestedData?.id;
+      if (postId === undefined || postId === null || String(postId).trim() === '') {
+        log.error('mixpost_publish_missing_id', { hasResult: Boolean(result) });
+        return c.json({ success: false, error: 'Failed to publish post' }, 502);
+      }
+
       if (env.AURA_DB) {
-        const rawTenantId = getTenantId(c as unknown as Parameters<typeof getTenantId>[0]).trim() || 'default';
-        const tenantId = rawTenantId === '*' ? 'default' : rawTenantId;
+        const tenantId = effectiveTenantId;
         const now = new Date().toISOString();
         try {
           await env.AURA_DB.prepare(
@@ -148,7 +141,7 @@ export function registerPostsHandler(router: Hono<{ Bindings: MixpostEnv }>): vo
         }
       }
 
-      return c.json({ success: true, postId: result.id });
+      return c.json({ success: true, postId });
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : String(e);
       log.error('mixpost_publish_failed', { error: msg });
@@ -179,6 +172,9 @@ export function registerPostsHandler(router: Hono<{ Bindings: MixpostEnv }>): vo
               .slice(0, limit);
           } catch {
             filtered = [];
+          }
+          if (scopedOk) {
+            return c.json({ success: true, data: filtered, source: 'd1' });
           }
         }
         if (filtered.length === 0 && (tenantId === '*' || (!scopedOk && tenantId === 'default'))) {
@@ -229,14 +225,32 @@ export function registerPostsHandler(router: Hono<{ Bindings: MixpostEnv }>): vo
     if (user?.role && !['owner', 'admin', 'manager', 'supervisor', 'staff'].includes(String(user.role).toLowerCase())) {
       return c.json({ success: false, error: 'Insufficient permissions' }, 403);
     }
+    const rawTenant = getTenantId(c as unknown as Parameters<typeof getTenantId>[0]).trim() || 'default';
+    const tenantId = rawTenant.toLowerCase() === 'hq' ? '*' : rawTenant;
     const client = getMixpostClient(env);
     if (!client) {
       return c.json({ success: false, error: 'Mixpost not configured' }, 503);
     }
 
+    const accountPolicy = await resolveTenantMixpostAccountPolicy(env, tenantId);
+
     try {
-      const accounts = await client.listAccounts();
-      return c.json({ success: true, data: accounts });
+      const rawAccounts = await client.listAccounts();
+      const accountList = Array.isArray(rawAccounts)
+        ? rawAccounts
+        : Array.isArray((rawAccounts as { data?: unknown })?.data)
+          ? (rawAccounts as { data: Array<Record<string, unknown>> }).data
+          : [];
+      const tenantScopedAccounts = accountList.filter((acc) =>
+        accountPolicy.isAccountAllowed(Number(acc?.id))
+      );
+      const providerFilter = (c.req.query('provider') || '').trim().toLowerCase();
+      const filteredAccounts = providerFilter
+        ? tenantScopedAccounts.filter((acc) =>
+            String(acc?.provider || '').toLowerCase().includes(providerFilter)
+          )
+        : tenantScopedAccounts;
+      return c.json({ success: true, data: filteredAccounts });
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : String(e);
       log.error('mixpost_fetch_accounts_failed', { error: msg });

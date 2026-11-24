@@ -11,6 +11,7 @@ export type KitchenStation = 'espresso' | 'food' | 'pastry' | 'cold' | 'all';
 
 export interface KitchenOrder {
   id: string;
+  order_number?: string | null;
   table_name: string | null;
   order_type?: string | null;
   items: KitchenItem[];

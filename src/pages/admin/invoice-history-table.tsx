@@ -1,8 +1,10 @@
+import { useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { useTranslation } from 'react-i18next';
 import type { InvoiceRecord } from './invoice-history-types';
 import { getStatusLabel, formatCurrency, formatDate } from './invoice-history-types';
-import { API_BASE, apiFetch } from '@/lib/api-client';
+import { API_BASE } from '@/lib/api-client';
+import { getAuthHeaders } from '@/hooks/stores/admin/admin-utils';
 
 function getInvoicePdfUrl(erpnextId: string): string {
   return `${API_BASE}/api/erpnext-invoices/${encodeURIComponent(erpnextId)}/pdf`;
@@ -11,19 +13,34 @@ function getInvoicePdfUrl(erpnextId: string): string {
 async function handleInvoicePdfDownload(
   e: React.MouseEvent<HTMLAnchorElement>,
   erpnextId: string,
+  onError: (message: string) => void,
 ): Promise<void> {
   e.preventDefault();
   try {
-    const res = await apiFetch<{ success?: boolean; data?: { pdf_url?: string; pdfUrl?: string } }>(
-      `/api/erpnext-invoices/${encodeURIComponent(erpnextId)}/pdf`,
-    );
-    const pdfUrl =
-      (res?.data as any)?.pdfUrl ||
-      res?.data?.pdf_url ||
-      `${API_BASE}/api/erpnext-invoices/${encodeURIComponent(erpnextId)}/pdf`;
-    window.open(pdfUrl, '_blank', 'noopener,noreferrer');
-  } catch {
-    window.open(getInvoicePdfUrl(erpnextId), '_blank', 'noopener,noreferrer');
+    const res = await fetch(getInvoicePdfUrl(erpnextId), {
+      method: 'GET',
+      credentials: 'include',
+      headers: {
+        ...getAuthHeaders(),
+        Accept: 'application/pdf',
+      },
+    });
+    if (!res.ok) {
+      throw new Error(`PDF download failed (${res.status})`);
+    }
+    const blob = await res.blob();
+    const blobUrl = URL.createObjectURL(blob);
+    const opened = window.open(blobUrl, '_blank', 'noopener,noreferrer');
+    if (!opened) {
+      const link = document.createElement('a');
+      link.href = blobUrl;
+      link.download = `${erpnextId.replace(/[^a-zA-Z0-9._-]/g, '_')}.pdf`;
+      link.click();
+    }
+    setTimeout(() => URL.revokeObjectURL(blobUrl), 60_000);
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : 'PDF download failed';
+    onError(message);
   }
 }
 
@@ -37,9 +54,25 @@ interface InvoiceTableProps {
 
 export function InvoiceTable({ invoices }: InvoiceTableProps) {
   const { t } = useTranslation();
+  const [downloadError, setDownloadError] = useState<string | null>(null);
 
   return (
     <div className="overflow-x-auto">
+      {downloadError && (
+        <div
+          role="alert"
+          className="mb-3 flex items-center justify-between rounded-md border border-destructive/50 bg-destructive/10 px-3 py-2 text-xs text-destructive"
+        >
+          <span>{downloadError}</span>
+          <button
+            type="button"
+            onClick={() => setDownloadError(null)}
+            className="ml-3 font-medium underline hover:no-underline"
+          >
+            {t('common.dismiss', 'Dismiss')}
+          </button>
+        </div>
+      )}
       <table className="w-full text-sm">
         <thead>
           <tr className="border-b border-border">
@@ -93,7 +126,10 @@ export function InvoiceTable({ invoices }: InvoiceTableProps) {
                     href={getInvoicePdfUrl(inv.erpnext_id)}
                     target="_blank"
                     rel="noopener noreferrer"
-                    onClick={(e) => void handleInvoicePdfDownload(e, inv.erpnext_id)}
+                    onClick={(e) => {
+                      setDownloadError(null);
+                      void handleInvoicePdfDownload(e, inv.erpnext_id, setDownloadError);
+                    }}
                     className="inline-flex items-center gap-1 text-xs text-blue-400 hover:underline"
                   >
                     PDF

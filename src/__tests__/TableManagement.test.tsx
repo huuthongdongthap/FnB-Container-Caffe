@@ -81,7 +81,7 @@ describe('TableManagementPage', () => {
     await waitFor(() => {
       expect(screen.getByText('1')).toBeTruthy();
     });
-    expect(screen.getByText('All zones')).toBeTruthy();
+    expect(screen.getByText(/allZones|All zones/)).toBeTruthy();
   });
 
   it('shows quick stats after loading', async () => {
@@ -166,7 +166,7 @@ describe('staff table transfer', () => {
       method: 'POST', body: JSON.stringify({ source_table_id: 't-2', destination_table_id: 't-1', transfer_reservation: true }),
     });
     expect(mockApiFetch).toHaveBeenCalledWith('/api/tables');
-    expect(mockApiFetch).toHaveBeenCalledWith('/api/orders?limit=20');
+    expect(mockApiFetch).toHaveBeenCalledWith('/api/orders?limit=200&order_type=dine_in');
     expect(screen.getByRole('status')).toHaveTextContent('Đã chuyển bàn 2 → 1');
   });
 

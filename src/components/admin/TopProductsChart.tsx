@@ -46,7 +46,7 @@ function TopProductsError({ message, onRetry }: { message: string; onRetry?: () 
   return (
     <div className="rounded-xl border border-[var(--glass-border)] bg-[var(--glass-bg)] backdrop-blur-[var(--glass-blur)] p-5">
       <h3 className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--aura-chrome-light)] mb-4">
-        San pham ban chay
+        Sản phẩm bán chạy
       </h3>
       <div className="flex flex-col items-center justify-center py-6 text-center">
         <svg className="w-8 h-8 text-[var(--aura-danger)] mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
@@ -60,7 +60,7 @@ function TopProductsError({ message, onRetry }: { message: string; onRetry?: () 
               border border-[var(--aura-chrome-light)] text-[var(--aura-chrome-light)]
               hover:bg-[rgba(201,214,223,0.08)] transition-all duration-300"
           >
-            Thu lai
+            Thử lại
           </button>
         )}
       </div>
@@ -105,7 +105,7 @@ export function TopProductsChart({ data, loading, error, onRetry, className }: T
       className,
     )}>
       <h3 className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--aura-chrome-light)] mb-4">
-        San pham ban chay
+        Sản phẩm bán chạy
       </h3>
 
       <div className="space-y-3">

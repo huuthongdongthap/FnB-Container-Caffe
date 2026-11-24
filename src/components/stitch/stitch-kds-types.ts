@@ -4,7 +4,11 @@
  * Shared types for the Kitchen Display System components.
  */
 
+import type { ReactNode } from 'react';
+
 export type TicketStatus = 'preparing' | 'pending' | 'ready' | 'overdue';
+
+export type KdsFilterKey = 'all' | 'overdue' | 'priority' | 'pending' | 'preparing' | 'ready';
 
 export interface TicketItem {
   name: string;
@@ -20,6 +24,7 @@ export interface Ticket {
   status: TicketStatus;
   rawStatus?: string;
   isOverdue?: boolean;
+  isWarning?: boolean;
   items: TicketItem[];
   notes?: string;
   elapsedSeconds: number;
@@ -49,17 +54,18 @@ export interface StitchKDSNewProps {
   onStartPrep?: (id: string) => void;
   onPickupOrder?: (id: string) => void;
   onRefresh?: () => void;
-  activeFilter?: 'all' | 'priority' | 'preparing' | 'ready';
-  onFilterChange?: (filter: StitchKDSNewProps['activeFilter']) => void;
+  activeFilter?: KdsFilterKey;
+  onFilterChange?: (filter: KdsFilterKey) => void;
   soundEnabled?: boolean;
   isFullscreen?: boolean;
   onToggleSound?: () => void;
   onToggleFullscreen?: () => void;
+  cancelledBanner?: ReactNode;
 }
 
 /** Filter tab configuration */
 export interface FilterTab {
-  key: StitchKDSNewProps['activeFilter'];
+  key: KdsFilterKey;
   tKey: string;
   label: string;
 }

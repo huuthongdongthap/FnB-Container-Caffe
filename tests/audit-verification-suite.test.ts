@@ -74,6 +74,10 @@ describe('End-to-End Domain Integrity, Concurrency, Security & Privacy Verificat
     sqlite.prepare("INSERT INTO payments (id, order_id, method, amount, status, transaction_id, payment_url, tenant_id) VALUES ('payos:ord_exp', 'ord_exp', 'payos', 40000, 'expired', '70001', 'https://pay.payos.vn/web/old', 'default')").run();
     vi.spyOn(globalThis, 'fetch').mockImplementation(async (url, init) => {
       if (String(url).includes('/cancel')) return new Response(JSON.stringify({ code: '00' }), { status: 200 });
+      if (!init?.method || init.method === 'GET') {
+        const expData = { id: 'exp_link', orderCode: 70001, amount: 40000, status: 'EXPIRED' };
+        return new Response(JSON.stringify({ code: '00', data: expData, signature: signPayOS(expData, 'chk_1') }), { status: 200 });
+      }
       const body = JSON.parse(String(init?.body));
       const d = { orderCode: body.orderCode, amount: 40000, status: 'PENDING', paymentLinkId: 'rot_1', checkoutUrl: 'https://pay.payos.vn/web/rot_1' };
       return new Response(JSON.stringify({ code: '00', data: d, signature: signPayOS(d, 'chk_1') }), { status: 200 });
@@ -138,7 +142,7 @@ describe('End-to-End Domain Integrity, Concurrency, Security & Privacy Verificat
 
     vi.spyOn(Date, 'now').mockReturnValue(new Date('2026-11-16T01:00:00+07:00').getTime());
     const ictStats = await (await getStats(new Request('https://api.aura.vn/api/orders/stats'), { AURA_DB: db }, 'default')).json() as { stats: { orders_today: number } };
-    expect(ictStats.stats.orders_today).toBe(2);
+    expect(ictStats.stats.orders_today).toBe(1);
 
     sqlite.prepare("INSERT INTO erpnext_mappings (id, local_type, local_id, erpnext_id, sync_status, tenant_id) VALUES ('em_1', 'sales_invoice', 'ord_cod', 'SINV-001', 'synced', 'default')").run();
     expect(await hasIssuedEInvoice(db, 'ord_cod')).toBe(true);

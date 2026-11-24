@@ -243,7 +243,7 @@ describe('Admin Metrics Routes', () => {
               if (sql.includes('SELECT DISTINCT name')) {
                 return { results: [{ name: 'request_duration_ms' }] };
               }
-              if (sql.includes('ORDER BY duration')) {
+              if (sql.includes('ORDER BY created_at DESC')) {
                 return {
                   results: [10, 20, 30, 40, 50, 60, 70, 80, 90, 100].map((duration) => ({ duration })),
                 };

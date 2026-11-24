@@ -10,7 +10,7 @@ import {
   Plus,
   Minus,
 } from 'lucide-react';
-import { formatPosPrice, type POSNewCartItem, type POSTableOption } from './StitchPOSNew-types';
+import { formatPosPrice, type POSNewCartItem, type POSOrderType, type POSTableOption } from './StitchPOSNew-types';
 import type { POSCustomer } from '@/hooks/use-pos-customer';
 import { CustomerLookup } from './StitchPOSNew-customer-lookup';
 
@@ -34,6 +34,8 @@ interface CartSidebarProps {
   tables?: POSTableOption[];
   selectedTableId?: string;
   onSelectTable?: (tableId: string | undefined) => void;
+  orderType?: POSOrderType;
+  deliveryAddress?: string;
   tableLabel?: string;
   guestLabel?: string;
   orderNumber?: string;
@@ -60,6 +62,8 @@ export function CartSidebar({
   tables = [],
   selectedTableId,
   onSelectTable,
+  orderType,
+  deliveryAddress = '',
   tableLabel,
   guestLabel,
   orderNumber,
@@ -74,22 +78,34 @@ export function CartSidebar({
   onToggleCashback,
 }: CartSidebarProps) {
   const { t } = useTranslation();
+  const resolvedOrderType: POSOrderType = orderType ?? (selectedTableId ? 'dine_in' : 'takeaway');
   const formattedSubtotal = formatPosPrice(subtotal);
   const selectedTable = tables.find((tb) => tb.id === selectedTableId);
-  const resolvedTableBadge = selectedTable
-    ? selectedTable.name
-    : tableLabel || t('posNew.takeaway', { defaultValue: 'Mang về' });
+  const resolvedTableBadge =
+    resolvedOrderType === 'delivery'
+      ? t('orderMgmt.channel.delivery', { defaultValue: 'Giao hàng' })
+      : resolvedOrderType === 'dine_in'
+        ? selectedTable
+          ? selectedTable.name
+          : t('posNew.noTableSelected', { defaultValue: 'Chưa chọn bàn' })
+        : tableLabel || t('posNew.takeaway', { defaultValue: 'Mang về' });
+
+  const totalItemQuantity = cart.reduce((sum, item) => sum + item.quantity, 0);
+  const shippingFee = resolvedOrderType === 'delivery' && totalItemQuantity > 0 && totalItemQuantity < 2 ? 15_000 : 0;
+  const totalWithShipping = Math.max(0, Math.round(total) + shippingFee);
+  const effectivePaymentMethod: 'payos' | 'cod' = resolvedOrderType === 'delivery' ? 'payos' : paymentMethod;
+
   const rawCashbackDeduction = useCashback && customer && customer.cashback_balance > 0
-    ? Math.min(Math.floor(customer.cashback_balance), Math.max(0, Math.round(total)))
+    ? Math.min(Math.floor(customer.cashback_balance), totalWithShipping)
     : 0;
   const cashbackDeduction =
-    paymentMethod === 'payos' &&
+    effectivePaymentMethod === 'payos' &&
     rawCashbackDeduction > 0 &&
-    Math.round(total) - rawCashbackDeduction > 0 &&
-    Math.round(total) - rawCashbackDeduction < 1000
-      ? Math.max(0, Math.round(total) - 1000)
+    totalWithShipping - rawCashbackDeduction > 0 &&
+    totalWithShipping - rawCashbackDeduction < 1000
+      ? Math.max(0, totalWithShipping - 1000)
       : rawCashbackDeduction;
-  const payableTotal = Math.max(0, Math.round(total) - cashbackDeduction);
+  const payableTotal = Math.max(0, totalWithShipping - cashbackDeduction);
   return (
     <aside
       className={cn(
@@ -106,11 +122,14 @@ export function CartSidebar({
           <h2 className="text-[14px] text-[#f2c08d] font-semibold uppercase tracking-wider font-body">
             {t('posNew.orderSummary')}
           </h2>
-          <span className="bg-[var(--aura-chrome-light,#B8C5D0)]/10 text-[#f2c08d] border border-[var(--aura-chrome-light,#B8C5D0)]/20 px-2.5 py-0.5 rounded-sm text-[11px] font-body">
+          <span
+            data-testid="pos-bill-channel-badge"
+            className="bg-[var(--aura-chrome-light,#B8C5D0)]/10 text-[#f2c08d] border border-[var(--aura-chrome-light,#B8C5D0)]/20 px-2.5 py-0.5 rounded-sm text-[11px] font-body"
+          >
             {resolvedTableBadge}
           </span>
         </div>
-        {onSelectTable ? (
+        {resolvedOrderType === 'dine_in' && onSelectTable ? (
           <div className="mt-1">
             <label htmlFor="pos-table-selector" className="sr-only">
               {t('posNew.selectTable', { defaultValue: 'Chọn bàn phục vụ' })}
@@ -124,7 +143,7 @@ export function CartSidebar({
               className="w-full bg-[var(--aura-noir-deep,#0A1A2E)] border border-[var(--aura-chrome-light,#B8C5D0)]/20 rounded-md px-3 py-2 text-[12px] text-[var(--aura-text-primary,#eae1db)] font-body outline-none focus:border-[#f2c08d] cursor-pointer"
             >
               <option value="">
-                {t('posNew.takeawayOption', { defaultValue: 'Mang về (Takeaway)' })}
+                {t('posNew.selectTablePlaceholder', { defaultValue: 'Chọn bàn phục vụ...' })}
               </option>
               {tables.map((tb) => (
                 <option key={tb.id} value={tb.id}>
@@ -133,6 +152,21 @@ export function CartSidebar({
                 </option>
               ))}
             </select>
+          </div>
+        ) : resolvedOrderType === 'delivery' ? (
+          <div
+            data-testid="pos-bill-delivery-summary"
+            className="mt-1 rounded-md border border-amber-400/20 bg-[var(--aura-noir-deep,#0A1A2E)] px-3 py-2 text-[12px] font-body"
+          >
+            {deliveryAddress.trim() ? (
+              <p className="text-[var(--aura-text-primary,#eae1db)] truncate" title={deliveryAddress.trim()}>
+                Giao tới: {deliveryAddress.trim()}
+              </p>
+            ) : (
+              <p className="text-amber-300">
+                Chưa nhập địa chỉ giao hàng
+              </p>
+            )}
           </div>
         ) : (
           (guestLabel || orderNumber) && (
@@ -217,6 +251,12 @@ export function CartSidebar({
           <span>{t('posNew.tax')}</span>
           <span>{formatPosPrice(tax)}</span>
         </div>
+        {orderType === 'delivery' && (
+          <div className="flex justify-between text-[13px] text-[var(--aura-text-muted,#8A8E96)] font-body" data-testid="pos-shipping-fee-row">
+            <span>Phí giao hàng</span>
+            <span>{shippingFee > 0 ? formatPosPrice(shippingFee) : 'Miễn phí'}</span>
+          </div>
+        )}
         {cashbackDeduction > 0 && (
           <div className="flex justify-between text-[13px] text-emerald-400 font-body" data-testid="pos-cashback-discount-row">
             <span>Ví hoàn tiền</span>
@@ -227,17 +267,17 @@ export function CartSidebar({
           <span className="text-[15px] font-semibold uppercase tracking-widest font-body">
             {t('posNew.total')}
           </span>
-          <span className="text-[22px] text-[#f2c08d] font-bold font-body">
+          <span className="text-[22px] text-[#f2c08d] font-bold font-body" data-testid="pos-payable-total">
             {formatPosPrice(payableTotal)}
           </span>
         </div>
         <div className="grid grid-cols-2 gap-3 mt-3">
           <button
             type="button"
-            aria-pressed={paymentMethod === 'payos'}
+            aria-pressed={effectivePaymentMethod === 'payos'}
             className={cn(
               'industrial-gradient py-3 px-3 rounded-lg border flex flex-col items-center gap-1 active:brightness-110 transition-all bronze-glow cursor-pointer',
-              paymentMethod === 'payos'
+              effectivePaymentMethod === 'payos'
                 ? 'border-[#f2c08d] ring-1 ring-[#f2c08d]'
                 : 'border-[var(--aura-chrome-light,#B8C5D0)]/20'
             )}
@@ -251,14 +291,21 @@ export function CartSidebar({
           </button>
           <button
             type="button"
-            aria-pressed={paymentMethod === 'cod'}
+            disabled={orderType === 'delivery'}
+            aria-pressed={effectivePaymentMethod === 'cod'}
+            title={orderType === 'delivery' ? 'Đơn giao hàng yêu cầu thanh toán PayOS trả trước' : undefined}
             className={cn(
-              'industrial-gradient py-3 px-3 rounded-lg border flex flex-col items-center gap-1 active:brightness-110 transition-all bronze-glow cursor-pointer',
-              paymentMethod === 'cod'
+              'industrial-gradient py-3 px-3 rounded-lg border flex flex-col items-center gap-1 active:brightness-110 transition-all bronze-glow',
+              orderType === 'delivery'
+                ? 'opacity-40 cursor-not-allowed border-[var(--aura-chrome-light,#B8C5D0)]/10'
+                : 'cursor-pointer',
+              effectivePaymentMethod === 'cod'
                 ? 'border-[#f2c08d] ring-1 ring-[#f2c08d]'
                 : 'border-[var(--aura-chrome-light,#B8C5D0)]/20'
             )}
-            onClick={() => onPayment?.('cod')}
+            onClick={() => {
+              if (orderType !== 'delivery') onPayment?.('cod');
+            }}
             aria-label={t('posNew.cod')}
           >
             <Wallet className="w-6 h-6 text-[var(--aura-text-primary,#eae1db)]" />
@@ -267,10 +314,15 @@ export function CartSidebar({
             </span>
           </button>
         </div>
+        {orderType === 'delivery' && (
+          <p className="text-[11px] text-amber-300/90 font-body" data-testid="pos-delivery-payos-note">
+            Đơn giao hàng yêu cầu thanh toán trả trước qua PayOS.
+          </p>
+        )}
         <button
           type="button"
           className="w-full bg-[#f2c08d] hover:bg-[#f6cda3] disabled:opacity-40 py-4 rounded-xl flex items-center justify-center gap-2 text-[14px] font-semibold text-[#1a1008] uppercase tracking-widest active:scale-[0.97] transition-all mt-3 shadow-[0_0_20px_rgba(242,192,141,0.18)] font-body cursor-pointer disabled:cursor-not-allowed"
-          onClick={() => onCompleteOrder?.(cart, total)}
+          onClick={() => onCompleteOrder?.(cart, totalWithShipping)}
           disabled={cart.length === 0}
           aria-label={t('posNew.completeOrder')}
         >

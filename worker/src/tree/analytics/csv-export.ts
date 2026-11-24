@@ -52,7 +52,7 @@ export async function getOrdersInRange(
     SELECT id, customer_name, customer_phone, total, status, payment_method, items, created_at
     FROM orders
     WHERE LOWER(COALESCE(TRIM(status), '')) NOT IN ('cancelled', 'canceled', 'refunded', 'failed', 'rejected', 'expired')
-      AND LOWER(COALESCE(TRIM(payment_status), '')) NOT IN ('refunded', 'failed', 'cancelled', 'canceled')
+      AND LOWER(COALESCE(TRIM(payment_status), '')) IN ('paid', 'partially_refunded', 'completed')
       AND NOT (COALESCE(TRIM(notes), '') = 'Khách QR - cho don mon' AND COALESCE(TRIM(items), '[]') IN ('', '[]'))
       AND ${datePredicate}${tenantClause}
     ORDER BY created_at ASC
@@ -67,7 +67,7 @@ export async function getOrdersInRange(
         SELECT id, customer_name, customer_phone, total, status, payment_method, items, created_at
         FROM orders
         WHERE LOWER(COALESCE(TRIM(status), '')) NOT IN ('cancelled', 'canceled', 'refunded', 'failed', 'rejected', 'expired')
-          AND LOWER(COALESCE(TRIM(payment_status), '')) NOT IN ('refunded', 'failed', 'cancelled', 'canceled')
+          AND LOWER(COALESCE(TRIM(payment_status), '')) IN ('paid', 'partially_refunded', 'completed')
           AND ${datePredicate}${tenantClause}
         ORDER BY created_at ASC
         LIMIT 10000
@@ -168,7 +168,7 @@ export async function getDailyRevenueInRange(
            CASE WHEN COUNT(*) > 0 THEN ROUND(COALESCE(SUM(total), 0) * 1.0 / COUNT(*)) ELSE 0 END AS avg_order_value
     FROM orders
     WHERE LOWER(COALESCE(TRIM(status), '')) NOT IN ('cancelled', 'canceled', 'refunded', 'failed', 'rejected', 'expired')
-      AND LOWER(COALESCE(TRIM(payment_status), '')) NOT IN ('refunded', 'failed', 'cancelled', 'canceled')
+      AND LOWER(COALESCE(TRIM(payment_status), '')) IN ('paid', 'partially_refunded', 'completed')
       AND NOT (COALESCE(TRIM(notes), '') = 'Khách QR - cho don mon' AND COALESCE(TRIM(items), '[]') IN ('', '[]'))
       AND DATE(datetime(created_at, '+7 hours')) BETWEEN ? AND ?${tenantClause}
     GROUP BY DATE(datetime(created_at, '+7 hours'))

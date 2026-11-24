@@ -332,6 +332,15 @@ describe('Payment, Order & Loyalty Concurrency Hardening', () => {
       `).run();
 
       vi.spyOn(globalThis, 'fetch').mockImplementation(async (_url, init) => {
+        if (!init?.method || init.method === 'GET') {
+          const expSigned = createSignedWebhookPayload({
+            id: 'oldlink',
+            orderCode: 10001,
+            amount: 50000,
+            status: 'EXPIRED',
+          }, 'test_checksum');
+          return new Response(JSON.stringify({ code: '00', data: expSigned.data, signature: expSigned.signature }));
+        }
         const body = JSON.parse(String(init?.body));
         const signed = createSignedWebhookPayload({
           orderCode: body.orderCode,

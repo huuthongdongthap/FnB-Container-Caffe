@@ -479,21 +479,34 @@ describe('Loyalty, Referrals, Inventory PO, Customer Events & Audit Cutover (202
     for (const migration of [
       '20261121_01_refund_manual_transfer_ledger.sql',
       '20261121_03_refund_atomicity_and_loyalty_work.sql',
+      '20261124_02_tenant_scoped_unique_keys.sql',
     ]) {
       sqlite.exec(readFileSync(resolve(__dirname, '../../../db/migrations', migration), 'utf8'));
     }
 
-    const migration1124_02Up = readFileSync(
-      resolve(__dirname, '../../../db/migrations/20261124_02_leads_table.sql'),
+    const migration1124_01Up = readFileSync(
+      resolve(__dirname, '../../../db/migrations/20261124_01_orders_kds_prep_timestamps.sql'),
       'utf8'
     );
-    const migration1124_02Down = readFileSync(
-      resolve(__dirname, '../../../db/migrations/20261124_02_leads_table.down.sql'),
+    const migration1124_01Down = readFileSync(
+      resolve(__dirname, '../../../db/migrations/20261124_01_orders_kds_prep_timestamps.down.sql'),
       'utf8'
     );
-    sqlite.exec(migration1124_02Up);
-    sqlite.exec(migration1124_02Down);
-    sqlite.exec(migration1124_02Up);
+    sqlite.exec(migration1124_01Up);
+    sqlite.exec(migration1124_01Down);
+    sqlite.exec(migration1124_01Up);
+
+    const migration1124_03Up = readFileSync(
+      resolve(__dirname, '../../../db/migrations/20261124_03_leads_table.sql'),
+      'utf8'
+    );
+    const migration1124_03Down = readFileSync(
+      resolve(__dirname, '../../../db/migrations/20261124_03_leads_table.down.sql'),
+      'utf8'
+    );
+    sqlite.exec(migration1124_03Up);
+    sqlite.exec(migration1124_03Down);
+    sqlite.exec(migration1124_03Up);
 
     const canonicalSqlite = new DatabaseSync(':memory:');
     canonicalSqlite.exec(readFileSync(resolve(__dirname, '../../../schema.sql'), 'utf8'));

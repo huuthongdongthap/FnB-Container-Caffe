@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { TEMPLATE_IDS, buildTemplateData } from '../../../tree/zalo/zns-templates.js';
+import { TEMPLATE_IDS, buildTemplateData, resolveTemplateId } from '../../../tree/zalo/zns-templates.js';
 import type { ZnsData } from '../../../tree/zalo/types.js';
 
 // ---------------------------------------------------------------------------
@@ -198,16 +198,57 @@ describe('buildTemplateData', () => {
   // --- general_promotion ---
 
   describe('general_promotion', () => {
-    it('returns empty object for unknown template', () => {
+    it('maps promotion broadcast fields including customer_name, title, message, and promo metadata', () => {
+      const result = buildTemplateData(
+        'general_promotion',
+        makeData({
+          title: 'Ưu đãi SUMMER20',
+          message: 'Giảm 20% toàn bộ đồ uống',
+          promo_code: 'SUMMER20',
+          discount: '20%',
+          expires_at: '31/08/2026',
+        })
+      );
+      expect(result).toEqual({
+        customer_name: 'Nguyen Van A',
+        title: 'Ưu đãi SUMMER20',
+        message: 'Giảm 20% toàn bộ đồ uống',
+        promo_code: 'SUMMER20',
+        discount: '20%',
+        expires_at: '31/08/2026',
+      });
+    });
 
-      const result = buildTemplateData('general_promotion', makeData());
-      expect(result).toEqual({});
+    it('defaults missing promotion fields to empty strings', () => {
+      const result = buildTemplateData('general_promotion', {});
+      expect(result).toEqual({
+        customer_name: '',
+        title: '',
+        message: '',
+        promo_code: '',
+        discount: '',
+        expires_at: '',
+      });
     });
 
     it('returns empty object for any unregistered template key', () => {
-
       const result = buildTemplateData('nonexistent_template', {});
       expect(result).toEqual({});
+    });
+  });
+
+  // --- resolveTemplateId ---
+
+  describe('resolveTemplateId', () => {
+    it('returns null when general_promotion is not overridden in env (placeholder fallback)', () => {
+      expect(resolveTemplateId('general_promotion', {})).toBeNull();
+      expect(resolveTemplateId('general_promotion', { ZALO_ZNS_TEMPLATE_GENERAL_PROMOTION: 'YOUR_PROMO_TEMPLATE' })).toBeNull();
+    });
+
+    it('resolves approved env-configured template ID for general_promotion', () => {
+      expect(
+        resolveTemplateId('general_promotion', { ZALO_ZNS_TEMPLATE_GENERAL_PROMOTION: ' 384920 ' })
+      ).toBe('384920');
     });
   });
 });

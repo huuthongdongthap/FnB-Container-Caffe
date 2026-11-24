@@ -14,6 +14,7 @@ export const payOSCreateLinkSchema = z.preprocess((val: unknown) => {
       amount: obj.amount ?? obj.total,
       return_url: obj.return_url ?? obj.returnUrl,
       cancel_url: obj.cancel_url ?? obj.cancelUrl,
+      regenerate: obj.regenerate ?? obj.force_refresh ?? obj.forceRefresh,
     };
   }
   return val;
@@ -24,6 +25,7 @@ export const payOSCreateLinkSchema = z.preprocess((val: unknown) => {
   amount: z.number().optional(),
   return_url: z.string().url().optional(),
   cancel_url: z.string().url().optional(),
+  regenerate: z.boolean().optional(),
 }));
 
 export type PayOSCreateLinkInput = z.infer<typeof payOSCreateLinkSchema>;

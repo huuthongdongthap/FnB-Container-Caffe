@@ -51,6 +51,7 @@ export function useCategoryManager() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: categoriesKey });
+      queryClient.invalidateQueries({ queryKey: ['menu'] });
       closeModal();
     },
     onError: (err: Error) => {
@@ -63,6 +64,7 @@ export function useCategoryManager() {
       apiFetch(`/api/categories/${id}`, { method: 'DELETE' }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: categoriesKey });
+      queryClient.invalidateQueries({ queryKey: ['menu'] });
       setDeleteId(null);
     },
     onError: (err: Error) => {

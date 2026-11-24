@@ -21,7 +21,7 @@ import { floorPlanRouter } from './floor-plan';
 import { clientErrorsRouter } from './client-errors';
 import { staffTipsRouter } from '@aura/domain-staff';
 import { adminQRRouter } from './admin-qr';
-import { reservationsRouter } from '@aura/domain-reservation';
+import { reservationsRouter, waitlistRouter } from '@aura/domain-reservation';
 import { customersRouter } from './customers';
 import { crmRouter } from './crm';
 import { posCustomerRouter } from './pos-customer';
@@ -141,6 +141,7 @@ export function registerFeatureRoutes(app: Hono<{ Bindings: Env }>): void {
   // Reservations & CRM
   app.route('/api/reservations', reservationsRouter);
   app.route('/api/admin/reservations', reservationsRouter);
+  app.route('/api/waitlist', waitlistRouter);
   app.route('/api/customers', customersRouter);
   app.route('/api/crm', crmRouter);
   app.route('/api/pos/customer', posCustomerRouter);

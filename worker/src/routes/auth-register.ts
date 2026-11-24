@@ -110,6 +110,8 @@ export async function registerWithVerification(request: Request, env: Record<str
           (!existingEmail || existingEmail === email)
         );
 
+        const normalizedCustomerPhone = String(phone || '').trim() || null;
+
         if (canAdoptCustomer && existingCustomer) {
           userId = existingCustomer.id;
           try {
@@ -120,24 +122,24 @@ export async function registerWithVerification(request: Request, env: Record<str
                    phone = COALESCE(NULLIF(phone, ''), ?),
                    updated_at = ?
                WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?`
-            ).bind(email, name || 'Thành viên', phone || '', now, userId, rawPilotTenant).run();
+            ).bind(email, name || 'Thành viên', normalizedCustomerPhone, now, userId, rawPilotTenant).run();
           } catch {
             if (rawPilotTenant === 'default') {
               await db.prepare(
                 'UPDATE customers SET email = COALESCE(NULLIF(email, \'\'), ?), name = COALESCE(NULLIF(name, \'\'), ?), phone = COALESCE(NULLIF(phone, \'\'), ?), updated_at = ? WHERE id = ?'
-              ).bind(email, name || 'Thành viên', phone || '', now, userId).run().catch(() => {});
+              ).bind(email, name || 'Thành viên', normalizedCustomerPhone, now, userId).run().catch(() => {});
             }
           }
         } else {
           try {
             await db.prepare(
               'INSERT INTO customers (id, email, name, phone, loyalty_points, lifetime_points, loyalty_tier, tenant_id, created_at, updated_at) VALUES (?, ?, ?, ?, 0, 0, ?, ?, ?, ?)'
-            ).bind(userId, email, name || 'Thành viên', phone || '', 'bronze', rawPilotTenant, now, now).run();
+            ).bind(userId, email, name || 'Thành viên', normalizedCustomerPhone, 'bronze', rawPilotTenant, now, now).run();
           } catch {
             if (rawPilotTenant === 'default') {
               await db.prepare(
                 'INSERT INTO customers (id, email, name, phone, loyalty_points, loyalty_tier, created_at) VALUES (?, ?, ?, ?, 0, ?, ?)'
-              ).bind(userId, email, name || 'Thành viên', phone || '', 'bronze', now).run().catch(() => {});
+              ).bind(userId, email, name || 'Thành viên', normalizedCustomerPhone, 'bronze', now).run().catch(() => {});
             }
           }
           const walletId = generateId('wal_');

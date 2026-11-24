@@ -81,7 +81,7 @@ describe('PayOS durable attempt invariant (real SQLite)', () => {
     expect(codes).toEqual([123456]);
   });
 
-  it.each(['completed', 'cancelled', 'failed', 'refunded'])('does not recreate a terminal %s attempt', async (status) => {
+  it.each(['completed', 'refunded'])('does not recreate a terminal %s attempt', async (status) => {
     const { input, payment } = fixture();
     payment('order-1', status);
     const spy = vi.spyOn(globalThis, 'fetch');
@@ -89,24 +89,121 @@ describe('PayOS durable attempt invariant (real SQLite)', () => {
     expect(spy).not.toHaveBeenCalled();
   });
 
-  it('rotates an expired attempt in place to a fresh orderCode when the order is still unpaid', async () => {
+  it.each(['cancelled', 'failed'])('rotates a %s attempt in place when order is unpaid and provider confirms not PAID', async (status) => {
     const { input, payment, sqlite } = fixture();
-    payment('order-1', 'expired');
+    payment('order-1', status);
     const codes: number[] = [];
     vi.spyOn(globalThis, 'fetch').mockImplementation(async (_url, init) => {
-      const body = JSON.parse(String(init?.body));
+      if (!init?.method || init.method === 'GET') {
+        return signedPayOSResponse({ id: 'old-link', orderCode: 123456, amount: 20000, status: 'CANCELLED' }, 'local-checksum');
+      }
+      const body = JSON.parse(String(init.body));
       codes.push(body.orderCode);
-      return payosCheckoutResponse({ orderCode: body.orderCode, amount: 20000 }, 'local-checksum', 'rotated-link');
+      return payosCheckoutResponse({ orderCode: body.orderCode, amount: 20000 }, 'local-checksum', 'rotated-from-closed');
     });
     const rotated = await getOrCreatePayOSAttempt(input);
     expect(rotated).toMatchObject({ ok: true, cached: false });
     expect(codes).toHaveLength(1);
     expect(codes[0]).not.toBe(123456);
     expect(sqlite.prepare('SELECT COUNT(*) count FROM payments').get()?.count).toBe(1);
+  });
+
+  it('fails closed with 502 when provider verification throws a network error during rotation', async () => {
+    const { input, payment } = fixture();
+    payment('order-1', 'cancelled');
+    vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('network timeout'));
+    const res = await getOrCreatePayOSAttempt(input);
+    expect(res).toMatchObject({ ok: false, status: 502, code: 'PAYOS_UPSTREAM_UNAVAILABLE' });
+  });
+
+  it('fails closed with 409 PAYMENT_RECONCILIATION_REQUIRED on bad_signature during rotation', async () => {
+    const { input, payment } = fixture();
+    payment('order-1', 'cancelled');
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      json({ code: '00', data: { id: 'old-link', orderCode: 123456, amount: 20000, status: 'CANCELLED' }, signature: 'invalid-sig' }),
+    );
+    const res = await getOrCreatePayOSAttempt(input);
+    expect(res).toMatchObject({ ok: false, status: 409, code: 'PAYMENT_RECONCILIATION_REQUIRED' });
+  });
+
+  it('fails closed with ORDER_ALREADY_PAID if provider reports PAID when attempting to rotate cancelled attempt', async () => {
+    const { input, payment } = fixture();
+    payment('order-1', 'cancelled');
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (_url, init) => {
+      if (!init?.method || init.method === 'GET') {
+        return signedPayOSResponse({ id: 'paid-link', orderCode: 123456, amount: 20000, status: 'PAID' }, 'local-checksum');
+      }
+      throw new Error('should not POST new link when already PAID');
+    });
+    const res = await getOrCreatePayOSAttempt(input);
+    expect(res).toMatchObject({ ok: false, status: 409, code: 'ORDER_ALREADY_PAID' });
+  });
+
+  it('rotates an expired attempt in place to a fresh orderCode when the order is still unpaid', async () => {
+    const { input, payment, sqlite } = fixture();
+    payment('order-1', 'expired');
+    const codes: number[] = [];
+    const expiredAtValues: number[] = [];
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (_url, init) => {
+      if (!init?.method || init.method === 'GET') {
+        return signedPayOSResponse({ id: 'expired-link', orderCode: 123456, amount: 20000, status: 'EXPIRED' }, 'local-checksum');
+      }
+      const body = JSON.parse(String(init?.body));
+      codes.push(body.orderCode);
+      expiredAtValues.push(body.expiredAt);
+      return payosCheckoutResponse({ orderCode: body.orderCode, amount: 20000 }, 'local-checksum', 'rotated-link');
+    });
+    const beforeSec = Math.floor(Date.now() / 1000);
+    const rotated = await getOrCreatePayOSAttempt(input);
+    const afterSec = Math.floor(Date.now() / 1000);
+    expect(rotated).toMatchObject({ ok: true, cached: false });
+    expect(codes).toHaveLength(1);
+    expect(codes[0]).not.toBe(123456);
+    expect(expiredAtValues[0]).toBeGreaterThanOrEqual(beforeSec + 15 * 60);
+    expect(expiredAtValues[0]).toBeLessThanOrEqual(afterSec + 15 * 60 + 2);
+    expect(sqlite.prepare('SELECT COUNT(*) count FROM payments').get()?.count).toBe(1);
     expect(sqlite.prepare('SELECT status, transaction_id FROM payments').get()).toMatchObject({
       status: 'pending',
       transaction_id: String(codes[0]),
     });
+  });
+
+  it('reconciles and blocks rotating an expired attempt when provider GET reports PAID, and cancels upstream when provider GET reports PENDING', async () => {
+    const { input, payment, sqlite } = fixture();
+    payment('order-1', 'expired');
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (_url, init) => {
+      if (!init?.method || init.method === 'GET') {
+        return signedPayOSResponse({ id: 'paid-expired-link', orderCode: 123456, amount: 20000, status: 'PAID' }, 'local-checksum');
+      }
+      throw new Error('must not create a new payment request when expired attempt was already PAID upstream');
+    });
+    const paidRes = await getOrCreatePayOSAttempt(input);
+    expect(paidRes).toMatchObject({ ok: false, status: 409, code: 'ORDER_ALREADY_PAID' });
+    expect(sqlite.prepare("SELECT payment_status FROM orders WHERE id = 'order-1'").get()?.payment_status).toBe('paid');
+
+    // Second scenario: locally expired attempt is still PENDING at PayOS -> must cancel upstream before rotating
+    const f2 = fixture();
+    f2.payment('order-1', 'expired');
+    const calls: string[] = [];
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (url, init) => {
+      const urlStr = String(url);
+      calls.push(`${init?.method ?? 'GET'} ${urlStr}`);
+      if (!init?.method || init.method === 'GET') {
+        return signedPayOSResponse({ id: 'pending-expired-link', orderCode: 123456, amount: 20000, status: 'PENDING' }, 'local-checksum');
+      }
+      if (urlStr.endsWith('/cancel')) {
+        return json({ code: '00' }, 200);
+      }
+      const body = JSON.parse(String(init?.body));
+      return payosCheckoutResponse({ orderCode: body.orderCode, amount: 20000 }, 'local-checksum', 'fresh-after-cancel');
+    });
+    const pendingRotated = await getOrCreatePayOSAttempt(f2.input);
+    expect(pendingRotated).toMatchObject({ ok: true, cached: false });
+    expect(calls).toEqual([
+      'GET https://api-merchant.payos.vn/v2/payment-requests/123456',
+      'POST https://api-merchant.payos.vn/v2/payment-requests/123456/cancel',
+      'POST https://api-merchant.payos.vn/v2/payment-requests',
+    ]);
   });
 
   it('does not rotate an expired attempt when the order is already marked paid', async () => {

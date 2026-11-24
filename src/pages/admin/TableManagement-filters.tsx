@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import type { CafeTableRow } from './TableManagement-types';
 import { STATUS_OPTIONS } from './TableManagement-constants';
 
@@ -11,6 +12,7 @@ interface TableFiltersProps {
 }
 
 export function TableFilters({ filterZone, filterStatus, zones, onZoneChange, onStatusChange, statusLabel }: TableFiltersProps) {
+	const { t } = useTranslation();
 	return (
 		<div className="flex gap-3 mb-4 flex-wrap text-sm">
 			<select
@@ -18,7 +20,7 @@ export function TableFilters({ filterZone, filterStatus, zones, onZoneChange, on
 				onChange={(e) => onZoneChange(e.target.value)}
 				className="rounded-lg border border-border bg-background px-3 py-1.5 text-sm"
 			>
-				<option value="all">All zones</option>
+				<option value="all">{t('admin.tableManagement.allZones', { defaultValue: 'All zones' })}</option>
 				{zones.map((z) => (
 					<option key={z} value={z}>{z}</option>
 				))}
@@ -28,7 +30,7 @@ export function TableFilters({ filterZone, filterStatus, zones, onZoneChange, on
 				onChange={(e) => onStatusChange(e.target.value)}
 				className="rounded-lg border border-border bg-background px-3 py-1.5 text-sm"
 			>
-				<option value="all">All statuses</option>
+				<option value="all">{t('admin.tableManagement.allStatuses', { defaultValue: 'All statuses' })}</option>
 				{STATUS_OPTIONS.map((s) => (
 					<option key={s.value} value={s.value}>
 						{statusLabel(s.value)}

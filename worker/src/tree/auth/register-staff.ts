@@ -28,7 +28,8 @@ export async function registerStaff(
       const first = parsed.error.issues[0];
       return errorResponse(first.message, 400);
     }
-    const { email, password, name, phone, role, tenant_id } = parsed.data;
+    const { email: rawEmail, password, name, phone, role, tenant_id } = parsed.data;
+    const email = rawEmail.trim().toLowerCase();
     const rawBodyObj = (body && typeof body === 'object' ? body : {}) as Record<string, unknown>;
     const bodyStoreOverride = String(
       tenant_id ||
@@ -80,7 +81,9 @@ export async function registerStaff(
     }
 
     const authKV = env.AUTH_KV as import('@cloudflare/workers-types').KVNamespace | undefined;
-    const existingUser = authKV ? await authKV.get(`user:${email}`) : null;
+    const existingUser = authKV
+      ? ((await authKV.get(`user:${email}`)) || (rawEmail !== email ? await authKV.get(`user:${rawEmail}`) : null))
+      : null;
     if (existingUser) {
       return errorResponse('Email đã được đăng ký', 409);
     }

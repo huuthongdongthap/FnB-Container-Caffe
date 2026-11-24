@@ -60,10 +60,12 @@ describe('StitchKDSNew', () => {
     const filterNav = screen.getByRole('navigation', { name: 'Filter tickets' });
     expect(filterNav.className).not.toContain('hidden');
     expect(filterNav.className).toContain('flex');
-    expect(screen.getByText('ALL')).toBeTruthy();
-    expect(screen.getByText('PRIORITY')).toBeTruthy();
-    expect(screen.getByText('PREPARING')).toBeTruthy();
-    expect(screen.getByText('READY')).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'ALL' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'OVERDUE' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'PRIORITY' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'PENDING' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'PREPARING' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'READY' })).toBeTruthy();
   });
 
   it('keeps overdue preparing tickets in PREPARING with active counts and correct action', () => {

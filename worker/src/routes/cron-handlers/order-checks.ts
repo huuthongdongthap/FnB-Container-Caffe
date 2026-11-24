@@ -1,9 +1,67 @@
 import { createLogger } from '../../middleware/logger';
 import { resolvePilotStore, matchesTenantRow } from '../../middleware/tenant';
 import { createMetricsCollector } from '../../lib/metrics-collector';
+import { isHeldOutOfKds } from '@aura/domain-kitchen';
 
 const SLA_MINUTES_DEFAULT = 15;
 const log = createLogger({ route: 'cron' });
+
+const OVERDUE_STATUS_CLAUSE = "status IN ('pending', 'confirmed', 'preparing', 'Bep tiep nhan', 'Dang pha che')";
+
+const OVERDUE_COLUMN_SETS = [
+  'items, notes, payment_method, payment_status, order_type, is_cod',
+  'items, notes, payment_method, payment_status, order_type',
+  'items, notes, payment_method, payment_status',
+  'items, notes, payment_status, order_type',
+  'items, notes',
+  '',
+] as const;
+
+async function fetchOverdueCandidates(
+  db: import('@cloudflare/workers-types').D1Database,
+  cutoff: string,
+  tenantId: string,
+  scoped: boolean,
+): Promise<Array<Record<string, unknown>>> {
+  const runCascade = async (includeTenantColumn: boolean, filterTenant: boolean): Promise<Array<Record<string, unknown>> | null> => {
+    const tenantSelect = includeTenantColumn ? ', tenant_id' : '';
+    const tenantWhere = filterTenant ? "\n            AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?" : '';
+    for (const extraCols of OVERDUE_COLUMN_SETS) {
+      const colList = `id, customer_name, status, created_at${tenantSelect}${extraCols ? `, ${extraCols}` : ''}`;
+      try {
+        const stmt = db.prepare(`
+          SELECT ${colList}
+          FROM orders
+          WHERE ${OVERDUE_STATUS_CLAUSE}
+            AND datetime(created_at) < datetime(?)${tenantWhere}
+            AND (notes IS NULL OR notes NOT LIKE '%[OVERDUE]%')
+        `);
+        const res = await (filterTenant ? stmt.bind(cutoff, tenantId) : stmt.bind(cutoff)).all<Record<string, unknown>>();
+        return (res.results || []).filter(
+          (row) => matchesTenantRow(row, tenantId) && !isHeldOutOfKds(row),
+        );
+      } catch {
+        // Column absent in partial schema: step down while keeping payment/item hold columns where possible
+      }
+    }
+    return null;
+  };
+
+  if (scoped && tenantId) {
+    const scopedRows = await runCascade(true, true);
+    if (scopedRows !== null) return scopedRows;
+    if (tenantId === 'default') {
+      const unscopedRows = await runCascade(false, false);
+      if (unscopedRows !== null) return unscopedRows;
+    }
+    return [];
+  }
+
+  const withTenantRows = await runCascade(true, false);
+  if (withTenantRows !== null) return withTenantRows;
+  const legacyRows = await runCascade(false, false);
+  return legacyRows ?? [];
+}
 
 export async function checkOverdueOrders(env: Record<string, unknown>, tenantOverride?: string): Promise<void> {
   const slaMinutes = Number.isFinite(Number(env.SLA_THRESHOLD_MINUTES)) && Number(env.SLA_THRESHOLD_MINUTES) > 0
@@ -21,61 +79,7 @@ export async function checkOverdueOrders(env: Record<string, unknown>, tenantOve
     const cutoff = new Date(Date.now() - slaMinutes * 60 * 1000).toISOString();
     const scoped = Boolean(tenantId && tenantId !== '*');
 
-    let overdue: Array<Record<string, unknown>> = [];
-    if (scoped && tenantId) {
-      try {
-        const scopedRes = await db.prepare(`
-          SELECT id, customer_name, status, created_at, tenant_id
-          FROM orders
-          WHERE status IN ('pending', 'confirmed', 'preparing', 'Bep tiep nhan', 'Dang pha che')
-            AND created_at < ?
-            AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?
-            AND (notes IS NULL OR notes NOT LIKE '%[OVERDUE]%')
-        `).bind(cutoff, tenantId).all<Record<string, unknown>>();
-        overdue = (scopedRes.results || []).filter(
-          (row) => matchesTenantRow(row, tenantId)
-        );
-      } catch {
-        if (tenantId === 'default') {
-          const unscoped = await db.prepare(`
-            SELECT id, customer_name, status, created_at
-            FROM orders
-            WHERE status IN ('pending', 'confirmed', 'preparing', 'Bep tiep nhan', 'Dang pha che')
-              AND created_at < ?
-              AND (notes IS NULL OR notes NOT LIKE '%[OVERDUE]%')
-          `).bind(cutoff).all<Record<string, unknown>>();
-          overdue = (unscoped.results || []).filter(
-            (row) => matchesTenantRow(row, tenantId)
-          );
-        } else {
-          overdue = [];
-        }
-      }
-    } else {
-      try {
-        const withTenant = await db.prepare(`
-          SELECT id, customer_name, status, created_at, tenant_id
-          FROM orders
-          WHERE status IN ('pending', 'confirmed', 'preparing', 'Bep tiep nhan', 'Dang pha che')
-            AND created_at < ?
-            AND (notes IS NULL OR notes NOT LIKE '%[OVERDUE]%')
-        `).bind(cutoff).all<Record<string, unknown>>();
-        overdue = (withTenant.results || []).filter(
-          (row) => matchesTenantRow(row, tenantId)
-        );
-      } catch {
-        const unscoped = await db.prepare(`
-          SELECT id, customer_name, status, created_at
-          FROM orders
-          WHERE status IN ('pending', 'confirmed', 'preparing', 'Bep tiep nhan', 'Dang pha che')
-            AND created_at < ?
-            AND (notes IS NULL OR notes NOT LIKE '%[OVERDUE]%')
-        `).bind(cutoff).all<Record<string, unknown>>();
-        overdue = (unscoped.results || []).filter(
-          (row) => matchesTenantRow(row, tenantId)
-        );
-      }
-    }
+    const overdue = await fetchOverdueCandidates(db, cutoff, tenantId, scoped);
 
     if (!overdue.length) {
       log.info('No overdue orders found.');

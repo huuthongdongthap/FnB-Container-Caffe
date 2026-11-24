@@ -16,18 +16,39 @@ import { ActionButton } from './stitch-kds-action-button';
 
 /** Compute accent bar color based on ticket status */
 function getAccentColorClass(status: Ticket['status']): string {
-  if (status === 'overdue') return 'bg-[var(--aura-error)]';
-  if (status === 'ready') return 'bg-[var(--aura-chrome-bright,#adc8f5)]';
-  if (status === 'preparing') return 'bg-[var(--aura-chrome-bright)]';
-  return 'bg-[var(--aura-chrome-light,#dfaf7e)]';
+  if (status === 'overdue') return 'bg-[var(--aura-error,#ef4444)]';
+  if (status === 'ready') return 'bg-[var(--aura-success,#34d399)]';
+  if (status === 'preparing') return 'bg-sky-400';
+  return 'bg-amber-400';
 }
 
 /** Compute timer text color based on ticket status */
 function getTimerColorClass(status: Ticket['status']): string {
-  if (status === 'overdue') return 'text-[var(--aura-error)]';
-  if (status === 'ready') return 'text-[var(--aura-chrome-bright,#adc8f5)]';
-  if (status === 'preparing') return 'text-[var(--aura-chrome-bright)]';
-  return 'text-[var(--aura-chrome-bright,#d4e4fa)]';
+  if (status === 'overdue') return 'text-[var(--aura-error,#ffb4ab)]';
+  if (status === 'ready') return 'text-[var(--aura-success,#34d399)]';
+  if (status === 'preparing') return 'text-sky-300';
+  return 'text-amber-300';
+}
+
+/** Compute status pill badge classes */
+function getStatusPillClass(status: Ticket['status']): string {
+  if (status === 'overdue') {
+    return 'border border-[var(--aura-error,#ef4444)]/50 bg-[var(--aura-error,#ef4444)]/15 text-[var(--aura-error,#ffb4ab)]';
+  }
+  if (status === 'ready') {
+    return 'border border-[var(--aura-success,#34d399)]/40 bg-[var(--aura-success,#34d399)]/15 text-[var(--aura-success,#34d399)]';
+  }
+  if (status === 'preparing') {
+    return 'border border-sky-400/40 bg-sky-400/15 text-sky-300';
+  }
+  return 'border border-amber-400/40 bg-amber-400/15 text-amber-300';
+}
+
+const HIGHLIGHT_MODIFIER_PREFIXES = ['EXTRA', 'ADD', 'THÊM', 'THEM', 'ÍT', 'IT ', 'KHÔNG', 'KHONG', 'ĐỔI', 'DOI'];
+
+function isHighlightedModifier(modifier: string): boolean {
+  const upper = modifier.trim().toUpperCase();
+  return HIGHLIGHT_MODIFIER_PREFIXES.some((prefix) => upper.startsWith(prefix));
 }
 
 export function TicketCard({
@@ -96,20 +117,37 @@ export function TicketCard({
       <div className={cn('h-1 w-full shrink-0', accentColorClass)} />
 
       <div className="flex flex-grow flex-col p-6">
-        {/* Header row: ticket ID + timer */}
+        {/* Header row: ticket ID + status pill + timer */}
         <div className="mb-4 flex items-start justify-between">
           <div>
-            <h2
-              className={cn('text-[32px] leading-[1.2] font-bold tracking-tighter', timerColorClass)}
-              style={{ fontFamily: 'var(--aura-font-display)' }}
-            >
-              {ticket.id}
-            </h2>
+            <div className="flex items-center gap-2">
+              <h2
+                className={cn('text-[32px] leading-[1.2] font-bold tracking-tighter', timerColorClass)}
+                style={{ fontFamily: 'var(--aura-font-display)' }}
+              >
+                {ticket.id}
+              </h2>
+              <span
+                className={cn(
+                  'rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider',
+                  getStatusPillClass(visualStatus),
+                )}
+              >
+                {t(`kds.${visualStatus}`, visualStatus.toUpperCase())}
+              </span>
+            </div>
             <p
-              className="text-[12px] leading-none tracking-[0.1em] font-bold uppercase text-[var(--aura-chrome-soft)]"
+              className="mt-1 text-[12px] leading-none tracking-[0.1em] font-bold uppercase text-[var(--aura-chrome-soft)]"
               style={{ fontFamily: "var(--aura-font-body)" }}
             >
-              {ticket.table} &bull; {t(`kds.${ticket.type.toLowerCase().replace(' ', '')}`, ticket.type)}
+              {(() => {
+                const channelLabel = t(`kds.${ticket.type.toLowerCase().replace(' ', '')}`, ticket.type);
+                const trimmedTable = (ticket.table ?? '').trim();
+                if (!trimmedTable || trimmedTable.toLowerCase() === channelLabel.toLowerCase()) {
+                  return channelLabel;
+                }
+                return `${trimmedTable} • ${channelLabel}`;
+              })()}
             </p>
           </div>
           <div className="text-right">
@@ -157,7 +195,7 @@ export function TicketCard({
                   <span
                     className={cn(
                       'mt-1 inline-block rounded px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider',
-                      item.modifier.startsWith('EXTRA') || item.modifier.startsWith('ADD')
+                      isHighlightedModifier(item.modifier)
                         ? 'bg-[color-mix(in srgb,var(--aura-chrome-mid,rgba(100,66,26,1)) 30%,transparent)] text-[var(--aura-chrome-light,#dfaf7e)] border border-[color-mix(in srgb,var(--aura-chrome-light,rgba(var(--aura-chrome-light),1)) 30%,transparent)]'
                         : 'border border-[var(--aura-chrome-bright)] text-[var(--aura-chrome-bright)]',
                     )}
@@ -170,7 +208,7 @@ export function TicketCard({
                     className="mt-1 text-xs italic text-[var(--aura-chrome-light,#dfaf7e)]"
                     style={{ fontFamily: 'var(--aura-font-body)' }}
                   >
-                    Ghi chú: {item.notes}
+                    {t('kds.itemNotes', 'Note')}: {item.notes}
                   </p>
                 )}
               </div>
@@ -178,7 +216,7 @@ export function TicketCard({
           ))}
           {ticket.notes && (
             <div className="mt-2 rounded border border-[var(--aura-chrome-light,#dfaf7e)]/30 bg-[var(--aura-chrome-light,#dfaf7e)]/10 px-3 py-2 text-xs italic text-[var(--aura-chrome-light,#dfaf7e)]">
-              Ghi chú đơn: {ticket.notes}
+              {t('kds.orderNotes', 'Order note')}: {ticket.notes}
             </div>
           )}
         </div>
@@ -221,7 +259,12 @@ export function TicketCard({
             {t('kds.startPrep', 'START PREP')}
           </ActionButton>
         )}
-        {isReady && onPickup && (
+        {isReady && ticket.type === 'DELIVERY' && (
+          <div className="rounded-lg border border-[var(--aura-success,#34d399)]/40 bg-[var(--aura-success,#34d399)]/10 py-3.5 text-center text-[12px] font-black uppercase tracking-[0.1em] text-[var(--aura-success,#34d399)]">
+            {t('kds.awaitingRider', 'AWAITING RIDER')}
+          </div>
+        )}
+        {isReady && ticket.type !== 'DELIVERY' && onPickup && (
           <ActionButton disabled={pending} onClick={() => onPickup(ticket.id)}>
             {t('kds.orderPickedUp', 'ORDER PICKED UP')}
           </ActionButton>
@@ -234,12 +277,12 @@ export function TicketCard({
                 ? (onComplete ? onComplete(ticket.id) : onStart?.(ticket.id))
                 : (onStart ? onStart(ticket.id) : onComplete?.(ticket.id))
             }
-            className="bg-error"
+            className="!bg-none bg-[var(--md-sys-color-error,#ef4444)] text-[var(--md-sys-color-on-error,#ffffff)]"
           >
             {isOverduePreparing
               ? t('kds.priorityComplete', 'PRIORITY COMPLETE')
               : onStart
-                ? t('kds.startPrep', 'START PREP')
+                ? t('kds.priorityStart', 'START NOW — OVERDUE')
                 : t('kds.priorityComplete', 'PRIORITY COMPLETE')}
           </ActionButton>
         )}

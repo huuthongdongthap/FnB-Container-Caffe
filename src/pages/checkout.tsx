@@ -132,11 +132,13 @@ export function CheckoutPage() {
       customer_email: '',
       customer_address: effectiveOrderType === 'delivery'
         ? formData.address
-        : (isRealDineIn ? `Bàn ${validTableNumber}` : (rawTable ? `Đặt trước: ${rawTable}` : 'Nhận tại quầy bar AURA')),
+        : (isRealDineIn ? `Bàn ${validTableNumber}` : 'Nhận tại quầy bar AURA'),
       order_type: effectiveOrderType,
       ...(isRealDineIn && validTableNumber ? { table_id: validTableNumber } : {}),
       payment_method: formData.paymentMethod,
-      notes: formData.notes,
+      notes: effectiveOrderType === 'dine_in'
+        ? formData.notes
+        : (formData.notes || '').replace(/^\[Đặt trước bàn:[^\]]*\]\s*(?:\|\s*)?/, '').trim(),
       delivery_time: 'now',
       shipping_fee: effectiveShippingFee,
       service_fee: 0,
@@ -152,6 +154,12 @@ export function CheckoutPage() {
         creationError: () => useOrderStore.getState().error || t('failedToCreateOrder'),
       });
       const { id: orderId, total: serverTotal } = order;
+      try {
+        localStorage.removeItem('aura_active_booking');
+        localStorage.removeItem('aura_checkout_form');
+      } catch {
+        /* ignore storage errors */
+      }
 
       // Handle PayOS redirect with internal retry
       if (formData.paymentMethod === 'payos' && !alreadyPaid && serverTotal > 0) {
