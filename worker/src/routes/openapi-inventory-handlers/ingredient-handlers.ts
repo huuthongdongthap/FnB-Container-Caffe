@@ -320,13 +320,15 @@ export function registerIngredientHandlers(app: OpenAPIHono<{ Bindings: Env }>) 
       }
     }
 
+    let tenantVerifiedRows: Array<Record<string, unknown>> | null = null;
     if (tenantId !== '*' && itemResults.length > 0) {
-      const filtered: any[] = [];
+      const filtered: Array<Record<string, unknown>> = [];
       for (const item of itemResults) {
         if (await checkIngredientTenant(db, String(item.id), item, tenantId)) {
           filtered.push(item);
         }
       }
+      tenantVerifiedRows = filtered;
       if (!sqlTenantScoped || filtered.length !== itemResults.length || (offset === 0 && filtered.length < limit)) {
         total = filtered.length;
         itemResults = filtered.slice(offset, offset + limit);
@@ -337,35 +339,63 @@ export function registerIngredientHandlers(app: OpenAPIHono<{ Bindings: Env }>) 
 
     // Compute full-catalog KPI summary across all matching rows (not limited to current page)
     let summary: { totalItems: number; lowStockCount: number; outOfStockCount: number; totalValue: number } | undefined;
-    try {
-      const kpiSql = sqlTenantScoped
-        ? `SELECT COUNT(*) as total_items,
-                  SUM(CASE WHEN COALESCE(current_stock, 0) <= 0 THEN 1 ELSE 0 END) as out_of_stock,
-                  SUM(CASE WHEN COALESCE(current_stock, 0) > 0 AND COALESCE(current_stock, 0) <= COALESCE(min_stock, 0) THEN 1 ELSE 0 END) as low_stock,
-                  COALESCE(SUM(COALESCE(current_stock, 0) * COALESCE(cost_per_unit, 0)), 0) as total_value
-           FROM ingredients ${scopedWhere}`
-        : `SELECT COUNT(*) as total_items,
-                  SUM(CASE WHEN COALESCE(current_stock, 0) <= 0 THEN 1 ELSE 0 END) as out_of_stock,
-                  SUM(CASE WHEN COALESCE(current_stock, 0) > 0 AND COALESCE(current_stock, 0) <= COALESCE(min_stock, 0) THEN 1 ELSE 0 END) as low_stock,
-                  COALESCE(SUM(COALESCE(current_stock, 0) * COALESCE(cost_per_unit, 0)), 0) as total_value
-           FROM ingredients ${whereClause}`;
-      const kpiBind = sqlTenantScoped ? [...params, tenantId] : params;
-      const kpiRow = (await db.prepare(kpiSql).bind(...kpiBind).first()) as {
-        total_items?: number;
-        out_of_stock?: number;
-        low_stock?: number;
-        total_value?: number;
-      } | null;
-      if (kpiRow && Number.isFinite(Number(kpiRow.total_items))) {
+    if (!sqlTenantScoped && tenantId !== '*') {
+      if (tenantId !== 'default') {
+        summary = { totalItems: 0, lowStockCount: 0, outOfStockCount: 0, totalValue: 0 };
+      } else {
+        const rowsForSummary = tenantVerifiedRows ?? [];
+        let lowStockCount = 0;
+        let outOfStockCount = 0;
+        let totalValue = 0;
+        for (const row of rowsForSummary) {
+          const stock = Number(row.current_stock ?? 0);
+          const minStock = Number(row.min_stock ?? 0);
+          const unitCost = Number(row.cost_per_unit ?? 0);
+          if (stock <= 0) {
+            outOfStockCount += 1;
+          } else if (stock <= minStock) {
+            lowStockCount += 1;
+          }
+          totalValue += stock * unitCost;
+        }
         summary = {
-          totalItems: Number(kpiRow.total_items ?? total),
-          lowStockCount: Number(kpiRow.low_stock ?? 0),
-          outOfStockCount: Number(kpiRow.out_of_stock ?? 0),
-          totalValue: Number(kpiRow.total_value ?? 0),
+          totalItems: rowsForSummary.length,
+          lowStockCount,
+          outOfStockCount,
+          totalValue,
         };
       }
-    } catch {
-      // Fallback: omit summary when schema differs
+    } else {
+      try {
+        const kpiSql = sqlTenantScoped
+          ? `SELECT COUNT(*) as total_items,
+                    SUM(CASE WHEN COALESCE(current_stock, 0) <= 0 THEN 1 ELSE 0 END) as out_of_stock,
+                    SUM(CASE WHEN COALESCE(current_stock, 0) > 0 AND COALESCE(current_stock, 0) <= COALESCE(min_stock, 0) THEN 1 ELSE 0 END) as low_stock,
+                    COALESCE(SUM(COALESCE(current_stock, 0) * COALESCE(cost_per_unit, 0)), 0) as total_value
+             FROM ingredients ${scopedWhere}`
+          : `SELECT COUNT(*) as total_items,
+                    SUM(CASE WHEN COALESCE(current_stock, 0) <= 0 THEN 1 ELSE 0 END) as out_of_stock,
+                    SUM(CASE WHEN COALESCE(current_stock, 0) > 0 AND COALESCE(current_stock, 0) <= COALESCE(min_stock, 0) THEN 1 ELSE 0 END) as low_stock,
+                    COALESCE(SUM(COALESCE(current_stock, 0) * COALESCE(cost_per_unit, 0)), 0) as total_value
+             FROM ingredients ${whereClause}`;
+        const kpiBind = sqlTenantScoped ? [...params, tenantId] : params;
+        const kpiRow = (await db.prepare(kpiSql).bind(...kpiBind).first()) as {
+          total_items?: number;
+          out_of_stock?: number;
+          low_stock?: number;
+          total_value?: number;
+        } | null;
+        if (kpiRow && Number.isFinite(Number(kpiRow.total_items))) {
+          summary = {
+            totalItems: Number(kpiRow.total_items ?? total),
+            lowStockCount: Number(kpiRow.low_stock ?? 0),
+            outOfStockCount: Number(kpiRow.out_of_stock ?? 0),
+            totalValue: Number(kpiRow.total_value ?? 0),
+          };
+        }
+      } catch {
+        // Fallback: omit summary when schema differs
+      }
     }
 
     return c.json({
