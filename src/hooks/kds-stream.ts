@@ -3,12 +3,18 @@ import { AUTH_TOKEN_KEY } from './stores/use-auth-store';
 import { invalidateClientSession, sessionErrorRequiresLogin } from '../lib/client-session';
 
 /** Authenticated streaming fetch keeps the bearer token out of request URLs. */
-export async function consumeKdsStream(signal: AbortSignal, snapshot: (orders: unknown[]) => void) {
+export async function consumeKdsStream(
+  signal: AbortSignal,
+  snapshot: (orders: unknown[]) => void,
+  station?: string,
+) {
   while (!signal.aborted) {
     let reader: ReadableStreamDefaultReader<Uint8Array> | undefined;
     try {
       const token = localStorage.getItem(AUTH_TOKEN_KEY);
-      const response = await fetch(`${API_BASE}/api/kds/orders/stream`, {
+      const stationQuery =
+        station && station !== 'all' ? `?station=${encodeURIComponent(station)}` : '';
+      const response = await fetch(`${API_BASE}/api/kds/orders/stream${stationQuery}`, {
         credentials: 'include', signal,
         headers: { Accept: 'text/event-stream', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
       });

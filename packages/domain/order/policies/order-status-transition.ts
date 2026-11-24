@@ -241,10 +241,18 @@ export async function transitionOrderStatus(
   if (isNoOp && fields.length === 0) {
     return { success: true, idempotent: true, order: { id: orderId, status: targetStatus, previous_status: order.status } };
   }
+  const nowIso = new Date().toISOString();
+  const fieldKeys = new Set(fields.map(([key]) => key));
+  const prepTimestampAddition =
+    !isNoOp && targetStatus === 'preparing' && !fieldKeys.has('started_at')
+      ? ', started_at = COALESCE(started_at, ?2)'
+      : !isNoOp && targetStatus === 'ready' && !fieldKeys.has('ready_at')
+        ? ', ready_at = COALESCE(ready_at, ?2)'
+        : '';
   const additions = fields.map(([key]) => `, ${key} = ?`).join('');
-  const updateStatus = (guard = '') => db.prepare(
-    `UPDATE orders SET status = ?, updated_at = ?${additions} WHERE id = ? AND status = ?${writeTenantClause}${guard}`,
-  ).bind(targetStatus, new Date().toISOString(), ...fields.map(([, value]) => value), orderId, order.status, ...writeTenantBinds).run();
+  const updateStatus = (guard = '', includePrepTimestamp = true) => db.prepare(
+    `UPDATE orders SET status = ?, updated_at = ?${includePrepTimestamp ? prepTimestampAddition : ''}${additions} WHERE id = ? AND status = ?${writeTenantClause}${guard}`,
+  ).bind(targetStatus, nowIso, ...fields.map(([, value]) => value), orderId, order.status, ...writeTenantBinds).run();
   const closingOrder = targetStatus === 'completed' && !isNoOp;
   const atomicMarkingPaid =
     String((options.fields as Record<string, unknown> | undefined)?.payment_status ?? '')
@@ -259,6 +267,13 @@ export async function transitionOrderStatus(
     } catch (error) {
       if (!/no such column:\s*payment_status\b/i.test(String(error))) throw error;
       result = await updateStatus();
+    }
+  } else if (prepTimestampAddition) {
+    try {
+      result = await updateStatus('', true);
+    } catch (error) {
+      if (!/no such column:\s*(started_at|ready_at)\b/i.test(String(error))) throw error;
+      result = await updateStatus('', false);
     }
   } else {
     result = await updateStatus();

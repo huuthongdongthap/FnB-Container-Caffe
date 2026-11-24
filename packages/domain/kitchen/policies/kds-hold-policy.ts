@@ -8,7 +8,7 @@ export const PREPAID_ONLINE_METHODS = new Set(['payos', 'bank_transfer', 'qr']);
  */
 export function isHeldOutOfKds(order: Record<string, unknown>): boolean {
   const rawNotes = typeof order.notes === 'string' ? order.notes.trim() : '';
-  if (rawNotes === 'Khách QR - cho don mon') {
+  if (rawNotes === 'Khách QR - cho don mon' || rawNotes.startsWith('Khách QR - cho don mon |')) {
     const rawItems = order.items;
     if (Array.isArray(rawItems) && rawItems.length === 0) return true;
     if (typeof rawItems === 'string') {

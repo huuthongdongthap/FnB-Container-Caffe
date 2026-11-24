@@ -25,9 +25,9 @@ export type { Ticket, TicketStatus, StitchKDSNewProps } from './stitch-kds-types
 
 /* ─── Imports from extracted modules ──────────────────────────────────────────── */
 
-import type { StitchKDSNewProps } from './stitch-kds-types';
+import type { KdsFilterKey, StitchKDSNewProps } from './stitch-kds-types';
 import { DEFAULT_TICKETS } from './stitch-kds-default';
-import { StatusBadge } from './stitch-kds-status-badge';
+import { sortKdsTickets } from './stitch-kds-utils';
 import { TicketCard } from './stitch-kds-order-card';
 import { EmptyState } from './stitch-kds-empty-state';
 import { LoadingState } from './stitch-kds-loading-state';
@@ -87,30 +87,44 @@ export function StitchKDSNew({
   isFullscreen = false,
   onToggleSound,
   onToggleFullscreen,
+  cancelledBanner,
 }: Readonly<StitchKDSNewProps>) {
   const { t } = useTranslation();
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const filteredTickets = useCallback(() => {
     if (!tickets) return [];
-    if (activeFilter === 'all') return tickets;
-    if (activeFilter === 'priority')
-      return tickets.filter(
+    let list = tickets;
+    if (activeFilter === 'overdue') {
+      list = tickets.filter((tk) => Boolean(tk.isOverdue || tk.status === 'overdue'));
+    } else if (activeFilter === 'priority') {
+      list = tickets.filter(
         (tk) =>
-          Boolean(tk.isOverdue || tk.status === 'overdue') ||
-          (tk.rawStatus ?? tk.status) === 'preparing',
+          Boolean(tk.isOverdue || tk.status === 'overdue' || tk.isWarning),
       );
-    return tickets.filter((tk) => {
-      const operationalStatus = tk.rawStatus ?? tk.status;
-      return operationalStatus === activeFilter;
-    });
+    } else if (activeFilter === 'pending') {
+      list = tickets.filter((tk) => ['pending', 'confirmed'].includes(tk.rawStatus ?? tk.status));
+    } else if (activeFilter !== 'all') {
+      list = tickets.filter((tk) => (tk.rawStatus ?? tk.status) === activeFilter);
+    }
+    return sortKdsTickets(list);
   }, [tickets, activeFilter]);
 
   const filtered = filteredTickets();
+  const countOverdue = tickets.filter((tk) => Boolean(tk.isOverdue || tk.status === 'overdue')).length;
+  const countPriority = tickets.filter((tk) => Boolean(tk.isOverdue || tk.status === 'overdue' || tk.isWarning)).length;
   const countPreparing = tickets.filter((tk) => (tk.rawStatus ?? tk.status) === 'preparing').length;
   const countPending = tickets.filter((tk) => ['pending', 'confirmed'].includes(tk.rawStatus ?? tk.status)).length;
   const countReady = tickets.filter((tk) => (tk.rawStatus ?? tk.status) === 'ready').length;
   const activeCount = countPreparing + countPending;
+  const filterCounts: Partial<Record<KdsFilterKey, number>> = {
+    all: tickets.length,
+    overdue: countOverdue,
+    priority: countPriority,
+    pending: countPending,
+    preparing: countPreparing,
+    ready: countReady,
+  };
 
   return (
     <div
@@ -122,6 +136,7 @@ export function StitchKDSNew({
         onToggleSidebar={() => setSidebarOpen((prev) => !prev)}
         activeFilter={activeFilter}
         onFilterChange={onFilterChange}
+        filterCounts={filterCounts}
         stationLabel={stationLabel}
         selectedStation={selectedStation}
         stations={stations}
@@ -146,12 +161,8 @@ export function StitchKDSNew({
         className="ml-0 md:ml-64 h-screen overflow-y-auto px-4 md:px-8 pb-8 pt-36 lg:pt-24"
         aria-label={t('kds.mainContent', 'Main order grid')}
       >
-        <div className="mb-8 flex flex-wrap items-center justify-between gap-4 border-b border-[var(--aura-chrome-dim)]/10 pb-4">
-          <div className="flex flex-wrap gap-4">
-            <StatusBadge status="preparing" count={countPreparing} />
-            <StatusBadge status="pending" count={countPending} />
-            <StatusBadge status="ready" count={countReady} />
-          </div>
+        {cancelledBanner && <div className="mb-4">{cancelledBanner}</div>}
+        <div className="mb-6 flex flex-wrap items-center justify-end gap-4 border-b border-[var(--aura-chrome-dim)]/10 pb-3">
           <span
             className="text-[12px] leading-none tracking-[0.1em] font-bold uppercase text-[var(--aura-chrome-soft)]"
             style={{ fontFamily: "var(--aura-font-body)" }}

@@ -1,4 +1,5 @@
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import { KitchenOrder } from './kitchen-display-types';
 import {
   cardHeader, tableName, time, itemRow, itemName,
@@ -14,12 +15,12 @@ interface Props {
   onStatusChange: (orderId: string, status: KitchenOrder['status']) => void;
 }
 
-const STATUS_LABEL: Record<string, string> = {
-  pending: 'Chờ',
-  confirmed: 'Đã xác nhận',
-  preparing: 'Đang làm',
-  ready: 'Sẵn',
-  served: 'Đã phục vụ',
+const STATUS_TKEY: Record<string, string> = {
+  pending: 'kds.pending',
+  confirmed: 'kds.confirmed',
+  preparing: 'kds.preparing',
+  ready: 'kds.ready',
+  served: 'kds.served',
 };
 
 export default function KitchenOrderCard({
@@ -29,21 +30,26 @@ export default function KitchenOrderCard({
   onRetry,
   onStatusChange,
 }: Props) {
+  const { t } = useTranslation();
   const isUpdating = updatingId === order.id;
+  const isDelivery = order.order_type === 'delivery';
 
   return (
     <div style={cardBorder(order.status)}>
       <div style={cardHeader}>
         <h3 style={tableName}>
           {order.table_name
-            ? `Bàn ${order.table_name}`
-            : order.order_type === 'delivery'
-              ? 'Giao hàng'
-              : 'Mang đi'}
+            ? t('kds.tablePrefix', { table: order.table_name, defaultValue: `Bàn ${order.table_name}` })
+            : isDelivery
+              ? t('kds.delivery', 'Giao hàng')
+              : t('kds.togo', 'Mang đi')}
         </h3>
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4 }}>
           <span style={statusBadgeStyle(order.status)}>
-            {STATUS_LABEL[order.status] ?? order.status}
+            {(() => {
+              const statusKey = STATUS_TKEY[order.status];
+              return statusKey ? t(statusKey, order.status) : order.status;
+            })()}
           </span>
           <span style={time}>{timeAgo(order.created_at)}</span>
         </div>
@@ -90,7 +96,7 @@ export default function KitchenOrderCard({
             gap: 8,
           }}
         >
-          <span>Cập nhật thất bại: {mutationError}</span>
+          <span>{t('kds.updateFailed', 'Không thể cập nhật')}: {mutationError}</span>
           {onRetry && (
             <button
               type="button"
@@ -107,7 +113,7 @@ export default function KitchenOrderCard({
                 cursor: isUpdating ? 'not-allowed' : 'pointer',
               }}
             >
-              Thử lại
+              {t('common.retry', 'Thử lại')}
             </button>
           )}
         </div>
@@ -121,7 +127,7 @@ export default function KitchenOrderCard({
             onMouseDown={(e) => e.preventDefault()}
             onClick={() => onStatusChange(order.id, 'preparing')}
           >
-            Bắt đầu / Start
+            {t('kds.startPrep', 'Bắt đầu chế biến')}
           </button>
         </div>
       )}
@@ -134,24 +140,30 @@ export default function KitchenOrderCard({
             onMouseDown={(e) => e.preventDefault()}
             onClick={() => onStatusChange(order.id, 'ready')}
           >
-            Sẵn sàng / Ready
+            {t('kds.ready', 'Sẵn sàng')}
           </button>
         </div>
       )}
 
       {order.status === 'ready' && (
         <>
-          <div style={noOrderText}>Đã sẵn sàng / Ready</div>
-          <div style={actions}>
-            <button
-              style={{ ...btnReady, opacity: isUpdating ? 0.6 : 1 }}
-              disabled={isUpdating}
-              onMouseDown={(e) => e.preventDefault()}
-              onClick={() => onStatusChange(order.id, 'served')}
-            >
-              Đã phục vụ / Served
-            </button>
+          <div style={noOrderText}>
+            {isDelivery
+              ? t('kds.awaitingRider', 'Chờ shipper nhận')
+              : t('kds.mobileReadyBanner', 'Đã sẵn sàng')}
           </div>
+          {!isDelivery && (
+            <div style={actions}>
+              <button
+                style={{ ...btnReady, opacity: isUpdating ? 0.6 : 1 }}
+                disabled={isUpdating}
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => onStatusChange(order.id, 'served')}
+              >
+                {t('kds.served', 'Đã phục vụ')}
+              </button>
+            </div>
+          )}
         </>
       )}
     </div>
