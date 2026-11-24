@@ -3,22 +3,53 @@ import { Link } from 'react-router-dom';
 import { LandingNav } from '@/components/stitch/StitchLandingNew-nav';
 import { LandingFooter } from '@/components/stitch/StitchLandingNew-footer';
 import { HelmetHead } from '@/components/seo/HelmetHead';
+import { apiFetch } from '@/lib/api-client';
 import { QrCode, Sparkles, Phone, ArrowRight, CheckCircle2, Store } from 'lucide-react';
 
 export default function CheckinNew() {
   const [phone, setPhone] = useState('');
   const [isSuccess, setIsSuccess] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [pointsEarned, setPointsEarned] = useState<number | null>(null);
   const phoneInputRef = useRef<HTMLInputElement | null>(null);
 
   const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const digits = e.target.value.replace(/\D/g, '').slice(0, 10);
     setPhone(digits);
+    if (error) setError(null);
   };
 
-  const handleCheckin = (e: React.FormEvent) => {
+  const handleCheckin = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (phone.length < 10) return;
-    setIsSuccess(true);
+    if (phone.length < 10 || submitting) return;
+    setSubmitting(true);
+    setError(null);
+    try {
+      const res = await apiFetch<{
+        success?: boolean;
+        ok?: boolean;
+        points_earned?: number;
+        points?: number;
+        data?: { points_earned?: number; points?: number };
+        error?: string;
+        message?: string;
+      }>('/api/checkin', {
+        method: 'POST',
+        body: JSON.stringify({ phone }),
+      });
+      if (res.success === false || res.ok === false) {
+        setError(res.error || res.message || 'Check-in thất bại. Vui lòng thử lại.');
+        return;
+      }
+      const earned = res.points_earned ?? res.points ?? res.data?.points_earned ?? res.data?.points ?? null;
+      setPointsEarned(typeof earned === 'number' ? earned : null);
+      setIsSuccess(true);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Không thể kết nối máy chủ. Vui lòng thử lại.');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -43,7 +74,7 @@ export default function CheckinNew() {
               Cảm Ơn Quý Khách!
             </h2>
             <p className="text-[var(--aura-chrome-soft)] text-sm max-w-sm mx-auto mb-6 font-light leading-relaxed">
-              Điểm thưởng của lượt ghé hôm nay đã được ghi nhận cho số điện thoại <span className="font-mono text-white font-semibold">{phone}</span>.
+              Điểm thưởng{pointsEarned !== null ? ` (+${pointsEarned} điểm)` : ''} của lượt ghé hôm nay đã được ghi nhận cho số điện thoại <span className="font-mono text-white font-semibold">{phone}</span>.
             </p>
             <div className="flex flex-col sm:flex-row gap-3 justify-center">
               <a
@@ -103,12 +134,18 @@ export default function CheckinNew() {
                 </div>
               </div>
 
+              {error && (
+                <div role="alert" className="rounded-xl border border-red-400/40 bg-red-500/15 px-4 py-3 text-xs text-red-200">
+                  {error}
+                </div>
+              )}
+
               <button
                 type="submit"
-                disabled={phone.length < 10}
+                disabled={phone.length < 10 || submitting}
                 className="w-full py-4 rounded-2xl bg-[var(--aura-chrome-bright)] text-[var(--aura-noir-deep)] font-body text-xs font-bold uppercase tracking-widest transition-all duration-300 flex items-center justify-center gap-2 shadow-xl hover:bg-white active:scale-[0.98] disabled:opacity-40 disabled:pointer-events-none cursor-pointer"
               >
-                Xác Nhận &amp; Tích Điểm
+                {submitting ? 'Đang xử lý...' : 'Xác Nhận & Tích Điểm'}
                 <ArrowRight className="w-4 h-4" />
               </button>
             </form>

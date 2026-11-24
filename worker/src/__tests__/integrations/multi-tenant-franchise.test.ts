@@ -8188,6 +8188,33 @@ describe('Multi-Tenant & Franchise Preparation Integration', () => {
               })),
             };
           }
+          if (/FROM campaign_configs/i.test(sql)) {
+            return {
+              results: [
+                { trigger: 'welcome', is_active: 1, channels: '["sms"]' },
+                { trigger: 'birthday', is_active: 1, channels: '["sms"]' },
+                { trigger: 'winback', is_active: 1, channels: '["sms"]' },
+                { trigger: 'post_visit', is_active: 1, channels: '["sms"]' },
+                { trigger: 'cashback_expiry', is_active: 1, channels: '["sms"]' },
+              ],
+            };
+          }
+          if (/FROM consents/i.test(sql)) {
+            const tid = /TRIM\(tenant_id\)/i.test(sql)
+              ? (args.find((a) => a === 'tenant_sadec_02' || a === 'default') as string | undefined)
+              : undefined;
+            return {
+              results: customers
+                .filter((c) => !tid || String(c.tenant_id || 'default').trim() === tid)
+                .map((c) => ({
+                  customer_id: c.id,
+                  channel: 'all',
+                  granted: 1,
+                  revoked_at: null,
+                  tenant_id: c.tenant_id,
+                })),
+            };
+          }
           if (/FROM customers c/i.test(sql)) {
             const tid = /TRIM\(c\.tenant_id\)/i.test(sql)
               ? (args.find((a) => a === 'tenant_sadec_02' || a === 'default') as string | undefined)
@@ -21080,6 +21107,13 @@ describe('Multi-Tenant & Franchise Preparation Integration', () => {
                 return {
                   results: [
                     { id: 'cust-sd-1', name: 'Lan Sa Dec', phone: '0901112222', loyalty_tier: 'silver', total_spent: 150000, tenant_id: 'sadec' },
+                  ],
+                };
+              }
+              if (/FROM consents/i.test(sql)) {
+                return {
+                  results: [
+                    { customer_id: 'cust-sd-1', channel: 'all', granted: 1, revoked_at: null, tenant_id: 'sadec' },
                   ],
                 };
               }

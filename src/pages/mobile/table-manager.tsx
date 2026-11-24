@@ -69,7 +69,7 @@ function actionBtn(color: string, active: boolean): React.CSSProperties {
 export default function TableManager() {
   const [tables, setTables] = useState<TableRow[]>([]);
   const [loading, setLoading] = useState(true);
-  const [_error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const [confirmTarget, setConfirmTarget] = useState<{ id: string; newStatus: string } | null>(null);
 
   const loadTables = useCallback(async () => {
@@ -136,6 +136,44 @@ export default function TableManager() {
       <div style={header}>
         <h1 style={headerTitle}>Quản lý bàn / Tables</h1>
       </div>
+
+      {error && (
+        <div
+          role="alert"
+          style={{
+            margin: '12px 14px 0',
+            padding: '10px 12px',
+            borderRadius: 10,
+            background: 'rgba(239, 68, 68, 0.16)',
+            border: '1px solid rgba(239, 68, 68, 0.5)',
+            color: '#fca5a5',
+            fontSize: 13,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: 10,
+          }}
+        >
+          <span>{error}</span>
+          <button
+            type="button"
+            onClick={() => void loadTables()}
+            style={{
+              padding: '5px 10px',
+              borderRadius: 8,
+              border: '1px solid rgba(252, 165, 165, 0.6)',
+              background: 'transparent',
+              color: '#fecaca',
+              fontSize: 12,
+              fontWeight: 600,
+              cursor: 'pointer',
+              flexShrink: 0,
+            }}
+          >
+            Thử lại / Retry
+          </button>
+        </div>
+      )}
 
       {loading && tables.length === 0 && <div style={empty}>Đang tải... / Loading...</div>}
 

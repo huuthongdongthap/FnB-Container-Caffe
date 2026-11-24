@@ -63,11 +63,19 @@ export function resolveStaffPushRequestedRole(
     return { ok: true, role: caller };
   }
   if (!isStaffPushRole(requested)) {
+    if (requested === 'all' && (caller === 'owner' || caller === 'admin' || caller === 'manager' || caller === 'supervisor')) {
+      return { ok: true, role: DEFAULT_STAFF_PUSH_ROLE };
+    }
     return { ok: false, error: 'Forbidden: unknown staff push role' };
   }
   const isPrivileged = caller === 'owner' || caller === 'admin' || caller === 'manager' || caller === 'supervisor';
+  const KITCHEN_ELIGIBLE_ROLES = new Set(['kitchen', 'barista', 'chef', 'staff', 'cashier', STAFF_PUSH_ROLE]);
   if (!isPrivileged) {
-    if (requested !== caller && requested !== DEFAULT_STAFF_PUSH_ROLE) {
+    if (
+      requested !== caller &&
+      requested !== DEFAULT_STAFF_PUSH_ROLE &&
+      !(requested === STAFF_PUSH_ROLE && KITCHEN_ELIGIBLE_ROLES.has(caller))
+    ) {
       return { ok: false, error: 'Forbidden: staff cannot subscribe with an elevated role' };
     }
     return { ok: true, role: requested };

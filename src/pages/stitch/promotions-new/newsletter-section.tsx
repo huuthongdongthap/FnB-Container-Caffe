@@ -3,26 +3,44 @@ import { Mail, Sparkles, CheckCircle2, ShieldCheck } from 'lucide-react';
 import { apiFetch } from '@/lib/api-client';
 
 export function NewsletterSection() {
-  const [email, setEmail] = useState('');
+  const [contact, setContact] = useState('');
   const [submitted, setSubmitted] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const trimmed = email.trim();
-    if (!trimmed) return;
-    try {
-      localStorage.setItem('aura_selected_promo_code', 'WELCOME');
-      const digits = trimmed.replace(/\D/g, '');
-      if (digits.length >= 9 && digits.length <= 12) {
-        await apiFetch('/api/loyalty/phone-auth', {
-          method: 'POST',
-          body: JSON.stringify({ phone: digits }),
-        }).catch(() => {});
-      }
-    } catch {
-      // ignore storage errors
+    const trimmed = contact.trim();
+    if (!trimmed || submitting) return;
+    const isEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed);
+    const digits = trimmed.replace(/\D/g, '');
+    const isPhone = !isEmail && !/[a-zA-Z]/.test(trimmed) && digits.length >= 9 && digits.length <= 15;
+    if (!isEmail && !isPhone) {
+      setError('Vui lòng nhập email hoặc số điện thoại hợp lệ.');
+      return;
     }
-    setSubmitted(true);
+    setError(null);
+    setSubmitting(true);
+    try {
+      try {
+        localStorage.setItem('aura_selected_promo_code', 'WELCOME');
+      } catch {
+        // ignore storage errors
+      }
+      await apiFetch('/api/leads', {
+        method: 'POST',
+        body: JSON.stringify(
+          isPhone
+            ? { phone: digits, source: 'promotions_newsletter' }
+            : { email: trimmed, source: 'promotions_newsletter' }
+        ),
+      });
+      setSubmitted(true);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Đăng ký thất bại. Vui lòng thử lại.');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -78,28 +96,40 @@ export function NewsletterSection() {
               </div>
             </div>
           ) : (
-            <form className="flex flex-col sm:flex-row gap-3" onSubmit={handleSubmit}>
-              <div className="relative flex-1">
-                <Mail className="w-5 h-5 absolute left-4 top-1/2 -translate-y-1/2 text-[var(--aura-chrome-mid)]" />
-                <input
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="Nhập email hoặc số điện thoại của bạn..."
-                  required
-                  className="w-full pl-12 pr-4 py-4 rounded-full bg-black/40 border border-[var(--aura-chrome-mid)]/30 focus:border-[var(--aura-bronze-shimmer,#C9A96E)] focus:outline-none text-white text-sm placeholder:text-[var(--aura-chrome-mid)]/60 transition-colors shadow-inner"
-                />
+            <form className="flex flex-col gap-3" onSubmit={handleSubmit}>
+              <div className="flex flex-col sm:flex-row gap-3">
+                <div className="relative flex-1">
+                  <Mail className="w-5 h-5 absolute left-4 top-1/2 -translate-y-1/2 text-[var(--aura-chrome-mid)]" />
+                  <input
+                    type="text"
+                    inputMode="email"
+                    value={contact}
+                    onChange={(e) => {
+                      setContact(e.target.value);
+                      if (error) setError(null);
+                    }}
+                    placeholder="Nhập email hoặc số điện thoại của bạn..."
+                    required
+                    className="w-full pl-12 pr-4 py-4 rounded-full bg-black/40 border border-[var(--aura-chrome-mid)]/30 focus:border-[var(--aura-bronze-shimmer,#C9A96E)] focus:outline-none text-white text-sm placeholder:text-[var(--aura-chrome-mid)]/60 transition-colors shadow-inner"
+                  />
+                </div>
+                <button
+                  type="submit"
+                  disabled={submitting}
+                  className="px-8 py-4 rounded-full text-xs font-bold uppercase tracking-[0.16em] transition-all active:scale-95 hover:brightness-110 shadow-lg cursor-pointer flex-shrink-0 disabled:opacity-60"
+                  style={{
+                    background: 'linear-gradient(135deg, #C9A96E 0%, #E2D4B7 50%, #C9A96E 100%)',
+                    color: '#0A1A2E',
+                  }}
+                >
+                  {submitting ? 'Đang gửi...' : 'Đăng Ký Ngay'}
+                </button>
               </div>
-              <button
-                type="submit"
-                className="px-8 py-4 rounded-full text-xs font-bold uppercase tracking-[0.16em] transition-all active:scale-95 hover:brightness-110 shadow-lg cursor-pointer flex-shrink-0"
-                style={{
-                  background: 'linear-gradient(135deg, #C9A96E 0%, #E2D4B7 50%, #C9A96E 100%)',
-                  color: '#0A1A2E',
-                }}
-              >
-                Đăng Ký Ngay
-              </button>
+              {error && (
+                <div role="alert" className="text-xs text-red-300 px-4">
+                  {error}
+                </div>
+              )}
             </form>
           )}
 

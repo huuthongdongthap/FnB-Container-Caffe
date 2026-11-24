@@ -65,55 +65,73 @@ export function registerCheckoutHandlers(router: Hono<{ Bindings: Env }>): void 
         }
       }
 
-      for (const row of rows) {
+      const isKvDerivedFilter = statusFilter === 'printed' || statusFilter === 'qc_ok';
+      const eligibleRows = rows.filter((row) => {
         if (!matchesTenantRow(row, tenantId)) {
-          continue;
+          return false;
         }
         const rowStatus = row.status || 'pending';
-        if (statusFilter && statusFilter !== 'all' && rowStatus !== statusFilter) {
-          continue;
+        if (statusFilter && statusFilter !== 'all' && !isKvDerivedFilter && rowStatus !== statusFilter) {
+          return false;
         }
-        let parsedItems: Array<Record<string, unknown>> = [];
-        try {
-          const raw = JSON.parse(row.items || '[]');
-          if (Array.isArray(raw)) {
-            parsedItems = raw.map((it: Record<string, unknown>) => {
-              const qty = Math.max(1, Number(it.quantity ?? it.qty ?? 1));
-              return {
-                ...it,
-                id: String(it.product_id ?? it.id ?? ''),
-                name: String(it.name ?? ''),
-                price: Number(it.price ?? 0),
-                qty,
-                quantity: qty,
-              };
-            });
+        return true;
+      });
+
+      const hydrated = await Promise.all(
+        eligibleRows.map(async (row) => {
+          let parsedItems: Array<Record<string, unknown>> = [];
+          try {
+            const raw = JSON.parse(row.items || '[]');
+            if (Array.isArray(raw)) {
+              parsedItems = raw.map((it: Record<string, unknown>) => {
+                const qty = Math.max(1, Number(it.quantity ?? it.qty ?? 1));
+                return {
+                  ...it,
+                  id: String(it.product_id ?? it.id ?? ''),
+                  name: String(it.name ?? ''),
+                  price: Number(it.price ?? 0),
+                  qty,
+                  quantity: qty,
+                };
+              });
+            }
+          } catch {
+            parsedItems = [];
           }
-        } catch {
-          parsedItems = [];
-        }
-        const rowTenant =
-          (typeof row.tenant_id === 'string' && row.tenant_id.trim() ? row.tenant_id.trim() : '') ||
-          (tenantId && tenantId !== '*' && tenantId.toLowerCase() !== 'hq' ? tenantId : 'default');
-        const printKey = rowTenant !== 'default' ? `dindin:print:${rowTenant}:${row.id}` : `dindin:print:${row.id}`;
-        const qcKey = rowTenant !== 'default' ? `dindin:qc:${rowTenant}:${row.id}` : `dindin:qc:${row.id}`;
-        const printedState = await kvGet<{ printed?: boolean }>(c.env.AUTH_KV, printKey);
-        const qcState = await kvGet<{ qcPassed?: boolean }>(c.env.AUTH_KV, qcKey);
-        checkouts.push({
-          id: row.id,
-          orderId: row.id,
-          sessionId: row.customer_phone || '',
-          payment_method: row.payment_method || 'cod',
-          paymentMethod: row.payment_method || 'cod',
-          items: parsedItems,
-          total: Number(row.total ?? 0),
-          status: row.status || 'pending',
-          printed: Boolean(printedState?.printed),
-          qcPassed: Boolean(qcState?.qcPassed || row.status === 'completed'),
-          created_at: row.created_at || new Date().toISOString(),
-          createdAt: row.created_at || new Date().toISOString(),
-        });
-      }
+          const rowTenant =
+            (typeof row.tenant_id === 'string' && row.tenant_id.trim() ? row.tenant_id.trim() : '') ||
+            (tenantId && tenantId !== '*' && tenantId.toLowerCase() !== 'hq' ? tenantId : 'default');
+          const printKey = rowTenant !== 'default' ? `dindin:print:${rowTenant}:${row.id}` : `dindin:print:${row.id}`;
+          const qcKey = rowTenant !== 'default' ? `dindin:qc:${rowTenant}:${row.id}` : `dindin:qc:${row.id}`;
+          const [printedState, qcState] = await Promise.all([
+            kvGet<{ printed?: boolean }>(c.env.AUTH_KV, printKey),
+            kvGet<{ qcPassed?: boolean }>(c.env.AUTH_KV, qcKey),
+          ]);
+          const printed = Boolean(printedState?.printed);
+          const qcPassed = Boolean(qcState?.qcPassed || row.status === 'completed');
+          if (statusFilter === 'printed' && !printed) {
+            return null;
+          }
+          if (statusFilter === 'qc_ok' && !qcPassed) {
+            return null;
+          }
+          return {
+            id: row.id,
+            orderId: row.id,
+            sessionId: row.customer_phone || '',
+            payment_method: row.payment_method || 'cod',
+            paymentMethod: row.payment_method || 'cod',
+            items: parsedItems,
+            total: Number(row.total ?? 0),
+            status: row.status || 'pending',
+            printed,
+            qcPassed,
+            created_at: row.created_at || new Date().toISOString(),
+            createdAt: row.created_at || new Date().toISOString(),
+          };
+        })
+      );
+      checkouts = hydrated.filter((item): item is NonNullable<typeof item> => item !== null);
     } catch {
       checkouts = [];
     }
@@ -416,11 +434,16 @@ export function registerCheckoutHandlers(router: Hono<{ Bindings: Env }>): void 
       for (const section of sections) {
         const items = section.items ?? [];
         for (const raw of items) {
-          const mi = raw as { id?: string; name?: string; price?: number; sold_out?: boolean };
+          const mi = raw as { id?: string; name?: string; price?: number; sold_out?: boolean; available?: boolean };
           if (!mi.name) {
             continue;
           }
-          const entry = { id: mi.id, price: Number(mi.price ?? 0), sold_out: Boolean(mi.sold_out), name: mi.name };
+          const entry = {
+            id: mi.id,
+            price: Number(mi.price ?? 0),
+            sold_out: Boolean(mi.sold_out) || mi.available === false,
+            name: mi.name,
+          };
           lookup.set(mi.name.toLowerCase(), entry);
           if (mi.id) {
             lookup.set(mi.id, entry);

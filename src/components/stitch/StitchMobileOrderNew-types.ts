@@ -33,6 +33,8 @@ export interface StitchMobileOrderNewProps {
   loading?: boolean;
   /** Error message if fetching fails */
   error?: string | null;
+  /** Optional map of category slug -> localized display label */
+  categoryLabels?: Record<string, string>;
   /** Placeholder image URL when a product card lacks an image */
   fallbackImage?: string;
   /** Called when the back button is pressed */

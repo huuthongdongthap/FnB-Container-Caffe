@@ -484,17 +484,29 @@ describe('Loyalty, Referrals, Inventory PO, Customer Events & Audit Cutover (202
       sqlite.exec(readFileSync(resolve(__dirname, '../../../db/migrations', migration), 'utf8'));
     }
 
-    const migration1124Up = readFileSync(
+    const migration1124_01Up = readFileSync(
       resolve(__dirname, '../../../db/migrations/20261124_01_orders_kds_prep_timestamps.sql'),
       'utf8'
     );
-    const migration1124Down = readFileSync(
+    const migration1124_01Down = readFileSync(
       resolve(__dirname, '../../../db/migrations/20261124_01_orders_kds_prep_timestamps.down.sql'),
       'utf8'
     );
-    sqlite.exec(migration1124Up);
-    sqlite.exec(migration1124Down);
-    sqlite.exec(migration1124Up);
+    sqlite.exec(migration1124_01Up);
+    sqlite.exec(migration1124_01Down);
+    sqlite.exec(migration1124_01Up);
+
+    const migration1124_03Up = readFileSync(
+      resolve(__dirname, '../../../db/migrations/20261124_03_leads_table.sql'),
+      'utf8'
+    );
+    const migration1124_03Down = readFileSync(
+      resolve(__dirname, '../../../db/migrations/20261124_03_leads_table.down.sql'),
+      'utf8'
+    );
+    sqlite.exec(migration1124_03Up);
+    sqlite.exec(migration1124_03Down);
+    sqlite.exec(migration1124_03Up);
 
     const canonicalSqlite = new DatabaseSync(':memory:');
     canonicalSqlite.exec(readFileSync(resolve(__dirname, '../../../schema.sql'), 'utf8'));
@@ -512,7 +524,7 @@ describe('Loyalty, Referrals, Inventory PO, Customer Events & Audit Cutover (202
     };
     const replicaSchema = getSchemaMap(sqlite);
     const canonicalSchema = getSchemaMap(canonicalSqlite);
-    expect(replicaSchema.tables).toHaveLength(139);
+    expect(replicaSchema.tables).toHaveLength(140);
     expect(replicaSchema.tables).toEqual(canonicalSchema.tables);
     expect(replicaSchema.map).toEqual(canonicalSchema.map);
 

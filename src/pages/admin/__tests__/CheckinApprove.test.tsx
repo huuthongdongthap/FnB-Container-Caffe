@@ -52,18 +52,45 @@ vi.mock('@/components/admin/checkin-row', () => ({
   ),
 }));
 
-// Offline deterministic data source: apiFetch rejects, hook falls back to MOCK_CHECKINS.
-// Real network timing previously made these tests hang past waitFor's 1s timeout.
+const FIXTURE_CHECKINS = [
+  {
+    id: 'C001',
+    memberId: 'M001',
+    memberName: 'Nguyen Van A',
+    memberPhone: '0901234567',
+    submittedAt: '2026-04-01T08:00:00.000Z',
+    status: 'pending' as const,
+  },
+  {
+    id: 'C002',
+    memberId: 'M002',
+    memberName: 'Tran Thi B',
+    memberPhone: '0902345678',
+    submittedAt: '2026-04-01T08:10:00.000Z',
+    status: 'pending' as const,
+  },
+  {
+    id: 'C003',
+    memberId: 'M003',
+    memberName: 'Le Van C',
+    memberPhone: '0903456789',
+    submittedAt: '2026-04-01T08:20:00.000Z',
+    status: 'pending' as const,
+  },
+];
+
 vi.mock('@/lib/api-client', () => ({
-  apiFetch: vi.fn().mockRejectedValue(new Error('network unavailable in test')),
+  apiFetch: vi.fn(),
   API_BASE: 'https://test.api.com',
 }));
 
+import { apiFetch } from '@/lib/api-client';
 import AdminCheckinApprovePage from '@/pages/admin/CheckinApprove';
 
 describe('AdminCheckinApprovePage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(apiFetch).mockResolvedValue({ checkins: FIXTURE_CHECKINS });
     useAuthStore.setState({ user: null });
   });
 
@@ -109,5 +136,16 @@ describe('AdminCheckinApprovePage', () => {
       expect(screen.getByText('Approve')).toBeTruthy();
       expect(screen.getByText('Reject')).toBeTruthy();
     });
+  });
+
+  it('shows error banner and Retry button with zero fake rows when apiFetch rejects', async () => {
+    vi.mocked(apiFetch).mockRejectedValueOnce(new Error('network unavailable in test'));
+    renderWithProviders(<AdminCheckinApprovePage />);
+    await waitFor(() => {
+      expect(screen.getByText('network unavailable in test')).toBeTruthy();
+      expect(screen.getByText('Retry')).toBeTruthy();
+    });
+    expect(screen.getByText('0 pending')).toBeTruthy();
+    expect(screen.queryByTestId('checkin-row-C001')).toBeNull();
   });
 });

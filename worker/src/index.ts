@@ -31,6 +31,7 @@ import { kdsStreamRouter } from '@aura/domain-kitchen';
 import { registerFeatureRoutes } from './routes/features-router';
 import { registerIntegrationRoutes } from './routes/integrations-router';
 import { subscriptionsRouter } from './routes/subscriptions';
+import { leadsRouter } from './routes/leads';
 
 // ── OpenAPI & Docs ──
 import { openApiApp } from './lib/openapi';
@@ -173,6 +174,7 @@ app.get('/sw-mobile.js', (c) => c.text('/* Service Worker at /sw-mobile.js — m
 
 // ── Domain Features & External Integrations ──
 app.route('/api/subscriptions', subscriptionsRouter);
+app.route('/api/leads', leadsRouter);
 registerFeatureRoutes(app);
 registerIntegrationRoutes(app);
 
