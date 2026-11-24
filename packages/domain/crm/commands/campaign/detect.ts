@@ -22,9 +22,18 @@ function rowMatchesTenant(row: unknown, tenantId?: string): boolean {
   return normalized === normTenant;
 }
 
-function isMissingSchemaError(err: unknown): boolean {
+function isMissingTableError(err: unknown): boolean {
   const msg = err instanceof Error ? err.message : String(err ?? '');
-  return /no such (table|column)/i.test(msg);
+  return /no such table/i.test(msg);
+}
+
+function isMissingColumnError(err: unknown): boolean {
+  const msg = err instanceof Error ? err.message : String(err ?? '');
+  return /no such column/i.test(msg);
+}
+
+function isMissingSchemaError(err: unknown): boolean {
+  return isMissingTableError(err) || isMissingColumnError(err);
 }
 
 /**
@@ -82,7 +91,7 @@ async function filterEligibleMarketingCandidates(
             .all<{ customer_id: string; granted?: number | boolean | null; revoked_at?: string | null }>();
           consentRows = res.results || [];
         } catch (err) {
-          if (isMissingSchemaError(err) && normTenant === 'default') {
+          if (isMissingColumnError(err) && normTenant === 'default') {
             const fallback = await db
               .prepare(
                 `SELECT customer_id, granted, revoked_at FROM consents
@@ -122,7 +131,7 @@ async function filterEligibleMarketingCandidates(
         }
       }
     } catch (err) {
-      if (!isMissingSchemaError(err)) {
+      if (!isMissingTableError(err)) {
         for (const id of batch) excludedIds.add(id);
       }
     }
