@@ -26,6 +26,7 @@ export { creditLoyaltyIfEligible } from './policies/loyalty-trigger';
 export { restoreLoyaltyVoucherForOrder } from './loyalty-voucher';
 export { releaseTableIfNoActiveOrders } from './policies/table-occupancy-release';
 export { calculateOrderSnapshot } from './policies/order-snapshot';
+export { VOID_STATUSES, isVoidStatus } from './policies/order-status-transition';
 export { canActorTransition, toActorRole } from './policies/transition-authorization';
 export type { ActorRole } from './policies/transition-authorization';
 export {

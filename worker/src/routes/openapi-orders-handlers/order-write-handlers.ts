@@ -3,7 +3,7 @@ import type { Context } from 'hono';
 import type { Env } from '../../types/env';
 import { OrderRoutes } from '../../schemas/orders';
 import { formatCustomerOrder, formatOrder, fetchOrderItemsAndPayments, resolveOpenApiOrdersTenant } from './helpers';
-import { canTransition, isTerminal, canActorTransition, toActorRole, publishOrderEvent } from '@aura/domain-order';
+import { canTransition, isTerminal, canActorTransition, toActorRole, publishOrderEvent, isVoidStatus } from '@aura/domain-order';
 import { executeKdsStatusTransition } from '@aura/domain-kitchen';
 import { canAccessOrder } from '@aura/domain-customer';
 import { createOrderFromAlias } from '../../../../packages/domain/order/commands/create-order-alias';
@@ -13,7 +13,7 @@ import { fetchOrderForRead } from './order-read-handlers';
 
 export { handleCancelOrder };
 
-const ORDER_STAFF_ROLES = ['owner', 'manager', 'supervisor', 'admin', 'cashier', 'waiter', 'staff'];
+const ORDER_STAFF_ROLES = ['owner', 'manager', 'supervisor', 'admin', 'cashier', 'waiter', 'staff', 'rider'];
 
 function matchesOrderTenant(row: Record<string, unknown>, tenantId: string): boolean {
   return matchesTenantRow(row, tenantId);
@@ -133,14 +133,14 @@ export async function handleOpenApiUpdateOrder(c: Context<{ Bindings: Env }>) {
   const normalizedActorRole = String(user?.role || '').trim().toLowerCase();
   const canCompensatePaid = ['owner', 'admin', 'manager', 'supervisor'].includes(normalizedActorRole);
   if (
-    body.status === 'cancelled' &&
-    existing.status !== 'cancelled' &&
+    isVoidStatus(body.status) &&
+    existing.status !== body.status &&
     !canCompensatePaid &&
     String(existing.payment_status || '').trim().toLowerCase() === 'paid'
   ) {
     return c.json({ success: false, error: 'Paid order cannot be cancelled; initiate a refund instead' }, 409);
   }
-  if (body.status === 'cancelled' && existing.status !== 'cancelled' && (await hasIssuedEInvoice(db, id))) {
+  if (isVoidStatus(body.status) && existing.status !== body.status && (await hasIssuedEInvoice(db, id))) {
     return c.json({
       success: false,
       code: 'EINVOICE_ADJUSTMENT_REQUIRED',
@@ -183,9 +183,10 @@ export async function handleOpenApiUpdateOrder(c: Context<{ Bindings: Env }>) {
       const authCheck = canActorTransition(toActorRole(user?.role), existing.status, body.status);
       if (!authCheck.ok) return c.json({ success: false, error: authCheck.error }, 403);
 
-      if (body.status === 'cancelled') {
+      if (isVoidStatus(body.status)) {
         const preCancelStatus = String(existing.status ?? '');
-        const transition = await executeKdsStatusTransition(db, id, 'cancelled', user?.role, {
+        const voidStatus = String(body.status);
+        const transition = await executeKdsStatusTransition(db, id, voidStatus, user?.role, {
           tenantId: user?.role === 'customer' ? (rawExistingTenant || 'default') : (tenantId === '*' ? (rawExistingTenant || 'default') : tenantId),
           kv: c.env?.AUTH_KV,
           env: c.env as unknown as Record<string, unknown>,

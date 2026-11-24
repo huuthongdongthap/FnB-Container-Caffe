@@ -42,7 +42,7 @@ async function recordWasteLog(env: Env, orderId: string, tenant: string, ingredi
 const inFlightOrderRestorations = new Map<string, Promise<void>>();
 
 /** Statuses after which ingredients were already brewed or plated, so cancelling cannot return them to clean stock. */
-const POST_PREP_STATUSES = new Set(['preparing', 'ready', 'served', 'completed']);
+const POST_PREP_STATUSES = new Set(['preparing', 'ready', 'delivering', 'delivered', 'served', 'completed']);
 
 function isPostPrepStatus(status?: string): boolean {
   return POST_PREP_STATUSES.has(String(status ?? '').trim().toLowerCase());

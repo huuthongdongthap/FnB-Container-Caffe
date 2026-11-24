@@ -23,6 +23,12 @@ export const ISSUED_EINVOICE_CANCEL_ERROR = 'Cannot cancel an order with an issu
 
 const ISSUED_INVOICE_SYNC_STATUSES = ['synced', 'submitted', 'issued', 'completed'] as const;
 
+/** Terminal void statuses share the same money/invoice/rollback obligations. */
+export const VOID_STATUSES = ['cancelled', 'failed', 'expired'] as const;
+export function isVoidStatus(status: unknown): boolean {
+  return (VOID_STATUSES as readonly string[]).includes(String(status ?? '').trim().toLowerCase());
+}
+
 export async function hasIssuedEInvoiceForOrder(db: OrderStatusDb, orderId: string): Promise<boolean> {
   const placeholders = ISSUED_INVOICE_SYNC_STATUSES.map(() => '?').join(', ');
   const queries: Array<{ sql: string; binds: unknown[] }> = [
@@ -197,7 +203,7 @@ export async function transitionOrderStatus(
     }
   }
 
-  if (targetStatus === 'cancelled' && !isNoOp) {
+  if (isVoidStatus(targetStatus) && !isNoOp) {
     const canProbeIssuedInvoice =
       !options.currentOrder ||
       'payment_status' in options.currentOrder ||
