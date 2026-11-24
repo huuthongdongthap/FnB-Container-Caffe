@@ -139,7 +139,8 @@ function computeNextAction(
 
   const method = (ao.paymentMethod ?? '').toLowerCase();
   const isCod = method === 'cod' || method === 'cash';
-  const isPrepaidOnline = method === 'payos' || method === 'bank_transfer' || method === 'qr';
+  const isPrepaidOnline =
+    method === 'payos' || method === 'bank_transfer' || method === 'qr' || method === 'vietqr';
   const requiresPrepayment = isPrepaidOnline || (orderType === 'delivery' && !isCod);
   const isUnpaid = ao.paymentStatus !== 'paid' && ao.paymentStatus !== 'completed';
   const unpaidWarning =
@@ -506,10 +507,21 @@ export default function AdminOrdersPage() {
           ...(regenerate ? { regenerate: true } : {}),
         }),
       });
-      const url = res.payment_url || res.checkout_url || res.checkoutUrl || res.data?.checkoutUrl || res.data?.payment_url || null;
+      const rawUrl = res.payment_url || res.checkout_url || res.checkoutUrl || res.data?.checkoutUrl || res.data?.payment_url || null;
+      let url: string | null = null;
+      if (rawUrl) {
+        try {
+          const parsed = new URL(rawUrl, window.location.origin);
+          if (parsed.protocol === 'https:' || parsed.protocol === 'http:') {
+            url = parsed.toString();
+          }
+        } catch {
+          url = null;
+        }
+      }
       const emvco = res.qrCode || res.qr_code || res.data?.qrCode || null;
       if (!url) {
-        setQrError('Không nhận được liên kết thanh toán PayOS.');
+        setQrError('Không nhận được liên kết thanh toán PayOS hợp lệ.');
         return;
       }
       setQrCheckoutUrl(url);

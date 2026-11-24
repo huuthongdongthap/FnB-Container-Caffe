@@ -172,8 +172,10 @@ export async function transitionOrderStatus(
             statusCode: 409,
           };
         }
-      } catch {
-        // Minimal schema fallback
+      } catch (err) {
+        if (!/no such column:\s*payment_status\b/i.test(String(err))) {
+          throw err;
+        }
       }
     }
   }
@@ -208,7 +210,8 @@ export async function transitionOrderStatus(
       const rawPaymentStatus =
         typeof paymentRow?.payment_status === 'string' ? paymentRow.payment_status.trim().toLowerCase() : '';
       const isCodDelivery = method === 'cod' || Number(paymentRow?.is_cod ?? 0) === 1;
-      const isPrepaidOnline = method === 'payos' || method === 'bank_transfer' || method === 'qr';
+      const isPrepaidOnline =
+        method === 'payos' || method === 'bank_transfer' || method === 'qr' || method === 'vietqr';
       if (isPrepaidOnline && rawPaymentStatus && rawPaymentStatus !== 'paid') {
         return {
           success: false,
@@ -281,11 +284,19 @@ export async function transitionOrderStatus(
   if (closingOrder) {
     // Check persisted settlement in the same write that would close the order.
     const paid = "LOWER(TRIM(COALESCE(payment_status, ''))) = 'paid'";
+    const notRefunded = "LOWER(TRIM(COALESCE(payment_status, ''))) <> 'refunded'";
     try {
-      result = await updateStatus(` AND (LOWER(TRIM(COALESCE(payment_method, ''))) NOT IN ('cash', 'cod') OR ${paid})`);
+      result = await updateStatus(` AND ${notRefunded} AND (LOWER(TRIM(COALESCE(payment_method, ''))) NOT IN ('cash', 'cod') OR ${paid})`);
     } catch (error) {
       if (!/no such column:\s*payment_method\b/i.test(String(error))) throw error;
-      result = await updateStatus(` AND (COALESCE(is_cod, 0) <> 1 OR ${paid})`);
+      result = await updateStatus(` AND ${notRefunded} AND (COALESCE(is_cod, 0) <> 1 OR ${paid})`);
+    }
+  } else if (forwardStatuses.has(targetStatus)) {
+    try {
+      result = await updateStatus(" AND LOWER(TRIM(COALESCE(payment_status, ''))) <> 'refunded'");
+    } catch (error) {
+      if (!/no such column:\s*payment_status\b/i.test(String(error))) throw error;
+      result = await updateStatus();
     }
   } else {
     result = await updateStatus();

@@ -145,8 +145,12 @@ export async function updateOrder(
           ? " AND (tenant_id = ? OR tenant_id IS NULL OR tenant_id = '')"
           : ' AND tenant_id = ?';
       const updateTenantBinds = loadedOrderTenant === '*' ? [] : [loadedOrderTenant];
+      const paymentStatusGuard =
+        body.payment_method !== undefined
+          ? " AND LOWER(TRIM(COALESCE(payment_status, ''))) NOT IN ('paid', 'completed', 'refunded', 'partially_refunded')"
+          : '';
       const result = await db.prepare(
-        `UPDATE orders SET ${fields.map(field => `${field} = ?`).join(', ')}, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND status = ?${updateTenantClause}`,
+        `UPDATE orders SET ${fields.map(field => `${field} = ?`).join(', ')}, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND status = ?${updateTenantClause}${paymentStatusGuard}`,
       ).bind(...fields.map(field => body[field]), id, results[0].status, ...updateTenantBinds).run();
       if (changedRows(result) < 1) return errorResponse('Order changed concurrently; refresh and retry', 409);
     }

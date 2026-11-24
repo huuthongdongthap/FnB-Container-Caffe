@@ -1,4 +1,4 @@
-export const PREPAID_ONLINE_METHODS = new Set(['payos', 'bank_transfer', 'qr']);
+export const PREPAID_ONLINE_METHODS = new Set(['payos', 'bank_transfer', 'qr', 'vietqr']);
 
 /**
  * Kitchen must never brew an order whose money has not arrived or that is an

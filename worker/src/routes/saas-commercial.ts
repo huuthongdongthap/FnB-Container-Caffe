@@ -568,6 +568,7 @@ export function createSaasCommercialRoutes() {
   router.use('/branding', requireAuth(), tenantMiddleware);
   router.use('/payment-config/*', requireAuth(), tenantMiddleware);
   router.use('/payment-config', requireAuth(), tenantMiddleware);
+  router.use('/payment-info', requireAuth(), tenantMiddleware);
   router.use('/domains/*', requireAuth(), tenantMiddleware);
   router.use('/domains', requireAuth(), tenantMiddleware);
   router.use('/billing/status', requireAuth(), tenantMiddleware);
