@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import { apiFetch } from '@/lib/api-client';
 import { isSameSessionSnapshot, readSessionSnapshot, subscribeSessionChange } from '@/lib/client-session';
 import { KitchenOrder, KitchenStation } from './kitchen-display-types';
@@ -11,12 +12,12 @@ import {
 } from './kitchen-display-styles';
 
 /* ── Station filter config ── */
-const STATIONS: { key: KitchenStation; label: string; emoji: string }[] = [
-  { key: 'all', label: 'Tất cả', emoji: '📋' },
-  { key: 'espresso', label: 'Espresso', emoji: '☕' },
-  { key: 'food', label: 'Đồ ăn', emoji: '🍽️' },
-  { key: 'pastry', label: 'Bánh', emoji: '🥐' },
-  { key: 'cold', label: 'Đồ lạnh', emoji: '🧊' },
+const STATIONS: { key: KitchenStation; labelKey: string; defaultLabel: string; emoji: string }[] = [
+  { key: 'all', labelKey: 'kds.mobileAll', defaultLabel: 'Tất cả', emoji: '📋' },
+  { key: 'espresso', labelKey: 'kds.mobileEspresso', defaultLabel: 'Espresso', emoji: '☕' },
+  { key: 'food', labelKey: 'kds.mobileFood', defaultLabel: 'Đồ ăn', emoji: '🍽️' },
+  { key: 'pastry', labelKey: 'kds.mobilePastry', defaultLabel: 'Bánh', emoji: '🥐' },
+  { key: 'cold', labelKey: 'kds.mobileCold', defaultLabel: 'Đồ lạnh', emoji: '🧊' },
 ];
 
 const STATION_KEYWORDS: Record<Exclude<KitchenStation, 'all'>, string[]> = {
@@ -63,6 +64,7 @@ const STATION_COLORS: Record<KitchenStation, string> = {
 };
 
 export default function KitchenDisplay() {
+  const { t } = useTranslation();
   const [orders, setOrders] = useState<KitchenOrder[]>([]);
   const [loading, setLoading] = useState(true);
   const [pendingOrders, setPendingOrders] = useState<Record<string, boolean>>({});
@@ -71,6 +73,7 @@ export default function KitchenDisplay() {
   >({});
   const [error, setError] = useState<string | null>(null);
   const [activeStation, setActiveStation] = useState<KitchenStation>('all');
+  const [dismissedCancelledIds, setDismissedCancelledIds] = useState<Set<string>>(() => new Set());
   const pollRef = useRef<ReturnType<typeof setInterval>>(null);
   const abortRef = useRef<AbortController | null>(null);
   const requestSeqRef = useRef(0);
@@ -124,6 +127,7 @@ export default function KitchenDisplay() {
       inFlightRef.current.clear();
       setPendingOrders({});
       setMutationErrors({});
+      setDismissedCancelledIds(new Set());
       setLoading(true);
       void fetchOrders();
     });
@@ -171,7 +175,9 @@ export default function KitchenDisplay() {
     }
   }, [fetchOrders]);
 
-  const cancelledOrders = orders.filter((o) => o.status === 'cancelled');
+  const cancelledOrders = orders.filter(
+    (o) => o.status === 'cancelled' && !dismissedCancelledIds.has(o.id),
+  );
   const activeOrders = orders.filter((o) => o.status !== 'served' && o.status !== 'cancelled');
   const filteredOrders = activeStation === 'all'
     ? activeOrders
@@ -215,7 +221,7 @@ export default function KitchenDisplay() {
               }}
             >
               <span>{s.emoji}</span>
-              <span>{s.label}</span>
+              <span>{t(s.labelKey, s.defaultLabel)}</span>
               {count > 0 && (
                 <span style={{
                   minWidth: 18, height: 18, borderRadius: 9,
@@ -244,25 +250,61 @@ export default function KitchenDisplay() {
             borderRadius: 10,
             color: '#FECACA',
             fontSize: 13,
+            display: 'flex',
+            flexWrap: 'wrap',
+            alignItems: 'flex-start',
+            justifyContent: 'space-between',
+            gap: 10,
           }}
         >
-          <div style={{ fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-            ĐÃ HỦY — DỪNG PHA CHẾ ({cancelledOrders.length})
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+              {t('kds.cancelledBanner', {
+                count: cancelledOrders.length,
+                defaultValue: `ĐÃ HỦY — DỪNG PHA CHẾ (${cancelledOrders.length})`,
+              })}
+            </div>
+            <div style={{ marginTop: 6, display: 'flex', flexWrap: 'wrap', gap: 8, fontSize: 12 }}>
+              {cancelledOrders.map((c) => {
+                const label = c.order_type === 'delivery'
+                  ? t('kds.delivery', 'Giao hàng')
+                  : c.table_name
+                    ? t('kds.tablePrefix', { table: c.table_name, defaultValue: `Bàn ${c.table_name}` })
+                    : t('kds.togo', 'Mang đi');
+                const displayId = c.order_number ? c.order_number.replace(/^#/, '') : c.id.slice(-4);
+                return (
+                  <span key={c.id} style={{ textDecoration: 'line-through' }}>
+                    #{displayId} ({label}): {c.items.map((i) => `${i.quantity}x ${i.name}`).join(', ')}
+                  </span>
+                );
+              })}
+            </div>
           </div>
-          <div style={{ marginTop: 6, display: 'flex', flexWrap: 'wrap', gap: 8, fontSize: 12 }}>
-            {cancelledOrders.map((c) => {
-              const label = c.table_name
-                ? `Bàn ${c.table_name}`
-                : c.order_type === 'delivery'
-                  ? 'Giao hàng'
-                  : 'Mang đi';
-              return (
-                <span key={c.id} style={{ textDecoration: 'line-through' }}>
-                  #{c.id.slice(-4)} ({label}): {c.items.map((i) => `${i.quantity}x ${i.name}`).join(', ')}
-                </span>
-              );
-            })}
-          </div>
+          <button
+            type="button"
+            onClick={() =>
+              setDismissedCancelledIds((prev) => {
+                const next = new Set(prev);
+                for (const c of cancelledOrders) next.add(c.id);
+                return next;
+              })
+            }
+            style={{
+              flexShrink: 0,
+              padding: '6px 12px',
+              borderRadius: 6,
+              border: '1px solid rgba(254, 202, 202, 0.5)',
+              background: 'transparent',
+              color: '#FECACA',
+              fontSize: 12,
+              fontWeight: 700,
+              textTransform: 'uppercase',
+              letterSpacing: '0.04em',
+              cursor: 'pointer',
+            }}
+          >
+            {t('kds.dismiss', 'Đã hiểu')}
+          </button>
         </div>
       )}
 
@@ -278,14 +320,14 @@ export default function KitchenDisplay() {
       {activeOrders.length === 0 && !loading && (
         <div style={empty}>
           <div style={{ fontSize: 40, marginBottom: 8 }}>🍳</div>
-          <div>Không có đơn / No orders</div>
+          <div>{t('kds.mobileNoOrders', 'Không có đơn / No orders')}</div>
         </div>
       )}
 
       {activeOrders.length > 0 && filteredOrders.length === 0 && !loading && (
         <div style={empty}>
           <div style={{ fontSize: 40, marginBottom: 8 }}>🔍</div>
-          <div>Không có đơn cho trạm này / No orders for this station</div>
+          <div>{t('kds.mobileNoOrdersStation', 'Không có đơn cho trạm này / No orders for this station')}</div>
         </div>
       )}
 

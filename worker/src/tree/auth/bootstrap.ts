@@ -23,7 +23,7 @@ export async function bootstrapOwner(request: Request, env: Record<string, unkno
       return jsonResponse({
         success: false,
         error: 'Owner đã tồn tại — bootstrap chỉ chạy được khi chưa có owner nào.',
-        hint: 'Login với owner hiện có. Nếu quên mật khẩu, đặt RESET_KEY secret rồi gọi /api/auth/reset-password'
+        hint: 'Login với owner hiện có. Nếu quên mật khẩu, đặt RESET_KEY secret rồi gọi /api/auth/operator-reset-password'
       }, 409);
     }
 
@@ -33,9 +33,10 @@ export async function bootstrapOwner(request: Request, env: Record<string, unkno
       const first = parsed.error.issues[0];
       return errorResponse(first.message, 400);
     }
-    const { email, password, name } = parsed.data;
+    const { email: rawEmail, password, name } = parsed.data;
+    const email = rawEmail.trim().toLowerCase();
 
-    const existingUser = await authKV.get(`user:${email}`);
+    const existingUser = (await authKV.get(`user:${email}`)) || (rawEmail !== email ? await authKV.get(`user:${rawEmail}`) : null);
     if (existingUser) {
       return errorResponse(
         'Email này đã đăng ký với role khác (customer/staff). Dùng email khác hoặc xoá account cũ qua wrangler kv.',

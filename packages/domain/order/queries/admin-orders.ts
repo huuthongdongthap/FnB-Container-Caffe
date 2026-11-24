@@ -164,16 +164,18 @@ export async function getAdminOrders(request: Request, env: Record<string, unkno
        o.order_type, o.customer_address, o.notes, o.delivery_time,
        COALESCE(o.payment_method, p.method) AS payment_method,
        t.table_number AS table_number, t.zone AS table_zone,
-       p.id AS payment_id, p.refund_status, p.refund_amount, p.amount AS payment_amount, p.transaction_id AS payment_transaction_id
+       p.id AS payment_id, p.status AS payment_attempt_status, p.payment_url, p.refund_status, p.refund_amount, p.amount AS payment_amount, p.transaction_id AS payment_transaction_id
      FROM orders o
      LEFT JOIN cafe_tables t ON t.id = o.table_id
        AND COALESCE(NULLIF(TRIM(t.tenant_id), ''), 'default') = COALESCE(NULLIF(TRIM(o.tenant_id), ''), 'default')
      LEFT JOIN payments p ON p.id = (
        SELECT p2.id FROM payments p2
        WHERE p2.order_id = o.id
-         AND p2.status IN ('paid', 'completed', 'refunded', 'partially_refunded')
          AND COALESCE(NULLIF(TRIM(p2.tenant_id), ''), 'default') = COALESCE(NULLIF(TRIM(o.tenant_id), ''), 'default')
-       ORDER BY p2.created_at DESC, p2.rowid DESC
+       ORDER BY
+         CASE WHEN p2.status IN ('paid', 'completed', 'refunded', 'partially_refunded') THEN 0 ELSE 1 END ASC,
+         p2.created_at DESC,
+         p2.rowid DESC
        LIMIT 1
      )
      WHERE 1=1${fullClause}${tail}`;
@@ -188,14 +190,16 @@ export async function getAdminOrders(request: Request, env: Record<string, unkno
       try {
         const legacyJoinQuery = `SELECT o.id, o.table_id, o.status, o.total, o.payment_status, o.customer_name, o.customer_phone, o.created_at,
            o.items, o.shipping_fee, o.discount,
-           p.id AS payment_id, p.method AS payment_method, p.refund_status, p.refund_amount, p.amount AS payment_amount
+           p.id AS payment_id, p.status AS payment_attempt_status, p.method AS payment_method, p.refund_status, p.refund_amount, p.amount AS payment_amount
          FROM orders o
          LEFT JOIN payments p ON p.id = (
            SELECT p2.id FROM payments p2
            WHERE p2.order_id = o.id
-             AND p2.status IN ('paid', 'completed', 'refunded', 'partially_refunded')
              AND COALESCE(NULLIF(TRIM(p2.tenant_id), ''), 'default') = COALESCE(NULLIF(TRIM(o.tenant_id), ''), 'default')
-           ORDER BY p2.created_at DESC, p2.rowid DESC
+           ORDER BY
+             CASE WHEN p2.status IN ('paid', 'completed', 'refunded', 'partially_refunded') THEN 0 ELSE 1 END ASC,
+             p2.created_at DESC,
+             p2.rowid DESC
            LIMIT 1
          )
          WHERE 1=1${fallbackClause}${tail}`;

@@ -3,7 +3,7 @@
 import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { useMobileAuth } from '@/hooks/use-mobile-auth';
 import { apiFetch } from '@/lib/api-client';
-import type { TableInfo, MobileOrder, OrderItem } from './waiter-orders-types';
+import type { TableInfo, MobileOrder, OrderItem, WaiterMenuItem } from './waiter-orders-types';
 import {
   wrap, header, headerTitle, tabBar, tableGrid, orderCard,
   empty, fab, orderHeader, orderTable, orderTime, orderItem,
@@ -22,6 +22,7 @@ export default function WaiterOrders() {
   const [tab, setTab] = useState<'orders' | 'tables'>('orders');
   const [rawOrders, setRawOrders] = useState<MobileOrder[]>([]);
   const [tables, setTables] = useState<TableInfo[]>([]);
+  const [menuItems, setMenuItems] = useState<WaiterMenuItem[]>([]);
   const [showNewOrder, setShowNewOrder] = useState(false);
   const [selectedTableId, setSelectedTableId] = useState('');
   const [newOrderItems, setNewOrderItems] = useState<OrderItem[]>([{ name: '', quantity: 1, price: 0, note: '' }]);
@@ -60,12 +61,29 @@ export default function WaiterOrders() {
     }));
   }, [rawOrders, tables]);
 
+  const fetchMenu = useCallback(async () => {
+    try {
+      const body = await apiFetch<{
+        success?: boolean;
+        products?: Array<{ id?: string; name?: string; price?: number }>;
+        data?: Array<{ id?: string; name?: string; price?: number }>;
+      }>('/api/products');
+      const list = Array.isArray(body.products) ? body.products : Array.isArray(body.data) ? body.data : [];
+      setMenuItems(
+        list
+          .filter((p): p is { id: string; name: string; price?: number } => Boolean(p?.id && p?.name))
+          .map((p) => ({ id: String(p.id), name: String(p.name), price: Number(p.price ?? 0) }))
+      );
+    } catch { /* silent */ }
+  }, [token, user?.id, user?.tenantId]);
+
   useEffect(() => {
     setRawOrders([]);
     setTables([]);
     void fetchTables();
     void fetchOrders();
-  }, [fetchTables, fetchOrders]);
+    void fetchMenu();
+  }, [fetchTables, fetchOrders, fetchMenu]);
 
   const submitOrder = useCallback(async () => {
     if (submittingRef.current) return;
@@ -74,11 +92,8 @@ export default function WaiterOrders() {
     const validItems = newOrderItems.filter((i) => i.name.trim());
     if (validItems.length === 0) return;
     const selectedTable = tables.find((t) => String(t.id) === newOrderTable) as (TableInfo & { number?: number }) | undefined;
-    const resolvedTableId =
-      Number.isFinite(Number(newOrderTable)) &&
-      String(parseInt(newOrderTable, 10)) === newOrderTable
-        ? parseInt(newOrderTable, 10)
-        : newOrderTable;
+    const resolvedTableId = String(selectedTable?.id ?? newOrderTable);
+    const menuByName = new Map(menuItems.map((m) => [m.name.trim().toLowerCase(), m]));
     submittingRef.current = true;
     setSubmitting(true);
     setSubmitError(null);
@@ -93,9 +108,17 @@ export default function WaiterOrders() {
         body: JSON.stringify({
           table_id: resolvedTableId,
           table_number: selectedTable?.number ?? selectedTable?.table_number,
-          items: validItems.map((i) => ({
-            name: i.name, quantity: i.quantity, price: i.price, note: i.note || undefined,
-          })),
+          items: validItems.map((i) => {
+            const matched = menuByName.get(i.name.trim().toLowerCase());
+            const resolvedProductId = i.product_id || i.id || matched?.id || i.name.trim().toLowerCase().replace(/\s+/g, '-');
+            return {
+              product_id: resolvedProductId,
+              name: i.name.trim(),
+              quantity: i.quantity,
+              price: i.price || matched?.price || 0,
+              note: i.note || undefined,
+            };
+          }),
         }),
       });
       if (body.success) {
@@ -199,9 +222,18 @@ export default function WaiterOrders() {
 
       {showNewOrder && (
         <NewOrderModal
-          tables={tables} selectedTableId={selectedTableId} setSelectedTableId={setSelectedTableId}
-          newOrderItems={newOrderItems} updateItem={updateItem} addItem={addItem} removeItem={removeItem}
-          submitting={submitting} submitOrder={submitOrder} onClose={() => setShowNewOrder(false)}
+          tables={tables}
+          menuItems={menuItems}
+          selectedTableId={selectedTableId}
+          setSelectedTableId={setSelectedTableId}
+          newOrderItems={newOrderItems}
+          updateItem={updateItem}
+          addItem={addItem}
+          removeItem={removeItem}
+          submitting={submitting}
+          submitError={submitError}
+          submitOrder={submitOrder}
+          onClose={() => setShowNewOrder(false)}
         />
       )}
     </div>

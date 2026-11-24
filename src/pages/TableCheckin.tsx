@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 function useQueryParams() {
   const [params, setParams] = useState<URLSearchParams>(() => new URLSearchParams(window.location.search));
   useEffect(() => {
@@ -11,19 +12,16 @@ function useQueryParams() {
   return params;
 }
 
-function navigate(path: string) { window.location.href = path; }
-
 import { useTranslation } from 'react-i18next';
 import { HelmetHead } from '@/components/seo/HelmetHead';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { apiFetch } from '@/lib/api-client';
-import { captureGuestOrderTokenFromResponse } from '@/lib/guest-order-token';
 
 export default function TableCheckinPage() {
   const { t: _t } = useTranslation();
-   const search = useQueryParams();
- const tableSlug = search.get('table') || '';
+  const navigate = useNavigate();
+  const search = useQueryParams();
+  const tableSlug = search.get('table') || '';
 
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
@@ -47,18 +45,19 @@ export default function TableCheckinPage() {
 
     setLoading(true);
     try {
-      const body = await apiFetch<{ success: boolean; order_token?: string; data?: { id?: string; order_token?: string }; error?: string }>('/api/orders/guest-checkin', {
-        method: 'POST',
-        body: JSON.stringify({ customer_name: name.trim(), customer_phone: phone.trim(), table_id: tableSlug }),
-      });
-      if (!body.success) {
-        setError(body.error || 'Không thể xác nhận. Vui lòng thử lại.');
-        setLoading(false);
-        return;
+      const trimmedName = name.trim();
+      const trimmedPhone = phone.trim();
+      try {
+        localStorage.setItem(
+          'aura_saved_customer',
+          JSON.stringify({ fullName: trimmedName, phone: trimmedPhone }),
+        );
+      } catch {
+        /* ignore storage errors */
       }
-      captureGuestOrderTokenFromResponse(body);
-      const orderId = body.data?.id;
-      navigate(`/order?table=${encodeURIComponent(tableSlug)}${orderId ? '&orderId=' + encodeURIComponent(orderId) : ''}`);
+      navigate(`/order?table=${encodeURIComponent(tableSlug)}`, {
+        state: { guestName: trimmedName, guestPhone: trimmedPhone },
+      });
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Lỗi kết nối. Vui lòng thử lại.';
       setError(message);

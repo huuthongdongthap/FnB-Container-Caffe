@@ -238,6 +238,35 @@ export function registerStaffHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
       rawRows = rows.results || [];
     }
 
+    const typedRows = rawRows as Array<Record<string, unknown> & { id?: string; email?: string | null }>;
+    const missingEmailIds = typedRows
+      .filter((r) => !String(r?.email || '').trim() && r?.id)
+      .map((r) => String(r.id));
+    if (missingEmailIds.length > 0) {
+      try {
+        const placeholders = missingEmailIds.map(() => '?').join(', ');
+        const idRows = (await db
+          .prepare(`SELECT staff_id, email FROM staff_login_identities WHERE staff_id IN (${placeholders})`)
+          .bind(...missingEmailIds)
+          .all()) as { results?: Array<{ staff_id: string; email?: string | null }> };
+        const emailById = new Map<string, string>();
+        for (const row of idRows.results || []) {
+          if (row?.staff_id && row?.email) {
+            emailById.set(row.staff_id, row.email);
+          }
+        }
+        if (emailById.size > 0) {
+          rawRows = typedRows.map((r) =>
+            !String(r?.email || '').trim() && emailById.has(String(r.id))
+              ? { ...r, email: emailById.get(String(r.id)) }
+              : r
+          );
+        }
+      } catch {
+        // Ignore when staff_login_identities table is absent in minimal test schemas
+      }
+    }
+
     const caller = c.get('user');
     const canViewUnmaskedPii = Boolean(
       caller?.role && ['owner', 'admin', 'manager'].includes(String(caller.role).toLowerCase())
@@ -288,6 +317,19 @@ export function registerStaffHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
 
     if (!staff) {
       return c.json({ success: false, error: 'Staff not found' }, 404);
+    }
+    if (!String(staff.email || '').trim()) {
+      try {
+        const identity = await db
+          .prepare('SELECT email FROM staff_login_identities WHERE staff_id = ? LIMIT 1')
+          .bind(id)
+          .first<{ email?: string | null }>();
+        if (identity?.email) {
+          staff = { ...staff, email: identity.email };
+        }
+      } catch {
+        // Ignore when staff_login_identities table is absent in minimal test schemas
+      }
     }
 
     const targetStaffTenant = (account.account.tenant_id || '').trim() || 'default';
@@ -349,7 +391,7 @@ export function registerStaffHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
     if (!['owner', 'manager', 'admin'].includes(user?.role)) {
       return c.json({ success: false, error: 'Không đủ quyền tạo tài khoản nhân viên' }, 403);
     }
-    if (body.role === 'owner' && user?.role !== 'owner' && user?.role !== 'admin') {
+    if (body.role === 'owner' && user?.role !== 'owner' && !isHQSuperAdmin(user)) {
       return c.json({ success: false, error: 'Only owners can create owner accounts' }, 403);
     }
     if (body.role === 'admin' && user?.role !== 'admin') {
@@ -425,20 +467,21 @@ export function registerStaffHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
     }
 
     // Check if email exists within the target tenant
+    const normalizedEmail = String(body.email || '').trim().toLowerCase();
     let existing: Record<string, unknown> | null = null;
     try {
       existing = await db
         .prepare(
-          "SELECT id, tenant_id FROM users WHERE email = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
+          "SELECT id, tenant_id FROM users WHERE LOWER(email) = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
         )
-        .bind(body.email, staffTenant)
+        .bind(normalizedEmail, staffTenant)
         .first<Record<string, unknown>>();
     } catch {
       if (staffTenant === 'default') {
         try {
           const unscopedEmail = await db
-            .prepare('SELECT id, tenant_id FROM users WHERE email = ?')
-            .bind(body.email)
+            .prepare('SELECT id, tenant_id FROM users WHERE LOWER(email) = ?')
+            .bind(normalizedEmail)
             .first<Record<string, unknown>>();
           if (unscopedEmail && matchesTenantRow(unscopedEmail, staffTenant)) {
             existing = unscopedEmail;
@@ -446,8 +489,8 @@ export function registerStaffHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
         } catch {
           try {
             const legacyEmail = await db
-              .prepare('SELECT id FROM users WHERE email = ?')
-              .bind(body.email)
+              .prepare('SELECT id FROM users WHERE LOWER(email) = ?')
+              .bind(normalizedEmail)
               .first<Record<string, unknown>>();
             if (legacyEmail && matchesTenantRow(legacyEmail, staffTenant)) {
               existing = legacyEmail;
@@ -510,15 +553,16 @@ export function registerStaffHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
     const passwordHash = await hashPassword(body.password);
     const id = crypto.randomUUID();
 
-    if (!await createStaffIdentity(c.env, { id, name: body.name, email: body.email,
+    if (!await createStaffIdentity(c.env, { id, name: body.name, email: normalizedEmail,
       phone: body.phone || '', role: body.role, tenant_id: staffTenant,
       password: passwordHash, active: body.isActive !== false })) {
       return c.json({ success: false, error: 'Email already exists' }, 409);
     }
+    await db.prepare('UPDATE users SET email = ? WHERE id = ?').bind(normalizedEmail, id).run().catch(() => {});
     if (c.env.AUTH_KV) {
-      const credential = JSON.stringify({ id, name: body.name, email: body.email, role: body.role,
+      const credential = JSON.stringify({ id, name: body.name, email: normalizedEmail, role: body.role,
         phone: body.phone || '', password: passwordHash, tenant_id: staffTenant, active: body.isActive !== false, auth_version: 1 });
-      await c.env.AUTH_KV.put(`user:${body.email}`, credential).catch(() => {});
+      await c.env.AUTH_KV.put(`user:${normalizedEmail}`, credential).catch(() => {});
       await c.env.AUTH_KV.put(`user:${id}`, credential).catch(() => {});
     }
 
@@ -542,9 +586,10 @@ export function registerStaffHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
     return c.json({
       success: true,
       data: {
+        ...created,
         id,
-        name: body.name,
-        email: created?.email ?? body.email,
+        name: created?.name ?? body.name,
+        email: created?.email || normalizedEmail,
         phone: created?.phone ?? body.phone ?? null,
         role: created?.role ?? body.role,
         tenant_id: staffTenant,
@@ -553,7 +598,6 @@ export function registerStaffHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
         hireDate: created?.hire_date ?? body.hireDate ?? now.slice(0, 10),
         createdAt: created?.created_at ?? now,
         updatedAt: created?.updated_at ?? now,
-        ...created,
       },
     }, 201);
   });
@@ -602,7 +646,7 @@ export function registerStaffHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
       return c.json({ success: false, error: 'Staff not found' }, 404);
     }
 
-    if ((existing.role === 'owner' || body.role === 'owner') && user?.role !== 'owner') {
+    if ((existing.role === 'owner' || body.role === 'owner') && user?.role !== 'owner' && !isHQSuperAdmin(user)) {
       return c.json({ success: false, error: 'Only owners can modify or assign owner accounts' }, 403);
     }
 
@@ -617,33 +661,34 @@ export function registerStaffHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
       canonicalUpdates.push('name = ?');
       canonicalParams.push(body.name);
     }
-    if (body.email !== undefined) {
-      if (await staffEmailInUse(c.env, body.email, id)) return c.json({ success: false, error: 'Email already exists' }, 409);
-      const identity = await db.prepare('SELECT staff_id FROM staff_login_identities WHERE email = ? AND staff_id != ?')
-        .bind(body.email, id).first().catch(() => null);
+    const normalizedBodyEmail = body.email !== undefined ? String(body.email).trim().toLowerCase() : undefined;
+    if (normalizedBodyEmail !== undefined) {
+      if (await staffEmailInUse(c.env, normalizedBodyEmail, id)) return c.json({ success: false, error: 'Email already exists' }, 409);
+      const identity = await db.prepare('SELECT staff_id FROM staff_login_identities WHERE LOWER(email) = ? AND staff_id != ?')
+        .bind(normalizedBodyEmail, id).first().catch(() => null);
       if (identity) return c.json({ success: false, error: 'Email already exists' }, 409);
       let emailExists: Record<string, unknown> | null = null;
       try {
         emailExists = await db
           .prepare(
-            "SELECT id, tenant_id FROM users WHERE email = ? AND id != ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
+            "SELECT id, tenant_id FROM users WHERE LOWER(email) = ? AND id != ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
           )
-          .bind(body.email, id, targetAccountTenant)
+          .bind(normalizedBodyEmail, id, targetAccountTenant)
           .first<Record<string, unknown>>();
       } catch {
         if (targetAccountTenant === 'default') {
           try {
             const unscopedEmail = await db
-              .prepare('SELECT id, tenant_id FROM users WHERE email = ? AND id != ?')
-              .bind(body.email, id)
+              .prepare('SELECT id, tenant_id FROM users WHERE LOWER(email) = ? AND id != ?')
+              .bind(normalizedBodyEmail, id)
               .first<Record<string, unknown>>();
             if (unscopedEmail && matchesTenantRow(unscopedEmail, targetAccountTenant)) {
               emailExists = unscopedEmail;
             }
           } catch {
             const legacyEmail = await db
-              .prepare('SELECT id FROM users WHERE email = ? AND id != ?')
-              .bind(body.email, id)
+              .prepare('SELECT id FROM users WHERE LOWER(email) = ? AND id != ?')
+              .bind(normalizedBodyEmail, id)
               .first<Record<string, unknown>>()
               .catch(() => null);
             if (legacyEmail && matchesTenantRow(legacyEmail, targetAccountTenant)) {
@@ -655,7 +700,7 @@ export function registerStaffHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
       if (emailExists && matchesTenantRow(emailExists, targetAccountTenant)) {
         return c.json({ success: false, error: 'Email already exists' }, 409);
       }
-      updates.push('email = ?'); params.push(body.email);
+      updates.push('email = ?'); params.push(normalizedBodyEmail);
     }
     if (body.phone !== undefined) {
       if (String(body.phone).trim() !== '') {
@@ -726,13 +771,13 @@ export function registerStaffHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
     canonicalUpdates.push('updated_at = ?'); canonicalParams.push(now, ...guard.values);
     const saveAccount = async (sql: string, values: (string | number | null)[]) => {
       const update = db.prepare(sql).bind(...values);
-      if (body.email === undefined) return update.run();
+      if (normalizedBodyEmail === undefined) return update.run();
       // Both statements use the same account/version/tenant guard and execute
       // in one D1 batch. The directory runs first so a stale write cannot rename
       // credentials after a competing account mutation advances the version.
       const identity = db.prepare(`INSERT INTO staff_login_identities (email, staff_id)
         SELECT ?, id FROM users WHERE ${guard.sql}
-        ON CONFLICT(staff_id) DO UPDATE SET email = excluded.email`).bind(body.email, ...guard.values);
+        ON CONFLICT(staff_id) DO UPDATE SET email = excluded.email`).bind(normalizedBodyEmail, ...guard.values);
       const results = await db.batch([identity, update]);
       return results[1];
     };
@@ -759,7 +804,7 @@ export function registerStaffHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
       const staffUpdates: string[] = [];
       const staffParams: (string | number | null)[] = [];
       if (body.name !== undefined) { staffUpdates.push('name = ?'); staffParams.push(body.name); }
-      if (body.email !== undefined) { staffUpdates.push('email = ?'); staffParams.push(body.email); }
+      if (normalizedBodyEmail !== undefined) { staffUpdates.push('email = ?'); staffParams.push(normalizedBodyEmail); }
       if (body.phone !== undefined) { staffUpdates.push('phone = ?'); staffParams.push(body.phone); }
       if (body.role !== undefined) { staffUpdates.push('role = ?'); staffParams.push(body.role); }
       if (body.isActive !== undefined) { staffUpdates.push('is_active = ?'); staffParams.push(body.isActive ? 1 : 0); }
@@ -785,23 +830,26 @@ export function registerStaffHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
     // Dual-store sync: update AUTH_KV cached user record if bound
     if (c.env.AUTH_KV) {
       try {
-        let oldEmail = existing.email ? String(existing.email).trim() : '';
-        if (!oldEmail) {
+        let rawOldEmail = existing.email ? String(existing.email).trim() : '';
+        if (!rawOldEmail) {
           try {
             const identityRow = await db
               .prepare('SELECT email FROM staff_login_identities WHERE staff_id = ? LIMIT 1')
               .bind(id)
               .first<{ email?: string | null }>();
             if (identityRow?.email && String(identityRow.email).trim()) {
-              oldEmail = String(identityRow.email).trim();
+              rawOldEmail = String(identityRow.email).trim();
             }
           } catch {
             // staff_login_identities optional
           }
         }
-        const newEmail = body.email || oldEmail;
+        const oldEmail = rawOldEmail.toLowerCase();
+        const newEmail = normalizedBodyEmail || oldEmail;
         const kvKey = oldEmail ? `user:${oldEmail}` : '';
-        const raw = kvKey ? await c.env.AUTH_KV.get(kvKey) : null;
+        const legacyKvKey = rawOldEmail && rawOldEmail !== oldEmail ? `user:${rawOldEmail}` : '';
+        const raw = (kvKey ? await c.env.AUTH_KV.get(kvKey) : null)
+          || (legacyKvKey ? await c.env.AUTH_KV.get(legacyKvKey) : null);
         let kvUser: any = raw ? JSON.parse(raw) : null;
         if (!kvUser) {
           const rawById = await c.env.AUTH_KV.get(`user:${id}`);
@@ -825,6 +873,9 @@ export function registerStaffHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
           };
           if (kvKey && newEmail !== oldEmail) {
             await c.env.AUTH_KV.delete(kvKey);
+          }
+          if (legacyKvKey) {
+            await c.env.AUTH_KV.delete(legacyKvKey);
           }
           if (newEmail) {
             await c.env.AUTH_KV.put(`user:${newEmail}`, JSON.stringify(updatedKv));
@@ -915,7 +966,7 @@ export function registerStaffHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
       return c.json({ success: false, error: 'Staff not found' }, 404);
     }
 
-    if (existing.role === 'owner' && user?.role !== 'owner') {
+    if (existing.role === 'owner' && user?.role !== 'owner' && !isHQSuperAdmin(user)) {
       return c.json({ success: false, error: 'Only owners can delete owner accounts' }, 403);
     }
 
@@ -959,13 +1010,21 @@ export function registerStaffHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
             // staff_login_identities optional
           }
         }
-        const emailKey = resolvedDeleteEmail ? `user:${resolvedDeleteEmail}` : null;
-        const rawByEmail = emailKey ? await c.env.AUTH_KV.get(emailKey) : null;
+        const normalizedDeleteEmail = resolvedDeleteEmail.toLowerCase();
+        const emailKey = normalizedDeleteEmail ? `user:${normalizedDeleteEmail}` : null;
+        const legacyEmailKey =
+          resolvedDeleteEmail && resolvedDeleteEmail !== normalizedDeleteEmail
+            ? `user:${resolvedDeleteEmail}`
+            : null;
+        const rawByEmail =
+          (emailKey ? await c.env.AUTH_KV.get(emailKey) : null)
+          || (legacyEmailKey ? await c.env.AUTH_KV.get(legacyEmailKey) : null);
         const rawById = await c.env.AUTH_KV.get(`user:${id}`);
         const baseKv = rawByEmail ? JSON.parse(rawByEmail) : (rawById ? JSON.parse(rawById) : existing);
         const disabledKv = JSON.stringify({
           ...baseKv,
           id,
+          ...(normalizedDeleteEmail ? { email: normalizedDeleteEmail } : {}),
           active: false,
           isActive: false,
           is_active: 0,
@@ -974,6 +1033,9 @@ export function registerStaffHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
         });
         if (emailKey) {
           await c.env.AUTH_KV.put(emailKey, disabledKv).catch(() => {});
+        }
+        if (legacyEmailKey) {
+          await c.env.AUTH_KV.delete(legacyEmailKey).catch(() => {});
         }
         await c.env.AUTH_KV.put(`user:${id}`, disabledKv).catch(() => {});
       } catch {

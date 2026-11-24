@@ -11,6 +11,7 @@ import { CheckoutFooter } from './StitchCheckoutNew-footer';
 
 import { cn } from '@/lib/cn';
 import { apiFetch } from '@/lib/api-client';
+import { useAuthStore } from '@/hooks/stores/use-auth-store';
 import type {
   StitchCheckoutNewProps,
   CheckoutNewFormData,
@@ -94,13 +95,20 @@ function getInitialCheckoutForm(): {
     }
 
     if (booking) {
-      const table = booking.tableNumber || '';
+      const physicalRe = /^(?:(?:bàn|ban|table|t)\s*[-#]?\s*)?0*([1-9]\d*)(?:[-_][a-z0-9]+)?$/i;
+      const rawTableNum = (booking.tableNumber || '').trim();
+      const rawTableId = ((booking as unknown as { tableId?: string }).tableId || '').trim();
+      const physicalTable = physicalRe.test(rawTableNum)
+        ? rawTableNum
+        : physicalRe.test(rawTableId)
+          ? rawTableId
+          : '';
       merged.orderType = 'dine_in';
       if (booking.fullName) merged.fullName = booking.fullName;
       if (booking.phone) merged.phone = booking.phone;
-      if (table) merged.tableNumber = table;
+      if (physicalTable) merged.tableNumber = physicalTable;
       if (!merged.notes && booking.zone) {
-        merged.notes = `[Đặt trước bàn: ${table} - ${booking.zone}]`;
+        merged.notes = `[Đặt trước bàn: ${physicalTable || rawTableNum} - ${booking.zone}]`;
       }
     }
 
@@ -173,11 +181,12 @@ export function StitchCheckoutNew({
     prevSubtotalRef.current = currentSubtotal;
   }, [summary?.subtotal, appliedDiscount, appliedPromoCode]);
 
-  // Loyalty lookup: only query authenticated customer summary (no public phone lookup)
+  // Loyalty lookup: query authenticated customer summary (supports both HttpOnly cookie and bearer auth)
+  const authUser = useAuthStore((s) => s.user);
   const lookupLoyalty = useCallback(async (phone: string) => {
     const digits = phone.replace(/\D/g, '');
-    const hasAuthToken = typeof window !== 'undefined' && Boolean(localStorage.getItem('aura_auth_token'));
-    if (digits.length < 9 || digits.length > 12 || !hasAuthToken) {
+    const hasAuthSession = Boolean(authUser) || (typeof window !== 'undefined' && Boolean(localStorage.getItem('aura_auth_token')));
+    if (digits.length < 9 || digits.length > 12 || !hasAuthSession) {
       setLoyalty(null);
       return;
     }
@@ -207,7 +216,7 @@ export function StitchCheckoutNew({
     } finally {
       setIsLookingUp(false);
     }
-  }, []);
+  }, [authUser]);
 
   useEffect(() => {
     if (lookupTimerRef.current) clearTimeout(lookupTimerRef.current);
@@ -405,7 +414,12 @@ export function StitchCheckoutNew({
               <div className="grid grid-cols-3 gap-3">
                 <button
                   type="button"
-                  onClick={() => { setOrderType('delivery'); updateField('orderType', 'delivery'); }}
+                  onClick={() => {
+                    setOrderType('delivery');
+                    updateField('orderType', 'delivery');
+                    updateField('tableNumber', '');
+                    updateField('notes', (form.notes || '').replace(/^\[Đặt trước bàn:[^\]]*\]\s*(?:\|\s*)?/, '').trim());
+                  }}
                   className={cn(
                     'py-3.5 px-3 rounded-xl border text-sm font-medium transition-all text-center flex flex-col items-center gap-1.5 cursor-pointer',
                     orderType === 'delivery'
@@ -420,7 +434,12 @@ export function StitchCheckoutNew({
 
                 <button
                   type="button"
-                  onClick={() => { setOrderType('takeaway'); updateField('orderType', 'takeaway'); }}
+                  onClick={() => {
+                    setOrderType('takeaway');
+                    updateField('orderType', 'takeaway');
+                    updateField('tableNumber', '');
+                    updateField('notes', (form.notes || '').replace(/^\[Đặt trước bàn:[^\]]*\]\s*(?:\|\s*)?/, '').trim());
+                  }}
                   className={cn(
                     'py-3.5 px-3 rounded-xl border text-sm font-medium transition-all text-center flex flex-col items-center gap-1.5 cursor-pointer',
                     orderType === 'takeaway'

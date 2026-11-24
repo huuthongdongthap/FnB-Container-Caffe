@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { X } from 'lucide-react';
+import { X, QrCode, ExternalLink, RefreshCw, AlertCircle } from 'lucide-react';
+import QRCode from 'qrcode';
 import { StitchOrderMgmtNew } from '@/components/stitch';
 import type {
   OrderChannel,
@@ -16,7 +17,7 @@ import {
 import type { AdminOrder } from '@/hooks/use-admin';
 import { useAuthStore } from '@/hooks/stores/use-auth-store';
 import { ManualOrderRefund } from '@/components/admin/manual-order-refund';
-import { apiFetch } from '@/lib/api-client';
+import { apiFetch, ApiClientError } from '@/lib/api-client';
 
 /* ─── Status & Transition Logic ──────────────────────────────────────── */
 
@@ -123,6 +124,13 @@ function computeNextAction(
   t: (k: string, opts?: Record<string, unknown>) => string,
 ): NextActionInfo {
   const status = normalizeOrderStatus(ao.status);
+  if ((ao.paymentStatus ?? '').toLowerCase() === 'refunded') {
+    return {
+      disabled: true,
+      canConfirm: false,
+      canCancel: false,
+    };
+  }
   const role = normalizeActorRole(actorRole);
   const orderType: OrderChannel =
     ao.orderType === 'delivery' || ao.orderType === 'takeaway' || ao.orderType === 'dine_in'
@@ -133,7 +141,8 @@ function computeNextAction(
 
   const method = (ao.paymentMethod ?? '').toLowerCase();
   const isCod = method === 'cod' || method === 'cash';
-  const isPrepaidOnline = method === 'payos' || method === 'bank_transfer' || method === 'qr';
+  const isPrepaidOnline =
+    method === 'payos' || method === 'bank_transfer' || method === 'qr' || method === 'vietqr';
   const requiresPrepayment = isPrepaidOnline || (orderType === 'delivery' && !isCod);
   const isUnpaid = ao.paymentStatus !== 'paid' && ao.paymentStatus !== 'completed';
   const unpaidWarning =
@@ -225,15 +234,20 @@ function computeNextAction(
   };
 }
 
+function getPaymentMethod(order: AdminOrder): string {
+  const raw = order as unknown as Record<string, unknown>;
+  return String(raw.payment_method ?? raw.paymentMethod ?? '').trim().toLowerCase();
+}
+
 function isCodMethod(order: AdminOrder): boolean {
   const raw = order as unknown as Record<string, unknown>;
-  const method = String(raw.payment_method ?? raw.paymentMethod ?? '').toLowerCase();
+  const method = getPaymentMethod(order);
   return method === 'cod' || method === 'cash' || raw.is_cod === 1;
 }
 
 function getPaymentStatus(order: AdminOrder): string {
   const raw = order as unknown as Record<string, unknown>;
-  return String(raw.payment_status ?? raw.paymentStatus ?? 'unpaid').toLowerCase();
+  return String(raw.payment_status ?? raw.paymentStatus ?? 'unpaid').trim().toLowerCase() || 'unpaid';
 }
 
 function mapAdminOrder(
@@ -338,12 +352,34 @@ export default function AdminOrdersPage() {
 
   const [activeFilter, setActiveFilter] = useState<OrderStatus | 'all'>('all');
   const [activeChannel, setActiveChannel] = useState<OrderChannel | 'all'>('all');
-  const [searchInput, setSearchInput] = useState('');
-  const [debouncedSearch, setDebouncedSearch] = useState('');
-  const [searchField, setSearchField] = useState<OrderSearchFieldType>('all');
+  const [searchInput, setSearchInput] = useState(() => {
+    if (typeof window === 'undefined') return '';
+    return new URLSearchParams(window.location.search).get('search') ?? '';
+  });
+  const [debouncedSearch, setDebouncedSearch] = useState(() => {
+    if (typeof window === 'undefined') return '';
+    return (new URLSearchParams(window.location.search).get('search') ?? '').trim();
+  });
+  const [searchField, setSearchField] = useState<OrderSearchFieldType>(() => {
+    if (typeof window === 'undefined') return 'all';
+    const f = new URLSearchParams(window.location.search).get('searchField');
+    if (f === 'table' || f === 'id' || f === 'customer_name' || f === 'customer_phone' || f === 'item' || f === 'address' || f === 'notes') {
+      return f;
+    }
+    return 'all';
+  });
   const [currentPage, setCurrentPage] = useState(1);
   const [codCollectingId, setCodCollectingId] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
+
+  // PayOS QR Modal state (#173)
+  const [qrOrder, setQrOrder] = useState<AdminOrder | null>(null);
+  const [qrCheckoutUrl, setQrCheckoutUrl] = useState<string | null>(null);
+  const [qrEmvcoPayload, setQrEmvcoPayload] = useState<string | null>(null);
+  const [qrMode, setQrMode] = useState<'vietqr' | 'web'>('vietqr');
+  const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
+  const [qrLoading, setQrLoading] = useState(false);
+  const [qrError, setQrError] = useState<string | null>(null);
 
   // Modals state
   const [detailsOrder, setDetailsOrder] = useState<AdminOrder | null>(null);
@@ -430,6 +466,127 @@ export default function AdminOrdersPage() {
     }
   }, [loadOrdersAndSummary]);
 
+  const hasQrEmvco = Boolean(qrEmvcoPayload && !/^https?:\/\//i.test(qrEmvcoPayload));
+  const activeQrContent = qrMode === 'web' || !hasQrEmvco ? qrCheckoutUrl : qrEmvcoPayload;
+
+  useEffect(() => {
+    if (!activeQrContent) {
+      setQrDataUrl(null);
+      return;
+    }
+    let cancelled = false;
+    void QRCode.toDataURL(activeQrContent, { width: 360, margin: 2, errorCorrectionLevel: 'M' })
+      .then((dataUrl) => {
+        if (!cancelled) setQrDataUrl(dataUrl);
+      })
+      .catch(() => {
+        if (!cancelled) setQrDataUrl(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [activeQrContent]);
+
+  const handleOpenOrderQr = useCallback(async (order: AdminOrder, regenerate = false) => {
+    setQrOrder(order);
+    setQrLoading(true);
+    setQrError(null);
+    if (!regenerate) {
+      setQrCheckoutUrl(null);
+      setQrEmvcoPayload(null);
+    }
+    try {
+      const res = await apiFetch<{
+        payment_url?: string;
+        checkout_url?: string;
+        checkoutUrl?: string;
+        qrCode?: string;
+        qr_code?: string;
+        data?: { checkoutUrl?: string; payment_url?: string; qrCode?: string };
+      }>('/api/payment/create-link', {
+        method: 'POST',
+        body: JSON.stringify({
+          order_id: order.id,
+          total: order.total,
+          return_url: window.location.href,
+          cancel_url: window.location.href,
+          description: `Order #${order.id.slice(0, 8)}`,
+          ...(regenerate ? { regenerate: true } : {}),
+        }),
+      });
+      const rawUrl = res.payment_url || res.checkout_url || res.checkoutUrl || res.data?.checkoutUrl || res.data?.payment_url || null;
+      let url: string | null = null;
+      if (rawUrl) {
+        try {
+          const parsed = new URL(rawUrl, window.location.origin);
+          if (parsed.protocol === 'https:' || parsed.protocol === 'http:') {
+            url = parsed.toString();
+          }
+        } catch {
+          url = null;
+        }
+      }
+      const emvco = res.qrCode || res.qr_code || res.data?.qrCode || null;
+      if (!url) {
+        setQrError('Không nhận được liên kết thanh toán PayOS hợp lệ.');
+        return;
+      }
+      setQrCheckoutUrl(url);
+      setQrEmvcoPayload(emvco);
+      setQrMode(emvco && !/^https?:\/\//i.test(emvco) ? 'vietqr' : 'web');
+    } catch (err) {
+      if (err instanceof ApiClientError && err.code === 'ORDER_ALREADY_PAID') {
+        setQrOrder(null);
+        setQrCheckoutUrl(null);
+        setQrEmvcoPayload(null);
+        setQrError(null);
+        loadOrdersAndSummary();
+        return;
+      }
+      setQrError(err instanceof Error ? err.message : 'Không thể tạo mã QR thanh toán.');
+    } finally {
+      setQrLoading(false);
+    }
+  }, [loadOrdersAndSummary]);
+
+  // Poll payment status while QR modal is open
+  useEffect(() => {
+    if (!qrOrder) return;
+    let active = true;
+    const poll = async () => {
+      try {
+        const res = await apiFetch<{
+          order?: { status?: string; payment_status?: string; paymentStatus?: string; payment?: { status?: string } };
+          data?: { status?: string; payment_status?: string; paymentStatus?: string; payment?: { status?: string } };
+          status?: string;
+          payment_status?: string;
+          paymentStatus?: string;
+          payment?: { status?: string };
+        }>(`/api/orders/${encodeURIComponent(qrOrder.id)}`);
+        if (!active) return;
+        const orderObj = res?.order ?? res?.data ?? res;
+        const payStatus = String(
+          orderObj?.payment_status ?? orderObj?.paymentStatus ?? orderObj?.payment?.status ?? '',
+        ).toLowerCase();
+        const ordStatus = String(orderObj?.status ?? '').toLowerCase();
+        if (payStatus === 'paid' || payStatus === 'completed' || ordStatus === 'cancelled') {
+          setQrOrder(null);
+          setQrCheckoutUrl(null);
+          setQrEmvcoPayload(null);
+          setQrError(null);
+          loadOrdersAndSummary();
+        }
+      } catch {
+        // transient poll error
+      }
+    };
+    const interval = setInterval(() => void poll(), 3000);
+    return () => {
+      active = false;
+      clearInterval(interval);
+    };
+  }, [qrOrder, loadOrdersAndSummary]);
+
   const canCollectCod = useMemo(() => {
     const normalizedRole = (actorRole || '').trim().toLowerCase();
     return ['owner', 'manager', 'supervisor', 'cashier', 'admin', 'waiter', 'shipper'].includes(normalizedRole);
@@ -438,17 +595,38 @@ export default function AdminOrdersPage() {
   const stitchOrders: OrderData[] = useMemo(
     () =>
       orders.map((order) => {
+        const payStatus = getPaymentStatus(order);
+        const isTerminal =
+          order.status === 'cancelled' ||
+          order.status === 'completed' ||
+          order.status === 'failed' ||
+          order.status === 'expired';
         const unpaidCod =
           canCollectCod &&
           isCodMethod(order) &&
-          getPaymentStatus(order) !== 'paid' &&
-          getPaymentStatus(order) !== 'completed' &&
-          order.status !== 'cancelled' &&
-          order.status !== 'completed';
+          payStatus !== 'paid' &&
+          payStatus !== 'completed' &&
+          payStatus !== 'refunded' &&
+          !isTerminal;
+        const canShowPayosQr =
+          getPaymentMethod(order) === 'payos' &&
+          (payStatus === 'pending' || payStatus === 'unpaid') &&
+          !isTerminal;
         return {
           ...mapAdminOrder(order, actorRole, t),
           additionalActions: (
             <div className="inline-flex items-center gap-2">
+              {canShowPayosQr && (
+                <button
+                  type="button"
+                  data-testid={`show-payos-qr-${order.id}`}
+                  onClick={() => { void handleOpenOrderQr(order, false); }}
+                  className="inline-flex items-center gap-1 rounded-md bg-sky-600 px-2.5 py-1 text-xs font-semibold text-white hover:bg-sky-700 cursor-pointer"
+                >
+                  <QrCode className="w-3.5 h-3.5" />
+                  Hiện mã QR
+                </button>
+              )}
               {unpaidCod && (
                 <button
                   type="button"
@@ -470,7 +648,7 @@ export default function AdminOrdersPage() {
           ),
         };
       }),
-    [orders, actorRole, canCollectCod, t, loadOrdersAndSummary, codCollectingId, handleMarkCodPaid],
+    [orders, actorRole, canCollectCod, t, loadOrdersAndSummary, codCollectingId, handleMarkCodPaid, handleOpenOrderQr],
   );
 
   const stats: StatCardData[] = useMemo(
@@ -842,6 +1020,128 @@ export default function AdminOrdersPage() {
                 className="rounded-lg bg-amber-400 px-4 py-2 text-xs font-semibold text-[#0c1c30] hover:bg-amber-300"
               >
                 {t('orderMgmt.saveChanges')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* PayOS Payment QR Modal (#173) */}
+      {qrOrder && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label="Mã QR thanh toán PayOS"
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 p-4"
+        >
+          <div className="flex flex-col items-center gap-3 w-full max-w-sm rounded-2xl border border-white/15 bg-[#0A1A2E] p-6 text-center text-white shadow-2xl">
+            <div className="w-full flex items-center justify-between">
+              <h2 className="text-sm font-semibold uppercase tracking-wider text-amber-300">
+                Thanh toán PayOS #{qrOrder.id.slice(0, 8)}
+              </h2>
+              <button
+                type="button"
+                onClick={() => {
+                  setQrOrder(null);
+                  setQrCheckoutUrl(null);
+                  setQrEmvcoPayload(null);
+                  setQrError(null);
+                }}
+                className="rounded p-1 hover:bg-white/10 cursor-pointer"
+                aria-label="Đóng"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <p className="text-sm font-bold text-white">
+              {formatCurrency(qrOrder.total)}
+            </p>
+
+            {qrError && (
+              <div
+                role="alert"
+                className="w-full flex items-start gap-2 rounded-lg bg-red-500/20 border border-red-400/40 px-3 py-2 text-left text-xs text-red-100"
+              >
+                <AlertCircle className="w-4 h-4 shrink-0 text-red-300 mt-0.5" />
+                <span className="flex-1">{qrError}</span>
+              </div>
+            )}
+
+            {hasQrEmvco && (
+              <div className="w-full grid grid-cols-2 gap-1.5 rounded-lg bg-white/5 p-1" role="tablist">
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={qrMode === 'vietqr'}
+                  onClick={() => setQrMode('vietqr')}
+                  className={`px-2 py-1.5 rounded-md text-[11px] font-semibold cursor-pointer ${
+                    qrMode === 'vietqr' ? 'bg-amber-400 text-[#0c1c30]' : 'text-slate-300 hover:text-white'
+                  }`}
+                >
+                  VietQR (App Ngân hàng)
+                </button>
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={qrMode === 'web'}
+                  onClick={() => setQrMode('web')}
+                  className={`px-2 py-1.5 rounded-md text-[11px] font-semibold cursor-pointer ${
+                    qrMode === 'web' ? 'bg-amber-400 text-[#0c1c30]' : 'text-slate-300 hover:text-white'
+                  }`}
+                >
+                  Link thanh toán (iPhone)
+                </button>
+              </div>
+            )}
+
+            <div className="rounded-lg bg-white p-3 min-h-[216px] min-w-[216px] flex items-center justify-center">
+              {qrLoading ? (
+                <span className="text-xs text-slate-600">Đang tạo mã QR...</span>
+              ) : qrDataUrl ? (
+                <img
+                  src={qrDataUrl}
+                  alt={qrMode === 'web' ? 'PayOS Web Link QR' : 'PayOS VietQR'}
+                  className="h-48 w-48 object-contain"
+                />
+              ) : (
+                <span className="text-xs text-slate-600">Chưa có mã QR</span>
+              )}
+            </div>
+
+            {qrCheckoutUrl && (
+              <a
+                href={qrCheckoutUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-sky-600 text-white text-xs font-semibold hover:bg-sky-700"
+              >
+                <ExternalLink className="w-3.5 h-3.5" />
+                Mở trang thanh toán
+              </a>
+            )}
+
+            <div className="flex items-center gap-2 mt-1">
+              <button
+                type="button"
+                disabled={qrLoading}
+                onClick={() => void handleOpenOrderQr(qrOrder, true)}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/10 hover:bg-white/20 text-xs font-semibold text-white cursor-pointer disabled:opacity-50"
+              >
+                <RefreshCw className="w-3.5 h-3.5" />
+                Tạo lại QR
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setQrOrder(null);
+                  setQrCheckoutUrl(null);
+                  setQrEmvcoPayload(null);
+                  setQrError(null);
+                }}
+                className="px-3 py-1.5 rounded-full border border-white/15 text-xs text-slate-300 hover:text-white cursor-pointer"
+              >
+                Đóng
               </button>
             </div>
           </div>

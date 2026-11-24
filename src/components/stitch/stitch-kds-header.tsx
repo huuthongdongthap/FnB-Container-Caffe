@@ -17,7 +17,7 @@ import {
   ChevronLeft,
   ChevronRight,
 } from 'lucide-react';
-import type { StitchKDSNewProps } from './stitch-kds-types';
+import type { KdsFilterKey, StitchKDSNewProps } from './stitch-kds-types';
 import { FILTERS } from './stitch-kds-default';
 
 interface HeaderProps {
@@ -25,6 +25,7 @@ interface HeaderProps {
   onToggleSidebar: () => void;
   activeFilter: StitchKDSNewProps['activeFilter'];
   onFilterChange?: StitchKDSNewProps['onFilterChange'];
+  filterCounts?: Partial<Record<KdsFilterKey, number>>;
   stationLabel: string;
   selectedStation?: string;
   stations?: StitchKDSNewProps['stations'];
@@ -42,6 +43,7 @@ export function Header({
   onToggleSidebar,
   activeFilter,
   onFilterChange,
+  filterCounts,
   stationLabel,
   selectedStation,
   stations,
@@ -116,21 +118,29 @@ export function Header({
       >
         {FILTERS.map((f) => {
           const isActive = activeFilter === f.key;
+          const count = filterCounts?.[f.key];
           return (
             <button
               key={f.key}
               type="button"
               onClick={() => onFilterChange?.(f.key)}
               className={cn(
-                'min-h-[40px] shrink-0 whitespace-nowrap rounded-lg px-3.5 py-2 text-xs font-semibold tracking-wider uppercase transition-colors',
+                'inline-flex min-h-[40px] shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg px-3.5 py-2 text-xs font-semibold tracking-wider uppercase transition-colors',
                 isActive
                   ? 'border border-[#efbd8a]/50 bg-[#efbd8a]/20 text-[#f8d7b2]'
-                  : 'text-[var(--aura-chrome-soft)] hover:bg-[var(--st-surface-container-highest,#273647)]/40 hover:text-[var(--aura-chrome-bright)]',
+                  : f.key === 'overdue' && (count ?? 0) > 0
+                    ? 'border border-[var(--aura-error,#ffb4ab)]/40 bg-[var(--aura-error,#ffb4ab)]/10 text-[var(--aura-error,#ffb4ab)] hover:bg-[var(--aura-error,#ffb4ab)]/20'
+                    : 'text-[var(--aura-chrome-soft)] hover:bg-[var(--st-surface-container-highest,#273647)]/40 hover:text-[var(--aura-chrome-bright)]',
               )}
               aria-current={isActive ? 'page' : undefined}
               aria-label={t(f.tKey, f.label)}
             >
-              {t(f.tKey, f.label)}
+              <span>{t(f.tKey, f.label)}</span>
+              {typeof count === 'number' && (
+                <span className="rounded-full bg-white/10 px-1.5 py-0.5 text-[10px] font-bold leading-none tabular-nums">
+                  {count}
+                </span>
+              )}
             </button>
           );
         })}
@@ -156,8 +166,8 @@ export function Header({
             type="button"
             onClick={onToggleSound}
             className="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg border border-white/10 bg-white/5 p-2 text-[var(--aura-chrome-light,#C9D6DF)] transition-colors hover:bg-white/10"
-            title={soundEnabled ? 'Mute alerts' : 'Enable alerts'}
-            aria-label={soundEnabled ? 'Mute alerts' : 'Enable alerts'}
+            title={soundEnabled ? t('kds.muteAlerts', 'Mute alerts') : t('kds.enableAlerts', 'Enable alerts')}
+            aria-label={soundEnabled ? t('kds.muteAlerts', 'Mute alerts') : t('kds.enableAlerts', 'Enable alerts')}
           >
             {soundEnabled ? <Bell className="h-5 w-5" aria-hidden="true" /> : <BellOff className="h-5 w-5 text-amber-300" aria-hidden="true" />}
           </button>
@@ -165,8 +175,8 @@ export function Header({
             type="button"
             onClick={onToggleFullscreen}
             className="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg border border-white/10 bg-white/5 p-2 text-[var(--aura-chrome-light,#C9D6DF)] transition-colors hover:bg-white/10"
-            title={isFullscreen ? 'Exit fullscreen' : 'Fullscreen'}
-            aria-label={isFullscreen ? 'Exit fullscreen' : 'Fullscreen'}
+            title={isFullscreen ? t('kds.exitFullscreen', 'Exit fullscreen') : t('kds.fullscreen', 'Fullscreen')}
+            aria-label={isFullscreen ? t('kds.exitFullscreen', 'Exit fullscreen') : t('kds.fullscreen', 'Fullscreen')}
           >
             {isFullscreen ? <Minimize2 className="h-5 w-5" aria-hidden="true" /> : <Maximize2 className="h-5 w-5" aria-hidden="true" />}
           </button>

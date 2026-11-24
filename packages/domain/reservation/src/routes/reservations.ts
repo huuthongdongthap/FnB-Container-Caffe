@@ -45,6 +45,127 @@ function getTodayVN(): string {
   return new Date(Date.now() + 7 * 3600_000).toISOString().slice(0, 10);
 }
 
+function getNowVNMinutes(): number {
+  const vn = new Date(Date.now() + 7 * 3600_000);
+  return vn.getUTCHours() * 60 + vn.getUTCMinutes();
+}
+
+function parseTimeToMinutes(timeStr: string): number | null {
+  const m = /^(\d{1,2}):(\d{2})/.exec(String(timeStr || '').trim());
+  if (!m) return null;
+  const h = Number(m[1]);
+  const min = Number(m[2]);
+  if (!Number.isFinite(h) || !Number.isFinite(min) || h < 0 || h > 23 || min < 0 || min > 59) return null;
+  return h * 60 + min;
+}
+
+const RESERVATION_LOCK_WINDOW_MINUTES = 60;
+const RESERVATION_DURATION_MINUTES = 90;
+
+function isWithinReservationWindow(date: string, time: string): boolean {
+  if (date !== getTodayVN()) return false;
+  const rsvMin = parseTimeToMinutes(time);
+  if (rsvMin === null) return false;
+  const nowMin = getNowVNMinutes();
+  return rsvMin - nowMin <= RESERVATION_LOCK_WINDOW_MINUTES && rsvMin >= nowMin - 30;
+}
+
+function isPastTimeToday(date: string, time: string): boolean {
+  if (date !== getTodayVN()) return false;
+  const rsvMin = parseTimeToMinutes(time);
+  if (rsvMin === null) return false;
+  return rsvMin < getNowVNMinutes() - 5;
+}
+
+function isSameReservationTime(a: string, b: string): boolean {
+  const trimA = a.trim();
+  const trimB = b.trim();
+  if (trimA === trimB) return true;
+  const minA = parseTimeToMinutes(trimA);
+  const minB = parseTimeToMinutes(trimB);
+  return minA !== null && minB !== null && minA === minB;
+}
+
+function isNoSuchColumnError(err: unknown): boolean {
+  const msg = err instanceof Error ? err.message : String(err);
+  return /no such column/i.test(msg);
+}
+
+async function ensureActiveTableSession(
+  db: D1Database,
+  tableId: string,
+  tenantId: string,
+  guestCount = 2,
+  reservationId?: string
+): Promise<string | null> {
+  const normTenant = tenantId && tenantId !== '*' && tenantId.toLowerCase() !== 'hq' ? tenantId : 'default';
+  try {
+    const existing = await db
+      .prepare(
+        "SELECT id FROM table_sessions WHERE table_id = ? AND LOWER(COALESCE(status, '')) IN ('active', 'ordering', 'occupied', 'seated') AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ? LIMIT 1"
+      )
+      .bind(tableId, normTenant)
+      .first<{ id?: string }>()
+      .catch(() => null);
+    let sessionId = existing?.id ? String(existing.id) : '';
+    let sessionReady = Boolean(sessionId);
+    if (!sessionId) {
+      const rand = new Uint8Array(3);
+      crypto.getRandomValues(rand);
+      sessionId = `ts_${Date.now()}_${Array.from(rand, (b) => b.toString(16).padStart(2, '0')).join('')}`;
+      const now = new Date().toISOString();
+      const sessionNote = reservationId
+        ? `reservation:${reservationId}`
+        : Number.isFinite(guestCount) && guestCount > 0
+          ? `party_size:${guestCount}`
+          : null;
+      const inserted = await db
+        .prepare(
+          "INSERT INTO table_sessions (id, table_id, status, notes, tenant_id, started_at, created_at, updated_at) VALUES (?, ?, 'active', ?, ?, ?, ?, ?)"
+        )
+        .bind(sessionId, tableId, sessionNote, normTenant, now, now, now)
+        .run()
+        .then(() => true)
+        .catch(() =>
+          db
+            .prepare(
+              "INSERT INTO table_sessions (id, table_id, status, tenant_id, started_at, created_at, updated_at) VALUES (?, ?, 'active', ?, ?, ?, ?)"
+            )
+            .bind(sessionId, tableId, normTenant, now, now, now)
+            .run()
+            .then(() => true)
+            .catch(() =>
+              db
+                .prepare("INSERT INTO table_sessions (id, table_id, status, tenant_id) VALUES (?, ?, 'active', ?)")
+                .bind(sessionId, tableId, normTenant)
+                .run()
+                .then(() => true)
+                .catch(() => false)
+            )
+        );
+      sessionReady = inserted;
+      if (!inserted) {
+        sessionId = '';
+      }
+    }
+    if (sessionReady && sessionId) {
+      await db
+        .prepare("UPDATE cafe_tables SET current_session_id = ? WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?")
+        .bind(sessionId, tableId, normTenant)
+        .run()
+        .catch(() =>
+          normTenant === 'default'
+            ? db.prepare('UPDATE cafe_tables SET current_session_id = ? WHERE id = ?').bind(sessionId, tableId).run().catch(() => undefined)
+            : undefined
+        );
+      return sessionId;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
 function zodErrorResponse(c: import('hono').Context, error: z.ZodError) {
   return c.json({ success: false, errors: error.issues.map(i => i.message) }, 400);
 }
@@ -72,6 +193,7 @@ function slotAlreadyBooked(c: { json: (body: unknown, status: 409) => Response }
 }
 const ACTIVE_RESERVATION_STATUSES = new Set(['pending', 'confirmed', 'approved', 'seated']);
 const TERMINAL_RESERVATION_STATUSES = new Set(['cancelled', 'completed', 'rejected', 'no_show']);
+const ALL_RESERVATION_STATUSES = new Set([...ACTIVE_RESERVATION_STATUSES, ...TERMINAL_RESERVATION_STATUSES]);
 const RESERVATION_STAFF_ROLES = ['staff', 'owner', 'manager', 'supervisor', 'admin', 'cashier', 'waiter'];
 
 function verifyReservationStaffTenant(c: any): Response | null {
@@ -181,55 +303,47 @@ reservationsRouter.get('/availability', optionalAuth() as any, async (c) => {
 
   let rawReservations: Array<Record<string, unknown>> = [];
   try {
-    let query = "SELECT table_id, time AS reservation_time, guest_count AS party_size, status, tenant_id FROM reservations WHERE date = ? AND status IN ('confirmed', 'pending', 'seated') AND (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?)";
-    const params: unknown[] = [date, tenantId, tenantId];
-    if (time) {
-      query += ' AND time = ?';
-      params.push(time);
-    }
-    const res = await db.prepare(query).bind(...params).all<Record<string, unknown>>();
+    const query = "SELECT table_id, time AS reservation_time, guest_count AS party_size, status, tenant_id FROM reservations WHERE date = ? AND status IN ('confirmed', 'pending', 'approved', 'seated') AND (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?)";
+    const res = await db.prepare(query).bind(date, tenantId, tenantId).all<Record<string, unknown>>();
     rawReservations = res.results || [];
   } catch {
     try {
-      let query = "SELECT table_id, reservation_time, party_size, status, tenant_id FROM reservations WHERE reservation_date = ? AND status IN ('confirmed', 'pending', 'seated') AND (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?)";
-      const params: unknown[] = [date, tenantId, tenantId];
-      if (time) {
-        query += ' AND reservation_time = ?';
-        params.push(time);
-      }
-      const res = await db.prepare(query).bind(...params).all<Record<string, unknown>>();
+      const query = "SELECT table_id, reservation_time, party_size, status, tenant_id FROM reservations WHERE reservation_date = ? AND status IN ('confirmed', 'pending', 'approved', 'seated') AND (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?)";
+      const res = await db.prepare(query).bind(date, tenantId, tenantId).all<Record<string, unknown>>();
       rawReservations = res.results || [];
     } catch {
       if (tenantId === 'default' || tenantId === '*') {
         try {
-          let query = "SELECT * FROM reservations WHERE date = ? AND status IN ('confirmed', 'pending', 'seated')";
-          const params: unknown[] = [date];
-          if (time) {
-            query += ' AND time = ?';
-            params.push(time);
-          }
-          const res = await db.prepare(query).bind(...params).all<Record<string, unknown>>();
+          const query = "SELECT * FROM reservations WHERE date = ? AND status IN ('confirmed', 'pending', 'approved', 'seated')";
+          const res = await db.prepare(query).bind(date).all<Record<string, unknown>>();
           rawReservations = res.results || [];
         } catch {
-          let fallbackQuery = "SELECT *, reservation_time AS time FROM reservations WHERE reservation_date = ? AND status IN ('confirmed', 'pending', 'seated')";
-          const params: unknown[] = [date];
-          if (time) {
-            fallbackQuery += ' AND reservation_time = ?';
-            params.push(time);
-          }
-          const res = await db.prepare(fallbackQuery).bind(...params).all<Record<string, unknown>>().catch(() => ({ results: [] as Record<string, unknown>[] }));
+          const fallbackQuery = "SELECT *, reservation_time AS time FROM reservations WHERE reservation_date = ? AND status IN ('confirmed', 'pending', 'approved', 'seated')";
+          const res = await db.prepare(fallbackQuery).bind(date).all<Record<string, unknown>>().catch(() => ({ results: [] as Record<string, unknown>[] }));
           rawReservations = res.results || [];
         }
       }
     }
   }
+  const requestedTimeMin = time ? parseTimeToMinutes(time) : null;
   const reservations: Array<Record<string, unknown>> = [];
   for (const r of rawReservations) {
     if (tenantId === '*' || (await matchesReservationTenant(db, r, tenantId))) {
+      if (requestedTimeMin !== null) {
+        const rTime = String(r.reservation_time ?? r.time ?? '');
+        const rMin = parseTimeToMinutes(rTime);
+        if (rMin !== null && Math.abs(rMin - requestedTimeMin) >= RESERVATION_DURATION_MINUTES) {
+          continue;
+        }
+      }
       reservations.push(r);
     }
   }
   const bookedIds = new Set(reservations.map(r => String(r.table_id)));
+  const todayVN = getTodayVN();
+  const isNearTermToday =
+    date === todayVN &&
+    (requestedTimeMin === null || Math.abs(requestedTimeMin - getNowVNMinutes()) < RESERVATION_DURATION_MINUTES);
   const reservedSlots = reservations.map((r) => ({
     table_id: r.table_id ?? null,
     time: r.reservation_time ?? r.time ?? null,
@@ -244,9 +358,11 @@ reservationsRouter.get('/availability', optionalAuth() as any, async (c) => {
     delete safeTable.customer_name;
     delete safeTable.customer_phone;
     delete safeTable.phone;
+    const tblStatus = String(t.status ?? '').trim().toLowerCase();
+    const blockedByCurrentStatus = isNearTermToday && (tblStatus === 'occupied' || tblStatus === 'overdue');
     return {
       ...safeTable,
-      available: !bookedIds.has(String(t.id)) && !bookedIds.has(String(t.table_number)),
+      available: !blockedByCurrentStatus && !bookedIds.has(String(t.id)) && !bookedIds.has(String(t.table_number)),
     };
   });
 
@@ -260,12 +376,16 @@ reservationsRouter.post('/', optionalAuth() as any, async (c) => {
   const db = c.env.AURA_DB;
   const tenantId = resolveRequestTenantId(c);
 
-  const cfIp = c.req.header('CF-Connecting-IP')?.trim();
-  const xffIp = c.req.header('X-Forwarded-For')?.split(',')[0]?.trim();
-  const ip = cfIp || xffIp || 'unknown';
-  const allowed = await checkRateLimit(c, `rl:rsv:${tenantId}:${ip}`, 5, 3600);
-  if (!allowed) {
-    return c.json({ success: false, error: 'Quá nhiều yêu cầu, vui lòng thử lại sau' }, 429);
+  const reqUser = c.get('user' as never) as { id?: string; sub?: string; role?: string } | undefined;
+  const isStaffCaller = !!reqUser?.role && RESERVATION_STAFF_ROLES.includes(String(reqUser.role).trim().toLowerCase());
+  if (!isStaffCaller) {
+    const cfIp = c.req.header('CF-Connecting-IP')?.trim();
+    const xffIp = c.req.header('X-Forwarded-For')?.split(',')[0]?.trim();
+    const ip = cfIp || xffIp || 'unknown';
+    const allowed = await checkRateLimit(c, `rl:rsv:${tenantId}:${ip}`, 5, 3600);
+    if (!allowed) {
+      return c.json({ success: false, error: 'Quá nhiều yêu cầu, vui lòng thử lại sau' }, 429);
+    }
   }
 
   const rawBody = await c.req.json().catch(() => ({})) as Record<string, unknown>;
@@ -299,6 +419,9 @@ reservationsRouter.post('/', optionalAuth() as any, async (c) => {
   const today = todayVN;
   if (date < today) {
     return c.json({ success: false, error: 'Không thể đặt bàn cho ngày trong quá khứ' }, 400);
+  }
+  if (isPastTimeToday(date, time)) {
+    return c.json({ success: false, error: 'Không thể đặt bàn cho khung giờ đã qua' }, 400);
   }
   const guests = guest_count || 2;
 
@@ -351,29 +474,24 @@ reservationsRouter.post('/', optionalAuth() as any, async (c) => {
   let existingRows: Record<string, unknown>[] = [];
   try {
     const res = await db.prepare(
-      "SELECT * FROM reservations WHERE table_id = ? AND date = ? AND time = ? AND status IN ('confirmed', 'pending', 'approved', 'seated')"
-    ).bind(canonicalTableId, date, time).all<Record<string, unknown>>();
+      "SELECT * FROM reservations WHERE table_id = ? AND date = ? AND status IN ('confirmed', 'pending', 'approved', 'seated')"
+    ).bind(canonicalTableId, date).all<Record<string, unknown>>();
     existingRows = (res.results || []).filter((r) => 'table_id' in r || 'date' in r || 'reservation_date' in r);
-    if (existingRows.length === 0) {
-      const single = await db.prepare(
-        "SELECT * FROM reservations WHERE table_id = ? AND date = ? AND time = ? AND status IN ('confirmed', 'pending', 'approved', 'seated')"
-      ).bind(canonicalTableId, date, time).first<Record<string, unknown>>().catch(() => null);
-      if (single) existingRows = [single];
-    }
   } catch {
     const res = await db.prepare(
-      "SELECT * FROM reservations WHERE table_id = ? AND reservation_date = ? AND reservation_time = ? AND status IN ('confirmed', 'pending', 'approved', 'seated')"
-    ).bind(canonicalTableId, date, time).all<Record<string, unknown>>().catch(() => ({ results: [] as Record<string, unknown>[] }));
+      "SELECT * FROM reservations WHERE table_id = ? AND reservation_date = ? AND status IN ('confirmed', 'pending', 'approved', 'seated')"
+    ).bind(canonicalTableId, date).all<Record<string, unknown>>().catch(() => ({ results: [] as Record<string, unknown>[] }));
     existingRows = (res.results || []).filter((r) => 'table_id' in r || 'date' in r || 'reservation_date' in r);
-    if (existingRows.length === 0) {
-      const single = await db.prepare(
-        "SELECT * FROM reservations WHERE table_id = ? AND reservation_date = ? AND reservation_time = ? AND status IN ('confirmed', 'pending', 'approved', 'seated')"
-      ).bind(canonicalTableId, date, time).first<Record<string, unknown>>().catch(() => null);
-      if (single) existingRows = [single];
-    }
   }
+  const newTimeMin = parseTimeToMinutes(time);
   let hasConflict = false;
   for (const row of existingRows) {
+    const existingTime = String(row.time ?? row.reservation_time ?? '');
+    const existingTimeMin = parseTimeToMinutes(existingTime);
+    const overlaps =
+      existingTime === time ||
+      (newTimeMin !== null && existingTimeMin !== null && Math.abs(existingTimeMin - newTimeMin) < RESERVATION_DURATION_MINUTES);
+    if (!overlaps) continue;
     if (await matchesReservationTenant(db, row, effectiveTenant)) {
       hasConflict = true;
       break;
@@ -387,39 +505,48 @@ reservationsRouter.post('/', optionalAuth() as any, async (c) => {
   crypto.getRandomValues(rsvRand);
   const id = `rsv_${Date.now()}_${Array.from(rsvRand, (b) => b.toString(16).padStart(2, '0')).join('')}`;
   const now = new Date().toISOString();
+  const customerId = reqUser && !isStaffCaller ? String(reqUser.id ?? reqUser.sub ?? '').trim() || null : null;
 
   try {
     await db.prepare(
-      `INSERT INTO reservations (id, table_id, customer_name, customer_phone, guest_count, date, time, zone, notes, status, tenant_id, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'confirmed', ?, ?, ?)`
-    ).bind(id, canonicalTableId, customer_name, customer_phone, guests, date, time, (table.zone as string) || '', String(notes || '').slice(0, 500), effectiveTenant, now, now).run();
+      `INSERT INTO reservations (id, table_id, customer_id, customer_name, customer_phone, guest_count, date, time, zone, notes, status, tenant_id, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'confirmed', ?, ?, ?)`
+    ).bind(id, canonicalTableId, customerId, customer_name, customer_phone, guests, date, time, (table.zone as string) || '', String(notes || '').slice(0, 500), effectiveTenant, now, now).run();
   } catch (err) {
     if (isSlotUniqueViolation(err)) return slotAlreadyBooked(c);
     try {
       await db.prepare(
-        `INSERT INTO reservations (id, table_id, guest_name, guest_phone, party_size, reservation_date, reservation_time, status, tenant_id, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, 'confirmed', ?, ?, ?)`
-      ).bind(id, canonicalTableId, customer_name, customer_phone, guests, date, time, effectiveTenant, now, now).run();
-    } catch (legacyErr) {
-      if (isSlotUniqueViolation(legacyErr)) return slotAlreadyBooked(c);
-      if (effectiveTenant !== 'default') {
-        throw err;
-      }
+        `INSERT INTO reservations (id, table_id, customer_name, customer_phone, guest_count, date, time, zone, notes, status, tenant_id, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'confirmed', ?, ?, ?)`
+      ).bind(id, canonicalTableId, customer_name, customer_phone, guests, date, time, (table.zone as string) || '', String(notes || '').slice(0, 500), effectiveTenant, now, now).run();
+    } catch (noCustomerIdErr) {
+      if (isSlotUniqueViolation(noCustomerIdErr)) return slotAlreadyBooked(c);
       try {
         await db.prepare(
-          `INSERT INTO reservations (id, table_id, customer_name, customer_phone, guest_count, date, time, zone, notes, status, created_at, updated_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'confirmed', ?, ?)`
-        ).bind(id, canonicalTableId, customer_name, customer_phone, guests, date, time, (table.zone as string) || '', String(notes || '').slice(0, 500), now, now).run();
-      } catch (untenantedErr) {
-        if (isSlotUniqueViolation(untenantedErr)) return slotAlreadyBooked(c);
+          `INSERT INTO reservations (id, table_id, guest_name, guest_phone, party_size, reservation_date, reservation_time, status, tenant_id, created_at, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, 'confirmed', ?, ?, ?)`
+        ).bind(id, canonicalTableId, customer_name, customer_phone, guests, date, time, effectiveTenant, now, now).run();
+      } catch (legacyErr) {
+        if (isSlotUniqueViolation(legacyErr)) return slotAlreadyBooked(c);
+        if (effectiveTenant !== 'default') {
+          throw err;
+        }
         try {
           await db.prepare(
-            `INSERT INTO reservations (id, table_id, customer_name, phone, pax, reservation_date, reservation_time, notes, status, created_at, updated_at)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'confirmed', ?, ?)`
-          ).bind(id, canonicalTableId, customer_name, customer_phone, guests, date, time, String(notes || '').slice(0, 500), now, now).run();
-        } catch (v1UntenantedErr) {
-          if (isSlotUniqueViolation(v1UntenantedErr)) return slotAlreadyBooked(c);
-          throw v1UntenantedErr;
+            `INSERT INTO reservations (id, table_id, customer_name, customer_phone, guest_count, date, time, zone, notes, status, created_at, updated_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'confirmed', ?, ?)`
+          ).bind(id, canonicalTableId, customer_name, customer_phone, guests, date, time, (table.zone as string) || '', String(notes || '').slice(0, 500), now, now).run();
+        } catch (untenantedErr) {
+          if (isSlotUniqueViolation(untenantedErr)) return slotAlreadyBooked(c);
+          try {
+            await db.prepare(
+              `INSERT INTO reservations (id, table_id, customer_name, phone, pax, reservation_date, reservation_time, notes, status, created_at, updated_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'confirmed', ?, ?)`
+            ).bind(id, canonicalTableId, customer_name, customer_phone, guests, date, time, String(notes || '').slice(0, 500), now, now).run();
+          } catch (v1UntenantedErr) {
+            if (isSlotUniqueViolation(v1UntenantedErr)) return slotAlreadyBooked(c);
+            throw v1UntenantedErr;
+          }
         }
       }
     }
@@ -430,20 +557,21 @@ reservationsRouter.post('/', optionalAuth() as any, async (c) => {
     : 'available';
   const canMarkReserved =
     currentTableStatus !== 'occupied' &&
+    currentTableStatus !== 'overdue' &&
     !INACTIVE_TABLE_STATUSES.has(currentTableStatus);
-  if (date === today && canMarkReserved) {
+  if (isWithinReservationWindow(date, time) && canMarkReserved) {
     if (effectiveTenant && effectiveTenant !== '*') {
       await db
-        .prepare("UPDATE cafe_tables SET status = 'Reserved' WHERE id = ? AND status = 'Available' AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?")
+        .prepare("UPDATE cafe_tables SET status = 'Reserved' WHERE id = ? AND LOWER(TRIM(COALESCE(status, ''))) = 'available' AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?")
         .bind(canonicalTableId, effectiveTenant)
         .run()
         .catch(() =>
           effectiveTenant === 'default'
-            ? db.prepare("UPDATE cafe_tables SET status = 'Reserved' WHERE id = ? AND status = 'Available'").bind(canonicalTableId).run()
+            ? db.prepare("UPDATE cafe_tables SET status = 'Reserved' WHERE id = ? AND LOWER(TRIM(COALESCE(status, ''))) = 'available'").bind(canonicalTableId).run()
             : undefined
         );
     } else {
-      await db.prepare("UPDATE cafe_tables SET status = 'Reserved' WHERE id = ? AND status = 'Available'").bind(canonicalTableId).run();
+      await db.prepare("UPDATE cafe_tables SET status = 'Reserved' WHERE id = ? AND LOWER(TRIM(COALESCE(status, ''))) = 'available'").bind(canonicalTableId).run();
     }
   }
 
@@ -645,17 +773,42 @@ reservationsRouter.get('/', requireReservationStaff() as any, async (c) => {
 async function hasActiveTableSession(
   db: D1Database,
   tableIdStr: string,
-  targetTenant: string
+  targetTenant: string,
+  ignoreOwnedReservationId?: string
 ): Promise<boolean> {
+  const activeStatuses = ['active', 'ordering', 'paying', 'occupied', 'seated'];
+  if (ignoreOwnedReservationId) {
+    const ownedNote = `reservation:${ignoreOwnedReservationId}`;
+    try {
+      const res = await db
+        .prepare(
+          "SELECT id, status, notes, tenant_id FROM table_sessions WHERE table_id = ? AND LOWER(COALESCE(status, '')) IN ('active', 'ordering', 'paying', 'occupied', 'seated') AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
+        )
+        .bind(tableIdStr, targetTenant)
+        .all<Record<string, unknown>>();
+      for (const row of res?.results || []) {
+        if ('status' in row && !activeStatuses.includes(String(row.status || '').toLowerCase())) {
+          continue;
+        }
+        if (!matchesTenantRow(row, targetTenant)) continue;
+        if (String(row.notes ?? '').trim() !== ownedNote) {
+          return true;
+        }
+      }
+      return false;
+    } catch {
+      // Cannot verify session ownership (e.g. missing notes column); fall through to fail closed.
+    }
+  }
   try {
     const row = await db
       .prepare(
-        "SELECT id, status, tenant_id FROM table_sessions WHERE table_id = ? AND LOWER(COALESCE(status, '')) IN ('active', 'ordering', 'paid', 'paying', 'occupied', 'seated') AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ? LIMIT 1"
+        "SELECT id, status, tenant_id FROM table_sessions WHERE table_id = ? AND LOWER(COALESCE(status, '')) IN ('active', 'ordering', 'paying', 'occupied', 'seated') AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ? LIMIT 1"
       )
       .bind(tableIdStr, targetTenant)
       .first<Record<string, unknown>>();
     if (row && ('id' in row || 'status' in row)) {
-      if ('status' in row && !['active', 'ordering', 'paid', 'paying', 'occupied', 'seated'].includes(String(row.status || '').toLowerCase())) {
+      if ('status' in row && !activeStatuses.includes(String(row.status || '').toLowerCase())) {
         return false;
       }
       if (!matchesTenantRow(row, targetTenant)) return false;
@@ -666,13 +819,13 @@ async function hasActiveTableSession(
     if (targetTenant !== 'default') return false;
     const row = await db
       .prepare(
-        "SELECT id, status FROM table_sessions WHERE table_id = ? AND LOWER(COALESCE(status, '')) IN ('active', 'ordering', 'paid', 'paying', 'occupied', 'seated') LIMIT 1"
+        "SELECT id, status FROM table_sessions WHERE table_id = ? AND LOWER(COALESCE(status, '')) IN ('active', 'ordering', 'paying', 'occupied', 'seated') LIMIT 1"
       )
       .bind(tableIdStr)
       .first<Record<string, unknown>>()
       .catch(() => null);
     if (row && ('id' in row || 'status' in row)) {
-      if ('status' in row && !['active', 'ordering', 'paid', 'paying', 'occupied', 'seated'].includes(String(row.status || '').toLowerCase())) {
+      if ('status' in row && !activeStatuses.includes(String(row.status || '').toLowerCase())) {
         return false;
       }
       return true;
@@ -681,20 +834,11 @@ async function hasActiveTableSession(
   }
 }
 
-async function canResetTableToAvailableOnCancel(
+async function hasUnpaidActiveOrderOnTable(
   db: D1Database,
-  rsv: Record<string, unknown>,
-  rsvTenant: string | null,
-  opts?: { allowOccupiedRelease?: boolean }
+  tableIdStr: string,
+  targetTenant: string,
 ): Promise<boolean> {
-  if (!rsv.table_id) return false;
-  const targetTenant = rsvTenant || 'default';
-  const tableIdStr = String(rsv.table_id);
-
-  if (await hasActiveTableSession(db, tableIdStr, targetTenant)) {
-    return false;
-  }
-
   try {
     const activeOrder = await db
       .prepare(
@@ -713,11 +857,67 @@ async function canResetTableToAvailableOnCancel(
               .catch(() => null)
           : null
       );
-    if (activeOrder && ('id' in activeOrder || 'status' in activeOrder || 'payment_status' in activeOrder)) {
-      return false;
-    }
+    return Boolean(activeOrder && ('id' in activeOrder || 'status' in activeOrder || 'payment_status' in activeOrder));
   } catch {
-    // orders table optional in minimal schemas
+    return false;
+  }
+}
+
+async function closeActiveTableSessionsForRelease(
+  db: D1Database,
+  tableIdStr: string,
+  targetTenant: string,
+  reservationId: string,
+): Promise<void> {
+  const ownedNote = `reservation:${reservationId}`;
+  const nowIso = new Date().toISOString();
+  try {
+    await db
+      .prepare(
+        "UPDATE table_sessions SET status = 'completed', closed_at = ?, updated_at = ? WHERE table_id = ? AND notes = ? AND LOWER(COALESCE(status, '')) IN ('active', 'ordering', 'paying', 'occupied', 'seated') AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
+      )
+      .bind(nowIso, nowIso, tableIdStr, ownedNote, targetTenant)
+      .run()
+      .catch(() =>
+        db
+          .prepare(
+            "UPDATE table_sessions SET status = 'completed', closed_at = ? WHERE table_id = ? AND notes = ? AND LOWER(COALESCE(status, '')) IN ('active', 'ordering', 'paying', 'occupied', 'seated') AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
+          )
+          .bind(nowIso, tableIdStr, ownedNote, targetTenant)
+          .run()
+          .catch(() =>
+            targetTenant === 'default'
+              ? db
+                  .prepare(
+                    "UPDATE table_sessions SET status = 'completed', closed_at = ? WHERE table_id = ? AND notes = ? AND LOWER(COALESCE(status, '')) IN ('active', 'ordering', 'paying', 'occupied', 'seated')"
+                  )
+                  .bind(nowIso, tableIdStr, ownedNote)
+                  .run()
+                  .catch(() => undefined)
+              : undefined
+          )
+      );
+  } catch {
+    // table_sessions optional in minimal schemas
+  }
+}
+
+async function canResetTableToAvailableOnCancel(
+  db: D1Database,
+  rsv: Record<string, unknown>,
+  rsvTenant: string | null,
+  opts?: { allowOccupiedRelease?: boolean; ignoreOwnedReservationId?: string }
+): Promise<boolean> {
+  if (!rsv.table_id) return false;
+  const targetTenant = rsvTenant || 'default';
+  const tableIdStr = String(rsv.table_id);
+
+  if (await hasActiveTableSession(db, tableIdStr, targetTenant, opts?.ignoreOwnedReservationId)) {
+    return false;
+  }
+
+  if (await hasUnpaidActiveOrderOnTable(db, tableIdStr, targetTenant)) {
+    return false;
   }
 
   let tableRow: Record<string, unknown> | null = null;
@@ -783,7 +983,7 @@ async function canResetTableToAvailableOnCancel(
       } catch {
         // orders table optional in minimal schemas
       }
-    } else if (rawStatus && rawStatus !== 'reserved' && rawStatus !== 'seated') {
+    } else if (rawStatus && rawStatus !== 'reserved' && rawStatus !== 'seated' && rawStatus !== 'overdue') {
       return false;
     }
   }
@@ -835,34 +1035,60 @@ async function releaseTableIfEligible(
   opts?: { allowOccupiedRelease?: boolean; preferLowercaseAvailable?: boolean }
 ): Promise<void> {
   if (!rsv.table_id) return;
-  if (!(await canResetTableToAvailableOnCancel(db, rsv, rsvTenant, opts))) {
+  const targetTenant = rsvTenant || 'default';
+  const tableIdStr = String(rsv.table_id);
+  const rsvId = String(rsv.id ?? '').trim();
+  const rsvStatus = String(rsv.status ?? '').trim().toLowerCase();
+  const rsvDate = String(rsv.date ?? rsv.reservation_date ?? rsv.reserved_date ?? '').trim();
+  const isOwnedOccupiedRelease = Boolean(
+    opts?.allowOccupiedRelease &&
+    rsvStatus === 'seated' &&
+    (!rsvDate || rsvDate === getTodayVN())
+  );
+  if (
+    !(await canResetTableToAvailableOnCancel(db, rsv, rsvTenant, {
+      ...opts,
+      ignoreOwnedReservationId: isOwnedOccupiedRelease && rsvId ? rsvId : undefined,
+    }))
+  ) {
     return;
   }
-  const targetStatus = opts?.preferLowercaseAvailable ? 'available' : 'Available';
+  if (isOwnedOccupiedRelease && rsvId) {
+    await closeActiveTableSessionsForRelease(db, tableIdStr, targetTenant, rsvId);
+  }
+  const targetStatus = 'Available';
   if (rsvTenant) {
     const res = await db
-      .prepare(`UPDATE cafe_tables SET status = '${targetStatus}' WHERE id = ? AND status = 'Reserved' AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?`)
+      .prepare(`UPDATE cafe_tables SET status = '${targetStatus}', current_session_id = NULL WHERE id = ? AND LOWER(TRIM(COALESCE(status, ''))) IN ('reserved', 'occupied', 'seated', 'overdue') AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?`)
       .bind(rsv.table_id, rsvTenant)
       .run()
       .catch(() =>
-        rsvTenant === 'default'
-          ? db.prepare(`UPDATE cafe_tables SET status = '${targetStatus}' WHERE id = ? AND status = 'Reserved'`).bind(rsv.table_id).run()
-          : undefined
+        db
+          .prepare(`UPDATE cafe_tables SET status = '${targetStatus}' WHERE id = ? AND LOWER(TRIM(COALESCE(status, ''))) IN ('reserved', 'occupied', 'seated', 'overdue') AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?`)
+          .bind(rsv.table_id, rsvTenant)
+          .run()
+          .catch(() =>
+            rsvTenant === 'default'
+              ? db.prepare(`UPDATE cafe_tables SET status = '${targetStatus}' WHERE id = ? AND LOWER(TRIM(COALESCE(status, ''))) IN ('reserved', 'occupied', 'seated', 'overdue')`).bind(rsv.table_id).run()
+              : undefined
+          )
       );
     const changes = Number((res as { meta?: { changes?: number } } | undefined)?.meta?.changes ?? 0);
-    if (changes === 0 || opts?.preferLowercaseAvailable) {
+    if (changes === 0 && rsvTenant === 'default') {
       await db
-        .prepare("UPDATE cafe_tables SET status = 'available' WHERE id = ? AND LOWER(COALESCE(status, '')) IN ('reserved', 'occupied', 'seated') AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?")
-        .bind(rsv.table_id, rsvTenant)
+        .prepare(`UPDATE cafe_tables SET status = '${targetStatus}' WHERE id = ? AND LOWER(TRIM(COALESCE(status, ''))) IN ('reserved', 'occupied', 'seated', 'overdue')`)
+        .bind(rsv.table_id)
         .run()
-        .catch(() =>
-          rsvTenant === 'default'
-            ? db.prepare("UPDATE cafe_tables SET status = 'available' WHERE id = ? AND LOWER(COALESCE(status, '')) IN ('reserved', 'occupied', 'seated')").bind(rsv.table_id).run()
-            : undefined
-        );
+        .catch(() => undefined);
     }
   } else {
-    await db.prepare(`UPDATE cafe_tables SET status = '${targetStatus}' WHERE id = ? AND status = 'Reserved'`).bind(rsv.table_id).run();
+    await db
+      .prepare(`UPDATE cafe_tables SET status = '${targetStatus}', current_session_id = NULL WHERE id = ? AND LOWER(TRIM(COALESCE(status, ''))) IN ('reserved', 'occupied', 'seated', 'overdue')`)
+      .bind(rsv.table_id)
+      .run()
+      .catch(() =>
+        db.prepare(`UPDATE cafe_tables SET status = '${targetStatus}' WHERE id = ? AND LOWER(TRIM(COALESCE(status, ''))) IN ('reserved', 'occupied', 'seated', 'overdue')`).bind(rsv.table_id).run()
+      );
   }
 }
 
@@ -1001,36 +1227,72 @@ reservationsRouter.patch('/:id', optionalAuth() as any, requireReservationStaff(
         }
       }
     }
+    const pickNonEmpty = (...vals: unknown[]): string => {
+      for (const v of vals) {
+        if (v !== undefined && v !== null && String(v).trim() !== '') {
+          return String(v).trim();
+        }
+      }
+      return '';
+    };
+    const prevDate = pickNonEmpty(
+      body.date !== undefined ? rsv.date : undefined,
+      body.reservation_date !== undefined ? rsv.reservation_date : undefined,
+      body.reserved_date !== undefined ? rsv.reserved_date : undefined,
+      rsv.date,
+      rsv.reservation_date,
+      rsv.reserved_date
+    );
+    const prevTime = pickNonEmpty(
+      body.time !== undefined ? rsv.time : undefined,
+      body.reservation_time !== undefined ? rsv.reservation_time : undefined,
+      body.reserved_time !== undefined ? rsv.reserved_time : undefined,
+      rsv.time,
+      rsv.reservation_time,
+      rsv.reserved_time
+    );
+    const isDateChanged =
+      (body.date !== undefined || body.reservation_date !== undefined || body.reserved_date !== undefined) &&
+      nextDate !== prevDate;
+    const isTimeChanged =
+      (body.time !== undefined || body.reservation_time !== undefined || body.reserved_time !== undefined) &&
+      !isSameReservationTime(nextTime, prevTime);
+    if ((isDateChanged || isTimeChanged || isReopeningCancelled) && nextDate && nextTime) {
+      if ((/^\d{4}-\d{2}-\d{2}$/.test(nextDate) && nextDate < getTodayVN()) || isPastTimeToday(nextDate, nextTime)) {
+        return c.json({ success: false, error: 'Cannot book a reservation in the past' }, 400);
+      }
+    }
     if (hasSlotOrTableMutation && canonicalNextTableId && nextDate && nextTime) {
       let conflictCandidates: Record<string, unknown>[] = [];
       try {
         const res = await db
           .prepare(
-            "SELECT * FROM reservations WHERE table_id = ? AND date = ? AND time = ? AND status IN ('confirmed', 'pending', 'approved', 'seated') AND id != ?"
+            "SELECT * FROM reservations WHERE table_id = ? AND date = ? AND status IN ('confirmed', 'pending', 'approved', 'seated') AND id != ?"
           )
-          .bind(canonicalNextTableId, nextDate, nextTime, id)
+          .bind(canonicalNextTableId, nextDate, id)
           .all<Record<string, unknown>>();
         conflictCandidates = res?.results || [];
       } catch {
         try {
           const res = await db
             .prepare(
-              "SELECT * FROM reservations WHERE table_id = ? AND reservation_date = ? AND reservation_time = ? AND status IN ('confirmed', 'pending', 'approved', 'seated') AND id != ?"
+              "SELECT * FROM reservations WHERE table_id = ? AND reservation_date = ? AND status IN ('confirmed', 'pending', 'approved', 'seated') AND id != ?"
             )
-            .bind(canonicalNextTableId, nextDate, nextTime, id)
+            .bind(canonicalNextTableId, nextDate, id)
             .all<Record<string, unknown>>();
           conflictCandidates = res?.results || [];
         } catch {
           const res = await db
             .prepare(
-              "SELECT * FROM reservations WHERE table_id = ? AND reserved_date = ? AND reserved_time = ? AND status IN ('confirmed', 'pending', 'approved', 'seated') AND id != ?"
+              "SELECT * FROM reservations WHERE table_id = ? AND reserved_date = ? AND status IN ('confirmed', 'pending', 'approved', 'seated') AND id != ?"
             )
-            .bind(canonicalNextTableId, nextDate, nextTime, id)
+            .bind(canonicalNextTableId, nextDate, id)
             .all<Record<string, unknown>>()
             .catch(() => ({ results: [] as Record<string, unknown>[] }));
           conflictCandidates = res?.results || [];
         }
       }
+      const nextTimeMin = parseTimeToMinutes(nextTime);
       for (const row of conflictCandidates) {
         if (!row || String(row.id ?? '') === String(id)) continue;
         const rowTable = String(row.table_id ?? '').trim();
@@ -1042,13 +1304,32 @@ reservationsRouter.patch('/:id', optionalAuth() as any, requireReservationStaff(
         const rowTimeCandidates = [row.time, row.reserved_time, row.reservation_time]
           .map((v) => String(v ?? '').trim())
           .filter(Boolean);
-        if (rowTimeCandidates.length > 0 && !rowTimeCandidates.includes(nextTime) && !rowTimeCandidates.some((t) => t.endsWith(nextTime))) continue;
+        if (rowTimeCandidates.length > 0) {
+          const overlaps = rowTimeCandidates.some((t) => {
+            if (t === nextTime || t.endsWith(nextTime)) return true;
+            const existingMin = parseTimeToMinutes(t);
+            return nextTimeMin !== null && existingMin !== null && Math.abs(existingMin - nextTimeMin) < RESERVATION_DURATION_MINUTES;
+          });
+          if (!overlaps) continue;
+        }
         const rowStatus = String(row.status ?? '').trim().toLowerCase();
         if (rowStatus && !ACTIVE_RESERVATION_STATUSES.has(rowStatus)) continue;
         if (await matchesReservationTenant(db, row, targetTenant)) {
           return c.json({ success: false, error: 'Table already reserved for this time slot' }, 409);
         }
       }
+    }
+  }
+
+  if (nextStatus === 'seated' && canonicalNextTableId && currentStatus !== 'seated') {
+    const tblRow = await db
+      .prepare("SELECT status FROM cafe_tables WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?")
+      .bind(canonicalNextTableId, targetTenant)
+      .first<{ status?: string }>()
+      .catch(() => null);
+    const tblStatus = String(tblRow?.status ?? '').trim().toLowerCase();
+    if (tblStatus === 'occupied' || tblStatus === 'overdue') {
+      return c.json({ success: false, error: 'Table is currently occupied by another guest' }, 409);
     }
   }
 
@@ -1063,64 +1344,138 @@ reservationsRouter.patch('/:id', optionalAuth() as any, requireReservationStaff(
   if (customerEdits.length && !(rsvTenant && hasTenantColumn) && !(!hasTenantColumn && (!rsvTenant || rsvTenant === 'default'))) {
     throw new Error('Reservation tenant scope required for customer update');
   }
-  if (rsvTenant) {
-    try {
-      if (hasPartySizeUpdate || hasDateUpdate || hasTimeUpdate) {
-        await db
-          .prepare(
-            "UPDATE reservations SET status = ?, table_id = COALESCE(?, table_id), guest_count = COALESCE(?, guest_count), date = COALESCE(?, date), time = COALESCE(?, time), updated_at = ? WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
-          )
-          .bind(
-            effectiveStatus,
-            body.table_id !== undefined ? canonicalNextTableId : null,
-            hasPartySizeUpdate ? nextPartySize : null,
-            hasDateUpdate ? nextDate : null,
-            hasTimeUpdate ? nextTime : null,
-            now,
-            id,
-            rsvTenant
-          )
-          .run()
-          .catch(() =>
-            db
-              .prepare(
-                "UPDATE reservations SET status = ?, table_id = COALESCE(?, table_id), party_size = COALESCE(?, party_size), reservation_date = COALESCE(?, reservation_date), reservation_time = COALESCE(?, reservation_time), updated_at = ? WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
-              )
-              .bind(
-                effectiveStatus,
-                body.table_id !== undefined ? canonicalNextTableId : null,
-                hasPartySizeUpdate ? nextPartySize : null,
-                hasDateUpdate ? nextDate : null,
-                hasTimeUpdate ? nextTime : null,
-                now,
-                id,
-                rsvTenant
-              )
-              .run()
-          )
-          .catch(() =>
-            db
-              .prepare(
-                "UPDATE reservations SET status = ?, table_id = COALESCE(?, table_id), updated_at = ? WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
-              )
-              .bind(effectiveStatus, body.table_id !== undefined ? canonicalNextTableId : null, now, id, rsvTenant)
-              .run()
-          );
-      } else {
-        await db
-          .prepare("UPDATE reservations SET status = ?, table_id = COALESCE(?, table_id), updated_at = ? WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?")
-          .bind(effectiveStatus, body.table_id !== undefined ? canonicalNextTableId : null, now, id, rsvTenant)
-          .run();
+  if (hasPartySizeUpdate || hasDateUpdate || hasTimeUpdate) {
+    const knownPartyCols = (['guest_count', 'party_size', 'pax'] as const).filter((col) => col in rsv);
+    const knownDateCols = (['date', 'reservation_date', 'reserved_date'] as const).filter((col) => col in rsv);
+    const knownTimeCols = (['time', 'reservation_time', 'reserved_time'] as const).filter((col) => col in rsv);
+    const hasExactRsvCols =
+      (!hasPartySizeUpdate || knownPartyCols.length > 0) &&
+      (!hasDateUpdate || knownDateCols.length > 0) &&
+      (!hasTimeUpdate || knownTimeCols.length > 0);
+    const slotVariants: Array<{
+      partyCols: readonly string[];
+      dateCols: readonly string[];
+      timeCols: readonly string[];
+    }> = hasExactRsvCols
+      ? [{ partyCols: knownPartyCols, dateCols: knownDateCols, timeCols: knownTimeCols }]
+      : [
+          { partyCols: ['guest_count'], dateCols: ['date'], timeCols: ['time'] },
+          { partyCols: ['party_size'], dateCols: ['reservation_date'], timeCols: ['reservation_time'] },
+          { partyCols: ['party_size'], dateCols: ['reserved_date'], timeCols: ['reserved_time'] },
+        ];
+
+    let updated = false;
+    let lastErr: unknown;
+    for (const variant of slotVariants) {
+      const setClauses = ['status = ?', 'table_id = COALESCE(?, table_id)'];
+      const binds: unknown[] = [effectiveStatus, body.table_id !== undefined ? canonicalNextTableId : null];
+      if (hasPartySizeUpdate) {
+        for (const col of variant.partyCols) {
+          setClauses.push(`${col} = COALESCE(?, ${col})`);
+          binds.push(nextPartySize);
+        }
       }
-    } catch (err) {
-      if (rsvTenant !== 'default') throw err;
+      if (hasDateUpdate) {
+        for (const col of variant.dateCols) {
+          setClauses.push(`${col} = COALESCE(?, ${col})`);
+          binds.push(nextDate);
+        }
+      }
+      if (hasTimeUpdate) {
+        for (const col of variant.timeCols) {
+          setClauses.push(`${col} = COALESCE(?, ${col})`);
+          binds.push(nextTime);
+        }
+      }
+      setClauses.push('updated_at = ?');
+      binds.push(now);
+      const setSql = setClauses.join(', ');
+      try {
+        if (rsvTenant) {
+          try {
+            await db
+              .prepare(`UPDATE reservations SET ${setSql} WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?`)
+              .bind(...binds, id, rsvTenant)
+              .run();
+          } catch (innerErr) {
+            if (isSlotUniqueViolation(innerErr)) {
+              return slotAlreadyBooked(c);
+            }
+            if (rsvTenant !== 'default' || !isNoSuchColumnError(innerErr) || hasTenantColumn) {
+              throw innerErr;
+            }
+            await db
+              .prepare(`UPDATE reservations SET ${setSql} WHERE id = ?`)
+              .bind(...binds, id)
+              .run();
+          }
+        } else {
+          await db
+            .prepare(`UPDATE reservations SET ${setSql} WHERE id = ?`)
+            .bind(...binds, id)
+            .run();
+        }
+        updated = true;
+        break;
+      } catch (err) {
+        if (isSlotUniqueViolation(err)) {
+          return slotAlreadyBooked(c);
+        }
+        lastErr = err;
+        if (!isNoSuchColumnError(err)) {
+          throw err;
+        }
+      }
+    }
+    if (!updated && lastErr) {
+      throw lastErr;
+    }
+  } else if (rsvTenant) {
+    try {
       await db
-        .prepare('UPDATE reservations SET status = ?, updated_at = ? WHERE id = ?')
-        .bind(effectiveStatus, now, id)
+        .prepare("UPDATE reservations SET status = ?, table_id = COALESCE(?, table_id), updated_at = ? WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?")
+        .bind(effectiveStatus, body.table_id !== undefined ? canonicalNextTableId : null, now, id, rsvTenant)
         .run();
+    } catch (err) {
+      if (isSlotUniqueViolation(err)) {
+        return slotAlreadyBooked(c);
+      }
+      if (rsvTenant !== 'default') throw err;
+      try {
+        if (body.table_id !== undefined && 'table_id' in rsv) {
+          await db
+            .prepare('UPDATE reservations SET status = ?, table_id = COALESCE(?, table_id), updated_at = ? WHERE id = ?')
+            .bind(effectiveStatus, canonicalNextTableId, now, id)
+            .run();
+        } else {
+          await db
+            .prepare('UPDATE reservations SET status = ?, updated_at = ? WHERE id = ?')
+            .bind(effectiveStatus, now, id)
+            .run();
+        }
+      } catch (fallbackErr) {
+        if (isSlotUniqueViolation(fallbackErr)) {
+          return slotAlreadyBooked(c);
+        }
+        throw fallbackErr;
+      }
     }
   } else {
-    await db.prepare('UPDATE reservations SET status = ?, updated_at = ? WHERE id = ?').bind(effectiveStatus, now, id).run();
+    try {
+      if (body.table_id !== undefined && 'table_id' in rsv) {
+        await db
+          .prepare('UPDATE reservations SET status = ?, table_id = COALESCE(?, table_id), updated_at = ? WHERE id = ?')
+          .bind(effectiveStatus, canonicalNextTableId, now, id)
+          .run();
+      } else {
+        await db.prepare('UPDATE reservations SET status = ?, updated_at = ? WHERE id = ?').bind(effectiveStatus, now, id).run();
+      }
+    } catch (err) {
+      if (isSlotUniqueViolation(err)) {
+        return slotAlreadyBooked(c);
+      }
+      throw err;
+    }
   }
   // Keep tenant-scoped customer edits separate from legacy slot-column fallbacks.
   if (customerEdits.length) {
@@ -1149,21 +1504,33 @@ reservationsRouter.patch('/:id', optionalAuth() as any, requireReservationStaff(
   }
 
   if (body.table_id !== undefined && prevTableId && canonicalNextTableId && prevTableId !== canonicalNextTableId) {
-    await releaseTableIfEligible(db, rsv, rsvTenant, { allowOccupiedRelease: false, preferLowercaseAvailable: true });
+    await releaseTableIfEligible(db, rsv, rsvTenant, { allowOccupiedRelease: false });
+    if (nextDate && nextTime && isWithinReservationWindow(nextDate, nextTime) && ACTIVE_RESERVATION_STATUSES.has(effectiveStatus) && effectiveStatus !== 'seated') {
+      await db
+        .prepare("UPDATE cafe_tables SET status = 'Reserved' WHERE id = ? AND LOWER(TRIM(COALESCE(status, ''))) = 'available' AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?")
+        .bind(canonicalNextTableId, targetTenant)
+        .run()
+        .catch(() =>
+          targetTenant === 'default'
+            ? db.prepare("UPDATE cafe_tables SET status = 'Reserved' WHERE id = ? AND LOWER(TRIM(COALESCE(status, ''))) = 'available'").bind(canonicalNextTableId).run()
+            : undefined
+        );
+    }
   }
 
-  if (nextStatus === 'cancelled' || nextStatus === 'completed' || nextStatus === 'no_show') {
-    await releaseTableIfEligible(db, rsv, rsvTenant, { allowOccupiedRelease: true, preferLowercaseAvailable: true });
+  if (nextStatus === 'cancelled' || nextStatus === 'completed' || nextStatus === 'no_show' || nextStatus === 'rejected') {
+    await releaseTableIfEligible(db, rsv, rsvTenant, { allowOccupiedRelease: true });
   } else if (nextStatus === 'seated' && canonicalNextTableId) {
     await db
-      .prepare("UPDATE cafe_tables SET status = 'occupied' WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?")
+      .prepare("UPDATE cafe_tables SET status = 'Occupied' WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?")
       .bind(canonicalNextTableId, targetTenant)
       .run()
       .catch(() =>
         targetTenant === 'default'
-          ? db.prepare("UPDATE cafe_tables SET status = 'occupied' WHERE id = ?").bind(canonicalNextTableId).run()
+          ? db.prepare("UPDATE cafe_tables SET status = 'Occupied' WHERE id = ?").bind(canonicalNextTableId).run()
           : undefined
       );
+    await ensureActiveTableSession(db, canonicalNextTableId, targetTenant, nextPartySize || 2, id);
   }
 
   return c.json({
@@ -1216,9 +1583,25 @@ reservationsRouter.patch('/:id/status', optionalAuth() as any, requireReservatio
   if (!nextStatus) {
     return c.json({ success: false, error: 'status is required' }, 400);
   }
+  if (!ALL_RESERVATION_STATUSES.has(nextStatus)) {
+    return c.json({ success: false, error: `Invalid reservation status: ${nextStatus}` }, 400);
+  }
 
   const rsvTenant = resolveEffectiveRsvTenant(rsv, tenantId);
   const targetTenant = rsvTenant || 'default';
+
+  if (nextStatus === 'seated' && rsv.table_id) {
+    const tblRow = await db
+      .prepare("SELECT status FROM cafe_tables WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?")
+      .bind(rsv.table_id, targetTenant)
+      .first<{ status?: string }>()
+      .catch(() => null);
+    const tblStatus = String(tblRow?.status ?? '').trim().toLowerCase();
+    if ((tblStatus === 'occupied' || tblStatus === 'overdue') && currentStatus !== 'seated') {
+      return c.json({ success: false, error: 'Table is currently occupied by another guest' }, 409);
+    }
+  }
+
   const now = new Date().toISOString();
 
   if (rsvTenant) {
@@ -1235,17 +1618,18 @@ reservationsRouter.patch('/:id/status', optionalAuth() as any, requireReservatio
   }
 
   if (TERMINAL_RESERVATION_STATUSES.has(nextStatus)) {
-    await releaseTableIfEligible(db, rsv, rsvTenant, { allowOccupiedRelease: true, preferLowercaseAvailable: true });
+    await releaseTableIfEligible(db, rsv, rsvTenant, { allowOccupiedRelease: true });
   } else if (nextStatus === 'seated' && rsv.table_id) {
     await db
-      .prepare("UPDATE cafe_tables SET status = 'occupied' WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?")
+      .prepare("UPDATE cafe_tables SET status = 'Occupied' WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?")
       .bind(rsv.table_id, targetTenant)
       .run()
       .catch(() =>
         targetTenant === 'default'
-          ? db.prepare("UPDATE cafe_tables SET status = 'occupied' WHERE id = ?").bind(rsv.table_id).run()
+          ? db.prepare("UPDATE cafe_tables SET status = 'Occupied' WHERE id = ?").bind(rsv.table_id).run()
           : undefined
       );
+    await ensureActiveTableSession(db, String(rsv.table_id), targetTenant, Number(rsv.guest_count ?? rsv.party_size ?? 2), id);
   }
 
   return c.json({ success: true, data: { id, status: nextStatus } });
@@ -1422,13 +1806,20 @@ reservationsRouter.post('/waitlist/:id/seat', requireReservationStaff() as any, 
   }
 
   await db
-    .prepare("UPDATE cafe_tables SET status = 'occupied' WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?")
+    .prepare("UPDATE cafe_tables SET status = 'Occupied' WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?")
     .bind(canonicalTableId, effectiveTenant)
     .run()
     .catch((err) => {
       if (effectiveTenant !== 'default') throw err;
-      return db.prepare("UPDATE cafe_tables SET status = 'occupied' WHERE id = ?").bind(canonicalTableId).run();
+      return db.prepare("UPDATE cafe_tables SET status = 'Occupied' WHERE id = ?").bind(canonicalTableId).run();
     });
+  await ensureActiveTableSession(
+    db,
+    canonicalTableId,
+    effectiveTenant,
+    partySize || 2,
+    sourceTable === 'reservations' ? id : undefined
+  );
 
   return c.json({
     success: true,
@@ -1480,6 +1871,20 @@ reservationsRouter.patch('/:id/approve', requireReservationStaff() as any, async
   } else {
     await db.prepare("UPDATE reservations SET status = 'confirmed', updated_at = ? WHERE id = ?").bind(now, id).run();
   }
+  const rsvDate = String(rsv.date ?? rsv.reservation_date ?? '').trim();
+  const rsvTime = String(rsv.time ?? rsv.reservation_time ?? '').trim();
+  if (rsv.table_id && rsvDate && rsvTime && isWithinReservationWindow(rsvDate, rsvTime)) {
+    const targetTenant = rsvTenant || 'default';
+    await db
+      .prepare("UPDATE cafe_tables SET status = 'Reserved' WHERE id = ? AND LOWER(TRIM(COALESCE(status, ''))) = 'available' AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?")
+      .bind(rsv.table_id, targetTenant)
+      .run()
+      .catch(() =>
+        targetTenant === 'default'
+          ? db.prepare("UPDATE cafe_tables SET status = 'Reserved' WHERE id = ? AND LOWER(TRIM(COALESCE(status, ''))) = 'available'").bind(rsv.table_id).run()
+          : undefined
+      );
+  }
   return c.json({ success: true, message: 'Reservation confirmed' });
 });
 
@@ -1516,16 +1921,16 @@ reservationsRouter.patch('/:id/reject', requireReservationStaff() as any, async 
   const now = new Date().toISOString();
   if (rsvTenant) {
     await db
-      .prepare("UPDATE reservations SET status = 'cancelled', updated_at = ? WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?")
+      .prepare("UPDATE reservations SET status = 'rejected', updated_at = ? WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?")
       .bind(now, id, rsvTenant)
       .run()
       .catch(() =>
         rsvTenant === 'default'
-          ? db.prepare("UPDATE reservations SET status = 'cancelled', updated_at = ? WHERE id = ?").bind(now, id).run()
+          ? db.prepare("UPDATE reservations SET status = 'rejected', updated_at = ? WHERE id = ?").bind(now, id).run()
           : undefined
       );
   } else {
-    await db.prepare("UPDATE reservations SET status = 'cancelled', updated_at = ? WHERE id = ?").bind(now, id).run();
+    await db.prepare("UPDATE reservations SET status = 'rejected', updated_at = ? WHERE id = ?").bind(now, id).run();
   }
 
   await releaseTableIfEligible(db, rsv, rsvTenant);

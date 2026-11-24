@@ -4,8 +4,7 @@
  * persistence (table_qr_codes table) and image encoding.
  */
 
-import QRCode from 'qrcode';
-import type { CafeTable } from '@aura/domain-table';
+import { encodeQrToPngBytes, type CafeTable } from '@aura/domain-table';
 
 /**
  * Generate a URL-safe slug from table number + zone.
@@ -169,13 +168,22 @@ export async function generatePNG(
   }
   const normalizedBase = baseUrl ? baseUrl.replace(/\/+$/, '') : '';
   const payload = signedUrl || `${normalizedBase}/order/${encodeURIComponent(slug)}`;
-  const buffer = await QRCode.toBuffer(payload, {
-    type: 'png',
+  const pngBytes = encodeQrToPngBytes(payload, {
     width: 400,
     margin: 2,
-    errorCorrectionLevel: 'M'
+    errorCorrectionLevel: 'M',
   });
-  return buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength) as ArrayBuffer;
+  return pngBytes.buffer.slice(pngBytes.byteOffset, pngBytes.byteOffset + pngBytes.byteLength) as ArrayBuffer;
+}
+
+function arrayBufferToBase64(buffer: ArrayBuffer): string {
+  const bytes = new Uint8Array(buffer);
+  let binary = '';
+  const chunkSize = 0x8000;
+  for (let i = 0; i < bytes.length; i += chunkSize) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + chunkSize));
+  }
+  return btoa(binary);
 }
 
 /**
@@ -187,6 +195,6 @@ export async function generateDataURL(
   signedUrl?: string
 ): Promise<string> {
   const pngBuffer = await generatePNG(slug, baseUrl, signedUrl);
-  const base64 = Buffer.from(pngBuffer).toString('base64');
+  const base64 = arrayBufferToBase64(pngBuffer);
   return `data:image/png;base64,${base64}`;
 }

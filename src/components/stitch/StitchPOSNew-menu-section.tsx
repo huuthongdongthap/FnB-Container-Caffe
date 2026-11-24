@@ -25,6 +25,10 @@ interface MenuSectionProps {
   onOrderTypeChange?: (type: POSOrderType) => void;
   deliveryAddress?: string;
   onDeliveryAddressChange?: (address: string) => void;
+  deliveryRecipientName?: string;
+  onDeliveryRecipientNameChange?: (name: string) => void;
+  deliveryRecipientPhone?: string;
+  onDeliveryRecipientPhoneChange?: (phone: string) => void;
 }
 
 export function MenuSection({
@@ -44,6 +48,10 @@ export function MenuSection({
   onOrderTypeChange,
   deliveryAddress = '',
   onDeliveryAddressChange,
+  deliveryRecipientName = '',
+  onDeliveryRecipientNameChange,
+  deliveryRecipientPhone = '',
+  onDeliveryRecipientPhoneChange,
 }: MenuSectionProps) {
   const { t } = useTranslation();
   return (
@@ -101,15 +109,46 @@ export function MenuSection({
           )}
         </div>
         {orderType === 'delivery' && onDeliveryAddressChange && (
-          <input
-            type="text"
-            data-testid="pos-delivery-address-input"
-            value={deliveryAddress}
-            onChange={(e) => onDeliveryAddressChange(e.target.value)}
-            placeholder={t('orderMgmt.searchField.address', { defaultValue: 'Địa chỉ giao hàng' })}
-            aria-label={t('orderMgmt.searchField.address', { defaultValue: 'Địa chỉ giao hàng' })}
-            className="w-full max-w-xl rounded-lg border border-white/15 bg-[var(--aura-noir-void,#050814)]/75 px-3.5 py-2 text-xs text-[var(--aura-text-primary,#eae1db)] placeholder:text-[var(--aura-text-muted,#8A8E96)] outline-none focus:border-amber-400"
-          />
+          <div className="flex flex-col gap-2 max-w-2xl">
+            <input
+              type="text"
+              data-testid="pos-delivery-address-input"
+              value={deliveryAddress}
+              onChange={(e) => onDeliveryAddressChange(e.target.value)}
+              placeholder={t('orderMgmt.searchField.address', { defaultValue: 'Địa chỉ giao hàng (bắt buộc)' })}
+              aria-label={t('orderMgmt.searchField.address', { defaultValue: 'Địa chỉ giao hàng' })}
+              className={cn(
+                'w-full rounded-lg border bg-[var(--aura-noir-void,#050814)]/75 px-3.5 py-2 text-xs text-[var(--aura-text-primary,#eae1db)] placeholder:text-[var(--aura-text-muted,#8A8E96)] outline-none focus:border-amber-400',
+                !deliveryAddress.trim() ? 'border-amber-400/50' : 'border-white/15'
+              )}
+            />
+            {(onDeliveryRecipientNameChange || onDeliveryRecipientPhoneChange) && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                {onDeliveryRecipientNameChange && (
+                  <input
+                    type="text"
+                    data-testid="pos-delivery-recipient-name"
+                    value={deliveryRecipientName}
+                    onChange={(e) => onDeliveryRecipientNameChange(e.target.value)}
+                    placeholder="Tên người nhận (khách vãng lai)"
+                    aria-label="Tên người nhận"
+                    className="w-full rounded-lg border border-white/15 bg-[var(--aura-noir-void,#050814)]/75 px-3.5 py-2 text-xs text-[var(--aura-text-primary,#eae1db)] placeholder:text-[var(--aura-text-muted,#8A8E96)] outline-none focus:border-amber-400"
+                  />
+                )}
+                {onDeliveryRecipientPhoneChange && (
+                  <input
+                    type="tel"
+                    data-testid="pos-delivery-recipient-phone"
+                    value={deliveryRecipientPhone}
+                    onChange={(e) => onDeliveryRecipientPhoneChange(e.target.value)}
+                    placeholder="SĐT người nhận"
+                    aria-label="SĐT người nhận"
+                    className="w-full rounded-lg border border-white/15 bg-[var(--aura-noir-void,#050814)]/75 px-3.5 py-2 text-xs text-[var(--aura-text-primary,#eae1db)] placeholder:text-[var(--aura-text-muted,#8A8E96)] outline-none focus:border-amber-400"
+                  />
+                )}
+              </div>
+            )}
+          </div>
         )}
         <div className="flex gap-2.5 overflow-x-auto pb-1.5 custom-scrollbar-pos" role="tablist" aria-label={t('posNew.categoryFilter')}>
           {categories.map((cat) => {
