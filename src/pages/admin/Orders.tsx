@@ -52,9 +52,11 @@ const TRANSITION_ALLOWED_ROLES: Record<string, ReadonlySet<CanonicalRole>> = {
   'confirmed->preparing': new Set(['admin', 'manager', 'staff', 'kitchen']),
   'preparing->ready': new Set(['admin', 'manager', 'staff', 'kitchen']),
   'ready->served': new Set(['admin', 'manager', 'staff', 'kitchen']),
-  'ready->delivering': new Set(['admin', 'manager']),
+  'ready->delivering': new Set(['admin', 'manager', 'staff', 'rider']),
   'ready->delivered': new Set(['admin', 'manager', 'rider']),
-  'delivering->delivered': new Set(['admin', 'manager']),
+  'delivering->delivered': new Set(['admin', 'manager', 'rider']),
+  'delivering->failed': new Set(['admin', 'manager', 'rider']),
+  'delivering->cancelled': new Set(['admin', 'manager', 'rider']),
   'served->completed': new Set(['admin', 'manager', 'staff']),
   'delivered->completed': new Set(['admin', 'manager', 'rider']),
 };

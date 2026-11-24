@@ -124,7 +124,7 @@ describe('Shift Handover Flow (#102)', () => {
     });
 
     await waitFor(() => {
-      expect(screen.getByTestId('submit-handover-btn')).toBeTruthy();
+      expect(screen.getByTestId('handover-opened')).toBeTruthy();
     });
   });
 
@@ -205,6 +205,8 @@ describe('Shift Handover Flow (#102)', () => {
         body: JSON.stringify({
           opening_float: 200000,
           denominations: { denominations: [{ denomination: 500000, count: 1 }] },
+          remitted_cash: 0,
+          closing_float: 500000,
         }),
       }),
     );
@@ -517,5 +519,61 @@ describe('Shift Handover Flow (#102)', () => {
         }),
       );
     });
+  });
+
+  it('rejects out-of-range remittedCashInput without calling reconcile API', async () => {
+    const activeShift = {
+      id: '55',
+      staff_id: 'staff_1',
+      staff_name: 'Alice',
+      clock_in: '2026-11-21T01:00:00.000Z',
+      clock_out: null,
+      hours_worked: null,
+      date: '2026-11-21',
+      opening_cash: 200_000,
+      notes: null,
+      attendance_state: 'active',
+    };
+
+    mockApiFetch.mockImplementation(async (path: string) => {
+      if (path === '/api/shifts/today') return { success: true, data: [activeShift] };
+      if (path === '/api/shifts/55/reconciliation') {
+        throw new ApiClientError({ status: 404, message: 'Shift reconciliation not found' });
+      }
+      return { success: true, data: [] };
+    });
+
+    renderWithProviders(<ShiftHandoverModal isOpen onClose={vi.fn()} />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId('remitted-cash-input')).toBeTruthy();
+    });
+
+    // Count 200,000 VND (1 x 200,000)
+    const denom200k = screen.getByLabelText('Denomination 200000');
+    fireEvent.change(denom200k, { target: { value: '1' } });
+
+    // Enter remitted cash > countedTotal (300,000 > 200,000)
+    fireEvent.change(screen.getByTestId('remitted-cash-input'), { target: { value: '300000' } });
+    expect(screen.getByTestId('closing-float-display').textContent).toContain('Invalid');
+
+    fireEvent.click(screen.getByTestId('submit-handover-btn'));
+
+    await waitFor(() => {
+      expect(screen.getByRole('alert').textContent).toContain('Remitted cash must be between 0');
+    });
+
+    // Enter negative remitted cash (-1000)
+    fireEvent.change(screen.getByTestId('remitted-cash-input'), { target: { value: '-1000' } });
+    fireEvent.click(screen.getByTestId('submit-handover-btn'));
+
+    await waitFor(() => {
+      expect(screen.getByRole('alert').textContent).toContain('Remitted cash must be between 0');
+    });
+
+    expect(mockApiFetch).not.toHaveBeenCalledWith(
+      '/api/shifts/55/reconcile',
+      expect.anything(),
+    );
   });
 });

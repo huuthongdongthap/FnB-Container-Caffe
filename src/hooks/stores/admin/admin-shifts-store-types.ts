@@ -2,6 +2,9 @@ export interface ShiftRecord {
   id: string;
   staff_id: string;
   staff_name: string;
+  role?: string | null;
+  shift?: string | null;
+  shift_name?: string | null;
   clock_in: string | null;
   clock_out: string | null;
   hours_worked: number | null;

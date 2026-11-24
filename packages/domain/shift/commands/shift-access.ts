@@ -1,6 +1,6 @@
 import type { Env } from 'worker/src/types/env';
 import type { AuthUser } from 'worker/src/middleware/auth';
-import { requireStaffAccount, type StaffAccount } from 'worker/src/lib/staff-session';
+import { isStaffRole, loadStaffAccount, requireStaffAccount, StaffSessionError, type StaffAccount } from 'worker/src/lib/staff-session';
 import { resolvePilotStore } from 'worker/src/lib/pilot-store';
 
 export class ShiftContractError extends Error {
@@ -71,12 +71,25 @@ export async function shiftScope(env: Env, user: AuthUser | undefined, requested
 export function managerScope(scope: ShiftScope) {
   if (!scope.canManage) throw new ShiftContractError('Owner or manager required', 403);
 }
-export async function shiftTarget(scope: ShiftScope, requested?: string): Promise<StaffAccount> {
+export async function shiftTarget(
+  scope: ShiftScope,
+  requested?: string,
+  options?: { allowInactiveTarget?: boolean },
+): Promise<StaffAccount> {
   const id = requested || scope.actor.id;
   if (id === '*' || (id !== scope.actor.id && !scope.canManage)) {
     throw new ShiftContractError('Only your own attendance is allowed', 403);
   }
-  const account = await requireStaffAccount(scope.env.AURA_DB, id);
+  let account: StaffAccount;
+  if (options?.allowInactiveTarget && scope.canManage) {
+    const loaded = await loadStaffAccount(scope.env.AURA_DB, id);
+    if (!loaded.ok || !isStaffRole(loaded.account.role)) {
+      throw new StaffSessionError('SESSION_REVOKED');
+    }
+    account = loaded.account;
+  } else {
+    account = await requireStaffAccount(scope.env.AURA_DB, id);
+  }
   const rawAccountTenant = typeof account.tenant_id === 'string' ? account.tenant_id.trim() : '';
   const accountTenant = !rawAccountTenant || rawAccountTenant === '*' || rawAccountTenant.toLowerCase() === 'hq' ? 'default' : rawAccountTenant;
   if (scope.tenantId !== '*' && accountTenant !== scope.tenantId) throw new ShiftContractError('Staff not found', 404);

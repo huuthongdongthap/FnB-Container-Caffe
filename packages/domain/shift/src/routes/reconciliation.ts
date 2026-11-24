@@ -148,6 +148,9 @@ export function reconciliationRoutes(app: Hono<{ Bindings: Env; Variables: { use
       opening_float: Number(body.opening_float ?? 0),
       denominations,
       notes: typeof body.notes === 'string' ? body.notes : undefined,
+      ...(typeof body.remitted_cash === 'number' ? { remitted_cash: body.remitted_cash } : {}),
+      ...(typeof body.closing_float === 'number' ? { closing_float: body.closing_float } : {}),
+      ...(typeof body.handover_to_staff_id === 'string' ? { handover_to_staff_id: body.handover_to_staff_id } : {}),
       ...(body.actual_cash_counted !== undefined ? { actual_cash_counted: body.actual_cash_counted } : {}),
     };
 

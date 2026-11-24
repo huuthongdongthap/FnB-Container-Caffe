@@ -22,10 +22,55 @@ export interface ShiftRow {
 }
 export interface ShiftRecord extends Omit<ShiftRow, 'id'> { id: string }
 
+export interface ShiftSlotInfo {
+  code: 'morning' | 'afternoon' | 'night';
+  label: string;
+  shortLabel: string;
+  window: string;
+}
+
+/** Normalize SQLite/ISO UTC timestamps and derive store shift slot in Asia/Ho_Chi_Minh. */
+export function deriveShiftSlot(timestamp?: string | null, explicitShift?: string | null): ShiftSlotInfo {
+  const normalizedExplicit = String(explicitShift || '').trim().toLowerCase();
+  if (normalizedExplicit === 'morning' || normalizedExplicit === 'ca_1' || normalizedExplicit === 'ca1') {
+    return { code: 'morning', label: 'Ca sáng (06:00–14:00)', shortLabel: 'Ca sáng', window: '06:00–14:00' };
+  }
+  if (normalizedExplicit === 'afternoon' || normalizedExplicit === 'ca_2' || normalizedExplicit === 'ca2') {
+    return { code: 'afternoon', label: 'Ca chiều (14:00–22:00)', shortLabel: 'Ca chiều', window: '14:00–22:00' };
+  }
+  if (normalizedExplicit === 'night' || normalizedExplicit === 'evening' || normalizedExplicit === 'ca_3' || normalizedExplicit === 'ca3') {
+    return { code: 'night', label: 'Ca đêm (22:00–06:00)', shortLabel: 'Ca đêm', window: '22:00–06:00' };
+  }
+  let date = new Date();
+  if (timestamp && typeof timestamp === 'string') {
+    const trimmed = timestamp.trim();
+    const iso = /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}/.test(trimmed)
+      ? `${trimmed.replace(' ', 'T')}Z`
+      : trimmed;
+    const parsed = new Date(iso);
+    if (!Number.isNaN(parsed.getTime())) date = parsed;
+  }
+  const hourStr = new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'Asia/Ho_Chi_Minh',
+    hour: '2-digit',
+    hour12: false,
+  }).format(date);
+  const hour = Number.parseInt(hourStr, 10);
+  if (hour >= 6 && hour < 14) {
+    return { code: 'morning', label: 'Ca sáng (06:00–14:00)', shortLabel: 'Ca sáng', window: '06:00–14:00' };
+  }
+  if (hour >= 14 && hour < 22) {
+    return { code: 'afternoon', label: 'Ca chiều (14:00–22:00)', shortLabel: 'Ca chiều', window: '14:00–22:00' };
+  }
+  return { code: 'night', label: 'Ca đêm (22:00–06:00)', shortLabel: 'Ca đêm', window: '22:00–06:00' };
+}
+
 export const isActiveAttendance = (row: Pick<ShiftRow, 'clock_in' | 'clock_out'>) => row.clock_in !== null && row.clock_out === null;
 export function shiftDto(row: ShiftRow) {
   const status = isActiveAttendance(row) ? 'in_progress' : row.clock_out !== null ? 'completed' : row.attendance_state || 'scheduled';
+  const slot = deriveShiftSlot(row.clock_in || row.created_at, row.shift);
   return { ...row, id: String(row.id), status, staffId: row.staff_id, locationId: row.tenant_id,
+    shift_slot: slot.code, shift_name: slot.label, shift_short_name: slot.shortLabel, shift_window: slot.window,
     startTime: row.start_time, endTime: row.end_time, breakMinutes: 0,
     createdAt: row.created_at, updatedAt: row.created_at };
 }

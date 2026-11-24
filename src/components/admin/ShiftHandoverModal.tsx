@@ -12,9 +12,11 @@ import type {
   TodayResponse,
 } from '@/hooks/stores/admin/admin-shifts-store-types';
 
+import { deriveShiftSlotLabel, formatTime } from '@/pages/admin/staff-utils';
+
 const VND_DENOMINATIONS = [500_000, 200_000, 100_000, 50_000, 20_000, 10_000, 5_000, 2_000, 1_000] as const;
 const MANAGER_ROLES = new Set(['owner', 'manager', 'supervisor', 'admin']);
-const CASH_DRAWER_ROLES = new Set(['owner', 'admin', 'manager', 'supervisor', 'cashier']);
+const CASH_DRAWER_ROLES = new Set(['owner', 'admin', 'manager', 'supervisor', 'cashier', 'waiter', 'shipper']);
 
 interface ReconciliationResponse {
   success: boolean;
@@ -25,6 +27,7 @@ export interface ShiftHandoverModalProps {
   isOpen: boolean;
   onClose: () => void;
   initialShiftId?: string;
+  mode?: 'open' | 'close' | 'auto';
   onCompleted?: () => void;
 }
 
@@ -38,9 +41,7 @@ function formatVnd(amount: number): string {
 
 function formatClockTime(iso: string | null): string {
   if (!iso) return '--:--';
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return iso;
-  return d.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
+  return formatTime(iso);
 }
 
 function getErrorInfo(err: unknown, fallback: string): { status: number; code?: string; message: string } {
@@ -65,12 +66,14 @@ export function ShiftHandoverModal({
   isOpen,
   onClose,
   initialShiftId,
+  mode = 'auto',
   onCompleted,
 }: ShiftHandoverModalProps) {
   const user = useAuthStore((s) => s.user);
   const canManage = MANAGER_ROLES.has(user?.role || '');
 
   const [loading, setLoading] = useState(false);
+  const [loadingReconciliation, setLoadingReconciliation] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [loadError, setLoadError] = useState<{ status: number; message: string } | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
@@ -83,9 +86,11 @@ export function ShiftHandoverModal({
 
   const [counts, setCounts] = useState<Record<number, number>>(makeEmptyCounts);
   const [handoverNotes, setHandoverNotes] = useState<string>('');
+  const [remittedCashInput, setRemittedCashInput] = useState<string>('0');
 
   const [reconciliation, setReconciliation] = useState<ShiftReconciliationRecord | null>(null);
   const [reconciliationDisabled, setReconciliationDisabled] = useState(false);
+  const [openedShift, setOpenedShift] = useState<ShiftRecord | null>(null);
   const [completedShift, setCompletedShift] = useState<ShiftRecord | null>(null);
   const [confirmZeroCash, setConfirmZeroCash] = useState(false);
   const [payouts, setPayouts] = useState<Array<{ id: string; amount: number; reason: string | null; created_at: string }>>([]);
@@ -129,7 +134,17 @@ export function ShiftHandoverModal({
   );
 
   const activeReconRequestRef = useRef(0);
-  const isCashDrawerRole = CASH_DRAWER_ROLES.has(String(user?.role || '').toLowerCase());
+  const requiresCashForShift = useCallback(
+    (shift: ShiftRecord | null | undefined): boolean => {
+      if (!shift) return CASH_DRAWER_ROLES.has(String(user?.role || '').toLowerCase());
+      const shiftRole = String(shift.role || '').toLowerCase();
+      if (CASH_DRAWER_ROLES.has(shiftRole)) return true;
+      if (typeof shift.opening_cash === 'number' && shift.opening_cash > 0) return true;
+      return false;
+    },
+    [user?.role],
+  );
+  const isCashDrawerRole = requiresCashForShift(selectedShift);
 
   const fetchShiftPayouts = useCallback(async (shiftId: string, requestId: number) => {
     try {
@@ -145,15 +160,17 @@ export function ShiftHandoverModal({
     }
   }, []);
 
-  const fetchExistingReconciliation = useCallback(async (shiftId: string) => {
+  const fetchExistingReconciliation = useCallback(async (shiftId: string, targetShift?: ShiftRecord | null) => {
     const requestId = ++activeReconRequestRef.current;
     setReconciliation(null);
     setReconciliationDisabled(false);
     setConfirmZeroCash(false);
     setPayouts([]);
-    if (!isCashDrawerRole) {
+    if (!requiresCashForShift(targetShift)) {
+      setLoadingReconciliation(false);
       return;
     }
+    setLoadingReconciliation(true);
     void fetchShiftPayouts(shiftId, requestId);
     try {
       const res = await apiFetch<ReconciliationResponse>(`/api/shifts/${encodeURIComponent(shiftId)}/reconciliation`, {
@@ -177,8 +194,12 @@ export function ShiftHandoverModal({
       if (info.status === 401 || info.status === 403) {
         setLoadError({ status: info.status, message: info.message || 'Không có quyền truy cập đối soát ca.' });
       }
+    } finally {
+      if (activeReconRequestRef.current === requestId) {
+        setLoadingReconciliation(false);
+      }
     }
-  }, [fetchShiftPayouts, isCashDrawerRole]);
+  }, [fetchShiftPayouts, requiresCashForShift]);
 
   const loadShifts = useCallback(async () => {
     setLoading(true);
@@ -199,14 +220,16 @@ export function ShiftHandoverModal({
       );
 
       const preferred =
-        (initialShiftId && visibleActive.find((s) => s.id === initialShiftId)) ||
-        visibleActive.find((s) => s.staff_id === user?.id) ||
-        visibleActive[0] ||
-        null;
+        mode === 'open'
+          ? null
+          : (initialShiftId && visibleActive.find((s) => s.id === initialShiftId)) ||
+            visibleActive.find((s) => s.staff_id === user?.id) ||
+            visibleActive[0] ||
+            null;
 
       if (preferred) {
         setSelectedShiftId(preferred.id);
-        await fetchExistingReconciliation(preferred.id);
+        await fetchExistingReconciliation(preferred.id, preferred);
       } else {
         setSelectedShiftId('');
         const ownScheduled = visibleScheduled.find((s) => s.staff_id === user?.id) ?? visibleScheduled[0];
@@ -223,24 +246,34 @@ export function ShiftHandoverModal({
     } finally {
       setLoading(false);
     }
-  }, [canManage, fetchExistingReconciliation, initialShiftId, user?.id]);
+  }, [canManage, fetchExistingReconciliation, initialShiftId, mode, user?.id]);
 
   useEffect(() => {
     if (!isOpen) return;
     setCounts(makeEmptyCounts());
     setHandoverNotes('');
+    setRemittedCashInput('0');
     setOpeningCashInput('0');
     setClockInNotes('');
+    setOpenedShift(null);
+    setCompletedShift(null);
     void loadShifts();
   }, [isOpen, loadShifts]);
 
   if (!isOpen) return null;
 
   const handleSelectActiveShift = async (shiftId: string) => {
+    const nextShift = activeShifts.find((s) => s.id === shiftId) ?? null;
     setSelectedShiftId(shiftId);
+    setCounts(makeEmptyCounts());
+    setHandoverNotes('');
+    setRemittedCashInput('0');
+    setPayoutAmount('');
+    setPayoutReason('');
+    setConfirmZeroCash(false);
     setActionError(null);
     setCompletedShift(null);
-    await fetchExistingReconciliation(shiftId);
+    await fetchExistingReconciliation(shiftId, nextShift);
   };
 
   const handleClockIn = async () => {
@@ -277,8 +310,8 @@ export function ShiftHandoverModal({
         body: JSON.stringify(payload),
       });
       if (res?.data) {
+        setOpenedShift(res.data);
         onCompleted?.();
-        await loadShifts();
       }
     } catch (err) {
       const info = getErrorInfo(err, 'Không thể mở ca. Vui lòng thử lại.');
@@ -352,8 +385,10 @@ export function ShiftHandoverModal({
   };
 
   const handleReconcileAndClockOut = async (bypassZeroConfirm = false) => {
-    if (submittingRef.current || !selectedShift || completedShift || reconciliationDisabled) return;
-    if (!reconciliation && countedTotal === 0 && !bypassZeroConfirm && !confirmZeroCash) {
+    if (submittingRef.current || loadingReconciliation || !selectedShift || completedShift || reconciliationDisabled) return;
+    const matchedRecon =
+      reconciliation && String(reconciliation.shift_id) === String(selectedShift.id) ? reconciliation : null;
+    if (!matchedRecon && countedTotal === 0 && !bypassZeroConfirm && !confirmZeroCash) {
       setConfirmZeroCash(true);
       return;
     }
@@ -364,7 +399,7 @@ export function ShiftHandoverModal({
     setActionError(null);
 
     try {
-      let activeRecon = reconciliation;
+      let activeRecon = matchedRecon;
 
       if (!activeRecon) {
         const denominations: CashDenominationEntry[] = VND_DENOMINATIONS.filter(
@@ -373,6 +408,18 @@ export function ShiftHandoverModal({
           denomination: denom,
           count: counts[denom] || 0,
         }));
+        let remittedCash = 0;
+        if (remittedCashInput.trim() !== '') {
+          const parsedRemitted = Number(remittedCashInput);
+          if (!Number.isFinite(parsedRemitted) || parsedRemitted < 0 || parsedRemitted > countedTotal) {
+            setActionError(
+              `Tiền nộp chủ phải nằm trong khoảng 0 đến ${countedTotal.toLocaleString('vi-VN')} ₫. / Remitted cash must be between 0 and ${countedTotal.toLocaleString('vi-VN')} ₫.`,
+            );
+            return;
+          }
+          remittedCash = parsedRemitted;
+        }
+        const closingFloat = countedTotal - remittedCash;
 
         try {
           const reconRes = await apiFetch<ReconciliationResponse>(
@@ -382,6 +429,8 @@ export function ShiftHandoverModal({
               body: JSON.stringify({
                 opening_float: selectedShift.opening_cash ?? 0,
                 denominations: { denominations },
+                remitted_cash: remittedCash,
+                closing_float: closingFloat,
                 ...(handoverNotes.trim() ? { notes: handoverNotes.trim() } : {}),
               }),
             },
@@ -394,7 +443,7 @@ export function ShiftHandoverModal({
             setReconciliationDisabled(true);
           }
           if (info.status === 409 && info.message.toLowerCase().includes('already been reconciled')) {
-            await fetchExistingReconciliation(selectedShift.id);
+            await fetchExistingReconciliation(selectedShift.id, selectedShift);
             setActionError(
               'Ca này đã được đối soát trước đó. Kiểm tra số liệu và bấm Hoàn tất kết ca. / Shift was already reconciled; review totals and click Complete Clock-Out.',
             );
@@ -430,7 +479,9 @@ export function ShiftHandoverModal({
           <div className="flex items-center gap-2">
             <Wallet className="w-5 h-5 text-primary" />
             <h2 id="shift-handover-title" className="text-base font-semibold">
-              Bàn giao &amp; Kết ca / Shift Handover
+              {mode === 'open' || openedShift || (!selectedShift && !completedShift)
+                ? 'Mở ca làm việc / Open Shift'
+                : 'Bàn giao & Kết ca / Shift Handover'}
             </h2>
           </div>
           <button
@@ -463,6 +514,26 @@ export function ShiftHandoverModal({
                 </Button>
               </div>
             </div>
+          ) : openedShift ? (
+            <div className="space-y-4" data-testid="handover-opened">
+              <div className="rounded-lg border border-emerald-500/40 bg-emerald-500/10 p-4 flex items-start gap-3">
+                <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
+                <div className="space-y-1 text-sm">
+                  <p className="font-semibold text-emerald-700">
+                    Đã mở ca thành công / Shift Opened
+                  </p>
+                  <p className="text-muted">
+                    {deriveShiftSlotLabel(openedShift.clock_in, openedShift.shift)} — {openedShift.staff_name || openedShift.staff_id} (ID #{openedShift.id})
+                  </p>
+                  <p className="text-muted">
+                    Vào ca / Clock-in: {formatClockTime(openedShift.clock_in)} &bull; Quỹ đầu ca: {formatVnd(openedShift.opening_cash ?? 0)}
+                  </p>
+                </div>
+              </div>
+              <div className="flex justify-end">
+                <Button onClick={onClose}>Bắt đầu bán hàng / Đóng</Button>
+              </div>
+            </div>
           ) : completedShift ? (
             <div className="space-y-4" data-testid="handover-completed">
               <div className="rounded-lg border border-emerald-500/40 bg-emerald-500/10 p-4 flex items-start gap-3">
@@ -472,7 +543,7 @@ export function ShiftHandoverModal({
                     Đã bàn giao &amp; kết ca thành công / Shift Handover Completed
                   </p>
                   <p className="text-muted">
-                    Ca #{completedShift.id} — {completedShift.staff_name || completedShift.staff_id}
+                    {deriveShiftSlotLabel(completedShift.clock_in, completedShift.shift)} — {completedShift.staff_name || completedShift.staff_id} (ID #{completedShift.id})
                   </p>
                   {completedShift.hours_worked !== null && (
                     <p className="text-muted">Số giờ làm việc / Hours worked: {completedShift.hours_worked}h</p>
@@ -623,7 +694,7 @@ export function ShiftHandoverModal({
               <div className="rounded-lg border border-border bg-background/50 p-3 space-y-2 text-sm">
                 <div className="flex items-center justify-between gap-2">
                   <div className="font-semibold">
-                    {selectedShift.staff_name || selectedShift.staff_id} (Ca #{selectedShift.id})
+                    {deriveShiftSlotLabel(selectedShift.clock_in, selectedShift.shift)} — {selectedShift.staff_name || selectedShift.staff_id} (ID #{selectedShift.id})
                   </div>
                   <div className="flex items-center gap-1.5">
                     {isOvernightShift && (
@@ -709,6 +780,39 @@ export function ShiftHandoverModal({
                         />
                       </label>
                     ))}
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2 pt-2">
+                    <label className="flex flex-col gap-1 rounded-lg border border-border bg-background px-2.5 py-2 text-xs">
+                      <span className="text-muted font-medium">Tiền nộp chủ / Remitted Cash (₫)</span>
+                      <input
+                        type="number"
+                        min={0}
+                        max={countedTotal}
+                        inputMode="numeric"
+                        aria-label="Tiền nộp chủ / Remitted Cash"
+                        data-testid="remitted-cash-input"
+                        value={remittedCashInput}
+                        onChange={(e) => setRemittedCashInput(e.target.value)}
+                        disabled={submitting || reconciliationDisabled}
+                        className="w-full rounded border border-border bg-surface px-2 py-1 text-sm font-medium"
+                      />
+                    </label>
+                    <div className="flex flex-col justify-between rounded-lg border border-border bg-background px-2.5 py-2 text-xs">
+                      <span className="text-muted font-medium">Tiền để lại ca sau / Closing Float</span>
+                      <span className="text-sm font-semibold" data-testid="closing-float-display">
+                        {(() => {
+                          if (remittedCashInput.trim() === '') {
+                            return `${countedTotal.toLocaleString('vi-VN')} ₫`;
+                          }
+                          const parsed = Number(remittedCashInput);
+                          if (!Number.isFinite(parsed) || parsed < 0 || parsed > countedTotal) {
+                            return 'Không hợp lệ / Invalid';
+                          }
+                          return `${(countedTotal - parsed).toLocaleString('vi-VN')} ₫`;
+                        })()}
+                      </span>
+                    </div>
                   </div>
                 </div>
               )}

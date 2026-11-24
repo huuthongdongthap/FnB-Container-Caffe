@@ -28,13 +28,14 @@ const STAFF_TARGETS: Record<string, readonly string[]> = {
   pending: ['confirmed'],
   confirmed: ['preparing'],
   preparing: ['ready'],
-  ready: ['served'],
+  ready: ['served', 'delivering'],
   served: ['completed'],
 };
 
 /** Fulfilment moves a rider owns once the order has left the kitchen. */
 const RIDER_TARGETS: Record<string, readonly string[]> = {
-  ready: ['delivered'],
+  ready: ['delivering', 'delivered'],
+  delivering: ['delivered', 'failed', 'cancelled'],
   delivered: ['completed'],
 };
 

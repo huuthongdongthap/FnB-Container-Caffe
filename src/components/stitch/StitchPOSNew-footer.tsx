@@ -7,16 +7,21 @@ import { LiveClock } from './StitchPOSNew-live-clock';
 
 export function POSFooter({
   cartOpen: _cartOpen,
+  hasActiveShift = true,
   onOpenDrawer,
   onPrintReceipt,
   onEndShift,
 }: {
   cartOpen: boolean;
+  hasActiveShift?: boolean;
   onOpenDrawer?: () => void;
   onPrintReceipt?: () => void;
   onEndShift?: () => void;
 }) {
   const { t } = useTranslation();
+  const shiftButtonLabel = hasActiveShift
+    ? t('posNew.endShift')
+    : t('posNew.openShift', { defaultValue: 'Mở ca' });
   return (
     <footer
       data-testid="pos-footer"
@@ -57,11 +62,16 @@ export function POSFooter({
         <button
           type="button"
           onClick={() => (onEndShift ? onEndShift() : window.location.assign('/admin/staff'))}
-          className="inline-flex items-center gap-1.5 shrink-0 whitespace-nowrap bg-[#f2c08d] text-[#1a1008] hover:bg-[#f6cda3] font-bold px-3.5 sm:px-5 py-1.5 min-h-[36px] rounded-full text-[11px] shadow-sm transition-all active:scale-95 font-body cursor-pointer"
-          aria-label={t('posNew.endShift')}
+          className={cn(
+            'inline-flex items-center gap-1.5 shrink-0 whitespace-nowrap font-bold px-3.5 sm:px-5 py-1.5 min-h-[36px] rounded-full text-[11px] shadow-sm transition-all active:scale-95 font-body cursor-pointer',
+            hasActiveShift
+              ? 'bg-[#f2c08d] text-[#1a1008] hover:bg-[#f6cda3]'
+              : 'bg-amber-500/20 text-amber-200 border border-amber-400/40 hover:bg-amber-500/30',
+          )}
+          aria-label={shiftButtonLabel}
         >
           <Receipt className="w-3.5 h-3.5 shrink-0" />
-          {t('posNew.endShift')}
+          {shiftButtonLabel}
         </button>
       </nav>
       <div className="ml-auto hidden md:block shrink-0">

@@ -45,7 +45,7 @@ export function StitchPOSNew({
   paymentMethod: externalPaymentMethod,
   staffName,
   staffRole,
-  activeShift = null,
+  activeShift,
   onShiftAction,
   onNavigate,
   onCompleteOrder,
@@ -273,6 +273,7 @@ export function StitchPOSNew({
 
       <POSFooter
         cartOpen={cartOpen}
+        hasActiveShift={activeShift === undefined ? true : Boolean(activeShift)}
         onOpenDrawer={onOpenDrawer}
         onPrintReceipt={onPrintReceipt}
         onEndShift={onEndShift}
