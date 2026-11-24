@@ -1,7 +1,7 @@
 import webpush from 'web-push';
 import { createLogger } from '../../middleware/logger';
 import { matchesTenantRow, resolvePilotStore } from '../../middleware/tenant';
-import { CUSTOMER_PUSH_ROLE } from './roles';
+import { CUSTOMER_PUSH_ROLE, STAFF_PUSH_ROLE } from './roles';
 
 const log = createLogger({ route: 'push' });
 
@@ -10,7 +10,28 @@ export interface PushEnv {
   VAPID_PRIVATE_KEY?: string;
   VAPID_EMAIL?: string;
   PILOT_STORE?: string;
+  AUTH_KV?: import('@cloudflare/workers-types').KVNamespace;
   AURA_DB: import('@cloudflare/workers-types').D1Database;
+}
+
+const KITCHEN_EXTRA_ROLES = ['kitchen', 'barista', 'chef', 'staff', 'cashier'] as const;
+
+async function isAutoNotifyNewOrderEnabled(env: PushEnv, effectiveTenant: string): Promise<boolean> {
+  if (!env.AUTH_KV) return true;
+  try {
+    const tenantKey = `config:notification_settings:${effectiveTenant}`;
+    const raw =
+      (await env.AUTH_KV.get(tenantKey)) ??
+      (effectiveTenant === 'default' ? await env.AUTH_KV.get('config:notification_settings') : null);
+    if (!raw) return true;
+    const parsed = JSON.parse(raw) as { autoNotifyNewOrder?: unknown };
+    if (typeof parsed.autoNotifyNewOrder === 'boolean') {
+      return parsed.autoNotifyNewOrder;
+    }
+  } catch {
+    // Fail open on corrupt settings JSON so orders are not silently dropped
+  }
+  return true;
 }
 
 interface Subscription {
@@ -183,11 +204,23 @@ export async function sendPushToStaff(
   initPush(env);
   const effectiveTenant = tenantId || resolvePilotStore(env as unknown as Parameters<typeof resolvePilotStore>[0]);
 
-  // Build query: all non-customer roles, or specific role
+  if (role === STAFF_PUSH_ROLE && payload.data?.type === 'new_order') {
+    const enabled = await isAutoNotifyNewOrderEnabled(env, effectiveTenant);
+    if (!enabled) {
+      log.info('Auto new-order push disabled by admin notification settings', { tenantId: effectiveTenant });
+      return { sent: 0, failed: 0 };
+    }
+  }
+
+  // Build query: all non-customer roles, or specific role (expanding STAFF_PUSH_ROLE to kitchen-capable roles)
   let query = `SELECT id, endpoint, auth_key, p256dh_key, customer_id, role FROM push_subscriptions WHERE role != ?`;
   const params: unknown[] = [CUSTOMER_PUSH_ROLE];
 
-  if (role) {
+  if (role === STAFF_PUSH_ROLE) {
+    const placeholders = KITCHEN_EXTRA_ROLES.map(() => '?').join(', ');
+    query += ` AND (role = ? OR role IN (${placeholders}))`;
+    params.push(STAFF_PUSH_ROLE, ...KITCHEN_EXTRA_ROLES);
+  } else if (role) {
     query += ' AND role = ?';
     params.push(role);
   }

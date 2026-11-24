@@ -2,6 +2,8 @@ import { Hono } from 'hono';
 import type { Env } from '../types/env';
 import { requireAuth, optionalAuth } from '../middleware/auth';
 import { isHQSuperAdmin } from '../middleware/tenant';
+import { isStaffRole, issueStaffSession, loadStaffAccount } from '../lib/staff-session';
+import { generateJWT } from '../lib/jwt';
 
 export type SaasTenant = {
   id: string;
@@ -242,6 +244,154 @@ export function createTenantRoutes() {
 
       const row = await db.prepare('SELECT * FROM saas_tenants WHERE id = ?').bind(id).first<Record<string, unknown>>();
       return c.json({ ok: true, data: row ? mapRow(row) : null } as const, 201);
+    } catch (_err) {
+      return c.json({ ok: false, error: 'server_error' } as const, 500);
+    }
+  });
+
+  // Self-serve tenant onboarding: allows an authenticated user who does not yet
+  // belong to a tenant (or is HQ admin) to provision their first BASIC trial workspace.
+  router.post('/self-serve', async (c) => {
+    const currentUser = c.get('user');
+    if (!currentUser) {
+      return c.json({ ok: false, error: 'unauthenticated' } as const, 401);
+    }
+
+    const callerTenantId = (
+      currentUser.tenantId ||
+      (currentUser as { tenant_id?: string }).tenant_id ||
+      ''
+    ).trim();
+    const callerRole = String(currentUser.role || '').trim().toLowerCase();
+    const hasNonDefaultTenant = callerTenantId !== '' && callerTenantId !== 'default';
+    if (!isHQSuperAdmin(currentUser) && (hasNonDefaultTenant || (callerTenantId === 'default' && isStaffRole(callerRole)))) {
+      return c.json({ ok: false, error: 'already_has_tenant' } as const, 409);
+    }
+
+    let body: { name?: string; slug?: string };
+    try {
+      body = (await c.req.json()) as { name?: string; slug?: string };
+    } catch {
+      return c.json({ ok: false, error: 'invalid_json' } as const, 400);
+    }
+
+    const rawName = typeof body.name === 'string' && body.name.trim().length ? body.name.trim() : '';
+    if (!rawName) {
+      return c.json({ ok: false, error: 'name_required' } as const, 400);
+    }
+    const rawSlug = typeof body.slug === 'string' && body.slug.trim().length ? generateSlug(body.slug.trim()) : '';
+    const slug = (rawSlug || generateSlug(rawName)).slice(0, 60);
+
+    try {
+      const db = c.env.AURA_DB as unknown as {
+        prepare(sql: string): {
+          bind(...a: unknown[]): {
+            run(): Promise<{ rowCount: number }>;
+            first<T = Record<string, unknown>>(): Promise<T | null>;
+          };
+        };
+        batch?(statements: unknown[]): Promise<unknown[]>;
+      };
+
+      const existingOwned = await db
+        .prepare('SELECT id FROM saas_tenants WHERE owner_user_id = ? LIMIT 1')
+        .bind(currentUser.id)
+        .first<{ id: string }>()
+        .catch(() => null);
+      if (existingOwned && !isHQSuperAdmin(currentUser)) {
+        return c.json({ ok: false, error: 'already_has_tenant', tenantId: existingOwned.id } as const, 409);
+      }
+
+      const MAX_SLUG_ATTEMPTS = 10;
+      let finalSlug = slug;
+      const exists = await db.prepare('SELECT id FROM saas_tenants WHERE slug = ?').bind(slug).first<{ id: string }>();
+      if (exists) {
+        let counter = 1;
+        let candidate = slug + '-' + counter;
+        while (
+          counter <= MAX_SLUG_ATTEMPTS &&
+          (await db.prepare('SELECT id FROM saas_tenants WHERE slug = ?').bind(candidate).first<{ id: string }>())
+        ) {
+          counter += 1;
+          candidate = slug + '-' + counter;
+        }
+        if (counter > MAX_SLUG_ATTEMPTS) {
+          candidate = `${slug}-${crypto.randomUUID().slice(0, 6)}`;
+        }
+        finalSlug = candidate;
+      }
+
+      const id = generateId();
+      const ownerUserId = currentUser.id;
+      const now = new Date().toISOString();
+      const trialEnds = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString();
+
+      const tenantStmt = db
+        .prepare(
+          'INSERT INTO saas_tenants (id, slug, name, tier, status, owner_user_id, trial_ends_at, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'
+        )
+        .bind(id, finalSlug, rawName, 'BASIC', 'trial', ownerUserId, trialEnds, now, now);
+      const subscriptionStmt = db
+        .prepare(
+          'INSERT INTO tenant_subscriptions (id, tenant_id, tier, status, trial_ends_at, current_period_end, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
+        )
+        .bind(`sub_${id}`, id, 'BASIC', 'trial', trialEnds, trialEnds, now, now);
+
+      if (typeof db.batch === 'function') {
+        await db.batch([tenantStmt, subscriptionStmt]);
+      } else {
+        await tenantStmt.run();
+        await subscriptionStmt.run();
+      }
+
+      let token: string | null = null;
+      if (!isHQSuperAdmin(currentUser)) {
+        const nextRole = callerRole === 'customer' || callerRole === 'user' || !callerRole ? 'owner' : currentUser.role;
+        try {
+          await db
+            .prepare('UPDATE users SET tenant_id = ?, role = ?, updated_at = ? WHERE id = ?')
+            .bind(id, nextRole, now, ownerUserId)
+            .run();
+        } catch {
+          // Non-fatal if users table is absent or uses a different schema in isolated tests
+        }
+
+        if (c.env.JWT_SECRET) {
+          try {
+            const accountRes = await loadStaffAccount(c.env.AURA_DB, ownerUserId);
+            if (accountRes.ok) {
+              const issued = await issueStaffSession(c.env, { ...accountRes.account, tenant_id: id, role: nextRole }, {
+                email: currentUser.email,
+                sessionType: 'staff-web',
+              });
+              token = issued.token;
+            }
+          } catch {
+            token = null;
+          }
+          if (!token) {
+            try {
+              token = await generateJWT(
+                {
+                  sub: ownerUserId,
+                  id: ownerUserId,
+                  name: (currentUser as { name?: string }).name || currentUser.email || rawName,
+                  email: currentUser.email,
+                  role: nextRole,
+                  tenantId: id,
+                },
+                c.env.JWT_SECRET
+              );
+            } catch {
+              token = null;
+            }
+          }
+        }
+      }
+
+      const row = await db.prepare('SELECT * FROM saas_tenants WHERE id = ?').bind(id).first<Record<string, unknown>>();
+      const mapped = row ? mapRow(row) : { id, slug: finalSlug, name: rawName };
+      return c.json({ ok: true, data: { ...mapped, token }, token } as const, 201);
     } catch (_err) {
       return c.json({ ok: false, error: 'server_error' } as const, 500);
     }

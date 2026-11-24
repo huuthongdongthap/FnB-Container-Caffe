@@ -23,6 +23,85 @@ function rowMatchesTenant(row: unknown, tenantId?: string): boolean {
 }
 
 /**
+ * Exclude erased/anonymized customers and customers who explicitly revoked or
+ * denied marketing consent. Schema-safe: if `anonymized_at` or `consents` is
+ * absent in a minimal test DB, fails open for that check only.
+ */
+async function filterEligibleMarketingCandidates(
+  db: D1Database,
+  candidates: CampaignCustomer[],
+  tenantId?: string
+): Promise<CampaignCustomer[]> {
+  if (candidates.length === 0) return [];
+  const ids = candidates.map((c) => c.id).filter(Boolean);
+  if (ids.length === 0) return [];
+
+  const excludedIds = new Set<string>();
+  const BATCH_SIZE = 50;
+  const normTenant = normalizeCampaignTenant(tenantId);
+  const hasScopedTenant = Boolean(normTenant && normTenant !== '*');
+
+  for (let i = 0; i < ids.length; i += BATCH_SIZE) {
+    const batch = ids.slice(i, i + BATCH_SIZE);
+    const placeholders = batch.map(() => '?').join(', ');
+
+    // 1. Exclude anonymized / erased customers
+    try {
+      const res = await db
+        .prepare(`SELECT id FROM customers WHERE id IN (${placeholders}) AND anonymized_at IS NOT NULL`)
+        .bind(...batch)
+        .all<{ id: string }>();
+      for (const r of res.results || []) {
+        if (r.id) excludedIds.add(r.id);
+      }
+    } catch {
+      // anonymized_at column absent in legacy schema
+    }
+
+    // 2. Exclude customers who explicitly revoked or denied marketing consent
+    try {
+      const res = hasScopedTenant && normTenant
+        ? await db
+            .prepare(
+              `SELECT customer_id, granted, revoked_at FROM consents
+               WHERE customer_id IN (${placeholders})
+                 AND purpose = 'marketing'
+                 AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?`
+            )
+            .bind(...batch, normTenant)
+            .all<{ customer_id: string; granted?: number | boolean | null; revoked_at?: string | null }>()
+        : await db
+            .prepare(
+              `SELECT customer_id, granted, revoked_at FROM consents
+               WHERE customer_id IN (${placeholders})
+                 AND purpose = 'marketing'`
+            )
+            .bind(...batch)
+            .all<{ customer_id: string; granted?: number | boolean | null; revoked_at?: string | null }>();
+
+      const consentRows = res.results || [];
+      const byCustomer = new Map<string, Array<{ granted?: number | boolean | null; revoked_at?: string | null }>>();
+      for (const row of consentRows) {
+        if (!row.customer_id) continue;
+        const list = byCustomer.get(row.customer_id) ?? [];
+        list.push(row);
+        byCustomer.set(row.customer_id, list);
+      }
+      for (const [cid, rows] of byCustomer.entries()) {
+        const hasActiveGrant = rows.some((r) => Boolean(r.granted) && !r.revoked_at);
+        if (!hasActiveGrant) {
+          excludedIds.add(cid);
+        }
+      }
+    } catch {
+      // consents table absent in minimal test schema
+    }
+  }
+
+  return candidates.filter((c) => !excludedIds.has(c.id));
+}
+
+/**
  * Welcome — new customers in last 24h who haven't received welcome message.
  */
 export async function detectWelcomeCandidates(db: D1Database, tenantId?: string): Promise<CampaignCustomer[]> {
@@ -44,7 +123,7 @@ export async function detectWelcomeCandidates(db: D1Database, tenantId?: string)
               AND COALESCE(NULLIF(TRIM(cl.tenant_id), ''), 'default') = ?
           )
       `).bind(cutoff, tenantId, tenantId).all<CampaignCustomer>();
-      return (results || []).filter((r) => rowMatchesTenant(r, tenantId));
+      return filterEligibleMarketingCandidates(db, (results || []).filter((r) => rowMatchesTenant(r, tenantId)), tenantId);
     } catch {
       try {
         const { results } = await db.prepare(`
@@ -58,7 +137,7 @@ export async function detectWelcomeCandidates(db: D1Database, tenantId?: string)
               WHERE cl.customer_id = c.id AND cl.trigger = 'welcome'
             )
         `).bind(cutoff, tenantId).all<CampaignCustomer>();
-        return (results || []).filter((r) => rowMatchesTenant(r, tenantId));
+        return filterEligibleMarketingCandidates(db, (results || []).filter((r) => rowMatchesTenant(r, tenantId)), tenantId);
       } catch {
         if (tenantId !== 'default') {
           return [];
@@ -92,7 +171,7 @@ export async function detectWelcomeCandidates(db: D1Database, tenantId?: string)
     `).bind(cutoff).all<CampaignCustomer>();
     results = res.results;
   }
-  return (results || []).filter((r) => rowMatchesTenant(r, tenantId));
+  return filterEligibleMarketingCandidates(db, (results || []).filter((r) => rowMatchesTenant(r, tenantId)), tenantId);
 }
 
 /**
@@ -123,7 +202,7 @@ export async function detectBirthdayCandidates(db: D1Database, tenantId?: string
               AND COALESCE(NULLIF(TRIM(cl.tenant_id), ''), 'default') = ?
           )
       `).bind(month, tenantId, yearStart, tenantId).all<CampaignCustomer>();
-      return (results || []).filter((r) => rowMatchesTenant(r, tenantId));
+      return filterEligibleMarketingCandidates(db, (results || []).filter((r) => rowMatchesTenant(r, tenantId)), tenantId);
     } catch {
       try {
         const { results } = await db.prepare(`
@@ -140,7 +219,7 @@ export async function detectBirthdayCandidates(db: D1Database, tenantId?: string
                 AND cl.sent_at >= ?
             )
         `).bind(month, tenantId, yearStart).all<CampaignCustomer>();
-        return (results || []).filter((r) => rowMatchesTenant(r, tenantId));
+        return filterEligibleMarketingCandidates(db, (results || []).filter((r) => rowMatchesTenant(r, tenantId)), tenantId);
       } catch {
         if (tenantId !== 'default') {
           return [];
@@ -181,7 +260,7 @@ export async function detectBirthdayCandidates(db: D1Database, tenantId?: string
     `).bind(month, yearStart).all<CampaignCustomer>();
     results = res.results;
   }
-  return (results || []).filter((r) => rowMatchesTenant(r, tenantId));
+  return filterEligibleMarketingCandidates(db, (results || []).filter((r) => rowMatchesTenant(r, tenantId)), tenantId);
 }
 
 /**
@@ -220,7 +299,7 @@ export async function detectWinbackCandidates(
               AND COALESCE(NULLIF(TRIM(cl.tenant_id), ''), 'default') = ?
           )
       `).bind(tenantId, tenantId, tenantId, cutoff, sixtyDaysAgo, tenantId).all<CampaignCustomer>();
-      return (results || []).filter((r) => rowMatchesTenant(r, tenantId));
+      return filterEligibleMarketingCandidates(db, (results || []).filter((r) => rowMatchesTenant(r, tenantId)), tenantId);
     } catch {
       try {
         const { results } = await db.prepare(`
@@ -239,7 +318,7 @@ export async function detectWinbackCandidates(
                 AND cl.sent_at > ?
             )
         `).bind(tenantId, tenantId, tenantId, cutoff, sixtyDaysAgo).all<CampaignCustomer>();
-        return (results || []).filter((r) => rowMatchesTenant(r, tenantId));
+        return filterEligibleMarketingCandidates(db, (results || []).filter((r) => rowMatchesTenant(r, tenantId)), tenantId);
       } catch {
         try {
           const { results } = await db.prepare(`
@@ -258,7 +337,7 @@ export async function detectWinbackCandidates(
                   AND cl.sent_at > ?
               )
           `).bind(tenantId, cutoff, sixtyDaysAgo).all<CampaignCustomer>();
-          return (results || []).filter((r) => rowMatchesTenant(r, tenantId));
+          return filterEligibleMarketingCandidates(db, (results || []).filter((r) => rowMatchesTenant(r, tenantId)), tenantId);
         } catch {
           if (tenantId !== 'default') {
             return [];
@@ -323,7 +402,7 @@ export async function detectWinbackCandidates(
       results = res.results;
     }
   }
-  return (results || []).filter((r) => rowMatchesTenant(r, tenantId));
+  return filterEligibleMarketingCandidates(db, (results || []).filter((r) => rowMatchesTenant(r, tenantId)), tenantId);
 }
 
 /**
@@ -357,7 +436,7 @@ export async function detectPostVisitCandidates(db: D1Database, tenantId?: strin
               AND COALESCE(NULLIF(TRIM(cl.tenant_id), ''), 'default') = ?
           )
       `).bind(since, until, tenantId, tenantId, since, tenantId).all<CampaignCustomer>();
-      return (results || []).filter((r) => rowMatchesTenant(r, tenantId));
+      return filterEligibleMarketingCandidates(db, (results || []).filter((r) => rowMatchesTenant(r, tenantId)), tenantId);
     } catch {
       try {
         const { results } = await db.prepare(`
@@ -377,7 +456,7 @@ export async function detectPostVisitCandidates(db: D1Database, tenantId?: strin
                 AND cl.sent_at > ?
             )
         `).bind(since, until, tenantId, tenantId, since).all<CampaignCustomer>();
-        return (results || []).filter((r) => rowMatchesTenant(r, tenantId));
+        return filterEligibleMarketingCandidates(db, (results || []).filter((r) => rowMatchesTenant(r, tenantId)), tenantId);
       } catch {
         try {
           const { results } = await db.prepare(`
@@ -396,7 +475,7 @@ export async function detectPostVisitCandidates(db: D1Database, tenantId?: strin
                   AND cl.sent_at > ?
               )
           `).bind(since, until, tenantId, since).all<CampaignCustomer>();
-          return (results || []).filter((r) => rowMatchesTenant(r, tenantId));
+          return filterEligibleMarketingCandidates(db, (results || []).filter((r) => rowMatchesTenant(r, tenantId)), tenantId);
         } catch {
           if (tenantId !== 'default') {
             return [];
@@ -442,7 +521,7 @@ export async function detectPostVisitCandidates(db: D1Database, tenantId?: strin
     `).bind(since, until, since).all<CampaignCustomer>();
     results = res.results;
   }
-  return (results || []).filter((r) => rowMatchesTenant(r, tenantId));
+  return filterEligibleMarketingCandidates(db, (results || []).filter((r) => rowMatchesTenant(r, tenantId)), tenantId);
 }
 
 interface ExpiringRow {
@@ -482,7 +561,7 @@ export async function detectCashbackExpiry(db: D1Database, tenantId?: string): P
         GROUP BY cw.customer_id
       `).bind(sevenDaysFromNow, tenantId, tenantId, sevenDaysAgo).all<ExpiringRow>();
       results = (scopedRes.results || []).filter((r) => rowMatchesTenant(r, tenantId));
-      return results
+      const candidates = results
         .map((row) => {
           const cappedAmount = row.wallet_balance != null
             ? Math.max(0, Math.min(Number(row.total_expiring || 0), Number(row.wallet_balance)))
@@ -499,6 +578,7 @@ export async function detectCashbackExpiry(db: D1Database, tenantId?: string): P
           };
         })
         .filter((c) => (c.total_spent ?? 0) > 0);
+      return filterEligibleMarketingCandidates(db, candidates, tenantId);
     } catch {
       try {
         const scopedFallback = await db.prepare(`
@@ -515,15 +595,19 @@ export async function detectCashbackExpiry(db: D1Database, tenantId?: string): P
           GROUP BY cw.customer_id
         `).bind(sevenDaysFromNow, tenantId, tenantId).all<ExpiringRow>();
         results = (scopedFallback.results || []).filter((r) => rowMatchesTenant(r, tenantId));
-        return results.map((row) => ({
-          id: row.customer_id,
-          name: row.name || '',
-          phone: row.phone || undefined,
-          email: undefined,
-          loyalty_tier: undefined,
-          total_spent: row.total_expiring,
-          tenant_id: (row.tenant_id && String(row.tenant_id).trim()) || tenantId,
-        }));
+        return filterEligibleMarketingCandidates(
+          db,
+          results.map((row) => ({
+            id: row.customer_id,
+            name: row.name || '',
+            phone: row.phone || undefined,
+            email: undefined,
+            loyalty_tier: undefined,
+            total_spent: row.total_expiring,
+            tenant_id: (row.tenant_id && String(row.tenant_id).trim()) || tenantId,
+          })),
+          tenantId,
+        );
       } catch {
         if (tenantId !== 'default') {
           return [];
@@ -593,7 +677,7 @@ export async function detectCashbackExpiry(db: D1Database, tenantId?: string): P
     }
   }
 
-  return results
+  const candidates = results
     .filter((r) => rowMatchesTenant(r, normTenant))
     .map((row) => ({
       id: row.customer_id,
@@ -604,6 +688,7 @@ export async function detectCashbackExpiry(db: D1Database, tenantId?: string): P
       total_spent: row.total_expiring,
       tenant_id: (row.tenant_id && String(row.tenant_id).trim()) || (normTenant && normTenant !== '*' ? normTenant : 'default'),
     }));
+  return filterEligibleMarketingCandidates(db, candidates, normTenant);
 }
 
 /**

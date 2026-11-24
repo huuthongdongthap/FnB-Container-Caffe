@@ -2,7 +2,7 @@
  * Campaign Types — Automated Marketing Campaigns
  */
 export type CampaignTrigger = 'welcome' | 'birthday' | 'winback' | 'post_visit' | 'cashback_expiry';
-export type CampaignChannel = 'sms' | 'email' | 'zalo';
+export type CampaignChannel = 'sms' | 'email' | 'zalo' | 'push';
 
 export interface CampaignCustomer {
   id: string;

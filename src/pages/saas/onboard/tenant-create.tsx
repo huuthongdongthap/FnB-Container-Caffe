@@ -23,7 +23,13 @@ const TenantCreatePage: React.FC = () => {
 
     setLoading(true);
     try {
-      const data = await apiFetch<{ error?: string; message?: string; data?: { id?: string }; tenantId?: string }>('/api/saas/tenants/create', {
+      const data = await apiFetch<{
+        error?: string;
+        message?: string;
+        data?: { id?: string; token?: string | null };
+        tenantId?: string;
+        token?: string | null;
+      }>('/api/saas/tenants/self-serve', {
         method: 'POST',
         body: JSON.stringify({ name: name.trim() }),
       });
@@ -39,7 +45,12 @@ const TenantCreatePage: React.FC = () => {
         return;
       }
 
-      const newTenantId = (data as { data?: { id?: string } }).data?.id || (data as { tenantId?: string }).tenantId;
+      const refreshedToken = data.token || data.data?.token;
+      if (refreshedToken) {
+        localStorage.setItem('aura_auth_token', refreshedToken);
+      }
+
+      const newTenantId = data.data?.id || data.tenantId;
       if (newTenantId) {
         localStorage.setItem('aura_tenant_id', newTenantId);
         setTenantId(newTenantId);

@@ -18,6 +18,7 @@ import {
 import { sendCampaignSms } from './channels/sms';
 import { sendCampaignEmail } from './channels/email';
 import { sendCampaignZalo } from './channels/zalo';
+import { sendPushToCustomer, type PushEnv } from '../push/notifier';
 import type { CampaignTrigger, CampaignChannel, CampaignCustomer, CampaignResult } from './types';
 
 const log = createLogger({ route: 'campaign-cron' });
@@ -30,6 +31,11 @@ interface TriggerResult {
 interface ChannelConfig {
   channel: CampaignChannel;
   to: (customer: CampaignCustomer) => string | undefined;
+}
+
+interface ResolvedTriggerConfig {
+  isActive: boolean;
+  channels: CampaignChannel[];
 }
 
 const CHANNEL_PRIORITY: Record<CampaignTrigger, ChannelConfig[]> = {
@@ -52,12 +58,108 @@ const CHANNEL_PRIORITY: Record<CampaignTrigger, ChannelConfig[]> = {
   ]
 };
 
+function recipientForChannel(channel: CampaignChannel, customer: CampaignCustomer): string | undefined {
+  switch (channel) {
+  case 'sms':
+  case 'zalo':
+    return customer.phone;
+  case 'email':
+    return customer.email;
+  case 'push':
+    return customer.id;
+  default:
+    return undefined;
+  }
+}
+
+function parseChannelsJson(raw: unknown, fallback: CampaignChannel[]): CampaignChannel[] {
+  if (typeof raw !== 'string' || !raw.trim()) return fallback;
+  try {
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return fallback;
+    const valid = parsed.filter(
+      (ch): ch is CampaignChannel => ch === 'sms' || ch === 'email' || ch === 'zalo' || ch === 'push'
+    );
+    return valid.length > 0 ? valid : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+async function loadTriggerConfigs(
+  db: import('@cloudflare/workers-types').D1Database,
+  tenantId: string
+): Promise<Map<CampaignTrigger, ResolvedTriggerConfig>> {
+  const configs = new Map<CampaignTrigger, ResolvedTriggerConfig>();
+  const rows: Array<{ trigger: string; is_active: number | boolean; channels?: string | null }> = [];
+  try {
+    const res = await db.prepare(
+      "SELECT trigger, is_active, channels FROM tenant_campaign_configs WHERE COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
+    ).bind(tenantId).all<{ trigger: string; is_active: number | boolean; channels?: string | null }>();
+    if (res.results && res.results.length > 0) {
+      rows.push(...res.results);
+    }
+  } catch {
+    // tenant_campaign_configs table may not exist; fall back to campaign_configs
+  }
+  if (rows.length === 0) {
+    try {
+      const res = await db.prepare(
+        "SELECT trigger, is_active, channels FROM campaign_configs WHERE COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
+      ).bind(tenantId).all<{ trigger: string; is_active: number | boolean; channels?: string | null }>();
+      if (res.results && res.results.length > 0) {
+        rows.push(...res.results);
+      }
+    } catch {
+      try {
+        if (tenantId === 'default') {
+          const res = await db.prepare(
+            'SELECT trigger, is_active, channels FROM campaign_configs'
+          ).all<{ trigger: string; is_active: number | boolean; channels?: string | null }>();
+          if (res.results) rows.push(...res.results);
+        }
+      } catch {
+        // campaign_configs table absent in minimal test schemas
+      }
+    }
+  }
+  for (const row of rows) {
+    const trigger = row.trigger as CampaignTrigger;
+    const defaults = CHANNEL_PRIORITY[trigger]?.map((c) => c.channel) ?? ['sms'];
+    configs.set(trigger, {
+      isActive: Boolean(row.is_active),
+      channels: parseChannelsJson(row.channels, defaults),
+    });
+  }
+  return configs;
+}
+
+async function resolveActiveCampaignTenants(
+  db: import('@cloudflare/workers-types').D1Database,
+  pilotTenant: string
+): Promise<string[]> {
+  const tenants = new Set<string>([pilotTenant]);
+  try {
+    const res = await db.prepare(
+      "SELECT id FROM saas_tenants WHERE status IS NULL OR LOWER(status) IN ('active', 'trial', 'trialing')"
+    ).all<{ id?: string | null }>();
+    for (const r of res.results || []) {
+      const id = typeof r.id === 'string' ? r.id.trim() : '';
+      if (id) tenants.add(id);
+    }
+  } catch {
+    // saas_tenants may not exist in single-tenant or minimal test DBs
+  }
+  return Array.from(tenants);
+}
+
 async function processTrigger(
   env: Record<string, unknown>,
   db: import('@cloudflare/workers-types').D1Database,
   trigger: CampaignTrigger,
   customers: CampaignCustomer[],
-  tenantId: string
+  tenantId: string,
+  configuredChannels?: CampaignChannel[]
 ): Promise<TriggerResult> {
   let sent = 0;
 
@@ -69,7 +171,12 @@ async function processTrigger(
         continue;
       }
 
-      const channels = CHANNEL_PRIORITY[trigger];
+      const channels: ChannelConfig[] = configuredChannels && configuredChannels.length > 0
+        ? configuredChannels.map((channel) => ({
+            channel,
+            to: (cust: CampaignCustomer) => recipientForChannel(channel, cust),
+          }))
+        : CHANNEL_PRIORITY[trigger];
       let customerSent = false;
 
       for (const { channel, to } of channels) {
@@ -105,6 +212,26 @@ async function processTrigger(
         case 'zalo':
           result = await sendCampaignZalo(env, message, effectiveTenant);
           break;
+        case 'push': {
+          const pushRes = await sendPushToCustomer(
+            env as unknown as PushEnv,
+            customer.id,
+            {
+              title: template.subject || 'AURA SPACE',
+              body: template.sms,
+              data: { trigger, customer_id: customer.id, tenant_id: effectiveTenant },
+            },
+            effectiveTenant
+          );
+          result = {
+            trigger,
+            channel: 'push',
+            customer_id: customer.id,
+            sent: pushRes.sent > 0,
+            error: pushRes.sent > 0 ? undefined : 'No active push subscriptions',
+          };
+          break;
+        }
         default:
           continue;
         }
@@ -138,70 +265,42 @@ export async function runCampaignTriggers(
     return { triggered: 0, sent: 0 };
   }
 
-  const tenantId = resolvePilotStore(env as unknown as Parameters<typeof resolvePilotStore>[0]);
+  const pilotTenant = resolvePilotStore(env as unknown as Parameters<typeof resolvePilotStore>[0]);
+  const tenants = await resolveActiveCampaignTenants(db, pilotTenant);
   let totalTriggered = 0;
   let totalSent = 0;
 
-  // Welcome — every 15 min
-  try {
-    const welcome = await detectWelcomeCandidates(db, tenantId);
-    if (welcome.length > 0) {
-      const result = await processTrigger(env, db, 'welcome', welcome, tenantId);
-      totalTriggered += result.triggered;
-      totalSent += result.sent;
+  const triggerDetectors: Array<{
+    trigger: CampaignTrigger;
+    detect: (tenantId: string) => Promise<CampaignCustomer[]>;
+  }> = [
+    { trigger: 'welcome', detect: (tid) => detectWelcomeCandidates(db, tid) },
+    { trigger: 'birthday', detect: (tid) => detectBirthdayCandidates(db, tid) },
+    { trigger: 'winback', detect: (tid) => detectWinbackCandidates(db, tid) },
+    { trigger: 'post_visit', detect: (tid) => detectPostVisitCandidates(db, tid) },
+    { trigger: 'cashback_expiry', detect: (tid) => detectCashbackExpiry(db, tid) },
+  ];
+
+  for (const tenantId of tenants) {
+    const configMap = await loadTriggerConfigs(db, tenantId);
+    for (const { trigger, detect } of triggerDetectors) {
+      const cfg = configMap.get(trigger);
+      if (cfg && !cfg.isActive) {
+        continue;
+      }
+      try {
+        const candidates = await detect(tenantId);
+        if (candidates.length > 0) {
+          const result = await processTrigger(env, db, trigger, candidates, tenantId, cfg?.channels);
+          totalTriggered += result.triggered;
+          totalSent += result.sent;
+        }
+      } catch (err) {
+        log.error(`${trigger} trigger failed`, { tenantId, error: (err as Error).message });
+      }
     }
-  } catch (err) {
-    log.error('welcome trigger failed', { error: (err as Error).message });
   }
 
-  // Birthday — daily
-  try {
-    const birthday = await detectBirthdayCandidates(db, tenantId);
-    if (birthday.length > 0) {
-      const result = await processTrigger(env, db, 'birthday', birthday, tenantId);
-      totalTriggered += result.triggered;
-      totalSent += result.sent;
-    }
-  } catch (err) {
-    log.error('birthday trigger failed', { error: (err as Error).message });
-  }
-
-  // Winback — daily
-  try {
-    const winback = await detectWinbackCandidates(db, tenantId);
-    if (winback.length > 0) {
-      const result = await processTrigger(env, db, 'winback', winback, tenantId);
-      totalTriggered += result.triggered;
-      totalSent += result.sent;
-    }
-  } catch (err) {
-    log.error('winback trigger failed', { error: (err as Error).message });
-  }
-
-  // Post-visit — every 30 min
-  try {
-    const postVisit = await detectPostVisitCandidates(db, tenantId);
-    if (postVisit.length > 0) {
-      const result = await processTrigger(env, db, 'post_visit', postVisit, tenantId);
-      totalTriggered += result.triggered;
-      totalSent += result.sent;
-    }
-  } catch (err) {
-    log.error('post_visit trigger failed', { error: (err as Error).message });
-  }
-
-  // Cashback expiry — daily
-  try {
-    const cashback = await detectCashbackExpiry(db, tenantId);
-    if (cashback.length > 0) {
-      const result = await processTrigger(env, db, 'cashback_expiry', cashback, tenantId);
-      totalTriggered += result.triggered;
-      totalSent += result.sent;
-    }
-  } catch (err) {
-    log.error('cashback_expiry trigger failed', { error: (err as Error).message });
-  }
-
-  log.info('campaign_triggers_complete', { totalTriggered, totalSent });
+  log.info('campaign_triggers_complete', { totalTriggered, totalSent, tenantCount: tenants.length });
   return { triggered: totalTriggered, sent: totalSent };
 }

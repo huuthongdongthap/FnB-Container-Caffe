@@ -8,10 +8,17 @@ export interface TableInfo {
 
 export interface OrderItem {
   id?: string;
+  product_id?: string;
   name: string;
   quantity: number;
   price: number;
   note: string;
+}
+
+export interface WaiterMenuItem {
+  id: string;
+  name: string;
+  price: number;
 }
 
 export interface MobileOrder {

@@ -910,9 +910,6 @@ export async function pauseSubscription(c: Context<{ Bindings: Env }>) {
   if (String(sub.status || '').trim().toLowerCase() !== 'active') {
     return c.json({ success: false, error: `Only active subscriptions can be paused (current: ${sub.status || 'unknown'})` }, 409);
   }
-  if (sub.paused_at) {
-    return c.json({ success: false, error: 'Subscription already paused' }, 409);
-  }
   const pausedAt = nowStr();
   try {
     await db.prepare(
@@ -974,15 +971,27 @@ export async function resumeSubscription(c: Context<{ Bindings: Env }>) {
   const resumedAt = nowStr();
   try {
     await db.prepare(
-      'UPDATE subscriptions SET status = \'active\', current_period_end = ?, next_billing_date = ?, updated_at = ? WHERE id = ? AND (? = \'*\' OR COALESCE(NULLIF(TRIM(tenant_id), \'\'), \'default\') = ?)'
+      'UPDATE subscriptions SET status = \'active\', paused_at = NULL, current_period_end = ?, next_billing_date = ?, updated_at = ? WHERE id = ? AND (? = \'*\' OR COALESCE(NULLIF(TRIM(tenant_id), \'\'), \'default\') = ?)'
     ).bind(newPeriodEnd, newPeriodEnd, resumedAt, id, tenantId, tenantId).run();
-  } catch (err) {
-    if (tenantId !== 'default' && tenantId !== '*') {
-      return c.json({ success: false, error: 'Tenant-scoped subscription resume failed', detail: (err as Error).message }, 500);
+  } catch {
+    try {
+      await db.prepare(
+        'UPDATE subscriptions SET status = \'active\', current_period_end = ?, next_billing_date = ?, updated_at = ? WHERE id = ? AND (? = \'*\' OR COALESCE(NULLIF(TRIM(tenant_id), \'\'), \'default\') = ?)'
+      ).bind(newPeriodEnd, newPeriodEnd, resumedAt, id, tenantId, tenantId).run();
+    } catch (err) {
+      if (tenantId !== 'default' && tenantId !== '*') {
+        return c.json({ success: false, error: 'Tenant-scoped subscription resume failed', detail: (err as Error).message }, 500);
+      }
+      try {
+        await db.prepare(
+          'UPDATE subscriptions SET status = \'active\', paused_at = NULL, current_period_end = ?, next_billing_date = ?, updated_at = ? WHERE id = ?'
+        ).bind(newPeriodEnd, newPeriodEnd, resumedAt, id).run();
+      } catch {
+        await db.prepare(
+          'UPDATE subscriptions SET status = \'active\', current_period_end = ?, next_billing_date = ?, updated_at = ? WHERE id = ?'
+        ).bind(newPeriodEnd, newPeriodEnd, resumedAt, id).run();
+      }
     }
-    await db.prepare(
-      'UPDATE subscriptions SET status = \'active\', current_period_end = ?, next_billing_date = ?, updated_at = ? WHERE id = ?'
-    ).bind(newPeriodEnd, newPeriodEnd, resumedAt, id).run();
   }
 
   await updateMRRSnapshot(db, effectiveSubTenant);
