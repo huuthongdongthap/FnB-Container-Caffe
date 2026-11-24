@@ -283,8 +283,9 @@ export function createStoreMockDb() {  const customers = new Map<string, { id: s
               if (sql.includes('FROM orders') && sql.includes('customer_name') && (sql.includes('ORDER BY created_at') || sql.includes('ORDER BY o.created_at'))) {
                 // Row-level export SELECT: apply the same WHERE clauses SQLite would,
                 // but only the ones present in the SQL text the handler actually sent.
-                const from = String(args[0]);
-                const to = String(args[1]);
+                const dateArgs = args.map(String).filter((a) => /^\d{4}-\d{2}-\d{2}$/.test(a));
+                const from = dateArgs[0] || String(args[0]);
+                const to = dateArgs[1] || String(args[1]);
                 const badStatuses = ['cancelled', 'canceled', 'refunded', 'failed', 'rejected', 'expired'];
                 const badPayStatuses = ['refunded', 'failed', 'cancelled', 'canceled'];
                 const enforcesValidity = sql.includes("'cancelled'") && sql.includes('payment_status');

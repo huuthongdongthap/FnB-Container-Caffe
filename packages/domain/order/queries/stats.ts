@@ -252,8 +252,7 @@ export async function getStats(request: Request, env: Record<string, unknown>, t
           return acc;
         }, {}),
         top_products: topProductsList,
-        revenue_7days: revenueResult
-          .filter((row) => row.date >= weekAgo)
+        revenue_7days: (seriesDays < 2 ? revenueResult.filter((row) => row.date >= weekAgo) : revenueResult)
           .map(row => ({
             date: row.date,
             revenue: row.revenue

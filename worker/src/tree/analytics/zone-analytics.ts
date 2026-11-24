@@ -59,6 +59,8 @@ export async function getZoneStats(
   WHERE o.status != 'cancelled'
     AND o.status NOT IN ('cancelled', 'refunded', 'failed', 'rejected', 'expired')
     AND LOWER(COALESCE(TRIM(o.status), '')) NOT IN ('cancelled', 'canceled', 'refunded', 'failed', 'rejected', 'expired')
+    AND LOWER(COALESCE(TRIM(o.payment_status), '')) IN ('paid', 'partially_refunded', 'completed')
+    AND NOT (COALESCE(TRIM(o.notes), '') = 'Khách QR - cho don mon' AND COALESCE(TRIM(o.items), '[]') IN ('', '[]'))
     AND o.created_at >= datetime('now', '-' || ? || ' days')${tenantClause}
   GROUP BY label
   ORDER BY value DESC

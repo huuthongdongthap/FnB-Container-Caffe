@@ -232,9 +232,9 @@ describe('Phase 51 Slice AX2 — Grouped Sales Reports, Tree Analytics UTC+7 / T
       const catRes = await app.request('/sales-by-category?from=2026-11-03&to=2026-11-03', {}, env);
       expect(catRes.status).toBe(200);
       const catJson = (await catRes.json()) as {
-        data: { groups: Array<{ label: string; value: number; count: number }> };
+        data: { groups: Array<{ label: string; value: number; count: number; itemsCount?: number; orderCount?: number }> };
       };
-      expect(catJson.data.groups).toEqual([{ label: 'Coffee', value: 50000, count: 1 }]);
+      expect(catJson.data.groups).toEqual([{ label: 'Coffee', value: 50000, count: 1, itemsCount: 1, orderCount: 1 }]);
 
       const payRes = await app.request('/sales-by-payment?from=2026-11-03&to=2026-11-03', {}, env);
       expect(payRes.status).toBe(200);
