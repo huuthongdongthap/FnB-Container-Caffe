@@ -28,12 +28,24 @@ export async function processRefundLoyalty(db: D1Database, env: Env, input: {
     if (!customerId) {
       // Only zero-accrual orders may complete without a recipient. Missing ledger
       // evidence for a nonzero accrual must remain actionable, never silently skip.
-      const result = await db.prepare(`UPDATE refund_loyalty_work SET status = 'completed', completed_at = ?, updated_at = ?, last_error = NULL
-        WHERE tenant_id = ? AND reversal_key = ? AND status IN ('pending', 'failed')
-          AND EXISTS (SELECT 1 FROM orders WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?
-            AND COALESCE(points_earned, 0) = 0 AND COALESCE(cashback_earned, 0) = 0)`)
-        .bind(new Date().toISOString(), new Date().toISOString(), input.tenantId, input.reference, input.orderId, input.tenantId).run();
-      return result.meta.changes > 0 ? { status: 'skipped', reason: 'no_points_to_reverse' }
+      const completedAt = new Date().toISOString();
+      let changes = 0;
+      try {
+        const result = await db.prepare(`UPDATE refund_loyalty_work SET status = 'completed', completed_at = ?, updated_at = ?, last_error = NULL
+          WHERE tenant_id = ? AND reversal_key = ? AND status IN ('pending', 'failed')
+            AND EXISTS (SELECT 1 FROM orders WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?
+              AND COALESCE(points_earned, 0) = 0 AND COALESCE(cashback_earned, 0) = 0)`)
+          .bind(completedAt, completedAt, input.tenantId, input.reference, input.orderId, input.tenantId).run();
+        changes = result.meta.changes;
+      } catch {
+        const result = await db.prepare(`UPDATE refund_loyalty_work SET status = 'completed', completed_at = ?
+          WHERE tenant_id = ? AND reversal_key = ? AND status IN ('pending', 'failed')
+            AND EXISTS (SELECT 1 FROM orders WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?
+              AND COALESCE(points_earned, 0) = 0 AND COALESCE(cashback_earned, 0) = 0)`)
+          .bind(completedAt, input.tenantId, input.reference, input.orderId, input.tenantId).run();
+        changes = result.meta.changes;
+      }
+      return changes > 0 ? { status: 'skipped', reason: 'no_points_to_reverse' }
         : { status: 'failed', reason: 'accrual_recipient_missing', retryable: true };
     }
     const policy = await loadPolicy(db, env.AUTH_KV, new Date(), input.tenantId);

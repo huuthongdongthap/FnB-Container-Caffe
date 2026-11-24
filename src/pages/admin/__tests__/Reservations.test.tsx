@@ -135,4 +135,21 @@ describe('AdminReservationsPage', () => {
     renderWithProviders(<AdminReservationsPage />);
     expect(screen.getByText('adminReservations.emptyTitle')).toBeTruthy();
   });
+
+  it('resets edit form fields when switching directly between two reservations', () => {
+    renderWithProviders(<AdminReservationsPage />);
+    const editBtns = screen.getAllByText('adminReservations.editBtn');
+    expect(editBtns.length).toBeGreaterThanOrEqual(2);
+
+    _fireEvent.click(editBtns[0]!);
+    expect(screen.getByDisplayValue('Alice')).toBeTruthy();
+    expect(screen.getByDisplayValue('0901234567')).toBeTruthy();
+    expect(screen.getByDisplayValue('2026-08-20')).toBeTruthy();
+
+    _fireEvent.click(editBtns[1]!);
+    expect(screen.getByDisplayValue('Bob')).toBeTruthy();
+    expect(screen.getByDisplayValue('0907654321')).toBeTruthy();
+    expect(screen.getByDisplayValue('2026-08-21')).toBeTruthy();
+    expect(screen.queryByDisplayValue('Alice')).toBeNull();
+  });
 });

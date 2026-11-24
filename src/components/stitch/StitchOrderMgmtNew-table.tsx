@@ -350,7 +350,8 @@ function OrderListSection({
                       <StatusBadge status={order.status} />
                     </td>
                     <td className="px-4 py-3 text-right">
-                      <div className="inline-flex items-center gap-2">
+                      <div className="inline-flex flex-wrap items-center justify-end gap-2">
+                        {order.additionalActions}
                         <button
                           type="button"
                           onClick={() => onViewDetails?.(order)}

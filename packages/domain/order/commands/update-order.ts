@@ -57,23 +57,30 @@ export async function updateOrder(
     let results: Record<string, unknown>[];
     try {
       const q = await db.prepare(
-        `SELECT id, status, items, total, payment_status, customer_name, customer_phone, table_id, created_at, tenant_id, session_id FROM orders WHERE id = ?${tenantClause}`
+        `SELECT id, status, items, total, payment_status, order_type, customer_name, customer_phone, table_id, created_at, tenant_id, session_id FROM orders WHERE id = ?${tenantClause}`
       ).bind(id, ...tenantBinds).all<Record<string, unknown>>();
       results = q.results ?? [];
     } catch {
       try {
         const q = await db.prepare(
-          `SELECT id, status, items, total, payment_status, customer_name, customer_phone, table_id, created_at, tenant_id FROM orders WHERE id = ?${tenantClause}`
+          `SELECT id, status, items, total, payment_status, order_type, customer_name, customer_phone, table_id, created_at, tenant_id FROM orders WHERE id = ?${tenantClause}`
         ).bind(id, ...tenantBinds).all<Record<string, unknown>>();
         results = q.results ?? [];
-      } catch (selectErr) {
-        if (!/no such column:\s*tenant_id/i.test(String(selectErr)) || (tenantId !== 'default' && tenantId !== '*')) {
-          throw selectErr;
+      } catch {
+        try {
+          const q = await db.prepare(
+            `SELECT id, status, items, total, payment_status, customer_name, customer_phone, table_id, created_at, tenant_id FROM orders WHERE id = ?${tenantClause}`
+          ).bind(id, ...tenantBinds).all<Record<string, unknown>>();
+          results = q.results ?? [];
+        } catch (selectErr) {
+          if (!/no such column:\s*tenant_id/i.test(String(selectErr)) || (tenantId !== 'default' && tenantId !== '*')) {
+            throw selectErr;
+          }
+          const q = await db.prepare(
+            `SELECT id, status, items, total, payment_status, customer_name, customer_phone, table_id, created_at FROM orders WHERE id = ?`
+          ).bind(id).all<Record<string, unknown>>();
+          results = q.results ?? [];
         }
-        const q = await db.prepare(
-          `SELECT id, status, items, total, payment_status, customer_name, customer_phone, table_id, created_at FROM orders WHERE id = ?`
-        ).bind(id).all<Record<string, unknown>>();
-        results = q.results ?? [];
       }
     }
 
@@ -82,15 +89,33 @@ export async function updateOrder(
     }
 
     const currentStatus = String(results[0].status ?? '');
-    if ((body.notes !== undefined || body.delivery_time !== undefined) && isTerminal(currentStatus)) {
+    const currentPaymentStatus = String((results[0] as { payment_status?: unknown }).payment_status ?? 'unpaid').trim().toLowerCase();
+    const hasFieldUpdate = body.notes !== undefined || body.delivery_time !== undefined || body.payment_method !== undefined;
+    if (hasFieldUpdate && isTerminal(currentStatus)) {
       return errorResponse('Cannot modify a completed or cancelled order', 400);
     }
     if (
-      (body.notes !== undefined || body.delivery_time !== undefined) &&
+      hasFieldUpdate &&
       actorRole &&
-      !ORDER_FIELD_STAFF_ROLES.includes(actorRole)
+      !ORDER_FIELD_STAFF_ROLES.includes(normalizedRole) &&
+      normalizedRole !== 'super_admin'
     ) {
       return errorResponse('Insufficient permissions to update order fields', 403);
+    }
+    if (body.payment_method !== undefined) {
+      const allowedMethods = ['payos', 'cod', 'cash', 'vietqr'];
+      const nextMethod = String(body.payment_method).trim().toLowerCase();
+      if (!allowedMethods.includes(nextMethod)) {
+        return errorResponse('Invalid payment_method', 400);
+      }
+      const currentOrderType = String((results[0] as { order_type?: unknown }).order_type ?? '').trim().toLowerCase();
+      if (currentOrderType === 'delivery' && (nextMethod === 'cod' || nextMethod === 'cash')) {
+        return errorResponse('Delivery orders require prepaid online payment (PayOS)', 400);
+      }
+      if (['paid', 'completed', 'refunded', 'partially_refunded'].includes(currentPaymentStatus)) {
+        return errorResponse('Cannot change payment method on a settled or refunded order', 409);
+      }
+      body.payment_method = nextMethod;
     }
 
     if (body.status !== undefined) {
@@ -102,12 +127,12 @@ export async function updateOrder(
         currentOrder: results[0] as { id: string; status: string; payment_status?: string | null },
         paymentStatus: String((results[0] as { payment_status?: unknown }).payment_status ?? 'unpaid'),
         allowPaidCompensation: canCompensatePaid,
-        fields: { notes: body.notes, delivery_time: body.delivery_time },
+        fields: { notes: body.notes, delivery_time: body.delivery_time, payment_method: body.payment_method },
       });
       if (!transition.success) return errorResponse(transition.error!, transition.statusCode || 400);
       if (transition.idempotent) return jsonResponse({ success: true, idempotent: true });
     } else {
-      const fields = ['notes', 'delivery_time'].filter(field => body[field] !== undefined);
+      const fields = ['notes', 'delivery_time', 'payment_method'].filter(field => body[field] !== undefined);
       if (!fields.length) return errorResponse('No valid fields to update', 400);
       const rawLoadedTenant = (results[0] as Record<string, unknown> | undefined)?.tenant_id;
       const loadedOrderTenant =
@@ -120,8 +145,12 @@ export async function updateOrder(
           ? " AND (tenant_id = ? OR tenant_id IS NULL OR tenant_id = '')"
           : ' AND tenant_id = ?';
       const updateTenantBinds = loadedOrderTenant === '*' ? [] : [loadedOrderTenant];
+      const paymentStatusGuard =
+        body.payment_method !== undefined
+          ? " AND LOWER(TRIM(COALESCE(payment_status, ''))) NOT IN ('paid', 'completed', 'refunded', 'partially_refunded')"
+          : '';
       const result = await db.prepare(
-        `UPDATE orders SET ${fields.map(field => `${field} = ?`).join(', ')}, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND status = ?${updateTenantClause}`,
+        `UPDATE orders SET ${fields.map(field => `${field} = ?`).join(', ')}, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND status = ?${updateTenantClause}${paymentStatusGuard}`,
       ).bind(...fields.map(field => body[field]), id, results[0].status, ...updateTenantBinds).run();
       if (changedRows(result) < 1) return errorResponse('Order changed concurrently; refresh and retry', 409);
     }
@@ -745,6 +774,13 @@ export async function updateOrder(
       }
       if (results[0]?.table_id) {
         await releaseTableIfNoActiveOrders(db, String(results[0].table_id), effectiveCancelTenant).catch(() => false);
+      }
+    } else if (body.payment_method !== undefined && body.payment_method !== 'payos') {
+      try {
+        const { cancelOpenPayOSAttemptForOrder } = await import('@aura/domain-payment');
+        await cancelOpenPayOSAttemptForOrder(db, env, id, effectiveEventTenant).catch(() => {});
+      } catch {
+        // Optional PayOS payment table/module in partial schemas
       }
     }
 

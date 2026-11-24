@@ -13,20 +13,36 @@ import { sendZNS } from '../worker/src/tree/zalo/zns-sender';
 import { notifyMember } from '../worker/src/tree/zalo/notify-member';
 
 // Mock TEMPLATE_IDS to have valid template IDs for testing
-vi.mock('../worker/src/tree/zalo/zns-templates', () => ({
-  TEMPLATE_IDS: {
+vi.mock('../worker/src/tree/zalo/zns-templates', () => {
+  const TEMPLATE_IDS: Record<string, string> = {
     welcome_signup: 'TEST_WELCOME_TEMPLATE_ID',
     cashback_earned: 'TEST_CASHBACK_TEMPLATE_ID',
     tier_upgrade: 'TEST_TIER_TEMPLATE_ID',
     cashback_expiry_warning: 'TEST_EXPIRY_TEMPLATE_ID',
     general_promotion: 'TEST_GENERAL_PROMO_TEMPLATE_ID'
-  },
-  buildTemplateData: vi.fn((template_key: string, data: any) => ({
-    customer_name: data.name || '',
-    amount: String(data.amount || 0),
-    member_id: data.member_id || ''
-  }))
-}));
+  };
+  return {
+    TEMPLATE_IDS,
+    resolveTemplateId: vi.fn((template_key: string, env?: Record<string, unknown>) => {
+      const normalizedKey = String(template_key || '').trim();
+      if (!normalizedKey) return null;
+      const envVal = env?.[`ZALO_ZNS_TEMPLATE_${normalizedKey.toUpperCase()}`];
+      if (typeof envVal === 'string' && envVal.trim() && !envVal.trim().startsWith('YOUR_')) {
+        return envVal.trim();
+      }
+      const fallback = TEMPLATE_IDS[normalizedKey];
+      if (typeof fallback === 'string' && fallback.trim() && !fallback.trim().startsWith('YOUR_')) {
+        return fallback.trim();
+      }
+      return null;
+    }),
+    buildTemplateData: vi.fn((template_key: string, data: any) => ({
+      customer_name: data.name || '',
+      amount: String(data.amount || 0),
+      member_id: data.member_id || ''
+    }))
+  };
+});
 
 // Mock handleZaloRequest from routes/zalo - import real implementation
 vi.mock('../worker/src/routes/zalo', async () => {

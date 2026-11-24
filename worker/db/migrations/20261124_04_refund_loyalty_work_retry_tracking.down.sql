@@ -1,5 +1,6 @@
 -- Roll back retry tracking columns and 'failed' status on refund_loyalty_work.
-CREATE TABLE refund_loyalty_work_prev (
+DROP TABLE IF EXISTS _skip_refund_loyalty_work_prev;
+CREATE TABLE IF NOT EXISTS _skip_refund_loyalty_work_prev (
   tenant_id TEXT NOT NULL,
   reversal_key TEXT NOT NULL,
   payment_id TEXT,
@@ -14,7 +15,7 @@ CREATE TABLE refund_loyalty_work_prev (
   PRIMARY KEY (tenant_id, reversal_key)
 );
 
-INSERT INTO refund_loyalty_work_prev (
+INSERT INTO _skip_refund_loyalty_work_prev (
   tenant_id,
   reversal_key,
   payment_id,
@@ -41,8 +42,8 @@ SELECT
   CASE WHEN status = 'failed' THEN NULL ELSE completed_at END
 FROM refund_loyalty_work;
 
-DROP TABLE refund_loyalty_work;
-ALTER TABLE refund_loyalty_work_prev RENAME TO refund_loyalty_work;
+DROP TABLE IF EXISTS refund_loyalty_work;
+ALTER TABLE _skip_refund_loyalty_work_prev RENAME TO refund_loyalty_work;
 
 CREATE INDEX IF NOT EXISTS idx_refund_loyalty_order
   ON refund_loyalty_work(tenant_id, order_id, status);

@@ -112,7 +112,12 @@ export const EMPTY_MODIFIER_CHOICE: ModifierChoiceFormData = {
 
 export interface Promotion {
   code: string;
+  tenant_id?: string;
   percent: number;
+  discount_type?: string | null;
+  type?: string | null;
+  discount_value?: number | null;
+  value?: number | null;
   max_discount: number;
   min_order: number;
   usage_limit: number;

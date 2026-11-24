@@ -165,7 +165,7 @@ tablesRouter.get('/', optionalAuth(), async (c) => {
     params.push(zone);
   }
   if (status) {
-    baseQuery += ' AND status = ?';
+    baseQuery += " AND LOWER(TRIM(COALESCE(status, ''))) = LOWER(?)";
     params.push(status);
   }
 
@@ -188,7 +188,9 @@ tablesRouter.get('/', optionalAuth(), async (c) => {
     const stmt = params.length ? db.prepare(query).bind(...params) : db.prepare(query);
     ({ results: rawTables } = await stmt.all<CafeTable>());
   }
-  const tables = (rawTables || []).filter((t) => matchesTenantRow(t as unknown as Record<string, unknown>, tenantId));
+  const tables = (rawTables || [])
+    .filter((t) => matchesTenantRow(t as unknown as Record<string, unknown>, tenantId))
+    .filter((t) => !status || String(t.status ?? '').trim().toLowerCase() === status.trim().toLowerCase());
 
   // Lookup QR slugs for all tables using validated origin
   const rawHost = (c.req.header('host') || '').trim().toLowerCase();
@@ -273,7 +275,10 @@ tablesRouter.get('/', optionalAuth(), async (c) => {
 });
 
 // GET /api/tables/:id
-tablesRouter.get('/:id', optionalAuth(), async (c) => {
+tablesRouter.get('/:id', optionalAuth(), async (c, next) => {
+  if (c.req.param('id') === 'zones') {
+    return next();
+  }
   const tenantCheck = verifyTableRouteTenant(c, 'read');
   if (!tenantCheck.ok) {
     return c.json({ success: false, error: 'Cross-tenant table access denied' }, 403);
@@ -380,7 +385,7 @@ async function updateTable(db: Env['AURA_DB'], id: string, status: string, tenan
     : (table.tenant_id && String(table.tenant_id).trim() && String(table.tenant_id).trim() !== '*' && String(table.tenant_id).trim().toLowerCase() !== 'hq'
         ? String(table.tenant_id).trim()
         : '*');
-  if (normalizedTarget === 'Available' && (await hasUnpaidActiveOrderOnTable(db, id, effectiveTableTenant))) {
+  if ((normalizedTarget === 'Available' || normalizedTarget === 'Reserved') && (await hasUnpaidActiveOrderOnTable(db, id, effectiveTableTenant))) {
     return 'UNPAID_ORDER';
   }
   const targetTableName = useLegacyTable ? 'tables' : 'cafe_tables';
@@ -393,24 +398,101 @@ async function updateTable(db: Env['AURA_DB'], id: string, status: string, tenan
       : 'AND TRIM(tenant_id) = ?';
     if (normalizedTarget === 'Available') {
       try {
-        await db.prepare(`UPDATE ${targetTableName} SET status = ?, current_order_id = NULL WHERE id = ? ${tblTenantClause}`).bind(storedStatus, id, effectiveTableTenant).run();
+        await db.prepare(`UPDATE ${targetTableName} SET status = ?, current_order_id = NULL, current_session_id = NULL WHERE id = ? ${tblTenantClause}`).bind(storedStatus, id, effectiveTableTenant).run();
       } catch {
-        await db.prepare(`UPDATE ${targetTableName} SET status = ? WHERE id = ? ${tblTenantClause}`).bind(storedStatus, id, effectiveTableTenant).run();
+        try {
+          await db.prepare(`UPDATE ${targetTableName} SET status = ?, current_order_id = NULL WHERE id = ? ${tblTenantClause}`).bind(storedStatus, id, effectiveTableTenant).run();
+        } catch {
+          await db.prepare(`UPDATE ${targetTableName} SET status = ? WHERE id = ? ${tblTenantClause}`).bind(storedStatus, id, effectiveTableTenant).run();
+        }
       }
     } else {
       await db.prepare(`UPDATE ${targetTableName} SET status = ? WHERE id = ? ${tblTenantClause}`).bind(storedStatus, id, effectiveTableTenant).run();
     }
   } else if (normalizedTarget === 'Available') {
     try {
-      await db.prepare(`UPDATE ${targetTableName} SET status = ?, current_order_id = NULL WHERE id = ?`).bind(storedStatus, id).run();
+      await db.prepare(`UPDATE ${targetTableName} SET status = ?, current_order_id = NULL, current_session_id = NULL WHERE id = ?`).bind(storedStatus, id).run();
     } catch {
-      await db.prepare(`UPDATE ${targetTableName} SET status = ? WHERE id = ?`).bind(storedStatus, id).run();
+      try {
+        await db.prepare(`UPDATE ${targetTableName} SET status = ?, current_order_id = NULL WHERE id = ?`).bind(storedStatus, id).run();
+      } catch {
+        await db.prepare(`UPDATE ${targetTableName} SET status = ? WHERE id = ?`).bind(storedStatus, id).run();
+      }
     }
   } else {
     await db.prepare(`UPDATE ${targetTableName} SET status = ? WHERE id = ?`).bind(storedStatus, id).run();
   }
+  if (normalizedTarget === 'Occupied' && !useLegacyTable) {
+    const sessTenant = effectiveTableTenant !== '*' ? effectiveTableTenant : 'default';
+    try {
+      const existingSess = await db
+        .prepare("SELECT id FROM table_sessions WHERE table_id = ? AND LOWER(COALESCE(status, '')) IN ('active', 'ordering', 'occupied', 'seated') AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ? LIMIT 1")
+        .bind(id, sessTenant)
+        .first<{ id?: string }>()
+        .catch(() => null);
+      let sessId = existingSess?.id ? String(existingSess.id) : '';
+      let sessionReady = Boolean(sessId);
+      if (!sessId) {
+        const rand = new Uint8Array(3);
+        crypto.getRandomValues(rand);
+        sessId = `ts_${Date.now()}_${Array.from(rand, (b) => b.toString(16).padStart(2, '0')).join('')}`;
+        const nowIso = new Date().toISOString();
+        const inserted = await db
+          .prepare("INSERT INTO table_sessions (id, table_id, status, tenant_id, started_at, created_at, updated_at) VALUES (?, ?, 'active', ?, ?, ?, ?)")
+          .bind(sessId, id, sessTenant, nowIso, nowIso, nowIso)
+          .run()
+          .then(() => true)
+          .catch(() =>
+            db
+              .prepare("INSERT INTO table_sessions (id, table_id, status, tenant_id) VALUES (?, ?, 'active', ?)")
+              .bind(sessId, id, sessTenant)
+              .run()
+              .then(() => true)
+              .catch(() => false)
+          );
+        sessionReady = inserted;
+      }
+      if (sessionReady && sessId) {
+        if (effectiveTableTenant !== '*') {
+          const tblTenantClause = effectiveTableTenant === 'default'
+            ? "AND (tenant_id IS NULL OR TRIM(tenant_id) = '' OR tenant_id = ?)"
+            : 'AND tenant_id = ?';
+          await db
+            .prepare(`UPDATE cafe_tables SET current_session_id = ? WHERE id = ? ${tblTenantClause}`)
+            .bind(sessId, id, effectiveTableTenant)
+            .run()
+            .catch(() => undefined);
+        } else {
+          await db
+            .prepare('UPDATE cafe_tables SET current_session_id = ? WHERE id = ?')
+            .bind(sessId, id)
+            .run()
+            .catch(() => undefined);
+        }
+      }
+    } catch {
+      // table_sessions optional in minimal schemas
+    }
+  }
   if (normalizedTarget === 'Available') {
     const now = new Date().toISOString();
+    try {
+      if (effectiveTableTenant !== '*') {
+        await db
+          .prepare("UPDATE reservations SET status = 'completed', updated_at = ? WHERE table_id = ? AND LOWER(COALESCE(status, '')) = 'seated' AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?")
+          .bind(now, id, effectiveTableTenant)
+          .run()
+          .catch(() => undefined);
+      } else {
+        await db
+          .prepare("UPDATE reservations SET status = 'completed', updated_at = ? WHERE table_id = ? AND LOWER(COALESCE(status, '')) = 'seated'")
+          .bind(now, id)
+          .run()
+          .catch(() => undefined);
+      }
+    } catch {
+      // reservations table optional in minimal schemas
+    }
     try {
       if (effectiveTableTenant !== '*') {
         await db

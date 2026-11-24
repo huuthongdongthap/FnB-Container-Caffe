@@ -1,6 +1,7 @@
 -- Add retry tracking columns (attempts, last_error, updated_at) and terminal 'failed' status
 -- to refund_loyalty_work so scheduled retries never overwrite completed_at on pending rows.
-CREATE TABLE refund_loyalty_work_next (
+DROP TABLE IF EXISTS _skip_refund_loyalty_work_next;
+CREATE TABLE IF NOT EXISTS _skip_refund_loyalty_work_next (
   tenant_id TEXT NOT NULL,
   reversal_key TEXT NOT NULL,
   payment_id TEXT,
@@ -18,7 +19,7 @@ CREATE TABLE refund_loyalty_work_next (
   PRIMARY KEY (tenant_id, reversal_key)
 );
 
-INSERT INTO refund_loyalty_work_next (
+INSERT INTO _skip_refund_loyalty_work_next (
   tenant_id,
   reversal_key,
   payment_id,
@@ -51,8 +52,8 @@ SELECT
   CASE WHEN status = 'pending' THEN NULL ELSE completed_at END
 FROM refund_loyalty_work;
 
-DROP TABLE refund_loyalty_work;
-ALTER TABLE refund_loyalty_work_next RENAME TO refund_loyalty_work;
+DROP TABLE IF EXISTS refund_loyalty_work;
+ALTER TABLE _skip_refund_loyalty_work_next RENAME TO refund_loyalty_work;
 
 CREATE INDEX IF NOT EXISTS idx_refund_loyalty_order
   ON refund_loyalty_work(tenant_id, order_id, status);

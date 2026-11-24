@@ -19,24 +19,31 @@ import type { Env } from '../types/env';
 
 export const authEndpointsRouter = new Hono<{ Bindings: Env }>();
 
-function createAuthRateLimit(opts?: { allowWriteDegradation?: boolean }): MiddlewareHandler<{ Bindings: Env }> {
+function createAuthRateLimit(
+  scope: string,
+  opts?: { allowWriteDegradation?: boolean; onlyFailures?: boolean }
+): MiddlewareHandler<{ Bindings: Env }> {
   return async (c, next) => {
     const isProd = c.env?.ENVIRONMENT === 'production';
+    let key: string | null = null;
+    let count = 0;
     try {
       if (c.env?.AUTH_KV) {
         const cfIp = c.req.header('cf-connecting-ip')?.trim();
         const forwarded = !isProd ? c.req.header('x-forwarded-for')?.split(',')[0]?.trim() : undefined;
         const ip = cfIp || forwarded || 'unknown';
-        const key = `rate:auth:${ip}`;
-        const count = Number((await c.env.AUTH_KV.get(key)) || 0);
+        key = `rate:auth:${scope}:${ip}`;
+        count = Number((await c.env.AUTH_KV.get(key)) || 0);
         if (count >= 20) {
           return c.json({ ok: false, error: 'Too many requests. Try again in 5 minutes.' }, 429);
         }
-        try {
-          await c.env.AUTH_KV.put(key, String(count + 1), { expirationTtl: 300 });
-        } catch (putErr) {
-          if (!opts?.allowWriteDegradation) {
-            throw putErr;
+        if (!opts?.onlyFailures) {
+          try {
+            await c.env.AUTH_KV.put(key, String(count + 1), { expirationTtl: 300 });
+          } catch (putErr) {
+            if (!opts?.allowWriteDegradation) {
+              throw putErr;
+            }
           }
         }
       } else if (isProd) {
@@ -48,21 +55,40 @@ function createAuthRateLimit(opts?: { allowWriteDegradation?: boolean }): Middle
       }
     }
     await next();
+    if (opts?.onlyFailures && key && c.env?.AUTH_KV && (c.res?.status ?? 500) >= 400) {
+      try {
+        await c.env.AUTH_KV.put(key, String(count + 1), { expirationTtl: 300 });
+      } catch {
+        // Post-response best-effort counter increment on failed attempts
+      }
+    }
   };
 }
 
-const authRateLimit = createAuthRateLimit({ allowWriteDegradation: true });
-const passwordRotationRateLimit = createAuthRateLimit({ allowWriteDegradation: true });
+const registerRateLimit = createAuthRateLimit('register', { allowWriteDegradation: true });
+const loginAttemptRateLimit = createAuthRateLimit('login', { allowWriteDegradation: true, onlyFailures: true });
+const verifyEmailRateLimit = createAuthRateLimit('verify-email', { allowWriteDegradation: true });
+const bootstrapOwnerRateLimit = createAuthRateLimit('bootstrap-owner', { allowWriteDegradation: true });
+const operatorResetRateLimit = createAuthRateLimit('operator-reset-password', { allowWriteDegradation: true });
+const passwordRotationRateLimit = createAuthRateLimit('change-password', { allowWriteDegradation: true });
 
-authEndpointsRouter.post('/register', authRateLimit, (c) => registerWithVerification(c.req.raw, c.env));
-authEndpointsRouter.post('/login', authRateLimit, loginRateLimit(), (c) => loginUser(c.req.raw, c.env, c.executionCtx));
+authEndpointsRouter.post('/register', registerRateLimit, (c) => registerWithVerification(c.req.raw, c.env));
+authEndpointsRouter.post('/login', loginAttemptRateLimit, loginRateLimit(), (c) => {
+  let execCtx: { waitUntil?: (p: Promise<unknown>) => void } | undefined;
+  try {
+    execCtx = c.executionCtx;
+  } catch {
+    execCtx = undefined;
+  }
+  return loginUser(c.req.raw, c.env, execCtx);
+});
 authEndpointsRouter.post('/logout', (c) => logoutUser(c.req.raw, c.env));
 authEndpointsRouter.get('/me', (c) => getCurrentUser(c.req.raw, c.env));
 authEndpointsRouter.get('/session', (c) => getAuthSession(c.req.raw, c.env));
-authEndpointsRouter.post('/verify-email', authRateLimit, (c) => verifyEmail(c.req.raw, c.env));
+authEndpointsRouter.post('/verify-email', verifyEmailRateLimit, (c) => verifyEmail(c.req.raw, c.env));
 authEndpointsRouter.post('/register-staff', requireAuth(['owner', 'admin']), audit('register_staff'), (c) => registerStaff(c.req.raw, c.env));
 authEndpointsRouter.get('/staff', requireAuth(['owner', 'manager', 'supervisor', 'admin']), audit('list_staff'), (c) => listStaff(c.req.raw, c.env));
-authEndpointsRouter.post('/bootstrap-owner', authRateLimit, (c) => bootstrapOwner(c.req.raw, c.env));
-authEndpointsRouter.post('/reset-password', authRateLimit, (c) => resetPassword(c.req.raw, c.env));
-authEndpointsRouter.post('/forgot-password', authRateLimit, (c) => resetPassword(c.req.raw, c.env));
+authEndpointsRouter.post('/bootstrap-owner', bootstrapOwnerRateLimit, (c) => bootstrapOwner(c.req.raw, c.env));
+// Operator password reset (requires X-Reset-Key); self-service /forgot-password & /reset-password live on openApiAuthRouter
+authEndpointsRouter.post('/operator-reset-password', operatorResetRateLimit, (c) => resetPassword(c.req.raw, c.env));
 authEndpointsRouter.post('/change-password', passwordRotationRateLimit, (c) => changePassword(c.req.raw, c.env));

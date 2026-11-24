@@ -162,8 +162,10 @@ export function TableOrder(): ReactNode {
 
   const queuedOffline = useOrderStoreWithOfflineFlush((s) => s.queuedOffline);
 
-  const [guestName, setGuestName] = useState('');
-  const [guestPhone, setGuestPhone] = useState('');
+  const locationState = location.state as { guestName?: string; guestPhone?: string } | null;
+  const [guestName, setGuestName] = useState(() => locationState?.guestName?.trim() || '');
+  const [guestPhone, setGuestPhone] = useState(() => locationState?.guestPhone?.trim() || '');
+  const [paymentMethod, setPaymentMethod] = useState<'cod' | 'payos'>('cod');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
 
@@ -190,6 +192,7 @@ export function TableOrder(): ReactNode {
     hasValidTable,
     guestName,
     guestPhone,
+    paymentMethod,
     isSubmitting,
     queuedOffline,
     submitError,
@@ -205,6 +208,30 @@ export function TableOrder(): ReactNode {
   const activeTenant = useAuthStore((s) => s.user?.tenantId) || 'default';
   const sessionVersion = useAuthStore((s) => s.sessionVersion);
   const { data: liveMenuData } = useMenu({ available: true, limit: 100 });
+  const { data: categoriesRes } = useQuery<{
+    success?: boolean;
+    categories?: Array<{ slug?: string; id?: string; name?: string; name_vi?: string }>;
+    data?: Array<{ slug?: string; id?: string; name?: string; name_vi?: string }>;
+  }>({
+    queryKey: ['table-order-categories', activeTenant, sessionVersion],
+    queryFn: () => apiFetch('/api/categories', { silent: true }),
+    staleTime: 60_000,
+  });
+  const categoryLabels = useMemo<Record<string, string>>(() => {
+    const map: Record<string, string> = {};
+    const list = Array.isArray(categoriesRes?.categories)
+      ? categoriesRes.categories
+      : Array.isArray(categoriesRes?.data)
+        ? categoriesRes.data
+        : [];
+    for (const cat of list) {
+      const label = cat.name_vi || cat.name;
+      if (!label) continue;
+      if (cat.slug) map[cat.slug] = label;
+      if (cat.id) map[cat.id] = label;
+    }
+    return map;
+  }, [categoriesRes]);
   const { data: liveTablesRes } = useQuery<{
     success?: boolean;
     data?: Array<{ id: string; name?: string; code?: string; table_number?: number; zone?: string; zone_name?: string; status?: string }>;
@@ -384,12 +411,42 @@ export function TableOrder(): ReactNode {
         onPhoneChange={(v) => { setGuestPhone(v); clearError(); }}
       />
 
+      {/* Payment method selector (COD / PayOS QR) */}
+      <div className="max-w-lg mx-auto px-4 pt-2 flex items-center gap-2 text-xs">
+        <span className="text-[var(--aura-chrome-mid)]">Thanh toán:</span>
+        <button
+          type="button"
+          onClick={() => setPaymentMethod('cod')}
+          aria-pressed={paymentMethod === 'cod'}
+          className={`px-3 py-1 rounded-full border transition-colors ${
+            paymentMethod === 'cod'
+              ? 'bg-[var(--aura-chrome-bright)] text-[var(--aura-noir-deep)] border-transparent font-semibold'
+              : 'border-white/20 text-[var(--aura-chrome-soft)]'
+          }`}
+        >
+          Tiền mặt
+        </button>
+        <button
+          type="button"
+          onClick={() => setPaymentMethod('payos')}
+          aria-pressed={paymentMethod === 'payos'}
+          className={`px-3 py-1 rounded-full border transition-colors ${
+            paymentMethod === 'payos'
+              ? 'bg-[var(--aura-chrome-bright)] text-[var(--aura-noir-deep)] border-transparent font-semibold'
+              : 'border-white/20 text-[var(--aura-chrome-soft)]'
+          }`}
+        >
+          PayOS QR
+        </button>
+      </div>
+
       {!isPosRoute && <div style={{ height: '7.5rem' }} aria-hidden="true" />}
       {queuedOffline && <OfflineIndicator />}
 
       <StitchMobileOrderNew
         items={resolvedMenuItems}
         tableId={tableId}
+        categoryLabels={categoryLabels}
         onViewCart={handleViewCart}
       />
 

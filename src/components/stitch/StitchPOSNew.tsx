@@ -34,6 +34,10 @@ export function StitchPOSNew({
   onOrderTypeChange,
   deliveryAddress,
   onDeliveryAddressChange,
+  deliveryRecipientName,
+  onDeliveryRecipientNameChange,
+  deliveryRecipientPhone,
+  onDeliveryRecipientPhoneChange,
   tableLabel,
   guestLabel,
   orderNumber,
@@ -225,6 +229,10 @@ export function StitchPOSNew({
           onOrderTypeChange={onOrderTypeChange}
           deliveryAddress={deliveryAddress}
           onDeliveryAddressChange={onDeliveryAddressChange}
+          deliveryRecipientName={deliveryRecipientName}
+          onDeliveryRecipientNameChange={onDeliveryRecipientNameChange}
+          deliveryRecipientPhone={deliveryRecipientPhone}
+          onDeliveryRecipientPhoneChange={onDeliveryRecipientPhoneChange}
         />
 
         {/* Mobile Cart Toggle */}
@@ -256,6 +264,8 @@ export function StitchPOSNew({
           tables={tables}
           selectedTableId={selectedTableId}
           onSelectTable={onSelectTable}
+          orderType={orderType}
+          deliveryAddress={deliveryAddress}
           tableLabel={tableLabel}
           guestLabel={guestLabel}
           orderNumber={orderNumber}

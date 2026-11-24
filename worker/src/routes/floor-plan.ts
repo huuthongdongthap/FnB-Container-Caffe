@@ -283,10 +283,10 @@ floorPlanRouter.get('/', async (c) => {
 
   const summary = {
     total: tables.length,
-    available: tables.filter((t) => t.status === 'Available').length,
-    occupied: tables.filter((t) => t.status === 'Occupied').length,
-    reserved: tables.filter((t) => t.status === 'Reserved').length,
-    overdue: tables.filter((t) => t.status === 'Overdue').length,
+    available: tables.filter((t) => String(t.status || '').toLowerCase() === 'available').length,
+    occupied: tables.filter((t) => String(t.status || '').toLowerCase() === 'occupied').length,
+    reserved: tables.filter((t) => String(t.status || '').toLowerCase() === 'reserved').length,
+    overdue: tables.filter((t) => String(t.status || '').toLowerCase() === 'overdue').length,
     with_active_session: tables.filter((t) => t.active_session).length,
   };
 
@@ -337,7 +337,7 @@ floorPlanRouter.post('/:id/no-show', async (c) => {
       return c.json({ success: false, error: 'timeout_minutes must be a finite number between 1 and 1440' }, 400);
     }
   }
-  const timeoutMinutes = body.timeout_minutes !== undefined && body.timeout_minutes !== null
+  const _timeoutMinutes = body.timeout_minutes !== undefined && body.timeout_minutes !== null
     ? Math.floor(Number(body.timeout_minutes))
     : 30;
 
@@ -432,25 +432,106 @@ floorPlanRouter.post('/:id/no-show', async (c) => {
         }
       }
     }
-    await db.prepare(
+  }
+
+  // Mark only the targeted or active current reservation for this table as no_show.
+  let targetReservationId =
+    typeof body.reservation_id === 'string' && body.reservation_id.trim()
+      ? body.reservation_id.trim()
+      : typeof body.reservationId === 'string' && body.reservationId.trim()
+        ? body.reservationId.trim()
+        : '';
+  if (!targetReservationId && session?.id) {
+    try {
+      const sessionMeta = await db.prepare(
+        "SELECT notes FROM table_sessions WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
+      ).bind(session.id, effectiveTableTenant).first<{ notes?: string | null }>().catch(() => null);
+      const rawNote = typeof sessionMeta?.notes === 'string' ? sessionMeta.notes.trim() : '';
+      if (rawNote.startsWith('reservation:')) {
+        targetReservationId = rawNote.slice('reservation:'.length).trim();
+      }
+    } catch {
+      // notes column optional in minimal schemas
+    }
+  }
+  try {
+    if (targetReservationId) {
+      await db.prepare(
+        "UPDATE reservations SET status = 'no_show', updated_at = ? WHERE id = ? AND table_id = ? AND LOWER(COALESCE(status, '')) IN ('confirmed', 'pending', 'approved', 'seated') AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
+      ).bind(now, targetReservationId, id, effectiveTableTenant).run().catch(() => undefined);
+    } else {
+      const nowMinExpr = "(CAST(strftime('%H', 'now', '+7 hours') AS INTEGER) * 60 + CAST(strftime('%M', 'now', '+7 hours') AS INTEGER))";
+      const buildScopedNoShowSql = (dateExpr: string, timeExpr: string) => {
+        const trimmedTime = `TRIM(${timeExpr})`;
+        const hasClock = `(${timeExpr} IS NOT NULL AND ${trimmedTime} != '' AND instr(${trimmedTime}, ':') > 0)`;
+        const slotMinExpr = `(CAST(substr(${trimmedTime}, 1, instr(${trimmedTime}, ':') - 1) AS INTEGER) * 60 + CAST(substr(${trimmedTime}, instr(${trimmedTime}, ':') + 1, 2) AS INTEGER))`;
+        return `UPDATE reservations SET status = 'no_show', updated_at = ?
+         WHERE id = (
+           SELECT id FROM reservations
+           WHERE table_id = ?
+             AND LOWER(COALESCE(status, '')) IN ('confirmed', 'pending', 'approved', 'seated')
+             AND (
+               LOWER(COALESCE(status, '')) = 'seated'
+               OR (
+                 ${dateExpr} = DATE('now', '+7 hours')
+                 AND (NOT ${hasClock} OR (${slotMinExpr} - ${nowMinExpr}) <= 60)
+               )
+             )
+             AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?
+           ORDER BY
+             CASE
+               WHEN LOWER(COALESCE(status, '')) = 'seated' THEN 0
+               WHEN ${hasClock} AND ${slotMinExpr} <= ${nowMinExpr} THEN 1
+               WHEN ${hasClock} THEN 2
+               ELSE 3
+             END ASC,
+             CASE
+               WHEN ${hasClock} AND ${slotMinExpr} <= ${nowMinExpr} THEN -(${slotMinExpr})
+               WHEN ${hasClock} THEN ${slotMinExpr}
+               ELSE 9999
+             END ASC,
+             id ASC
+           LIMIT 1
+         )
+         AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?`;
+      };
+      const variants: Array<[string, string]> = [
+        ["COALESCE(NULLIF(TRIM(date), ''), reservation_date)", "COALESCE(NULLIF(TRIM(time), ''), reservation_time)"],
+        ['date', 'time'],
+        ['reservation_date', 'reservation_time'],
+      ];
+      for (const [dateExpr, timeExpr] of variants) {
+        try {
+          await db
+            .prepare(buildScopedNoShowSql(dateExpr, timeExpr))
+            .bind(now, id, effectiveTableTenant, effectiveTableTenant)
+            .run();
+          break;
+        } catch {
+          // Try alternate reservation date/time column naming
+        }
+      }
+    }
+  } catch {
+    // reservations table optional in minimal schemas
+  }
+
+  // Release the table unconditionally so state matches the response even when no session row existed.
+  await db.prepare(
+    "UPDATE cafe_tables SET status = 'Available', current_order_id = NULL, current_session_id = NULL WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
+  ).bind(id, effectiveTableTenant).run().catch(() =>
+    db.prepare(
       "UPDATE cafe_tables SET status = 'Available', current_order_id = NULL WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
     ).bind(id, effectiveTableTenant).run().catch(() =>
       canRunUnscopedFallback
         ? db.prepare("UPDATE cafe_tables SET status = 'Available', current_order_id = NULL WHERE id = ?").bind(id).run().catch(() => null)
         : null
-    );
-    await db.prepare(
-      "UPDATE cafe_tables SET status = 'Available' WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
-    ).bind(id, effectiveTableTenant).run().catch(() =>
-      canRunUnscopedFallback
-        ? db.prepare('UPDATE cafe_tables SET status = \'Available\' WHERE id = ?').bind(id).run()
-        : null
-    );
-  }
+    )
+  );
 
   return c.json({
     success: true,
-    message: `Table ${id} marked no-show; freed after ${timeoutMinutes} min`,
+    message: `Table ${id} marked no-show and released`,
     released_at: now,
   });
 });

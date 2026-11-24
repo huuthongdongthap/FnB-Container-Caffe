@@ -85,7 +85,7 @@ export async function transitionOrderStatus(
     currentOrder?: { id: string; status: string; payment_status?: string | null };
     paymentStatus?: string | null;
     allowPaidCompensation?: boolean;
-    fields?: { notes?: unknown; delivery_time?: unknown };
+    fields?: { notes?: unknown; delivery_time?: unknown; payment_method?: unknown; payment_status?: unknown };
   } = {},
 ): Promise<OrderStatusResult> {
   const rawTenantId = (options.tenantId ?? '').trim() || 'default';
@@ -147,6 +147,39 @@ export async function transitionOrderStatus(
   const allowed = canActorTransition(role, directStart ? 'confirmed' : order.status, targetStatus);
   if (!allowed.ok) return { success: false, error: allowed.error, statusCode: 403 };
 
+  const forwardStatuses = new Set(['confirmed', 'preparing', 'ready', 'delivering', 'served', 'delivered', 'completed']);
+  if (forwardStatuses.has(targetStatus)) {
+    const knownPaymentStatus = String(
+      options.paymentStatus ?? options.currentOrder?.payment_status ?? ''
+    ).trim().toLowerCase();
+    if (knownPaymentStatus === 'refunded') {
+      return {
+        success: false,
+        error: 'Đơn hàng đã hoàn tiền — không thể tiếp tục chế biến hoặc phục vụ',
+        statusCode: 409,
+      };
+    }
+    if (!knownPaymentStatus) {
+      try {
+        const payRow = await db
+          .prepare(`SELECT payment_status FROM orders WHERE id = ?${writeTenantClause}`)
+          .bind(orderId, ...writeTenantBinds)
+          .first<{ payment_status?: string | null }>();
+        if (String(payRow?.payment_status ?? '').trim().toLowerCase() === 'refunded') {
+          return {
+            success: false,
+            error: 'Đơn hàng đã hoàn tiền — không thể tiếp tục chế biến hoặc phục vụ',
+            statusCode: 409,
+          };
+        }
+      } catch (err) {
+        if (!/no such column:\s*payment_status\b/i.test(String(err))) {
+          throw err;
+        }
+      }
+    }
+  }
+
   if (targetStatus === 'preparing') {
     try {
       let paymentRow: {
@@ -173,11 +206,20 @@ export async function transitionOrderStatus(
             .first();
         }
       }
-      const method = String(paymentRow?.payment_method ?? '').trim().toLowerCase();
-      const rawPaymentStatus =
-        typeof paymentRow?.payment_status === 'string' ? paymentRow.payment_status.trim().toLowerCase() : '';
-      const isCodDelivery = method === 'cod' || Number(paymentRow?.is_cod ?? 0) === 1;
-      const isPrepaidOnline = method === 'payos' || method === 'bank_transfer' || method === 'qr';
+      const incomingPaymentMethod =
+        typeof options.fields?.payment_method === 'string'
+          ? options.fields.payment_method.trim().toLowerCase()
+          : '';
+      const persistedMethod = String(paymentRow?.payment_method ?? '').trim().toLowerCase();
+      const method = incomingPaymentMethod || persistedMethod;
+      const rawPaymentStatus = String(
+        paymentRow?.payment_status ?? options.paymentStatus ?? options.currentOrder?.payment_status ?? '',
+      ).trim().toLowerCase();
+      const isCodDelivery = incomingPaymentMethod
+        ? method === 'cod'
+        : (persistedMethod === 'cod' || Number(paymentRow?.is_cod ?? 0) === 1);
+      const isPrepaidOnline =
+        method === 'payos' || method === 'bank_transfer' || method === 'qr' || method === 'vietqr';
       if (isPrepaidOnline && rawPaymentStatus && rawPaymentStatus !== 'paid') {
         return {
           success: false,
@@ -185,7 +227,7 @@ export async function transitionOrderStatus(
           statusCode: 409,
         };
       }
-      if (paymentRow?.order_type === 'delivery' && paymentRow?.payment_status !== 'paid' && !isCodDelivery) {
+      if (paymentRow?.order_type === 'delivery' && rawPaymentStatus !== 'paid' && !isCodDelivery) {
         return {
           success: false,
           error: 'Đơn giao tận nơi phải hoàn tất thanh toán trước khi chế biến',
@@ -237,14 +279,49 @@ export async function transitionOrderStatus(
     }
   }
 
-  const fields = Object.entries(options.fields ?? {}).filter(([, value]) => value !== undefined);
+  const allowedFieldKeys = new Set(['notes', 'delivery_time', 'payment_method', 'payment_status']);
+  const fields = Object.entries(options.fields ?? {}).filter(
+    ([key, value]) => allowedFieldKeys.has(key) && value !== undefined,
+  );
   if (isNoOp && fields.length === 0) {
     return { success: true, idempotent: true, order: { id: orderId, status: targetStatus, previous_status: order.status } };
   }
+  const hasPaymentMethodField = fields.some(([key]) => key === 'payment_method');
+  const paymentMethodGuard = hasPaymentMethodField
+    ? " AND LOWER(TRIM(COALESCE(payment_status, ''))) NOT IN ('paid', 'completed', 'refunded', 'partially_refunded')"
+    : '';
+  const nowIso = new Date().toISOString();
+  const fieldKeys = new Set(fields.map(([key]) => key));
+  const prepTimestampAddition =
+    !isNoOp && targetStatus === 'preparing' && !fieldKeys.has('started_at')
+      ? ', started_at = COALESCE(started_at, ?2)'
+      : !isNoOp && targetStatus === 'ready' && !fieldKeys.has('ready_at')
+        ? ', ready_at = COALESCE(ready_at, ?2)'
+        : '';
   const additions = fields.map(([key]) => `, ${key} = ?`).join('');
-  const updateStatus = (guard = '') => db.prepare(
-    `UPDATE orders SET status = ?, updated_at = ?${additions} WHERE id = ? AND status = ?${writeTenantClause}${guard}`,
-  ).bind(targetStatus, new Date().toISOString(), ...fields.map(([, value]) => value), orderId, order.status, ...writeTenantBinds).run();
+  const updateStatus = (guard = '', includePrepTimestamp = true) => db.prepare(
+    `UPDATE orders SET status = ?, updated_at = ?${includePrepTimestamp ? prepTimestampAddition : ''}${additions} WHERE id = ? AND status = ?${writeTenantClause}${guard}`,
+  ).bind(targetStatus, nowIso, ...fields.map(([, value]) => value), orderId, order.status, ...writeTenantBinds).run();
+  const runUpdateWithCompatFallback = async (initialGuard: string): Promise<unknown> => {
+    let guard = initialGuard;
+    let includePrepTimestamp = Boolean(prepTimestampAddition);
+    for (;;) {
+      try {
+        return await updateStatus(guard, includePrepTimestamp);
+      } catch (error) {
+        const msg = String(error);
+        if (includePrepTimestamp && /no such column:\s*(started_at|ready_at)\b/i.test(msg)) {
+          includePrepTimestamp = false;
+          continue;
+        }
+        if (guard && /no such column:\s*payment_status\b/i.test(msg)) {
+          guard = '';
+          continue;
+        }
+        throw error;
+      }
+    }
+  };
   const closingOrder = targetStatus === 'completed' && !isNoOp;
   const atomicMarkingPaid =
     String((options.fields as Record<string, unknown> | undefined)?.payment_status ?? '')
@@ -254,14 +331,13 @@ export async function transitionOrderStatus(
   if (closingOrder && !atomicMarkingPaid) {
     // Require persisted payment settlement before completing an order.
     const paid = "LOWER(TRIM(COALESCE(payment_status, ''))) IN ('paid', 'partially_refunded')";
-    try {
-      result = await updateStatus(` AND ${paid}`);
-    } catch (error) {
-      if (!/no such column:\s*payment_status\b/i.test(String(error))) throw error;
-      result = await updateStatus();
-    }
+    result = await runUpdateWithCompatFallback(` AND ${paid}${paymentMethodGuard}`);
+  } else if (forwardStatuses.has(targetStatus)) {
+    result = await runUpdateWithCompatFallback(
+      ` AND LOWER(TRIM(COALESCE(payment_status, ''))) <> 'refunded'${paymentMethodGuard}`,
+    );
   } else {
-    result = await updateStatus();
+    result = await runUpdateWithCompatFallback(paymentMethodGuard);
   }
   // D1 changes includes timestamp/audit trigger writes; this PK-scoped CAS still matches at most one order.
   if (changedRows(result) < 1) {

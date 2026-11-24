@@ -12,7 +12,7 @@ import { GRACE_DAYS, SAAS_PLANS, TRIAL_DAYS, normalizeSaasPlanId, type SaasPlanI
 import { addDaysIso } from './saas-entitlement';
 import { SAAS_TEMPLATES, isValidTemplateId, type SaasTemplateId } from './saas-templates';
 
-const RESERVED_SLUGS = new Set([
+export const RESERVED_SLUGS = new Set([
   'default',
   'hq',
   'admin',
@@ -516,7 +516,7 @@ export async function provisionSelfServeTenant(
       .bind(tenantId, nowIso, ownerId, `new-tenant-provisioning:${tenantId}`)
       .run();
   } catch {
-    // Non-fatal if refund_tenant_readiness table is absent in legacy test schemas
+    // Non-fatal in minimal test schemas without refund_tenant_readiness
   }
 
   return {

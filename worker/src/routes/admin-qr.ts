@@ -207,23 +207,78 @@ async function fetchScopedTables(
   return allTables.filter((table) => isTableVisibleInScope(table, tenantId));
 }
 
+function getTableQrIdCandidates(table: AdminQrTableRecord): Array<string | number> {
+  const candidates: Array<string | number> = [];
+  const seen = new Set<string>();
+  const add = (val: string | number | null | undefined) => {
+    if (val === null || val === undefined || val === '') return;
+    const key = String(val);
+    if (seen.has(key)) return;
+    seen.add(key);
+    candidates.push(val);
+  };
+
+  add(table.id);
+  if (table.table_number !== undefined && table.table_number !== null) {
+    const num = Number(table.table_number);
+    if (Number.isFinite(num)) {
+      add(num);
+    }
+    add(String(table.table_number));
+  }
+  const rawId = String(table.id);
+  const tMatch = /^t0*(\d+)$/i.exec(rawId);
+  if (tMatch) {
+    add(parseInt(tMatch[1], 10));
+  }
+  return candidates;
+}
+
+type AlignedAdminQrCodeRow = AdminQrCodeRow & { resolved_table_id?: string };
+
 async function fetchAlignedQrRows(
   db: Env['AURA_DB'],
   tables: AdminQrTableRecord[],
   requestScope: string,
-): Promise<AdminQrCodeRow[]> {
+): Promise<AlignedAdminQrCodeRow[]> {
   if (tables.length === 0) return [];
-  const tableById = new Map<string, AdminQrTableRecord>();
-  tables.forEach((t) => tableById.set(String(t.id), t));
+  const tableByKey = new Map<string, AdminQrTableRecord[]>();
+  const allLookupKeys: Array<string | number> = [];
+  const seenLookupKeys = new Set<string>();
 
-  const filterAligned = (rows: AdminQrCodeRow[]): AdminQrCodeRow[] =>
-    rows.filter((row) => {
-      const table = tableById.get(String(row.table_id));
-      if (!table) return false;
-      const actualTenant = resolveActualTableTenant(table);
-      if (!actualTenant) return false;
-      return isQrRowAlignedWithTableTenant(row as unknown as Record<string, unknown>, actualTenant, requestScope);
-    });
+  for (const t of tables) {
+    for (const candidate of getTableQrIdCandidates(t)) {
+      const keyStr = String(candidate);
+      const list = tableByKey.get(keyStr);
+      if (list) {
+        if (!list.includes(t)) list.push(t);
+      } else {
+        tableByKey.set(keyStr, [t]);
+      }
+      if (!seenLookupKeys.has(keyStr)) {
+        seenLookupKeys.add(keyStr);
+        allLookupKeys.push(candidate);
+      }
+    }
+  }
+
+  const filterAligned = (rows: AdminQrCodeRow[]): AlignedAdminQrCodeRow[] => {
+    const aligned: AlignedAdminQrCodeRow[] = [];
+    for (const row of rows) {
+      const candidates = tableByKey.get(String(row.table_id));
+      if (!candidates || candidates.length === 0) continue;
+      for (const table of candidates) {
+        const actualTenant = resolveActualTableTenant(table);
+        if (!actualTenant) continue;
+        if (!isQrRowAlignedWithTableTenant(row as unknown as Record<string, unknown>, actualTenant, requestScope)) {
+          continue;
+        }
+        aligned.push({ ...row, resolved_table_id: String(table.id) });
+        break;
+      }
+    }
+    return aligned;
+  };
 
   let rows: AdminQrCodeRow[] = [];
   if (requestScope === '*') {
@@ -245,27 +300,42 @@ async function fetchAlignedQrRows(
     return filterAligned(rows);
   }
 
-  const placeholders = tables.map(() => '?').join(', ');
-  const tableIds = tables.map((t) => t.id);
-  try {
-    const scopedRes = await db
-      .prepare(
-        `SELECT table_id, slug, tenant_id FROM table_qr_codes WHERE table_id IN (${placeholders}) AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?`
-      )
-      .bind(...tableIds, requestScope)
-      .all<AdminQrCodeRow>();
-    rows = scopedRes.results || [];
-  } catch {
-    if (requestScope === 'default') {
+  if (allLookupKeys.length === 0) {
+    return [];
+  }
+
+  // Cloudflare D1 limits bound parameters to 100 per statement; chunk lookups so stores
+  // with many tables stay well under the parameter cap.
+  const MAX_QR_LOOKUP_CHUNK = 25;
+  let useLegacyUnscopedFallback = false;
+  for (let offset = 0; offset < allLookupKeys.length; offset += MAX_QR_LOOKUP_CHUNK) {
+    const chunk = allLookupKeys.slice(offset, offset + MAX_QR_LOOKUP_CHUNK);
+    const placeholders = chunk.map(() => '?').join(', ');
+    if (!useLegacyUnscopedFallback) {
       try {
-        const res = await db
-          .prepare(`SELECT table_id, slug FROM table_qr_codes WHERE table_id IN (${placeholders})`)
-          .bind(...tableIds)
+        const scopedRes = await db
+          .prepare(
+            `SELECT table_id, slug, tenant_id FROM table_qr_codes WHERE table_id IN (${placeholders}) AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?`
+          )
+          .bind(...chunk, requestScope)
           .all<AdminQrCodeRow>();
-        rows = res.results || [];
+        rows.push(...(scopedRes.results || []));
+        continue;
       } catch {
-        rows = [];
+        if (requestScope !== 'default') {
+          break;
+        }
+        useLegacyUnscopedFallback = true;
       }
+    }
+    try {
+      const res = await db
+        .prepare(`SELECT table_id, slug FROM table_qr_codes WHERE table_id IN (${placeholders})`)
+        .bind(...chunk)
+        .all<AdminQrCodeRow>();
+      rows.push(...(res.results || []));
+    } catch {
+      break;
     }
   }
   return filterAligned(rows);
@@ -324,6 +394,31 @@ async function upsertTenantTableQrRows(
   } catch (err) {
     const msg = String((err as Error)?.message || '').toLowerCase();
     if (msg.includes('no such table')) return generated;
+    if (msg.includes('unique constraint failed') && msg.includes('slug')) {
+      // Legacy schema may already store numeric table_id (e.g. 1) for the same slug (e.g. '1-indoor').
+      // Fall back to updating existing slug rows or inserting only non-conflicting entries.
+      for (const item of entries) {
+        try {
+          const existingBySlug = await db
+            .prepare('SELECT table_id, slug, tenant_id FROM table_qr_codes WHERE slug = ?')
+            .bind(item.slug)
+            .first<{ table_id: string | number; slug: string; tenant_id?: string | null }>();
+          if (existingBySlug) {
+            const existingTenant = existingBySlug.tenant_id && String(existingBySlug.tenant_id).trim()
+              ? String(existingBySlug.tenant_id).trim()
+              : 'default';
+            if (existingTenant === item.tenantId) {
+              generated.set(item.rawId, existingBySlug.slug);
+              continue;
+            }
+          }
+          await insertWithTenant(item).run();
+        } catch {
+          // Skip individual slug conflict already owned by same table
+        }
+      }
+      return generated;
+    }
     if (!msg.includes('column')) throw err;
   }
 
@@ -366,8 +461,12 @@ async function resolveScopedQrTableBySlug(
       .prepare(
         `SELECT q.table_id, q.slug, q.tenant_id AS qr_tenant_id, t.*
          FROM table_qr_codes q
-         JOIN cafe_tables t ON t.id = q.table_id
+         JOIN cafe_tables t ON (
+           CAST(t.id AS TEXT) = CAST(q.table_id AS TEXT)
+           OR (t.table_number IS NOT NULL AND CAST(t.table_number AS TEXT) = CAST(q.table_id AS TEXT))
+         )
          WHERE q.slug = ?
+           AND COALESCE(NULLIF(TRIM(t.tenant_id), ''), 'default') = COALESCE(NULLIF(TRIM(q.tenant_id), ''), 'default')
            AND (? = '*' OR COALESCE(NULLIF(TRIM(t.tenant_id), ''), 'default') = ?)
            AND (? = '*' OR COALESCE(NULLIF(TRIM(q.tenant_id), ''), 'default') = ?)`
       )
@@ -391,7 +490,10 @@ async function resolveScopedQrTableBySlug(
         .prepare(
           `SELECT q.table_id, q.slug, t.*
            FROM table_qr_codes q
-           JOIN cafe_tables t ON t.id = q.table_id
+           JOIN cafe_tables t ON (
+             CAST(t.id AS TEXT) = CAST(q.table_id AS TEXT)
+             OR (t.table_number IS NOT NULL AND CAST(t.table_number AS TEXT) = CAST(q.table_id AS TEXT))
+           )
            WHERE q.slug = ? AND (? = '*' OR COALESCE(NULLIF(TRIM(t.tenant_id), ''), 'default') = ?)`
         )
         .bind(slug, tenantId, tenantId)
@@ -445,10 +547,45 @@ async function resolveScopedQrTableBySlug(
   if (!qrRow) return null;
 
   try {
-    const tbl = await db
-      .prepare('SELECT * FROM cafe_tables WHERE id = ?')
-      .bind(qrRow.table_id)
-      .first<AdminQrTableRecord>();
+    const effectiveTenant =
+      tenantId === '*' && typeof qrRow.tenant_id === 'string' && qrRow.tenant_id.trim()
+        ? qrRow.tenant_id.trim()
+        : tenantId;
+    let tbl = await db
+      .prepare(
+        `SELECT t.* FROM table_qr_codes q
+         JOIN cafe_tables t ON t.id = q.table_id
+         WHERE q.slug = ?
+           AND (? = '*' OR COALESCE(NULLIF(TRIM(t.tenant_id), ''), 'default') = ?)
+         LIMIT 1`,
+      )
+      .bind(slug, effectiveTenant, effectiveTenant)
+      .first<AdminQrTableRecord>()
+      .catch(() => null);
+    if (!tbl) {
+      tbl = await db
+        .prepare(
+          `SELECT * FROM cafe_tables
+           WHERE id = ?
+             AND (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?)
+           LIMIT 1`,
+        )
+        .bind(qrRow.table_id, effectiveTenant, effectiveTenant)
+        .first<AdminQrTableRecord>()
+        .catch(() => null);
+    }
+    if (!tbl && /^\d+$/.test(String(qrRow.table_id))) {
+      const paddedId = `t${String(qrRow.table_id).padStart(2, '0')}`;
+      tbl = await db
+        .prepare(
+          `SELECT * FROM cafe_tables
+           WHERE (id = ? OR table_number = ?)
+             AND (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?)
+           LIMIT 1`,
+        )
+        .bind(paddedId, Number(qrRow.table_id), effectiveTenant, effectiveTenant)
+        .first<AdminQrTableRecord>();
+    }
     if (!tbl) return null;
     const actualTableTenant = resolveActualTableTenant(tbl);
     if (!actualTableTenant || !isQrRowAlignedWithTableTenant(qrRow as unknown as Record<string, unknown>, actualTableTenant, tenantId)) {
@@ -491,7 +628,7 @@ adminQRRouter.get('/tables', async(c) => {
   const qrRows = await fetchAlignedQrRows(db, tables, tenantId);
   const slugMap = new Map<string, string>();
   qrRows.forEach((r) => {
-    slugMap.set(String(r.table_id), r.slug);
+    slugMap.set(String(r.resolved_table_id ?? r.table_id), r.slug);
   });
 
   // Backfill missing QR rows only for tables that do not yet have an aligned QR row
@@ -503,7 +640,7 @@ adminQRRouter.get('/tables', async(c) => {
     });
     const refreshedRows = await fetchAlignedQrRows(db, tables, tenantId);
     refreshedRows.forEach((r) => {
-      slugMap.set(String(r.table_id), r.slug);
+      slugMap.set(String(r.resolved_table_id ?? r.table_id), r.slug);
     });
   }
 

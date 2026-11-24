@@ -1,7 +1,7 @@
 import { useLoyaltyStore } from '@/hooks/stores/use-loyalty-store';
 import { useReferralStore } from '@/hooks/stores/use-referral-store';
 import { useAuthStore } from '@/hooks/stores/use-auth-store';
-import { useEffect } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { HelmetHead } from '@/components/seo/HelmetHead';
 import { apiFetch } from '@/lib/api-client';
@@ -14,7 +14,7 @@ import {
   type LoyaltyTierBenefit,
   type LoyaltyLoadingState,
 } from '@/components/stitch/StitchLoyaltyNew';
-import { WEEK_DAYS, TIER_BENEFIT_KEYS, DEFAULT_CHECKIN, REWARD_IMAGES } from './loyalty-constants';
+import { WEEK_DAYS, TIER_BENEFIT_KEYS, REWARD_IMAGES } from './loyalty-constants';
 import { getDefaultLoyaltyData } from '@/components/stitch/loyalty-default-data';
 import type { Reward, PointsHistoryEntry as _PointsHistoryEntry, LoyaltyPageProps } from './loyalty-types';
 
@@ -70,7 +70,29 @@ export function LoyaltyPage({
   const storeLoading = store.loading;
   const storeReferralCode = useReferralStore((s) => s.referralCode);
   const referralCode = propReferralCode ?? storeReferralCode ?? '';
-  const checkinDays = propCheckinDays ?? DEFAULT_CHECKIN;
+  const [checkinError, setCheckinError] = useState<string | null>(null);
+  const [checkedInToday, setCheckedInToday] = useState(false);
+
+  const checkinDays = useMemo<Record<string, boolean>>(() => {
+    if (propCheckinDays) return propCheckinDays;
+    const derived: Record<string, boolean> = {};
+    for (const day of WEEK_DAYS) derived[day] = false;
+    const dayKeys = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'] as const;
+    const now = new Date();
+    const weekAgo = now.getTime() - 7 * 24 * 60 * 60 * 1000;
+    for (const h of history) {
+      if (!/check.?in/i.test(h.reason || '')) continue;
+      const ts = Date.parse(h.date || '');
+      if (!Number.isFinite(ts) || ts < weekAgo) continue;
+      const key = dayKeys[new Date(ts).getDay()];
+      if (key && key in derived) derived[key] = true;
+    }
+    if (checkedInToday) {
+      const todayKey = dayKeys[now.getDay()];
+      if (todayKey && todayKey in derived) derived[todayKey] = true;
+    }
+    return derived;
+  }, [propCheckinDays, history, checkedInToday]);
 
   /* ── Derived loading state for StitchLoyaltyNew ────────────────── */
   const loadingState: LoyaltyLoadingState = storeLoading
@@ -159,10 +181,12 @@ export function LoyaltyPage({
 
   const handleCheckIn = async () => {
     if (!user?.id && !(user as { phone?: string } | null)?.phone) {
+      setCheckinError('Vui lòng đăng nhập để check-in tích điểm.');
       return;
     }
+    setCheckinError(null);
     try {
-      await apiFetch('/api/checkin', {
+      const res = await apiFetch<{ success?: boolean; ok?: boolean; error?: string; message?: string }>('/api/checkin', {
         method: 'POST',
         body: JSON.stringify({
           ...(user?.id ? { customer_id: user.id } : {}),
@@ -170,8 +194,13 @@ export function LoyaltyPage({
           customer_name: user?.name || undefined,
         }),
       });
-    } catch {
-      // Non-fatal: refresh loyalty state afterward
+      if (res?.success === false || res?.ok === false) {
+        setCheckinError(res.error || res.message || 'Check-in thất bại.');
+      } else {
+        setCheckedInToday(true);
+      }
+    } catch (err) {
+      setCheckinError(err instanceof Error ? err.message : 'Check-in thất bại. Vui lòng thử lại.');
     }
     if (isAuthenticated) {
       await store.fetchLoyalty();
@@ -247,6 +276,13 @@ export function LoyaltyPage({
           fontFamily: "var(--aura-font-body)",
         }}
       >
+        {checkinError && (
+          <div role="alert" className="mx-auto max-w-4xl px-4 pt-4">
+            <div className="rounded-xl border border-red-400/40 bg-red-500/15 px-4 py-3 text-xs text-red-200">
+              {checkinError}
+            </div>
+          </div>
+        )}
         <StitchLoyaltyNew
           data={dashboardData}
           loadingState={loadingState}

@@ -27,6 +27,7 @@ export function StitchMobileOrderNew({
   tableId = 'B01',
   loading = false,
   error = null,
+  categoryLabels,
   onBack,
   onSearch,
   onViewCart,
@@ -48,10 +49,10 @@ export function StitchMobileOrderNew({
       { key: 'all', label: 'Tất cả' },
       ...itemCats.map((cat) => ({
         key: cat,
-        label: resolvePosCategoryLabel(cat),
+        label: resolvePosCategoryLabel(cat, categoryLabels),
       })),
     ];
-  }, [items]);
+  }, [items, categoryLabels]);
 
   const filteredItems = useMemo(() => {
     return items.filter((item) => {

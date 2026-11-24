@@ -6,6 +6,7 @@ import {
   useOrderStore,
   useOrderStoreWithOfflineFlush,
 } from '@/hooks/stores/use-order-store';
+import { usePaymentStore } from '@/hooks/stores/use-payment-store';
 import { normalizePhone } from './TableOrder-utils';
 
 interface UseHandleViewCartArgs {
@@ -13,6 +14,7 @@ interface UseHandleViewCartArgs {
   hasValidTable: boolean;
   guestName: string;
   guestPhone: string;
+  paymentMethod?: 'cod' | 'payos';
   isSubmitting: boolean;
   queuedOffline: boolean;
   submitError: string | null;
@@ -26,6 +28,7 @@ export function useHandleViewCart({
   hasValidTable,
   guestName,
   guestPhone,
+  paymentMethod = 'cod',
   isSubmitting,
   queuedOffline,
   setIsSubmitting,
@@ -36,6 +39,7 @@ export function useHandleViewCart({
   const { t } = useTranslation('order');
   const createOrder = useOrderStoreWithOfflineFlush((s) => s.createOrder);
   const flushQueuedOrders = useOrderStoreWithOfflineFlush((s) => s.flushQueuedOrders);
+  const retryCreatePaymentLink = usePaymentStore((s) => s.retryCreatePaymentLink);
 
   return useCallback(
     async (cart: CartItem[]): Promise<void> => {
@@ -72,20 +76,51 @@ export function useHandleViewCart({
           customer_phone: normalizePhone(guestPhone).trim(),
           customer_address: '',
           order_type: (hasValidTable && tableId ? 'dine_in' : 'takeaway') as 'dine_in' | 'takeaway',
-          payment_method: 'cod' as const,
+          payment_method: paymentMethod,
           table_id: hasValidTable && tableId ? tableId : undefined,
         };
 
         const order = await createOrder(payload);
-        const resolvedOrder = (order as unknown as { order?: { id?: string }; data?: { id?: string } })?.order
-          ?? (order as unknown as { data?: { id?: string } })?.data
-          ?? order;
+        const resolvedOrder = (order as unknown as { order?: { id?: string; total?: number }; data?: { id?: string; total?: number } })?.order
+          ?? (order as unknown as { data?: { id?: string; total?: number } })?.data
+          ?? (order as unknown as { id?: string; total?: number } | null);
 
         if (resolvedOrder?.id) {
           try {
             await flushQueuedOrders();
           } catch {
             /* non-fatal */
+          }
+          const serverTotal = typeof resolvedOrder.total === 'number' ? resolvedOrder.total : total;
+          if (paymentMethod === 'payos' && serverTotal > 0) {
+            const checkoutUrl = await retryCreatePaymentLink(resolvedOrder.id, serverTotal);
+            if (!checkoutUrl) {
+              throw new Error(
+                usePaymentStore.getState().error ||
+                  t('paymentLinkFailed', {
+                    defaultValue: 'Không thể tạo liên kết thanh toán PayOS. Vui lòng thử lại.',
+                  }),
+              );
+            }
+            let parsedUrl: URL;
+            try {
+              parsedUrl = new URL(checkoutUrl);
+            } catch {
+              throw new Error(
+                t('invalidPaymentUrl', {
+                  defaultValue: 'Liên kết thanh toán không hợp lệ.',
+                }),
+              );
+            }
+            if (parsedUrl.protocol !== 'https:' && parsedUrl.protocol !== 'http:') {
+              throw new Error(
+                t('invalidPaymentUrl', {
+                  defaultValue: 'Liên kết thanh toán không hợp lệ.',
+                }),
+              );
+            }
+            window.location.href = parsedUrl.toString();
+            return;
           }
           navigate(
             `/order-success?order_id=${encodeURIComponent(resolvedOrder.id)}`,
@@ -123,9 +158,11 @@ export function useHandleViewCart({
       hasValidTable,
       guestName,
       guestPhone,
+      paymentMethod,
       isSubmitting,
       queuedOffline,
       createOrder,
+      retryCreatePaymentLink,
       flushQueuedOrders,
       navigate,
       t,

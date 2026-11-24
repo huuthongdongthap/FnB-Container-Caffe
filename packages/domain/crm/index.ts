@@ -115,7 +115,11 @@ export {
   detectPostVisitCandidates,
   detectCashbackExpiry,
   markExpiryNotified,
+  filterEligibleMarketingCandidates,
+  hasMarketingConsentForChannel,
+  normalizeConsentChannel,
 } from './commands/campaign/detect';
+export type { ConsentChannelInput } from './commands/campaign/detect';
 
 export type {
   CampaignTrigger,

@@ -173,4 +173,39 @@ describe('floor-plan routes', () => {
     expect(recRes.status).toBe(200);
     expect(recSqls[0]).toContain("TRIM(tenant_id) = ''");
   });
+
+  it('POST /:id/no-show scopes reservation update to single due/targeted booking instead of all table bookings', async () => {
+    const autoScopedDb = makeDB([
+      { match: (s) => s.includes('cafe_tables WHERE id ='), rows: [{ id: 'T1', status: 'Reserved', tenant_id: 'default' }], firstRow: { id: 'T1', status: 'Reserved', tenant_id: 'default' } },
+      { match: (s) => s.startsWith('UPDATE cafe_tables SET status'), rows: [], firstRow: null },
+      { match: (s) => s.includes('table_sessions WHERE table_id'), rows: [], firstRow: null },
+      { match: (s) => s.includes("UPDATE reservations SET status = 'no_show'"), rows: [], firstRow: null },
+    ]);
+    const autoRes = await fh(autoScopedDb, 'POST', '/api/floor-plan/T1/no-show', { timeout_minutes: 15 });
+    expect(autoRes.status).toBe(200);
+    const rsvUpdate = (autoScopedDb as any)._bound.find((e: { sql: string }) =>
+      e.sql.includes("UPDATE reservations SET status = 'no_show'"),
+    );
+    expect(rsvUpdate).toBeTruthy();
+    expect(rsvUpdate.sql).toContain('WHERE id = (');
+    expect(rsvUpdate.sql).toContain('LIMIT 1');
+
+    const targetedDb = makeDB([
+      { match: (s) => s.includes('cafe_tables WHERE id ='), rows: [{ id: 'T1', status: 'Reserved', tenant_id: 'default' }], firstRow: { id: 'T1', status: 'Reserved', tenant_id: 'default' } },
+      { match: (s) => s.startsWith('UPDATE cafe_tables SET status'), rows: [], firstRow: null },
+      { match: (s) => s.includes('table_sessions WHERE table_id'), rows: [], firstRow: null },
+      { match: (s) => s.includes("UPDATE reservations SET status = 'no_show'"), rows: [], firstRow: null },
+    ]);
+    const targetedRes = await fh(targetedDb, 'POST', '/api/floor-plan/T1/no-show', {
+      timeout_minutes: 15,
+      reservation_id: 'rsv-123',
+    });
+    expect(targetedRes.status).toBe(200);
+    const targetedUpdate = (targetedDb as any)._bound.find((e: { sql: string }) =>
+      e.sql.includes("UPDATE reservations SET status = 'no_show'"),
+    );
+    expect(targetedUpdate).toBeTruthy();
+    expect(targetedUpdate.sql).toContain('WHERE id = ? AND table_id = ?');
+    expect(targetedUpdate.args).toContain('rsv-123');
+  });
 });
