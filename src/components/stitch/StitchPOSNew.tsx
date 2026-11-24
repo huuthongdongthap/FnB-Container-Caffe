@@ -197,7 +197,7 @@ export function StitchPOSNew({
 
   return (
     <div
-      className="min-h-screen flex flex-col select-none"
+      className="min-h-screen flex flex-col select-none print:hidden no-print"
       style={{ backgroundColor: 'var(--aura-bg-page, #16130f)', color: 'var(--aura-text-primary, #eae1db)', overflow: 'hidden', height: '100vh' }}
     >
       <POSHeader
@@ -284,7 +284,7 @@ export function StitchPOSNew({
       <POSFooter
         cartOpen={cartOpen}
         onOpenDrawer={onOpenDrawer}
-        onPrintReceipt={onPrintReceipt}
+        onPrintReceipt={onPrintReceipt ? () => onPrintReceipt({ items: cart, subtotal, total }) : undefined}
         onEndShift={onEndShift}
       />
       <style>{POS_STYLES}</style>

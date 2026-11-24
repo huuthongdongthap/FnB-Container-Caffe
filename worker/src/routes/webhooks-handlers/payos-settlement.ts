@@ -14,6 +14,9 @@ export async function settlePayOS(
   providerReference?: string | null,
 ) {
   if (!success) {
+    // A provider link that expired or was cancelled closes only that attempt. The order stays
+    // pending because POS retry rotation reopens `payments.status = 'expired'` in place, and a
+    // retry link can never be created for an order already marked `expired`.
     const result = await db.prepare("UPDATE payments SET status = ?, updated_at = ? WHERE id = ? AND status = 'pending'")
       .bind(status, now, payment.id).run();
     return { paymentChanged: (result.meta?.changes ?? 0) > 0, orderChanged: false };
@@ -26,7 +29,7 @@ export async function settlePayOS(
         AND other.status IN ('completed', 'paid', 'refunded'))`)
       .bind(...(withReference ? [now, reference] : [now]), payment.id, payment.order_id, payment.id),
     db.prepare(`UPDATE orders SET payment_status = 'paid', updated_at = ?
-      WHERE id = ? AND payment_method = 'payos' AND payment_status NOT IN ('paid', 'completed', 'refunded')
+      WHERE id = ? AND payment_method = 'payos' AND payment_status NOT IN ('paid', 'completed', 'partially_refunded', 'refunded')
       AND LOWER(COALESCE(status, 'pending')) NOT IN ('cancelled', 'canceled', 'rejected', 'failed', 'expired', 'refunded')
       AND EXISTS (SELECT 1 FROM payments WHERE id = ? AND status = 'completed')`)
       .bind(now, payment.order_id, payment.id),

@@ -15,6 +15,14 @@ export interface MD3TextFieldProps
   className?: string;
 }
 
+const ALWAYS_FLOAT_INPUT_TYPES = new Set([
+  'date',
+  'datetime-local',
+  'time',
+  'month',
+  'week',
+]);
+
 /* ─── Component ───────────────────────────────────────────── */
 export const MD3TextField = forwardRef<HTMLInputElement, MD3TextFieldProps>(
   function MD3TextField(
@@ -29,6 +37,9 @@ export const MD3TextField = forwardRef<HTMLInputElement, MD3TextFieldProps>(
       className,
       onFocus,
       onBlur,
+      onChange,
+      type,
+      placeholder,
       value,
       defaultValue,
       disabled,
@@ -40,11 +51,18 @@ export const MD3TextField = forwardRef<HTMLInputElement, MD3TextFieldProps>(
     const autoId = useId();
     const id = externalId ?? autoId;
     const [focused, setFocused] = useState(false);
-    const [hasValue, setHasValue] = useState(
-      Boolean(value ?? defaultValue),
+    const isControlled = value !== undefined;
+    const [uncontrolledHasValue, setUncontrolledHasValue] = useState(
+      Boolean(defaultValue),
     );
 
-    const floated = focused || hasValue;
+    const hasValue = isControlled
+      ? String(value).length > 0
+      : uncontrolledHasValue;
+    const alwaysFloat =
+      (type ? ALWAYS_FLOAT_INPUT_TYPES.has(type) : false) ||
+      Boolean(placeholder);
+    const floated = alwaysFloat || focused || hasValue;
     const isFilled = variant === 'filled';
     const isOutlined = variant === 'outlined';
     const charCount = typeof value === 'string' ? value.length : 0;
@@ -115,8 +133,11 @@ export const MD3TextField = forwardRef<HTMLInputElement, MD3TextFieldProps>(
 
           {/* Input */}
           <input
+            {...rest}
             ref={ref}
             id={id}
+            type={type}
+            placeholder={placeholder}
             value={value}
             defaultValue={defaultValue}
             disabled={disabled}
@@ -135,12 +156,16 @@ export const MD3TextField = forwardRef<HTMLInputElement, MD3TextFieldProps>(
             }}
             onBlur={(e) => {
               setFocused(false);
-              setHasValue(Boolean(e.target.value));
+              if (!isControlled) {
+                setUncontrolledHasValue(Boolean(e.target.value));
+              }
               onBlur?.(e);
             }}
             onChange={(e) => {
-              setHasValue(Boolean(e.target.value));
-              rest.onChange?.(e);
+              if (!isControlled) {
+                setUncontrolledHasValue(Boolean(e.target.value));
+              }
+              onChange?.(e);
             }}
             className={cn(
               'w-full bg-transparent outline-none',
@@ -148,7 +173,6 @@ export const MD3TextField = forwardRef<HTMLInputElement, MD3TextFieldProps>(
               floated ? 'pt-4 pb-1' : 'py-3.5',
               leadingIcon && 'ml-0',
             )}
-            {...rest}
           />
 
           {/* Trailing icon */}

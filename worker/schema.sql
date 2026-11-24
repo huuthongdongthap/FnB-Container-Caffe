@@ -2354,10 +2354,13 @@ CREATE TABLE IF NOT EXISTS refund_loyalty_work (
   order_id TEXT NOT NULL,
   customer_id TEXT,
   amount INTEGER NOT NULL CHECK (amount > 0),
-  status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'completed')),
+  status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'completed', 'failed')),
   points_reversed INTEGER NOT NULL DEFAULT 0,
   cashback_reversed INTEGER NOT NULL DEFAULT 0,
+  attempts INTEGER NOT NULL DEFAULT 0,
+  last_error TEXT,
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at TEXT,
   completed_at TEXT,
   PRIMARY KEY (tenant_id, reversal_key)
 );

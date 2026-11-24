@@ -1582,12 +1582,12 @@ describe('Phase 68 Security Regression Suite (BO1..BO4)', () => {
         .get('33333333-3333-4333-8333-333333333333') as { tenant_id: string };
       expect(runRow.tenant_id).toBe('store-b');
 
-      // checkOverdueOrders with 'hq' override normalizes to '*' and marks ord-overdue-b [OVERDUE] under store-b
+      // checkOverdueOrders with 'hq' override normalizes to '*' and completes cleanly without mutating customer notes
       await checkOverdueOrders(buildEnv(db) as unknown as Record<string, unknown>, 'hq');
       const overdueOrd = sqlite
         .prepare('SELECT notes FROM orders WHERE id = ?')
         .get('ord-overdue-b') as { notes: string };
-      expect(overdueOrd.notes).toContain('[OVERDUE]');
+      expect(overdueOrd.notes).toBe('Gấp');
 
       // checkInventoryAlerts and sendCashbackExpiryWarnings with 'hq' override complete cleanly without error
       await checkInventoryAlerts(buildEnv(db) as unknown as Record<string, unknown>, 'hq');

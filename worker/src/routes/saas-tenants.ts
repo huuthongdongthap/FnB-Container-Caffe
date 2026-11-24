@@ -266,6 +266,7 @@ export function createTenantRoutes() {
         await subscriptionStmt.run();
       }
 
+      // Brand-new tenants have zero legacy refund history — mark refund ledger ready immediately.
       try {
         await db
           .prepare(
