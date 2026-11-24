@@ -78,7 +78,7 @@ function ScopedTableManagement({ session, canTransfer, feedbackKey }: {
 
 	const loadActiveOrders = useCallback(async () => {
 		try {
-			const res = await apiFetch<{ success: boolean; data: unknown }>('/api/orders?limit=20');
+			const res = await apiFetch<{ success: boolean; data: unknown }>('/api/orders?limit=200&order_type=dine_in');
 			const raw = res?.success ? (res.data as unknown) : [];
 			const rows = Array.isArray(raw)
 				? (raw as Array<{ table_id?: string; status: string }>)
@@ -87,7 +87,7 @@ function ScopedTableManagement({ session, canTransfer, feedbackKey }: {
 					: [];
 			const counts: Record<string, number> = {};
 			for (const o of rows) {
-				if (o.table_id && ACTIVE_ORDER_STATUSES.has(o.status)) {
+				if (o.table_id && ACTIVE_ORDER_STATUSES.has(String(o.status || '').toLowerCase())) {
 					counts[o.table_id] = (counts[o.table_id] || 0) + 1;
 				}
 			}
@@ -113,15 +113,26 @@ function ScopedTableManagement({ session, canTransfer, feedbackKey }: {
 				body: JSON.stringify({ status }),
 			});
 			setTables((prev) => prev.map((t) => (t.id === id ? { ...t, status } : t)));
-		} catch { /* silent — next poll recovers */ }
+			recordFeedback(null);
+		} catch (err) {
+			const msg = err instanceof Error ? err.message : (i18n.language?.startsWith('vi') ? 'Không thể cập nhật trạng thái bàn' : 'Failed to update table status');
+			recordFeedback({ kind: 'error', message: msg });
+		}
 		setUpdating(null);
 	};
 
 	const bulkSetStatus = async (status: CafeTableRow['status']) => {
+		const vi = i18n.language?.startsWith('vi');
+		const confirmMsg = status === 'Available'
+			? (vi ? 'Mở trống tất cả các bàn đang hiển thị?' : 'Release all displayed tables to Available?')
+			: (vi ? 'Đặt trước tất cả các bàn đang hiển thị?' : 'Mark all displayed tables as Reserved?');
+		if (typeof window !== 'undefined' && !window.confirm(confirmMsg)) return;
 		setUpdating('BULK');
 		try {
-			const current = filterStatus !== 'all' ? tables.filter((t) => t.status === filterStatus) : tables;
-			await Promise.all(
+			const current = filterStatus !== 'all'
+				? tables.filter((t) => String(t.status || '').toLowerCase() === filterStatus.toLowerCase())
+				: tables;
+			const settled = await Promise.allSettled(
 				current.map((t) =>
 					apiFetch(`/api/tables/${t.id}/status`, {
 						method: 'PATCH',
@@ -130,6 +141,17 @@ function ScopedTableManagement({ session, canTransfer, feedbackKey }: {
 					}),
 				),
 			);
+			const failedCount = settled.filter((r) => r.status === 'rejected').length;
+			if (failedCount > 0) {
+				recordFeedback({
+					kind: 'error',
+					message: vi
+						? `Không thể cập nhật ${failedCount}/${current.length} bàn (có thể còn đơn chưa thanh toán).`
+						: `Failed to update ${failedCount}/${current.length} tables (unpaid active orders may exist).`,
+				});
+			} else {
+				recordFeedback(null);
+			}
 			loadTables();
 		} finally { setUpdating(null); }
 	};
@@ -143,7 +165,11 @@ function ScopedTableManagement({ session, canTransfer, feedbackKey }: {
 				body: JSON.stringify({ status: 'Available' }),
 			});
 			setTables((prev) => prev.map((t) => (t.id === table.id ? { ...t, status: 'Available' as const } : t)));
-		} catch { /* silent — next poll recovers */ }
+			recordFeedback(null);
+		} catch (err) {
+			const msg = err instanceof Error ? err.message : (i18n.language?.startsWith('vi') ? 'Không thể trả bàn (bàn có thể còn đơn chưa thanh toán)' : 'Failed to release table');
+			recordFeedback({ kind: 'error', message: msg });
+		}
 		setUpdating(null);
 	};
 
@@ -186,16 +212,24 @@ function ScopedTableManagement({ session, canTransfer, feedbackKey }: {
 
 					{!loading && !ordersLoading && (
 						<div className="flex flex-wrap gap-3 mb-4 text-sm">
-							<span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
-								<span className="w-2 h-2 rounded-full bg-emerald-400" />
-								{tables.filter((tb) => tb.status === 'Available').length} {t('admin.tableManagement.availableShort')}
+							<span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30">
+								<span className="w-2 h-2 rounded-full bg-emerald-500" />
+								{tables.filter((tb) => String(tb.status || '').toLowerCase() === 'available').length} {t('admin.tableManagement.availableShort')}
 							</span>
-							<span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/15 text-amber-300 border border-amber-500/30">
-								<span className="w-2 h-2 rounded-full bg-amber-400" />
-								{tables.filter((tb) => tb.status === 'Occupied').length} {t('admin.tableManagement.occupiedShort')}
+							<span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/30">
+								<span className="w-2 h-2 rounded-full bg-amber-500" />
+								{tables.filter((tb) => String(tb.status || '').toLowerCase() === 'occupied').length} {t('admin.tableManagement.occupiedShort')}
 							</span>
-							<span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-sky-500/15 text-sky-300 border border-sky-500/30">
-								<span className="w-2 h-2 rounded-full bg-sky-400" />
+							<span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-sky-500/15 text-sky-700 dark:text-sky-300 border border-sky-500/30">
+								<span className="w-2 h-2 rounded-full bg-sky-500" />
+								{tables.filter((tb) => String(tb.status || '').toLowerCase() === 'reserved').length} {t('admin.tableManagement.reservedShort', { defaultValue: 'Reserved' })}
+							</span>
+							<span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-red-500/15 text-red-700 dark:text-red-300 border border-red-500/30">
+								<span className="w-2 h-2 rounded-full bg-red-500" />
+								{tables.filter((tb) => String(tb.status || '').toLowerCase() === 'overdue').length} {t('admin.tableManagement.overdueShort', { defaultValue: 'Overdue' })}
+							</span>
+							<span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-indigo-500/15 text-indigo-700 dark:text-indigo-300 border border-indigo-500/30">
+								<span className="w-2 h-2 rounded-full bg-indigo-500" />
 								{Object.values(activeOrderCounts).reduce((s, v) => s + v, 0)} {t('admin.tableManagement.pendingOrdersShort')}
 							</span>
 						</div>

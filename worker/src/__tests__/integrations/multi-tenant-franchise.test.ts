@@ -10857,7 +10857,7 @@ describe('Multi-Tenant & Franchise Preparation Integration', () => {
       expect(
         executedSqls.some(
           (q) =>
-            /UPDATE cafe_tables SET status = 'Available' WHERE id = \? AND COALESCE\(NULLIF\(TRIM\(tenant_id\), ''\), 'default'\) = \?/i.test(q.sql) &&
+            /UPDATE cafe_tables SET status = 'Available'(?:, current_order_id = NULL(?:, current_session_id = NULL)?)? WHERE id = \? AND COALESCE\(NULLIF\(TRIM\(tenant_id\), ''\), 'default'\) = \?/i.test(q.sql) &&
             q.args[1] === 'default'
         )
       ).toBe(true);

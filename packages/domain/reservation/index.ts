@@ -7,4 +7,4 @@ export type {
   TableAvailability,
 } from './src/model/reservation-types';
 // routes
-export { reservationsRouter } from './src/routes/reservations';
+export { reservationsRouter, waitlistRouter } from './src/routes/reservations';

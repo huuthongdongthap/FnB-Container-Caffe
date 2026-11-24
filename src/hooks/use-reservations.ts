@@ -5,6 +5,8 @@ export interface TableInfo {
   id: string;
   table_number: string;
   zone: string;
+  capacity?: number;
+  status?: string;
   available: boolean;
 }
 
@@ -29,7 +31,9 @@ export interface ReservationResult {
   success: boolean;
   data?: {
     id: string;
+    table_id?: string;
     table_number?: string;
+    zone?: string;
   };
   error?: string;
 }

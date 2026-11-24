@@ -21,7 +21,7 @@ it.each([
                  VALUES ('order-race', 'table-a', '[]', 20000, 'Guest', '0900000010', 'cod', 'cafe-a')`],
   ['open session', `INSERT INTO table_sessions (id, table_id, tenant_id) VALUES ('session-race', 'table-a', 'cafe-a')`],
   ['active reservation', `INSERT INTO reservations (id, table_id, customer_name, customer_phone, date, time, zone, tenant_id)
-                          VALUES ('reservation-race', 'table-a', 'Guest', '0900000010', DATE('now', '+7 hours'), '18:00', 'A', 'cafe-a')`],
+                          VALUES ('reservation-race', 'table-a', 'Guest', '0900000010', DATE('now', '+7 hours'), strftime('%H:%M', 'now', '+7 hours'), 'A', 'cafe-a')`],
 ])('keeps an occupied table when a %s appears immediately before release', async (_holder, insert) => {
   const { sqlite, env } = orderCreationFixture();
   try {
@@ -66,10 +66,26 @@ it.each(['date', 'reservation_date'])('preserves reservation guards with only %s
       .not.toContain(column === 'date' ? 'reservation_date' : 'date');
     sqlite.exec(`UPDATE cafe_tables SET status = 'Occupied' WHERE id = 'table-a';
       INSERT INTO reservations (id, table_id, customer_name, customer_phone, ${column}, time, zone, tenant_id)
-      VALUES ('legacy-holder', 'table-a', 'Guest', '0900000010', DATE('now', '+7 hours'), '18:00', 'A', 'cafe-a')`);
+      VALUES ('legacy-holder', 'table-a', 'Guest', '0900000010', DATE('now', '+7 hours'), strftime('%H:%M', 'now', '+7 hours'), 'A', 'cafe-a')`);
     expect(await releaseTableIfNoActiveOrders(env.AURA_DB, 'A1', 'cafe-a')).toBe(false);
     expect(sqlite.prepare("SELECT status FROM cafe_tables WHERE id = 'table-a'").get()?.status).toBe('Occupied');
     sqlite.exec("UPDATE reservations SET status = 'cancelled' WHERE id = 'legacy-holder'");
+    expect(await releaseTableIfNoActiveOrders(env.AURA_DB, 'A1', 'cafe-a')).toBe(true);
+    expect(sqlite.prepare("SELECT status FROM cafe_tables WHERE id = 'table-a'").get()?.status).toBe('Available');
+  } finally { sqlite.close(); }
+});
+
+it('releases a table when a same-day confirmed reservation is outside the imminent lock window', async () => {
+  const { sqlite, env } = orderCreationFixture();
+  try {
+    const vnNow = new Date(Date.now() + 7 * 3600_000);
+    const currentHour = vnNow.getUTCHours();
+    // Pick a same-day hour at least 3 hours away from currentHour so it is outside [-30, +60] min.
+    const distantHour = currentHour < 12 ? 23 : 1;
+    const distantTime = `${String(distantHour).padStart(2, '0')}:00`;
+    sqlite.exec(`UPDATE cafe_tables SET status = 'Occupied' WHERE id = 'table-a';
+      INSERT INTO reservations (id, table_id, customer_name, customer_phone, date, time, zone, tenant_id, status)
+      VALUES ('later-rsv', 'table-a', 'Guest', '0900000010', DATE('now', '+7 hours'), '${distantTime}', 'A', 'cafe-a', 'confirmed')`);
     expect(await releaseTableIfNoActiveOrders(env.AURA_DB, 'A1', 'cafe-a')).toBe(true);
     expect(sqlite.prepare("SELECT status FROM cafe_tables WHERE id = 'table-a'").get()?.status).toBe('Available');
   } finally { sqlite.close(); }
