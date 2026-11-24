@@ -11,6 +11,8 @@ import { Hono } from 'hono';
 import { settlePayOS } from '../routes/webhooks-handlers/payos-settlement';
 import { canTransition, ORDER_STATUSES } from '../../../packages/domain/order/model/order-state-machine';
 import { canActorTransition } from '../../../packages/domain/order/policies/transition-authorization';
+import { transitionOrderStatus } from '../../../packages/domain/order/policies/order-status-transition';
+import { executeKdsStatusTransition } from '../../../packages/domain/kitchen/commands/kds-status-transition';
 import { createOrderSchema, updateOrderStatusSchema } from '../lib/validators/order';
 import type { ShiftScope } from '../../../packages/domain/shift/commands/shift-access';
 import type { Env } from '../types/env';
@@ -452,5 +454,203 @@ describe('PR-4: Shifts, Cash Reconciliation, Counter Cash & Delivery State Machi
     const denom = body.data.shifts.find((s) => s.shift_id === 'shift-2');
     expect(undenom?.denominated).toBe(false);
     expect(denom?.denominated).toBe(true);
+  });
+
+  it('guards void transitions (failed/expired) on paid orders and persists delivery metadata when schema supports it', async () => {
+    d1.exec(`
+      ALTER TABLE orders ADD COLUMN assigned_shipper_id TEXT;
+      ALTER TABLE orders ADD COLUMN shipper_name TEXT;
+      ALTER TABLE orders ADD COLUMN failure_reason TEXT;
+      INSERT INTO orders (id, tenant_id, payment_method, payment_status, status)
+      VALUES
+        ('ord-paid-deliv', 'default', 'payos', 'paid', 'delivering'),
+        ('ord-paid-pending', 'default', 'payos', 'paid', 'pending'),
+        ('ord-cod-deliv', 'default', 'cod', 'unpaid', 'ready');
+    `);
+
+    const blockedFail = await transitionOrderStatus(d1.db, 'ord-paid-deliv', 'failed', 'shipper', { tenantId: 'default' });
+    expect(blockedFail.success).toBe(false);
+    expect(blockedFail.statusCode).toBe(409);
+
+    const blockedExpire = await transitionOrderStatus(d1.db, 'ord-paid-pending', 'expired', 'manager', { tenantId: 'default' });
+    expect(blockedExpire.success).toBe(false);
+    expect(blockedExpire.statusCode).toBe(409);
+
+    const dispatch = await executeKdsStatusTransition(d1.db, 'ord-cod-deliv', 'delivering', 'rider', {
+      tenantId: 'default',
+      fields: { assigned_shipper_id: 'shipper-1', shipper_name: 'Nguyen Van Shipper' },
+    });
+    expect(dispatch.success).toBe(true);
+
+    const failUnpaid = await executeKdsStatusTransition(d1.db, 'ord-cod-deliv', 'failed', 'rider', {
+      tenantId: 'default',
+      fields: { failure_reason: 'Customer unreachable' },
+    });
+    expect(failUnpaid.success).toBe(true);
+
+    const stored = await d1.db
+      .prepare('SELECT status, assigned_shipper_id, shipper_name, failure_reason FROM orders WHERE id = ?')
+      .bind('ord-cod-deliv')
+      .first<{ status: string; assigned_shipper_id: string | null; shipper_name: string | null; failure_reason: string | null }>();
+    expect(stored).toEqual({
+      status: 'failed',
+      assigned_shipper_id: 'shipper-1',
+      shipper_name: 'Nguyen Van Shipper',
+      failure_reason: 'Customer unreachable',
+    });
+  });
+
+  it('prevents non-manager clock-out attendanceId probing and returns 404 for unknown manager target', async () => {
+    const cashierScope = makeScope('cashier-1', 'cashier', false);
+    const baristaScope = makeScope('barista-1', 'barista', false);
+    const mgrScope = makeScope('mgr-1', 'manager', true);
+
+    const cashierShift = await clockIn(cashierScope, 'cashier-1', undefined, undefined, 100_000);
+
+    await expect(clockOut(baristaScope, undefined, String(cashierShift.id))).rejects.toMatchObject({
+      status: 404,
+    });
+
+    await expect(clockOut(mgrScope, 'missing-staff-id')).rejects.toMatchObject({
+      status: 404,
+      message: 'Staff not found',
+    });
+  });
+
+  it('excludes scheduled/cancelled shifts from cash ambiguity, returns structured ambiguous_payment_ids, bounds online_sales by clock_out, and validates handover recipient', async () => {
+    d1.exec(`
+      INSERT INTO users (id, name, role, tenant_id, is_active, auth_version) VALUES
+        ('cashier-2', 'Cashier Two', 'cashier', 'default', 1, 1),
+        ('other-store-mgr', 'Other Store Mgr', 'manager', 'store-b', 1, 1);
+    `);
+
+    const cashier1Scope = makeScope('cashier-1', 'cashier', false);
+    const shift1 = await clockIn(cashier1Scope, 'cashier-1', undefined, undefined, 100_000);
+    const nowMs = Date.now();
+    const clockInTime = new Date(nowMs - 10_000).toISOString();
+    const duringShift = new Date(nowMs - 8_000).toISOString();
+    d1.exec(`UPDATE staff_shifts SET clock_in = '${clockInTime}' WHERE id = ${shift1.id};`);
+
+    // Add a scheduled (clock_in IS NULL) and a cancelled cashier shift — neither should cause ambiguity
+    d1.exec(`
+      INSERT INTO staff_shifts (tenant_id, staff_id, staff_name, role, date, shift, clock_in, attendance_state, status, opening_cash)
+      VALUES
+        ('default', 'cashier-2', 'Cashier Two', 'cashier', '2026-11-24', 'morning', NULL, 'scheduled', 'open', 0),
+        ('default', 'cashier-cancelled', 'Cancelled Cashier', 'cashier', '2026-11-24', 'morning', '${clockInTime}', 'cancelled', 'closed', 0);
+      INSERT INTO payments (id, order_id, tenant_id, method, status, amount, created_at, updated_at)
+      VALUES
+        ('pay-cash-clean', 'ord-cash-clean', 'default', 'cash', 'completed', 50000, '${duringShift}', '${duringShift}');
+    `);
+
+    // Reject inactive and cross-tenant handover_to_staff_id
+    await expect(
+      reconcileShiftCash(
+        d1.db,
+        {
+          shift_id: String(shift1.id),
+          opening_float: 100_000,
+          denominations: { denominations: [{ denomination: 100_000, count: 1 }, { denomination: 50_000, count: 1 }] },
+          handover_to_staff_id: 'inactive-1',
+        },
+        'cashier-1',
+        'default',
+        'cashier',
+      ),
+    ).rejects.toMatchObject({ status: 400 });
+
+    await expect(
+      reconcileShiftCash(
+        d1.db,
+        {
+          shift_id: String(shift1.id),
+          opening_float: 100_000,
+          denominations: { denominations: [{ denomination: 100_000, count: 1 }, { denomination: 50_000, count: 1 }] },
+          handover_to_staff_id: 'other-store-mgr',
+        },
+        'cashier-1',
+        'default',
+        'cashier',
+      ),
+    ).rejects.toMatchObject({ status: 400 });
+
+    // Now add a truly active overlapping cashier shift -> 409 must include code + ambiguous_payment_ids
+    const cashier2Scope = makeScope('cashier-2', 'cashier', false);
+    const shift2 = await clockIn(cashier2Scope, 'cashier-2', undefined, undefined, 0);
+    const shift2ClockIn = new Date(nowMs - 6_000).toISOString();
+    const overlapTime = new Date(nowMs - 4_000).toISOString();
+    d1.exec(`
+      UPDATE staff_shifts SET clock_in = '${shift2ClockIn}' WHERE id = ${shift2.id};
+      UPDATE payments SET created_at = '${overlapTime}', updated_at = '${overlapTime}' WHERE id = 'pay-cash-clean';
+    `);
+
+    const app = new Hono<{ Bindings: Env; Variables: { user: Record<string, unknown>; tenantId: string } }>();
+    app.use('*', async (c, next) => {
+      c.set('user', { id: 'cashier-1', sub: 'cashier-1', role: 'cashier', tenantId: 'default' });
+      c.set('tenantId', 'default');
+      await next();
+    });
+    reconciliationRoutes(app);
+    const env = { AURA_DB: d1.db, CASH_RECONCILIATION_ENABLED: 'true' } as unknown as Env;
+
+    const conflictRes = await app.request(
+      `/api/shifts/${shift1.id}/reconcile`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          opening_float: 100_000,
+          denominations: { denominations: [{ denomination: 100_000, count: 1 }, { denomination: 50_000, count: 1 }] },
+        }),
+      },
+      env,
+    );
+    expect(conflictRes.status).toBe(409);
+    const conflictBody = (await conflictRes.json()) as {
+      code?: string;
+      ambiguous_payment_ids?: string[];
+    };
+    expect(conflictBody.code).toBe('AMBIGUOUS_CASH_PAYMENTS');
+    expect(conflictBody.ambiguous_payment_ids).toEqual(['pay-cash-clean']);
+
+    // Assign via route, close shift1, add a post-clock-out PayOS payment, and verify online_sales_total excludes it
+    const assignRes = await app.request(
+      `/api/shifts/${shift1.id}/assign-cash-payments`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ payment_ids: ['pay-cash-clean'] }),
+      },
+      env,
+    );
+    expect(assignRes.status).toBe(200);
+
+    const closedClockOut = new Date(nowMs - 2_000).toISOString();
+    const afterClockOut = new Date(nowMs - 1_000).toISOString();
+    d1.exec(`
+      UPDATE staff_shifts SET clock_out = '${closedClockOut}', attendance_state = 'completed', status = 'closed' WHERE id = ${shift1.id};
+      INSERT INTO payments (id, order_id, tenant_id, method, status, amount, created_at, updated_at)
+      VALUES
+        ('pay-payos-in', 'ord-payos-in', 'default', 'payos', 'completed', 40000, '${overlapTime}', '${overlapTime}'),
+        ('pay-payos-after', 'ord-payos-after', 'default', 'payos', 'completed', 99000, '${afterClockOut}', '${afterClockOut}');
+    `);
+
+    const okRes = await app.request(
+      `/api/shifts/${shift1.id}/reconcile`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          opening_float: 100_000,
+          denominations: { denominations: [{ denomination: 100_000, count: 1 }, { denomination: 50_000, count: 1 }] },
+          handover_to_staff_id: 'mgr-1',
+        }),
+      },
+      env,
+    );
+    expect(okRes.status).toBe(201);
+    const okJson = (await okRes.json()) as { data: { cash_payment_total: number; online_sales_total: number; handover_to_staff_id: string | null } };
+    expect(okJson.data.cash_payment_total).toBe(50_000);
+    expect(okJson.data.online_sales_total).toBe(40_000);
+    expect(okJson.data.handover_to_staff_id).toBe('mgr-1');
   });
 });

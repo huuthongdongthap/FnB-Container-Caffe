@@ -17,6 +17,7 @@ export interface KdsTransitionOptions {
   env?: Record<string, unknown>;
   skipCancelSideEffects?: boolean;
   allowPaidCompensation?: boolean;
+  fields?: Record<string, unknown>;
 }
 
 /**
@@ -38,6 +39,7 @@ export async function executeKdsStatusTransition(
   const result = await transitionOrderStatus(db, orderId, targetStatus, userRole, {
     tenantId: options?.tenantId,
     allowPaidCompensation: options?.allowPaidCompensation,
+    fields: options?.fields,
   });
   if (!result.success || result.idempotent) return result;
   const order = result.order!;

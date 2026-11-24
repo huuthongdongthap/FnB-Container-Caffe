@@ -1,10 +1,17 @@
 import type { Env } from 'worker/src/types/env';
 import type { AuthUser } from 'worker/src/middleware/auth';
-import { isStaffRole, loadStaffAccount, requireStaffAccount, StaffSessionError, type StaffAccount } from 'worker/src/lib/staff-session';
+import { isStaffRole, loadStaffAccount, requireStaffAccount, type StaffAccount } from 'worker/src/lib/staff-session';
 import { resolvePilotStore } from 'worker/src/lib/pilot-store';
 
 export class ShiftContractError extends Error {
-  constructor(message: string, readonly status: 400 | 403 | 404 | 409 | 503) { super(message); }
+  constructor(
+    message: string,
+    readonly status: 400 | 403 | 404 | 409 | 503,
+    readonly code?: string,
+    readonly details?: Record<string, unknown>,
+  ) {
+    super(message);
+  }
 }
 export interface ShiftScope { env: Env; tenantId: string; actor: StaffAccount; canManage: boolean }
 
@@ -84,7 +91,7 @@ export async function shiftTarget(
   if (options?.allowInactiveTarget && scope.canManage) {
     const loaded = await loadStaffAccount(scope.env.AURA_DB, id);
     if (!loaded.ok || !isStaffRole(loaded.account.role)) {
-      throw new StaffSessionError('SESSION_REVOKED');
+      throw new ShiftContractError('Staff not found', 404);
     }
     account = loaded.account;
   } else {

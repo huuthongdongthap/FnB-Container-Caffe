@@ -126,29 +126,54 @@ async function getCashPaymentsForShift(
   const now = asOf || new Date().toISOString();
   const endTime = shift.clock_out || now;
   try {
-    const rows = await db.prepare(`SELECT p.id, p.amount, a.shift_id,
-        (SELECT COUNT(*) FROM staff_shifts s
-         WHERE COALESCE(NULLIF(TRIM(s.tenant_id), ''), 'default') = ?
-         AND LOWER(COALESCE(s.role, '')) NOT IN ('barista', 'kitchen', 'chef')
-         AND julianday(COALESCE(p.updated_at, p.created_at)) >= julianday(s.clock_in)
-         AND julianday(COALESCE(p.updated_at, p.created_at)) <= julianday(COALESCE(s.clock_out, ?))) AS candidates
-      FROM payments p LEFT JOIN cash_payment_attributions a ON a.payment_id = p.id AND a.tenant_id = COALESCE(NULLIF(TRIM(p.tenant_id), ''), 'default')
-      WHERE p.method IN ('cash', 'cod') AND p.status = 'completed'
-      AND COALESCE(NULLIF(TRIM(p.tenant_id), ''), 'default') = ?
-      AND (a.shift_id = ? OR (a.shift_id IS NULL
-        AND julianday(COALESCE(p.updated_at, p.created_at)) >= julianday(?)
-        AND julianday(COALESCE(p.updated_at, p.created_at)) <= julianday(?)))`)
-      .bind(tenant, now, tenant, shiftId, shift.clock_in, endTime)
-      .all<{ id: string; amount: number; shift_id: string | null; candidates: number }>();
+    const queryAttributionRows = (includeAttendanceState: boolean) =>
+      db.prepare(`SELECT p.id, p.amount, a.shift_id,
+          (SELECT COUNT(*) FROM staff_shifts s
+           WHERE COALESCE(NULLIF(TRIM(s.tenant_id), ''), 'default') = ?
+           AND s.clock_in IS NOT NULL
+           ${includeAttendanceState ? "AND LOWER(COALESCE(s.attendance_state, 'active')) <> 'cancelled'" : ''}
+           AND LOWER(COALESCE(s.role, '')) NOT IN ('barista', 'kitchen', 'chef')
+           AND julianday(COALESCE(p.updated_at, p.created_at)) >= julianday(s.clock_in)
+           AND julianday(COALESCE(p.updated_at, p.created_at)) <= julianday(COALESCE(s.clock_out, ?))) AS candidates
+        FROM payments p LEFT JOIN cash_payment_attributions a ON a.payment_id = p.id AND a.tenant_id = COALESCE(NULLIF(TRIM(p.tenant_id), ''), 'default')
+        WHERE p.method IN ('cash', 'cod') AND p.status = 'completed'
+        AND COALESCE(NULLIF(TRIM(p.tenant_id), ''), 'default') = ?
+        AND (a.shift_id = ? OR (a.shift_id IS NULL
+          AND julianday(COALESCE(p.updated_at, p.created_at)) >= julianday(?)
+          AND julianday(COALESCE(p.updated_at, p.created_at)) <= julianday(?)))`)
+        .bind(tenant, now, tenant, shiftId, shift.clock_in, endTime)
+        .all<{ id: string; amount: number; shift_id: string | null; candidates: number }>();
+
+    let rows: { results?: Array<{ id: string; amount: number; shift_id: string | null; candidates: number }> };
+    try {
+      rows = await queryAttributionRows(true);
+    } catch (innerErr) {
+      if (/no such column:.*attendance_state/i.test(String(innerErr))) {
+        rows = await queryAttributionRows(false);
+      } else {
+        throw innerErr;
+      }
+    }
+
     if (Array.isArray(rows?.results) && (rows.results.length > 0 || Boolean(shift.staff_id))) {
       let total = 0;
+      const ambiguousPaymentIds: string[] = [];
       for (const row of rows.results) {
         if (row.shift_id !== null && row.shift_id !== undefined) {
           if (String(row.shift_id) === String(shiftId)) total += row.amount;
+        } else if (row.candidates !== 1) {
+          ambiguousPaymentIds.push(String(row.id));
         } else {
-          if (row.candidates !== 1) throw new ShiftContractError('Ambiguous cash payment responsibility; assign collecting shift before reconciliation', 409);
           total += row.amount;
         }
+      }
+      if (ambiguousPaymentIds.length > 0) {
+        throw new ShiftContractError(
+          'Ambiguous cash payment responsibility; assign collecting shift before reconciliation',
+          409,
+          'AMBIGUOUS_CASH_PAYMENTS',
+          { ambiguous_payment_ids: ambiguousPaymentIds },
+        );
       }
       return total;
     }
@@ -433,6 +458,46 @@ export async function reconcileShiftCash(
     );
   }
 
+  let handoverToStaffId: string | null = null;
+  if (input.handover_to_staff_id !== undefined && input.handover_to_staff_id !== null) {
+    if (typeof input.handover_to_staff_id !== 'string') {
+      throw new ShiftContractError('Invalid handover_to_staff_id', 400);
+    }
+    const trimmedHandoverTo = input.handover_to_staff_id.trim();
+    if (trimmedHandoverTo.length > 120) {
+      throw new ShiftContractError('Invalid handover_to_staff_id: exceeds 120 characters', 400);
+    }
+    if (trimmedHandoverTo) {
+      if (shiftWindow.staff_id) {
+        let recipient: { tenant_id?: string | null; role: string; is_active: number } | null = null;
+        try {
+          recipient = await db
+            .prepare('SELECT tenant_id, role, is_active FROM users WHERE id = ?')
+            .bind(trimmedHandoverTo)
+            .first<{ tenant_id: string | null; role: string; is_active: number }>();
+        } catch (err) {
+          if (/no such column:.*tenant_id/i.test(String(err))) {
+            const legacyRecipient = await db
+              .prepare('SELECT role, is_active FROM users WHERE id = ?')
+              .bind(trimmedHandoverTo)
+              .first<{ role: string; is_active: number }>();
+            recipient = legacyRecipient ? { ...legacyRecipient, tenant_id: 'default' } : null;
+          } else {
+            throw err;
+          }
+        }
+        const validStaffRoles = ['staff', 'cashier', 'waiter', 'barista', 'chef', 'kitchen', 'shipper', 'rider', 'supervisor', 'manager', 'owner', 'admin'];
+        const recipientTenant = (recipient?.tenant_id?.trim() || 'default').toLowerCase();
+        const isHqRecipient = Boolean(recipient && ['owner', 'admin'].includes(recipient.role) && (recipientTenant === 'hq' || recipientTenant === '*'));
+        const sameTenantRecipient = Boolean(recipient && (recipient.tenant_id?.trim() || 'default') === effectiveReconTenant);
+        if (!recipient || recipient.is_active !== 1 || !validStaffRoles.includes(recipient.role) || (!isHqRecipient && !sameTenantRecipient)) {
+          throw new ShiftContractError('Invalid handover recipient staff member', 400);
+        }
+      }
+      handoverToStaffId = trimmedHandoverTo;
+    }
+  }
+
   let onlineSalesTotal = 0;
   try {
     const onlineRow = await db
@@ -443,7 +508,7 @@ export async function reconcileShiftCash(
            AND julianday(COALESCE(updated_at, created_at)) >= julianday(?)
            AND julianday(COALESCE(updated_at, created_at)) <= julianday(?)`,
       )
-      .bind(effectiveReconTenant, shiftWindow.clock_in, reconciliationTime)
+      .bind(effectiveReconTenant, shiftWindow.clock_in, shiftWindow.clock_out || reconciliationTime)
       .first<{ total: number }>();
     onlineSalesTotal = onlineRow?.total || 0;
   } catch {
@@ -464,7 +529,7 @@ export async function reconcileShiftCash(
     cash_payout_total: cashPayouts,
     remitted_cash: remittedCash,
     closing_float: closingFloat,
-    handover_to_staff_id: input.handover_to_staff_id ?? null,
+    handover_to_staff_id: handoverToStaffId,
     online_sales_total: onlineSalesTotal,
     notes: input.notes ?? null,
     created_at: reconciliationTime,
@@ -474,7 +539,7 @@ export async function reconcileShiftCash(
     ...input.denominations,
     remitted_cash: remittedCash,
     closing_float: closingFloat,
-    handover_to_staff_id: input.handover_to_staff_id ?? null,
+    handover_to_staff_id: handoverToStaffId,
     online_sales_total: onlineSalesTotal,
   });
 

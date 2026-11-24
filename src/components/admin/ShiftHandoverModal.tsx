@@ -44,9 +44,24 @@ function formatClockTime(iso: string | null): string {
   return formatTime(iso);
 }
 
-function getErrorInfo(err: unknown, fallback: string): { status: number; code?: string; message: string } {
+function getErrorInfo(err: unknown, fallback: string): {
+  status: number;
+  code?: string;
+  message: string;
+  ambiguousPaymentIds?: string[];
+} {
   if (err instanceof ApiClientError) {
-    return { status: err.status, code: err.code, message: err.message || fallback };
+    const ids = Array.isArray(err.ambiguous_payment_ids)
+      ? err.ambiguous_payment_ids
+      : Array.isArray(err.details?.ambiguous_payment_ids)
+        ? (err.details.ambiguous_payment_ids as unknown[]).map(String)
+        : undefined;
+    return {
+      status: err.status,
+      code: err.code,
+      message: err.message || fallback,
+      ...(ids && ids.length > 0 ? { ambiguousPaymentIds: ids } : {}),
+    };
   }
   if (err instanceof Error) {
     return { status: 0, message: err.message || fallback };
@@ -97,6 +112,8 @@ export function ShiftHandoverModal({
   const [payoutAmount, setPayoutAmount] = useState('');
   const [payoutReason, setPayoutReason] = useState('');
   const [payoutSubmitting, setPayoutSubmitting] = useState(false);
+  const [ambiguousPaymentIds, setAmbiguousPaymentIds] = useState<string[]>([]);
+  const [assigningAmbiguous, setAssigningAmbiguous] = useState(false);
 
   const submittingRef = useRef(false);
 
@@ -257,6 +274,7 @@ export function ShiftHandoverModal({
     setClockInNotes('');
     setOpenedShift(null);
     setCompletedShift(null);
+    setAmbiguousPaymentIds([]);
     void loadShifts();
   }, [isOpen, loadShifts]);
 
@@ -272,6 +290,7 @@ export function ShiftHandoverModal({
     setPayoutReason('');
     setConfirmZeroCash(false);
     setActionError(null);
+    setAmbiguousPaymentIds([]);
     setCompletedShift(null);
     await fetchExistingReconciliation(shiftId, nextShift);
   };
@@ -397,6 +416,7 @@ export function ShiftHandoverModal({
     submittingRef.current = true;
     setSubmitting(true);
     setActionError(null);
+    setAmbiguousPaymentIds([]);
 
     try {
       let activeRecon = matchedRecon;
@@ -449,6 +469,12 @@ export function ShiftHandoverModal({
             );
             return;
           }
+          if (
+            info.status === 409 &&
+            (info.code === 'AMBIGUOUS_CASH_PAYMENTS' || (info.ambiguousPaymentIds?.length ?? 0) > 0)
+          ) {
+            setAmbiguousPaymentIds(info.ambiguousPaymentIds ?? []);
+          }
           setActionError(info.message);
           return;
         }
@@ -463,6 +489,25 @@ export function ShiftHandoverModal({
     } finally {
       submittingRef.current = false;
       setSubmitting(false);
+    }
+  };
+
+  const handleAssignAmbiguousAndRetry = async () => {
+    if (!selectedShift || ambiguousPaymentIds.length === 0 || assigningAmbiguous || submittingRef.current) return;
+    setAssigningAmbiguous(true);
+    setActionError(null);
+    try {
+      await apiFetch(`/api/shifts/${encodeURIComponent(selectedShift.id)}/assign-cash-payments`, {
+        method: 'POST',
+        body: JSON.stringify({ payment_ids: ambiguousPaymentIds }),
+      });
+      setAmbiguousPaymentIds([]);
+      setAssigningAmbiguous(false);
+      await handleReconcileAndClockOut(true);
+    } catch (err) {
+      const info = getErrorInfo(err, 'Không thể gán giao dịch tiền mặt về ca hiện tại.');
+      setActionError(info.message);
+      setAssigningAmbiguous(false);
     }
   };
 
@@ -720,6 +765,29 @@ export function ShiftHandoverModal({
                 <div className="rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive flex items-start gap-2" role="alert">
                   <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
                   <span>{actionError}</span>
+                </div>
+              )}
+
+              {ambiguousPaymentIds.length > 0 && (
+                <div
+                  className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-xs space-y-2"
+                  data-testid="ambiguous-cash-recovery"
+                >
+                  <p className="font-medium text-amber-800 dark:text-amber-200">
+                    Có {ambiguousPaymentIds.length} giao dịch tiền mặt trùng khung giờ nhiều ca thu ngân ({ambiguousPaymentIds.join(', ')}). Gán về ca này để tiếp tục đối soát.
+                  </p>
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    size="sm"
+                    disabled={assigningAmbiguous || submitting}
+                    onClick={() => void handleAssignAmbiguousAndRetry()}
+                    data-testid="assign-ambiguous-cash-btn"
+                  >
+                    {assigningAmbiguous
+                      ? 'Đang gán giao dịch...'
+                      : 'Gán giao dịch về ca này & Đối soát lại / Assign to Shift & Retry'}
+                  </Button>
                 </div>
               )}
 

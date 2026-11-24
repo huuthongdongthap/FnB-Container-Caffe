@@ -218,7 +218,7 @@ export async function handleOpenApiUpdateOrder(c: Context<{ Bindings: Env }>) {
         }
         statusHandledByKds = true;
       }
-      if (body.status === 'cancelled') {
+      if (isVoidStatus(body.status)) {
         try {
           await db
             .prepare("UPDATE payments SET status = 'cancelled' WHERE order_id = ? AND status = 'pending' AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?")
@@ -264,7 +264,7 @@ export async function handleOpenApiUpdateOrder(c: Context<{ Bindings: Env }>) {
     }
     if (body.status === 'served') { updates.push('served_at = ?'); params.push(now); }
     else if (body.status === 'completed') { updates.push('completed_at = ?'); params.push(now); }
-    else if (body.status === 'cancelled') { updates.push('cancelled_at = ?'); params.push(now); }
+    else if (isVoidStatus(body.status)) { updates.push('cancelled_at = ?'); params.push(now); }
   }
   if (Boolean(user?.role && ORDER_STAFF_ROLES.includes(user.role))) {
     if (notes !== undefined) {

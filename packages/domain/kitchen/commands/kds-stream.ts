@@ -27,7 +27,7 @@ const SSE_TIMEOUT_MS = 120_000;
 // Poll D1 every 3 seconds for changes.
 const POLL_INTERVAL_MS = 3_000;
 const CANCEL_ALERT_WINDOW_MS = 10 * 60_000;
-const PREP_HISTORY_STATUSES = new Set(['preparing', 'ready', 'served', 'completed']);
+const PREP_HISTORY_STATUSES = new Set(['preparing', 'ready', 'delivering', 'served', 'delivered', 'completed']);
 
 export function parseUtcTimestampMs(raw: unknown): number {
   if (typeof raw !== 'string' || !raw.trim()) return NaN;

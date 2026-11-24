@@ -79,7 +79,7 @@ export async function clockOut(scope: ShiftScope, staffId?: string, attendanceId
     ? String(attendanceId).trim()
     : undefined;
   const resolvedNotes = notes;
-  const preloaded = resolvedAttendanceId ? await getShift({ ...scope, canManage: true }, resolvedAttendanceId) : undefined;
+  const preloaded = resolvedAttendanceId ? await getShift(scope, resolvedAttendanceId) : undefined;
   const checkStaffId = staffId || (!scope.canManage ? scope.actor.id : undefined);
   if (preloaded && checkStaffId && String(preloaded.staff_id) !== String(checkStaffId).trim()) {
     throw new ShiftContractError('Attendance record does not match staff member', 409);

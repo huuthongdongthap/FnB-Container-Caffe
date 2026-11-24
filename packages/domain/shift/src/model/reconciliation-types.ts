@@ -25,7 +25,6 @@ export interface ShiftReconciliation {
   closing_float?: number;
   handover_to_staff_id?: string | null;
   online_sales_total?: number;
-  open_orders_count?: number;
   notes: string | null;
   created_at: string;
 }
@@ -37,6 +36,5 @@ export interface ReconciliationInput {
   remitted_cash?: number;
   closing_float?: number;
   handover_to_staff_id?: string | null;
-  open_orders_acknowledged?: boolean;
   notes?: string;
 }

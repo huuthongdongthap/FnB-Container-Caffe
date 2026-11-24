@@ -130,10 +130,13 @@ export const OrderStatusEnum = z.enum([
   'confirmed',
   'preparing',
   'ready',
+  'delivering',
   'served',
   'delivered',
   'completed',
   'cancelled',
+  'failed',
+  'expired',
   'refunded',
 ]).openapi({
   example: 'confirmed',
