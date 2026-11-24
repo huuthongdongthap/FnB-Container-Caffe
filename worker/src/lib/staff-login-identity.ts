@@ -86,6 +86,7 @@ export async function loadStaffAccountForLogin(
   }
   const db = envOrDb as Env['AURA_DB'];
   if (!db?.prepare) return null;
+  const normalizedEmail = String(email || '').trim().toLowerCase();
   const rawTenant = typeof tenantId === 'string' ? tenantId.trim() : '';
   const requestedTenant =
     rawTenant && rawTenant !== '*' && rawTenant.toLowerCase() !== 'hq'
@@ -94,17 +95,17 @@ export async function loadStaffAccountForLogin(
   if (requestedTenant) {
     return db
       .prepare(
-        "SELECT u.* FROM staff_login_identities sli JOIN users u ON u.id = sli.staff_id WHERE sli.email = ? AND COALESCE(NULLIF(TRIM(u.tenant_id), ''), 'default') = ? LIMIT 1"
+        "SELECT u.* FROM staff_login_identities sli JOIN users u ON u.id = sli.staff_id WHERE LOWER(sli.email) = ? AND COALESCE(NULLIF(TRIM(u.tenant_id), ''), 'default') = ? LIMIT 1"
       )
-      .bind(email, requestedTenant)
+      .bind(normalizedEmail, requestedTenant)
       .first<Record<string, any>>()
       .catch(() => null);
   }
   return db
     .prepare(
-      'SELECT u.* FROM staff_login_identities sli JOIN users u ON u.id = sli.staff_id WHERE sli.email = ? LIMIT 1'
+      'SELECT u.* FROM staff_login_identities sli JOIN users u ON u.id = sli.staff_id WHERE LOWER(sli.email) = ? LIMIT 1'
     )
-    .bind(email)
+    .bind(normalizedEmail)
     .first<Record<string, any>>()
     .catch(() => null);
 }
@@ -113,8 +114,9 @@ export async function createStaffIdentity(env: Env, user: {
   id: string; name: string; role: string; phone: string; tenant_id: string;
   password: string; email: string; active?: boolean;
 }, firstOwner = false) {
+  const normalizedEmail = String(user.email || '').trim().toLowerCase();
   // Legacy customer/Staff accounts may not yet have a D1 login directory entry.
-  if (await staffEmailInUse(env, user.email, user.id)) return false;
+  if (await staffEmailInUse(env, normalizedEmail, user.id)) return false;
   const now = new Date().toISOString();
   const values = [user.id, user.name, user.role, user.phone, user.tenant_id,
     user.active === false ? 0 : 1, user.password, now, now];
@@ -123,7 +125,7 @@ export async function createStaffIdentity(env: Env, user: {
     ${firstOwner ? "SELECT ?, ?, ?, ?, ?, ?, 1, ?, ?, ? WHERE NOT EXISTS (SELECT 1 FROM users WHERE role = 'owner')" : 'VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?, ?)'}`)
     .bind(...values);
   const identity = env.AURA_DB.prepare(`INSERT INTO staff_login_identities (email, staff_id)
-    SELECT ?, id FROM users WHERE id = ?`).bind(user.email, user.id);
+    SELECT ?, id FROM users WHERE id = ?`).bind(normalizedEmail, user.id);
   try {
     const result = await env.AURA_DB.batch([account, identity]);
     return (result[0]?.meta.changes || 0) > 0 && (result[1]?.meta.changes || 0) > 0;

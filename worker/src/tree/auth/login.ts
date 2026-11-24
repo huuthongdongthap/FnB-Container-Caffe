@@ -46,7 +46,12 @@ export async function loginUser(request: Request, env: Record<string, unknown>, 
       }
     };
 
-    const user = await findLoginUser(env as unknown as Env, email);
+    const explicitReqTenant = String(
+      request.headers?.get?.('x-tenant-id') ||
+        request.headers?.get?.('X-Tenant-ID') ||
+        ''
+    ).trim();
+    const user = await findLoginUser(env as unknown as Env, email, explicitReqTenant || undefined);
     const failedPassword = async () => {
       await recordEmailFailure();
       const failedTenant = String(user?.tenant_id ?? '').trim();

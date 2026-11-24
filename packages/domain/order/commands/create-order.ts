@@ -119,7 +119,7 @@ export async function createOrder(
         is_active?: number; type?: string | null; tenant_id?: string | null;
       };
       let promo = await db.prepare(
-        "SELECT id, code, percent, discount_type, discount_value, max_discount, max_discount_value, min_order, min_order_value, starts_at, valid_from, expires_at, valid_to, usage_limit, max_uses, usage_count, current_uses, is_active, type, tenant_id FROM promotions WHERE UPPER(code) = ? AND (COALESCE(NULLIF(tenant_id, ''), 'default') = ? OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?2)"
+        "SELECT id, code, percent, discount_type, discount_value, max_discount, max_discount_value, min_order, min_order_value, starts_at, valid_from, expires_at, valid_to, usage_limit, max_uses, usage_count, current_uses, usage_limit_per_customer, is_active, type, tenant_id FROM promotions WHERE UPPER(code) = ? AND (COALESCE(NULLIF(tenant_id, ''), 'default') = ? OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?2)"
       ).bind(rawPromoCode, tenantId).first<PromoRow>().catch(() =>
         db.prepare(
           "SELECT * FROM promotions WHERE UPPER(code) = ? AND (COALESCE(NULLIF(tenant_id, ''), 'default') = ? OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?2)"
@@ -734,28 +734,8 @@ export async function createOrder(
         const redemptionTenant = tenantId === '*' ? 'default' : (tenantId || 'default');
         const promoCodeUpper = String(appliedPromo.code || '').toUpperCase();
         const promoIdStr = String(appliedPromo.id || '');
-        const postCountRow = await db.prepare(
-          `SELECT COUNT(*) AS cnt
-           FROM promotion_redemptions pr
-           LEFT JOIN orders o ON o.id = pr.order_id
-           WHERE (UPPER(pr.code) = ? OR pr.promotion_id = ?)
-             AND COALESCE(NULLIF(TRIM(pr.tenant_id), ''), 'default') = ?
-             AND pr.customer_id = ?
-             AND (o.status IS NULL OR o.status NOT IN ('cancelled', 'failed'))`
-        ).bind(promoCodeUpper, promoIdStr, redemptionTenant, appliedPromo.customerKey)
-          .first<{ cnt?: number }>()
-          .catch(() =>
-            db.prepare(
-              `SELECT COUNT(*) AS cnt
-               FROM promotion_redemptions
-               WHERE (UPPER(code) = ? OR promotion_id = ?)
-                 AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?
-                 AND customer_id = ?`
-            ).bind(promoCodeUpper, promoIdStr, redemptionTenant, appliedPromo.customerKey)
-              .first<{ cnt?: number }>()
-              .catch(() => null)
-          );
-        if (postCountRow && Number(postCountRow.cnt ?? 0) > appliedPromo.perCustomerLimit) {
+        const rollbackCommittedOrder = async () => {
+          await db.prepare('DELETE FROM order_creation_requests WHERE order_id = ?').bind(orderId).run().catch(() => {});
           await db.prepare('DELETE FROM order_items WHERE order_id = ?').bind(orderId).run().catch(() => {});
           await db.prepare('DELETE FROM payments WHERE order_id = ?').bind(orderId).run().catch(() => {});
           await db.prepare('DELETE FROM loyalty_transactions WHERE order_id = ?').bind(orderId).run().catch(() => {});
@@ -769,6 +749,45 @@ export async function createOrder(
             ).bind(resolvedTableId, resolvedTableId).run().catch(() => {});
           }
           await rollbackPreOrderReservations();
+        };
+        let postCountRow: { cnt?: number } | null = null;
+        try {
+          postCountRow = await db.prepare(
+            `SELECT COUNT(*) AS cnt
+             FROM promotion_redemptions pr
+             LEFT JOIN orders o ON o.id = pr.order_id
+             WHERE (UPPER(pr.code) = ? OR pr.promotion_id = ?)
+               AND COALESCE(NULLIF(TRIM(pr.tenant_id), ''), 'default') = ?
+               AND pr.customer_id = ?
+               AND (o.status IS NULL OR o.status NOT IN ('cancelled', 'failed'))`
+          ).bind(promoCodeUpper, promoIdStr, redemptionTenant, appliedPromo.customerKey)
+            .first<{ cnt?: number }>();
+        } catch (joinErr) {
+          const joinMsg = joinErr instanceof Error ? joinErr.message : String(joinErr);
+          if (/no such column|no such table/i.test(joinMsg)) {
+            try {
+              postCountRow = await db.prepare(
+                `SELECT COUNT(*) AS cnt
+                 FROM promotion_redemptions
+                 WHERE (UPPER(code) = ? OR promotion_id = ?)
+                   AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?
+                   AND customer_id = ?`
+              ).bind(promoCodeUpper, promoIdStr, redemptionTenant, appliedPromo.customerKey)
+                .first<{ cnt?: number }>();
+            } catch (fallbackErr) {
+              const fbMsg = fallbackErr instanceof Error ? fallbackErr.message : String(fallbackErr);
+              if (!/no such table/i.test(fbMsg)) {
+                await rollbackCommittedOrder();
+                return errorResponse('Không thể xác minh giới hạn sử dụng mã khuyến mãi', 503);
+              }
+            }
+          } else {
+            await rollbackCommittedOrder();
+            return errorResponse('Không thể xác minh giới hạn sử dụng mã khuyến mãi', 503);
+          }
+        }
+        if (postCountRow && Number(postCountRow.cnt ?? 0) > appliedPromo.perCustomerLimit) {
+          await rollbackCommittedOrder();
           return errorResponse('Bạn đã sử dụng hết lượt cho mã khuyến mãi này', 400);
         }
       }
