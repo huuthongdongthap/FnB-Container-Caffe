@@ -81,12 +81,62 @@ describe('PayOS durable attempt invariant (real SQLite)', () => {
     expect(codes).toEqual([123456]);
   });
 
-  it.each(['completed', 'cancelled', 'failed', 'refunded'])('does not recreate a terminal %s attempt', async (status) => {
+  it.each(['completed', 'refunded'])('does not recreate a terminal %s attempt', async (status) => {
     const { input, payment } = fixture();
     payment('order-1', status);
     const spy = vi.spyOn(globalThis, 'fetch');
     expect(await getOrCreatePayOSAttempt(input)).toMatchObject({ ok: false, status: 409 });
     expect(spy).not.toHaveBeenCalled();
+  });
+
+  it.each(['cancelled', 'failed'])('rotates a %s attempt in place when order is unpaid and provider confirms not PAID', async (status) => {
+    const { input, payment, sqlite } = fixture();
+    payment('order-1', status);
+    const codes: number[] = [];
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (_url, init) => {
+      if (!init?.method || init.method === 'GET') {
+        return signedPayOSResponse({ id: 'old-link', orderCode: 123456, amount: 20000, status: 'CANCELLED' }, 'local-checksum');
+      }
+      const body = JSON.parse(String(init.body));
+      codes.push(body.orderCode);
+      return payosCheckoutResponse({ orderCode: body.orderCode, amount: 20000 }, 'local-checksum', 'rotated-from-closed');
+    });
+    const rotated = await getOrCreatePayOSAttempt(input);
+    expect(rotated).toMatchObject({ ok: true, cached: false });
+    expect(codes).toHaveLength(1);
+    expect(codes[0]).not.toBe(123456);
+    expect(sqlite.prepare('SELECT COUNT(*) count FROM payments').get()?.count).toBe(1);
+  });
+
+  it('fails closed with 502 when provider verification throws a network error during rotation', async () => {
+    const { input, payment } = fixture();
+    payment('order-1', 'cancelled');
+    vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('network timeout'));
+    const res = await getOrCreatePayOSAttempt(input);
+    expect(res).toMatchObject({ ok: false, status: 502, code: 'PAYOS_UPSTREAM_UNAVAILABLE' });
+  });
+
+  it('fails closed with 409 PAYMENT_RECONCILIATION_REQUIRED on bad_signature during rotation', async () => {
+    const { input, payment } = fixture();
+    payment('order-1', 'cancelled');
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      json({ code: '00', data: { id: 'old-link', orderCode: 123456, amount: 20000, status: 'CANCELLED' }, signature: 'invalid-sig' }),
+    );
+    const res = await getOrCreatePayOSAttempt(input);
+    expect(res).toMatchObject({ ok: false, status: 409, code: 'PAYMENT_RECONCILIATION_REQUIRED' });
+  });
+
+  it('fails closed with ORDER_ALREADY_PAID if provider reports PAID when attempting to rotate cancelled attempt', async () => {
+    const { input, payment } = fixture();
+    payment('order-1', 'cancelled');
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (_url, init) => {
+      if (!init?.method || init.method === 'GET') {
+        return signedPayOSResponse({ id: 'paid-link', orderCode: 123456, amount: 20000, status: 'PAID' }, 'local-checksum');
+      }
+      throw new Error('should not POST new link when already PAID');
+    });
+    const res = await getOrCreatePayOSAttempt(input);
+    expect(res).toMatchObject({ ok: false, status: 409, code: 'ORDER_ALREADY_PAID' });
   });
 
   it('rotates an expired attempt in place to a fresh orderCode when the order is still unpaid', async () => {

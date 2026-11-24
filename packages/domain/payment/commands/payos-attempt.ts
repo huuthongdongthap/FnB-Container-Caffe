@@ -13,13 +13,223 @@ export interface PayOSAttempt {
 interface AttemptInput {
   db: D1Database; kv?: KVNamespace | null; env?: Record<string, unknown> | null; orderId: string; amount: number; clientId: string; apiKey: string;
   checksumKey: string; description: string; returnUrl: string; cancelUrl: string; buyerName?: string; tenantId?: string;
+  regenerate?: boolean; locale?: 'vi' | 'en';
 }
 type AttemptResult = { ok: true; payment: PayOSAttempt; cached: boolean; qrCode?: string | null }
   | { ok: false; status: 202 | 409 | 502; code?: string; orderId?: string; error: string; payment?: PayOSAttempt };
 const LEASE_MS = 30_000;
+const ROTATABLE_PRIOR_STATUSES = new Set(['expired', 'cancelled', 'failed']);
+
+function localizeAttemptError(
+  code: 'ORDER_ALREADY_PAID' | 'PAYMENT_ATTEMPT_CLOSED' | 'PAYMENT_RECONCILIATION_REQUIRED' | 'PAYMENT_IN_PROGRESS',
+  locale: 'vi' | 'en' = 'vi',
+): string {
+  const messages: Record<typeof code, { vi: string; en: string }> = {
+    ORDER_ALREADY_PAID: {
+      vi: 'Đơn hàng đã được thanh toán. Vui lòng làm mới trạng thái đơn.',
+      en: 'Payment attempt is already completed',
+    },
+    PAYMENT_ATTEMPT_CLOSED: {
+      vi: 'Phiên thanh toán PayOS đã đóng hoặc hết hạn. Vui lòng tạo lại mã QR.',
+      en: 'Payment attempt is closed or requires reconciliation',
+    },
+    PAYMENT_RECONCILIATION_REQUIRED: {
+      vi: 'Giao dịch thanh toán cần đối soát trước khi tiếp tục.',
+      en: 'Payment attempts require reconciliation',
+    },
+    PAYMENT_IN_PROGRESS: {
+      vi: 'Đang khởi tạo mã thanh toán, vui lòng thử lại sau vài giây.',
+      en: 'Payment creation in progress; retry shortly',
+    },
+  };
+  return messages[code][locale];
+}
+
+async function rotateAttemptInPlace(
+  input: AttemptInput,
+  prior: PayOSAttempt,
+): Promise<{ ok: true; payment: PayOSAttempt; owned: boolean } | { ok: false; result: AttemptResult }> {
+  const { db, kv, orderId, amount } = input;
+  const locale = input.locale ?? 'en';
+
+  // Fail CLOSED: for cancelled/failed or explicitly regenerated pending attempts, verify provider truth first
+  // so we never rotate an attempt that was actually PAID or cannot be safely verified on PayOS.
+  if (
+    prior.status !== 'expired' &&
+    /^\d+$/.test(prior.transaction_id)
+  ) {
+    const verified = await verifyPayOSPaymentRequest({
+      transactionId: prior.transaction_id,
+      expectedAmount: Number(prior.amount) || amount,
+      checksumKey: input.checksumKey,
+      clientId: input.clientId,
+      apiKey: input.apiKey,
+    }).catch(() => null);
+
+    if (!verified) {
+      return {
+        ok: false,
+        result: {
+          ok: false,
+          status: 502,
+          code: 'PAYOS_UPSTREAM_UNAVAILABLE',
+          error: 'Không thể xác minh trạng thái thanh toán với PayOS. Vui lòng thử lại.',
+          payment: prior,
+        },
+      };
+    }
+
+    if (!verified.ok) {
+      if (verified.reason === 'bad_signature' || verified.reason === 'mismatch') {
+        return {
+          ok: false,
+          result: {
+            ok: false,
+            status: 409,
+            code: 'PAYMENT_RECONCILIATION_REQUIRED',
+            error: localizeAttemptError('PAYMENT_RECONCILIATION_REQUIRED', locale),
+            payment: prior,
+          },
+        };
+      }
+      if (verified.reason !== 'not_found') {
+        return {
+          ok: false,
+          result: {
+            ok: false,
+            status: 502,
+            code: 'PAYOS_UPSTREAM_UNAVAILABLE',
+            error: 'PayOS tạm thời không phản hồi. Vui lòng thử lại sau.',
+            payment: prior,
+          },
+        };
+      }
+      // verified.reason === 'not_found' -> safe to rotate
+    } else if (verified.status === 'PAID') {
+      const reconciled = await reconcilePayOSPayment({
+        db,
+        kv,
+        env: input.env ?? null,
+        paymentId: prior.id,
+        clientId: input.clientId,
+        apiKey: input.apiKey,
+        checksumKey: input.checksumKey,
+        source: 'create_link',
+        preVerified: verified,
+        tenantId: (prior.tenant_id && String(prior.tenant_id).trim()) || input.tenantId,
+      });
+      if (reconciled.ok && (reconciled.outcome === 'settled' || reconciled.outcome === 'already_settled')) {
+        return {
+          ok: false,
+          result: {
+            ok: false,
+            status: 409,
+            code: 'ORDER_ALREADY_PAID',
+            orderId,
+            error: localizeAttemptError('ORDER_ALREADY_PAID', locale),
+            payment: { ...prior, status: 'completed' },
+          },
+        };
+      }
+      return {
+        ok: false,
+        result: {
+          ok: false,
+          status: 409,
+          code: 'PAYMENT_RECONCILIATION_REQUIRED',
+          error: reconciled.error || localizeAttemptError('PAYMENT_RECONCILIATION_REQUIRED', locale),
+          payment: prior,
+        },
+      };
+    } else if (verified.status === 'PENDING') {
+      if (!input.regenerate) {
+        return {
+          ok: false,
+          result: {
+            ok: false,
+            status: 409,
+            code: 'PAYMENT_RECONCILIATION_REQUIRED',
+            error: localizeAttemptError('PAYMENT_RECONCILIATION_REQUIRED', locale),
+            payment: prior,
+          },
+        };
+      }
+      let cancelOk = false;
+      try {
+        const cancelRes = await fetch(`${PAYOS_API}/${encodeURIComponent(prior.transaction_id)}/cancel`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-client-id': input.clientId,
+            'x-api-key': input.apiKey,
+          },
+          body: JSON.stringify({ cancellationReason: 'Regenerated by merchant' }),
+        });
+        const cancelJson = (await cancelRes.json().catch(() => null)) as { code?: unknown } | null;
+        cancelOk = cancelRes.ok && (cancelJson === null || String(cancelJson.code ?? '00') === '00');
+      } catch {
+        cancelOk = false;
+      }
+      if (!cancelOk) {
+        return {
+          ok: false,
+          result: {
+            ok: false,
+            status: 502,
+            code: 'PAYOS_UPSTREAM_UNAVAILABLE',
+            error: 'Không thể hủy mã QR PayOS cũ trước khi tạo mã mới. Vui lòng thử lại.',
+            payment: prior,
+          },
+        };
+      }
+    } else if (verified.status !== 'CANCELLED' && verified.status !== 'EXPIRED') {
+      return {
+        ok: false,
+        result: {
+          ok: false,
+          status: 409,
+          code: 'PAYMENT_RECONCILIATION_REQUIRED',
+          error: localizeAttemptError('PAYMENT_RECONCILIATION_REQUIRED', locale),
+          payment: prior,
+        },
+      };
+    }
+  }
+
+  const refreshedAt = new Date().toISOString();
+  const freshCode = String(generateOrderCode());
+  const rotated = await db.prepare(`
+    UPDATE payments SET status = 'pending', transaction_id = ?, payment_url = NULL, amount = ?, updated_at = ?
+    WHERE id = ? AND status = ? AND transaction_id = ?
+    AND EXISTS (SELECT 1 FROM orders WHERE id = ? AND LOWER(COALESCE(NULLIF(TRIM(payment_status), ''), 'unpaid')) IN ('unpaid', 'pending'))
+  `).bind(freshCode, amount, refreshedAt, prior.id, prior.status, prior.transaction_id, orderId).run().catch(() => null);
+
+  if ((rotated?.meta?.changes ?? 0) > 0) {
+    if (kv) {
+      await kv.delete(`payos:qr:${prior.id}:${prior.transaction_id}`).catch(() => {});
+    }
+    return {
+      ok: true,
+      payment: {
+        ...prior,
+        status: 'pending',
+        transaction_id: freshCode,
+        payment_url: null,
+        amount,
+        updated_at: refreshedAt,
+      },
+      owned: true,
+    };
+  }
+
+  const reread = await db.prepare('SELECT * FROM payments WHERE id = ?').bind(prior.id).first<PayOSAttempt>().catch(() => null);
+  return { ok: true, payment: reread ?? prior, owned: false };
+}
 
 /** A deterministic primary key plus a conditional INSERT serializes ALL local callers. */
-async function reserveAttempt(input: AttemptInput): Promise<{ payment: PayOSAttempt; owned: boolean } | null> {
+async function reserveAttempt(
+  input: AttemptInput,
+): Promise<{ payment: PayOSAttempt; owned: boolean } | { earlyResult: AttemptResult } | null> {
   const { db, orderId, amount } = input;
   const rawInputTenant = input.tenantId && input.tenantId.trim() ? input.tenantId.trim() : '';
   let orderTenant =
@@ -39,28 +249,15 @@ async function reserveAttempt(input: AttemptInput): Promise<{ payment: PayOSAtte
         ? db.prepare(
             "SELECT * FROM payments WHERE order_id = ? AND method = 'payos' ORDER BY created_at ASC LIMIT 2"
           ).bind(orderId).all<PayOSAttempt>()
-        : Promise.resolve({ results: [] as PayOSAttempt[] } as any)
+        : Promise.resolve({ results: [] as PayOSAttempt[] } as { results: PayOSAttempt[] })
     );
     // Historical duplicate invoices need reconciliation; never guess which is payable.
     if (existing.results.length > 1) return null;
     const prior = existing.results[0];
-    if (prior && prior.status === 'expired') {
-      // An expired provider link on an unpaid order is replaced in place with a fresh order code,
-      // keeping exactly one payable PayOS row per order. The CAS makes concurrent retries pick one winner.
-      const refreshedAt = new Date().toISOString();
-      const freshCode = String(generateOrderCode());
-      const rotated = await db.prepare(`
-        UPDATE payments SET status = 'pending', transaction_id = ?, payment_url = NULL, amount = ?, updated_at = ?
-        WHERE id = ? AND status = ? AND transaction_id = ?
-        AND EXISTS (SELECT 1 FROM orders WHERE id = ? AND LOWER(COALESCE(NULLIF(TRIM(payment_status), ''), 'unpaid')) IN ('unpaid', 'pending'))
-      `).bind(freshCode, amount, refreshedAt, prior.id, prior.status, prior.transaction_id, orderId).run().catch(() => null);
-      if ((rotated?.meta?.changes ?? 0) > 0) {
-        return { payment: { ...prior, status: 'pending', transaction_id: freshCode, payment_url: null, amount,
-          updated_at: refreshedAt }, owned: true };
-      }
-      // Lost the race or the order is settled: re-read before deciding.
-      const reread = await db.prepare('SELECT * FROM payments WHERE id = ?').bind(prior.id).first<PayOSAttempt>().catch(() => null);
-      return { payment: reread ?? prior, owned: false };
+    if (prior && ROTATABLE_PRIOR_STATUSES.has(prior.status)) {
+      const rotated = await rotateAttemptInPlace(input, prior);
+      if (!rotated.ok) return { earlyResult: rotated.result };
+      return { payment: rotated.payment, owned: rotated.owned };
     }
     if (prior) return { payment: prior, owned: false };
     const now = new Date().toISOString();
@@ -101,30 +298,65 @@ function checkoutUrl(data: Record<string, unknown>, recovery: boolean): string |
 }
 
 export async function getOrCreatePayOSAttempt(input: AttemptInput): Promise<AttemptResult> {
+  const locale = input.locale ?? 'en';
   const reserved = await reserveAttempt(input);
-  if (!reserved) return { ok: false, status: 409, error: 'Payment attempts require reconciliation' };
-  const { payment } = reserved;
+  if (!reserved) {
+    return {
+      ok: false,
+      status: 409,
+      code: 'PAYMENT_RECONCILIATION_REQUIRED',
+      error: localizeAttemptError('PAYMENT_RECONCILIATION_REQUIRED', locale),
+    };
+  }
+  if ('earlyResult' in reserved) {
+    return reserved.earlyResult;
+  }
+  let { payment, owned } = reserved;
   if (payment.status !== 'pending' || !/^\d+$/.test(payment.transaction_id)
     || Number(payment.amount) !== input.amount) {
-    if (payment.status === 'completed') {
-      return { ok: false, status: 409, code: 'ORDER_ALREADY_PAID', orderId: input.orderId, error: 'Payment attempt is already completed', payment };
+    if (payment.status === 'completed' || payment.status === 'paid') {
+      return {
+        ok: false,
+        status: 409,
+        code: 'ORDER_ALREADY_PAID',
+        orderId: input.orderId,
+        error: localizeAttemptError('ORDER_ALREADY_PAID', locale),
+        payment,
+      };
     }
-    return { ok: false, status: 409, error: 'Payment attempt is closed or requires reconciliation', payment };
+    const code = Number(payment.amount) !== input.amount ? 'PAYMENT_RECONCILIATION_REQUIRED' : 'PAYMENT_ATTEMPT_CLOSED';
+    return {
+      ok: false,
+      status: 409,
+      code,
+      error: localizeAttemptError(code, locale),
+      payment,
+    };
   }
-  const qrCacheKey = `payos:qr:${payment.id}:${payment.transaction_id}`;
+  let qrCacheKey = `payos:qr:${payment.id}:${payment.transaction_id}`;
   if (payment.payment_url) {
-    let cachedQrCode: string | null = null;
-    if (input.kv) {
-      try {
-        const stored = await input.kv.get(qrCacheKey);
-        if (typeof stored === 'string' && stored.trim()) {
-          cachedQrCode = stored.trim();
+    if (input.regenerate) {
+      const rotated = await rotateAttemptInPlace(input, payment);
+      if (!rotated.ok) return rotated.result;
+      payment = rotated.payment;
+      owned = rotated.owned;
+      qrCacheKey = `payos:qr:${payment.id}:${payment.transaction_id}`;
+    } else {
+      let cachedQrCode: string | null = null;
+      if (input.kv) {
+        try {
+          const stored = await input.kv.get(qrCacheKey);
+          if (typeof stored === 'string' && stored.trim()) {
+            cachedQrCode = stored.trim();
+          }
+        } catch {
+          // Non-fatal KV read failure
         }
-      } catch {
-        // Non-fatal KV read failure
+      }
+      if (payment.payment_url) {
+        return { ok: true, payment, cached: true, qrCode: cachedQrCode };
       }
     }
-    return { ok: true, payment, cached: true, qrCode: cachedQrCode };
   }
   const headers = { 'Content-Type': 'application/json', 'x-client-id': input.clientId, 'x-api-key': input.apiKey };
   const saveUrl = async (url: string, qrCode?: string | null): Promise<AttemptResult> => {
@@ -140,7 +372,7 @@ export async function getOrCreatePayOSAttempt(input: AttemptInput): Promise<Atte
         // Non-fatal KV write failure
       }
     }
-    return { ok: true, payment: { ...payment, payment_url: url }, cached: !reserved.owned, qrCode: normalizedQrCode };
+    return { ok: true, payment: { ...payment, payment_url: url }, cached: !owned, qrCode: normalizedQrCode };
   };
   const recover = async (): Promise<AttemptResult | null> => {
     const verified = await verifyPayOSPaymentRequest({
@@ -191,19 +423,33 @@ export async function getOrCreatePayOSAttempt(input: AttemptInput): Promise<Atte
     return url ? saveUrl(url, verified.qrCode ?? null) : { ok: false, status: 502, error: 'Invalid provider checkout link', payment };
   };
   try {
-    if (!reserved.owned) {
+    if (!owned) {
       const recovered = await recover();
       if (recovered) return recovered;
       const stamp = payment.updated_at || payment.created_at;
       const stampMs = Date.parse(stamp.includes('T') ? stamp : `${stamp.replace(' ', 'T')}Z`);
       if (!Number.isFinite(stampMs) || Date.now() - stampMs < LEASE_MS) {
-        return { ok: false, status: 202, error: 'Payment creation in progress; retry shortly', payment };
+        return {
+          ok: false,
+          status: 202,
+          code: 'PAYMENT_IN_PROGRESS',
+          error: localizeAttemptError('PAYMENT_IN_PROGRESS', locale),
+          payment,
+        };
       }
       const claim = await input.db.prepare(`
         UPDATE payments SET updated_at = ? WHERE id = ? AND status = 'pending'
         AND (payment_url IS NULL OR payment_url = '') AND COALESCE(updated_at, created_at) = ?
       `).bind(new Date().toISOString(), payment.id, stamp).run();
-      if (!((claim.meta?.changes ?? 0) > 0)) return { ok: false, status: 202, error: 'Payment creation in progress; retry shortly', payment };
+      if (!((claim.meta?.changes ?? 0) > 0)) {
+        return {
+          ok: false,
+          status: 202,
+          code: 'PAYMENT_IN_PROGRESS',
+          error: localizeAttemptError('PAYMENT_IN_PROGRESS', locale),
+          payment,
+        };
+      }
     }
     const orderCode = Number(payment.transaction_id);
     const { amount, cancelUrl, description, returnUrl } = input;

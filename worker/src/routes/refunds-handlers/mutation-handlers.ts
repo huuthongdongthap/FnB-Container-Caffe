@@ -212,7 +212,10 @@ export async function handleRefund(c: Context<{ Bindings: Env }>, openApi = fals
           .bind(effectivePaymentTenant, manualTransferRef, payment.id, payment.order_id, amount),
         db.prepare(`INSERT INTO refund_mutation_guards (settlement_ok)
           VALUES (CASE WHEN changes() = 1 THEN 1 ELSE 0 END)`),
-        ...(fullRefund ? [db.prepare(`UPDATE orders SET payment_status = 'refunded', updated_at = ?
+        ...(fullRefund ? [db.prepare(`UPDATE orders
+          SET payment_status = 'refunded',
+              status = CASE WHEN LOWER(COALESCE(status, '')) NOT IN ('completed', 'cancelled') THEN 'cancelled' ELSE status END,
+              updated_at = ?
           WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?
             AND LOWER(COALESCE(payment_status, '')) IN ('paid', 'completed')`)
           .bind(now, payment.order_id, effectivePaymentTenant),
@@ -256,6 +259,20 @@ export async function handleRefund(c: Context<{ Bindings: Env }>, openApi = fals
         );
       const effectiveOrderStatus = String(postRefundOrder?.status || 'pending');
       const effectiveOrderPayStatus = String(postRefundOrder?.payment_status || 'paid');
+
+      if (fullRefund && effectiveOrderStatus === 'cancelled') {
+        await db
+          .prepare(
+            "UPDATE orders SET cancelled_at = COALESCE(cancelled_at, ?) WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?",
+          )
+          .bind(now, payment.order_id, effectivePaymentTenant)
+          .run()
+          .catch(() => {});
+        if (postRefundOrder?.table_id) {
+          const { releaseTableIfNoActiveOrders } = await import('../../../../packages/domain/order/policies/table-occupancy-release');
+          await releaseTableIfNoActiveOrders(db, String(postRefundOrder.table_id), effectivePaymentTenant).catch(() => {});
+        }
+      }
 
       if (c.env?.AUTH_KV) {
         await Promise.all([

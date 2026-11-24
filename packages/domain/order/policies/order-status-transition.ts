@@ -147,6 +147,37 @@ export async function transitionOrderStatus(
   const allowed = canActorTransition(role, directStart ? 'confirmed' : order.status, targetStatus);
   if (!allowed.ok) return { success: false, error: allowed.error, statusCode: 403 };
 
+  const forwardStatuses = new Set(['confirmed', 'preparing', 'ready', 'delivering', 'served', 'delivered', 'completed']);
+  if (forwardStatuses.has(targetStatus)) {
+    const knownPaymentStatus = String(
+      options.paymentStatus ?? options.currentOrder?.payment_status ?? ''
+    ).trim().toLowerCase();
+    if (knownPaymentStatus === 'refunded') {
+      return {
+        success: false,
+        error: 'Đơn hàng đã hoàn tiền — không thể tiếp tục chế biến hoặc phục vụ',
+        statusCode: 409,
+      };
+    }
+    if (!knownPaymentStatus) {
+      try {
+        const payRow = await db
+          .prepare(`SELECT payment_status FROM orders WHERE id = ?${writeTenantClause}`)
+          .bind(orderId, ...writeTenantBinds)
+          .first<{ payment_status?: string | null }>();
+        if (String(payRow?.payment_status ?? '').trim().toLowerCase() === 'refunded') {
+          return {
+            success: false,
+            error: 'Đơn hàng đã hoàn tiền — không thể tiếp tục chế biến hoặc phục vụ',
+            statusCode: 409,
+          };
+        }
+      } catch {
+        // Minimal schema fallback
+      }
+    }
+  }
+
   if (targetStatus === 'preparing') {
     try {
       let paymentRow: {

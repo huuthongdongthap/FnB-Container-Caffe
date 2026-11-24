@@ -20,6 +20,7 @@ export function isHeldOutOfKds(order: Record<string, unknown>): boolean {
   const status = String(order.status ?? '').trim().toLowerCase();
   const rawPaymentStatus =
     typeof order.payment_status === 'string' ? order.payment_status.trim().toLowerCase() : '';
+  if (rawPaymentStatus === 'refunded') return true;
   if (rawPaymentStatus === 'paid') return false;
   // Orders already admitted into active prep remain visible so baristas can finish or clear tickets.
   if (status === 'preparing' || status === 'ready') return false;

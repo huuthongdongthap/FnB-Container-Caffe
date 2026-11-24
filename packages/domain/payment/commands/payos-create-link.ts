@@ -21,7 +21,11 @@ function resolveSafePosRedirectUrl(rawUrl: unknown, baseUrl: string): string | n
     const parsed = new URL(trimmed, trustedBase.origin);
     if (parsed.origin !== trustedBase.origin) return null;
     if (parsed.username || parsed.password) return null;
-    if (parsed.pathname !== '/admin/pos' && !parsed.pathname.startsWith('/admin/pos/')) return null;
+    const allowedPrefixes = ['/admin/pos', '/admin/orders', '/admin/tables'];
+    const isAllowedPath = allowedPrefixes.some(
+      (prefix) => parsed.pathname === prefix || parsed.pathname.startsWith(`${prefix}/`)
+    );
+    if (!isAllowedPath) return null;
     return `${trustedBase.origin}${parsed.pathname}${parsed.search}`;
   } catch {
     return null;
@@ -245,6 +249,8 @@ export const handleCreateLink = async (c: any, input?: unknown, openApi = false)
       returnUrl,
       cancelUrl,
       tenantId: orderTenant,
+      regenerate: parsed.data.regenerate === true,
+      locale,
     });
     if (result.ok === false) {
       if (result.status === 202) c.header('Retry-After', '2');

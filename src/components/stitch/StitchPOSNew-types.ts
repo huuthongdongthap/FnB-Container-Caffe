@@ -59,6 +59,14 @@ export interface StitchPOSNewProps {
   deliveryAddress?: string;
   /** Called when cashier edits delivery address */
   onDeliveryAddressChange?: (address: string) => void;
+  /** Recipient name for walk-in delivery orders */
+  deliveryRecipientName?: string;
+  /** Called when cashier edits delivery recipient name */
+  onDeliveryRecipientNameChange?: (name: string) => void;
+  /** Recipient phone for walk-in delivery orders */
+  deliveryRecipientPhone?: string;
+  /** Called when cashier edits delivery recipient phone */
+  onDeliveryRecipientPhoneChange?: (phone: string) => void;
   tableLabel?: string;
   guestLabel?: string;
   orderNumber?: string;
@@ -112,22 +120,42 @@ export function formatPosPrice(val: number): string {
 export const DEFAULT_CATEGORY_LABELS: Record<string, string> = {
   All: 'Tất cả',
   cat_trad_coffee: 'Cà Phê Truyền Thống',
+  'traditional-coffee': 'Cà Phê Truyền Thống',
   cat_hot_coffee: 'Cà Phê Nóng',
+  'hot-coffee': 'Cà Phê Nóng',
   cat_iced_coffee: 'Cà Phê Đá',
+  'iced-coffee': 'Cà Phê Đá',
   cat_frappuccino: 'Đá Xay',
+  frappuccino: 'Đá Xay',
   cat_tea: 'Trà',
+  tea: 'Trà',
   cat_fruit_tea: 'Trà Trái Cây',
+  'fruit-tea': 'Trà Trái Cây',
   cat_milk_tea: 'Trà Sữa',
+  'milk-tea': 'Trà Sữa',
   cat_matcha: 'Matcha',
+  matcha: 'Matcha',
   cat_juice: 'Nước Ép',
+  juice: 'Nước Ép',
   cat_smoothie: 'Sinh Tố',
+  smoothie: 'Sinh Tố',
+  smoothies: 'Sinh Tố',
   cat_soda: 'Soda',
+  soda: 'Soda',
   cat_bottled: 'Đồ Uống Đóng Chai',
+  bottled: 'Đồ Uống Đóng Chai',
+  cat_yogurt: 'Sữa Chua',
+  yogurt: 'Sữa Chua',
   cat_pastry: 'Bánh Ngọt',
   cat_pastries: 'Bánh Ngọt',
+  pastry: 'Bánh Ngọt',
+  pastries: 'Bánh Ngọt',
   cat_snack: 'Ăn Nhẹ',
+  snack: 'Ăn Nhẹ',
   cat_signature: 'Signature',
+  signature: 'Signature',
   cat_topping: 'Topping',
+  topping: 'Topping',
 };
 
 export function resolvePosCategoryLabel(
@@ -139,7 +167,7 @@ export function resolvePosCategoryLabel(
   }
   const custom = categoryLabels?.[categoryId];
   if (custom) return custom;
-  const fallback = DEFAULT_CATEGORY_LABELS[categoryId] ?? DEFAULT_CATEGORY_LABELS[categoryId.toLowerCase()];
+  const fallback = DEFAULT_CATEGORY_LABELS[categoryId];
   if (fallback) return fallback;
   if (categoryId.startsWith('cat_')) {
     return categoryId

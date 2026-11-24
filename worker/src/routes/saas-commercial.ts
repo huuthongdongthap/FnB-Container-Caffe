@@ -741,6 +741,59 @@ export function createSaasCommercialRoutes() {
   // PER-TENANT MERCHANT PAYMENT CONFIG (AES-256-GCM)
   // =====================================================
 
+  // Public merchant payment info for staff (cashier/waiter/manager/owner) — NO secrets
+  router.get('/payment-info', async (c) => {
+    const user = c.get('user');
+    const role = String(user?.role || '').trim().toLowerCase();
+    const allowedRoles = ['owner', 'admin', 'super_admin', 'manager', 'supervisor', 'cashier', 'waiter', 'staff'];
+    if (!user || !allowedRoles.includes(role)) {
+      return c.json({ success: false, error: 'Insufficient permissions' }, 403);
+    }
+    const db = c.env.AURA_DB;
+    const tenantId = resolveScopedTenant(c);
+
+    let row: Record<string, unknown> | null = null;
+    try {
+      row = await db
+        .prepare(
+          `SELECT provider, payos_client_id_enc, payos_api_key_enc, payos_checksum_key_enc,
+                  bank_bin, bank_account_no, bank_account_name, bank_name
+           FROM tenant_payment_configs
+           WHERE tenant_id = ?
+           LIMIT 1`
+        )
+        .bind(tenantId)
+        .first<Record<string, unknown>>();
+    } catch {
+      row = null;
+    }
+
+    const hasFlagshipPayos =
+      tenantId === 'default' &&
+      Boolean(c.env.PAYOS_CLIENT_ID && c.env.PAYOS_API_KEY && c.env.PAYOS_CHECKSUM_KEY);
+    const hasTenantPayos = Boolean(
+      row?.payos_client_id_enc && row?.payos_api_key_enc && row?.payos_checksum_key_enc
+    );
+    const hasPayos = hasTenantPayos || hasFlagshipPayos;
+    const provider = row?.provider
+      ? String(row.provider)
+      : hasFlagshipPayos
+        ? 'payos'
+        : 'vietqr';
+
+    return c.json({
+      success: true,
+      data: {
+        provider,
+        hasPayos,
+        bankBin: String(row?.bank_bin || ''),
+        bankAccountNo: String(row?.bank_account_no || ''),
+        bankAccountName: String(row?.bank_account_name || ''),
+        bankName: String(row?.bank_name || ''),
+      },
+    });
+  });
+
   router.get('/payment-config', async (c) => {
     const denied = requireOwnerOrAdmin(c);
     if (denied) return denied;

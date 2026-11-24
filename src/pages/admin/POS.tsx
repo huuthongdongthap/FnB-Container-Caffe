@@ -20,7 +20,7 @@ import { useMenu } from '@/hooks/use-menu';
 import { useCheckout, useProcessPayOS } from '@/hooks/use-checkout';
 import { useOfflineSync } from '@/hooks/use-offline-sync';
 import { useAuthStore } from '@/hooks/stores/use-auth-store';
-import { apiFetch } from '@/lib/api-client';
+import { apiFetch, ApiClientError } from '@/lib/api-client';
 import { CheckCircle2, AlertCircle, X, ExternalLink, RefreshCw, Banknote } from 'lucide-react';
 import type { PaymentMethod } from '@/lib/validators';
 import { brandConfig } from '@/config/brand-types';
@@ -36,7 +36,9 @@ import type { TodayResponse } from '@/hooks/stores/admin/admin-shifts-store-type
 
 interface CategoryApiRow {
   id: string;
+  slug?: string | null;
   name: string;
+  display_name_vi?: string | null;
 }
 
 interface TableApiRow {
@@ -110,8 +112,17 @@ export default function AdminPOSPage() {
         : [];
     const map: Record<string, string> = {};
     for (const row of rows) {
-      if (row?.id && row?.name) {
-        map[row.id] = row.name;
+      const label = (row?.display_name_vi || row?.name || '').trim();
+      if (!label) continue;
+      if (row?.id) {
+        map[row.id] = label;
+      }
+      if (row?.slug) {
+        const slug = String(row.slug).trim();
+        if (slug) {
+          map[slug] = label;
+          map[slug.toLowerCase()] = label;
+        }
       }
     }
     return map;
@@ -176,7 +187,12 @@ export default function AdminPOSPage() {
   const [paymentUrl, setPaymentUrl] = useState<string | null>(null);
   const [paymentQrPayload, setPaymentQrPayload] = useState<string | null>(null);
   const [paymentQrDataUrl, setPaymentQrDataUrl] = useState<string | null>(null);
+  const [payOSModalOpen, setPayOSModalOpen] = useState(false);
+  const [qrMode, setQrMode] = useState<'vietqr' | 'web'>('vietqr');
+  const [qrInvalidated, setQrInvalidated] = useState(false);
   const [pendingPayOSOrder, setPendingPayOSOrder] = useState<{ orderId: string; total: number } | null>(null);
+  const [deliveryRecipientName, setDeliveryRecipientName] = useState('');
+  const [deliveryRecipientPhone, setDeliveryRecipientPhone] = useState('');
   const [isRetryingPayOS, setIsRetryingPayOS] = useState(false);
   const [isCancellingOrder, setIsCancellingOrder] = useState(false);
   const [cartResetKey, setCartResetKey] = useState(0);
@@ -188,9 +204,15 @@ export default function AdminPOSPage() {
     setCustomer(null);
     setUseCashback(false);
     setSelectedTableId(undefined);
+    setOrderType('takeaway');
+    setDeliveryAddress('');
+    setDeliveryRecipientName('');
+    setDeliveryRecipientPhone('');
     setPaymentUrl(null);
     setPaymentQrPayload(null);
     setPaymentQrDataUrl(null);
+    setPayOSModalOpen(false);
+    setQrInvalidated(false);
     setPendingPayOSOrder(null);
     setCheckoutError(null);
     setCheckoutSuccess(false);
@@ -229,14 +251,18 @@ export default function AdminPOSPage() {
     }
   }, []);
 
+  const hasEmvcoQr = Boolean(paymentQrPayload && !/^https?:\/\//i.test(paymentQrPayload));
+
   useEffect(() => {
-    const qrSource = paymentQrPayload || paymentUrl;
-    if (!qrSource) {
+    const qrSource = qrMode === 'web'
+      ? paymentUrl
+      : (hasEmvcoQr ? paymentQrPayload : paymentUrl);
+    if (!qrSource || qrInvalidated) {
       setPaymentQrDataUrl(null);
       return;
     }
     let cancelled = false;
-    void QRCode.toDataURL(qrSource, { width: 180, margin: 1 })
+    void QRCode.toDataURL(qrSource, { width: 360, margin: 2 })
       .then((dataUrl) => {
         if (!cancelled) setPaymentQrDataUrl(dataUrl);
       })
@@ -246,41 +272,63 @@ export default function AdminPOSPage() {
     return () => {
       cancelled = true;
     };
-  }, [paymentQrPayload, paymentUrl]);
+  }, [paymentQrPayload, paymentUrl, qrMode, hasEmvcoQr, qrInvalidated]);
 
   useEffect(() => {
-    if (!paymentUrl || !pendingPayOSOrder?.orderId) return;
+    if (!payOSModalOpen || !pendingPayOSOrder?.orderId) return;
     let cancelled = false;
     const orderId = pendingPayOSOrder.orderId;
     const pollOrderPayment = async () => {
       try {
         const res = await apiFetch<{
-          order?: { payment_status?: string; paymentStatus?: string };
-          data?: { payment_status?: string; paymentStatus?: string };
+          order?: { status?: string; payment_status?: string; paymentStatus?: string; payment?: { status?: string }; payments?: Array<{ status?: string }> };
+          data?: { status?: string; payment_status?: string; paymentStatus?: string; payment?: { status?: string }; payments?: Array<{ status?: string }> };
+          status?: string;
           payment_status?: string;
           paymentStatus?: string;
+          payment?: { status?: string };
+          payments?: Array<{ status?: string }>;
         }>(`/api/orders/${encodeURIComponent(orderId)}`);
         if (cancelled) return;
-        const status = String(
-          res?.order?.payment_status ??
-          res?.order?.paymentStatus ??
-          res?.data?.payment_status ??
-          res?.data?.paymentStatus ??
-          res?.payment_status ??
-          res?.paymentStatus ??
-          ''
+        const orderObj = res?.order ?? res?.data ?? res;
+        const payStatus = String(
+          orderObj?.payment_status ?? orderObj?.paymentStatus ?? ''
         ).toLowerCase();
-        if (status === 'paid' || status === 'completed') {
+        const orderStatus = String(orderObj?.status ?? '').toLowerCase();
+        const attemptStatus = String(
+          orderObj?.payment?.status ?? orderObj?.payments?.[0]?.status ?? ''
+        ).toLowerCase();
+
+        if (payStatus === 'paid' || payStatus === 'completed') {
+          setPayOSModalOpen(false);
           setPaymentUrl(null);
           setPaymentQrPayload(null);
+          setQrInvalidated(false);
           setPendingPayOSOrder(null);
+          setCheckoutError(null);
           setCartResetKey((k) => k + 1);
           setCheckoutSuccess(true);
+          void queryClient.invalidateQueries({ queryKey: ['pos-tables'] });
           if (successTimerRef.current) clearTimeout(successTimerRef.current);
           successTimerRef.current = setTimeout(() => {
             setCheckoutSuccess(false);
             successTimerRef.current = null;
           }, 5000);
+          return;
+        }
+        if (['cancelled', 'canceled', 'expired', 'failed'].includes(orderStatus)) {
+          setPayOSModalOpen(false);
+          setPaymentUrl(null);
+          setPaymentQrPayload(null);
+          setQrInvalidated(false);
+          setPendingPayOSOrder(null);
+          setCheckoutError('Đơn hàng đã bị hủy.');
+          void queryClient.invalidateQueries({ queryKey: ['pos-tables'] });
+          return;
+        }
+        if (['expired', 'cancelled', 'failed'].includes(attemptStatus)) {
+          setQrInvalidated(true);
+          setCheckoutError('Mã QR PayOS đã hết hạn hoặc bị hủy. Vui lòng bấm "Tạo lại QR" hoặc "Hủy đơn".');
         }
       } catch {
         // Ignore transient polling failures
@@ -289,11 +337,20 @@ export default function AdminPOSPage() {
     const intervalId = setInterval(() => {
       void pollOrderPayment();
     }, 3000);
+    const handleVisibilityOrFocus = () => {
+      if (document.visibilityState === 'visible') {
+        void pollOrderPayment();
+      }
+    };
+    window.addEventListener('focus', handleVisibilityOrFocus);
+    document.addEventListener('visibilitychange', handleVisibilityOrFocus);
     return () => {
       cancelled = true;
       clearInterval(intervalId);
+      window.removeEventListener('focus', handleVisibilityOrFocus);
+      document.removeEventListener('visibilitychange', handleVisibilityOrFocus);
     };
-  }, [paymentUrl, pendingPayOSOrder?.orderId]);
+  }, [payOSModalOpen, pendingPayOSOrder?.orderId, queryClient]);
 
   useEffect(() => {
     return () => {
@@ -338,13 +395,25 @@ export default function AdminPOSPage() {
       const resolvedTableId = tableId ?? selectedTableId;
 
       try {
+        const effectiveOrderType = orderType;
+        if (effectiveOrderType === 'delivery' && !deliveryAddress.trim()) {
+          setCheckoutError('Vui lòng nhập địa chỉ giao hàng trước khi tạo đơn.');
+          return false;
+        }
+        if (effectiveOrderType === 'dine_in' && !resolvedTableId) {
+          setCheckoutError('Vui lòng chọn bàn phục vụ trước khi tạo đơn.');
+          return false;
+        }
+        const effectiveMethod: PaymentMethod = effectiveOrderType === 'delivery' ? 'payos' : paymentMethod;
+        const totalQty = cart.reduce((sum, ci) => sum + ci.quantity, 0);
+        const computedShippingFee = effectiveOrderType === 'delivery' && totalQty > 0 && totalQty < 2 ? 15_000 : 0;
         const subtotal = cart.reduce((acc, ci) => acc + ci.price * ci.quantity, 0);
-        const serviceFee = Math.max(0, Math.round(total - subtotal));
+        const serviceFee = Math.max(0, Math.round(total - subtotal - computedShippingFee));
         const rawAppliedCashback = useCashback && customer && customer.cashback_balance > 0
           ? Math.min(Math.floor(customer.cashback_balance), Math.round(total))
           : 0;
         const appliedCashback =
-          paymentMethod === 'payos' &&
+          effectiveMethod === 'payos' &&
           rawAppliedCashback > 0 &&
           Math.round(total) - rawAppliedCashback > 0 &&
           Math.round(total) - rawAppliedCashback < 1000
@@ -359,24 +428,30 @@ export default function AdminPOSPage() {
             quantity: ci.quantity,
           })),
           total: payableTotal,
-          customer_name: customer?.name || t('adminPOS.customerDefaultName'),
-          customer_phone: customer?.phone || '',
+          customer_name:
+            customer?.name ||
+            (effectiveOrderType === 'delivery' && deliveryRecipientName.trim()
+              ? deliveryRecipientName.trim()
+              : t('adminPOS.customerDefaultName')),
+          customer_phone:
+            customer?.phone ||
+            (effectiveOrderType === 'delivery' ? deliveryRecipientPhone.trim() : ''),
           customer_id: customer?.id,
           customer_email: undefined,
           customer_address:
-            orderType === 'dine_in'
+            effectiveOrderType === 'dine_in'
               ? t('adminPOS.customerDefaultAddress')
-              : orderType === 'delivery'
+              : effectiveOrderType === 'delivery'
                 ? deliveryAddress.trim()
                 : '',
-          order_type: resolvedTableId ? 'dine_in' : orderType,
-          payment_method: paymentMethod,
-          shipping_fee: 0,
+          order_type: effectiveOrderType,
+          payment_method: effectiveMethod,
+          shipping_fee: computedShippingFee,
           service_fee: serviceFee,
           discount: 0,
           tip: 0,
           ...(appliedCashback > 0 ? { use_cashback: true, cashback_amount: appliedCashback } : {}),
-          ...(resolvedTableId ? { table_id: resolvedTableId } : {}),
+          ...(effectiveOrderType === 'dine_in' && resolvedTableId ? { table_id: resolvedTableId } : {}),
         });
 
         if (result.success) {
@@ -385,7 +460,7 @@ export default function AdminPOSPage() {
           const createdOrderId = result.order_id || result.order?.id;
           const serverTotal = Math.round(result.order?.total ?? result.order?.totalAmount ?? payableTotal);
 
-          if (paymentMethod === 'payos' && serverTotal > 0) {
+          if (effectiveMethod === 'payos' && serverTotal > 0) {
             if (!createdOrderId) {
               setCheckoutError(t('adminPOS.createOrderError'));
               return false;
@@ -418,13 +493,18 @@ export default function AdminPOSPage() {
               return false;
             }
             setPendingPayOSOrder({ orderId: createdOrderId, total: serverTotal });
-            setPaymentQrPayload(resolvedQrCode || safeUrl);
+            setPaymentQrPayload(resolvedQrCode);
             setPaymentUrl(safeUrl);
+            setQrMode(resolvedQrCode ? 'vietqr' : 'web');
+            setQrInvalidated(false);
+            setPayOSModalOpen(true);
             setCustomer(null);
             setUseCashback(false);
             setSelectedTableId(undefined);
             setOrderType('takeaway');
             setDeliveryAddress('');
+            setDeliveryRecipientName('');
+            setDeliveryRecipientPhone('');
             if (resolvedTableId) {
               void queryClient.invalidateQueries({ queryKey: ['pos-tables'] });
             }
@@ -436,10 +516,12 @@ export default function AdminPOSPage() {
           setSelectedTableId(undefined);
           setOrderType('takeaway');
           setDeliveryAddress('');
+          setDeliveryRecipientName('');
+          setDeliveryRecipientPhone('');
           if (resolvedTableId) {
             void queryClient.invalidateQueries({ queryKey: ['pos-tables'] });
           }
-          const needsCodCollection = canCollectCod && paymentMethod === 'cod' && Boolean(createdOrderId) && serverTotal > 0;
+          const needsCodCollection = canCollectCod && effectiveMethod === 'cod' && Boolean(createdOrderId) && serverTotal > 0;
           if (needsCodCollection && createdOrderId) {
             setPendingCodOrder({ id: createdOrderId, total: serverTotal });
           } else {
@@ -486,7 +568,8 @@ export default function AdminPOSPage() {
         cancel_url: window.location.href,
         return_url: window.location.href,
         description: `POS #${pendingPayOSOrder.orderId.slice(0, 8)}`,
-      });
+        regenerate: true,
+      } as Parameters<typeof payOSMutation.mutateAsync>[0]);
       const resolvedUrl = payRes.payment_url || payRes.checkout_url || payRes.checkoutUrl || payRes.data?.checkoutUrl || payRes.data?.payment_url;
       const resolvedQrCode = payRes.qrCode || payRes.qr_code || payRes.qrCodeUrl || payRes.data?.qrCode || payRes.data?.qrCodeUrl || null;
       const safeUrl = sanitizePaymentUrl(resolvedUrl);
@@ -494,20 +577,42 @@ export default function AdminPOSPage() {
         setCheckoutError('Không nhận được liên kết thanh toán PayOS hợp lệ.');
         return;
       }
-      setPaymentQrPayload((prev) => {
-        if (resolvedQrCode) return resolvedQrCode;
-        if (prev && !/^https?:\/\//i.test(prev)) return prev;
-        return safeUrl;
-      });
+      setPaymentQrPayload(resolvedQrCode);
       setPaymentUrl(safeUrl);
+      setQrMode(resolvedQrCode ? 'vietqr' : 'web');
+      setQrInvalidated(false);
+      setPayOSModalOpen(true);
       setCustomer(null);
       setUseCashback(false);
       setSelectedTableId(undefined);
       setOrderType('takeaway');
       setDeliveryAddress('');
+      setDeliveryRecipientName('');
+      setDeliveryRecipientPhone('');
       void queryClient.invalidateQueries({ queryKey: ['pos-tables'] });
       setCartResetKey((k) => k + 1);
     } catch (err) {
+      if (err instanceof ApiClientError && err.code === 'ORDER_ALREADY_PAID') {
+        setPayOSModalOpen(false);
+        setPaymentUrl(null);
+        setPaymentQrPayload(null);
+        setQrInvalidated(false);
+        setPendingPayOSOrder(null);
+        setCheckoutError(null);
+        setCheckoutSuccess(true);
+        void queryClient.invalidateQueries({ queryKey: ['pos-tables'] });
+        if (successTimerRef.current) clearTimeout(successTimerRef.current);
+        successTimerRef.current = setTimeout(() => {
+          setCheckoutSuccess(false);
+          successTimerRef.current = null;
+        }, 5000);
+        return;
+      }
+      if (err instanceof ApiClientError && err.status === 409) {
+        setQrInvalidated(true);
+        setCheckoutError('Phiên thanh toán PayOS đã đóng hoặc cần đối soát. Vui lòng thử tạo lại QR hoặc hủy đơn.');
+        return;
+      }
       setCheckoutError(err instanceof Error ? err.message : 'Thử tạo lại mã QR PayOS thất bại.');
     } finally {
       setIsRetryingPayOS(false);
@@ -522,8 +627,10 @@ export default function AdminPOSPage() {
         method: 'PATCH',
         body: JSON.stringify({ status: 'cancelled' }),
       });
+      setPayOSModalOpen(false);
       setPaymentUrl(null);
       setPaymentQrPayload(null);
+      setQrInvalidated(false);
       setPendingPayOSOrder(null);
       setCheckoutError(null);
       void queryClient.invalidateQueries({ queryKey: ['pos-tables'] });
@@ -546,21 +653,23 @@ export default function AdminPOSPage() {
         selectedTableId={selectedTableId}
         onSelectTable={(tableId) => {
           setSelectedTableId(tableId);
-          if (tableId) {
-            setOrderType('dine_in');
-          } else if (orderType === 'dine_in') {
-            setOrderType('takeaway');
-          }
         }}
         orderType={orderType}
         onOrderTypeChange={(nextType) => {
           setOrderType(nextType);
+          if (nextType === 'delivery') {
+            setPaymentMethod('payos');
+          }
           if (nextType !== 'dine_in') {
             setSelectedTableId(undefined);
           }
         }}
         deliveryAddress={deliveryAddress}
         onDeliveryAddressChange={setDeliveryAddress}
+        deliveryRecipientName={deliveryRecipientName}
+        onDeliveryRecipientNameChange={setDeliveryRecipientName}
+        deliveryRecipientPhone={deliveryRecipientPhone}
+        onDeliveryRecipientPhoneChange={setDeliveryRecipientPhone}
         taxRate={0}
         staffName={user?.name || user?.email || undefined}
         staffRole={user?.role || undefined}
@@ -657,11 +766,44 @@ export default function AdminPOSPage() {
         </div>
       )}
 
-      {/* ── Error Banner Overlay ────────────────────────────────────────── */}
-      {checkoutError && (
+      {/* ── Minimized Pending PayOS Pill (prevents orphaned orders on close) ── */}
+      {!payOSModalOpen && pendingPayOSOrder && (
+        <div
+          data-testid="pos-pending-payos-pill"
+          className="fixed bottom-20 left-1/2 -translate-x-1/2 z-[95] flex items-center gap-3 px-4 py-2.5 rounded-full shadow-xl border border-amber-400/40 bg-[#0A1A2E]/95 text-white text-xs"
+        >
+          <span>
+            Đơn <strong>#{pendingPayOSOrder.orderId.slice(0, 8)}</strong> đang chờ PayOS ({pendingPayOSOrder.total.toLocaleString('vi-VN')}₫)
+          </span>
+          <button
+            type="button"
+            onClick={() => {
+              if (paymentUrl) {
+                setPayOSModalOpen(true);
+              } else {
+                void handleRetryPayOSLink();
+              }
+            }}
+            className="px-3 py-1 rounded-full bg-[#f2c08d] text-[#1a1008] font-semibold cursor-pointer hover:brightness-105"
+          >
+            Mở lại QR
+          </button>
+          <button
+            type="button"
+            disabled={isCancellingOrder}
+            onClick={() => void handleCancelPendingOrder()}
+            className="px-2.5 py-1 rounded-full bg-red-500/25 text-red-200 font-semibold cursor-pointer hover:bg-red-500/40 disabled:opacity-50"
+          >
+            Hủy đơn
+          </button>
+        </div>
+      )}
+
+      {/* ── Error Banner Overlay (only when PayOS modal is closed to prevent backdrop overlap) ── */}
+      {checkoutError && !payOSModalOpen && (
         <div
           role="alert"
-          className="fixed top-20 left-1/2 -translate-x-1/2 z-[100] flex items-center gap-3 px-5 py-3 rounded-lg shadow-lg max-w-xl"
+          className="fixed top-20 left-1/2 -translate-x-1/2 z-[110] flex items-center gap-3 px-5 py-3 rounded-lg shadow-lg max-w-xl"
           style={{
             backgroundColor: 'rgba(220,53,69,0.95)',
             color: '#fff',
@@ -700,7 +842,7 @@ export default function AdminPOSPage() {
       )}
 
       {/* ── PayOS Payment Link Modal (replaces window.open) ─────────── */}
-      {paymentUrl && (
+      {payOSModalOpen && paymentUrl && (
         <div
           className="fixed inset-0 z-[100] flex items-center justify-center bg-black/65 p-4"
           role="dialog"
@@ -711,22 +853,95 @@ export default function AdminPOSPage() {
             className="flex flex-col items-center gap-3 px-6 py-5 rounded-xl shadow-2xl max-w-sm w-full text-center"
             style={{ backgroundColor: 'rgba(10,26,46,0.98)', border: '1px solid rgba(201,214,223,0.3)', color: '#fff' }}
           >
-            <span className="text-xs font-semibold text-[#C9D6DF] uppercase tracking-wider">Thanh toán PayOS</span>
-            <div className="rounded-lg bg-white p-3">
-              {paymentQrDataUrl && (
-                <img
-                  src={paymentQrDataUrl}
-                  alt="PayOS QR Code"
-                  className="h-44 w-44 object-contain"
-                />
+            <div className="w-full flex items-center justify-between">
+              <span className="text-xs font-semibold text-[#C9D6DF] uppercase tracking-wider">Thanh toán PayOS</span>
+              {pendingPayOSOrder && (
+                <span className="text-[11px] text-amber-300 font-medium">
+                  #{pendingPayOSOrder.orderId.slice(0, 8)} • Chờ thanh toán
+                </span>
               )}
             </div>
-            <p className="text-xs text-[#C9D6DF] break-all">{paymentUrl}</p>
+
+            {checkoutError && (
+              <div
+                role="alert"
+                data-testid="pos-payos-modal-error"
+                className="w-full flex items-start gap-2 rounded-lg bg-red-500/20 border border-red-400/40 px-3 py-2 text-left text-xs text-red-100"
+              >
+                <AlertCircle className="w-4 h-4 shrink-0 text-red-300 mt-0.5" />
+                <span className="flex-1">{checkoutError}</span>
+                <button
+                  type="button"
+                  onClick={() => setCheckoutError(null)}
+                  className="shrink-0 text-red-200 hover:text-white cursor-pointer"
+                  aria-label="Đóng thông báo lỗi"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            )}
+
+            {hasEmvcoQr && (
+              <div className="w-full grid grid-cols-2 gap-1.5 rounded-lg bg-white/5 p-1" role="tablist" aria-label="Chế độ mã QR">
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={qrMode === 'vietqr'}
+                  data-testid="pos-qr-mode-vietqr"
+                  onClick={() => setQrMode('vietqr')}
+                  className={`px-2 py-1.5 rounded-md text-[11px] font-semibold cursor-pointer transition-colors ${
+                    qrMode === 'vietqr' ? 'bg-[#f2c08d] text-[#1a1008]' : 'text-[#C9D6DF] hover:text-white'
+                  }`}
+                >
+                  VietQR (App Ngân hàng / Zalo)
+                </button>
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={qrMode === 'web'}
+                  data-testid="pos-qr-mode-web"
+                  onClick={() => setQrMode('web')}
+                  className={`px-2 py-1.5 rounded-md text-[11px] font-semibold cursor-pointer transition-colors ${
+                    qrMode === 'web' ? 'bg-[#f2c08d] text-[#1a1008]' : 'text-[#C9D6DF] hover:text-white'
+                  }`}
+                >
+                  Link thanh toán (Camera iPhone)
+                </button>
+              </div>
+            )}
+
+            <div className="relative rounded-lg bg-white p-3">
+              {qrInvalidated ? (
+                <div
+                  data-testid="pos-qr-invalidated"
+                  className="h-48 w-48 flex flex-col items-center justify-center gap-2 text-center text-xs text-slate-700 px-3"
+                >
+                  <AlertCircle className="w-7 h-7 text-red-500" />
+                  <span className="font-semibold text-red-600">Mã QR không còn hiệu lực</span>
+                  <span>Vui lòng bấm "Tạo lại QR" hoặc "Hủy đơn".</span>
+                </div>
+              ) : (
+                paymentQrDataUrl && (
+                  <img
+                    src={paymentQrDataUrl}
+                    alt={qrMode === 'web' ? 'PayOS Web Link QR Code' : 'PayOS VietQR Code'}
+                    className="h-48 w-48 object-contain"
+                  />
+                )
+              )}
+            </div>
+
+            <p className="text-[11px] text-[#C9D6DF]">
+              {qrMode === 'web' || !hasEmvcoQr
+                ? 'Dùng Camera iPhone hoặc trình duyệt quét để mở trang thanh toán PayOS.'
+                : 'Mở App Ngân hàng hoặc Zalo để quét chuyển khoản nhanh.'}
+            </p>
+
             <a
               href={paymentUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="flex items-center gap-2 mt-1 px-4 py-2 rounded-full bg-[#6B9FB8] text-white text-sm font-bold hover:opacity-90 transition-opacity"
+              className="flex items-center gap-2 mt-0.5 px-4 py-2 rounded-full bg-[#6B9FB8] text-white text-sm font-bold hover:opacity-90 transition-opacity"
             >
               <ExternalLink className="w-4 h-4" /> Mở trang thanh toán
             </a>
@@ -754,16 +969,12 @@ export default function AdminPOSPage() {
             <button
               type="button"
               onClick={() => {
-                setPaymentUrl(null);
-                setPaymentQrPayload(null);
-                setPendingPayOSOrder(null);
-                setCustomer(null);
-                setUseCashback(false);
-                setSelectedTableId(undefined);
+                setPayOSModalOpen(false);
+                setCheckoutError(null);
               }}
               className="text-xs text-[#8898A4] hover:text-white mt-1 cursor-pointer transition-colors"
             >
-              Đóng
+              Thu gọn (giữ đơn chờ)
             </button>
           </div>
         </div>
