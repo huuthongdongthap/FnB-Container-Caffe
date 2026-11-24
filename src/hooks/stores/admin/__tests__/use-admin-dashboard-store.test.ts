@@ -52,6 +52,7 @@ describe('useAdminDashboardStore', () => {
       stats: {
         orders_today: 20,
         revenue_today: 1600000,
+        distinct_customers_today: 14,
         orders_by_status: { completed: 20 },
       },
     });
@@ -63,8 +64,37 @@ describe('useAdminDashboardStore', () => {
       todayRevenue: 1600000,
       todayOrders: 20,
       avgOrderValue: 80000,
-      activeCustomers: 20,
+      activeCustomers: 14,
+      revenueChangePercent: null,
     });
+  });
+
+  it('fetchDashboard(): preserves numeric and null revenue_change_percent', async () => {
+    mockSuccess({
+      success: true,
+      stats: {
+        orders_today: 10,
+        revenue_today: 500000,
+        distinct_customers_today: 8,
+        revenue_change_percent: 12.5,
+      },
+    });
+
+    await useAdminDashboardStore.getState().fetchDashboard();
+    expect(useAdminDashboardStore.getState().stats?.revenueChangePercent).toBe(12.5);
+
+    mockSuccess({
+      success: true,
+      stats: {
+        orders_today: 10,
+        revenue_today: 500000,
+        distinct_customers_today: 8,
+        revenue_change_percent: null,
+      },
+    });
+
+    await useAdminDashboardStore.getState().fetchDashboard();
+    expect(useAdminDashboardStore.getState().stats?.revenueChangePercent).toBeNull();
   });
 
   it('fetchDashboard(): sets error on failure', async () => {

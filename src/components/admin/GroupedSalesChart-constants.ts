@@ -3,15 +3,15 @@ import type { GroupedSalesChartProps } from './GroupedSalesChart-types';
 /* ─── Title mapping ─── */
 
 export const TITLE_MAP: Record<GroupedSalesChartProps['groupBy'], string> = {
-  hour: 'Theo gio',
-  day: 'Theo ngay',
-  category: 'Theo danh muc',
-  payment: 'Theo phuong thuc thanh toan',
+  hour: 'Theo giờ',
+  day: 'Theo ngày',
+  category: 'Theo danh mục',
+  payment: 'Theo phương thức thanh toán',
 };
 
 export const EMPTY_MSG: Record<GroupedSalesChartProps['groupBy'], string> = {
-  hour: 'Chua co du lieu theo gio',
-  day: 'Chua co du lieu theo ngay',
-  category: 'Chua co du lieu theo danh muc',
-  payment: 'Chua co du lieu theo phuong thuc thanh toan',
+  hour: 'Chưa có dữ liệu theo giờ',
+  day: 'Chưa có dữ liệu theo ngày',
+  category: 'Chưa có dữ liệu theo danh mục',
+  payment: 'Chưa có dữ liệu theo phương thức thanh toán',
 };

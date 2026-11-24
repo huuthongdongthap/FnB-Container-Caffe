@@ -10,12 +10,12 @@ import type { PeriodDataPoint } from './sales-report-types';
 const COMPARISON_ERROR_KEY = '__COMPARISON_ERR__';
 const CSV_EXPORT_ERR_KEY = '__CSV_EXPORT_ERR__';
 
-export function useDailyReportData(from: string, to: string) {
+export function useDailyReportData(from: string, to: string, enabled = true) {
   const session = useClientSessionScope();
   return useQuery<{ success: boolean; data: PeriodDataPoint[] }>({
     queryKey: ['reports', 'daily', session.tenantId, session.userScope, from, to],
     queryFn: () => apiFetch(`/api/reports/daily?from=${from}&to=${to}`),
-    enabled: !!from && !!to,
+    enabled: enabled && !!from && !!to,
     staleTime: 60_000,
   });
 }
@@ -41,18 +41,18 @@ export function useSalesGrouped(
   });
 }
 
-export function useComparisonData(from: string, to: string) {
+export function useComparisonData(from: string, to: string, enabled = true) {
   const prev = previousPeriodDates(from, to);
-  const currentQ = useDailyReportData(from, to);
-  const previousQ = useDailyReportData(prev.from, prev.to);
+  const currentQ = useDailyReportData(from, to, enabled);
+  const previousQ = useDailyReportData(prev.from, prev.to, enabled);
 
   return {
     data:
       currentQ.data?.data && previousQ.data?.data
         ? { current: currentQ.data.data, previous: previousQ.data.data }
         : null,
-    loading: currentQ.isLoading || previousQ.isLoading,
-    error: currentQ.error || previousQ.error ? COMPARISON_ERROR_KEY : null,
+    loading: enabled && (currentQ.isLoading || previousQ.isLoading),
+    error: enabled && (currentQ.error || previousQ.error) ? COMPARISON_ERROR_KEY : null,
     refetch: () => { currentQ.refetch(); previousQ.refetch(); },
   };
 }

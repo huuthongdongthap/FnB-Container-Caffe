@@ -6,7 +6,9 @@ import type { DailyReport, SummaryReport } from './types';
 
 const REPORT_ANALYTICS_ROLES = ['owner', 'manager', 'supervisor', 'admin'];
 export const VALID_REVENUE_ORDER_SQL =
-  "COALESCE(status, '') NOT IN ('cancelled', 'refunded', 'failed', 'expired') AND COALESCE(payment_status, '') NOT IN ('refunded', 'failed', 'cancelled', 'canceled') AND LOWER(COALESCE(status, '')) NOT IN ('cancelled', 'canceled', 'refunded', 'failed', 'rejected', 'expired') AND LOWER(COALESCE(payment_status, '')) NOT IN ('refunded', 'failed', 'cancelled', 'canceled') AND NOT (COALESCE(total, 0) = 0 AND (COALESCE(customer_name, '') = 'Khách QR - cho don mon' OR COALESCE(items, '') IN ('', '[]')))";
+  "LOWER(TRIM(COALESCE(status, ''))) NOT IN ('cancelled', 'canceled', 'refunded', 'failed', 'rejected', 'expired') AND LOWER(TRIM(COALESCE(payment_status, ''))) IN ('paid', 'partially_refunded', 'completed') AND NOT (COALESCE(total, 0) = 0 AND (COALESCE(customer_name, '') = 'Khách QR - cho don mon' OR COALESCE(items, '') IN ('', '[]')))";
+export const VALID_REVENUE_ORDER_ALIAS_SQL =
+  "LOWER(TRIM(COALESCE(o.status, ''))) NOT IN ('cancelled', 'canceled', 'refunded', 'failed', 'rejected', 'expired') AND LOWER(TRIM(COALESCE(o.payment_status, ''))) IN ('paid', 'partially_refunded', 'completed') AND NOT (COALESCE(o.total, 0) = 0 AND (COALESCE(o.customer_name, '') = 'Khách QR - cho don mon' OR COALESCE(o.items, '') IN ('', '[]')))";
 
 export function isStrictHQReportAdmin(role: string, userTenant: string): boolean {
   const normTenant = (userTenant || '').trim().toLowerCase();
@@ -296,7 +298,7 @@ export function registerAnalyticsHandlers(app: Hono<{ Bindings: Env }>) {
     const start = new Date(from);
     const end = new Date(to);
 
-    for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+    for (let d = new Date(start); d <= end; d.setUTCDate(d.getUTCDate() + 1)) {
       const dateStr = d.toISOString().slice(0, 10);
       const orderData = orderMap.get(dateStr) || { count: 0, revenue: 0 };
 
@@ -328,7 +330,7 @@ export function registerAnalyticsHandlers(app: Hono<{ Bindings: Env }>) {
       const allBinds = [...extraBinds, ...tf.binds];
       return allBinds.length > 0 ? stmt.bind(...allBinds).first<T>() : stmt.first<T>();
     };
-    const thirtyDaysAgo = new Date(Date.now() - 30 * 86400000).toISOString();
+    const thirtyDaysAgo = new Date(Date.now() - 30 * 86400000).toISOString().replace('T', ' ').slice(0, 19);
 
     const [
       totalCustomers,
@@ -363,11 +365,11 @@ export function registerAnalyticsHandlers(app: Hono<{ Bindings: Env }>) {
         }
       })(),
       runFirst<{ count: number }>(
-        `SELECT COUNT(*) as count FROM customers WHERE updated_at >= ?${tf.and}`,
+        `SELECT COUNT(*) as count FROM customers WHERE datetime(updated_at) >= datetime(?)${tf.and}`,
         [thirtyDaysAgo]
       ).catch(() =>
         runFirst<{ count: number }>(
-          `SELECT COUNT(*) as count FROM customers WHERE created_at >= ?${tf.and}`,
+          `SELECT COUNT(*) as count FROM customers WHERE datetime(created_at) >= datetime(?)${tf.and}`,
           [thirtyDaysAgo]
         ).catch(() => ({ count: 0 }))
       ),
@@ -542,7 +544,7 @@ export function registerAnalyticsHandlers(app: Hono<{ Bindings: Env }>) {
       return allBinds.length > 0 ? stmt.bind(...allBinds).first<T>() : stmt.first<T>();
     };
 
-    const thirtyDaysAgo = new Date(Date.now() - 30 * 86400000).toISOString();
+    const thirtyDaysAgo = new Date(Date.now() - 30 * 86400000).toISOString().replace('T', ' ').slice(0, 19);
 
     const [
       totalCustomers,
@@ -553,7 +555,7 @@ export function registerAnalyticsHandlers(app: Hono<{ Bindings: Env }>) {
       orderCustomers
     ] = await Promise.all([
       runFirst<{ count: number }>(`SELECT COUNT(*) as count FROM customers${tf.where}`),
-      runFirst<{ count: number }>(`SELECT COUNT(*) as count FROM customers WHERE created_at >= ?${tf.and}`, [thirtyDaysAgo]),
+      runFirst<{ count: number }>(`SELECT COUNT(*) as count FROM customers WHERE datetime(created_at) >= datetime(?)${tf.and}`, [thirtyDaysAgo]),
       runFirst<{ count: number }>(
         `SELECT COUNT(*) as count FROM (SELECT customer_id FROM orders WHERE customer_id IS NOT NULL AND TRIM(COALESCE(customer_id, '')) NOT IN ('', 'guest', 'walk-in', 'pos') AND ${VALID_REVENUE_ORDER_SQL}${tf.and} GROUP BY customer_id, COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') HAVING COUNT(*) > 1)`
       ),

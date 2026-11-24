@@ -844,7 +844,7 @@ describe('Phase 49 Slice AV3: Promotions, OpenAPI Inventory & Analytics/Export R
         { headers: { 'X-Tenant-ID': 'tenant_a' } },
         env
       );
-      expect(supExport.status).toBe(403);
+      expect(supExport.status).toBe(200);
     });
 
     it('excludes refunded and failed orders from daily, summary, top-products, peak-hours, customer-metrics, and exports', async () => {

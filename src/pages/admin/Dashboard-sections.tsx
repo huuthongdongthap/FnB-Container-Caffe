@@ -37,7 +37,14 @@ export function StatsGrid({ stats, loading }: StatsGridProps) {
           value={stats?.[card.valueKey] ?? 0}
           type={card.type}
           icon={ICON_MAP[card.iconName]}
-          change={card.key === 'revenue' && stats ? { value: 12, isPositive: true } : undefined}
+          change={
+            card.key === 'revenue' && typeof stats?.revenueChangePercent === 'number'
+              ? {
+                  value: Math.abs(stats.revenueChangePercent),
+                  isPositive: stats.revenueChangePercent >= 0,
+                }
+              : undefined
+          }
         />
       ))}
     </div>

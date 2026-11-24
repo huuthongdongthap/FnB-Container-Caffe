@@ -42,7 +42,7 @@ export async function getStats(request: Request, env: Record<string, unknown>, t
     const qrPlaceholderExclusionClause =
       "NOT (COALESCE(TRIM(notes), '') = 'Khách QR - cho don mon' AND COALESCE(TRIM(items), '[]') IN ('', '[]'))";
     const revenueWithoutNotesClause =
-      "status != 'cancelled' AND COALESCE(LOWER(TRIM(status)), '') NOT IN ('cancelled', 'canceled', 'refunded', 'failed', 'rejected', 'expired') AND COALESCE(LOWER(TRIM(payment_status)), '') NOT IN ('refunded', 'failed', 'cancelled', 'canceled')";
+      "status != 'cancelled' AND COALESCE(LOWER(TRIM(status)), '') NOT IN ('cancelled', 'canceled', 'refunded', 'failed', 'rejected', 'expired') AND COALESCE(LOWER(TRIM(payment_status)), '') IN ('paid', 'partially_refunded')";
     const revenueExclusionClause = `${revenueWithoutNotesClause} AND ${qrPlaceholderExclusionClause}`;
     const statusOnlyExclusionClause =
       "status != 'cancelled' AND COALESCE(LOWER(TRIM(status)), '') NOT IN ('cancelled', 'canceled', 'refunded', 'failed', 'rejected', 'expired')";
@@ -170,8 +170,13 @@ export async function getStats(request: Request, env: Record<string, unknown>, t
       .sort((a, b) => b.quantity - a.quantity)
       .slice(0, 6);
 
-    const weekAgo = new Date(ictNowMs - 7 * 86_400_000).toISOString().slice(0, 10);
-    const sevenDaysAgoParam = new Date(`${weekAgo}T00:00:00+07:00`).toISOString().replace('T', ' ').slice(0, 19);
+    const rawPeriod = (url.searchParams.get('period') || '').trim().toLowerCase();
+    const seriesDays = rawPeriod === 'daily' ? 1 : rawPeriod === 'monthly' ? 30 : 7;
+    const weekAgo = new Date(ictNowMs - (seriesDays - 1) * 86_400_000).toISOString().slice(0, 10);
+    const yesterday = new Date(ictNowMs - 86_400_000).toISOString().slice(0, 10);
+    const queryDays = Math.max(seriesDays, 2);
+    const queryStart = new Date(ictNowMs - (queryDays - 1) * 86_400_000).toISOString().slice(0, 10);
+    const sevenDaysAgoParam = new Date(`${queryStart}T00:00:00+07:00`).toISOString().replace('T', ' ').slice(0, 19);
 
     let revenueResult: { date: string; revenue: number }[] = [];
     try {
@@ -216,20 +221,43 @@ export async function getStats(request: Request, env: Record<string, unknown>, t
       }
     }
 
+    let distinctCustomersToday = 0;
+    try {
+      const custRes = await db.prepare(`
+        SELECT COUNT(DISTINCT COALESCE(NULLIF(TRIM(customer_phone), ''), NULLIF(TRIM(customer_name), ''), id)) as distinct_customers
+        FROM orders
+        WHERE datetime(created_at) >= datetime(?) AND ${revenueExclusionClause}${tenantAnd2}
+      `).bind(todayStartParam, ...tenantBinds).all<{ distinct_customers: number }>();
+      distinctCustomersToday = Number(custRes.results?.[0]?.distinct_customers || 0);
+    } catch {
+      distinctCustomersToday = 0;
+    }
+
+    const todayRevenue = ordersTodayResult[0]?.revenue || 0;
+    const yesterdayRevenue = Number(revenueResult.find((r) => r.date === yesterday)?.revenue || 0);
+    const revenueChangePercent =
+      yesterdayRevenue > 0
+        ? Math.round(((todayRevenue - yesterdayRevenue) / yesterdayRevenue) * 1000) / 10
+        : null;
+
     return jsonResponse({
       success: true,
       stats: {
         orders_today: ordersTodayResult[0]?.total || 0,
-        revenue_today: ordersTodayResult[0]?.revenue || 0,
+        revenue_today: todayRevenue,
+        distinct_customers_today: distinctCustomersToday,
+        revenue_change_percent: revenueChangePercent,
         orders_by_status: statusResult.reduce((acc: Record<string, number>, row) => {
           acc[row.status] = row.count;
           return acc;
         }, {}),
         top_products: topProductsList,
-        revenue_7days: revenueResult.map(row => ({
-          date: row.date,
-          revenue: row.revenue
-        }))
+        revenue_7days: revenueResult
+          .filter((row) => row.date >= weekAgo)
+          .map(row => ({
+            date: row.date,
+            revenue: row.revenue
+          }))
       }
     });
   } catch (error) {

@@ -2,6 +2,7 @@ import type { Hono } from 'hono';
 import type { Env } from '../../types/env';
 import { getTenantId } from '../../middleware/tenant';
 import {
+  VALID_REVENUE_ORDER_ALIAS_SQL,
   VALID_REVENUE_ORDER_SQL,
   buildTenantClause,
   validateDateRangeWindow,
@@ -132,7 +133,8 @@ export function registerPnlHandlers(app: Hono<{ Bindings: Env }>) {
       orderRows = res.results || [];
     }
 
-    // 2. Daily Inventory COGS (sale/reserve deductions net of release + BOM stock movements) & Waste Cost (Vietnam UTC+7)
+    // 2. Daily Inventory COGS (sale/reserve deductions net of release) & Waste Cost (Vietnam UTC+7)
+    // Exclude order rows already recorded in stock_movements to avoid double-counting bom-policy dual writes.
     let invRows: { date: string; cogs: number; waste_cost: number }[] = [];
     try {
       const res = await db
@@ -143,39 +145,80 @@ export function registerPnlHandlers(app: Hono<{ Bindings: Env }>) {
            FROM inventory_transactions t
            JOIN inventory_items i ON i.id = t.item_id
            WHERE DATE(datetime(t.created_at, '+7 hours')) BETWEEN ? AND ?
-             AND t.type IN ('out', 'reserve', 'sale', 'release', 'waste')${invTf.and}
+             AND t.type IN ('out', 'reserve', 'sale', 'release', 'waste')
+             AND NOT (
+               t.reference_type = 'order'
+               AND t.reference_id IS NOT NULL
+               AND EXISTS (
+                 SELECT 1 FROM stock_movements sm
+                 WHERE sm.reference_type = 'order'
+                   AND sm.reference_id = t.reference_id
+                   AND sm.ingredient_id = t.item_id
+                   AND COALESCE(NULLIF(TRIM(sm.tenant_id), ''), 'default') = COALESCE(NULLIF(TRIM(i.tenant_id), ''), 'default')
+               )
+             )${invTf.and}
            GROUP BY DATE(datetime(t.created_at, '+7 hours')) ORDER BY date`
         )
         .bind(from, to, ...invTf.binds)
         .all<{ date: string; cogs: number; waste_cost: number }>();
       invRows = res.results || [];
     } catch {
-      invRows = [];
+      try {
+        const res = await db
+          .prepare(
+            `SELECT DATE(datetime(t.created_at, '+7 hours')) as date,
+                    MAX(0, COALESCE(SUM(CASE WHEN t.type IN ('out', 'reserve', 'sale') THEN ABS(t.quantity) * COALESCE(i.cost_per_unit, 0) WHEN t.type = 'release' THEN -ABS(t.quantity) * COALESCE(i.cost_per_unit, 0) ELSE 0 END), 0)) as cogs,
+                    COALESCE(SUM(CASE WHEN t.type = 'waste' THEN ABS(t.quantity) * COALESCE(i.cost_per_unit, 0) ELSE 0 END), 0) as waste_cost
+             FROM inventory_transactions t
+             JOIN inventory_items i ON i.id = t.item_id
+             WHERE DATE(datetime(t.created_at, '+7 hours')) BETWEEN ? AND ?
+               AND t.type IN ('out', 'reserve', 'sale', 'release', 'waste')${invTf.and}
+             GROUP BY DATE(datetime(t.created_at, '+7 hours')) ORDER BY date`
+          )
+          .bind(from, to, ...invTf.binds)
+          .all<{ date: string; cogs: number; waste_cost: number }>();
+        invRows = res.results || [];
+      } catch {
+        invRows = [];
+      }
     }
 
-    // 2b. BOM Ingredient Stock Movements COGS (when inventory_transactions has no row for a date)
-    let bomMovementRows: { date: string; cogs: number }[] = [];
+    // 2b. BOM Ingredient Stock Movements COGS & Waste (consumption net of cancelled-order restock/reversal + waste)
+    let bomMovementRows: { date: string; cogs: number; waste_cost: number }[] = [];
     try {
       const smTf = buildTenantClause(tenantId, 'sm');
       const smRes = await db
         .prepare(
           `SELECT DATE(datetime(sm.created_at, '+7 hours')) as date,
-                  MAX(0, COALESCE(SUM(CASE WHEN sm.type IN ('consumption', 'order_deduction', 'deduction', 'out') THEN ABS(sm.quantity) * COALESCE(ing.cost_per_unit, ing.unit_cost, 0) WHEN sm.type IN ('release', 'reversal', 'in_reversal') THEN -ABS(sm.quantity) * COALESCE(ing.cost_per_unit, ing.unit_cost, 0) ELSE 0 END), 0)) as cogs
+                  MAX(0, COALESCE(SUM(
+                    CASE
+                      WHEN sm.reference_type = 'order' AND sm.type IN ('consumption', 'order_consumption', 'order_deduction', 'deduction', 'out')
+                        THEN ABS(sm.quantity) * COALESCE(ing.cost_per_unit, 0)
+                      WHEN sm.reference_type = 'order' AND sm.type IN ('release', 'reversal', 'in_reversal', 'adjustment', 'waste')
+                        THEN -ABS(sm.quantity) * COALESCE(ing.cost_per_unit, 0)
+                      ELSE 0
+                    END
+                  ), 0)) as cogs,
+                  COALESCE(SUM(
+                    CASE WHEN sm.type = 'waste' THEN ABS(sm.quantity) * COALESCE(ing.cost_per_unit, 0) ELSE 0 END
+                  ), 0) as waste_cost
            FROM stock_movements sm
            JOIN ingredients ing ON ing.id = sm.ingredient_id
            WHERE DATE(datetime(sm.created_at, '+7 hours')) BETWEEN ? AND ?
-             AND sm.reference_type = 'order'
-             AND sm.type IN ('consumption', 'order_deduction', 'deduction', 'out', 'release', 'reversal', 'in_reversal')${smTf.and}
+             AND (
+               (sm.reference_type = 'order' AND sm.type IN ('consumption', 'order_consumption', 'order_deduction', 'deduction', 'out', 'release', 'reversal', 'in_reversal', 'adjustment', 'waste'))
+               OR sm.type = 'waste'
+             )${smTf.and}
            GROUP BY DATE(datetime(sm.created_at, '+7 hours')) ORDER BY date`
         )
         .bind(from, to, ...smTf.binds)
-        .all<{ date: string; cogs: number }>();
+        .all<{ date: string; cogs: number; waste_cost: number }>();
       bomMovementRows = smRes.results || [];
     } catch {
       bomMovementRows = [];
     }
 
-    // 3. Daily Refunds (refunds table when present, else payments refund ledger)
+    // 3. Daily Refunds on recognized-revenue orders (excludes fully refunded orders already omitted from orderRows)
     let refundRows: { date: string; refunds: number }[] = [];
     try {
       const ordTf = buildTenantClause(tenantId, 'o');
@@ -186,14 +229,15 @@ export function registerPnlHandlers(app: Hono<{ Bindings: Env }>) {
            FROM refunds r
            JOIN orders o ON o.id = r.order_id
            WHERE DATE(datetime(r.created_at, '+7 hours')) BETWEEN ? AND ?
-             AND r.status IN ('approved', 'completed', 'succeeded')${ordTf.and}
+             AND r.status IN ('approved', 'completed', 'succeeded')
+             AND ${VALID_REVENUE_ORDER_ALIAS_SQL}${ordTf.and}
            GROUP BY DATE(datetime(r.created_at, '+7 hours')) ORDER BY date`
         )
         .bind(from, to, ...ordTf.binds)
         .all<{ date: string; refunds: number }>();
       refundRows = res.results || [];
     } catch {
-      // No refunds table → derive refunds from the payments refund ledger.
+      // No refunds table → derive refunds from the payments refund ledger for recognized-revenue orders.
       try {
         const pTf = buildTenantClause(tenantId, 'p');
         const res = await db
@@ -201,8 +245,10 @@ export function registerPnlHandlers(app: Hono<{ Bindings: Env }>) {
             `SELECT DATE(datetime(COALESCE(p.refunded_at, p.updated_at, p.created_at), '+7 hours')) as date,
                     COALESCE(SUM(p.refund_amount), 0) as refunds
              FROM payments p
+             JOIN orders o ON o.id = p.order_id
              WHERE DATE(datetime(COALESCE(p.refunded_at, p.updated_at, p.created_at), '+7 hours')) BETWEEN ? AND ?
-               AND COALESCE(p.refund_amount, 0) > 0${pTf.and}
+               AND COALESCE(p.refund_amount, 0) > 0
+               AND ${VALID_REVENUE_ORDER_ALIAS_SQL}${pTf.and}
              GROUP BY DATE(datetime(COALESCE(p.refunded_at, p.updated_at, p.created_at), '+7 hours')) ORDER BY date`
           )
           .bind(from, to, ...pTf.binds)
@@ -235,16 +281,17 @@ export function registerPnlHandlers(app: Hono<{ Bindings: Env }>) {
       const serviceFee = Math.round(Number(o?.service_fee || 0));
       const tipAmount = Math.round(Number(o?.tip_amount || 0));
       const discounts = Math.round(Number(o?.discounts || 0));
-      const netRevenue = Math.max(0, totalCollected - shippingFee - serviceFee - tipAmount);
-      const grossSales = netRevenue + discounts;
       const refunds = Math.round(Number(ref?.refunds || 0));
+      const baseNetBeforeRefunds = Math.max(0, totalCollected - shippingFee - serviceFee - tipAmount);
+      const grossSales = baseNetBeforeRefunds + discounts;
+      const netRevenue = Math.max(0, baseNetBeforeRefunds - refunds);
       const invCogs = Math.round(Number(inv?.cogs || 0));
       const bomCogs = Math.round(Number(bom?.cogs || 0));
-      const cogs = invCogs > 0 ? invCogs : bomCogs;
-      const wasteCost = Math.round(Number(inv?.waste_cost || 0));
-      const grossProfit = grossSales - discounts - refunds - cogs - wasteCost;
+      const cogs = invCogs + bomCogs;
+      const wasteCost = Math.round(Number(inv?.waste_cost || 0)) + Math.round(Number(bom?.waste_cost || 0));
+      const grossProfit = netRevenue - cogs - wasteCost;
       const grossMarginPct =
-        grossSales > 0 ? Math.round((grossProfit / grossSales) * 10000) / 100 : 0;
+        netRevenue > 0 ? Math.round((grossProfit / netRevenue) * 10000) / 100 : 0;
 
       return {
         date,
@@ -297,8 +344,8 @@ export function registerPnlHandlers(app: Hono<{ Bindings: Env }>) {
       }
     );
     totals.gross_margin_pct =
-      totals.gross_sales > 0
-        ? Math.round((totals.gross_profit / totals.gross_sales) * 10000) / 100
+      totals.net_revenue > 0
+        ? Math.round((totals.gross_profit / totals.net_revenue) * 10000) / 100
         : 0;
 
     const payload: PnlSummaryReport = {

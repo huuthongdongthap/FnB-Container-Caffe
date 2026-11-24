@@ -138,7 +138,7 @@ describe('End-to-End Domain Integrity, Concurrency, Security & Privacy Verificat
 
     vi.spyOn(Date, 'now').mockReturnValue(new Date('2026-11-16T01:00:00+07:00').getTime());
     const ictStats = await (await getStats(new Request('https://api.aura.vn/api/orders/stats'), { AURA_DB: db }, 'default')).json() as { stats: { orders_today: number } };
-    expect(ictStats.stats.orders_today).toBe(2);
+    expect(ictStats.stats.orders_today).toBe(1);
 
     sqlite.prepare("INSERT INTO erpnext_mappings (id, local_type, local_id, erpnext_id, sync_status, tenant_id) VALUES ('em_1', 'sales_invoice', 'ord_cod', 'SINV-001', 'synced', 'default')").run();
     expect(await hasIssuedEInvoice(db, 'ord_cod')).toBe(true);
