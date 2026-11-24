@@ -4,6 +4,8 @@
  */
 export { tablesRouter } from './commands/tables';
 export { qrRouter } from './commands/qr-scan';
+export { encodeQrToPngBytes } from './lib/qr-png-encoder';
+export type { QrPngOptions } from './lib/qr-png-encoder';
 export {
   TABLE_STATUSES,
   TABLE_STATUS_TRANSITIONS,

@@ -41,6 +41,11 @@ vi.mock('@/components/stitch', () => ({
       <button type="button" data-testid="goto-page-2" onClick={() => onPageChange?.(2)}>Page 2</button>
       <button type="button" data-testid="filter-preparing" onClick={() => onFilterChange?.('preparing')}>Filter Prep</button>
       <button type="button" data-testid="search-vip" onClick={() => onSearch?.('VIP')}>Search VIP</button>
+      {orders.map((order: any) => (
+        <div key={order.id} data-testid={`order-actions-${order.id}`}>
+          {order.additionalActions}
+        </div>
+      ))}
     </div>
   ),
 }));
@@ -139,5 +144,29 @@ describe('AdminOrdersPage', () => {
     await vi.waitFor(() => {
       expect(fetchOrdersSpy).toHaveBeenLastCalledWith(1, { status: 'preparing', search: 'VIP', searchField: 'all', orderType: undefined }, 12);
     });
+  });
+
+  it('shows PayOS QR action only for active unpaid/pending PayOS orders and hides it for vietqr, cash, paid, refunded, and cancelled orders', () => {
+    const nowIso = new Date().toISOString();
+    setupStore({
+      orders: [
+        { id: 'ord-payos-unpaid', customer: 'A', status: 'pending', total: 50000, items: 1, payment_method: 'payos', payment_status: 'unpaid', createdAt: nowIso },
+        { id: 'ord-payos-pending', customer: 'B', status: 'confirmed', total: 50000, items: 1, paymentMethod: 'PAYOS', paymentStatus: 'pending', createdAt: nowIso },
+        { id: 'ord-vietqr-unpaid', customer: 'C', status: 'pending', total: 50000, items: 1, payment_method: 'vietqr', payment_status: 'unpaid', createdAt: nowIso },
+        { id: 'ord-cash-unpaid', customer: 'D', status: 'pending', total: 50000, items: 1, payment_method: 'cash', payment_status: 'unpaid', createdAt: nowIso },
+        { id: 'ord-payos-paid', customer: 'E', status: 'preparing', total: 50000, items: 1, payment_method: 'payos', payment_status: 'paid', createdAt: nowIso },
+        { id: 'ord-payos-refunded', customer: 'F', status: 'preparing', total: 50000, items: 1, payment_method: 'payos', payment_status: 'refunded', createdAt: nowIso },
+        { id: 'ord-payos-cancelled', customer: 'G', status: 'cancelled', total: 50000, items: 1, payment_method: 'payos', payment_status: 'unpaid', createdAt: nowIso },
+      ],
+    });
+    renderWithProviders(<AdminOrdersPage />);
+
+    expect(screen.queryByTestId('show-payos-qr-ord-payos-unpaid')).toBeTruthy();
+    expect(screen.queryByTestId('show-payos-qr-ord-payos-pending')).toBeTruthy();
+    expect(screen.queryByTestId('show-payos-qr-ord-vietqr-unpaid')).toBeNull();
+    expect(screen.queryByTestId('show-payos-qr-ord-cash-unpaid')).toBeNull();
+    expect(screen.queryByTestId('show-payos-qr-ord-payos-paid')).toBeNull();
+    expect(screen.queryByTestId('show-payos-qr-ord-payos-refunded')).toBeNull();
+    expect(screen.queryByTestId('show-payos-qr-ord-payos-cancelled')).toBeNull();
   });
 });

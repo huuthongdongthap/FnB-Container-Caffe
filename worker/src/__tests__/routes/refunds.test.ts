@@ -184,6 +184,56 @@ describe('manual refund transfer ledger', () => {
     expect((await app.fetch(req({ ...valid, manual_transfer_ref: 'x'.repeat(201) }, await headers()), env)).status).toBe(400);
     expect(sqlite.prepare('SELECT refund_amount FROM payments').get()?.refund_amount).toBeNull();
   });
+
+  it('settles final full refund when order payment_status is partially_refunded and restores or spoils inventory based on pre-refund order status', async () => {
+    const { app, env, sqlite } = fixture();
+    const auth = await headers();
+    sqlite.exec(`
+      CREATE TABLE ingredients (id TEXT PRIMARY KEY, tenant_id TEXT DEFAULT 'default', current_stock REAL DEFAULT 0, updated_at TEXT);
+      CREATE TABLE stock_movements (id TEXT PRIMARY KEY, ingredient_id TEXT, type TEXT, quantity REAL, reference_id TEXT, reference_type TEXT, notes TEXT, created_at TEXT, tenant_id TEXT DEFAULT 'default');
+      INSERT INTO ingredients (id, tenant_id, current_stock) VALUES ('ing-beans', 'default', 100);
+      INSERT INTO stock_movements (id, ingredient_id, type, quantity, reference_id, reference_type, tenant_id)
+        VALUES ('mov-out-1', 'ing-beans', 'out', -15, 'ORDER', 'order', 'default');
+      UPDATE orders SET status = 'pending', payment_status = 'partially_refunded' WHERE id = 'ORDER';
+      UPDATE payments SET refund_status = 'partial', refund_amount = 5000 WHERE id = 'pay_ORDER';
+    `);
+
+    const finishRes = await app.fetch(req({ ...valid, amount: 15000, manual_transfer_ref: 'BANK-FINAL-1' }, auth), env);
+    expect(finishRes.status).toBe(200);
+    expect(sqlite.prepare("SELECT status, payment_status FROM orders WHERE id = 'ORDER'").get()).toMatchObject({
+      status: 'cancelled',
+      payment_status: 'refunded',
+    });
+    expect(sqlite.prepare("SELECT current_stock FROM ingredients WHERE id = 'ing-beans'").get()?.current_stock).toBe(115);
+    expect(
+      sqlite
+        .prepare("SELECT type, quantity FROM stock_movements WHERE reference_id = 'ORDER' AND type = 'adjustment'")
+        .get(),
+    ).toMatchObject({ type: 'adjustment', quantity: 15 });
+
+    // Second order already in preparing status spoils stock as waste instead of returning to stock
+    sqlite.exec(`
+      INSERT INTO orders (id, tenant_id, status, payment_status, total) VALUES ('ORDER_PREP', 'default', 'preparing', 'paid', 20000);
+      INSERT INTO payments (id, order_id, amount, status, method, transaction_id) VALUES ('pay_PREP', 'ORDER_PREP', 20000, 'paid', 'payos', '888777');
+      INSERT INTO stock_movements (id, ingredient_id, type, quantity, reference_id, reference_type, tenant_id)
+        VALUES ('mov-out-2', 'ing-beans', 'out', -10, 'ORDER_PREP', 'order', 'default');
+    `);
+    const prepRes = await app.fetch(
+      req({ paymentId: 'pay_PREP', amount: 20000, reason: 'Spoiled refund', manual_transfer_ref: 'BANK-PREP-1' }, auth),
+      env,
+    );
+    expect(prepRes.status).toBe(200);
+    expect(sqlite.prepare("SELECT status, payment_status FROM orders WHERE id = 'ORDER_PREP'").get()).toMatchObject({
+      status: 'cancelled',
+      payment_status: 'refunded',
+    });
+    expect(sqlite.prepare("SELECT current_stock FROM ingredients WHERE id = 'ing-beans'").get()?.current_stock).toBe(115);
+    expect(
+      sqlite
+        .prepare("SELECT type, quantity FROM stock_movements WHERE reference_id = 'ORDER_PREP' AND type = 'waste'")
+        .get(),
+    ).toMatchObject({ type: 'waste', quantity: 10 });
+  });
 });
 
 describe('GET /api/payments/refunds/:paymentId', () => {

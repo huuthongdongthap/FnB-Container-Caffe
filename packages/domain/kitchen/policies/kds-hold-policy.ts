@@ -1,4 +1,4 @@
-export const PREPAID_ONLINE_METHODS = new Set(['payos', 'bank_transfer', 'qr']);
+export const PREPAID_ONLINE_METHODS = new Set(['payos', 'bank_transfer', 'qr', 'vietqr']);
 
 /**
  * Kitchen must never brew an order whose money has not arrived or that is an
@@ -20,6 +20,7 @@ export function isHeldOutOfKds(order: Record<string, unknown>): boolean {
   const status = String(order.status ?? '').trim().toLowerCase();
   const rawPaymentStatus =
     typeof order.payment_status === 'string' ? order.payment_status.trim().toLowerCase() : '';
+  if (rawPaymentStatus === 'refunded') return true;
   if (rawPaymentStatus === 'paid') return false;
   // Orders already admitted into active prep remain visible so baristas can finish or clear tickets.
   if (status === 'preparing' || status === 'ready') return false;

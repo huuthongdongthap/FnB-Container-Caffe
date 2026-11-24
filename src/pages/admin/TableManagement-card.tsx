@@ -86,7 +86,7 @@ export function TableCard({ table, zone, activeCount, isUpdating, onSetStatus, o
 				{activeCount > 0 && (
 					<button
 						type="button"
-						onClick={() => { window.location.href = '/kds'; }}
+						onClick={() => { const q = encodeURIComponent(String(table.table_number)); window.location.href = `/admin/orders?search=${q}&searchField=table`; }}
 						className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-700 dark:text-amber-300 text-[11px] font-medium hover:bg-amber-500/30 transition-colors"
 						title={t('admin.tableManagement.viewKDS')}
 					>
