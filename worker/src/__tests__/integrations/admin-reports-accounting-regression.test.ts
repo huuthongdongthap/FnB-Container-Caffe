@@ -19,6 +19,7 @@ function createSqliteD1(): { db: D1Database; raw: DatabaseSync } {
     CREATE TABLE orders (
       id TEXT PRIMARY KEY,
       tenant_id TEXT DEFAULT 'default',
+      customer_id TEXT,
       customer_name TEXT,
       customer_phone TEXT,
       items TEXT DEFAULT '[]',
@@ -283,32 +284,102 @@ describe('Accounting, COGS & Reports Regression Suite (Real SQLite)', () => {
     // Net sales = 250,000 - 20,000 - 10,000 - 5,000 - 15,000 = 200,000
     expect(body.data.gross_sales).toBe(200000);
     expect(body.data.royalty_amount).toBe(20000);
+
+    const invertedRange = await app.request(
+      '/locations/loc-1/metrics?start_date=2026-11-10&end_date=2026-11-01',
+      { headers: { Authorization: `Bearer ${token}` } },
+      env,
+    );
+    expect(invertedRange.status).toBe(400);
+
+    const oversizedRange = await app.request(
+      '/locations/loc-1/metrics?start_date=2024-01-01&end_date=2026-11-01',
+      { headers: { Authorization: `Bearer ${token}` } },
+      env,
+    );
+    expect(oversizedRange.status).toBe(400);
   });
 
-  it('exports orders CSV with payments.refund_amount, fee columns, supervisor access, and enforces daySpan <= 366', async () => {
+  it('exports orders CSV with payments.refund_amount, fee columns, forced supervisor PII masking, 403 on supervisor customers export, and enforces daySpan <= 366', async () => {
     const { db, raw } = createSqliteD1();
     raw.exec(`
+      CREATE TABLE customers (
+        id TEXT PRIMARY KEY,
+        name TEXT,
+        email TEXT,
+        phone TEXT,
+        loyalty_tier TEXT,
+        tenant_id TEXT DEFAULT 'default',
+        created_at TEXT
+      );
+      INSERT INTO customers (id, name, email, phone, loyalty_tier, tenant_id, created_at)
+      VALUES ('cust-1', 'An Nguyen', 'an@example.com', '0901234567', 'gold', 'default', '2026-11-01 05:00:00');
       INSERT INTO orders (id, tenant_id, customer_name, customer_phone, shipping_fee, service_fee, tip_amount, total, status, payment_status, payment_method, created_at)
       VALUES ('ord-1', 'default', 'An', '0901234567', 15000, 5000, 2000, 122000, 'completed', 'paid', 'cash', '2026-11-01 05:00:00');
       INSERT INTO payments (id, order_id, tenant_id, amount, refund_amount, status, created_at)
       VALUES ('pay-1', 'ord-1', 'default', 122000, 10000, 'paid', '2026-11-01 05:00:00');
     `);
 
+    let currentRole = 'supervisor';
     const app = new Hono<{ Bindings: Env; Variables: { user: { id: string; role: string; tenantId: string } } }>();
     app.use('*', async (c, next) => {
-      c.set('user', { id: 'sup-1', role: 'supervisor', tenantId: 'default' });
+      c.set('user', { id: 'actor-1', role: currentRole, tenantId: 'default' });
       await next();
     });
     registerExportHandlers(app as unknown as Hono<{ Bindings: Env }>);
 
-    const res = await app.request('/export?type=orders&from=2026-11-01&to=2026-11-07', {}, { AURA_DB: db } as unknown as Env);
+    const res = await app.request('/export?type=orders&from=2026-11-01&to=2026-11-07&mask_pii=0', {}, { AURA_DB: db } as unknown as Env);
     expect(res.status).toBe(200);
     const csv = await res.text();
     expect(csv).toContain('shipping_fee,service_fee,tip,total,refund_amount');
     expect(csv).toContain('15000,5000,2000,122000,10000');
+    expect(csv).toContain('A***,090****567');
+    expect(csv).not.toContain('0901234567');
+
+    const supCustRes = await app.request('/export?type=customers&from=2026-11-01&to=2026-11-07', {}, { AURA_DB: db } as unknown as Env);
+    expect(supCustRes.status).toBe(403);
+
+    currentRole = 'manager';
+    const mgrOrdersRes = await app.request('/export?type=orders&from=2026-11-01&to=2026-11-07', {}, { AURA_DB: db } as unknown as Env);
+    expect(mgrOrdersRes.status).toBe(200);
+    expect(await mgrOrdersRes.text()).toContain('An,0901234567,15000,5000,2000,122000,10000');
+
+    const mgrCustRes = await app.request('/export?type=customers&from=2026-11-01&to=2026-11-07', {}, { AURA_DB: db } as unknown as Env);
+    expect(mgrCustRes.status).toBe(200);
+    expect(await mgrCustRes.text()).toContain('An Nguyen,an@example.com,0901234567');
 
     const badRange = await app.request('/export?type=orders&from=2024-01-01&to=2026-11-01', {}, { AURA_DB: db } as unknown as Env);
     expect(badRange.status).toBe(400);
+  });
+
+  it('isolates payments fallback refunds by tenant on P&L when refunds table is absent', async () => {
+    const { db, raw } = createSqliteD1();
+    raw.exec(`
+      DROP TABLE refunds;
+      INSERT INTO orders (id, tenant_id, subtotal, total, status, payment_status, created_at)
+      VALUES
+        ('ord-shared', 'default', 200000, 200000, 'completed', 'paid', '2026-11-01 05:00:00'),
+        ('ord-other', 'tenant_b', 200000, 200000, 'completed', 'paid', '2026-11-01 05:00:00');
+      INSERT INTO payments (id, order_id, tenant_id, amount, refund_amount, status, created_at, refunded_at)
+      VALUES
+        ('pay-def', 'ord-shared', 'default', 200000, 10000, 'paid', '2026-11-01 05:00:00', '2026-11-01 06:00:00'),
+        ('pay-b-collide', 'ord-shared', 'tenant_b', 200000, 90000, 'paid', '2026-11-01 05:00:00', '2026-11-01 06:00:00');
+    `);
+
+    const app = new Hono<{ Bindings: Env; Variables: { user: { role: string; tenantId: string } } }>();
+    app.use('*', async (c, next) => {
+      c.set('user', { role: 'manager', tenantId: 'default' });
+      await next();
+    });
+    registerPnlHandlers(app as unknown as Hono<{ Bindings: Env }>);
+
+    const res = await app.request('/pnl?from=2026-11-01&to=2026-11-01', {}, { AURA_DB: db } as unknown as Env);
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      data: { totals: { refunds: number; net_revenue: number } };
+    };
+    expect(body.data.totals.refunds).toBe(10000);
+    expect(body.data.totals.net_revenue).toBe(190000);
   });
 
   it('blocks completing unpaid orders and separates Delivery/Dine-in/Takeaway in getZoneStats', async () => {

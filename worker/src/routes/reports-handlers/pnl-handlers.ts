@@ -246,6 +246,7 @@ export function registerPnlHandlers(app: Hono<{ Bindings: Env }>) {
                     COALESCE(SUM(p.refund_amount), 0) as refunds
              FROM payments p
              JOIN orders o ON o.id = p.order_id
+              AND COALESCE(NULLIF(TRIM(o.tenant_id), ''), 'default') = COALESCE(NULLIF(TRIM(p.tenant_id), ''), 'default')
              WHERE DATE(datetime(COALESCE(p.refunded_at, p.updated_at, p.created_at), '+7 hours')) BETWEEN ? AND ?
                AND COALESCE(p.refund_amount, 0) > 0
                AND ${VALID_REVENUE_ORDER_ALIAS_SQL}${pTf.and}

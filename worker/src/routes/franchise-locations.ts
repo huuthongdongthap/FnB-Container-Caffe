@@ -9,6 +9,7 @@ import { requireAuth } from '../middleware/auth';
 import { getTenantId, isHQSuperAdmin } from '../middleware/tenant';
 import { matchesTenantRow } from '../lib/db';
 import { createLogger } from '../middleware/logger';
+import { validateDateRangeWindow } from './reports-handlers/analytics-handlers';
 import type { FranchiseLocation } from '../types/api';
 
 const log = createLogger({ route: 'franchise-locations' });
@@ -25,12 +26,6 @@ const createLocationSchema = z.object({
   royalty_percentage: z.number().min(0).max(100).optional().default(5.0),
   status: z.enum(['active', 'suspended', 'closed']).optional().default('active'),
 });
-
-const ISO_DATE_FILTER_RE = /^\d{4}-\d{2}-\d{2}(?:[T\s]\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?(?:Z|[+-]\d{2}:?\d{2})?)?$/;
-
-function isValidDateFilter(value: string): boolean {
-  return ISO_DATE_FILTER_RE.test(value) && !Number.isNaN(Date.parse(value));
-}
 
 function extractFranchiseTenantCandidates(c: any): string[] {
   return [
@@ -214,8 +209,14 @@ franchiseRouter.get('/locations/:id/metrics', requireAuth(['owner', 'admin', 'ma
 
   const startDate = c.req.query('start_date');
   const endDate = c.req.query('end_date');
-  if ((startDate && !isValidDateFilter(startDate)) || (endDate && !isValidDateFilter(endDate))) {
-    return c.json({ success: false, error: 'Invalid date filter' }, 400);
+  if (startDate !== undefined || endDate !== undefined) {
+    const rangeErr =
+      startDate !== undefined && endDate !== undefined
+        ? validateDateRangeWindow(startDate, endDate)
+        : validateDateRangeWindow((startDate ?? endDate) as string, (startDate ?? endDate) as string);
+    if (rangeErr) {
+      return c.json({ success: false, error: rangeErr }, 400);
+    }
   }
 
   const targetTenant = resolveFranchiseTargetTenant(c, user);

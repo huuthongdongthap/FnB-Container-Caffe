@@ -132,7 +132,10 @@ export function registerExportHandlers(app: Hono<{ Bindings: Env }>) {
       return c.json({ success: false, error: 'Invalid date range' }, 400);
     }
     const type = c.req.query('type') || 'orders';
-    const maskPii = c.req.query('mask_pii') === '1' || c.req.query('mask_pii') === 'true';
+    if (role === 'supervisor' && type === 'customers') {
+      return c.json({ success: false, error: 'Forbidden' }, 403);
+    }
+    const maskPii = role === 'supervisor' || c.req.query('mask_pii') === '1' || c.req.query('mask_pii') === 'true';
     const maskPhone = (val: string | null | undefined) => {
       if (!maskPii) return val || '';
       const s = String(val || '').trim();

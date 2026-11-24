@@ -809,11 +809,12 @@ describe('Phase 49 Slice AV3: Promotions, OpenAPI Inventory & Analytics/Export R
       ).run();
     });
 
-    it('rejects unauthenticated (401), non-staff (403), supervisor on /export (403), and cross-tenant user.tenantId (403)', async () => {
+    it('rejects unauthenticated (401), non-staff (403), supervisor on customers /export (403), masks PII for supervisor orders /export, and rejects cross-tenant user.tenantId (403)', async () => {
       const anonApp = buildReportsApp(null, 'tenant_a');
       const customerApp = buildReportsApp({ id: 'cust_1', role: 'customer', tenantId: 'tenant_a' }, 'tenant_a');
       const crossMgrApp = buildReportsApp({ id: 'mgr_b', role: 'manager', tenantId: 'tenant_b' }, 'tenant_a');
       const supApp = buildReportsApp({ id: 'sup_a', role: 'supervisor', tenantId: 'tenant_a' }, 'tenant_a');
+      const mgrApp = buildReportsApp({ id: 'mgr_a', role: 'manager', tenantId: 'tenant_a' }, 'tenant_a');
 
       const endpoints = [
         `/api/reports/daily?from=${today}&to=${today}`,
@@ -839,12 +840,29 @@ describe('Phase 49 Slice AV3: Promotions, OpenAPI Inventory & Analytics/Export R
       const supSummary = await supApp.request('/api/reports/summary', { headers: { 'X-Tenant-ID': 'tenant_a' } }, env);
       expect(supSummary.status).toBe(200);
 
-      const supExport = await supApp.request(
-        `/api/reports/export?type=orders&from=${today}&to=${today}`,
+      const supExportOrders = await supApp.request(
+        `/api/reports/export?type=orders&from=${today}&to=${today}&mask_pii=0`,
         { headers: { 'X-Tenant-ID': 'tenant_a' } },
         env
       );
-      expect(supExport.status).toBe(200);
+      expect(supExportOrders.status).toBe(200);
+      const supOrdersCsv = await supExportOrders.text();
+      expect(supOrdersCsv).toContain("'|***");
+      expect(supOrdersCsv).not.toContain('line1\n');
+
+      const supExportCustomers = await supApp.request(
+        `/api/reports/export?type=customers&from=${today}&to=${today}`,
+        { headers: { 'X-Tenant-ID': 'tenant_a' } },
+        env
+      );
+      expect(supExportCustomers.status).toBe(403);
+
+      const mgrExportCustomers = await mgrApp.request(
+        `/api/reports/export?type=customers&from=${today}&to=${today}`,
+        { headers: { 'X-Tenant-ID': 'tenant_a' } },
+        env
+      );
+      expect(mgrExportCustomers.status).toBe(200);
     });
 
     it('excludes refunded and failed orders from daily, summary, top-products, peak-hours, customer-metrics, and exports', async () => {
