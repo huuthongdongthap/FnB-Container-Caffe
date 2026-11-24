@@ -26,7 +26,10 @@ export const broadcastSendSchema = z.object({
     .default('all'),
   channel: z.enum(['zns', 'sms', 'email', 'all']),
   title: z.string().max(200).optional(),
-  message: z.string().min(1, 'message là bắt buộc').max(5000)
+  message: z.string().min(1, 'message là bắt buộc').max(5000),
+  promo_code: z.string().max(64).optional(),
+  discount: z.string().max(100).optional(),
+  expires_at: z.string().max(100).optional()
 });
 
 // ══════════════════════════════════════════════

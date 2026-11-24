@@ -10,6 +10,12 @@ export interface ZnsData {
   new_tier_vi?: string;
   new_rate?: number;
   days?: number;
+  // Promotion announcement fields (general_promotion template)
+  title?: string;
+  message?: string;
+  promo_code?: string;
+  discount?: string;
+  expires_at?: string;
 }
 
 export interface ZnsResult {
