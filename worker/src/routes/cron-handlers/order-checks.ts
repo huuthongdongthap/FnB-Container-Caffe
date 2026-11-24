@@ -50,19 +50,33 @@ export async function checkOverdueOrders(env: Record<string, unknown>, tenantOve
             (row) => matchesTenantRow(row, tenantId) && !isHeldOutOfKds(row)
           );
         } catch {
-          if (tenantId === 'default') {
-            const unscoped = await db.prepare(`
-              SELECT id, customer_name, status, created_at
+          try {
+            const scopedMinimalTenant = await db.prepare(`
+              SELECT id, customer_name, status, created_at, tenant_id
               FROM orders
               WHERE status IN ('pending', 'confirmed', 'preparing', 'Bep tiep nhan', 'Dang pha che')
                 AND datetime(created_at) < datetime(?)
+                AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?
                 AND (notes IS NULL OR notes NOT LIKE '%[OVERDUE]%')
-            `).bind(cutoff).all<Record<string, unknown>>();
-            overdue = (unscoped.results || []).filter(
+            `).bind(cutoff, tenantId).all<Record<string, unknown>>();
+            overdue = (scopedMinimalTenant.results || []).filter(
               (row) => matchesTenantRow(row, tenantId) && !isHeldOutOfKds(row)
             );
-          } else {
-            overdue = [];
+          } catch {
+            if (tenantId === 'default') {
+              const unscoped = await db.prepare(`
+                SELECT id, customer_name, status, created_at
+                FROM orders
+                WHERE status IN ('pending', 'confirmed', 'preparing', 'Bep tiep nhan', 'Dang pha che')
+                  AND datetime(created_at) < datetime(?)
+                  AND (notes IS NULL OR notes NOT LIKE '%[OVERDUE]%')
+              `).bind(cutoff).all<Record<string, unknown>>();
+              overdue = (unscoped.results || []).filter(
+                (row) => matchesTenantRow(row, tenantId) && !isHeldOutOfKds(row)
+              );
+            } else {
+              overdue = [];
+            }
           }
         }
       }
@@ -91,16 +105,29 @@ export async function checkOverdueOrders(env: Record<string, unknown>, tenantOve
             (row) => matchesTenantRow(row, tenantId) && !isHeldOutOfKds(row)
           );
         } catch {
-          const unscoped = await db.prepare(`
-            SELECT id, customer_name, status, created_at
-            FROM orders
-            WHERE status IN ('pending', 'confirmed', 'preparing', 'Bep tiep nhan', 'Dang pha che')
-              AND datetime(created_at) < datetime(?)
-              AND (notes IS NULL OR notes NOT LIKE '%[OVERDUE]%')
-          `).bind(cutoff).all<Record<string, unknown>>();
-          overdue = (unscoped.results || []).filter(
-            (row) => matchesTenantRow(row, tenantId) && !isHeldOutOfKds(row)
-          );
+          try {
+            const withTenantOnly = await db.prepare(`
+              SELECT id, customer_name, status, created_at, tenant_id
+              FROM orders
+              WHERE status IN ('pending', 'confirmed', 'preparing', 'Bep tiep nhan', 'Dang pha che')
+                AND datetime(created_at) < datetime(?)
+                AND (notes IS NULL OR notes NOT LIKE '%[OVERDUE]%')
+            `).bind(cutoff).all<Record<string, unknown>>();
+            overdue = (withTenantOnly.results || []).filter(
+              (row) => matchesTenantRow(row, tenantId) && !isHeldOutOfKds(row)
+            );
+          } catch {
+            const unscoped = await db.prepare(`
+              SELECT id, customer_name, status, created_at
+              FROM orders
+              WHERE status IN ('pending', 'confirmed', 'preparing', 'Bep tiep nhan', 'Dang pha che')
+                AND datetime(created_at) < datetime(?)
+                AND (notes IS NULL OR notes NOT LIKE '%[OVERDUE]%')
+            `).bind(cutoff).all<Record<string, unknown>>();
+            overdue = (unscoped.results || []).filter(
+              (row) => matchesTenantRow(row, tenantId) && !isHeldOutOfKds(row)
+            );
+          }
         }
       }
     }
