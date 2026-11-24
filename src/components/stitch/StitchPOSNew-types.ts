@@ -31,6 +31,8 @@ export interface POSTableOption {
   zone?: string;
 }
 
+export type POSOrderType = 'dine_in' | 'takeaway' | 'delivery';
+
 export interface POSActiveShift {
   id: string;
   shiftName?: string;
@@ -49,6 +51,14 @@ export interface StitchPOSNewProps {
   selectedTableId?: string;
   /** Called when cashier switches between Takeaway or a specific table */
   onSelectTable?: (tableId: string | undefined) => void;
+  /** Selected order channel rendered inline in the POS menu toolbar */
+  orderType?: POSOrderType;
+  /** Called when cashier switches between dine_in, takeaway, and delivery */
+  onOrderTypeChange?: (type: POSOrderType) => void;
+  /** Delivery address when orderType is delivery */
+  deliveryAddress?: string;
+  /** Called when cashier edits delivery address */
+  onDeliveryAddressChange?: (address: string) => void;
   tableLabel?: string;
   guestLabel?: string;
   orderNumber?: string;

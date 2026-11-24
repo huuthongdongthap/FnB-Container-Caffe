@@ -43,7 +43,7 @@ export function POSHeader({
 
   return (
     <header
-      className="bg-[rgba(var(--aura-noir-void),0.9)] backdrop-blur-[8px] border-b border-[rgba(var(--aura-chrome-light),0.08)] flex justify-between items-center px-4 lg:px-6 h-16 w-full fixed top-0 z-50 gap-3"
+      className="bg-[var(--aura-noir-void,#050814)]/95 backdrop-blur-md border-b border-[var(--aura-chrome-light,#B8C5D0)]/15 flex justify-between items-center px-4 lg:px-6 h-16 w-full fixed top-0 z-50 gap-3"
       role="banner"
     >
       {/* Brand + 1-tap Navigation (#116) */}
@@ -51,26 +51,26 @@ export function POSHeader({
         <button
           type="button"
           onClick={() => handleNav('/admin')}
-          className="text-[14px] text-[var(--aura-primary,#f2c08d)] uppercase tracking-widest font-semibold font-body hover:brightness-110 transition-all cursor-pointer shrink-0"
+          className="text-[14px] text-[#f2c08d] uppercase tracking-widest font-semibold font-body hover:brightness-110 transition-all cursor-pointer shrink-0"
           aria-label={`${brandName} — Quản trị`}
         >
           {brandName}
         </button>
-        <div className="h-5 w-px bg-[rgba(var(--aura-chrome-light),0.15)] shrink-0" aria-hidden="true" />
+        <div className="h-5 w-px bg-[var(--aura-chrome-light,#B8C5D0)]/20 shrink-0" aria-hidden="true" />
         <nav className="flex items-center gap-1.5" aria-label={t('posNew.quickNav', { defaultValue: 'Điều hướng POS' })}>
           <button
             type="button"
             onClick={() => handleNav('/admin')}
-            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-[12px] text-[var(--aura-text-primary,#eae1db)] bg-[rgba(var(--aura-chrome-light),0.06)] hover:bg-[rgba(var(--aura-chrome-light),0.14)] border border-[rgba(var(--aura-chrome-light),0.12)] transition-colors cursor-pointer shrink-0 font-body"
+            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-[12px] text-[var(--aura-text-primary,#eae1db)] bg-[var(--aura-chrome-light,#B8C5D0)]/10 hover:bg-[var(--aura-chrome-light,#B8C5D0)]/20 border border-[var(--aura-chrome-light,#B8C5D0)]/15 transition-colors cursor-pointer shrink-0 font-body"
             aria-label={t('posNew.backToAdmin', { defaultValue: 'Quản trị' })}
           >
-            <LayoutDashboard className="w-3.5 h-3.5 text-[var(--aura-primary,#f2c08d)]" />
+            <LayoutDashboard className="w-3.5 h-3.5 text-[#f2c08d]" />
             <span className="hidden sm:inline">{t('posNew.backToAdmin', { defaultValue: 'Quản trị' })}</span>
           </button>
           <button
             type="button"
             onClick={() => handleNav('/admin/orders')}
-            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-[12px] text-[var(--aura-text-muted,#8a7a6a)] hover:text-[var(--aura-text-primary,#eae1db)] hover:bg-[rgba(var(--aura-chrome-light),0.08)] transition-colors cursor-pointer shrink-0 font-body"
+            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-[12px] text-[var(--aura-text-muted,#8a7a6a)] hover:text-[var(--aura-text-primary,#eae1db)] hover:bg-[var(--aura-chrome-light,#B8C5D0)]/10 transition-colors cursor-pointer shrink-0 font-body"
             aria-label={t('posNew.navOrders', { defaultValue: 'Đơn hàng' })}
           >
             <ClipboardList className="w-3.5 h-3.5" />
@@ -79,7 +79,7 @@ export function POSHeader({
           <button
             type="button"
             onClick={() => handleNav('/kds')}
-            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-[12px] text-[var(--aura-text-muted,#8a7a6a)] hover:text-[var(--aura-text-primary,#eae1db)] hover:bg-[rgba(var(--aura-chrome-light),0.08)] transition-colors cursor-pointer shrink-0 font-body"
+            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-[12px] text-[var(--aura-text-muted,#8a7a6a)] hover:text-[var(--aura-text-primary,#eae1db)] hover:bg-[var(--aura-chrome-light,#B8C5D0)]/10 transition-colors cursor-pointer shrink-0 font-body"
             aria-label={t('posNew.navKds', { defaultValue: 'KDS' })}
           >
             <ChefHat className="w-3.5 h-3.5" />
@@ -88,7 +88,7 @@ export function POSHeader({
           <button
             type="button"
             onClick={() => handleNav('/')}
-            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-[12px] text-[var(--aura-text-muted,#8a7a6a)] hover:text-[var(--aura-text-primary,#eae1db)] hover:bg-[rgba(var(--aura-chrome-light),0.08)] transition-colors cursor-pointer shrink-0 font-body"
+            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-[12px] text-[var(--aura-text-muted,#8a7a6a)] hover:text-[var(--aura-text-primary,#eae1db)] hover:bg-[var(--aura-chrome-light,#B8C5D0)]/10 transition-colors cursor-pointer shrink-0 font-body"
             aria-label={t('posNew.navHome', { defaultValue: 'Trang chủ' })}
           >
             <Home className="w-3.5 h-3.5" />
@@ -130,7 +130,7 @@ export function POSHeader({
           )}
         </button>
 
-        <div className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-[rgba(var(--aura-noir-void),0.4)] border border-[rgba(var(--aura-chrome-light),0.08)]">
+        <div className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-[var(--aura-noir-deep,#0A1A2E)]/80 border border-[var(--aura-chrome-light,#B8C5D0)]/12">
           <Clock className="w-3.5 h-3.5 text-[var(--aura-text-muted,#8A8E96)]" aria-hidden="true" />
           <LiveClock />
         </div>
@@ -138,15 +138,15 @@ export function POSHeader({
         <button
           type="button"
           onClick={() => onOpenSchedule?.()}
-          className="flex items-center gap-2 bg-[rgba(var(--aura-noir-void),0.3)] px-3 py-1.5 rounded-lg border border-[rgba(var(--aura-chrome-light),0.1)] hover:border-[rgba(var(--aura-chrome-light),0.3)] cursor-pointer active:scale-95 transition-all"
+          className="flex items-center gap-2 bg-[var(--aura-noir-deep,#0A1A2E)]/70 px-3 py-1.5 rounded-lg border border-[var(--aura-chrome-light,#B8C5D0)]/15 hover:border-[var(--aura-chrome-light,#B8C5D0)]/35 cursor-pointer active:scale-95 transition-all"
           aria-label={`${t('posNew.userProfile')}: ${displayStaffName}`}
         >
-          <UserCheck className="w-4 h-4 text-[var(--aura-primary,#f2c08d)] shrink-0" />
+          <UserCheck className="w-4 h-4 text-[#f2c08d] shrink-0" />
           <span className="text-[12px] font-body text-[var(--aura-text-primary,#eae1db)] max-w-[120px] truncate">
             {displayStaffName}
           </span>
           {staffRole && (
-            <span className="hidden xl:inline text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded bg-[rgba(var(--aura-chrome-light),0.1)] text-[var(--aura-text-muted,#8A8E96)] font-body">
+            <span className="hidden xl:inline text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded bg-[var(--aura-chrome-light,#B8C5D0)]/12 text-[var(--aura-text-muted,#8A8E96)] font-body">
               {staffRole}
             </span>
           )}

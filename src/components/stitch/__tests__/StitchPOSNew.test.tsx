@@ -278,4 +278,67 @@ describe('StitchPOSNew', () => {
     fireEvent.click(screen.getByLabelText('Trang chủ'));
     expect(onNavigate).toHaveBeenCalledWith('/');
   });
+
+  it('renders channel switcher inline inside MenuSection and shows delivery address input for delivery', () => {
+    const onOrderTypeChange = vi.fn();
+    const onDeliveryAddressChange = vi.fn();
+    const { rerender } = renderWithProviders(
+      <StitchPOSNew
+        menuItems={CUSTOM_ITEMS}
+        orderType="dine_in"
+        onOrderTypeChange={onOrderTypeChange}
+        deliveryAddress=""
+        onDeliveryAddressChange={onDeliveryAddressChange}
+      />
+    );
+
+    const switcher = screen.getByTestId('pos-channel-switcher');
+    expect(switcher.className).not.toContain('fixed');
+    const menuSection = screen.getByLabelText('Menu Section');
+    expect(menuSection.contains(switcher)).toBe(true);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Mang đi' }));
+    expect(onOrderTypeChange).toHaveBeenCalledWith('takeaway');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Giao hàng' }));
+    expect(onOrderTypeChange).toHaveBeenCalledWith('delivery');
+
+    rerender(
+      <StitchPOSNew
+        menuItems={CUSTOM_ITEMS}
+        orderType="delivery"
+        onOrderTypeChange={onOrderTypeChange}
+        deliveryAddress=""
+        onDeliveryAddressChange={onDeliveryAddressChange}
+      />
+    );
+
+    const addressInput = screen.getByTestId('pos-delivery-address-input');
+    fireEvent.change(addressInput, { target: { value: '29 Nguyễn Tất Thành' } });
+    expect(onDeliveryAddressChange).toHaveBeenCalledWith('29 Nguyễn Tất Thành');
+  });
+
+  it('bounds main viewport above an opaque POSFooter and keeps Print Receipt and End Shift unobstructed', () => {
+    renderWithProviders(
+      <StitchPOSNew
+        menuItems={CUSTOM_ITEMS}
+        onPrintReceipt={vi.fn()}
+        onEndShift={vi.fn()}
+      />
+    );
+
+    const mainEl = screen.getByRole('main');
+    expect(mainEl.className).toContain('pb-14');
+    expect(mainEl.className).toContain('overflow-hidden');
+
+    const footer = screen.getByTestId('pos-footer');
+    expect(footer.className).toContain('bg-[var(--aura-noir-void,#050814)]/95');
+    expect(footer.className).not.toContain('rgba(var(--aura-');
+
+    const printBtn = screen.getByLabelText('Print Receipt');
+    const endShiftBtn = screen.getByLabelText('End Shift');
+    expect(footer.contains(printBtn)).toBe(true);
+    expect(footer.contains(endShiftBtn)).toBe(true);
+    expect(endShiftBtn.className).toContain('bg-[#f2c08d]');
+  });
 });
