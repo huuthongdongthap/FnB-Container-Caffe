@@ -20,6 +20,7 @@ import { authenticateRequest } from 'worker/src/lib/staff-session-auth';
 import { StaffSessionError } from 'worker/src/lib/staff-session';
 import { getTenantId } from 'worker/src/middleware/tenant';
 import { isHeldOutOfKds } from '../policies/kds-hold-policy';
+import { buildIndexFromDbRows } from '../src/policies/station-policy';
 
 // Max SSE connection duration: 120s — client reconnects naturally after.
 const SSE_TIMEOUT_MS = 120_000;
@@ -52,12 +53,17 @@ interface KdsStreamOrder {
   id: string;
   customer_name: string;
   table_id: string | null;
+  table_name?: string | null;
+  order_number?: string | null;
   order_type?: string | null;
   items: unknown[];
   notes?: string | null;
   status: string;
   elapsed_minutes: number;
   created_at: string;
+  updated_at?: string | null;
+  started_at?: string | null;
+  ready_at?: string | null;
   cancel_alert?: boolean;
   kds_alert?: string;
 }
@@ -66,12 +72,17 @@ interface OrderRecord {
   id: string;
   customer_name: string;
   table_id: string | null;
+  table_name?: string | null;
+  order_number?: string | null;
   items: string;
   notes?: string | null;
   status: string;
   order_type?: string | null;
   payment_status?: string | null;
   created_at: string;
+  updated_at?: string | null;
+  started_at?: string | null;
+  ready_at?: string | null;
   cancelled_at?: string | null;
   previous_status?: string | null;
   cancel_alert?: number | boolean | null;
@@ -127,9 +138,15 @@ export function hasCrossTenantOverride(
   );
 }
 
-function mapKdsOrder(order: OrderRecord, isCancelAlert = false): KdsStreamOrder {
+function mapKdsOrder(
+  order: OrderRecord,
+  isCancelAlert = false,
+  filteredItems?: unknown[],
+): KdsStreamOrder {
   let items: unknown[] = [];
-  if (Array.isArray(order.items)) {
+  if (filteredItems) {
+    items = filteredItems;
+  } else if (Array.isArray(order.items)) {
     items = order.items;
   } else {
     try {
@@ -147,12 +164,17 @@ function mapKdsOrder(order: OrderRecord, isCancelAlert = false): KdsStreamOrder 
     id: order.id,
     customer_name: order.customer_name,
     table_id: order.table_id,
+    ...(typeof order.table_name === 'string' && order.table_name.trim() ? { table_name: order.table_name.trim() } : {}),
+    ...(typeof order.order_number === 'string' && order.order_number.trim() ? { order_number: order.order_number.trim() } : {}),
     ...(order.order_type ? { order_type: order.order_type } : {}),
     items,
     ...(order.notes ? { notes: order.notes } : {}),
     status: order.status,
     elapsed_minutes: elapsed,
     created_at: order.created_at,
+    ...(typeof order.updated_at === 'string' && order.updated_at.trim() ? { updated_at: order.updated_at.trim() } : {}),
+    ...(typeof order.started_at === 'string' && order.started_at.trim() ? { started_at: order.started_at.trim() } : {}),
+    ...(typeof order.ready_at === 'string' && order.ready_at.trim() ? { ready_at: order.ready_at.trim() } : {}),
     ...(isCancelAlert ? { cancel_alert: true, kds_alert: 'cancelled' } : {}),
   };
 }
@@ -230,6 +252,39 @@ kdsStreamRouter.get('/stream', async(c) => {
     return c.json({ error: 'DB not available' }, 500);
   }
 
+  const rawStation = (c.req.query('station_id') || c.req.query('station') || '').trim();
+  const stationId = rawStation && rawStation !== 'all' ? rawStation : '';
+
+  let categoryIndex: Map<string, { station_id: string; station_name: string | null }> | null = null;
+  if (stationId) {
+    try {
+      let mappings: Record<string, unknown>[] = [];
+      if (tenantId === '*') {
+        const res = await db.prepare(
+          'SELECT cs.category_id, cs.station_id, ks.name AS station_name FROM category_stations cs JOIN kitchen_stations ks ON ks.id = cs.station_id'
+        ).all<Record<string, unknown>>();
+        mappings = res.results || [];
+      } else {
+        try {
+          const res = await db.prepare(
+            "SELECT cs.category_id, cs.station_id, ks.name AS station_name, ks.tenant_id FROM category_stations cs JOIN kitchen_stations ks ON ks.id = cs.station_id WHERE COALESCE(NULLIF(TRIM(ks.tenant_id), ''), 'default') = ?"
+          ).bind(tenantId).all<Record<string, unknown>>();
+          mappings = res.results || [];
+        } catch {
+          if (tenantId === 'default') {
+            const res = await db.prepare(
+              'SELECT cs.category_id, cs.station_id, ks.name AS station_name FROM category_stations cs JOIN kitchen_stations ks ON ks.id = cs.station_id'
+            ).all<Record<string, unknown>>();
+            mappings = res.results || [];
+          }
+        }
+      }
+      categoryIndex = buildIndexFromDbRows(mappings);
+    } catch {
+      // Table unseeded or mock DB
+    }
+  }
+
   const encoder = new TextEncoder();
   let closed = false;
   let warningTimer: ReturnType<typeof setTimeout> | undefined;
@@ -269,6 +324,11 @@ kdsStreamRouter.get('/stream', async(c) => {
           try { controller.close(); } catch { /* Disconnected. */ }
           throw error;
         }
+        const tenantClauseO = tenantId === '*'
+          ? ''
+          : tenantId === 'default'
+            ? " AND (TRIM(o.tenant_id) = ? OR o.tenant_id IS NULL OR TRIM(o.tenant_id) = '')"
+            : ' AND TRIM(o.tenant_id) = ?';
         const tenantClause = tenantId === '*'
           ? ''
           : tenantId === 'default'
@@ -277,34 +337,70 @@ kdsStreamRouter.get('/stream', async(c) => {
         let results: OrderRecord[] | undefined;
         try {
           const statement = db.prepare(
-            `SELECT id, customer_name, table_id, items, notes, status, order_type, payment_status, payment_method, is_cod, created_at FROM orders
-             WHERE status IN ('pending', 'confirmed', 'preparing', 'ready')
-             ${tenantClause}
-             ORDER BY created_at ASC LIMIT 50`
+            `SELECT o.id, o.customer_name, o.table_id, COALESCE(NULLIF(TRIM(t.table_number), ''), NULLIF(TRIM(t.name), ''), o.table_id) AS table_name, o.order_number, o.items, o.notes, o.status, o.order_type, o.payment_status, o.payment_method, o.is_cod, o.created_at, o.updated_at FROM orders o
+             LEFT JOIN cafe_tables t ON t.id = o.table_id
+               AND COALESCE(NULLIF(TRIM(t.tenant_id), ''), 'default') = COALESCE(NULLIF(TRIM(o.tenant_id), ''), 'default')
+             WHERE o.status IN ('pending', 'confirmed', 'preparing', 'ready')
+             ${tenantClauseO}
+             AND NOT (TRIM(COALESCE(o.notes, '')) LIKE 'Khách QR - cho don mon%' AND TRIM(COALESCE(o.items, '')) = '[]')
+             ORDER BY CASE WHEN o.status = 'ready' THEN 1 ELSE 0 END ASC, o.created_at ASC LIMIT 200`
           );
           ({ results } = await (tenantId === '*' ? statement : statement.bind(tenantId)).all<OrderRecord>());
         } catch {
           try {
             const statement = db.prepare(
-              `SELECT id, customer_name, table_id, items, notes, status, order_type, payment_status, created_at FROM orders
+              `SELECT id, customer_name, table_id, items, notes, status, order_type, payment_status, payment_method, is_cod, created_at FROM orders
                WHERE status IN ('pending', 'confirmed', 'preparing', 'ready')
                ${tenantClause}
-               ORDER BY created_at ASC LIMIT 50`
+               AND NOT (TRIM(COALESCE(notes, '')) LIKE 'Khách QR - cho don mon%' AND TRIM(COALESCE(items, '')) = '[]')
+               ORDER BY CASE WHEN status = 'ready' THEN 1 ELSE 0 END ASC, created_at ASC LIMIT 200`
             );
             ({ results } = await (tenantId === '*' ? statement : statement.bind(tenantId)).all<OrderRecord>());
           } catch {
-            const statement = db.prepare(
-              `SELECT id, customer_name, table_id, items, notes, status, created_at FROM orders
-               WHERE status IN ('pending', 'confirmed', 'preparing', 'ready')
-               ${tenantClause}
-               ORDER BY created_at ASC LIMIT 50`
-            );
-            ({ results } = await (tenantId === '*' ? statement : statement.bind(tenantId)).all<OrderRecord>());
+            try {
+              const statement = db.prepare(
+                `SELECT id, customer_name, table_id, items, notes, status, order_type, payment_status, created_at FROM orders
+                 WHERE status IN ('pending', 'confirmed', 'preparing', 'ready')
+                 ${tenantClause}
+                 AND NOT (TRIM(COALESCE(notes, '')) LIKE 'Khách QR - cho don mon%' AND TRIM(COALESCE(items, '')) = '[]')
+                 ORDER BY CASE WHEN status = 'ready' THEN 1 ELSE 0 END ASC, created_at ASC LIMIT 200`
+              );
+              ({ results } = await (tenantId === '*' ? statement : statement.bind(tenantId)).all<OrderRecord>());
+            } catch {
+              const statement = db.prepare(
+                `SELECT id, customer_name, table_id, items, notes, status, created_at FROM orders
+                 WHERE status IN ('pending', 'confirmed', 'preparing', 'ready')
+                 ${tenantClause}
+                 AND NOT (TRIM(COALESCE(notes, '')) LIKE 'Khách QR - cho don mon%' AND TRIM(COALESCE(items, '')) = '[]')
+                 ORDER BY CASE WHEN status = 'ready' THEN 1 ELSE 0 END ASC, created_at ASC LIMIT 200`
+              );
+              ({ results } = await (tenantId === '*' ? statement : statement.bind(tenantId)).all<OrderRecord>());
+            }
           }
         }
-        const activeOrders = (results || [])
-          .filter((r) => !isHeldOutOfKds(r as unknown as Record<string, unknown>))
-          .map((r) => mapKdsOrder(r, false));
+        const activeOrders: KdsStreamOrder[] = [];
+        for (const r of results || []) {
+          if (isHeldOutOfKds(r as unknown as Record<string, unknown>)) continue;
+          if (stationId && categoryIndex) {
+            let parsedItems: Array<Record<string, unknown>> = [];
+            if (Array.isArray(r.items)) {
+              parsedItems = r.items as Array<Record<string, unknown>>;
+            } else {
+              try {
+                const parsed = JSON.parse(r.items);
+                if (Array.isArray(parsed)) parsedItems = parsed;
+              } catch { /* keep empty */ }
+            }
+            const stationItems = parsedItems.filter((item) => {
+              const catId = String(item.category_id ?? item.categoryId ?? '');
+              return categoryIndex!.get(catId)?.station_id === stationId;
+            });
+            if (stationItems.length === 0) continue;
+            activeOrders.push(mapKdsOrder(r, false, stationItems));
+          } else {
+            activeOrders.push(mapKdsOrder(r, false));
+          }
+        }
 
         const nowMs = Date.now();
         let recentCancelled: KdsStreamOrder[] = [];

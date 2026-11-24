@@ -32,11 +32,11 @@ describe('useKDS authoritative session cache', () => {
     await waitFor(() => expect(result.current.orders[0]?.id).toBe('ORD_1'));
     expect(apiFetch).toHaveBeenCalledWith('/api/kds/orders', { signal: expect.any(AbortSignal) });
   });
-  it('filters by station and uses REST for filtered queues', async () => {
+  it('filters by station and subscribes to station-scoped SSE stream', async () => {
     const { result } = setup('drinks');
     await waitFor(() => expect(result.current.orders).toHaveLength(1));
     expect(apiFetch).toHaveBeenCalledWith('/api/kds/orders?station=drinks', expect.any(Object));
-    expect(consumeKdsStream).not.toHaveBeenCalled();
+    expect(consumeKdsStream).toHaveBeenCalledWith(expect.any(AbortSignal), expect.any(Function), 'drinks');
   });
   it('removes completed tickets absent from the next authoritative REST queue', async () => {
     const { result } = setup();

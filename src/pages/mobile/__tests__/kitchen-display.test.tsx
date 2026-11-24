@@ -43,7 +43,7 @@ describe('Mobile KitchenDisplay mutation error and retry behavior', () => {
 
     render(<KitchenDisplay />);
 
-    const startBtn = await screen.findByRole('button', { name: /Bắt đầu \/ Start/i });
+    const startBtn = await screen.findByRole('button', { name: /Bắt đầu|Start/i });
     fireEvent.click(startBtn);
 
     await waitFor(() => {
@@ -51,7 +51,7 @@ describe('Mobile KitchenDisplay mutation error and retry behavior', () => {
     });
 
     // Status remains pending (not faked as preparing)
-    expect(screen.getByRole('button', { name: /Bắt đầu \/ Start/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Bắt đầu|Start/i })).toBeInTheDocument();
 
     // Retry succeeds and clears error
     fireEvent.click(screen.getByRole('button', { name: 'Thử lại' }));
@@ -82,7 +82,7 @@ describe('Mobile KitchenDisplay mutation error and retry behavior', () => {
 
     render(<KitchenDisplay />);
 
-    const startBtn = await screen.findByRole('button', { name: /Bắt đầu \/ Start/i });
+    const startBtn = await screen.findByRole('button', { name: /Bắt đầu|Start/i });
     fireEvent.click(startBtn);
     fireEvent.click(startBtn);
 

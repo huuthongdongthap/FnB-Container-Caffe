@@ -45,16 +45,17 @@ describe('StitchKDSNew', () => {
     expect(screen.getByText('QUẦY PHA CHẾ')).toBeInTheDocument();
   });
 
-  it('renders status badge counts with i18n keys', () => {
+  it('renders status filter counts in header nav', () => {
     renderWithProviders(<StitchKDSNew />);
-    expect(screen.getAllByLabelText(/kds\.preparing/).length).toBeGreaterThanOrEqual(1);
-    expect(screen.getAllByLabelText(/kds\.pending/).length).toBeGreaterThanOrEqual(1);
-    expect(screen.getAllByLabelText(/kds\.ready/).length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByRole('button', { name: /PREPARING/i })).toHaveTextContent('1');
+    expect(screen.getByRole('button', { name: /PENDING/i })).toHaveTextContent('2');
+    expect(screen.getByRole('button', { name: /READY/i })).toHaveTextContent('1');
+    expect(screen.getByRole('button', { name: /OVERDUE/i })).toHaveTextContent('1');
   });
 
   it('renders overdue badge', () => {
     renderWithProviders(<StitchKDSNew />);
-    expect(screen.getByLabelText(/kds\.overdue/)).toBeInTheDocument();
+    expect(screen.getAllByLabelText(/kds\.overdue/).length).toBeGreaterThanOrEqual(1);
   });
 
   it('calls onCompleteTicket when complete button clicked', async () => {

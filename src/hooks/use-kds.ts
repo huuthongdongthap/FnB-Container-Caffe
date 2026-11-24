@@ -53,7 +53,7 @@ export function useKDS(station: string = 'all'): KDSResult {
 
   useEffect(() => {
     const controller = new AbortController();
-    if (enabled && station === 'all') {
+    if (enabled) {
       void consumeKdsStream(controller.signal, payload => {
         if (!controller.signal.aborted) {
           const incoming = mapStreamOrders(payload as KdsStreamOrder[]);
@@ -65,7 +65,7 @@ export function useKDS(station: string = 'all'): KDSResult {
             return preservedCancelled.length > 0 ? [...incoming, ...preservedCancelled] : incoming;
           });
         }
-      });
+      }, station);
     }
     return () => {
       controller.abort();
