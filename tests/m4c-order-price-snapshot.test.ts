@@ -234,7 +234,7 @@ describe('calculateOrderSnapshot Policy', () => {
     const snapshot = await calculateOrderSnapshot(db, {
       items: [{ id: 'item_cf_den', quantity: 2 }], // 25,000 * 2 = 50,000
       order_type: 'dine_in',
-      now: new Date('2026-09-16T15:00:00'), // Wednesday 15:00 inside window
+      now: new Date('2026-09-16T15:00:00+07:00'), // Wednesday 15:00 ICT inside window
     });
 
     expect(snapshot.rejected).toBeNull();
