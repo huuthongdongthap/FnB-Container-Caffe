@@ -635,25 +635,199 @@ tablesRouter.patch('/:id', tableMutationAuth, audit('table_status_change'), asyn
   const id = c.req.param('id');
   const tenantId = resolveTableRouteTenantId(c).trim() || 'default';
   const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
+
+  const hasFieldMutations =
+    body.table_number !== undefined ||
+    body.number !== undefined ||
+    body.name !== undefined ||
+    body.zone !== undefined ||
+    body.capacity !== undefined ||
+    body.notes !== undefined;
+
+  let nextTableNumber: string | number | undefined;
+  const rawTableNumber = body.table_number !== undefined ? body.table_number : body.number;
+  if (rawTableNumber !== undefined) {
+    if (
+      rawTableNumber === null ||
+      (typeof rawTableNumber !== 'string' && typeof rawTableNumber !== 'number') ||
+      String(rawTableNumber).trim() === '' ||
+      String(rawTableNumber).trim().length > 50
+    ) {
+      return c.json({ success: false, error: 'Invalid table_number' }, 400);
+    }
+    nextTableNumber = typeof rawTableNumber === 'number' ? rawTableNumber : rawTableNumber.trim();
+  }
+
+  let nextName: string | null | undefined;
+  if (body.name !== undefined) {
+    if (body.name !== null && (typeof body.name !== 'string' || body.name.trim().length > 100)) {
+      return c.json({ success: false, error: 'Invalid name' }, 400);
+    }
+    nextName = body.name === null ? null : body.name.trim();
+  }
+
+  let nextZone: string | undefined;
+  if (body.zone !== undefined) {
+    if (typeof body.zone !== 'string' || !body.zone.trim() || body.zone.trim().length > 60) {
+      return c.json({ success: false, error: 'Invalid zone' }, 400);
+    }
+    nextZone = body.zone.trim();
+  }
+
+  let nextCapacity: number | undefined;
+  if (body.capacity !== undefined) {
+    if (typeof body.capacity !== 'number' || !Number.isInteger(body.capacity) || body.capacity < 1 || body.capacity > 200) {
+      return c.json({ success: false, error: 'Invalid capacity: must be an integer between 1 and 200' }, 400);
+    }
+    nextCapacity = body.capacity;
+  }
+
+  let nextNotes: string | null | undefined;
+  if (body.notes !== undefined) {
+    if (body.notes !== null && (typeof body.notes !== 'string' || body.notes.length > 500)) {
+      return c.json({ success: false, error: 'Invalid notes' }, 400);
+    }
+    nextNotes = body.notes === null ? null : body.notes.trim();
+  }
+
+  let parsedStatus: string | undefined;
   if (typeof body.status === 'string') {
     const parsed = updateTableStatusSchema.safeParse({ status: body.status });
     if (!parsed.success) {
       return zodErrorResponse(c, parsed.error);
     }
-    const table = await updateTable(db, id, parsed.data.status, tenantId);
+    parsedStatus = parsed.data.status;
+  } else if (body.status !== undefined) {
+    return c.json({ success: false, error: 'Invalid status' }, 400);
+  }
+
+  if (parsedStatus !== undefined && !hasFieldMutations) {
+    const table = await updateTable(db, id, parsedStatus, tenantId);
     if (table === 'UNPAID_ORDER') {
       return c.json({ success: false, error: 'Cannot release table with unpaid active orders' }, 409);
     }
     if (!table) {
       return c.json({ success: false, error: 'Table not found' }, 404);
     }
-    return c.json({ success: true, message: `Table ${id} → ${parsed.data.status}` });
+    return c.json({ success: true, message: `Table ${id} → ${parsedStatus}` });
   }
+
   const existing = await db.prepare('SELECT * FROM cafe_tables WHERE id = ?').bind(id).first<CafeTable>();
   if (!existing || !matchesTenantRow(existing as unknown as Record<string, unknown>, tenantId)) {
     return c.json({ success: false, error: 'Table not found' }, 404);
   }
-  return c.json({ success: true, data: existing });
+
+  if (parsedStatus !== undefined) {
+    const statusResult = await updateTable(db, id, parsedStatus, tenantId);
+    if (statusResult === 'UNPAID_ORDER') {
+      return c.json({ success: false, error: 'Cannot release table with unpaid active orders' }, 409);
+    }
+    if (!statusResult) {
+      return c.json({ success: false, error: 'Table not found' }, 404);
+    }
+  }
+
+  if (hasFieldMutations) {
+    const rawRowTenant = (existing as unknown as Record<string, unknown>).tenant_id;
+    const effectiveTableTenant =
+      tenantId !== '*' && tenantId.toLowerCase() !== 'hq'
+        ? tenantId
+        : typeof rawRowTenant === 'string' && rawRowTenant.trim() && rawRowTenant.trim() !== '*' && rawRowTenant.trim().toLowerCase() !== 'hq'
+          ? rawRowTenant.trim()
+          : 'default';
+
+    if (nextTableNumber !== undefined && String(nextTableNumber) !== String((existing as unknown as Record<string, unknown>).table_number ?? '')) {
+      const dup = await db
+        .prepare(
+          "SELECT id FROM cafe_tables WHERE CAST(table_number AS TEXT) = ? AND id != ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ? LIMIT 1",
+        )
+        .bind(String(nextTableNumber), id, effectiveTableTenant)
+        .first<{ id: string }>()
+        .catch(() => null);
+      if (dup) {
+        return c.json({ success: false, error: `Table number ${String(nextTableNumber)} already exists` }, 409);
+      }
+    }
+
+    const buildFieldUpdate = (opts: { useNumberCol?: boolean; omitName?: boolean; omitNotes?: boolean; omitUpdatedAt?: boolean; omitTenant?: boolean }) => {
+      const sets: string[] = [];
+      const binds: unknown[] = [];
+      if (nextTableNumber !== undefined) {
+        sets.push(`${opts.useNumberCol ? 'number' : 'table_number'} = ?`);
+        binds.push(nextTableNumber);
+      }
+      if (nextName !== undefined && !opts.omitName) {
+        sets.push('name = ?');
+        binds.push(nextName);
+      }
+      if (nextZone !== undefined) {
+        sets.push('zone = ?');
+        binds.push(nextZone);
+      }
+      if (nextCapacity !== undefined) {
+        sets.push('capacity = ?');
+        binds.push(nextCapacity);
+      }
+      if (nextNotes !== undefined && !opts.omitNotes) {
+        sets.push('notes = ?');
+        binds.push(nextNotes);
+      }
+      if (!opts.omitUpdatedAt && sets.length > 0) {
+        sets.push('updated_at = ?');
+        binds.push(new Date().toISOString());
+      }
+      if (sets.length === 0) return null;
+      const whereSql = opts.omitTenant
+        ? 'WHERE id = ?'
+        : "WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?";
+      binds.push(id);
+      if (!opts.omitTenant) binds.push(effectiveTableTenant);
+      return db.prepare(`UPDATE cafe_tables SET ${sets.join(', ')} ${whereSql}`).bind(...binds);
+    };
+
+    const optsState = { useNumberCol: false, omitName: false, omitNotes: false, omitUpdatedAt: false, omitTenant: false };
+    for (let attempt = 0; attempt < 5; attempt++) {
+      const stmt = buildFieldUpdate(optsState);
+      if (!stmt) break;
+      try {
+        await stmt.run();
+        break;
+      } catch (err) {
+        const msg = String(err);
+        if (/UNIQUE constraint failed/i.test(msg)) {
+          return c.json({ success: false, error: 'Table number already exists' }, 409);
+        }
+        if (!optsState.omitNotes && /no such column:.*notes/i.test(msg)) {
+          optsState.omitNotes = true;
+          continue;
+        }
+        if (!optsState.omitName && /no such column:.*name/i.test(msg)) {
+          optsState.omitName = true;
+          continue;
+        }
+        if (!optsState.omitUpdatedAt && /no such column:.*updated_at/i.test(msg)) {
+          optsState.omitUpdatedAt = true;
+          continue;
+        }
+        if (!optsState.useNumberCol && /no such column:.*table_number/i.test(msg)) {
+          optsState.useNumberCol = true;
+          continue;
+        }
+        if (!optsState.omitTenant && effectiveTableTenant === 'default' && /no such column:.*tenant_id/i.test(msg)) {
+          optsState.omitTenant = true;
+          continue;
+        }
+        throw err;
+      }
+    }
+  }
+
+  const updated = (await db.prepare('SELECT * FROM cafe_tables WHERE id = ?').bind(id).first<CafeTable>()) ?? existing;
+  return c.json({
+    success: true,
+    ...(parsedStatus !== undefined ? { message: `Table ${id} → ${parsedStatus}` } : {}),
+    data: updated,
+  });
 });
 
 // DELETE /api/tables/:id — delete table (staff/manager-only)

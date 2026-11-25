@@ -7,8 +7,8 @@ import type { Context } from 'hono';
 
 const log = createLogger({ route: 'orders-mobile' });
 
-const VIEW_ROLES: string[] = ['owner', 'manager', 'supervisor', 'staff', 'waiter', 'kitchen', 'barista', 'chef', 'admin', 'cashier', 'shipper'];
-const CREATE_ROLES: string[] = ['owner', 'manager', 'supervisor', 'waiter', 'admin', 'cashier'];
+const VIEW_ROLES: string[] = ['owner', 'manager', 'supervisor', 'staff', 'waiter', 'phuc_vu', 'kitchen', 'barista', 'chef', 'bep', 'admin', 'cashier', 'shipper', 'rider'];
+const CREATE_ROLES: string[] = ['owner', 'manager', 'supervisor', 'staff', 'waiter', 'phuc_vu', 'admin', 'cashier', 'shipper', 'rider'];
 const PII_MASKED_ROLES: string[] = ['kitchen', 'barista', 'chef'];
 const PII_UNMASKED_ROLES: string[] = ['owner', 'manager', 'admin', 'shipper'];
 
@@ -53,7 +53,9 @@ function maskMobileOrderPii(
   user?: { id?: string; tenantId?: string; tenant_id?: string }
 ): Record<string, unknown> {
   const normalizedRole = role.toLowerCase();
-  if (PII_UNMASKED_ROLES.includes(normalizedRole) && !PII_MASKED_ROLES.includes(normalizedRole)) {
+  const isMaskedKitchen = PII_MASKED_ROLES.includes(normalizedRole) || normalizedRole === 'bep';
+  const isUnmasked = PII_UNMASKED_ROLES.includes(normalizedRole) || normalizedRole === 'rider';
+  if (isUnmasked && !isMaskedKitchen) {
     return row;
   }
   const hasExplicitUserTenant =

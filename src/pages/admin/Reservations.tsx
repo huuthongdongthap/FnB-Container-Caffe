@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -15,6 +15,56 @@ interface TableOption {
   zone: string;
   capacity?: number;
   status?: string;
+  is_active?: number | boolean;
+}
+
+const INACTIVE_TABLE_STATUS_SET = new Set(['maintenance', 'out_of_order', 'outoforder', 'disabled', 'inactive']);
+const ACTIVE_RESERVATION_STATUS_SET = new Set(['pending', 'confirmed', 'approved', 'seated']);
+
+function parseHHMMToMinutes(val?: string | null): number | null {
+  if (!val) return null;
+  const m = /^(\d{1,2}):(\d{2})/.exec(val.trim());
+  if (!m) return null;
+  return Number(m[1]) * 60 + Number(m[2]);
+}
+
+function filterCandidateTablesForSlot(
+  tables: TableOption[],
+  reservations: AdminReservation[],
+  slotDate: string,
+  slotTime: string,
+  guestCount: number,
+  excludeReservationId?: string,
+  preserveTableId?: string,
+): TableOption[] {
+  const slotMinutes = parseHHMMToMinutes(slotTime);
+  const reqGuests = Number.isFinite(guestCount) && guestCount > 0 ? guestCount : 1;
+
+  return tables.filter((tb) => {
+    if (preserveTableId && (tb.id === preserveTableId || String(tb.table_number) === preserveTableId)) {
+      return true;
+    }
+    const statusLower = String(tb.status || 'available').trim().toLowerCase();
+    if (INACTIVE_TABLE_STATUS_SET.has(statusLower)) return false;
+    if (tb.is_active === 0 || tb.is_active === false) return false;
+    const cap = typeof tb.capacity === 'number' && Number.isFinite(tb.capacity) ? tb.capacity : 4;
+    if (cap < reqGuests) return false;
+
+    if (slotDate && slotMinutes !== null) {
+      const hasOverlap = reservations.some((r) => {
+        if (excludeReservationId && r.id === excludeReservationId) return false;
+        if (!ACTIVE_RESERVATION_STATUS_SET.has(r.status)) return false;
+        if (r.date !== slotDate) return false;
+        const matchesTable = r.tableId === tb.id || String(r.tableNumber) === String(tb.table_number);
+        if (!matchesTable) return false;
+        const rMin = parseHHMMToMinutes(r.time);
+        if (rMin === null) return r.time === slotTime;
+        return Math.abs(slotMinutes - rMin) < 90;
+      });
+      if (hasOverlap) return false;
+    }
+    return true;
+  });
 }
 
 const FILTER_KEYS: Record<FilterValue, string> = {
@@ -137,11 +187,34 @@ export default function AdminReservationsPage() {
   const [filter, setFilter] = useState<FilterValue>('all');
   const [date, setDate] = useState('');
   const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [editing, setEditing] = useState<AdminReservation | null>(null);
   const [creating, setCreating] = useState(false);
   const [processingId, setProcessingId] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [tables, setTables] = useState<TableOption[]>([]);
+
+  const defaultBookingDate = useMemo(
+    () => date || new Date(Date.now() + 7 * 3600_000).toISOString().slice(0, 10),
+    [date],
+  );
+  const [createGuests, setCreateGuests] = useState<number>(2);
+  const [createDate, setCreateDate] = useState<string>(defaultBookingDate);
+  const [createTime, setCreateTime] = useState<string>('19:00');
+
+  const [editGuests, setEditGuests] = useState<number>(2);
+  const [editDate, setEditDate] = useState<string>('');
+  const [editTime, setEditTime] = useState<string>('19:00');
+
+  useEffect(() => {
+    const trimmed = search.trim();
+    if (!trimmed) {
+      setDebouncedSearch('');
+      return;
+    }
+    const timer = setTimeout(() => setDebouncedSearch(trimmed), 250);
+    return () => clearTimeout(timer);
+  }, [search]);
 
   const loadTables = useCallback(async () => {
     try {
@@ -153,12 +226,36 @@ export default function AdminReservationsPage() {
   }, []);
 
   useEffect(() => {
-    void fetchReservations({ offset: 0, date, status: filter });
-  }, [fetchReservations, date, filter]);
+    if (debouncedSearch) {
+      void fetchReservations({ offset: 0, date, status: filter, search: debouncedSearch });
+    } else {
+      void fetchReservations({ offset: 0, date, status: filter });
+    }
+  }, [fetchReservations, date, filter, debouncedSearch]);
 
   useEffect(() => {
     void loadTables();
   }, [loadTables]);
+
+  const createTableOptions = useMemo(
+    () => filterCandidateTablesForSlot(tables, reservations, createDate, createTime, createGuests),
+    [tables, reservations, createDate, createTime, createGuests],
+  );
+  const editTableOptions = useMemo(
+    () =>
+      editing
+        ? filterCandidateTablesForSlot(
+            tables,
+            reservations,
+            editDate || editing.date,
+            editTime || editing.time,
+            editGuests || editing.guests,
+            editing.id,
+            editing.tableId || editing.tableNumber,
+          )
+        : [],
+    [tables, reservations, editing, editDate, editTime, editGuests],
+  );
 
   const normalizedSearch = search.trim().toLowerCase();
   const filtered = reservations.filter((r) => {
@@ -239,7 +336,7 @@ export default function AdminReservationsPage() {
         throw new Error(res.error || 'Failed to create reservation');
       }
       setCreating(false);
-      await fetchReservations({ offset: 0, date, status: filter });
+      await fetchReservations({ offset: 0, date, status: filter, ...(debouncedSearch ? { search: debouncedSearch } : {}) });
     } catch (err) {
       setActionError(err instanceof Error ? err.message : 'Failed to create reservation');
     } finally {
@@ -260,7 +357,17 @@ export default function AdminReservationsPage() {
           <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
             <h1 className="text-2xl font-display font-bold">{t('adminReservations.title')}</h1>
             <div className="flex flex-wrap items-center gap-2">
-              <Button size="sm" onClick={() => { setCreating(true); setEditing(null); setActionError(null); }}>
+              <Button
+                size="sm"
+                onClick={() => {
+                  setCreateGuests(2);
+                  setCreateDate(defaultBookingDate);
+                  setCreateTime('19:00');
+                  setCreating(true);
+                  setEditing(null);
+                  setActionError(null);
+                }}
+              >
                 {t('adminReservations.createBtn')}
               </Button>
               {filterValues.map((f) => (
@@ -321,21 +428,47 @@ export default function AdminReservationsPage() {
                   </label>
                   <label className="flex flex-col gap-1 text-sm">
                     <span>{t('adminReservations.guestsLabel')}</span>
-                    <input required name="guests" type="number" min="1" max="200" defaultValue={2} className="rounded-lg border border-border bg-background px-3 py-1.5 text-sm" />
+                    <input
+                      required
+                      name="guests"
+                      type="number"
+                      min="1"
+                      max="200"
+                      value={createGuests}
+                      onChange={(e) => setCreateGuests(Math.max(1, Number(e.target.value) || 1))}
+                      className="rounded-lg border border-border bg-background px-3 py-1.5 text-sm"
+                    />
                   </label>
                   <label className="flex flex-col gap-1 text-sm">
                     <span>{t('adminReservations.dateLabel')}</span>
-                    <input required name="date" type="date" defaultValue={date || new Date(Date.now() + 7 * 3600_000).toISOString().slice(0, 10)} className="rounded-lg border border-border bg-background px-3 py-1.5 text-sm" />
+                    <input
+                      required
+                      name="date"
+                      type="date"
+                      value={createDate}
+                      onChange={(e) => setCreateDate(e.target.value)}
+                      className="rounded-lg border border-border bg-background px-3 py-1.5 text-sm"
+                    />
                   </label>
                   <label className="flex flex-col gap-1 text-sm">
                     <span>{t('adminReservations.timeLabel')}</span>
-                    <input required name="time" type="time" defaultValue="19:00" className="rounded-lg border border-border bg-background px-3 py-1.5 text-sm" />
+                    <input
+                      required
+                      name="time"
+                      type="time"
+                      value={createTime}
+                      onChange={(e) => setCreateTime(e.target.value)}
+                      className="rounded-lg border border-border bg-background px-3 py-1.5 text-sm"
+                    />
                   </label>
                   <label className="flex flex-col gap-1 text-sm">
                     <span>{t('adminReservations.table')}</span>
                     {tables.length > 0 ? (
                       <select required name="table" className="rounded-lg border border-border bg-background px-3 py-1.5 text-sm">
-                        {tables.map((tb) => (
+                        {createTableOptions.length === 0 && (
+                          <option value="">{t('adminReservations.notAssigned')}</option>
+                        )}
+                        {createTableOptions.map((tb) => (
                           <option key={tb.id} value={tb.id}>
                             {t('adminReservations.table')} {tb.table_number} — {tb.zone} ({tb.capacity ?? 4} {t('adminReservations.guests')})
                           </option>
@@ -402,21 +535,44 @@ export default function AdminReservationsPage() {
                   </label>
                   <label className="flex flex-col gap-1 text-sm">
                     <span>{t('adminReservations.guestsLabel')}</span>
-                    <input required name="guests" type="number" min="1" max="200" defaultValue={editing.guests} className="rounded-lg border border-border bg-background px-3 py-1.5 text-sm" />
+                    <input
+                      required
+                      name="guests"
+                      type="number"
+                      min="1"
+                      max="200"
+                      value={editGuests}
+                      onChange={(e) => setEditGuests(Math.max(1, Number(e.target.value) || 1))}
+                      className="rounded-lg border border-border bg-background px-3 py-1.5 text-sm"
+                    />
                   </label>
                   <label className="flex flex-col gap-1 text-sm">
                     <span>{t('adminReservations.dateLabel')}</span>
-                    <input required name="date" type="date" defaultValue={editing.date} className="rounded-lg border border-border bg-background px-3 py-1.5 text-sm" />
+                    <input
+                      required
+                      name="date"
+                      type="date"
+                      value={editDate}
+                      onChange={(e) => setEditDate(e.target.value)}
+                      className="rounded-lg border border-border bg-background px-3 py-1.5 text-sm"
+                    />
                   </label>
                   <label className="flex flex-col gap-1 text-sm">
                     <span>{t('adminReservations.timeLabel')}</span>
-                    <input required name="time" type="time" defaultValue={editing.time} className="rounded-lg border border-border bg-background px-3 py-1.5 text-sm" />
+                    <input
+                      required
+                      name="time"
+                      type="time"
+                      value={editTime}
+                      onChange={(e) => setEditTime(e.target.value)}
+                      className="rounded-lg border border-border bg-background px-3 py-1.5 text-sm"
+                    />
                   </label>
                   <label className="flex flex-col gap-1 text-sm">
                     <span>{t('adminReservations.table')}</span>
                     {tables.length > 0 ? (
                       <select required name="table" defaultValue={editing.tableId || editing.tableNumber} className="rounded-lg border border-border bg-background px-3 py-1.5 text-sm">
-                        {tables.map((tb) => (
+                        {editTableOptions.map((tb) => (
                           <option key={tb.id} value={tb.id}>
                             {t('adminReservations.table')} {tb.table_number} — {tb.zone} ({tb.capacity ?? 4} {t('adminReservations.guests')})
                           </option>
@@ -440,11 +596,11 @@ export default function AdminReservationsPage() {
           )}
 
           <div className="flex items-center gap-2 my-4">
-            <Button size="sm" variant="secondary" disabled={loading || offset === 0} onClick={() => fetchReservations({ offset: Math.max(0, offset - 50), date, status: filter })}>
+            <Button size="sm" variant="secondary" disabled={loading || offset === 0} onClick={() => fetchReservations({ offset: Math.max(0, offset - 50), date, status: filter, ...(debouncedSearch ? { search: debouncedSearch } : {}) })}>
               {t('adminReservations.previousBtn')}
             </Button>
             <span className="text-sm px-2">{Math.floor(offset / 50) + 1}</span>
-            <Button size="sm" variant="secondary" disabled={loading || !hasNext} onClick={() => fetchReservations({ offset: offset + 50, date, status: filter })}>
+            <Button size="sm" variant="secondary" disabled={loading || !hasNext} onClick={() => fetchReservations({ offset: offset + 50, date, status: filter, ...(debouncedSearch ? { search: debouncedSearch } : {}) })}>
               {t('adminReservations.nextBtn')}
             </Button>
           </div>
@@ -482,7 +638,14 @@ export default function AdminReservationsPage() {
                   onApprove={() => handleApprove(r.id)}
                   onReject={() => handleReject(r.id)}
                   onStatus={(status) => handleStatus(r.id, status)}
-                  onEdit={() => { setEditing(r); setCreating(false); setActionError(null); }}
+                  onEdit={() => {
+                    setEditGuests(r.guests);
+                    setEditDate(r.date);
+                    setEditTime(r.time);
+                    setEditing(r);
+                    setCreating(false);
+                    setActionError(null);
+                  }}
                   t={t}
                 />
               ))}

@@ -11,8 +11,14 @@ export async function resolveCashCollectingShift(db: D1Database, staffId: string
   try {
     const shift = await db.prepare(`SELECT CAST(id AS TEXT) AS id, clock_in FROM staff_shifts
       WHERE staff_id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?
-      AND clock_in IS NOT NULL AND clock_out IS NULL ORDER BY clock_in DESC, id DESC LIMIT 1`)
-      .bind(staffId, tenant).first<CashCollectingShift>();
+      AND clock_in IS NOT NULL AND clock_out IS NULL
+      AND NOT EXISTS (
+        SELECT 1 FROM shift_reconciliations sr
+        WHERE sr.shift_id = CAST(staff_shifts.id AS TEXT)
+          AND COALESCE(NULLIF(TRIM(sr.tenant_id), ''), 'default') = ?
+      )
+      ORDER BY clock_in DESC, id DESC LIMIT 1`)
+      .bind(staffId, tenant, tenant).first<CashCollectingShift>();
     return { shift, hasShifts: true };
   } catch (error) {
     if (/no such table:.*\bstaff_shifts\b/i.test(String(error))) return { shift: null, hasShifts: false };

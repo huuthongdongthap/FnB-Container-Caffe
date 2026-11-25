@@ -561,11 +561,17 @@ floorPlanRouter.post('/:id/release', async (c) => {
 
   const now = new Date().toISOString();
   await db.prepare(
-    "UPDATE cafe_tables SET status = 'Available', current_order_id = NULL WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
+    "UPDATE cafe_tables SET status = 'Available', current_order_id = NULL, current_session_id = NULL WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
   ).bind(id, effectiveTableTenant).run().catch(() =>
-    canRunUnscopedFallback
-      ? db.prepare("UPDATE cafe_tables SET status = 'Available', current_order_id = NULL WHERE id = ?").bind(id).run().catch(() => null)
-      : null
+    db.prepare(
+      "UPDATE cafe_tables SET status = 'Available', current_order_id = NULL WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
+    ).bind(id, effectiveTableTenant).run().catch(() =>
+      canRunUnscopedFallback
+        ? db.prepare("UPDATE cafe_tables SET status = 'Available', current_order_id = NULL, current_session_id = NULL WHERE id = ?").bind(id).run().catch(() =>
+            db.prepare("UPDATE cafe_tables SET status = 'Available', current_order_id = NULL WHERE id = ?").bind(id).run().catch(() => null)
+          )
+        : null
+    )
   );
   await db.prepare(
     "UPDATE cafe_tables SET status = 'Available' WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"

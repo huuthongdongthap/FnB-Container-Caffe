@@ -82,9 +82,13 @@ describe('canonical attendance access and persistence', () => {
     expect((await f.request('/clock-in','owner',{ staff_id:'peer' })).status).toBe(201);
     expect((await f.request('/clock-out','manager',{ staff_id:'peer' })).status).toBe(200);
     expect((await f.request('/clock-in','manager',{ staff_id:'other' })).status).toBe(404);
-    expect((await f.request('/','foreign-manager')).status).toBe(403);
+    const foreignList = await f.request('/', 'foreign-manager');
+    expect(foreignList.status).toBe(200);
+    const foreignRows = (await foreignList.json()).data;
+    expect(foreignRows).toHaveLength(1);
+    expect(foreignRows[0].staff_id).toBe('other');
   });
-  it('blocks inactive/revoked sessions, inactive targets and missing pilot configuration', async () => {
+  it('blocks inactive/revoked sessions, inactive targets and per-tenant shift opt-out while allowing multi-tenant production stores', async () => {
     const f = fixture(), token = await f.token();
     f.sqlite.exec("UPDATE users SET is_active = 0 WHERE id = 'staff'");
     expect((await f.request('/', 'staff', undefined, 'GET', false, token)).status).toBe(403);
@@ -92,7 +96,9 @@ describe('canonical attendance access and persistence', () => {
     f.sqlite.exec("UPDATE users SET is_active = 1, auth_version = 2 WHERE id = 'staff'");
     expect((await f.request('/', 'staff', undefined, 'GET', false, token)).status).toBe(401);
     f.env.PILOT_TENANT_ID = undefined;
-    expect((await f.request('/', 'manager')).status).toBe(503);
+    expect((await f.request('/', 'manager')).status).toBe(200);
+    (f.env as unknown as Record<string, unknown>).SHIFTS_DISABLED_TENANTS = 'cafe-a';
+    expect((await f.request('/', 'manager')).status).toBe(403);
   });
   it('fails closed when the canonical table is unavailable without querying legacy shifts', async () => {
     const f = fixture(false); f.sqlite.exec('CREATE TABLE shifts (id TEXT)');

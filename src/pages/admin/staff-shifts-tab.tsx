@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -9,7 +9,7 @@ import { apiFetch } from '@/lib/api-client';
 import { useAuthStore } from '@/hooks/stores/use-auth-store';
 import { useAdminStaffStore } from '@/hooks/stores/admin/use-admin-staff-store';
 import { useAdminShiftsStore, type ShiftRecord } from '@/hooks/stores/admin/use-admin-shifts-store';
-import { formatTime, formatDate, formatHours } from './staff-utils';
+import { CASH_DRAWER_ROLES, formatTime, formatDate, formatHours } from './staff-utils';
 
 const MANAGER_ROLES = new Set(['owner', 'manager', 'supervisor', 'admin']);
 
@@ -123,6 +123,7 @@ export function ShiftsTab() {
   const {
     todayShifts,
     historyShifts,
+    suggestedOpeningCash,
     loading,
     error,
     mutationError,
@@ -135,12 +136,33 @@ export function ShiftsTab() {
   const [selectedStaffId, setSelectedStaffId] = useState<string>('');
   const [selectedScheduledId, setSelectedScheduledId] = useState<string>('');
   const [openingCashInput, setOpeningCashInput] = useState<string>('0');
+  const [openingCashTouched, setOpeningCashTouched] = useState<boolean>(false);
   const [clockInNotes, setClockInNotes] = useState<string>('');
   const [formError, setFormError] = useState<string | null>(null);
   const [reconReport, setReconReport] = useState<ReconciliationReportData | null>(null);
 
   const [handoverShiftId, setHandoverShiftId] = useState<string | undefined>(undefined);
+  const [handoverShift, setHandoverShift] = useState<ShiftRecord | undefined>(undefined);
   const [handoverOpen, setHandoverOpen] = useState(false);
+
+  const fetchReconReport = useCallback(() => {
+    if (!canManage) return;
+    const today = vietnamBusinessDate();
+    Promise.resolve(
+      apiFetch<{ success: boolean; data?: ReconciliationReportData }>(
+        `/api/reports/reconciliation?from=${encodeURIComponent(today)}&to=${encodeURIComponent(today)}`,
+        { silent: true },
+      ),
+    )
+      .then((res) => {
+        if (res?.data && res.data.totals && typeof res.data.totals.revenue === 'number') {
+          setReconReport(res.data);
+        }
+      })
+      .catch(() => {
+        setReconReport(null);
+      });
+  }, [canManage]);
 
   useEffect(() => {
     if (canManage) {
@@ -148,24 +170,14 @@ export function ShiftsTab() {
     }
     fetchToday();
     fetchHistory();
-    if (canManage) {
-      const today = vietnamBusinessDate();
-      Promise.resolve(
-        apiFetch<{ success: boolean; data?: ReconciliationReportData }>(
-          `/api/reports/reconciliation?from=${encodeURIComponent(today)}&to=${encodeURIComponent(today)}`,
-          { silent: true },
-        ),
-      )
-        .then((res) => {
-          if (res?.data && res.data.totals && typeof res.data.totals.revenue === 'number') {
-            setReconReport(res.data);
-          }
-        })
-        .catch(() => {
-          setReconReport(null);
-        });
+    fetchReconReport();
+  }, [fetchStaff, fetchToday, fetchHistory, fetchReconReport, canManage]);
+
+  useEffect(() => {
+    if (!openingCashTouched && !selectedScheduledId && suggestedOpeningCash > 0) {
+      setOpeningCashInput(String(suggestedOpeningCash));
     }
-  }, [fetchStaff, fetchToday, fetchHistory, canManage]);
+  }, [openingCashTouched, selectedScheduledId, suggestedOpeningCash]);
 
   const activeStaff = staff.filter((m) => m.isActive !== false);
   const defaultManageStaffId =
@@ -207,7 +219,8 @@ export function ShiftsTab() {
     if (created) {
       setSelectedScheduledId('');
       setClockInNotes('');
-      setOpeningCashInput('0');
+      setOpeningCashTouched(false);
+      setOpeningCashInput(suggestedOpeningCash > 0 ? String(suggestedOpeningCash) : '0');
     }
   };
 
@@ -232,9 +245,17 @@ export function ShiftsTab() {
     );
   }
 
+  const workedTodayShifts = todayShifts.filter(
+    (s) =>
+      Boolean(s.clock_in) &&
+      s.attendance_state !== 'scheduled' &&
+      s.attendance_state !== 'cancelled' &&
+      s.status !== 'scheduled' &&
+      s.status !== 'cancelled',
+  );
   const todayBizDate = vietnamBusinessDate();
   const todayMidnightUtcMs = Date.parse(`${todayBizDate}T00:00:00+07:00`);
-  const totalHoursToday = todayShifts.reduce((acc: number, s: ShiftRecord) => {
+  const totalHoursToday = workedTodayShifts.reduce((acc: number, s: ShiftRecord) => {
     if (s.hours_worked) return acc + s.hours_worked;
     if (!s.clock_out && s.clock_in) {
       const parsedStart = parseUtcTimestamp(s.clock_in);
@@ -254,6 +275,7 @@ export function ShiftsTab() {
         todayShifts={todayShifts}
         t={t}
         onStartHandover={(shiftId) => {
+          setHandoverShift(todayShifts.find((s) => s.id === shiftId));
           setHandoverShiftId(shiftId);
           setHandoverOpen(true);
         }}
@@ -276,7 +298,8 @@ export function ShiftsTab() {
                   onChange={(e) => {
                     setSelectedStaffId(e.target.value);
                     setSelectedScheduledId('');
-                    setOpeningCashInput('0');
+                    setOpeningCashTouched(false);
+                    setOpeningCashInput(suggestedOpeningCash > 0 ? String(suggestedOpeningCash) : '0');
                   }}
                   className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm"
                 >
@@ -299,11 +322,16 @@ export function ShiftsTab() {
                 onChange={(e) => {
                   const nextId = e.target.value;
                   setSelectedScheduledId(nextId);
+                  setOpeningCashTouched(false);
                   const nextScheduled = scheduledShifts.find((s) => s.id === nextId);
-                  setOpeningCashInput(
+                  const preset =
                     typeof nextScheduled?.opening_cash === 'number' && Number.isFinite(nextScheduled.opening_cash)
-                      ? String(nextScheduled.opening_cash)
-                      : '0',
+                      ? nextScheduled.opening_cash
+                      : null;
+                  setOpeningCashInput(
+                    preset !== null && (preset > 0 || suggestedOpeningCash === 0)
+                      ? String(preset)
+                      : String(suggestedOpeningCash),
                   );
                 }}
                 className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm"
@@ -328,7 +356,10 @@ export function ShiftsTab() {
                 step={1000}
                 value={openingCashInput}
                 disabled={openingCashLocked}
-                onChange={(e) => setOpeningCashInput(e.target.value)}
+                onChange={(e) => {
+                  setOpeningCashTouched(true);
+                  setOpeningCashInput(e.target.value);
+                }}
                 className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm disabled:opacity-60"
               />
             </div>
@@ -372,7 +403,7 @@ export function ShiftsTab() {
         <CardBody>
           <div className="grid grid-cols-3 gap-4 text-center">
             <div>
-              <p className="text-2xl font-bold">{todayShifts.length}</p>
+              <p className="text-2xl font-bold">{workedTodayShifts.length}</p>
               <p className="text-xs text-muted">{t('adminStaff.shifts')}</p>
             </div>
             <div>
@@ -380,7 +411,7 @@ export function ShiftsTab() {
               <p className="text-xs text-muted">{t('adminStaff.totalHours')}</p>
             </div>
             <div>
-              <p className="text-2xl font-bold">{new Set(todayShifts.map((s) => s.staff_id)).size}</p>
+              <p className="text-2xl font-bold">{new Set(workedTodayShifts.map((s) => s.staff_id)).size}</p>
               <p className="text-xs text-muted">{t('adminStaff.staffWorking')}</p>
             </div>
           </div>
@@ -443,24 +474,51 @@ export function ShiftsTab() {
             <p className="text-sm text-muted">{t('adminStaff.noRecentShifts')}</p>
           ) : (
             <div className="space-y-2">
-              {historyShifts.slice(0, 50).map((s) => (
-                <div key={s.id} className="flex items-center justify-between gap-3 p-3 rounded-lg bg-surface border border-border">
-                  <div className="min-w-0">
-                    <p className="font-medium">{staff.find((m) => m.id === s.staff_id)?.name || s.staff_name || s.staff_id}</p>
-                    <p className="text-xs text-muted">
-                      {formatDate(s.date)} | {s.clock_in ? formatTime(s.clock_in) : '--:--'}{' '}
-                      {s.clock_out ? `- ${formatTime(s.clock_out)}` : s.clock_in ? `(${t('adminStaff.active')})` : '(Scheduled)'}
-                    </p>
-                    <p className="text-xs text-muted mt-0.5">
-                      Đầu ca: {formatVnd(s.opening_cash ?? 0)}
-                      {typeof s.expected_cash === 'number' ? ` • Kỳ vọng: ${formatVnd(s.expected_cash)}` : ''}
-                      {typeof s.actual_cash === 'number' ? ` • Thực đếm: ${formatVnd(s.actual_cash)}` : ''}
-                      {typeof s.cash_variance === 'number' ? ` • Lệch: ${formatVnd(s.cash_variance)}` : ''}
-                    </p>
+              {historyShifts.slice(0, 50).map((s) => {
+                const shiftRole = String(s.role || '').trim().toLowerCase();
+                const isClosedUnreconciled =
+                  Boolean(s.clock_in) &&
+                  Boolean(s.clock_out) &&
+                  s.expected_cash == null &&
+                  s.actual_cash == null &&
+                  ((s.opening_cash ?? 0) > 0 || (shiftRole ? CASH_DRAWER_ROLES.has(shiftRole) : CASH_DRAWER_ROLES.has(String(user?.role || '').toLowerCase())));
+                const canReconcileThisShift = canManage || s.staff_id === user?.id;
+                return (
+                  <div key={s.id} className="flex flex-wrap items-center justify-between gap-3 p-3 rounded-lg bg-surface border border-border">
+                    <div className="min-w-0">
+                      <p className="font-medium">{staff.find((m) => m.id === s.staff_id)?.name || s.staff_name || s.staff_id}</p>
+                      <p className="text-xs text-muted">
+                        {formatDate(s.date)} | {s.clock_in ? formatTime(s.clock_in) : '--:--'}{' '}
+                        {s.clock_out ? `- ${formatTime(s.clock_out)}` : s.clock_in ? `(${t('adminStaff.active')})` : '(Scheduled)'}
+                      </p>
+                      <p className="text-xs text-muted mt-0.5">
+                        Đầu ca: {formatVnd(s.opening_cash ?? 0)}
+                        {typeof s.expected_cash === 'number' ? ` • Kỳ vọng: ${formatVnd(s.expected_cash)}` : ''}
+                        {typeof s.actual_cash === 'number' ? ` • Thực đếm: ${formatVnd(s.actual_cash)}` : ''}
+                        {typeof s.cash_variance === 'number' ? ` • Lệch: ${formatVnd(s.cash_variance)}` : ''}
+                        {typeof s.closing_float === 'number' ? ` • Quỹ để lại: ${formatVnd(s.closing_float)}` : ''}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {isClosedUnreconciled && canReconcileThisShift && (
+                        <Button
+                          size="sm"
+                          variant="secondary"
+                          onClick={() => {
+                            setHandoverShift(s);
+                            setHandoverShiftId(s.id);
+                            setHandoverOpen(true);
+                          }}
+                          data-testid={`reconcile-closed-shift-btn-${s.id}`}
+                        >
+                          Đối soát bổ sung / Reconcile
+                        </Button>
+                      )}
+                      <Badge>{s.hours_worked ? formatHours(s.hours_worked) : '--'}</Badge>
+                    </div>
                   </div>
-                  <Badge>{s.hours_worked ? formatHours(s.hours_worked) : '--'}</Badge>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </CardBody>
@@ -469,13 +527,16 @@ export function ShiftsTab() {
       <ShiftHandoverModal
         isOpen={handoverOpen}
         initialShiftId={handoverShiftId}
+        initialShift={handoverShift}
         onClose={() => {
           setHandoverOpen(false);
           setHandoverShiftId(undefined);
+          setHandoverShift(undefined);
         }}
         onCompleted={() => {
           void fetchToday();
           void fetchHistory();
+          fetchReconReport();
         }}
       />
     </>

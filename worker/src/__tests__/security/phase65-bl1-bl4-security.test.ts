@@ -943,7 +943,7 @@ describe('Phase 65 Security & Operational Regression Suite (BL1-BL4)', () => {
       return sqlite;
     }
 
-    it('BL3-01: supports HQ wildcard and explicit store overrides in shiftScope while enforcing PILOT_TENANT_ID and blocking non-HQ cross-store access', async () => {
+    it('BL3-01: supports multi-tenant shiftScope across all stores, HQ self-target resolution, per-tenant SHIFTS_DISABLED_TENANTS opt-out, and blocks non-HQ cross-store access', async () => {
       const sqlite = createShiftSqlite();
       const db = createSqliteD1(sqlite);
       const env = { AURA_DB: db, JWT_SECRET } as unknown as Env;
@@ -959,13 +959,26 @@ describe('Phase 65 Security & Operational Regression Suite (BL1-BL4)', () => {
       );
       expect(hqStoreBScope.tenantId).toBe('store-b');
 
+      // HQ Admin clocking themselves in/out in store-b resolves tenant_id = 'store-b' instead of 404
+      const hqSelfTarget = await shiftTarget(hqStoreBScope);
+      expect(hqSelfTarget.id).toBe('hq_1');
+      expect(hqSelfTarget.tenant_id).toBe('store-b');
+
       await expect(
         shiftScope(env, { id: 'mgr_a', role: 'manager', tenantId: 'store-a' }, 'store-b')
       ).rejects.toThrow(ShiftContractError);
 
+      // Multi-tenant shifts enabled across stores even when PILOT_TENANT_ID is configured
+      const multiStoreScope = await shiftScope(
+        { AURA_DB: db, ENVIRONMENT: 'production', PILOT_TENANT_ID: 'default' } as unknown as Env,
+        { id: 'st_store_b', role: 'cashier', tenantId: 'store-b' }
+      );
+      expect(multiStoreScope.tenantId).toBe('store-b');
+
+      // Per-tenant opt-out via SHIFTS_DISABLED_TENANTS blocks only opted-out stores
       await expect(
         shiftScope(
-          { AURA_DB: db, PILOT_TENANT_ID: 'store-a' } as unknown as Env,
+          { AURA_DB: db, SHIFTS_DISABLED_TENANTS: 'store-b' } as unknown as Env,
           { id: 'st_store_b', role: 'cashier', tenantId: 'store-b' }
         )
       ).rejects.toThrow('Attendance is unavailable for this store');

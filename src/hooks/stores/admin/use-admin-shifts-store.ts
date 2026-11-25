@@ -30,6 +30,7 @@ function extractShiftError(err: unknown, fallback: string): string {
 export const useAdminShiftsStore = create<AdminShiftsState>((set, get) => ({
   todayShifts: [],
   historyShifts: [],
+  suggestedOpeningCash: 0,
   loading: { ...INITIAL_LOADING },
   error: null,
   mutationError: null,
@@ -39,7 +40,14 @@ export const useAdminShiftsStore = create<AdminShiftsState>((set, get) => ({
   },
 
   reset: () => {
-    set({ todayShifts: [], historyShifts: [], loading: { ...INITIAL_LOADING }, error: null, mutationError: null });
+    set({
+      todayShifts: [],
+      historyShifts: [],
+      suggestedOpeningCash: 0,
+      loading: { ...INITIAL_LOADING },
+      error: null,
+      mutationError: null,
+    });
   },
 
   fetchToday: async () => {
@@ -48,8 +56,13 @@ export const useAdminShiftsStore = create<AdminShiftsState>((set, get) => ({
     try {
       const body = await apiFetch<TodayResponse>('/api/shifts/today');
       if (seq !== latestFetchTodaySeq) return;
+      const suggested =
+        typeof body.meta?.suggested_opening_cash === 'number' && Number.isFinite(body.meta.suggested_opening_cash)
+          ? Math.max(0, body.meta.suggested_opening_cash)
+          : 0;
       set({
         todayShifts: Array.isArray(body.data) ? body.data : [],
+        suggestedOpeningCash: suggested,
         loading: { ...get().loading, today: false },
       });
     } catch (err) {

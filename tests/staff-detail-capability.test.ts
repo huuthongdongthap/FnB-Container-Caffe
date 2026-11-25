@@ -35,19 +35,28 @@ describe('production staff detail attendance capability', () => {
     expect(data.recentShifts).toHaveLength(1);
     expect(data.recentAttendance).toHaveLength(1);
   });
-  it.each(['manager', 'owner'])('returns non-pilot profiles for a same-store %s', async role => {
+  it.each(['manager', 'owner'])('enables multi-tenant shifts for a same-store %s on non-default SaaS stores', async role => {
     const f = fixture('default', 'saas-store');
     f.sqlite.prepare("UPDATE users SET role = ? WHERE id = 'manager'").run(role);
     const response = await f.request();
     expect(response.status).toBe(200);
-    expect((await response.json()).data).toMatchObject({ id: 'peer', shifts_availability: { available: false, reason: 'pilot_restricted' }, recentShifts: [], recentAttendance: [] });
-    expect(f.executedStatements.some(row => /FROM staff_shifts/i.test(row.sql))).toBe(false);
+    const { data } = await response.json();
+    expect(data).toMatchObject({ id: 'peer', shifts_availability: { available: true } });
+    expect(data.recentShifts).toHaveLength(1);
+    expect(data.recentAttendance).toHaveLength(1);
   });
-  it('returns profiles when the production pilot is unconfigured', async () => {
-    const f = fixture(); f.env.PILOT_TENANT_ID = undefined;
+  it('disables shifts_availability when a tenant explicitly opts out via SHIFTS_DISABLED_TENANTS', async () => {
+    const f = fixture('default', 'saas-store');
+    (f.env as unknown as Record<string, unknown>).SHIFTS_DISABLED_TENANTS = 'saas-store';
     const response = await f.request();
     expect(response.status).toBe(200);
-    expect((await response.json()).data).toMatchObject({ shifts_availability: { available: false, reason: 'pilot_unconfigured' }, recentShifts: [], recentAttendance: [] });
+    expect((await response.json()).data).toMatchObject({
+      id: 'peer',
+      shifts_availability: { available: false, reason: 'tenant_disabled' },
+      recentShifts: [],
+      recentAttendance: [],
+    });
+    expect(f.executedStatements.some(row => /FROM staff_shifts/i.test(row.sql))).toBe(false);
   });
   it.each(['default', undefined])('rejects foreign profiles and tenant spoofing with pilot %s', async pilot => {
     const f = fixture(); f.env.PILOT_TENANT_ID = pilot;

@@ -148,7 +148,7 @@ export function registerFeatureRoutes(app: Hono<{ Bindings: Env }>): void {
   app.route('/api/promotions', promotionsRouter);
   app.route('/api/signage', signageRouter);
   app.route('/api/pretix', pretixRouter);
-  app.use('/api/shifts/:id/*', requireAuth(['owner', 'manager', 'supervisor', 'staff', 'admin', 'waiter', 'kitchen', 'barista', 'chef', 'cashier', 'shipper']));
+  app.use('/api/shifts/:id/*', requireAuth(['owner', 'manager', 'supervisor', 'staff', 'admin', 'waiter', 'kitchen', 'barista', 'chef', 'bep', 'cashier', 'shipper', 'rider']));
   reconciliationRoutes(app as any);
   app.route('/api/shifts', shiftsRouter);
   app.get('/api/subscriptions/invoices/:id/receipt', requireAuth(['owner', 'manager', 'supervisor', 'admin', 'staff', 'vendor', 'customer']), (c) => getInvoiceReceipt(c));

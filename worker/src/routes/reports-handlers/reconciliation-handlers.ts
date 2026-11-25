@@ -283,9 +283,10 @@ export function registerReconciliationHandlers(app: Hono<{ Bindings: Env }>) {
           `SELECT id, staff_name, role, date, clock_in, clock_out, opening_cash
            FROM staff_shifts
            WHERE date BETWEEN ? AND ?
-             AND clock_in IS NOT NULL${tf.and}
+             AND clock_in IS NOT NULL
+             AND LOWER(COALESCE(attendance_state, 'active')) <> 'cancelled'${tf.and}
              AND (
-               LOWER(TRIM(COALESCE(role, 'staff'))) NOT IN ('barista', 'chef', 'kitchen', 'shipper', 'waiter')
+               LOWER(TRIM(COALESCE(role, 'staff'))) NOT IN ('barista', 'chef', 'kitchen', 'bep')
                OR COALESCE(opening_cash, 0) > 0
              )
              AND NOT EXISTS (
