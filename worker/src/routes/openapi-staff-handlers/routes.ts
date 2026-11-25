@@ -10,7 +10,17 @@ import { registerAttendanceHandlers } from './attendance-handlers';
 export const openApiStaffRouter = new OpenAPIHono<{ Bindings: Env }>();
 
 openApiStaffRouter.onError((error, c) => {
-  if (error instanceof ShiftContractError) return c.json({ success: false, error: error.message }, error.status);
+  if (error instanceof ShiftContractError) {
+    return c.json(
+      {
+        success: false,
+        error: error.message,
+        ...(error.code ? { code: error.code } : {}),
+        ...(error.details ? { details: error.details } : {}),
+      },
+      error.status,
+    );
+  }
   if ('status' in error && error.status === 503) return c.json({ success: false, error: error.message }, 503);
   return staffSessionErrorResponse(error) || c.json({ success: false, error: 'Không thể cập nhật nhân viên' }, 500);
 });

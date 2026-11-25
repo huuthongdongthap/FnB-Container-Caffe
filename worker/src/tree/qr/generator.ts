@@ -161,13 +161,19 @@ export async function bulkGenerateSlugs(
 export async function generatePNG(
   slug: string,
   baseUrl: string,
-  signedUrl?: string
+  signedUrl?: string,
+  tenantId?: string,
 ): Promise<ArrayBuffer> {
   if (!baseUrl && !signedUrl) {
     throw new Error(`generatePNG: baseUrl is required (was: ${baseUrl})`);
   }
   const normalizedBase = baseUrl ? baseUrl.replace(/\/+$/, '') : '';
-  const payload = signedUrl || `${normalizedBase}/order/${encodeURIComponent(slug)}`;
+  const cleanTenant = typeof tenantId === 'string' ? tenantId.trim() : '';
+  const tenantQuery =
+    cleanTenant && cleanTenant !== 'default' && cleanTenant !== '*' && cleanTenant.toLowerCase() !== 'hq'
+      ? `&tenant=${encodeURIComponent(cleanTenant)}`
+      : '';
+  const payload = signedUrl || `${normalizedBase}?table=${encodeURIComponent(slug)}${tenantQuery}`;
   const pngBytes = encodeQrToPngBytes(payload, {
     width: 400,
     margin: 2,
@@ -192,9 +198,10 @@ function arrayBufferToBase64(buffer: ArrayBuffer): string {
 export async function generateDataURL(
   slug: string,
   baseUrl: string,
-  signedUrl?: string
+  signedUrl?: string,
+  tenantId?: string,
 ): Promise<string> {
-  const pngBuffer = await generatePNG(slug, baseUrl, signedUrl);
+  const pngBuffer = await generatePNG(slug, baseUrl, signedUrl, tenantId);
   const base64 = arrayBufferToBase64(pngBuffer);
   return `data:image/png;base64,${base64}`;
 }

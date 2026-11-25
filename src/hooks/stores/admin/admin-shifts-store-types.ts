@@ -14,6 +14,10 @@ export interface ShiftRecord {
   expected_cash?: number | null;
   actual_cash?: number | null;
   cash_variance?: number | null;
+  remitted_cash?: number | null;
+  closing_float?: number | null;
+  handover_to_staff_id?: string | null;
+  online_sales_total?: number | null;
   attendance_state?: 'scheduled' | 'active' | 'completed' | 'cancelled' | null;
   start_time?: string | null;
   end_time?: string | null;
@@ -43,6 +47,13 @@ export interface ShiftReconciliationRecord {
   variance_status: 'balanced' | 'overage' | 'shortage';
   cash_payment_total: number;
   cash_payout_total: number;
+  remitted_cash?: number;
+  closing_float?: number;
+  handover_to_staff_id?: string | null;
+  online_sales_total?: number;
+  shift_closed?: boolean;
+  clock_out?: string | null;
+  hours_worked?: number | null;
   notes: string | null;
   created_at: string;
 }
@@ -50,6 +61,11 @@ export interface ShiftReconciliationRecord {
 export interface TodayResponse {
   success: boolean;
   data: ShiftRecord[];
+  meta?: {
+    suggested_opening_cash?: number;
+    latest_reconciled_shift_id?: string | null;
+    latest_handover_to_staff_id?: string | null;
+  };
 }
 
 export interface SingleShiftResponse {
@@ -67,6 +83,7 @@ export interface LoadingMap {
 export interface AdminShiftsState {
   todayShifts: ShiftRecord[];
   historyShifts: ShiftRecord[];
+  suggestedOpeningCash: number;
   loading: LoadingMap;
   error: string | null;
   mutationError: string | null;

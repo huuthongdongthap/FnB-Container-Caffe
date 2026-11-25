@@ -12,6 +12,8 @@ export default function CheckinNew() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pointsEarned, setPointsEarned] = useState<number | null>(null);
+  const [rewardAmount, setRewardAmount] = useState<number | null>(null);
+  const [checkinStatus, setCheckinStatus] = useState<string | null>(null);
   const phoneInputRef = useRef<HTMLInputElement | null>(null);
 
   const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -29,9 +31,16 @@ export default function CheckinNew() {
       const res = await apiFetch<{
         success?: boolean;
         ok?: boolean;
+        status?: string;
+        reward_amount?: number;
         points_earned?: number;
         points?: number;
-        data?: { points_earned?: number; points?: number };
+        data?: {
+          status?: string;
+          reward_amount?: number;
+          points_earned?: number;
+          points?: number;
+        };
         error?: string;
         message?: string;
       }>('/api/checkin', {
@@ -43,7 +52,11 @@ export default function CheckinNew() {
         return;
       }
       const earned = res.points_earned ?? res.points ?? res.data?.points_earned ?? res.data?.points ?? null;
+      const reward = res.reward_amount ?? res.data?.reward_amount ?? null;
+      const status = res.status ?? res.data?.status ?? null;
       setPointsEarned(typeof earned === 'number' ? earned : null);
+      setRewardAmount(typeof reward === 'number' ? reward : null);
+      setCheckinStatus(typeof status === 'string' ? status : null);
       setIsSuccess(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Không thể kết nối máy chủ. Vui lòng thử lại.');
@@ -67,14 +80,34 @@ export default function CheckinNew() {
             <div className="w-16 h-16 rounded-full bg-[#4A7C59]/20 border border-[#4A7C59] flex items-center justify-center mx-auto mb-6 text-[#4A7C59]">
               <CheckCircle2 className="w-10 h-10" />
             </div>
-            <span className="text-[11px] font-bold uppercase tracking-[0.25em] text-[#4A7C59] block mb-2">
-              TÍCH ĐIỂM THÀNH CÔNG
+            <span
+              data-testid="checkin-status-badge"
+              className="text-[11px] font-bold uppercase tracking-[0.25em] text-[#4A7C59] block mb-2"
+            >
+              {checkinStatus === 'pending' ? 'ĐÃ GHI NHẬN CHECK-IN • CHỜ DUYỆT' : 'TÍCH ĐIỂM THÀNH CÔNG'}
             </span>
             <h2 className="font-display text-3xl text-white font-semibold mb-3">
               Cảm Ơn Quý Khách!
             </h2>
             <p className="text-[var(--aura-chrome-soft)] text-sm max-w-sm mx-auto mb-6 font-light leading-relaxed">
-              Điểm thưởng{pointsEarned !== null ? ` (+${pointsEarned} điểm)` : ''} của lượt ghé hôm nay đã được ghi nhận cho số điện thoại <span className="font-mono text-white font-semibold">{phone}</span>.
+              {checkinStatus === 'pending' ? (
+                <>
+                  Yêu cầu check-in cho số điện thoại{' '}
+                  <span className="font-mono text-white font-semibold">{phone}</span> đã được ghi nhận
+                  {rewardAmount !== null ? ` với mức thưởng +${rewardAmount.toLocaleString('vi-VN')} ₫` : ''} và đang chờ nhân viên xác nhận tại quầy.
+                </>
+              ) : (
+                <>
+                  Điểm thưởng
+                  {pointsEarned !== null
+                    ? ` (+${pointsEarned} điểm)`
+                    : rewardAmount !== null
+                      ? ` (+${rewardAmount.toLocaleString('vi-VN')} ₫)`
+                      : ''}{' '}
+                  của lượt ghé hôm nay đã được ghi nhận cho số điện thoại{' '}
+                  <span className="font-mono text-white font-semibold">{phone}</span>.
+                </>
+              )}
             </p>
             <div className="flex flex-col sm:flex-row gap-3 justify-center">
               <a
@@ -87,6 +120,9 @@ export default function CheckinNew() {
                 onClick={() => {
                   setIsSuccess(false);
                   setPhone('');
+                  setRewardAmount(null);
+                  setCheckinStatus(null);
+                  setPointsEarned(null);
                 }}
                 className="border border-white/20 text-[var(--aura-chrome-bright)] hover:border-white px-6 py-3 rounded-full font-body text-xs font-semibold uppercase tracking-widest transition-all"
               >

@@ -22,8 +22,8 @@ interface AdminReservationsState {
   error: string | null;
   offset: number;
   hasNext: boolean;
-  filters: { date?: string; status?: string };
-  fetchReservations: (options?: { offset?: number; date?: string; status?: string }) => Promise<void>;
+  filters: { date?: string; status?: string; search?: string };
+  fetchReservations: (options?: { offset?: number; date?: string; status?: string; search?: string }) => Promise<void>;
   updateReservation: (id: string, data: Record<string, string | number>) => Promise<boolean>;
   changeStatus: (id: string, status: string) => Promise<boolean>;
   approveReservation: (id: string) => Promise<void>;
@@ -67,11 +67,12 @@ export const useAdminReservationsStore = create<AdminReservationsState>((set, ge
   filters: {},
 
   fetchReservations: async (options) => {
-    const filters = options ? { date: options.date, status: options.status } : get().filters;
+    const filters = options ? { date: options.date, status: options.status, search: options.search } : get().filters;
     const offset = options?.offset ?? get().offset;
     const params = new URLSearchParams({ limit: '50', offset: String(offset) });
     if (filters.date) params.set('date', filters.date);
     if (filters.status && filters.status !== 'all') params.set('status', filters.status);
+    if (filters.search && filters.search.trim()) params.set('search', filters.search.trim());
     const seq = ++latestFetchReservationsSeq;
     set({ loading: true, error: null });
     try {

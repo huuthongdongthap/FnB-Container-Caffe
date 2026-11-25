@@ -6,11 +6,10 @@ import { getDatabase, matchesTenantRow } from '../../lib/db';
 import { hashPassword } from '../../lib/jwt';
 import { getTenantId, isHQSuperAdmin } from '../../middleware/tenant';
 import { loadStaffAccount, SessionUnavailableError } from '../../lib/staff-session';
-import { PilotStoreError, resolvePilotStore } from '../../lib/pilot-store';
 import { staffManagementDenial, staffMutationGuard } from '../../lib/staff-account-mutation';
 import { createStaffIdentity, staffEmailInUse } from '../../lib/staff-login-identity';
 
-import { extractRequestedShiftTenant, shiftScope } from '../../../../packages/domain/shift/commands/shift-access';
+import { extractRequestedShiftTenant, isTenantShiftsOptedOut, shiftScope } from '../../../../packages/domain/shift/commands/shift-access';
 import { listShifts } from '../../../../packages/domain/shift/commands/shift-repository';
 import { shiftDto, attendanceDto } from '../../../../packages/domain/shift/model/shift-types';
 
@@ -332,23 +331,18 @@ export function registerStaffHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
       }
     }
 
-    const targetStaffTenant = (account.account.tenant_id || '').trim() || 'default';
-    let shiftsAvailability: { available: true } | { available: false; reason: 'pilot_restricted' | 'pilot_unconfigured' } = { available: true };
-    const hasExplicitPilot = c.env.PILOT_TENANT_ID !== undefined || c.env.ENVIRONMENT === 'production' || c.env.NODE_ENV === 'production';
-    if (hasExplicitPilot) {
-      try {
-        const pilotTenant = resolvePilotStore(c.env);
-        if (!tenantCheck.isHq && targetStaffTenant !== pilotTenant) {
-          shiftsAvailability = { available: false, reason: 'pilot_restricted' };
-        }
-      } catch (error) {
-        if (!(error instanceof PilotStoreError)) throw error;
-        shiftsAvailability = { available: false, reason: 'pilot_unconfigured' };
-      }
-    }
+    const rawTargetTenant = (account.account.tenant_id || '').trim();
+    const targetStaffTenant = !rawTargetTenant || rawTargetTenant === '*' || rawTargetTenant.toLowerCase() === 'hq'
+      ? (tenantId !== '*' ? tenantId : 'default')
+      : rawTargetTenant;
+    const tenantOptedOut = await isTenantShiftsOptedOut(c.env, db, targetStaffTenant);
+    const shiftsAvailability: { available: true } | { available: false; reason: 'pilot_restricted' | 'pilot_unconfigured' | 'tenant_disabled' } =
+      tenantOptedOut
+        ? { available: false, reason: 'tenant_disabled' }
+        : { available: true };
     let shiftResults: ReturnType<typeof shiftDto>[] = [];
     let attendanceResults: ReturnType<typeof attendanceDto>[] = [];
-    // Profile authorization above is independent of the optional attendance pilot.
+    // Profile authorization above is independent of per-tenant shift opt-out.
     // All other scope, authorization and storage errors must still fail closed.
     if (shiftsAvailability.available) {
       const scope = await shiftScope(c.env, c.get('user'), tenantId === '*' ? targetStaffTenant : tenantId);

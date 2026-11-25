@@ -499,7 +499,7 @@ export function registerSessionHandlers(router: Hono<{ Bindings: Env }>): void {
           id, table_id: tableId, customer_id: body.customer_id || null,
           customer_name: body.customer_name || null, customer_phone: body.customer_phone || null,
           status: 'active', notes: body.notes || null, tenant_id: effectiveSessionTenant,
-          started_at: now, created_at: now, updated_at: now,
+          opened_at: now, started_at: now, created_at: now, updated_at: now,
         };
         const entries = Object.entries(values).filter(([key]) => !schema.sessionMissing.has(key));
         const sessionScoped = !schema.sessionMissing.has('tenant_id');

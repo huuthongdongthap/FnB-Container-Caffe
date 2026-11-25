@@ -205,8 +205,9 @@ describe('Shift Handover Flow (#102)', () => {
         body: JSON.stringify({
           opening_float: 200000,
           denominations: { denominations: [{ denomination: 500000, count: 1 }] },
-          remitted_cash: 0,
-          closing_float: 500000,
+          remitted_cash: 300000,
+          closing_float: 200000,
+          close_shift: true,
         }),
       }),
     );
@@ -669,5 +670,158 @@ describe('Shift Handover Flow (#102)', () => {
       }),
     );
     expect(reconcileAttempts).toBe(2);
+  });
+
+  it('#222 & #223: mode="open" never hijacks to another staff active shift or scheduled shift, suggests previous closing_float, and lets managers pick target staff', async () => {
+    mockActor = { id: 'mgr_1', name: 'Manager', role: 'manager', tenantId: 'default' };
+    const otherActiveShift = {
+      id: '101',
+      staff_id: 'staff_1',
+      staff_name: 'Alice',
+      clock_in: '2026-11-25T01:00:00.000Z',
+      clock_out: null,
+      hours_worked: null,
+      date: '2026-11-25',
+      opening_cash: 200_000,
+      notes: null,
+      attendance_state: 'active',
+    };
+    const otherScheduledShift = {
+      id: '102',
+      staff_id: 'staff_2',
+      staff_name: 'Bob',
+      clock_in: null,
+      clock_out: null,
+      hours_worked: null,
+      date: '2026-11-25',
+      opening_cash: 500_000,
+      notes: null,
+      attendance_state: 'scheduled',
+      start_time: '14:00',
+    };
+
+    mockApiFetch.mockImplementation(async (path: string, opts?: RequestInit) => {
+      if (path === '/api/shifts/today') {
+        return {
+          success: true,
+          data: [otherActiveShift, otherScheduledShift],
+          meta: { suggested_opening_cash: 250_000 },
+        };
+      }
+      if (path === '/api/shifts/clock-in' && opts?.method === 'POST') {
+        return {
+          success: true,
+          data: {
+            id: '103',
+            staff_id: 'mgr_1',
+            staff_name: 'Manager',
+            clock_in: '2026-11-25T02:00:00.000Z',
+            clock_out: null,
+            hours_worked: null,
+            date: '2026-11-25',
+            opening_cash: 250_000,
+            notes: null,
+            attendance_state: 'active',
+          },
+        };
+      }
+      return { success: true, data: [] };
+    });
+
+    renderWithProviders(<ShiftHandoverModal isOpen mode="open" onClose={vi.fn()} />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId('handover-no-active-shift')).toBeTruthy();
+    });
+    expect(screen.queryByTestId('submit-handover-btn')).toBeNull();
+
+    // Auto-suggests previous closing_float (250,000) instead of Bob's scheduled 500,000
+    const openingInput = screen.getByLabelText(/Opening Cash Float/i) as HTMLInputElement;
+    expect(openingInput.value).toBe('250000');
+
+    // Manager opens shift for themselves (not hijacked to Bob's schedule #102)
+    fireEvent.click(screen.getByRole('button', { name: /Clock In/i }));
+
+    await waitFor(() => {
+      expect(mockApiFetch).toHaveBeenCalledWith(
+        '/api/shifts/clock-in',
+        expect.objectContaining({
+          method: 'POST',
+          body: JSON.stringify({
+            staff_id: 'mgr_1',
+            opening_cash: 250000,
+          }),
+        }),
+      );
+    });
+  });
+
+  it('#223: completes single-step atomic handover when close_shift returns shift_closed=true and displays all 4 handover fields', async () => {
+    const activeShift = {
+      id: '201',
+      staff_id: 'staff_1',
+      staff_name: 'Alice',
+      role: 'staff',
+      clock_in: '2026-11-25T01:00:00.000Z',
+      clock_out: null,
+      hours_worked: null,
+      date: '2026-11-25',
+      opening_cash: 100_000,
+      notes: null,
+      attendance_state: 'active',
+    };
+
+    mockApiFetch.mockImplementation(async (path: string, opts?: RequestInit) => {
+      if (path === '/api/shifts/today') return { success: true, data: [activeShift] };
+      if (path === '/api/shifts/201/reconciliation') {
+        throw new ApiClientError({ status: 404, message: 'Not found' });
+      }
+      if (path === '/api/shifts/201/reconcile' && opts?.method === 'POST') {
+        return {
+          success: true,
+          data: {
+            id: 'rec_201',
+            shift_id: '201',
+            staff_id: 'staff_1',
+            opening_float: 100_000,
+            expected_cash: 300_000,
+            actual_cash: 300_000,
+            variance: 0,
+            variance_status: 'balanced',
+            cash_payment_total: 200_000,
+            cash_payout_total: 0,
+            remitted_cash: 200_000,
+            closing_float: 100_000,
+            handover_to_staff_id: 'staff_2',
+            online_sales_total: 120_000,
+            shift_closed: true,
+            clock_out: '2026-11-25T09:00:00.000Z',
+            hours_worked: 8,
+            notes: null,
+            created_at: '2026-11-25T09:00:00.000Z',
+          },
+        };
+      }
+      return { success: true, data: [] };
+    });
+
+    renderWithProviders(<ShiftHandoverModal isOpen onClose={vi.fn()} />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId('submit-handover-btn')).toBeTruthy();
+    });
+
+    fireEvent.change(screen.getByLabelText('Denomination 200000'), { target: { value: '1' } });
+    fireEvent.change(screen.getByLabelText('Denomination 100000'), { target: { value: '1' } });
+    fireEvent.change(screen.getByTestId('handover-recipient-select'), { target: { value: 'staff_2' } });
+
+    fireEvent.click(screen.getByTestId('submit-handover-btn'));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('handover-completed')).toBeTruthy();
+      expect(screen.getByTestId('handover-summary-fields').textContent).toContain('Bob');
+    });
+
+    expect(mockApiFetch).not.toHaveBeenCalledWith('/api/shifts/clock-out', expect.anything());
   });
 });

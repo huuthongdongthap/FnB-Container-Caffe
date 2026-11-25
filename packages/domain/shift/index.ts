@@ -8,9 +8,19 @@ export type {
   ReconciliationInput,
   VarianceStatus,
 } from './src/model/reconciliation-types';
+export {
+  CASH_DRAWER_ROLES,
+  PAYOUT_ROLES,
+  CASH_ASSIGN_ROLES,
+  NON_CASH_SHIFT_ROLES,
+  RECONCILIATION_ROLES,
+  deriveShiftSlot,
+  shiftDto,
+  attendanceDto,
+} from './model/shift-types';
 // commands
 export { shiftsRouter } from './commands/shifts';
-export { ShiftContractError } from './commands/shift-access';
+export { ShiftContractError, isTenantShiftsOptedOut, extractRequestedShiftTenant } from './commands/shift-access';
 export { reconciliationRoutes } from './src/routes/reconciliation';
 // policies
 export {

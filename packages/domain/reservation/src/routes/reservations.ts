@@ -121,26 +121,35 @@ async function ensureActiveTableSession(
           : null;
       const inserted = await db
         .prepare(
-          "INSERT INTO table_sessions (id, table_id, status, notes, tenant_id, started_at, created_at, updated_at) VALUES (?, ?, 'active', ?, ?, ?, ?, ?)"
+          "INSERT INTO table_sessions (id, table_id, status, notes, tenant_id, opened_at, started_at, created_at, updated_at) VALUES (?, ?, 'active', ?, ?, ?, ?, ?, ?)"
         )
-        .bind(sessionId, tableId, sessionNote, normTenant, now, now, now)
+        .bind(sessionId, tableId, sessionNote, normTenant, now, now, now, now)
         .run()
         .then(() => true)
         .catch(() =>
           db
             .prepare(
-              "INSERT INTO table_sessions (id, table_id, status, tenant_id, started_at, created_at, updated_at) VALUES (?, ?, 'active', ?, ?, ?, ?)"
+              "INSERT INTO table_sessions (id, table_id, status, notes, tenant_id, started_at, created_at, updated_at) VALUES (?, ?, 'active', ?, ?, ?, ?, ?)"
             )
-            .bind(sessionId, tableId, normTenant, now, now, now)
+            .bind(sessionId, tableId, sessionNote, normTenant, now, now, now)
             .run()
             .then(() => true)
             .catch(() =>
               db
-                .prepare("INSERT INTO table_sessions (id, table_id, status, tenant_id) VALUES (?, ?, 'active', ?)")
-                .bind(sessionId, tableId, normTenant)
+                .prepare(
+                  "INSERT INTO table_sessions (id, table_id, status, tenant_id, started_at, created_at, updated_at) VALUES (?, ?, 'active', ?, ?, ?, ?)"
+                )
+                .bind(sessionId, tableId, normTenant, now, now, now)
                 .run()
                 .then(() => true)
-                .catch(() => false)
+                .catch(() =>
+                  db
+                    .prepare("INSERT INTO table_sessions (id, table_id, status, tenant_id) VALUES (?, ?, 'active', ?)")
+                    .bind(sessionId, tableId, normTenant)
+                    .run()
+                    .then(() => true)
+                    .catch(() => false)
+                )
             )
         );
       sessionReady = inserted;
@@ -666,6 +675,8 @@ reservationsRouter.get('/', requireReservationStaff() as any, async (c) => {
   const tenantId = resolveRequestTenantId(c);
   const date = c.req.query('date');
   const status = c.req.query('status');
+  const rawSearch = (c.req.query('search') || c.req.query('q') || '').trim().slice(0, 100);
+  const searchPattern = rawSearch ? `%${rawSearch.toLowerCase()}%` : '';
   if (status && !new Set([...ACTIVE_RESERVATION_STATUSES, ...TERMINAL_RESERVATION_STATUSES]).has(status)) {
     return c.json({ success: false, error: 'Invalid reservation status' }, 400);
   }
@@ -691,6 +702,10 @@ reservationsRouter.get('/', requireReservationStaff() as any, async (c) => {
       query += ' AND r.date = ?'; params.push(date);
     }
     if (status) { query += ' AND r.status = ?'; params.push(status); }
+    if (searchPattern) {
+      query += " AND (LOWER(COALESCE(r.customer_name, '')) LIKE ? OR LOWER(COALESCE(r.customer_phone, '')) LIKE ? OR LOWER(COALESCE(r.id, '')) LIKE ?)";
+      params.push(searchPattern, searchPattern, searchPattern);
+    }
     query += ' ORDER BY r.date DESC, r.time ASC LIMIT ? OFFSET ?';
     params.push(limit, offset);
 
@@ -712,6 +727,10 @@ reservationsRouter.get('/', requireReservationStaff() as any, async (c) => {
           query += ' AND r.date = ?'; params.push(date);
         }
         if (status) { query += ' AND r.status = ?'; params.push(status); }
+        if (searchPattern) {
+          query += " AND (LOWER(COALESCE(r.customer_name, '')) LIKE ? OR LOWER(COALESCE(r.customer_phone, '')) LIKE ? OR LOWER(COALESCE(r.id, '')) LIKE ?)";
+          params.push(searchPattern, searchPattern, searchPattern);
+        }
         query += ' ORDER BY r.date DESC, r.time ASC LIMIT ? OFFSET ?';
         params.push(fetchLimit, fetchOffset);
 
@@ -729,6 +748,10 @@ reservationsRouter.get('/', requireReservationStaff() as any, async (c) => {
           fallbackQuery += ' AND r.reservation_date = ?'; params.push(date);
         }
         if (status) { fallbackQuery += ' AND r.status = ?'; params.push(status); }
+        if (searchPattern) {
+          fallbackQuery += " AND (LOWER(COALESCE(r.customer_name, '')) LIKE ? OR LOWER(COALESCE(r.phone, '')) LIKE ? OR LOWER(COALESCE(r.id, '')) LIKE ?)";
+          params.push(searchPattern, searchPattern, searchPattern);
+        }
         fallbackQuery += ' ORDER BY r.reservation_date DESC, r.reservation_time ASC LIMIT ? OFFSET ?';
         params.push(fetchLimit, fetchOffset);
 
@@ -748,6 +771,10 @@ reservationsRouter.get('/', requireReservationStaff() as any, async (c) => {
           fallbackQuery += ' AND r.reservation_date = ?'; params.push(date);
         }
         if (status) { fallbackQuery += ' AND r.status = ?'; params.push(status); }
+        if (searchPattern) {
+          fallbackQuery += " AND (LOWER(COALESCE(r.customer_name, '')) LIKE ? OR LOWER(COALESCE(r.customer_phone, '')) LIKE ? OR LOWER(COALESCE(r.id, '')) LIKE ?)";
+          params.push(searchPattern, searchPattern, searchPattern);
+        }
         fallbackQuery += ' ORDER BY r.reservation_date DESC, r.reservation_time ASC LIMIT ? OFFSET ?';
         params.push(limit, offset);
         const res = await db.prepare(fallbackQuery).bind(...params).all().catch(() => ({ results: [] }));
@@ -1142,6 +1169,9 @@ reservationsRouter.patch('/:id', optionalAuth() as any, requireReservationStaff(
     }
   }
   const nextStatus = body.status !== undefined ? String(body.status).trim().toLowerCase() : undefined;
+  if (body.status !== undefined && (typeof body.status !== 'string' || !nextStatus || !ALL_RESERVATION_STATUSES.has(nextStatus))) {
+    return c.json({ success: false, error: `Invalid reservation status: ${String(body.status)}` }, 400);
+  }
   const hasCancelledAtColumn = 'cancelled_at' in rsv;
   const isReopeningCancelled =
     hasCancelledAtColumn &&
@@ -1933,7 +1963,7 @@ reservationsRouter.patch('/:id/reject', requireReservationStaff() as any, async 
     await db.prepare("UPDATE reservations SET status = 'rejected', updated_at = ? WHERE id = ?").bind(now, id).run();
   }
 
-  await releaseTableIfEligible(db, rsv, rsvTenant);
+  await releaseTableIfEligible(db, rsv, rsvTenant, { allowOccupiedRelease: true });
   return c.json({ success: true, message: 'Reservation rejected' });
 });
 
@@ -2007,7 +2037,7 @@ reservationsRouter.delete(
       await db.prepare("UPDATE reservations SET status = 'cancelled', updated_at = ? WHERE id = ?").bind(now, id).run();
     }
 
-    await releaseTableIfEligible(db, rsv, rsvTenant);
+    await releaseTableIfEligible(db, rsv, rsvTenant, { allowOccupiedRelease: true });
     return c.json({ success: true, message: 'Reservation cancelled' });
   }
 );
