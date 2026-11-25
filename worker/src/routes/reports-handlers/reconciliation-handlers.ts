@@ -476,15 +476,17 @@ export function registerReconciliationHandlers(app: Hono<{ Bindings: Env }>) {
         opening_cash?: number | null;
       };
       let staffShiftRows: StaffShiftRow[] = [];
-      try {
+      const runUnreconciledQuery = async (withAttendanceState: boolean) => {
         const extraBinds = tenantId !== '*' ? [tenantId, tenantId, tenantId] : [];
-        const res = await db
+        const attendanceFilter = withAttendanceState
+          ? " AND LOWER(COALESCE(attendance_state, 'active')) <> 'cancelled'"
+          : '';
+        return db
           .prepare(
             `SELECT id, staff_name, role, date, clock_in, clock_out, opening_cash
              FROM staff_shifts
              WHERE date BETWEEN ? AND ?
-               AND clock_in IS NOT NULL
-               AND LOWER(COALESCE(attendance_state, 'active')) <> 'cancelled'${tf.and}
+               AND clock_in IS NOT NULL${attendanceFilter}${tf.and}
                AND (
                  LOWER(TRIM(COALESCE(role, 'staff'))) NOT IN ('barista', 'chef', 'kitchen', 'bep', 'shipper', 'rider', 'waiter')
                  OR COALESCE(opening_cash, 0) > 0
@@ -506,28 +508,36 @@ export function registerReconciliationHandlers(app: Hono<{ Bindings: Env }>) {
           )
           .bind(from, to, ...tf.binds, ...extraBinds)
           .all<StaffShiftRow>();
+      };
+      try {
+        const res = await runUnreconciledQuery(true);
         staffShiftRows = res.results || [];
       } catch {
-        const reconBinds = tenantId !== '*' ? [tenantId] : [];
-        const res = await db
-          .prepare(
-            `SELECT id, staff_name, role, date, clock_in, clock_out, opening_cash
-             FROM staff_shifts
-             WHERE date BETWEEN ? AND ?
-               AND clock_in IS NOT NULL${tf.and}
-               AND (
-                 LOWER(TRIM(COALESCE(role, 'staff'))) NOT IN ('barista', 'chef', 'kitchen', 'bep', 'shipper', 'rider', 'waiter')
-                 OR COALESCE(opening_cash, 0) > 0
-               )
-               AND NOT EXISTS (
-                 SELECT 1 FROM shift_reconciliations r
-                 WHERE r.shift_id = CAST(staff_shifts.id AS TEXT)${reconTenantClause}
-               )
-             ORDER BY clock_in DESC`
-          )
-          .bind(from, to, ...tf.binds, ...reconBinds)
-          .all<StaffShiftRow>();
-        staffShiftRows = res.results || [];
+        try {
+          const res = await runUnreconciledQuery(false);
+          staffShiftRows = res.results || [];
+        } catch {
+          const reconBinds = tenantId !== '*' ? [tenantId] : [];
+          const res = await db
+            .prepare(
+              `SELECT id, staff_name, role, date, clock_in, clock_out, opening_cash
+               FROM staff_shifts
+               WHERE date BETWEEN ? AND ?
+                 AND clock_in IS NOT NULL${tf.and}
+                 AND (
+                   LOWER(TRIM(COALESCE(role, 'staff'))) NOT IN ('barista', 'chef', 'kitchen', 'bep', 'shipper', 'rider', 'waiter')
+                   OR COALESCE(opening_cash, 0) > 0
+                 )
+                 AND NOT EXISTS (
+                   SELECT 1 FROM shift_reconciliations r
+                   WHERE r.shift_id = CAST(staff_shifts.id AS TEXT)${reconTenantClause}
+                 )
+               ORDER BY clock_in DESC`
+            )
+            .bind(from, to, ...tf.binds, ...reconBinds)
+            .all<StaffShiftRow>();
+          staffShiftRows = res.results || [];
+        }
       }
       for (const s of staffShiftRows || []) {
         const sid = String(s.id);
