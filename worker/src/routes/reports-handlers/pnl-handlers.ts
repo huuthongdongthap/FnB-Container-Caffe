@@ -24,7 +24,9 @@ export interface DailyPnlEntry {
   refunds: number;
   cogs: number;
   waste_cost: number;
+  cash_payouts: number;
   gross_profit: number;
+  operating_profit: number;
   gross_margin_pct: number;
 }
 
@@ -44,7 +46,9 @@ export interface PnlSummaryReport {
     refunds: number;
     cogs: number;
     waste_cost: number;
+    cash_payouts: number;
     gross_profit: number;
+    operating_profit: number;
     gross_margin_pct: number;
   };
   daily: DailyPnlEntry[];
@@ -260,22 +264,47 @@ export function registerPnlHandlers(app: Hono<{ Bindings: Env }>) {
       }
     }
 
+    // 4. Daily Operating Cash Payouts from drawer (excluding refund-linked payouts to avoid double-counting)
+    let payoutRows: { date: string; cash_payouts: number }[] = [];
+    try {
+      const cpTf = buildTenantClause(tenantId, 'cp');
+      const cpRes = await db
+        .prepare(
+          `SELECT DATE(datetime(cp.created_at, '+7 hours')) as date,
+                  COALESCE(SUM(ABS(cp.amount)), 0) as cash_payouts
+           FROM cash_payouts cp
+           WHERE DATE(datetime(cp.created_at, '+7 hours')) BETWEEN ? AND ?
+             AND LOWER(COALESCE(cp.status, 'completed')) IN ('completed', 'approved')
+             AND LOWER(COALESCE(cp.reason, '')) NOT LIKE '%refund%'
+             AND LOWER(COALESCE(cp.reason, '')) NOT LIKE '%hoàn tiền%'${cpTf.and}
+           GROUP BY DATE(datetime(cp.created_at, '+7 hours')) ORDER BY date`
+        )
+        .bind(from, to, ...cpTf.binds)
+        .all<{ date: string; cash_payouts: number }>();
+      payoutRows = cpRes.results || [];
+    } catch {
+      payoutRows = [];
+    }
+
     const dates = new Set<string>();
     for (const r of orderRows) if (r.date) dates.add(r.date);
     for (const r of invRows) if (r.date) dates.add(r.date);
     for (const r of bomMovementRows) if (r.date) dates.add(r.date);
     for (const r of refundRows) if (r.date) dates.add(r.date);
+    for (const r of payoutRows) if (r.date) dates.add(r.date);
 
     const orderMap = new Map(orderRows.map((r) => [r.date, r]));
     const invMap = new Map(invRows.map((r) => [r.date, r]));
     const bomMap = new Map(bomMovementRows.map((r) => [r.date, r]));
     const refundMap = new Map(refundRows.map((r) => [r.date, r]));
+    const payoutMap = new Map(payoutRows.map((r) => [r.date, r]));
 
     const daily: DailyPnlEntry[] = [...dates].sort().map((date) => {
       const o = orderMap.get(date);
       const inv = invMap.get(date);
       const bom = bomMap.get(date);
       const ref = refundMap.get(date);
+      const pay = payoutMap.get(date);
       const orders = Number(o?.orders || 0);
       const totalCollected = Math.round(Number(o?.total_collected || 0));
       const shippingFee = Math.round(Number(o?.shipping_fee || 0));
@@ -283,14 +312,16 @@ export function registerPnlHandlers(app: Hono<{ Bindings: Env }>) {
       const tipAmount = Math.round(Number(o?.tip_amount || 0));
       const discounts = Math.round(Number(o?.discounts || 0));
       const refunds = Math.round(Number(ref?.refunds || 0));
+      const cashPayouts = Math.round(Number(pay?.cash_payouts || 0));
       const baseNetBeforeRefunds = Math.max(0, totalCollected - shippingFee - serviceFee - tipAmount);
       const grossSales = baseNetBeforeRefunds + discounts;
-      const netRevenue = Math.max(0, baseNetBeforeRefunds - refunds);
+      const netRevenue = baseNetBeforeRefunds - refunds;
       const invCogs = Math.round(Number(inv?.cogs || 0));
       const bomCogs = Math.round(Number(bom?.cogs || 0));
       const cogs = invCogs + bomCogs;
       const wasteCost = Math.round(Number(inv?.waste_cost || 0)) + Math.round(Number(bom?.waste_cost || 0));
       const grossProfit = netRevenue - cogs - wasteCost;
+      const operatingProfit = grossProfit - cashPayouts;
       const grossMarginPct =
         netRevenue > 0 ? Math.round((grossProfit / netRevenue) * 10000) / 100 : 0;
 
@@ -307,7 +338,9 @@ export function registerPnlHandlers(app: Hono<{ Bindings: Env }>) {
         refunds,
         cogs,
         waste_cost: wasteCost,
+        cash_payouts: cashPayouts,
         gross_profit: grossProfit,
+        operating_profit: operatingProfit,
         gross_margin_pct: grossMarginPct,
       };
     });
@@ -325,7 +358,9 @@ export function registerPnlHandlers(app: Hono<{ Bindings: Env }>) {
         acc.refunds += d.refunds;
         acc.cogs += d.cogs;
         acc.waste_cost += d.waste_cost;
+        acc.cash_payouts += d.cash_payouts;
         acc.gross_profit += d.gross_profit;
+        acc.operating_profit += d.operating_profit;
         return acc;
       },
       {
@@ -340,7 +375,9 @@ export function registerPnlHandlers(app: Hono<{ Bindings: Env }>) {
         refunds: 0,
         cogs: 0,
         waste_cost: 0,
+        cash_payouts: 0,
         gross_profit: 0,
+        operating_profit: 0,
         gross_margin_pct: 0,
       }
     );

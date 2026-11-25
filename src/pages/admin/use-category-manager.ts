@@ -15,6 +15,7 @@ export function useCategoryManager() {
   const [editing, setEditing] = useState<Category | null>(null);
   const [form, setForm] = useState<CategoryFormData>(EMPTY_CATEGORY);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [actionError, setActionError] = useState<string | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -22,6 +23,7 @@ export function useCategoryManager() {
     setEditing(null);
     setForm(EMPTY_CATEGORY);
     setErrors({});
+    setActionError(null);
     setDeleteId(null);
   }, [session.tenantId, session.userScope]);
 
@@ -63,12 +65,15 @@ export function useCategoryManager() {
     mutationFn: (id: string) =>
       apiFetch(`/api/categories/${id}`, { method: 'DELETE' }),
     onSuccess: () => {
+      setActionError(null);
       queryClient.invalidateQueries({ queryKey: categoriesKey });
       queryClient.invalidateQueries({ queryKey: ['menu'] });
       setDeleteId(null);
     },
     onError: (err: Error) => {
+      setDeleteId(null);
       setErrors({ _form: err.message });
+      setActionError(err.message || 'Không thể xoá danh mục');
     },
   });
 
@@ -131,6 +136,8 @@ export function useCategoryManager() {
     editing,
     form,
     errors,
+    actionError,
+    clearActionError: () => setActionError(null),
     deleteId,
     setDeleteId,
     saveMutation,

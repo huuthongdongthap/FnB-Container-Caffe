@@ -65,6 +65,8 @@ export function resolveErpnextTenant(c: import('hono').Context<{ Bindings: Env }
 }
 
 const VendorSyncSchema = z.object({
+  id: z.string().optional(),
+  erpnext_id: z.string().optional(),
   name: z.string().min(1),
   tax_id: z.string().optional().or(z.literal('')),
   address: z.string().optional().or(z.literal('')),
@@ -89,7 +91,7 @@ export function vendorRoutes(app: import('hono').Hono<{ Bindings: Env }>): void 
       const parsedLimit = parseInt(c.req.query('limit') || '100', 10);
       const limit = Math.min(Math.max(Number.isFinite(parsedLimit) ? parsedLimit : 100, 1), 500);
 
-      let results: any[] = [];
+      let results: Record<string, unknown>[] = [];
       try {
         if (tenantId !== '*') {
           try {
@@ -172,26 +174,159 @@ export function vendorRoutes(app: import('hono').Hono<{ Bindings: Env }>): void 
       }
       const data = parsed.data;
 
+      const db = c.env.AURA_DB;
+      let effectiveTenant = tenantId === '*' ? 'default' : tenantId;
+      let targetVendorId: string | null = data.id?.trim() || null;
+      let existingErpnextId: string | null = data.erpnext_id?.trim() || null;
+
+      if (db) {
+        try {
+          if (targetVendorId) {
+            const supRow = await db
+              .prepare('SELECT id, name, tenant_id FROM suppliers WHERE id = ? LIMIT 1')
+              .bind(targetVendorId)
+              .first<{ id?: string; name?: string; tenant_id?: string | null; erpnext_id?: string | null }>()
+              .catch(() => null);
+            if (supRow) {
+              if (tenantId !== '*' && !matchesTenantRow(supRow as unknown as Record<string, unknown>, tenantId)) {
+                return c.json({ success: false, error: 'Vendor not found' }, 404);
+              }
+              const rowTenant = typeof supRow.tenant_id === 'string' ? supRow.tenant_id.trim() : '';
+              if (rowTenant && rowTenant !== '*' && rowTenant.toLowerCase() !== 'hq') {
+                effectiveTenant = rowTenant;
+              }
+            }
+          } else {
+            const byName = await db
+              .prepare(
+                "SELECT id, name, tenant_id FROM suppliers WHERE name = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ? ORDER BY created_at DESC LIMIT 1"
+              )
+              .bind(data.name, effectiveTenant)
+              .first<{ id?: string; name?: string; tenant_id?: string | null }>()
+              .catch(() => null);
+            if (byName?.id) {
+              targetVendorId = String(byName.id);
+            }
+          }
+          if (!existingErpnextId && targetVendorId) {
+            const mapRow = await db
+              .prepare(
+                "SELECT erpnext_id FROM erpnext_mappings WHERE local_type IN ('supplier', 'vendor') AND local_id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ? LIMIT 1"
+              )
+              .bind(targetVendorId, effectiveTenant)
+              .first<{ erpnext_id?: string | null }>()
+              .catch(() => null);
+            if (mapRow?.erpnext_id) {
+              existingErpnextId = String(mapRow.erpnext_id).trim();
+            }
+          }
+        } catch {
+          // Optional lookup on minimal mock DBs
+        }
+      }
+
       if (c.env.ERPNEXT_MOCK === 'true') {
         return c.json({ success: true, data: { name: `mock-vendor-${Date.now()}`, mock: true, tax_id: data.tax_id, address: data.address, phone: data.phone }, synced: true });
       }
 
-      const isNonDefaultTenant = Boolean(tenantId && tenantId !== 'default' && tenantId !== '*');
+      const isNonDefaultTenant = Boolean(effectiveTenant && effectiveTenant !== 'default' && effectiveTenant !== '*');
       const envForKv = isNonDefaultTenant
         ? { ...c.env, ERPNEXT_URL: undefined, ERPNEXT_API_KEY: undefined, ERPNEXT_API_SECRET: undefined }
         : c.env;
       const client =
         c.env.AUTH_KV && typeof createErpnextClientWithKv === 'function'
-          ? (await createErpnextClientWithKv(envForKv, tenantId)) ??
+          ? (await createErpnextClientWithKv(envForKv, effectiveTenant)) ??
             (isNonDefaultTenant ? null : createErpnextClient(c.env))
           : createErpnextClient(c.env);
       if (!client) {
         return c.json({ success: false, error: 'ERPNext not configured' }, 503);
       }
 
-      const result = await client.create('Supplier', { supplier_name: data.name, tax_id: data.tax_id || '', address_line1: data.address || '', mobile_no: data.phone || '' });
+      const supplierPayload = {
+        supplier_name: data.name,
+        tax_id: data.tax_id || '',
+        address_line1: data.address || '',
+        mobile_no: data.phone || '',
+      };
 
-      return c.json({ success: true, data: result });
+      let result: { data?: unknown };
+      if (existingErpnextId) {
+        result = await client.update('Supplier', existingErpnextId, supplierPayload);
+      } else {
+        try {
+          result = await client.create('Supplier', supplierPayload);
+        } catch (createErr) {
+          const msg = createErr instanceof Error ? createErr.message : String(createErr);
+          if (/duplicate|already exists|409/i.test(msg)) {
+            const listed = await client.list('Supplier', {
+              fields: ['name'],
+              filters: [['supplier_name', '=', data.name]],
+              limit: 1,
+            });
+            const foundName = Array.isArray(listed?.data)
+              ? (listed.data[0] as Record<string, string> | undefined)?.name
+              : undefined;
+            const targetErpName = foundName || data.name;
+            result = await client.update('Supplier', targetErpName, supplierPayload);
+            existingErpnextId = targetErpName;
+          } else {
+            throw createErr;
+          }
+        }
+      }
+
+      const erpnextName =
+        (result?.data as Record<string, string> | undefined)?.name ||
+        existingErpnextId ||
+        data.name;
+
+      if (db) {
+        const now = new Date().toISOString();
+        const localVendorId = targetVendorId || `sup_${crypto.randomUUID()}`;
+        if (!targetVendorId) {
+          await db
+            .prepare(
+              'INSERT INTO suppliers (id, name, phone, address, tax_id, is_active, tenant_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, 1, ?, ?, ?)'
+            )
+            .bind(localVendorId, data.name, data.phone || null, data.address || null, data.tax_id || null, effectiveTenant, now, now)
+            .run()
+            .catch(() => {});
+        } else {
+          await db
+            .prepare(
+              "UPDATE suppliers SET phone = COALESCE(NULLIF(?, ''), phone), address = COALESCE(NULLIF(?, ''), address), tax_id = COALESCE(NULLIF(?, ''), tax_id), updated_at = ? WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
+            )
+            .bind(data.phone || '', data.address || '', data.tax_id || '', now, localVendorId, effectiveTenant)
+            .run()
+            .catch(() => {});
+        }
+        await db
+          .prepare(
+            "UPDATE suppliers SET erpnext_id = ?, sync_status = 'synced' WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
+          )
+          .bind(erpnextName, localVendorId, effectiveTenant)
+          .run()
+          .catch(() => {});
+        await db
+          .prepare(
+            "UPDATE vendors SET erpnext_id = ?, sync_status = 'synced' WHERE (id = ? OR name = ?) AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
+          )
+          .bind(erpnextName, localVendorId, data.name, effectiveTenant)
+          .run()
+          .catch(() => {});
+        const mappingId = `map_supplier_${effectiveTenant}_${localVendorId}`;
+        await db
+          .prepare(
+            `INSERT INTO erpnext_mappings (id, local_type, local_id, erpnext_id, erpnext_model, sync_status, last_synced_at, tenant_id)
+             VALUES (?, 'supplier', ?, ?, 'Supplier', 'synced', ?, ?)
+             ON CONFLICT(id) DO UPDATE SET erpnext_id = excluded.erpnext_id, sync_status = 'synced', last_synced_at = excluded.last_synced_at`
+          )
+          .bind(mappingId, localVendorId, erpnextName, now, effectiveTenant)
+          .run()
+          .catch(() => {});
+      }
+
+      return c.json({ success: true, data: result, erpnext_id: erpnextName, sync_status: 'synced' });
     } catch {
       return c.json({ success: false, error: 'Failed to sync vendor' }, 500);
     }

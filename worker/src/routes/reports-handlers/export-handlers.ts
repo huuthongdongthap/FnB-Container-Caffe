@@ -3,6 +3,8 @@ import type { Env } from '../../types/env';
 import { authenticateRequest } from '../../middleware/auth';
 import { getTenantId } from '../../middleware/tenant';
 import {
+  NET_ORDER_ALIAS_TOTAL_SQL,
+  NET_ORDER_TOTAL_SQL,
   VALID_REVENUE_ORDER_ALIAS_SQL,
   VALID_REVENUE_ORDER_SQL,
   buildTenantClause,
@@ -241,8 +243,8 @@ export function registerExportHandlers(app: Hono<{ Bindings: Env }>) {
         const res = await db.prepare(
           `SELECT DATE(datetime(created_at, '+7 hours')) as date,
                   COUNT(*) as orders,
-                  COALESCE(SUM(total), 0) as revenue,
-                  CASE WHEN COUNT(*) > 0 THEN ROUND(CAST(COALESCE(SUM(total), 0) AS REAL) / COUNT(*)) ELSE 0 END as avg_order_value
+                  COALESCE(SUM(${NET_ORDER_TOTAL_SQL}), 0) as revenue,
+                  CASE WHEN COUNT(*) > 0 THEN ROUND(CAST(COALESCE(SUM(${NET_ORDER_TOTAL_SQL}), 0) AS REAL) / COUNT(*)) ELSE 0 END as avg_order_value
            FROM orders
            WHERE DATE(datetime(created_at, '+7 hours')) BETWEEN ? AND ? AND ${VALID_EXPORT_ORDER_SQL}${tenantClause}
            GROUP BY DATE(datetime(created_at, '+7 hours')) ORDER BY date LIMIT 5000`
@@ -250,30 +252,35 @@ export function registerExportHandlers(app: Hono<{ Bindings: Env }>) {
         results = res.results || [];
       } catch {
         const res = await db.prepare(
-          `SELECT DATE(created_at) as date,
+          `SELECT DATE(datetime(created_at, '+7 hours')) as date,
                   COUNT(*) as orders,
                   COALESCE(SUM(total), 0) as revenue,
                   CASE WHEN COUNT(*) > 0 THEN ROUND(CAST(COALESCE(SUM(total), 0) AS REAL) / COUNT(*)) ELSE 0 END as avg_order_value
            FROM orders
-           WHERE DATE(created_at) BETWEEN ? AND ? AND ${VALID_EXPORT_ORDER_SQL}${tenantClause}
-           GROUP BY DATE(created_at) ORDER BY date LIMIT 5000`
+           WHERE DATE(datetime(created_at, '+7 hours')) BETWEEN ? AND ? AND ${VALID_EXPORT_ORDER_SQL}${tenantClause}
+           GROUP BY DATE(datetime(created_at, '+7 hours')) ORDER BY date LIMIT 5000`
         ).bind(from, to, ...tenantBinds).all<RevenueExportRow>();
         results = res.results || [];
       }
 
-      // Get cashback earned per day separately
+      // Get cashback earned per day separately (primary: cashback_transactions, fallback: checkins)
       const custJoin = tenantId === '*'
         ? ''
         : tenantId === 'default'
           ? ' LEFT JOIN customers c ON c.id = t.customer_id'
           : ' JOIN customers c ON c.id = t.customer_id';
       const { and: custClause } = buildTenantClause(tenantId, 'c');
+      const txWalletTenantAnd = tenantId === '*'
+        ? ''
+        : " AND COALESCE(NULLIF(TRIM(t.tenant_id), ''), NULLIF(TRIM(cw.tenant_id), ''), NULLIF(TRIM(c.tenant_id), ''), 'default') = ?";
       let cashbackResults: { date: string; amount: number }[] = [];
       try {
         const res = await db.prepare(
-          `SELECT DATE(datetime(t.created_at, '+7 hours')) as date, COALESCE(SUM(t.reward_amount), 0) as amount
-           FROM checkins t${custJoin}
-           WHERE DATE(datetime(t.created_at, '+7 hours')) BETWEEN ? AND ? AND t.status = 'approved'${custClause}
+          `SELECT DATE(datetime(t.created_at, '+7 hours')) as date, COALESCE(SUM(t.amount), 0) as amount
+           FROM cashback_transactions t
+           LEFT JOIN cashback_wallets cw ON cw.id = t.wallet_id
+           LEFT JOIN customers c ON c.id = cw.customer_id
+           WHERE DATE(datetime(t.created_at, '+7 hours')) BETWEEN ? AND ? AND t.type IN ('earn', 'bonus')${txWalletTenantAnd}
            GROUP BY DATE(datetime(t.created_at, '+7 hours'))`
         ).bind(from, to, ...tenantBinds).all<{ date: string; amount: number }>();
         cashbackResults = res.results || [];
@@ -282,12 +289,22 @@ export function registerExportHandlers(app: Hono<{ Bindings: Env }>) {
           const res = await db.prepare(
             `SELECT DATE(datetime(t.created_at, '+7 hours')) as date, COALESCE(SUM(t.amount), 0) as amount
              FROM cashback_transactions t${custJoin}
-             WHERE DATE(datetime(t.created_at, '+7 hours')) BETWEEN ? AND ? AND t.type = 'earn'${custClause}
+             WHERE DATE(datetime(t.created_at, '+7 hours')) BETWEEN ? AND ? AND t.type IN ('earn', 'bonus')${custClause}
              GROUP BY DATE(datetime(t.created_at, '+7 hours'))`
           ).bind(from, to, ...tenantBinds).all<{ date: string; amount: number }>();
           cashbackResults = res.results || [];
         } catch {
-          cashbackResults = [];
+          try {
+            const res = await db.prepare(
+              `SELECT DATE(datetime(t.created_at, '+7 hours')) as date, COALESCE(SUM(t.reward_amount), 0) as amount
+               FROM checkins t${custJoin}
+               WHERE DATE(datetime(t.created_at, '+7 hours')) BETWEEN ? AND ? AND t.status = 'approved'${custClause}
+               GROUP BY DATE(datetime(t.created_at, '+7 hours'))`
+            ).bind(from, to, ...tenantBinds).all<{ date: string; amount: number }>();
+            cashbackResults = res.results || [];
+          } catch {
+            cashbackResults = [];
+          }
         }
       }
 
@@ -322,7 +339,7 @@ export function registerExportHandlers(app: Hono<{ Bindings: Env }>) {
         const res = await db.prepare(
           `SELECT c.id, c.name, c.email, c.phone, c.loyalty_tier, c.created_at,
                   DATE(datetime(c.created_at, '+7 hours')) as ict_date,
-                  COALESCE(SUM(o.total), 0) as total_spent,
+                  COALESCE(SUM(CASE WHEN o.id IS NOT NULL THEN ${NET_ORDER_ALIAS_TOTAL_SQL} ELSE 0 END), 0) as total_spent,
                   COUNT(o.id) as order_count
            FROM customers c
            LEFT JOIN orders o ON (o.customer_id = c.id OR (o.customer_id IS NULL AND ${VALID_CUSTOMER_EXPORT_PHONE_SQL} AND o.customer_phone = c.phone)) AND ${VALID_JOINED_ORDER_SQL}${orderTenantJoin}${custWhere}${dateFilter}
@@ -330,19 +347,32 @@ export function registerExportHandlers(app: Hono<{ Bindings: Env }>) {
         ).bind(...datedBinds).all<CustomerExportRow>();
         results = res.results || [];
       } catch {
-        const stmt = db.prepare(
-          `SELECT c.id, c.name, c.email, c.phone, c.loyalty_tier, c.created_at,
-                  DATE(datetime(c.created_at, '+7 hours')) as ict_date,
-                  COALESCE(SUM(o.total), 0) as total_spent,
-                  COUNT(o.id) as order_count
-           FROM customers c
-           LEFT JOIN orders o ON (o.customer_id = c.id OR (o.customer_id IS NULL AND ${VALID_CUSTOMER_EXPORT_PHONE_SQL} AND o.customer_phone = c.phone)) AND ${VALID_JOINED_ORDER_SQL}${orderTenantJoin}${custWhere}
-           GROUP BY c.id ORDER BY c.created_at LIMIT 5000`
-        );
-        const res = custBinds.length > 0
-          ? await stmt.bind(...custBinds).all<CustomerExportRow>()
-          : await stmt.all<CustomerExportRow>();
-        results = res.results || [];
+        try {
+          const res = await db.prepare(
+            `SELECT c.id, c.name, c.email, c.phone, c.loyalty_tier, c.created_at,
+                    DATE(datetime(c.created_at, '+7 hours')) as ict_date,
+                    COALESCE(SUM(o.total), 0) as total_spent,
+                    COUNT(o.id) as order_count
+             FROM customers c
+             LEFT JOIN orders o ON (o.customer_id = c.id OR (o.customer_id IS NULL AND ${VALID_CUSTOMER_EXPORT_PHONE_SQL} AND o.customer_phone = c.phone)) AND ${VALID_JOINED_ORDER_SQL}${orderTenantJoin}${custWhere}${dateFilter}
+             GROUP BY c.id ORDER BY c.created_at LIMIT 5000`
+          ).bind(...datedBinds).all<CustomerExportRow>();
+          results = res.results || [];
+        } catch {
+          const stmt = db.prepare(
+            `SELECT c.id, c.name, c.email, c.phone, c.loyalty_tier, c.created_at,
+                    DATE(datetime(c.created_at, '+7 hours')) as ict_date,
+                    COALESCE(SUM(o.total), 0) as total_spent,
+                    COUNT(o.id) as order_count
+             FROM customers c
+             LEFT JOIN orders o ON (o.customer_id = c.id OR (o.customer_id IS NULL AND ${VALID_CUSTOMER_EXPORT_PHONE_SQL} AND o.customer_phone = c.phone)) AND ${VALID_JOINED_ORDER_SQL}${orderTenantJoin}${custWhere}
+             GROUP BY c.id ORDER BY c.created_at LIMIT 5000`
+          );
+          const res = custBinds.length > 0
+            ? await stmt.bind(...custBinds).all<CustomerExportRow>()
+            : await stmt.all<CustomerExportRow>();
+          results = res.results || [];
+        }
       }
 
       const headers = ['id', 'name', 'email', 'phone', 'total_spent', 'order_count', 'loyalty_tier', 'created_at'];

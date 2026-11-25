@@ -149,46 +149,25 @@ export async function runPaymentReconciliation(
         `SELECT p.id AS payment_id, p.status, p.created_at,
                 o.status AS order_status,
                 o.payment_status AS order_payment_status,
+                o.tenant_id AS order_tenant_id,
                 j.attempts, j.last_checked_at
          FROM payments p
          JOIN orders o ON o.id = p.order_id
          LEFT JOIN payment_reconciliation_jobs j ON j.payment_id = p.id
          WHERE p.method = 'payos'
            AND p.status IN ('pending', 'completed')
-           AND COALESCE(p.refund_status, '') != 'completed'
            AND o.payment_status NOT IN ('paid', 'completed', 'refunded')
            AND NOT (p.status = 'completed' AND LOWER(COALESCE(o.status, '')) IN ('cancelled', 'canceled', 'rejected', 'failed', 'expired', 'refunded'))
            AND (j.last_outcome IS NULL OR j.last_outcome NOT IN ('settled', 'already_settled', 'requires_review'))
            AND (j.next_attempt_at IS NULL OR CAST(j.next_attempt_at AS INTEGER) <= CAST(? AS INTEGER))
            AND (j.lease_until IS NULL OR CAST(j.lease_until AS INTEGER) < CAST(? AS INTEGER))
+           AND (? = '*' OR COALESCE(NULLIF(TRIM(o.tenant_id), ''), 'default') = ?)
          ORDER BY COALESCE(j.attempts, 0) ASC, CAST(COALESCE(j.last_checked_at, '0') AS INTEGER) ASC, p.created_at ASC
          LIMIT 25`
-      ).bind(nowStr, nowStr).all<CandidateRow>();
+      ).bind(nowStr, nowStr, activeTenant, activeTenant).all<CandidateRow>();
       rows = queryResult.results ?? [];
     } catch {
       try {
-        const queryResult = await db.prepare(
-          `SELECT p.id AS payment_id, p.status, p.created_at,
-                  o.status AS order_status,
-                  o.payment_status AS order_payment_status,
-                  o.tenant_id AS order_tenant_id,
-                  j.attempts, j.last_checked_at
-           FROM payments p
-           JOIN orders o ON o.id = p.order_id
-           LEFT JOIN payment_reconciliation_jobs j ON j.payment_id = p.id
-           WHERE p.method = 'payos'
-             AND p.status IN ('pending', 'completed')
-             AND o.payment_status NOT IN ('paid', 'completed', 'refunded')
-             AND NOT (p.status = 'completed' AND LOWER(COALESCE(o.status, '')) IN ('cancelled', 'canceled', 'rejected', 'failed', 'expired', 'refunded'))
-             AND (j.last_outcome IS NULL OR j.last_outcome NOT IN ('settled', 'already_settled', 'requires_review'))
-             AND (j.next_attempt_at IS NULL OR CAST(j.next_attempt_at AS INTEGER) <= CAST(? AS INTEGER))
-             AND (j.lease_until IS NULL OR CAST(j.lease_until AS INTEGER) < CAST(? AS INTEGER))
-             AND (? = '*' OR COALESCE(NULLIF(TRIM(o.tenant_id), ''), 'default') = ?)
-           ORDER BY COALESCE(j.attempts, 0) ASC, CAST(COALESCE(j.last_checked_at, '0') AS INTEGER) ASC, p.created_at ASC
-           LIMIT 25`
-        ).bind(nowStr, nowStr, activeTenant, activeTenant).all<CandidateRow>();
-        rows = queryResult.results ?? [];
-      } catch {
         const queryResult = await db.prepare(
           `SELECT p.id AS payment_id, p.status, p.created_at,
                   o.status AS order_status,
@@ -204,8 +183,11 @@ export async function runPaymentReconciliation(
              AND (? = '*' OR COALESCE(NULLIF(TRIM(o.tenant_id), ''), 'default') = ?)
            ORDER BY p.created_at ASC
            LIMIT 25`
-        ).bind(activeTenant, activeTenant).all<CandidateRow>().catch(async () =>
-          db.prepare(
+        ).bind(activeTenant, activeTenant).all<CandidateRow>();
+        rows = queryResult.results ?? [];
+      } catch {
+        if (activeTenant === 'default' || activeTenant === '*') {
+          const queryResult = await db.prepare(
             `SELECT p.id AS payment_id, p.status, p.created_at,
                     o.status AS order_status,
                     o.payment_status AS order_payment_status,
@@ -218,9 +200,11 @@ export async function runPaymentReconciliation(
                AND NOT (p.status = 'completed' AND LOWER(COALESCE(o.status, '')) IN ('cancelled', 'canceled', 'rejected', 'failed', 'expired', 'refunded'))
              ORDER BY p.created_at ASC
              LIMIT 25`
-          ).all<CandidateRow>()
-        );
-        rows = queryResult.results ?? [];
+          ).all<CandidateRow>().catch(() => ({ results: [] as CandidateRow[] }));
+          rows = queryResult.results ?? [];
+        } else {
+          rows = [];
+        }
       }
     }
   }

@@ -39,10 +39,10 @@ const window_ = (
   ...overrides,
 });
 
-// 2026-09-16 is a Wednesday; 15:00 falls inside the default window.
-const WEDNESDAY_INSIDE = new Date('2026-09-16T15:00:00');
-const WEDNESDAY_OUTSIDE = new Date('2026-09-16T20:00:00');
-const THURSDAY_INSIDE = new Date('2026-09-17T15:00:00');
+// 2026-09-16 is a Wednesday in Asia/Ho_Chi_Minh (+07:00); 15:00 falls inside the default window.
+const WEDNESDAY_INSIDE = new Date('2026-09-16T15:00:00+07:00');
+const WEDNESDAY_OUTSIDE = new Date('2026-09-16T20:00:00+07:00');
+const THURSDAY_INSIDE = new Date('2026-09-17T15:00:00+07:00');
 
 describe('resolveItemPrice — base price', () => {
   test('returns base price when no modifiers, no deltas, no happy hour', () => {
@@ -321,12 +321,12 @@ describe('happyHourDiscountFor — regression guard', () => {
   });
 
   test('window end is exclusive', () => {
-    const atEnd = new Date('2026-09-16T17:00:00');
+    const atEnd = new Date('2026-09-16T17:00:00+07:00');
     expect(happyHourDiscountFor([window_()], atEnd)).toBeNull();
   });
 
   test('window start is inclusive', () => {
-    const atStart = new Date('2026-09-16T14:00:00');
+    const atStart = new Date('2026-09-16T14:00:00+07:00');
     expect(happyHourDiscountFor([window_()], atStart)?.id).toBe('hh1');
   });
 

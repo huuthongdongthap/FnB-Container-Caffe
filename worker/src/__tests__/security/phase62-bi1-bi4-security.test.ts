@@ -301,11 +301,11 @@ describe('Phase 62 Security Regression Suite (BI1-BI4)', () => {
     });
 
     it('matches Happy Hour category rules by both category_id and categorySlug', () => {
-      const now = new Date();
+      const now = new Date('2026-09-16T15:00:00+07:00');
       const windowRule = {
         id: 'hh_1',
         name: 'Coffee Happy Hour',
-        day_of_week: now.getDay(),
+        day_of_week: new Date(now.getTime() + 7 * 3600_000).getUTCDay(),
         start_time: '00:00',
         end_time: '23:59',
         discount_rate: 0.2,

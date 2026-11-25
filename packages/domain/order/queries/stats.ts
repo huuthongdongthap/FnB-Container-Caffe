@@ -40,17 +40,19 @@ export async function getStats(request: Request, env: Record<string, unknown>, t
     // created_at is stored in UTC; the business day starts at midnight in Asia/Ho_Chi_Minh (+07:00).
     const todayStartParam = new Date(`${today}T00:00:00+07:00`).toISOString().replace('T', ' ').slice(0, 19);
     const qrPlaceholderExclusionClause =
-      "NOT (COALESCE(TRIM(notes), '') = 'Khách QR - cho don mon' AND COALESCE(TRIM(items), '[]') IN ('', '[]'))";
+      "NOT (COALESCE(total, 0) = 0 AND (COALESCE(TRIM(notes), '') = 'Khách QR - cho don mon' OR COALESCE(TRIM(customer_name), '') = 'Khách QR - cho don mon' OR COALESCE(TRIM(items), '[]') IN ('', '[]')))";
     const revenueWithoutNotesClause =
-      "status != 'cancelled' AND COALESCE(LOWER(TRIM(status)), '') NOT IN ('cancelled', 'canceled', 'refunded', 'failed', 'rejected', 'expired') AND COALESCE(LOWER(TRIM(payment_status)), '') IN ('paid', 'partially_refunded')";
+      "status != 'cancelled' AND COALESCE(LOWER(TRIM(status)), '') NOT IN ('cancelled', 'canceled', 'refunded', 'failed', 'rejected', 'expired') AND COALESCE(LOWER(TRIM(payment_status)), '') IN ('paid', 'partially_refunded', 'completed')";
     const revenueExclusionClause = `${revenueWithoutNotesClause} AND ${qrPlaceholderExclusionClause}`;
     const statusOnlyExclusionClause =
-      "status != 'cancelled' AND COALESCE(LOWER(TRIM(status)), '') NOT IN ('cancelled', 'canceled', 'refunded', 'failed', 'rejected', 'expired')";
+      "status != 'cancelled' AND COALESCE(LOWER(TRIM(status)), '') IN ('completed', 'paid', 'delivered', 'served')";
+    const netOrderTotalExpr =
+      "MAX(0, COALESCE(total, 0) - CASE WHEN COALESCE(LOWER(TRIM(payment_status)), '') = 'partially_refunded' THEN COALESCE((SELECT SUM(COALESCE(p.refund_amount, 0)) FROM payments p WHERE p.order_id = orders.id AND COALESCE(NULLIF(TRIM(p.tenant_id), ''), 'default') = COALESCE(NULLIF(TRIM(orders.tenant_id), ''), 'default')), 0) ELSE 0 END)";
 
     let ordersTodayResult: { total: number; revenue: number }[] = [];
     try {
       const res = await db.prepare(`
-        SELECT COUNT(*) as total, COALESCE(SUM(total), 0) as revenue
+        SELECT COUNT(*) as total, COALESCE(SUM(${netOrderTotalExpr}), 0) as revenue
         FROM orders
         WHERE datetime(created_at) >= datetime(?) AND ${revenueExclusionClause}${tenantAnd2}
       `).bind(todayStartParam, ...tenantBinds).all<{ total: number; revenue: number }>();
@@ -60,7 +62,7 @@ export async function getStats(request: Request, env: Record<string, unknown>, t
         const res = await db.prepare(`
           SELECT COUNT(*) as total, COALESCE(SUM(total), 0) as revenue
           FROM orders
-          WHERE datetime(created_at) >= datetime(?) AND ${revenueWithoutNotesClause}${tenantAnd2}
+          WHERE datetime(created_at) >= datetime(?) AND ${revenueExclusionClause}${tenantAnd2}
         `).bind(todayStartParam, ...tenantBinds).all<{ total: number; revenue: number }>();
         ordersTodayResult = res.results || [];
       } catch {
@@ -181,7 +183,7 @@ export async function getStats(request: Request, env: Record<string, unknown>, t
     let revenueResult: { date: string; revenue: number }[] = [];
     try {
       const res = await db.prepare(`
-        SELECT DATE(datetime(created_at, '+7 hours')) as date, COALESCE(SUM(total), 0) as revenue
+        SELECT DATE(datetime(created_at, '+7 hours')) as date, COALESCE(SUM(${netOrderTotalExpr}), 0) as revenue
         FROM orders
         WHERE datetime(created_at) >= datetime(?) AND ${revenueExclusionClause}${tenantAnd2}
         GROUP BY DATE(datetime(created_at, '+7 hours'))
@@ -193,7 +195,7 @@ export async function getStats(request: Request, env: Record<string, unknown>, t
         const res = await db.prepare(`
           SELECT DATE(datetime(created_at, '+7 hours')) as date, COALESCE(SUM(total), 0) as revenue
           FROM orders
-          WHERE datetime(created_at) >= datetime(?) AND ${revenueWithoutNotesClause}${tenantAnd2}
+          WHERE datetime(created_at) >= datetime(?) AND ${revenueExclusionClause}${tenantAnd2}
           GROUP BY DATE(datetime(created_at, '+7 hours'))
           ORDER BY date DESC
         `).bind(sevenDaysAgoParam, ...tenantBinds).all<{ date: string; revenue: number }>();

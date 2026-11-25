@@ -78,10 +78,11 @@ export function useDinDinCart() {
     });
   }, [loadAll]);
 
-  const patchCart = async (op: 'add' | 'remove' | 'update', overrideItemId?: string) => {
+  const patchCart = async (op: 'add' | 'remove' | 'update', overrideItemId?: string, overrideQty?: number) => {
     if (!activeCart) return;
     const snap = readSessionSnapshot();
     const targetItemId = overrideItemId ?? itemId;
+    const targetQty = Math.max(1, Math.floor(Number(overrideQty ?? itemQty) || 1));
     setSaving(true);
     setError(null);
     setMessage(null);
@@ -92,8 +93,8 @@ export function useDinDinCart() {
         op,
         action: op,
         itemId: targetItemId,
-        qty: itemQty,
-        item: { id: targetItemId, qty: itemQty, quantity: itemQty },
+        qty: targetQty,
+        item: { id: targetItemId, qty: targetQty, quantity: targetQty },
       };
       const result = (await apiFetch<Record<string, unknown>>(`/api/admin/dindin/cart/${encodeURIComponent(activeCart.sessionId)}`, {
         method: 'PATCH',

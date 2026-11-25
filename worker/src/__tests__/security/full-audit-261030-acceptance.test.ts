@@ -8586,7 +8586,8 @@ describe('Phase 48 (AU1..AU4) — Loyalty Tiers/Phone Auth/Referral Reversal, Mo
     const { resolveAnalyticsTenant } = await import('../../tree/analytics/summary');
     const { escapeCsvField } = await import('../../tree/analytics/csv-export');
 
-    expect(metricsHandlersSrc).toContain("status IN ('paid', 'Confirmed', 'preparing', 'ready', 'completed')");
+    expect(metricsHandlersSrc).toContain("'confirmed'");
+    expect(metricsHandlersSrc).not.toContain("'Confirmed'");
     expect(metricsHandlersSrc).toContain("COALESCE(payment_status, '') = 'refunded'");
     expect(summaryHandlersSrc).toContain('resolveAnalyticsTenant');
     expect(exportHandlersSrc).toContain("const EXPORT_ALLOWED_ROLES = new Set(['owner', 'manager', 'admin']);");

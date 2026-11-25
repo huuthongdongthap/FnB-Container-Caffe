@@ -132,30 +132,32 @@ export async function sendCashbackExpiryWarnings(env: Record<string, unknown>, t
     } else {
       try {
         const res = await db.prepare(`
-          SELECT cw.customer_id as customer_id, c.phone, c.name, c.zalo, SUM(ct.amount) as total_expiring, cw.balance as wallet_balance, c.tenant_id as tenant_id
+          SELECT cw.customer_id as customer_id, c.phone, c.name, c.zalo, SUM(ct.amount) as total_expiring, cw.balance as wallet_balance, COALESCE(NULLIF(TRIM(c.tenant_id), ''), 'default') as tenant_id
           FROM cashback_transactions ct
           JOIN cashback_wallets cw ON cw.id = ct.wallet_id
           JOIN customers c ON cw.customer_id = c.id
+            AND COALESCE(NULLIF(TRIM(cw.tenant_id), ''), 'default') = COALESCE(NULLIF(TRIM(c.tenant_id), ''), 'default')
           WHERE ct.type IN ('earn', 'bonus')
             AND ct.expires_at IS NOT NULL
             AND ct.expires_at <= ?
             AND ct.expires_at > datetime('now')
             AND (c.last_expiry_warning_at IS NULL OR c.last_expiry_warning_at < ?)
-          GROUP BY cw.customer_id
+          GROUP BY cw.customer_id, COALESCE(NULLIF(TRIM(c.tenant_id), ''), 'default')
         `).bind(sevenDaysFromNow, sevenDaysAgo).all<Record<string, unknown>>();
         expiring = res.results || [];
       } catch {
         try {
           const withWalletAndTenant = await db.prepare(`
-            SELECT cw.customer_id as customer_id, c.phone, c.name, SUM(ct.amount) as total_expiring, cw.balance as wallet_balance, c.tenant_id as tenant_id
+            SELECT cw.customer_id as customer_id, c.phone, c.name, SUM(ct.amount) as total_expiring, cw.balance as wallet_balance, COALESCE(NULLIF(TRIM(c.tenant_id), ''), 'default') as tenant_id
             FROM cashback_transactions ct
             JOIN cashback_wallets cw ON cw.id = ct.wallet_id
             JOIN customers c ON cw.customer_id = c.id
+              AND COALESCE(NULLIF(TRIM(cw.tenant_id), ''), 'default') = COALESCE(NULLIF(TRIM(c.tenant_id), ''), 'default')
             WHERE ct.type IN ('earn', 'bonus')
               AND ct.expires_at IS NOT NULL
               AND ct.expires_at <= ?
               AND ct.expires_at > datetime('now')
-            GROUP BY cw.customer_id
+            GROUP BY cw.customer_id, COALESCE(NULLIF(TRIM(c.tenant_id), ''), 'default')
           `).bind(sevenDaysFromNow).all<Record<string, unknown>>();
           expiring = withWalletAndTenant.results || [];
         } catch {

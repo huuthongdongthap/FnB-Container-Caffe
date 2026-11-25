@@ -38,6 +38,7 @@ export function useModifierManager() {
 
   const [confirmDeleteGroup, setConfirmDeleteGroup] = useState<ModifierGroup | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [actionError, setActionError] = useState<string | null>(null);
 
   useEffect(() => {
     setGroupModalOpen(false);
@@ -48,6 +49,7 @@ export function useModifierManager() {
     setEditingChoice(null);
     setConfirmDeleteGroup(null);
     setErrors({});
+    setActionError(null);
   }, [session.tenantId, session.userScope]);
 
   const groupsQuery = useQuery<{ success: boolean; data: ModifierGroup[] }>({
@@ -66,6 +68,7 @@ export function useModifierManager() {
     queryClient.invalidateQueries({ queryKey: groupsKey });
     queryClient.invalidateQueries({ queryKey: ['admin-modifier-choices', session.tenantId, session.userScope] });
     queryClient.invalidateQueries({ queryKey: ['admin-product-groups', session.tenantId, session.userScope] });
+    queryClient.invalidateQueries({ queryKey: ['menu'] });
   }
 
   const createGroupMutation = useMutation({
@@ -89,10 +92,15 @@ export function useModifierManager() {
   const deleteGroupMutation = useMutation({
     mutationFn: (id: string) => apiFetch(`/api/menu-modifiers/groups/${id}`, { method: 'DELETE' }),
     onSuccess: () => {
+      setActionError(null);
       invalidateAll();
       setConfirmDeleteGroup(null);
     },
-    onError: (err: Error) => setErrors({ _form: err.message }),
+    onError: (err: Error) => {
+      setConfirmDeleteGroup(null);
+      setErrors({ _form: err.message });
+      setActionError(err.message || 'Không thể xoá nhóm tùy chọn');
+    },
   });
 
   const createChoiceMutation = useMutation({
@@ -244,6 +252,8 @@ export function useModifierManager() {
     confirmDeleteGroup,
     setConfirmDeleteGroup,
     errors,
+    actionError,
+    clearActionError: () => setActionError(null),
     createGroupMutation,
     deleteGroupMutation,
     createChoiceMutation,

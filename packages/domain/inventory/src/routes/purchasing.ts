@@ -9,21 +9,30 @@ import type { PurchaseOrderInput } from '../model/supplier-policy';
 
 interface D1Database {
   prepare: (sql: string) => {
-    bind: (...args: any[]) => {
-      all: <T = any>() => Promise<{ results: T[] }>;
-      first: <T = any>() => Promise<T | null>;
+    bind: (...args: unknown[]) => {
+      all: <T = Record<string, unknown>>() => Promise<{ results: T[] }>;
+      first: <T = Record<string, unknown>>() => Promise<T | null>;
       run: () => Promise<{ meta: { changes: number } }>;
     };
   };
-  batch: (ops: any[]) => Promise<any[]>;
+  batch: (ops: unknown[]) => Promise<unknown[]>;
 }
 
 interface AppEnv {
   AURA_DB: D1Database;
-  executionCtx?: { waitUntil: (p: Promise<any>) => void };
+  executionCtx?: { waitUntil: (p: Promise<unknown>) => void };
 }
 
 type AppContext = { Bindings: AppEnv };
+
+interface RequestLikeContext {
+  get?: (k: string) => unknown;
+  req?: {
+    query?: (k: string) => string | undefined;
+    header?: (k: string) => string | undefined;
+  };
+  json: (data: unknown, status?: 200 | 201 | 400 | 401 | 403 | 404 | 409 | 500) => Response;
+}
 
 const PURCHASING_MUTATION_ROLES = new Set(['owner', 'manager', 'supervisor', 'admin']);
 const PURCHASING_READ_ROLES = new Set([
@@ -31,17 +40,22 @@ const PURCHASING_READ_ROLES = new Set([
   'admin',
   'manager',
   'supervisor',
+  'staff',
   'kitchen',
   'chef',
+  'bep',
   'barista',
+  'cashier',
+  'waiter',
+  'warehouse',
 ]);
 
 function verifyPurchasingTenant(
-  c: any,
+  c: RequestLikeContext,
   mode: 'read' | 'write'
 ): { ok: true; tenantId: string } | { ok: false } {
   const user = c.get?.('user') as { id?: string; role?: string; tenantId?: string; tenant_id?: string } | undefined;
-  const resolvedTenant = getTenantId(c).trim() || 'default';
+  const resolvedTenant = getTenantId(c as unknown as Parameters<typeof getTenantId>[0]).trim() || 'default';
   const candidateOverrides = [
     c.req?.query?.('tenant_id'),
     c.req?.query?.('tenantId'),
@@ -70,7 +84,8 @@ function verifyPurchasingTenant(
   }
 
   const rawUserTenant = user.tenantId ?? user.tenant_id;
-  const contextTenant = typeof c.get?.('tenantId') === 'string' ? c.get('tenantId').trim() : '';
+  const rawCtxTenant = c.get?.('tenantId');
+  const contextTenant = typeof rawCtxTenant === 'string' ? rawCtxTenant.trim() : '';
   const userTenant =
     (rawUserTenant && String(rawUserTenant).trim()) ||
     (!requestedTenant && contextTenant ? contextTenant : 'default');
@@ -110,8 +125,9 @@ function verifyPurchasingTenant(
   return { ok: true, tenantId: userTenant === '*' ? resolvedTenant : userTenant };
 }
 
-function checkPurchasingReadAccess(c: any): Response | null {
-  const userRole = c.get?.('user')?.role as string | undefined;
+function checkPurchasingReadAccess(c: RequestLikeContext): Response | null {
+  const user = c.get?.('user') as { role?: string } | undefined;
+  const userRole = user?.role;
   if (userRole) {
     if (!PURCHASING_READ_ROLES.has(userRole)) {
       return c.json({ success: false, error: 'Insufficient permissions' }, 403);
@@ -163,7 +179,7 @@ export function purchasing(app: Hono<AppContext>) {
       const tenantId = tenantCheck.tenantId;
       const body = (await c.req.json()) as PurchaseOrderInput;
       const po = await createCanonicalPurchaseOrder(
-        db as any,
+        db as unknown as Parameters<typeof createCanonicalPurchaseOrder>[0],
         {
           supplierId: body.supplier_id,
           items: body.items.map(i => ({
@@ -205,7 +221,7 @@ export function purchasing(app: Hono<AppContext>) {
     }
 
     const result = await receivePurchaseOrder(
-      db as any,
+      db as unknown as Parameters<typeof receivePurchaseOrder>[0],
       id,
       body.items.map(i => ({ ingredientId: i.ingredient_id, receivedQuantity: i.quantity })),
       { receiptId: body.receipt_id, tenantId }
@@ -232,15 +248,19 @@ export function purchasing(app: Hono<AppContext>) {
     const db = c.env.AURA_DB;
     const tenantId = tenantCheck.tenantId;
     const id = c.req.param('id');
-    const result = await cancelPurchaseOrder(db as any, id, tenantId);
+    const result = await cancelPurchaseOrder(
+      db as unknown as Parameters<typeof cancelPurchaseOrder>[0],
+      id,
+      tenantId
+    );
     if (!result.ok) {
-      const status =
+      const status: 400 | 404 | 409 =
         result.error?.includes('received') || result.error?.includes('cancelled')
           ? 409
           : result.error?.includes('not_found') || result.error?.includes('not found')
             ? 404
             : 400;
-      return c.json({ success: false, error: result.error }, status as any);
+      return c.json({ success: false, error: result.error }, status);
     }
     return c.json({ success: true });
   });

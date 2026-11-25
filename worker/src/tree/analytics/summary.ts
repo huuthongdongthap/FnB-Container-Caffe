@@ -114,11 +114,18 @@ const VALID_ORDER_WHERE = `status != 'cancelled'
     AND status NOT IN ('cancelled', 'refunded', 'failed', 'rejected', 'expired')
     AND LOWER(COALESCE(TRIM(status), '')) NOT IN ('cancelled', 'canceled', 'refunded', 'failed', 'rejected', 'expired')
     AND LOWER(COALESCE(TRIM(payment_status), '')) IN ('paid', 'partially_refunded', 'completed')
-    AND NOT (COALESCE(TRIM(notes), '') = 'Khách QR - cho don mon' AND COALESCE(TRIM(items), '[]') IN ('', '[]'))`;
+    AND NOT (COALESCE(total, 0) = 0 AND (COALESCE(TRIM(notes), '') = 'Khách QR - cho don mon' OR COALESCE(TRIM(customer_name), '') = 'Khách QR - cho don mon' OR COALESCE(TRIM(items), '[]') IN ('', '[]')))`;
+
+const VALID_ORDER_NO_NOTES_WHERE = `status != 'cancelled'
+    AND status NOT IN ('cancelled', 'refunded', 'failed', 'rejected', 'expired')
+    AND LOWER(COALESCE(TRIM(status), '')) NOT IN ('cancelled', 'canceled', 'refunded', 'failed', 'rejected', 'expired')
+    AND LOWER(COALESCE(TRIM(payment_status), '')) IN ('paid', 'partially_refunded', 'completed')`;
 
 const VALID_ORDER_FALLBACK_WHERE = `status != 'cancelled'
-    AND status NOT IN ('cancelled', 'refunded', 'failed', 'rejected', 'expired')
-    AND LOWER(COALESCE(TRIM(status), '')) NOT IN ('cancelled', 'canceled', 'refunded', 'failed', 'rejected', 'expired')`;
+    AND LOWER(COALESCE(TRIM(status), '')) IN ('completed', 'paid', 'delivered', 'served')`;
+
+const NET_SUMMARY_TOTAL_EXPR =
+  "MAX(0, COALESCE(total, 0) - CASE WHEN LOWER(COALESCE(TRIM(payment_status), '')) = 'partially_refunded' THEN COALESCE((SELECT SUM(COALESCE(p.refund_amount, 0)) FROM payments p WHERE p.order_id = orders.id AND COALESCE(NULLIF(TRIM(p.tenant_id), ''), 'default') = COALESCE(NULLIF(TRIM(orders.tenant_id), ''), 'default')), 0) ELSE 0 END)";
 
 const VALID_CUSTOMER_PHONE_EXPR =
   "CASE WHEN TRIM(COALESCE(customer_phone, '')) NOT IN ('', '0', '000000000', '0000000000', '00000000000', 'guest', 'walk-in', 'pos') THEN customer_phone END";
@@ -126,11 +133,22 @@ const VALID_CUSTOMER_PHONE_EXPR =
 const AGGREGATE_SQL = `
   SELECT
     COUNT(*) AS total_orders,
+    COALESCE(SUM(${NET_SUMMARY_TOTAL_EXPR}), 0) AS total_revenue,
+    CASE WHEN COUNT(*) > 0 THEN SUM(${NET_SUMMARY_TOTAL_EXPR}) / COUNT(*) ELSE 0 END AS avg_order_value,
+    COUNT(DISTINCT ${VALID_CUSTOMER_PHONE_EXPR}) AS total_customers
+  FROM orders
+  WHERE ${VALID_ORDER_WHERE}
+    AND created_at >= datetime('now', '-' || ? || ' days')
+`;
+
+const AGGREGATE_NO_PAYMENTS_SQL = `
+  SELECT
+    COUNT(*) AS total_orders,
     COALESCE(SUM(total), 0) AS total_revenue,
     CASE WHEN COUNT(*) > 0 THEN SUM(total) / COUNT(*) ELSE 0 END AS avg_order_value,
     COUNT(DISTINCT ${VALID_CUSTOMER_PHONE_EXPR}) AS total_customers
   FROM orders
-  WHERE ${VALID_ORDER_WHERE}
+  WHERE ${VALID_ORDER_NO_NOTES_WHERE}
     AND created_at >= datetime('now', '-' || ? || ' days')
 `;
 
@@ -158,7 +176,11 @@ export async function getSummary(
   try {
     row = await db.prepare(`${AGGREGATE_SQL}${tf.clause}`).bind(days, ...tf.binds).first<SummaryMetrics>();
   } catch {
-    row = await db.prepare(`${AGGREGATE_FALLBACK_SQL}${tf.clause}`).bind(days, ...tf.binds).first<SummaryMetrics>();
+    try {
+      row = await db.prepare(`${AGGREGATE_NO_PAYMENTS_SQL}${tf.clause}`).bind(days, ...tf.binds).first<SummaryMetrics>();
+    } catch {
+      row = await db.prepare(`${AGGREGATE_FALLBACK_SQL}${tf.clause}`).bind(days, ...tf.binds).first<SummaryMetrics>();
+    }
   }
   return {
     total_orders: row?.total_orders ?? 0,
@@ -187,8 +209,8 @@ export async function getSummaryCompare(
       db.prepare(`
         SELECT
           COUNT(*) AS total_orders,
-          COALESCE(SUM(total), 0) AS total_revenue,
-          CASE WHEN COUNT(*) > 0 THEN SUM(total) / COUNT(*) ELSE 0 END AS avg_order_value,
+          COALESCE(SUM(${NET_SUMMARY_TOTAL_EXPR}), 0) AS total_revenue,
+          CASE WHEN COUNT(*) > 0 THEN SUM(${NET_SUMMARY_TOTAL_EXPR}) / COUNT(*) ELSE 0 END AS avg_order_value,
           COUNT(DISTINCT ${VALID_CUSTOMER_PHONE_EXPR}) AS total_customers
         FROM orders
         WHERE ${VALID_ORDER_WHERE}
@@ -197,20 +219,37 @@ export async function getSummaryCompare(
       `).bind(days * 2, days, ...tf.binds).first<SummaryMetrics>()
     ]);
   } catch {
-    [current, previous] = await Promise.all([
-      db.prepare(`${AGGREGATE_FALLBACK_SQL}${tf.clause}`).bind(days, ...tf.binds).first<SummaryMetrics>(),
-      db.prepare(`
-        SELECT
-          COUNT(*) AS total_orders,
-          COALESCE(SUM(total), 0) AS total_revenue,
-          CASE WHEN COUNT(*) > 0 THEN SUM(total) / COUNT(*) ELSE 0 END AS avg_order_value,
-          COUNT(DISTINCT ${VALID_CUSTOMER_PHONE_EXPR}) AS total_customers
-        FROM orders
-        WHERE ${VALID_ORDER_FALLBACK_WHERE}
-          AND created_at >= datetime('now', '-' || ? || ' days')
-          AND created_at < datetime('now', '-' || ? || ' days')${tf.clause}
-      `).bind(days * 2, days, ...tf.binds).first<SummaryMetrics>()
-    ]);
+    try {
+      [current, previous] = await Promise.all([
+        db.prepare(`${AGGREGATE_NO_PAYMENTS_SQL}${tf.clause}`).bind(days, ...tf.binds).first<SummaryMetrics>(),
+        db.prepare(`
+          SELECT
+            COUNT(*) AS total_orders,
+            COALESCE(SUM(total), 0) AS total_revenue,
+            CASE WHEN COUNT(*) > 0 THEN SUM(total) / COUNT(*) ELSE 0 END AS avg_order_value,
+            COUNT(DISTINCT ${VALID_CUSTOMER_PHONE_EXPR}) AS total_customers
+          FROM orders
+          WHERE ${VALID_ORDER_NO_NOTES_WHERE}
+            AND created_at >= datetime('now', '-' || ? || ' days')
+            AND created_at < datetime('now', '-' || ? || ' days')${tf.clause}
+        `).bind(days * 2, days, ...tf.binds).first<SummaryMetrics>()
+      ]);
+    } catch {
+      [current, previous] = await Promise.all([
+        db.prepare(`${AGGREGATE_FALLBACK_SQL}${tf.clause}`).bind(days, ...tf.binds).first<SummaryMetrics>(),
+        db.prepare(`
+          SELECT
+            COUNT(*) AS total_orders,
+            COALESCE(SUM(total), 0) AS total_revenue,
+            CASE WHEN COUNT(*) > 0 THEN SUM(total) / COUNT(*) ELSE 0 END AS avg_order_value,
+            COUNT(DISTINCT ${VALID_CUSTOMER_PHONE_EXPR}) AS total_customers
+          FROM orders
+          WHERE ${VALID_ORDER_FALLBACK_WHERE}
+            AND created_at >= datetime('now', '-' || ? || ' days')
+            AND created_at < datetime('now', '-' || ? || ' days')${tf.clause}
+        `).bind(days * 2, days, ...tf.binds).first<SummaryMetrics>()
+      ]);
+    }
   }
 
   return {
@@ -235,7 +274,7 @@ const GROUP_QUERIES: Record<GroupBy, string> = {
   hour: `
     SELECT
       CAST(strftime('%H', datetime(created_at, '+7 hours')) AS INTEGER) AS label,
-      COALESCE(SUM(total), 0) AS value,
+      COALESCE(SUM(${NET_SUMMARY_TOTAL_EXPR}), 0) AS value,
       COUNT(*) AS count
     FROM orders
     WHERE ${VALID_ORDER_WHERE}
@@ -246,7 +285,7 @@ const GROUP_QUERIES: Record<GroupBy, string> = {
   day: `
     SELECT
       date(datetime(created_at, '+7 hours')) AS label,
-      COALESCE(SUM(total), 0) AS value,
+      COALESCE(SUM(${NET_SUMMARY_TOTAL_EXPR}), 0) AS value,
       COUNT(*) AS count
     FROM orders
     WHERE ${VALID_ORDER_WHERE}
@@ -276,13 +315,13 @@ const GROUP_QUERIES: Record<GroupBy, string> = {
   `,
   payment: `
     SELECT
-      payment_method AS label,
-      COALESCE(SUM(total), 0) AS value,
+      LOWER(TRIM(COALESCE(NULLIF(TRIM(payment_method), ''), 'cash'))) AS label,
+      COALESCE(SUM(${NET_SUMMARY_TOTAL_EXPR}), 0) AS value,
       COUNT(*) AS count
     FROM orders
     WHERE ${VALID_ORDER_WHERE}
       AND created_at >= datetime('now', '-' || ? || ' days')
-    GROUP BY payment_method
+    GROUP BY label
     ORDER BY value DESC
   `
 };
@@ -495,16 +534,16 @@ export async function getGrouped(
         }
       }
     } else {
+      const noPaymentsSql = sql
+        .replace(NET_SUMMARY_TOTAL_EXPR, 'total')
+        .replace(VALID_ORDER_WHERE, VALID_ORDER_NO_NOTES_WHERE);
       try {
-        const fallbackSql = sql.replace(VALID_ORDER_WHERE, VALID_ORDER_FALLBACK_WHERE);
-        const { results } = await db.prepare(fallbackSql).bind(days, ...tf.binds).all<GroupRow>();
+        const { results } = await db.prepare(noPaymentsSql).bind(days, ...tf.binds).all<GroupRow>();
         rows = results || [];
       } catch {
         try {
-          const legacySql = sql
-            .replace(VALID_ORDER_WHERE, VALID_ORDER_FALLBACK_WHERE)
-            .replace(/datetime\(created_at, '\+7 hours'\)/g, 'created_at');
-          const { results } = await db.prepare(legacySql).bind(days, ...tf.binds).all<GroupRow>();
+          const fallbackSql = noPaymentsSql.replace(VALID_ORDER_NO_NOTES_WHERE, VALID_ORDER_FALLBACK_WHERE);
+          const { results } = await db.prepare(fallbackSql).bind(days, ...tf.binds).all<GroupRow>();
           rows = results || [];
         } catch {
           rows = [];

@@ -15,6 +15,7 @@ export function useProductManager() {
   const [editing, setEditing] = useState<Product | null>(null);
   const [form, setForm] = useState<ProductFormData>(EMPTY_PRODUCT);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [actionError, setActionError] = useState<string | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -22,6 +23,7 @@ export function useProductManager() {
     setEditing(null);
     setForm(EMPTY_PRODUCT);
     setErrors({});
+    setActionError(null);
     setDeleteId(null);
   }, [session.tenantId, session.userScope]);
 
@@ -32,15 +34,17 @@ export function useProductManager() {
 
   const saveMutation = useMutation({
     mutationFn: async (formData: ProductFormData) => {
-      const body = {
+      const trimmedDescription = (formData.description ?? '').trim();
+      const trimmedImageUrl = (formData.image_url ?? '').trim();
+      const body: Record<string, unknown> = {
         name: formData.name,
         slug: formData.slug,
-        description: formData.description,
         price: Number(formData.price),
         category_id: String(formData.category_id),
-        image_url: formData.image_url,
-        is_available: formData.is_available ? 1 : 0,
+        is_available: Boolean(formData.is_available),
         sort_order: Number(formData.sort_order),
+        ...(trimmedDescription ? { description: trimmedDescription } : { description: '' }),
+        ...(trimmedImageUrl ? { image_url: trimmedImageUrl } : { image_url: '' }),
       };
 
       if (editing) {
@@ -55,6 +59,7 @@ export function useProductManager() {
       });
     },
     onSuccess: () => {
+      setActionError(null);
       queryClient.invalidateQueries({ queryKey: productsKey });
       queryClient.invalidateQueries({ queryKey: ['menu'] });
       closeModal();
@@ -68,38 +73,47 @@ export function useProductManager() {
     mutationFn: (id: string) =>
       apiFetch(`/api/products/${id}`, { method: 'DELETE' }),
     onSuccess: () => {
+      setActionError(null);
       queryClient.invalidateQueries({ queryKey: productsKey });
       queryClient.invalidateQueries({ queryKey: ['menu'] });
       setDeleteId(null);
     },
     onError: (err: Error) => {
+      setDeleteId(null);
       setErrors({ _form: err.message });
+      setActionError(err.message || 'Không thể xoá sản phẩm');
     },
   });
 
   const toggleAvailabilityMutation = useMutation({
     mutationFn: async (product: Product) => {
-      const body = {
+      const body: Record<string, unknown> = {
         name: product.name,
         slug: product.slug,
-        description: product.description,
         price: product.price,
         category_id: product.category_id,
-        image_url: product.image_url,
-        is_available: product.is_available ? 0 : 1,
+        is_available: !product.is_available,
         sort_order: product.sort_order,
       };
+      if (typeof product.description === 'string') {
+        body.description = product.description;
+      }
+      if (typeof product.image_url === 'string' && product.image_url.trim()) {
+        body.image_url = product.image_url.trim();
+      }
       return apiFetch(`/api/products/${product.id}`, {
         method: 'PUT',
         body: JSON.stringify(body),
       });
     },
     onSuccess: () => {
+      setActionError(null);
       queryClient.invalidateQueries({ queryKey: productsKey });
       queryClient.invalidateQueries({ queryKey: ['menu'] });
     },
     onError: (err: Error) => {
       setErrors({ _form: err.message });
+      setActionError(err.message || 'Không thể cập nhật trạng thái món');
     },
   });
 
@@ -107,6 +121,7 @@ export function useProductManager() {
     setEditing(null);
     setForm(EMPTY_PRODUCT);
     setErrors({});
+    setActionError(null);
     setModalOpen(true);
   }
 
@@ -115,14 +130,15 @@ export function useProductManager() {
     setForm({
       name: product.name,
       slug: product.slug,
-      description: product.description,
+      description: product.description ?? '',
       price: String(product.price),
       category_id: String(product.category_id),
-      image_url: product.image_url,
-      is_available: product.is_available === 1,
+      image_url: product.image_url ?? '',
+      is_available: Boolean(product.is_available),
       sort_order: String(product.sort_order),
     });
     setErrors({});
+    setActionError(null);
     setModalOpen(true);
   }
 
@@ -169,6 +185,8 @@ export function useProductManager() {
     editing,
     form,
     errors,
+    actionError,
+    clearActionError: () => setActionError(null),
     deleteId,
     setDeleteId,
     saveMutation,

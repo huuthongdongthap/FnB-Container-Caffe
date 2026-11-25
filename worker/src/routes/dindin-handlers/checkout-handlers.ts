@@ -1,5 +1,8 @@
 import type { Context, Hono } from 'hono';
 import { publishOrderEvent } from '@aura/domain-order';
+import { deductInventoryForOrder } from '@aura/domain-inventory';
+import { signPayOSData } from '../../../../packages/domain/payment/policies/payos-signature';
+import { resolvePayosReconcileCredentials } from '../../lib/merchant-payment';
 import type { Env } from '../../types/env';
 import { queryFirst, execute, matchesTenantRow } from '../../lib/db';
 import { kvGet, kvSet } from '../../lib/kv';
@@ -37,6 +40,7 @@ export function registerCheckoutHandlers(router: Hono<{ Bindings: Env }>): void 
         customer_name: string | null;
         customer_phone: string | null;
         payment_method: string | null;
+        payment_status?: string | null;
         items: string | null;
         total: number | null;
         status: string | null;
@@ -46,7 +50,7 @@ export function registerCheckoutHandlers(router: Hono<{ Bindings: Env }>): void 
       const effectiveTenant = tenantId?.trim() || 'default';
       try {
         const res = await c.env.AURA_DB.prepare(
-          "SELECT id, customer_name, customer_phone, payment_method, items, total, status, created_at, tenant_id FROM orders WHERE customer_name = 'DIN' AND (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?) OR (id LIKE 'DIN%' AND (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?)) ORDER BY created_at DESC LIMIT 50"
+          "SELECT id, customer_name, customer_phone, payment_method, payment_status, items, total, status, created_at, tenant_id FROM orders WHERE customer_name = 'DIN' AND (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?) OR (id LIKE 'DIN%' AND (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?)) ORDER BY created_at DESC LIMIT 50"
         ).bind(effectiveTenant, effectiveTenant, effectiveTenant, effectiveTenant).all<typeof rows[number]>();
         rows = res.results || [];
       } catch {
@@ -115,12 +119,27 @@ export function registerCheckoutHandlers(router: Hono<{ Bindings: Env }>): void 
           if (statusFilter === 'qc_ok' && !qcPassed) {
             return null;
           }
+          let paymentUrl: string | null = null;
+          try {
+            const payRow = await c.env.AURA_DB.prepare(
+              "SELECT payment_url, status FROM payments WHERE order_id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ? ORDER BY created_at DESC LIMIT 1"
+            ).bind(row.id, rowTenant).first<{ payment_url?: string | null; status?: string | null }>();
+            if (payRow?.payment_url) {
+              paymentUrl = String(payRow.payment_url);
+            }
+          } catch {
+            paymentUrl = null;
+          }
+          const resolvedPaymentStatus = row.payment_status || (row.payment_method === 'cod' ? 'cod_pending' : 'pending');
           return {
             id: row.id,
             orderId: row.id,
             sessionId: row.customer_phone || '',
             payment_method: row.payment_method || 'cod',
             paymentMethod: row.payment_method || 'cod',
+            payment_status: resolvedPaymentStatus,
+            paymentStatus: resolvedPaymentStatus,
+            paymentUrl,
             items: parsedItems,
             total: Number(row.total ?? 0),
             status: row.status || 'pending',
@@ -217,10 +236,32 @@ export function registerCheckoutHandlers(router: Hono<{ Bindings: Env }>): void 
       return c.json({ success: false, error: 'Cannot complete QC for a cancelled or failed order' }, 409);
     }
     const paymentMethod = String(ordRow.payment_method || '').trim().toLowerCase();
-    const paymentStatus = ordRow.payment_status != null ? String(ordRow.payment_status).trim().toLowerCase() : '';
+    let paymentStatus = ordRow.payment_status != null ? String(ordRow.payment_status).trim().toLowerCase() : '';
     const ordStatus = String(ordRow.status || '').trim().toLowerCase();
+    const rowTenant =
+      (typeof ordRow.tenant_id === 'string' && ordRow.tenant_id.trim() ? ordRow.tenant_id.trim() : '') ||
+      (tenantId && tenantId !== '*' && tenantId.toLowerCase() !== 'hq' ? tenantId : 'default');
     if (paymentStatus && ['refunded', 'failed', 'cancelled', 'canceled'].includes(paymentStatus)) {
       return c.json({ success: false, error: 'Cannot complete QC for refunded or failed payment' }, 409);
+    }
+    if (!['cash', 'cod', ''].includes(paymentMethod) && paymentStatus !== 'paid' && paymentStatus !== 'completed') {
+      try {
+        const settledPayment = await c.env.AURA_DB.prepare(
+          "SELECT status FROM payments WHERE order_id = ? AND LOWER(COALESCE(status, '')) IN ('completed', 'paid') AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ? LIMIT 1"
+        ).bind(orderId, rowTenant).first<{ status?: string }>();
+        if (settledPayment) {
+          paymentStatus = 'paid';
+          await execute(
+            c.env.AURA_DB,
+            "UPDATE orders SET payment_status = 'paid', updated_at = ? WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?",
+            new Date().toISOString(),
+            orderId,
+            rowTenant
+          ).catch(() => {});
+        }
+      } catch {
+        // payments table optional in minimal schemas
+      }
     }
     if (paymentStatus && ['unpaid', 'pending'].includes(paymentStatus)) {
       return c.json({ success: false, error: 'Cannot complete QC for unpaid non-cash order' }, 409);
@@ -234,9 +275,6 @@ export function registerCheckoutHandlers(router: Hono<{ Bindings: Env }>): void 
       return c.json({ success: false, error: 'Cannot complete QC for unpaid non-cash order' }, 409);
     }
     const checkedAt = new Date().toISOString();
-    const rowTenant =
-      (typeof ordRow.tenant_id === 'string' && ordRow.tenant_id.trim() ? ordRow.tenant_id.trim() : '') ||
-      (tenantId && tenantId !== '*' && tenantId.toLowerCase() !== 'hq' ? tenantId : 'default');
     {
       const tenantId = rowTenant;
       const qcKey = tenantId !== 'default' ? `dindin:qc:${tenantId}:${orderId}` : `dindin:qc:${orderId}`;
@@ -578,6 +616,124 @@ export function registerCheckoutHandlers(router: Hono<{ Bindings: Env }>): void 
 
       await writeCart(c.env, sessionId, emptyCart(), tenantId);
 
+      // Deduct BOM / inventory stock for the checked-out DinDin order (non-blocking on minimal mock schemas)
+      await deductInventoryForOrder(
+        c.env as unknown as Parameters<typeof deductInventoryForOrder>[0],
+        orderId,
+        validatedOrderItems.map((it) => ({
+          product_id: it.product_id,
+          quantity: it.quantity,
+          name: it.name,
+        })),
+        writeTenant
+      ).catch(() => {});
+
+      const orderTotal = Math.max(0, totalFromMenu);
+      const paymentId = `pay_${orderId.toLowerCase()}`;
+      let paymentUrl: string | null = null;
+      let orderCode: number | null = null;
+
+      if (payment_method === 'payos') {
+        orderCode = Number(`${Date.now().toString().slice(-6)}${Math.floor(100 + Math.random() * 900)}`);
+        try {
+          const creds = await resolvePayosReconcileCredentials(c.env.AURA_DB, c.env, writeTenant);
+          if (creds && orderTotal > 0) {
+            const origin = (() => {
+              try {
+                return new URL(c.req.url).origin;
+              } catch {
+                return 'https://auraspace.cafe';
+              }
+            })();
+            const returnUrl = `${origin}/admin/dindin/checkout?orderId=${encodeURIComponent(orderId)}&paid=1`;
+            const cancelUrl = `${origin}/admin/dindin/checkout?orderId=${encodeURIComponent(orderId)}&cancelled=1`;
+            const description = `DIN ${orderId.slice(-8)}`.slice(0, 25);
+            const signature = await signPayOSData(
+              {
+                amount: orderTotal,
+                cancelUrl,
+                description,
+                orderCode,
+                returnUrl,
+              },
+              creds.checksumKey
+            );
+            const payosRes = await fetch('https://api-merchant.payos.vn/v2/payment-requests', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'x-client-id': creds.clientId,
+                'x-api-key': creds.apiKey,
+              },
+              body: JSON.stringify({
+                orderCode,
+                amount: orderTotal,
+                description,
+                cancelUrl,
+                returnUrl,
+                signature,
+              }),
+              signal: AbortSignal.timeout(8000),
+            });
+            if (payosRes.ok) {
+              const payosJson = (await payosRes.json()) as { data?: { checkoutUrl?: string; paymentLinkId?: string } };
+              const checkoutUrl = payosJson?.data?.checkoutUrl;
+              const linkId = payosJson?.data?.paymentLinkId;
+              if (typeof checkoutUrl === 'string' && checkoutUrl.startsWith('https://')) {
+                paymentUrl = checkoutUrl;
+              } else if (typeof linkId === 'string' && linkId.trim()) {
+                paymentUrl = `https://pay.payos.vn/web/${linkId.trim()}`;
+              }
+            }
+          }
+        } catch {
+          // Non-fatal: still persist pending payments record for reconciliation / manual confirmation
+        }
+        try {
+          await execute(
+            c.env.AURA_DB,
+            'INSERT INTO payments (id, order_id, method, amount, status, transaction_id, payment_url, tenant_id, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)',
+            paymentId,
+            orderId,
+            'payos',
+            orderTotal,
+            'pending',
+            String(orderCode),
+            paymentUrl,
+            writeTenant
+          );
+        } catch {
+          if (writeTenant === 'default') {
+            await execute(
+              c.env.AURA_DB,
+              'INSERT INTO payments (id, order_id, method, amount, status, transaction_id, payment_url, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)',
+              paymentId,
+              orderId,
+              'payos',
+              orderTotal,
+              'pending',
+              String(orderCode),
+              paymentUrl
+            ).catch(() => {});
+          }
+        }
+      } else {
+        try {
+          await execute(
+            c.env.AURA_DB,
+            'INSERT INTO payments (id, order_id, method, amount, status, tenant_id, created_at) VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)',
+            paymentId,
+            orderId,
+            payment_method,
+            orderTotal,
+            'pending',
+            writeTenant
+          );
+        } catch {
+          // Optional in minimal DinDin test schemas
+        }
+      }
+
       if (c.env.AUTH_KV) {
         const ts = new Date().toISOString();
         const eventPayload = JSON.stringify({
@@ -602,12 +758,123 @@ export function registerCheckoutHandlers(router: Hono<{ Bindings: Env }>): void 
         await kvSet(
           c.env.AUTH_KV,
           idempotencyKVKey(idempotencyKey, tenantId),
-          JSON.stringify({ ok: true, orderId, status: 'pending', at: new Date().toISOString() })
+          JSON.stringify({
+            ok: true,
+            orderId,
+            status: 'pending',
+            paymentId,
+            paymentStatus: initialPaymentStatus,
+            ...(paymentUrl ? { paymentUrl } : {}),
+            ...(orderCode ? { orderCode } : {}),
+            at: new Date().toISOString(),
+          })
         );
       }
-      return c.json({ success: true, orderId, status: 'pending' });
+      return c.json({
+        success: true,
+        orderId,
+        status: 'pending',
+        paymentId,
+        paymentStatus: initialPaymentStatus,
+        ...(paymentUrl ? { paymentUrl } : {}),
+        ...(orderCode ? { orderCode } : {}),
+      });
     } catch {
       return errorResponse(c as DindinContext, err('D06', 500, 'Lỗi ghi CSDL - vui lòng thử lại sau'));
     }
+  });
+
+  // ── POST /checkout/:orderId/confirm-payment ─────────────────────────────────
+  router.post('/checkout/:orderId/confirm-payment', async (c) => {
+    if (
+      hasCrossTenantDindinOverride(c as unknown as Parameters<typeof hasCrossTenantDindinOverride>[0]) ||
+      hasForbiddenTenantOverride(c as unknown as Parameters<typeof hasForbiddenTenantOverride>[0])
+    ) {
+      return c.json({ success: false, error: 'Cross-tenant access denied' }, 403);
+    }
+    const user = c.get('user' as never) as { role?: string } | undefined;
+    if (user?.role && !['owner', 'admin', 'manager', 'supervisor', 'cashier', 'staff'].includes(user.role.toLowerCase())) {
+      return c.json({ success: false, error: 'Insufficient permissions' }, 403);
+    }
+    const { orderId } = c.req.param();
+    const tenantId = resolveDinDinTenant(c as unknown as Parameters<typeof resolveDinDinTenant>[0]);
+    type ConfirmOrderRow = {
+      id: string;
+      status?: string | null;
+      customer_name?: string | null;
+      payment_method?: string | null;
+      payment_status?: string | null;
+      total?: number | null;
+      tenant_id?: string | null;
+    };
+    let ordRow: ConfirmOrderRow | null = null;
+    try {
+      ordRow = await c.env.AURA_DB.prepare(
+        'SELECT id, status, customer_name, payment_method, payment_status, total, tenant_id FROM orders WHERE id = ?'
+      ).bind(orderId).first<ConfirmOrderRow>();
+    } catch {
+      if (!tenantId || tenantId === 'default' || tenantId === '*') {
+        ordRow = await c.env.AURA_DB.prepare(
+          'SELECT id, status, customer_name, payment_method, total FROM orders WHERE id = ?'
+        ).bind(orderId).first<ConfirmOrderRow>().catch(() => null);
+      }
+    }
+    if (!ordRow || !matchesTenantRow(ordRow, tenantId)) {
+      return c.json({ success: false, error: 'Order not found' }, 404);
+    }
+    const isDindinOrder =
+      String(ordRow.id || '').startsWith('DIN') ||
+      String(ordRow.customer_name || '').toUpperCase() === 'DIN';
+    if (!isDindinOrder) {
+      return c.json({ success: false, error: 'Order is not a DinDin order' }, 400);
+    }
+    const ordStatus = String(ordRow.status || '').trim().toLowerCase();
+    const payStatus = String(ordRow.payment_status || '').trim().toLowerCase();
+    if (
+      ['cancelled', 'canceled', 'failed', 'refunded', 'expired', 'rejected'].includes(ordStatus) ||
+      ['refunded', 'failed', 'cancelled', 'canceled'].includes(payStatus)
+    ) {
+      return c.json({ success: false, error: 'Cannot confirm payment for cancelled or refunded order' }, 409);
+    }
+    const rowTenant =
+      (typeof ordRow.tenant_id === 'string' && ordRow.tenant_id.trim() ? ordRow.tenant_id.trim() : '') ||
+      (tenantId && tenantId !== '*' && tenantId.toLowerCase() !== 'hq' ? tenantId : 'default');
+    const paidAt = new Date().toISOString();
+    await execute(
+      c.env.AURA_DB,
+      "UPDATE orders SET payment_status = 'paid', updated_at = ? WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?",
+      paidAt,
+      orderId,
+      rowTenant
+    ).catch(async () => {
+      if (rowTenant === 'default') {
+        await execute(
+          c.env.AURA_DB,
+          "UPDATE orders SET payment_status = 'paid', updated_at = ? WHERE id = ?",
+          paidAt,
+          orderId
+        );
+      }
+    });
+    try {
+      const updPay = await c.env.AURA_DB.prepare(
+        "UPDATE payments SET status = 'completed', updated_at = ? WHERE order_id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
+      ).bind(paidAt, orderId, rowTenant).run();
+      if (!updPay?.meta?.changes) {
+        await execute(
+          c.env.AURA_DB,
+          'INSERT INTO payments (id, order_id, method, amount, status, tenant_id, created_at) VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)',
+          `pay_${orderId.toLowerCase()}`,
+          orderId,
+          ordRow.payment_method || 'payos',
+          Number(ordRow.total ?? 0),
+          'completed',
+          rowTenant
+        ).catch(() => {});
+      }
+    } catch {
+      // Optional payments table in minimal schemas
+    }
+    return c.json({ success: true, orderId, paymentStatus: 'paid', paidAt });
   });
 }

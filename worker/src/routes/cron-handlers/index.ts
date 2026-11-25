@@ -1,5 +1,5 @@
 export { processErpnextRetryQueue, processErpnextProductSync } from './erpnext-sync';
-export { checkOverdueOrders, expireUnpaidOnlineOrders } from './order-checks';
+export { checkOverdueOrders, expireUnpaidOnlineOrders, checkInventoryAlerts } from './order-checks';
 export { retryPendingRefundLoyaltyWork } from '../refunds-handlers/loyalty-work';
 export { sendCashbackExpiryWarnings } from './cashback-warnings';
 export { runCampaignTriggers } from './campaigns';
