@@ -7,8 +7,10 @@ export type LoginStatus = 'idle' | 'loading' | 'error' | 'success';
 export interface StitchAdminLoginNewProps {
   /** External login handler. Falls back to simulated delay if omitted. */
   onLogin?: (email: string, password: string) => Promise<void>;
-  /** External guest login handler. */
+  /** External guest login handler (dev/demo only). */
   onGuestLogin?: () => void;
+  /** Optional forgot-password navigation path. Defaults to /forgot-password. */
+  forgotPasswordHref?: string;
   /** External control of login status (loading, error, etc.). */
   status?: LoginStatus;
   /** Error message shown in the error state. */

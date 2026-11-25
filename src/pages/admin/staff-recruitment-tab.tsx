@@ -38,7 +38,7 @@ const SHIFT_LABELS: Record<string, string> = {
 
 export function RecruitmentTab() {
   const session = useSubmissionSession();
-  const allowed = useAuthStore(state => ['owner', 'manager'].includes(state.user?.role || ''));
+  const allowed = useAuthStore(state => ['owner', 'admin', 'manager', 'supervisor'].includes(state.user?.role || ''));
   return allowed ? <RecruitmentSession key={session} /> : null;
 }
 

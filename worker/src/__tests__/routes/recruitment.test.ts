@@ -19,19 +19,20 @@ describe('Store owned recruitment on real SQLite', () => {
     expect(f.sqlite.prepare('SELECT COUNT(*) count FROM contact_messages').get()?.count).toBe(0);
     expect((await f.request('/api/recruitment', undefined, 'POST', candidate)).status).toBe(201);
   });
-  it('same-store owner/manager can create, list, patch, and delete persisted records', async () => {
+  it('same-store owner/admin/manager/supervisor can create, list, patch, and delete persisted records', async () => {
     const f = fixture();
+    f.sqlite.prepare('INSERT INTO users(id,name,role,tenant_id,is_active,auth_version) VALUES (?,?,?,?,1,1)').run('supervisor', 'supervisor', 'supervisor', 'cafe-a');
     const response = await f.request('/api/recruitment/applications', 'manager', 'POST', candidate, { 'Idempotency-Key': 'admin-create-0001' });
     expect(response.status).toBe(201);
     const { id } = await response.json();
-    const list = await (await f.request('/api/recruitment/applications', 'owner')).json();
-    expect(list.data.map((row: any) => row.id)).toEqual([id]);
-    expect((await f.request(`/api/recruitment/applications/${id}`, 'manager', 'PATCH', { status: 'hired' })).status).toBe(200);
+    const list = await (await f.request('/api/recruitment/applications', 'admin')).json();
+    expect(list.data.map((row: { id: string }) => row.id)).toEqual([id]);
+    expect((await f.request(`/api/recruitment/applications/${id}`, 'supervisor', 'PATCH', { status: 'hired' })).status).toBe(200);
     expect(f.sqlite.prepare('SELECT status FROM recruitment_applications WHERE id=?').get(id)?.status).toBe('hired');
     expect((await f.request(`/api/recruitment/applications/${id}`, 'owner', 'DELETE')).status).toBe(200);
     expect((await f.request(`/api/recruitment/applications/${id}`, 'owner', 'DELETE')).status).toBe(404);
   });
-  it.each(['staff', 'admin', 'cashier', 'other', 'wildcard', 'hq'])('denies %s across every management operation', async (actor) => {
+  it.each(['staff', 'cashier', 'other', 'wildcard', 'hq'])('denies %s across every management operation', async (actor) => {
     const f = fixture();
     for (const [path, method, body] of [
       ['/api/recruitment/applications', 'GET', undefined], ['/api/recruitment/applications', 'POST', candidate],

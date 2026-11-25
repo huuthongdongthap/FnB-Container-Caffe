@@ -1,7 +1,7 @@
 import React from 'react';
 import { Route, Navigate } from 'react-router-dom';
 import { ErrorBoundary } from '@/components/shared/ErrorBoundary';
-import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
+import { ProtectedRoute, SAAS_ONBOARD_ROLES } from '@/components/auth/ProtectedRoute';
 
 /** Wraps a route element in ErrorBoundary so a crash in one route doesn't take down the whole SPA. */
 function guarded(element: React.ReactNode): React.ReactNode {
@@ -39,6 +39,8 @@ const GalleryNew = React.lazy(() => import('@/pages/stitch/gallery-new'));
 const OurStory = React.lazy(() => import('@/pages/stitch/our-story'));
 const ReviewsPage = React.lazy(() => import('@/pages/ReviewsPage'));
 const RegisterPage = React.lazy(() => import('@/pages/register'));
+const VerifyEmailPage = React.lazy(() => import('@/pages/verify-email'));
+const ForgotPasswordPage = React.lazy(() => import('@/pages/forgot-password'));
 const StitchScreenGallery = React.lazy(() => import('@/pages/stitch-screen-gallery'));
 const SystemHubPage = React.lazy(() => import('@/pages/SystemHub'));
 const RecruitmentPage = React.lazy(() => import('@/pages/RecruitmentPage'));
@@ -66,6 +68,9 @@ export const publicRoutes = [
   // Tab 5: Cá nhân
   <Route key="/account" path="/account" element={guarded(<AccountPage />)} />,
   <Route key="/register" path="/register" element={guarded(<RegisterPage />)} />,
+  <Route key="/verify-email" path="/verify-email" element={guarded(<VerifyEmailPage />)} />,
+  <Route key="/forgot-password" path="/forgot-password" element={guarded(<ForgotPasswordPage />)} />,
+  <Route key="/reset-password" path="/reset-password" element={guarded(<ForgotPasswordPage />)} />,
   <Route key="/loyalty" path="/loyalty" element={guarded(<LoyaltyPage />)} />,
   <Route key="/dang-ky-thanh-vien" path="/dang-ky-thanh-vien" element={<Navigate to="/loyalty" replace />} />,
   <Route key="/referral" path="/referral" element={guarded(<ReferralPage />)} />,
@@ -99,7 +104,7 @@ export const publicRoutes = [
   <Route key="/signup" path="/signup" element={guarded(<SaasSignupPage />)} />,
   <Route key="/s/:slug" path="/s/:slug" element={guarded(<TenantStorefrontPage />)} />,
   <Route key="/s/:slug/*" path="/s/:slug/*" element={guarded(<TenantStorefrontPage />)} />,
-  <Route key="/saas-protected" element={<ProtectedRoute />}>
+  <Route key="/saas-protected" element={<ProtectedRoute allowedRoles={SAAS_ONBOARD_ROLES} loginPath="/signup" />}>
     <Route path="/saas/dashboard" element={guarded(<CustomerDashboard />)} />
     <Route path="/saas/onboard/tenant" element={guarded(<TenantCreate />)} />
     <Route path="/saas/onboard" element={guarded(<OnboardingWizard />)} />

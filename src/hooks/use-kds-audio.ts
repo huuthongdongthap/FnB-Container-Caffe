@@ -36,7 +36,19 @@ export function useKdsAudio(
       }
     }
 
-    if (enabled && hasNewOrder) {
+    let adminSoundAllowed = true;
+    try {
+      if (typeof localStorage !== 'undefined') {
+        const stored = localStorage.getItem('aura_admin_sound_alerts');
+        if (stored === '0') {
+          adminSoundAllowed = false;
+        }
+      }
+    } catch {
+      // Ignore storage access errors
+    }
+
+    if (enabled && adminSoundAllowed && hasNewOrder) {
       playBeep();
     }
 

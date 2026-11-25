@@ -18,6 +18,7 @@ import { LoginFooter } from './StitchAdminLoginNew-footer';
 export function StitchAdminLoginNew({
   onLogin,
   onGuestLogin,
+  forgotPasswordHref = '/forgot-password',
   status: externalStatus,
   errorMessage: externalError,
   brandName = BRAND,
@@ -76,12 +77,11 @@ export function StitchAdminLoginNew({
 
           <div className="w-full mt-4 text-center">
             <a
-              href="#"
+              href={forgotPasswordHref}
               className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center px-2 font-label-caps text-label-caps text-on-surface-variant hover:text-primary transition-colors duration-300 uppercase"
-              onClick={(e) => e.preventDefault()}
               aria-label={t('adminLogin.forgotPasswordAriaLabel')}
             >
-              {t('adminLogin.forgotPassword', 'Quen mat khau?')}
+              {t('adminLogin.forgotPassword', 'Quên mật khẩu?')}
             </a>
           </div>
 

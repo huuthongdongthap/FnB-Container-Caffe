@@ -31,7 +31,17 @@ function escapeTelegramMarkdown(text: string): string {
   return text.replace(/[*_`[\]()~>#+=|{}.!\\-]/g, '\\$&');
 }
 
-function extractTelemetryTenantCandidates(c: any): string[] {
+function parseSqliteUtcMillis(rawCreatedAt: string): number {
+  const trimmed = String(rawCreatedAt || '').trim();
+  if (!trimmed) return Number.NaN;
+  // SQLite datetime('now') produces 'YYYY-MM-DD HH:MM:SS' in UTC without a timezone suffix.
+  const hasExplicitTz = /(?:Z|[+-]\d{2}:?\d{2})$/i.test(trimmed);
+  const normalizedIso = hasExplicitTz ? trimmed.replace(' ', 'T') : `${trimmed.replace(' ', 'T')}Z`;
+  const parsed = Date.parse(normalizedIso);
+  return Number.isFinite(parsed) ? parsed : new Date(trimmed).getTime();
+}
+
+function extractTelemetryTenantCandidates(c: import('hono').Context): string[] {
   return [
     c.req.query('tenant_id'),
     c.req.query('tenantId'),
@@ -293,28 +303,68 @@ containerTelemetryRouter.get('/containers/status', requireAuth(['owner', 'admin'
   const db = (c.env.AURA_DB ?? (c.env as Record<string, unknown>).DB) as import('@cloudflare/workers-types').D1Database;
 
   try {
-    const { results: rawLogs } = await db.prepare(`
-      SELECT t.*
-      FROM container_telemetry_logs t
-      INNER JOIN (
-        SELECT container_id, COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') as norm_tenant, MAX(created_at) as max_created
-        FROM container_telemetry_logs
-        WHERE (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?)
-        GROUP BY container_id, COALESCE(NULLIF(TRIM(tenant_id), ''), 'default')
-      ) latest ON t.container_id = latest.container_id
-        AND COALESCE(NULLIF(TRIM(t.tenant_id), ''), 'default') = latest.norm_tenant
-        AND t.created_at = latest.max_created
-    `).bind(tenantId, tenantId).all<{
-      id: string; container_id: string; tenant_id?: string | null; power_source: string; battery_percentage: number | null;
-      ambient_temp_celsius: number; kds_online: number; alert_status: string; alert_message: string | null; created_at: string;
-    }>();
+    type TelemetryStatusRow = {
+      id: string;
+      container_id: string;
+      tenant_id?: string | null;
+      power_source: string;
+      battery_percentage: number | null;
+      ambient_temp_celsius: number;
+      kds_online: number;
+      alert_status: string;
+      alert_message: string | null;
+      created_at: string;
+    };
+    let rawLogs: TelemetryStatusRow[] = [];
+    try {
+      const rankedRes = await db.prepare(`
+        SELECT
+          id, container_id, tenant_id, power_source, battery_percentage,
+          ambient_temp_celsius, kds_online, alert_status, alert_message, created_at
+        FROM (
+          SELECT
+            t.*,
+            ROW_NUMBER() OVER (
+              PARTITION BY t.container_id, COALESCE(NULLIF(TRIM(t.tenant_id), ''), 'default')
+              ORDER BY replace(t.created_at, 'T', ' ') DESC, t.id DESC
+            ) AS rn
+          FROM container_telemetry_logs t
+          WHERE (? = '*' OR COALESCE(NULLIF(TRIM(t.tenant_id), ''), 'default') = ?)
+        ) ranked
+        WHERE rn = 1
+      `).bind(tenantId, tenantId).all<TelemetryStatusRow>();
+      rawLogs = rankedRes.results || [];
+    } catch {
+      const legacyRes = await db.prepare(`
+        SELECT t.*
+        FROM container_telemetry_logs t
+        INNER JOIN (
+          SELECT container_id, COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') as norm_tenant, MAX(created_at) as max_created
+          FROM container_telemetry_logs
+          WHERE (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?)
+          GROUP BY container_id, COALESCE(NULLIF(TRIM(tenant_id), ''), 'default')
+        ) latest ON t.container_id = latest.container_id
+          AND COALESCE(NULLIF(TRIM(t.tenant_id), ''), 'default') = latest.norm_tenant
+          AND t.created_at = latest.max_created
+        ORDER BY t.created_at DESC, t.id DESC
+      `).bind(tenantId, tenantId).all<TelemetryStatusRow>();
+      rawLogs = legacyRes.results || [];
+    }
+
+    const seenKeys = new Set<string>();
+    const dedupedLogs = (rawLogs || []).filter((row) => {
+      if (!matchesTenantRow(row as unknown as Record<string, unknown>, tenantId)) return false;
+      const normTenant = (typeof row.tenant_id === 'string' && row.tenant_id.trim()) || 'default';
+      const key = `${normTenant}:${row.container_id}`;
+      if (seenKeys.has(key)) return false;
+      seenKeys.add(key);
+      return true;
+    });
 
     const now = Date.now();
-    const containers = (rawLogs || [])
-      .filter((row) => matchesTenantRow(row as unknown as Record<string, unknown>, tenantId))
-      .map((row) => {
-      const logTime = new Date(row.created_at).getTime();
-      const minutesAgo = Math.round((now - logTime) / (60 * 1000));
+    const containers = dedupedLogs.map((row) => {
+      const logTime = parseSqliteUtcMillis(row.created_at);
+      const minutesAgo = Math.max(0, Math.round((now - logTime) / (60 * 1000)));
       const isOffline = minutesAgo > 15;
 
       return {

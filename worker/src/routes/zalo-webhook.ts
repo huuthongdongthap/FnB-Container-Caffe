@@ -9,6 +9,8 @@ import type { Env } from '../types/env';
 import { getTenantId, isHQSuperAdmin } from '../middleware/tenant';
 import { requireAuth } from '../middleware/auth';
 import { createLogger } from '../middleware/logger';
+import { recordMetric } from '../lib/metrics-collector';
+import { sendTelegramMessage } from '../lib/alerts/telegram';
 import { processCustomerQuery } from './customer-assistant';
 
 const log = createLogger({ route: 'zalo-webhook' });
@@ -257,9 +259,11 @@ zaloWebhookRouter.post('/', async (c) => {
 
   // Outbound push via Zalo OA message API if token is present
   const zaloToken = (c.env as Record<string, unknown>).ZALO_ACCESS_TOKEN as string | undefined;
+  let outboundDelivered: boolean | undefined;
+  let outboundError: string | undefined;
   if (zaloToken && sender?.id) {
     try {
-      await fetch('https://openapi.zalo.me/v3.0/oa/message/cs', {
+      const csRes = await fetch('https://openapi.zalo.me/v3.0/oa/message/cs', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -271,12 +275,61 @@ zaloWebhookRouter.post('/', async (c) => {
         }),
         signal: AbortSignal.timeout(4000)
       });
-    } catch { /* non-blocking outbound webhook error */ }
+      const csPayload = (await csRes.json().catch(() => null)) as { error?: number; message?: string } | null;
+      const zaloErrorCode = typeof csPayload?.error === 'number' ? csPayload.error : (csRes.ok ? 0 : -1);
+      if (!csRes.ok || zaloErrorCode !== 0) {
+        outboundDelivered = false;
+        outboundError = csPayload?.message || `Zalo OA CS API failed (HTTP ${csRes.status}, error=${zaloErrorCode})`;
+        log.error('zalo_cs_message_delivery_failed', {
+          tenantId: effectiveTenantId,
+          senderId: sender.id,
+          httpStatus: csRes.status,
+          zaloError: zaloErrorCode,
+          zaloMessage: csPayload?.message || '',
+        });
+        void recordMetric(db, 'zalo_cs_delivery_failed', 1, {
+          tenant_id: effectiveTenantId,
+          http_status: String(csRes.status),
+          zalo_error: String(zaloErrorCode),
+        });
+        const tgBotToken = (c.env as Record<string, unknown>).TELEGRAM_BOT_TOKEN as string | undefined;
+        const tgChatId = (c.env as Record<string, unknown>).TELEGRAM_CHAT_ID as string | undefined;
+        if (tgBotToken && tgChatId) {
+          void sendTelegramMessage(
+            tgBotToken,
+            tgChatId,
+            `[Zalo OA Alert] Gửi tin nhắn CS thất bại (tenant=${effectiveTenantId}, HTTP ${csRes.status}, error=${zaloErrorCode}): ${outboundError}`
+          ).catch(() => {});
+        }
+      } else {
+        outboundDelivered = true;
+      }
+    } catch (csErr) {
+      outboundDelivered = false;
+      outboundError = csErr instanceof Error ? csErr.message : String(csErr);
+      log.error('zalo_cs_message_request_exception', {
+        tenantId: effectiveTenantId,
+        senderId: sender.id,
+        error: outboundError,
+      });
+      void recordMetric(db, 'zalo_cs_delivery_failed', 1, {
+        tenant_id: effectiveTenantId,
+        zalo_error: 'network_exception',
+      });
+    }
   }
 
   return c.json({
     success: true,
-    data: { user_id: sender?.id, received_text: userText, reply: result.reply, intent: result.intent, engine: result.engine }
+    data: {
+      user_id: sender?.id,
+      received_text: userText,
+      reply: result.reply,
+      intent: result.intent,
+      engine: result.engine,
+      ...(outboundDelivered !== undefined ? { outbound_delivered: outboundDelivered } : {}),
+      ...(outboundError ? { outbound_error: outboundError } : {}),
+    }
   });
 });
 

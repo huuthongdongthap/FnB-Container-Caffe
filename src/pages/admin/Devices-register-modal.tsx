@@ -1,7 +1,7 @@
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Modal } from '@/components/ui/modal';
-import { ROLE_LABEL } from './Devices-constants';
+import { DEVICE_ROLE_OPTIONS, ROLE_LABEL } from './Devices-constants';
 import type { StaffOption } from './Devices-types';
 
 interface Props {
@@ -40,7 +40,18 @@ export function DevicesRegisterModal({
         ) : (
           <div>
             <label className="block text-sm font-medium mb-1.5">Chọn nhân viên</label>
-            <select value={regStaffId} onChange={e => onStaffIdChange(e.target.value)} className="w-full h-10 px-3 rounded-lg border border-border bg-surface text-foreground text-sm">
+            <select
+              value={regStaffId}
+              onChange={e => {
+                const nextId = e.target.value;
+                onStaffIdChange(nextId);
+                const selectedStaff = staffList.find(s => s.id === nextId);
+                if (selectedStaff?.role) {
+                  onRoleChange(selectedStaff.role);
+                }
+              }}
+              className="w-full h-10 px-3 rounded-lg border border-border bg-surface text-foreground text-sm"
+            >
               <option value="">-- Chọn nhân viên --</option>
               {staffList.map(s => (<option key={s.id} value={s.id}>{s.name} ({ROLE_LABEL[s.role] || s.role})</option>))}
             </select>
@@ -49,9 +60,9 @@ export function DevicesRegisterModal({
         <div>
           <label className="block text-sm font-medium mb-1.5">Vai trò trên thiết bị</label>
           <select value={regRole} onChange={e => onRoleChange(e.target.value)} className="w-full h-10 px-3 rounded-lg border border-border bg-surface text-foreground text-sm">
-            <option value="staff">Nhân viên / Staff</option>
-            <option value="waiter">Phục vụ / Waiter</option>
-            <option value="kitchen">Bếp / Kitchen</option>
+            {DEVICE_ROLE_OPTIONS.map(opt => (
+              <option key={opt.value} value={opt.value}>{opt.label}</option>
+            ))}
           </select>
         </div>
         <Input label="Mã PIN 4 chữ số *" value={regPin} onChange={e => onPinChange(e.target.value.replace(/\D/g, '').slice(0, 4))} placeholder="VD: 1234" inputMode="numeric" maxLength={4} />

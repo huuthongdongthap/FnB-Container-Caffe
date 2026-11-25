@@ -20,7 +20,7 @@ export function ProgressTracker({
             {t('stitch.referral.progressTitle', { defaultValue: 'Path to Platinum' })}
           </h3>
           <p className="font-body text-[12px] leading-[1.2] font-medium text-[var(--aura-chrome-soft)] opacity-60">
-            {t('stitch.referral.progressDesc', { defaultValue: 'Unlock $50 exclusive bonus' })}
+            +10.000đ / {t('stitch.referral.referrals', { defaultValue: 'lượt giới thiệu' })}
           </p>
         </div>
         <div className="text-right">

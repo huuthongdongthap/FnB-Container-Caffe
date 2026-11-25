@@ -3,7 +3,7 @@ import type { Env } from '../types/env';
 import { requireAuth, authenticateRequest } from '../middleware/auth';
 import { getTenantId as getCanonicalTenantId, resolvePilotStore, matchesTenantRow, isHQSuperAdmin } from '../middleware/tenant';
 import { sendPushToStaff } from '../tree/push/notifier';
-import { DEFAULT_STAFF_PUSH_ROLE, resolveStaffPushRequestedRole } from '../tree/push/roles';
+import { DEFAULT_STAFF_PUSH_ROLE, isStaffPushRole, resolveStaffPushRequestedRole } from '../tree/push/roles';
 import { pushSubscribeSchema, pushUnsubscribeSchema, pushSendStaffSchema, zodErrorResponse } from '../lib/validators';
 
 function extractPushTenantOverride(c: {
@@ -36,7 +36,7 @@ function hasPushStaffTenantMismatch(c: {
   const user = (typeof c?.get === 'function' ? c.get('user') : undefined) as
     | { role?: string; tenantId?: string; tenant_id?: string }
     | undefined;
-  if (!user || isHQSuperAdmin(user as any)) return false;
+  if (!user || isHQSuperAdmin(user as Parameters<typeof isHQSuperAdmin>[0])) return false;
   const rawUserTenant = user.tenantId ?? user.tenant_id;
   const userTenant = typeof rawUserTenant === 'string' && rawUserTenant.trim() ? rawUserTenant.trim() : 'default';
   if (userTenant === '*' || userTenant.toLowerCase() === 'hq') return true;
@@ -82,8 +82,11 @@ const STAFF_PUSH_AUTH_ROLES = new Set([
   'waiter',
   'cashier',
   'kitchen',
+  'bep',
   'barista',
   'chef',
+  'shipper',
+  'rider',
 ]);
 
 export const pushRouter = new Hono<{ Bindings: Env }>();
@@ -159,12 +162,13 @@ pushRouter.get('/list-subscriptions', requireAuth(['owner', 'manager', 'supervis
 
   const subscriptions = (results || []).filter((row) => matchesTenantRow(row, tenantId)).map((row) => {
     const isManual = row.endpoint?.startsWith('https://manual.auraspace.local/');
-    const normalizedRole: 'owner' | 'staff' | 'all' =
-      row.role === 'owner' || row.role === 'staff' || row.role === 'all'
-        ? row.role
-        : row.role?.startsWith('staff')
+    const rawRole = typeof row.role === 'string' ? row.role.trim().toLowerCase() : '';
+    const normalizedRole =
+      rawRole === 'all' || isStaffPushRole(rawRole)
+        ? rawRole
+        : rawRole.startsWith('staff')
           ? 'staff'
-          : 'all';
+          : DEFAULT_STAFF_PUSH_ROLE;
     return {
       name: row.user_agent || row.customer_id || row.id,
       role: normalizedRole,
@@ -181,17 +185,22 @@ pushRouter.get('/list-subscriptions', requireAuth(['owner', 'manager', 'supervis
 pushRouter.post('/subscribe', async(c) => {
   const db = c.env.AURA_DB;
   let tenantId = getTenantId(c as unknown as Parameters<typeof getTenantId>[0]);
-  const raw = await c.req.json() as Record<string, unknown>;
+  const rawBody = await c.req.json() as Record<string, unknown>;
+  const nestedKeys = rawBody.keys && typeof rawBody.keys === 'object' ? (rawBody.keys as Record<string, unknown>) : undefined;
+  const raw: Record<string, unknown> = {
+    ...rawBody,
+    ...(rawBody.auth_key === undefined && nestedKeys?.auth !== undefined ? { auth_key: nestedKeys.auth } : {}),
+    ...(rawBody.p256dh_key === undefined && nestedKeys?.p256dh !== undefined ? { p256dh_key: nestedKeys.p256dh } : {}),
+  };
   const isManualStaffEntry = !raw.endpoint && typeof raw.name === 'string' && raw.name.trim().length > 0;
   const requestedRole = typeof raw.role === 'string' && raw.role.trim() ? raw.role.trim() : (isManualStaffEntry ? DEFAULT_STAFF_PUSH_ROLE : 'customer');
+  let effectiveRole = requestedRole;
 
   // Rate limit customer subscriptions: 5 per minute per IP
   if (requestedRole === 'customer' && !isManualStaffEntry) {
     const preParsed = pushSubscribeSchema.safeParse({
       ...raw,
-      auth_key: raw.auth_key ?? (raw.keys as Record<string, unknown> | undefined)?.auth,
-      p256dh_key: raw.p256dh_key ?? (raw.keys as Record<string, unknown> | undefined)?.p256dh,
-      role: requestedRole,
+      role: effectiveRole,
     });
     if (!preParsed.success) {
       return c.json({ success: false, error: 'Invalid subscription payload' }, 400);
@@ -230,7 +239,7 @@ pushRouter.post('/subscribe', async(c) => {
   const rawCallerTenant = (callerUser as { tenant_id?: unknown; tenantId?: unknown } | undefined)?.tenant_id
     ?? (callerUser as { tenant_id?: unknown; tenantId?: unknown } | undefined)?.tenantId;
   const callerTenant = typeof rawCallerTenant === 'string' ? rawCallerTenant.trim() : '';
-  if (callerUser && !isHQSuperAdmin(callerUser as any)) {
+  if (callerUser && !isHQSuperAdmin(callerUser as Parameters<typeof isHQSuperAdmin>[0])) {
     if (callerTenant === '*' || callerTenant.toLowerCase() === 'hq') {
       return c.json({ success: false, error: 'Forbidden: cross-tenant push subscription' }, 403);
     }
@@ -309,7 +318,7 @@ pushRouter.post('/subscribe', async(c) => {
     const rawStaffTenant = payloadObj?.tenant_id ?? payloadObj?.tenantId;
     const staffTenant = typeof rawStaffTenant === 'string' ? rawStaffTenant.trim() : '';
     const staffUserObj = { role: String(resolvedRole), tenantId: staffTenant };
-    if (!isHQSuperAdmin(staffUserObj as any)) {
+    if (!isHQSuperAdmin(staffUserObj as Parameters<typeof isHQSuperAdmin>[0])) {
       if (staffTenant === '*' || staffTenant.toLowerCase() === 'hq') {
         return c.json({ success: false, error: 'Forbidden: cross-tenant push subscription' }, 403);
       }
@@ -326,7 +335,8 @@ pushRouter.post('/subscribe', async(c) => {
     if (!roleResolution.ok) {
       return c.json({ success: false, error: roleResolution.error }, 403);
     }
-    (raw as { role?: string }).role = roleResolution.role;
+    effectiveRole = roleResolution.role;
+    raw.role = roleResolution.role;
   }
 
   let endpoint: string;
@@ -347,9 +357,9 @@ pushRouter.post('/subscribe', async(c) => {
     p256dh_key = 'manual_pending';
     customer_id = cleanName;
     user_agent = cleanName;
-    role = requestedRole;
+    role = effectiveRole;
   } else {
-    const parsed = pushSubscribeSchema.safeParse({ ...raw, role: requestedRole });
+    const parsed = pushSubscribeSchema.safeParse({ ...raw, role: effectiveRole });
     if (!parsed.success) {
       return zodErrorResponse(c, parsed.error);
     }
@@ -552,7 +562,7 @@ pushRouter.post('/unsubscribe', async(c) => {
   const rawCallerTenant = (callerUser as { tenant_id?: unknown; tenantId?: unknown } | undefined)?.tenant_id
     ?? (callerUser as { tenant_id?: unknown; tenantId?: unknown } | undefined)?.tenantId;
   const callerTenant = typeof rawCallerTenant === 'string' ? rawCallerTenant.trim() : '';
-  if (callerUser && !isHQSuperAdmin(callerUser as any)) {
+  if (callerUser && !isHQSuperAdmin(callerUser as Parameters<typeof isHQSuperAdmin>[0])) {
     if (callerTenant === '*' || callerTenant.toLowerCase() === 'hq') {
       return c.json({ success: false, error: 'Forbidden: cross-tenant push unsubscribe' }, 403);
     }

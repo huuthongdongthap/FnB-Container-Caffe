@@ -12,6 +12,15 @@ import { resolvePilotStore } from '../lib/pilot-store';
 import type { Env } from '../types/env';
 
 const roles = ['owner', 'manager', 'supervisor', 'staff', 'waiter', 'cashier', 'admin'];
+const historyRoles = [...roles, 'customer'];
+
+function normalizeChatPhone(raw: string): string {
+  const digits = raw.replace(/\D/g, '');
+  if (digits.startsWith('84') && digits.length >= 10) {
+    return '0' + digits.slice(2);
+  }
+  return digits;
+}
 const sendMessageSchema = z.object({
   name: z.string().trim().min(1, 'Ten khong duoc de trong').max(100),
   phone: z.string().trim().min(8, 'So dien thoai khong hop le').max(15),
@@ -96,11 +105,35 @@ async function getConversations(c: Context<{ Bindings: Env }>) {
 }
 async function getMessageHistory(c: Context<{ Bindings: Env }>) {
   try {
-    const tenantId = privacyStore(c, roles);
+    const tenantId = privacyStore(c, historyRoles);
     if (tenantId instanceof Response) return tenantId;
     if (hasDisallowedStoreOverride(c, tenantId)) return errorResponse('Không đủ quyền truy cập cửa hàng', 403);
     const phone = c.req.param('phone') || c.req.param('id');
     if (!phone || phone.length < 8) return errorResponse('So dien thoai khong hop le', 400);
+
+    const caller = c.get('user') as { id?: string; sub?: string; customerId?: string; role?: string; phone?: string } | undefined;
+    if (caller?.role === 'customer') {
+      const requestedNorm = normalizeChatPhone(phone);
+      const callerId = String(caller.customerId || caller.id || caller.sub || '').trim();
+      let verifiedCustomerPhone = '';
+      if (callerId && c.env.AURA_DB) {
+        const custRow = await c.env.AURA_DB
+          .prepare("SELECT phone FROM customers WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ? LIMIT 1")
+          .bind(callerId, tenantId)
+          .first<{ phone?: string | null }>()
+          .catch(() => null);
+        if (custRow?.phone) {
+          verifiedCustomerPhone = normalizeChatPhone(String(custRow.phone));
+        }
+      }
+      if (!verifiedCustomerPhone && caller.phone) {
+        verifiedCustomerPhone = normalizeChatPhone(String(caller.phone));
+      }
+      if (!verifiedCustomerPhone || verifiedCustomerPhone !== requestedNorm) {
+        return errorResponse('Không đủ quyền truy cập cuộc trò chuyện này', 403);
+      }
+    }
+
     const repository = await contactMessageRepository(c.env.AURA_DB);
     return jsonResponse({ success: true, data: await repository.history(tenantId, phone) });
   } catch (error) { return chatError(error, 'Failed to get message history'); }
@@ -109,4 +142,4 @@ export const chatRouter = new Hono<{ Bindings: Env }>();
 chatRouter.post('/messages', sendMessage);
 chatRouter.get('/conversations', requireAuth(roles), getConversations);
 chatRouter.get('/conversations/:id/messages', requireAuth(roles), getMessageHistory);
-chatRouter.get('/messages/:phone', requireAuth(roles), getMessageHistory);
+chatRouter.get('/messages/:phone', requireAuth(historyRoles), getMessageHistory);

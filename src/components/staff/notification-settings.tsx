@@ -4,7 +4,7 @@ import { Bell, BellOff, Volume2, VolumeX, AlertCircle } from 'lucide-react';
 import { Card, CardHeader, CardBody } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
 import { usePushNotifications } from '@/hooks/use-push-notifications';
-import { API_BASE } from '@/lib/api-client';
+import { apiFetch } from '@/lib/api-client';
 
 /* ── Bilingual label map (used inside toggle switch) ── */
 
@@ -28,10 +28,6 @@ const TOGGLE_DESC_EN: Record<string, string> = {
   'shiftRemindersEnabled': 'Remind 30 minutes before your shift starts.',
 };
 
-/*
-
-Do not write any .md or summary file. Include status block at the end.
-*/
 type ToggleKey = keyof StaffNotificationPreferences;
 
 interface StaffNotificationPreferences {
@@ -66,20 +62,28 @@ export function StaffNotificationSettings() {
     let cancelled = false;
     (async () => {
       try {
-        const token = typeof localStorage !== 'undefined' ? localStorage.getItem('aura_auth_token') : null;
-        const headers: Record<string, string> = {};
-        if (token) headers.Authorization = `Bearer ${token}`;
-        const res = await fetch(`${API_BASE}/api/auth/me`, {
-          credentials: 'include',
-          ...(Object.keys(headers).length > 0 ? { headers } : {}),
-        });
-        if (!res.ok) return;
-        const json = (await res.json().catch(() => ({}))) as { role?: string; user?: { role?: string } };
-        if (cancelled) return;
-        // Normalize: backend uses staff-kitchen / staff-cashier / staff-* prefixes
-        setStaffRole(json.role ?? json.user?.role ?? 'staff-kitchen');
+        const meJson = await apiFetch<{ role?: string; user?: { role?: string } }>('/api/auth/me').catch(() => null);
+        if (!cancelled && meJson) {
+          setStaffRole(meJson.role ?? meJson.user?.role ?? 'staff-kitchen');
+        }
       } catch {
         // best-effort role
+      }
+      try {
+        const currentPrefs = await apiFetch<{
+          orderAlertsEnabled?: boolean;
+          shiftRemindersEnabled?: boolean;
+          data?: { orderAlertsEnabled?: boolean; shiftRemindersEnabled?: boolean };
+        }>('/api/staff/notification-settings');
+        if (!cancelled && currentPrefs) {
+          const source = currentPrefs.data ?? currentPrefs;
+          setPreferences({
+            orderAlertsEnabled: source.orderAlertsEnabled !== false,
+            shiftRemindersEnabled: source.shiftRemindersEnabled !== false,
+          });
+        }
+      } catch {
+        // Use default true/true when unauthenticated or endpoint unreachable
       }
     })();
     return () => {
@@ -89,48 +93,51 @@ export function StaffNotificationSettings() {
 
   const applySubscriptions = useCallback(
     async (next: StaffNotificationPreferences) => {
-      setError(null);
       const roleToUse = staffRole ?? 'staff-kitchen';
       const desiredSubscribed = next.orderAlertsEnabled || next.shiftRemindersEnabled;
 
-      try {
-        if (desiredSubscribed && !isSubscribed && permission !== 'denied') {
-          const ok = await subscribe(undefined, roleToUse);
-          if (!ok) throw new Error('subscribe_failed');
-        } else if (!desiredSubscribed && isSubscribed) {
-          await unsubscribe();
+      if (!supported) return;
+      if (desiredSubscribed && !isSubscribed && permission !== 'denied') {
+        const ok = await subscribe(undefined, roleToUse);
+        if (!ok) {
+          throw new Error(isVi ? 'Không thể đăng ký thông báo trên trình duyệt' : 'Browser push subscription failed');
         }
-      } catch (e) {
-        setError(e instanceof Error ? e.message : 'Loi ket noi');
+      } else if (!desiredSubscribed && isSubscribed) {
+        await unsubscribe();
       }
     },
-    [isSubscribed, permission, staffRole, subscribe, unsubscribe],
+    [isSubscribed, isVi, permission, staffRole, subscribe, supported, unsubscribe],
   );
 
   const handleToggle = useCallback(
     async (key: ToggleKey) => {
       setSaving(true);
       setSavedAt(null);
+      setError(null);
+      const previousValue = preferences[key];
       const next = {
         ...preferences,
-        [key]: !preferences[key],
+        [key]: !previousValue,
       } as StaffNotificationPreferences;
       setPreferences(next);
       try {
         await applySubscriptions(next);
-        const token = typeof localStorage !== 'undefined' ? localStorage.getItem('aura_auth_token') : null;
-        const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-        if (token) headers.Authorization = `Bearer ${token}`;
-        await fetch(`${API_BASE}/api/staff/notification-settings`, {
+        const res = await apiFetch<{
+          success?: boolean;
+          ok?: boolean;
+          error?: string;
+          message?: string;
+        }>('/api/staff/notification-settings', {
           method: 'PATCH',
-          credentials: 'include',
-          headers,
           body: JSON.stringify({ [key]: next[key] }),
-        }).catch(() => undefined);
+        });
+        if (!res || res.success === false || res.ok === false || res.error) {
+          throw new Error(res?.error || res?.message || (isVi ? 'Không thể lưu cài đặt' : 'Could not save setting'));
+        }
         setSavedAt(new Date().toLocaleTimeString());
-      } catch {
-        setPreferences((prev) => ({ ...prev, [key]: !(next as Record<ToggleKey, boolean>)[key] }));
-        setError(isVi ? 'Khong the luu cai dat' : 'Could not save setting');
+      } catch (err) {
+        setPreferences((prev) => ({ ...prev, [key]: previousValue }));
+        setError(err instanceof Error ? err.message : (isVi ? 'Không thể lưu cài đặt' : 'Could not save setting'));
       } finally {
         setSaving(false);
       }
@@ -176,7 +183,7 @@ export function StaffNotificationSettings() {
           <Switch
             checked={preferences.orderAlertsEnabled}
             onCheckedChange={() => void handleToggle('orderAlertsEnabled')}
-            disabled={saving || !supported || permission === 'denied'}
+            disabled={saving || permission === 'denied'}
             aria-label={labelFor('orderAlertsEnabled')}
           />
         </div>
@@ -194,7 +201,7 @@ export function StaffNotificationSettings() {
           <Switch
             checked={preferences.shiftRemindersEnabled}
             onCheckedChange={() => void handleToggle('shiftRemindersEnabled')}
-            disabled={saving || !supported}
+            disabled={saving}
             aria-label={labelFor('shiftRemindersEnabled')}
           />
         </div>

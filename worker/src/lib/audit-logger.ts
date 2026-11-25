@@ -205,12 +205,14 @@ export class AuditLogger {
       params.push(filters.resourceType);
     }
     if (filters.dateFrom) {
-      conditions.push('created_at >= ?');
-      params.push(filters.dateFrom);
+      const normalizedFrom = filters.dateFrom.trim().replace('T', ' ');
+      conditions.push("replace(created_at, 'T', ' ') >= ?");
+      params.push(normalizedFrom);
     }
     if (filters.dateTo) {
-      conditions.push('created_at <= ?');
-      params.push(filters.dateTo);
+      const normalizedTo = filters.dateTo.trim().replace('T', ' ');
+      conditions.push("replace(created_at, 'T', ' ') <= ?");
+      params.push(normalizedTo);
     }
 
     const page = Math.max(1, filters.page ?? 1);

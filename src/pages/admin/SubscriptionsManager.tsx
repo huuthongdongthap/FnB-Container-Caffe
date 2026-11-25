@@ -24,12 +24,12 @@ export default function SubscriptionsManagerPage() {
   const fetchInvoices = useCallback(async () => {
     setInvoicesLoading(true);
     try {
-      const res = await apiFetch<{ success?: boolean; data?: InvoiceRecord[] }>('/api/erpnext-invoices/list');
+      const res = await apiFetch<{ success?: boolean; data?: InvoiceRecord[] }>('/api/subscriptions/invoices/list');
       if (res?.data && Array.isArray(res.data)) {
         setInvoices(res.data);
       }
     } catch {
-      // Leave empty list when ERPNext invoices are unavailable
+      // Leave empty list when subscription invoices are unavailable
     } finally {
       setInvoicesLoading(false);
     }

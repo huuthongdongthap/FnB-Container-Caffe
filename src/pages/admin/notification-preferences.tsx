@@ -6,6 +6,7 @@
 import { useTranslation } from 'react-i18next';
 import { Card, CardHeader, CardBody } from '@/components/ui/card';
 import { Bell, Volume2, VolumeX, CheckCircle2 } from 'lucide-react';
+import { StaffNotificationSettings } from '@/components/staff/notification-settings';
 import type { PushSettings } from './notification-settings-types';
 
 type Props = {
@@ -132,6 +133,10 @@ export function NotificationPreferences({
             {isVi ? 'Đã lưu cài đặt' : 'Settings saved'}
           </div>
         )}
+
+        <div className="pt-2">
+          <StaffNotificationSettings />
+        </div>
       </CardBody>
     </Card>
   );

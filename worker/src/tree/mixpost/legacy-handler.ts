@@ -70,10 +70,32 @@ export async function handleMixpostRequest(request: Request, env: MixpostEnv, re
     }
 
     try {
+      const mediaIds: Array<string | number> = [];
+      const mediaUrls = Array.isArray(body.mediaUrls) ? body.mediaUrls : [];
+      for (const mediaUrl of mediaUrls) {
+        try {
+          const uploaded = await client.uploadMediaFromUrl(mediaUrl);
+          const mediaId =
+            uploaded?.id ??
+            (uploaded && typeof uploaded === 'object' && 'data' in uploaded && uploaded.data && typeof uploaded.data === 'object'
+              ? (uploaded.data as Record<string, unknown>).id
+              : undefined);
+          if (mediaId === undefined || mediaId === null || String(mediaId).trim() === '') {
+            log.error('mixpost_publish_media_upload_missing_id', { url: mediaUrl });
+            return json({ success: false, error: 'Failed to upload media to Mixpost' }, 502);
+          }
+          mediaIds.push(mediaId as string | number);
+        } catch (uploadErr: unknown) {
+          const msg = uploadErr instanceof Error ? uploadErr.message : String(uploadErr);
+          log.error('mixpost_publish_media_upload_failed', { url: mediaUrl, error: msg });
+          return json({ success: false, error: 'Failed to upload media to Mixpost' }, 502);
+        }
+      }
+
       const result = await client.createPost({
         content: body.content,
         accounts,
-        mediaIds: body.mediaUrls,
+        ...(mediaIds.length > 0 ? { mediaIds } : {}),
         scheduledAt: body.scheduledAt
       });
 

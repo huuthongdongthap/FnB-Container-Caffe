@@ -185,10 +185,25 @@ export function registerPromotionAdminHandlers(router: Hono<{ Bindings: Env }>):
     if (validationErr) return c.json({ success: false, error: validationErr }, 400);
 
     const existing = await findPromoForTenant(db, code, writeTenant);
-    if (existing) return c.json({ success: false, error: 'Mã khuyến mãi đã tồn tại' }, 409);
+    if (existing && Number(existing.is_active ?? 1) !== 0) {
+      return c.json({ success: false, error: 'Mã khuyến mãi đã tồn tại' }, 409);
+    }
 
     const p = [code, body.percent, body.max_discount ?? 0, body.min_order ?? 0, body.usage_limit ?? 0];
     const active = body.is_active ?? 1;
+    if (existing && code === 'WELCOME') {
+      await db.prepare(
+        "UPDATE promotions SET percent = ?, max_discount = ?, min_order = ?, usage_limit = ?, starts_at = ?, expires_at = ?, is_active = ? WHERE UPPER(code) = 'WELCOME' AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
+      ).bind(...p.slice(1), body.starts_at ?? null, body.expires_at ?? null, active, writeTenant).run().catch(async () => {
+        if (writeTenant === 'default') {
+          await db.prepare(
+            "UPDATE promotions SET percent = ?, max_discount = ?, min_order = ?, usage_limit = ?, expires_at = ?, is_active = ? WHERE UPPER(code) = 'WELCOME'"
+          ).bind(...p.slice(1), body.expires_at ?? null, active).run();
+        }
+      });
+      const revived = await findPromoForTenant(db, code, writeTenant);
+      return c.json({ success: true, data: revived }, 201);
+    }
     try {
       await db.prepare(
         'INSERT INTO promotions (code, percent, max_discount, min_order, usage_limit, usage_count, starts_at, expires_at, is_active, tenant_id) VALUES (?, ?, ?, ?, ?, 0, ?, ?, ?, ?)'
@@ -268,11 +283,47 @@ export function registerPromotionAdminHandlers(router: Hono<{ Bindings: Env }>):
     const rawParam = c.req.param('code');
     const code = rawParam.toUpperCase();
     const existing = await findPromoForTenant(db, code, rawTenantId);
-    if (!existing) return c.json({ success: false, error: 'Không tìm thấy khuyến mãi' }, 404);
+    const isWelcomeTarget = code === 'WELCOME' || String(existing?.code || '').toUpperCase() === 'WELCOME';
+    if (!existing && !isWelcomeTarget) {
+      return c.json({ success: false, error: 'Không tìm thấy khuyến mãi' }, 404);
+    }
     const writeTenant =
       rawTenantId === '*'
-        ? (typeof existing.tenant_id === 'string' && existing.tenant_id.trim()) || 'default'
+        ? (typeof existing?.tenant_id === 'string' && existing.tenant_id.trim()) || 'default'
         : rawTenantId;
+
+    if (isWelcomeTarget) {
+      if (existing) {
+        await db.prepare(
+          "UPDATE promotions SET is_active = 0 WHERE (id = ? OR UPPER(code) = 'WELCOME') AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
+        )
+          .bind(rawParam, writeTenant)
+          .run()
+          .catch(() => {
+            if (writeTenant === 'default') {
+              return db.prepare("UPDATE promotions SET is_active = 0 WHERE (id = ? OR UPPER(code) = 'WELCOME')").bind(rawParam).run();
+            }
+            return null;
+          });
+      } else {
+        const tombstoneId = writeTenant === 'default' ? 'promo_welcome' : `promo_welcome_${writeTenant}`;
+        await db.prepare(
+          'INSERT INTO promotions (id, code, percent, max_discount, min_order, usage_limit, usage_count, starts_at, expires_at, is_active, tenant_id) VALUES (?, ?, 10, 30000, 0, 0, 0, NULL, NULL, 0, ?)'
+        )
+          .bind(tombstoneId, 'WELCOME', writeTenant)
+          .run()
+          .catch(() => {
+            if (writeTenant === 'default') {
+              return db
+                .prepare('INSERT INTO promotions (code, percent, max_discount, min_order, usage_limit, usage_count, is_active) VALUES (?, 10, 30000, 0, 0, 0, 0)')
+                .bind('WELCOME')
+                .run();
+            }
+            return null;
+          });
+      }
+      return c.json({ success: true, data: null });
+    }
 
     await db.prepare(
       "DELETE FROM promotions WHERE (id = ? OR code = ?) AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"

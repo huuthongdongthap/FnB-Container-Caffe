@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 
 export function HeroEarningsCard({ rewardAmount }: { rewardAmount: number }) {
   const { t } = useTranslation();
+  const formattedVnd = `${Math.round(Number(rewardAmount) || 0).toLocaleString('vi-VN')}đ`;
   return (
     <section className="mt-2 mb-10" aria-label={t('stitch.referral.heroAria')}>
       <div className="relative overflow-hidden rounded-xl p-6 flex flex-col items-center text-center"
@@ -20,8 +21,8 @@ export function HeroEarningsCard({ rewardAmount }: { rewardAmount: number }) {
         <span className="font-body text-[14px] leading-[1.2] font-semibold uppercase tracking-[0.2em] text-[var(--aura-chrome-soft)] mb-1">
           {t('stitch.referral.heroTagline', { defaultValue: 'Refer & Earn' })}
         </span>
-        <h1 className="font-display text-[48px] leading-[1.1] tracking-[-0.02em] font-medium text-[var(--aura-chrome-bright)] mb-1">
-          {t('stitch.referral.heroAmount', { defaultValue: `Receive $${rewardAmount.toFixed(2)}`, amount: rewardAmount.toFixed(2) })}
+        <h1 className="font-display text-[40px] sm:text-[48px] leading-[1.1] tracking-[-0.02em] font-medium text-[var(--aura-chrome-bright)] mb-1">
+          {formattedVnd}
         </h1>
         <p className="font-body text-base leading-[1.5] text-[var(--aura-chrome-soft)] max-w-[280px]">
           {t('stitch.referral.heroDescription', { defaultValue: 'Share the Aura experience with your inner circle and earn rewards for every successful invitation.' })}

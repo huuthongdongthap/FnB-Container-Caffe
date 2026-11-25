@@ -173,23 +173,14 @@ describe('Promotions Routes (/api/promotions)', () => {
     }
   });
 
-  it('POST /validate permanently allows WELCOME (-10%, cap 30,000 VND) for new customer with registration info', async () => {
+  it('POST /validate allows default WELCOME (-10%, cap 30,000 VND) for new customer and enforces configured expires_at / usage_limit', async () => {
     const env = createMockEnv();
+    let promoRow: Record<string, unknown> | null = null;
     env.AURA_DB.prepare = vi.fn().mockImplementation((sql: string) => ({
       bind: vi.fn().mockReturnValue({
         first: vi.fn().mockImplementation(async () => {
           if (/FROM promotions/i.test(sql)) {
-            return {
-              id: 'promo_welcome',
-              code: 'WELCOME',
-              percent: 10,
-              max_discount: 30000,
-              min_order: 0,
-              usage_limit: 1,
-              usage_count: 999,
-              expires_at: '2020-01-01T00:00:00Z',
-              is_active: 1,
-            };
+            return promoRow;
           }
           if (/COUNT\(\*\)\s+AS\s+cnt\s+FROM\s+orders/i.test(sql)) {
             return { cnt: 0 };
@@ -197,7 +188,7 @@ describe('Promotions Routes (/api/promotions)', () => {
           return null;
         }),
       }),
-    })) as any;
+    })) as unknown as typeof env.AURA_DB.prepare;
 
     const res = await promotionsRouter.request('/validate', {
       method: 'POST',
@@ -211,12 +202,38 @@ describe('Promotions Routes (/api/promotions)', () => {
     }, env);
 
     expect(res.status).toBe(200);
-    const body = await res.json() as any;
+    const body = await res.json() as { success: boolean; data: { valid: boolean; percent?: number; max_discount?: number; discount_amount?: number; reason?: string } };
     expect(body.success).toBe(true);
     expect(body.data.valid).toBe(true);
     expect(body.data.percent).toBe(10);
     expect(body.data.max_discount).toBe(30000);
     expect(body.data.discount_amount).toBe(30000);
+
+    // When admin explicitly configures expires_at in the past or exhausted usage_limit on WELCOME, /validate enforces it consistently
+    promoRow = {
+      id: 'promo_welcome',
+      code: 'WELCOME',
+      percent: 10,
+      max_discount: 30000,
+      min_order: 0,
+      usage_limit: 1,
+      usage_count: 999,
+      expires_at: '2020-01-01T00:00:00Z',
+      is_active: 1,
+    };
+    const expiredRes = await promotionsRouter.request('/validate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        code: 'welcome',
+        order_total: 400000,
+        customer_name: 'Khach Moi',
+        customer_phone: '0912345678',
+      }),
+    }, env);
+    const expiredBody = await expiredRes.json() as { success: boolean; data: { valid: boolean; reason?: string } };
+    expect(expiredBody.data.valid).toBe(false);
+    expect(expiredBody.data.reason).toBe('Code has expired');
   });
 
   it('POST /validate rejects WELCOME for returning customer with prior non-cancelled order', async () => {

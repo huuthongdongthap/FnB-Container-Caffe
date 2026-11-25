@@ -28,6 +28,7 @@ import {
 } from './routes/mixpost';
 import { sendShiftReminders } from './routes/reminders/shifts/route';
 import { runSaasLifecycleCron } from './lib/saas-lifecycle-cron';
+import { mineProductAffinitiesForAllTenants } from './routes/recommendations';
 
 export async function handleScheduled(
   controller: ScheduledController,
@@ -69,5 +70,6 @@ export async function handleScheduled(
   safeWait(runSopReminders(primaryEnv as unknown as Record<string, unknown>));
   safeWait(sendShiftReminders(primaryEnv as unknown as Record<string, unknown>));
   safeWait(runSaasLifecycleCron(primaryEnv));
+  safeWait(mineProductAffinitiesForAllTenants(primaryEnv));
   safeWait(dispatchAlerts(primaryEnv));
 }

@@ -485,6 +485,48 @@ export function createTenantRoutes() {
         );
       }
 
+      // Provision a tenant-scoped customers row for the owner so Step 4 onboarding
+      // (`POST /api/subscriptions` with `customer_id = ownerUserId`) succeeds cleanly.
+      try {
+        const rawUserName = (currentUser as { name?: string }).name;
+        const ownerName =
+          (typeof rawUserName === 'string' && rawUserName.trim()) ||
+          (typeof currentUser.email === 'string' && currentUser.email.trim()) ||
+          rawName;
+        const ownerEmail = typeof currentUser.email === 'string' && currentUser.email.trim() ? currentUser.email.trim().toLowerCase() : null;
+        const rawUserPhone = (currentUser as { phone?: string | null }).phone;
+        const ownerPhone = typeof rawUserPhone === 'string' && rawUserPhone.trim() ? rawUserPhone.trim() : null;
+
+        const existingCust = await db
+          .prepare('SELECT id, tenant_id FROM customers WHERE id = ? LIMIT 1')
+          .bind(ownerUserId)
+          .first<{ id: string; tenant_id?: string | null }>()
+          .catch(() => null);
+        if (!existingCust) {
+          await db
+            .prepare(
+              'INSERT INTO customers (id, email, name, phone, loyalty_points, lifetime_points, loyalty_tier, tenant_id, created_at, updated_at) VALUES (?, ?, ?, ?, 0, 0, ?, ?, ?, ?)'
+            )
+            .bind(ownerUserId, ownerEmail, ownerName, ownerPhone, 'bronze', id, now, now)
+            .run();
+        } else if (!existingCust.tenant_id || String(existingCust.tenant_id).trim() === '' || String(existingCust.tenant_id).trim() === 'default') {
+          await db
+            .prepare('UPDATE customers SET tenant_id = ?, updated_at = ? WHERE id = ?')
+            .bind(id, now, ownerUserId)
+            .run();
+        } else if (String(existingCust.tenant_id).trim() !== id) {
+          const tenantCustomerId = `cust_${id}_${ownerUserId}`.slice(0, 64);
+          await db
+            .prepare(
+              'INSERT OR IGNORE INTO customers (id, email, name, phone, loyalty_points, lifetime_points, loyalty_tier, tenant_id, created_at, updated_at) VALUES (?, ?, ?, ?, 0, 0, ?, ?, ?, ?)'
+            )
+            .bind(tenantCustomerId, ownerEmail, ownerName, ownerPhone, 'bronze', id, now, now)
+            .run();
+        }
+      } catch {
+        // Non-fatal in minimal test schemas without customers table
+      }
+
       try {
         await db
           .prepare(
