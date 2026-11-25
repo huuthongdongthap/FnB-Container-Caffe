@@ -9,9 +9,11 @@ import type { Env } from './types/env';
 import {
   checkOverdueOrders,
   expireUnpaidOnlineOrders,
+  checkInventoryAlerts,
   retryPendingRefundLoyaltyWork,
   processErpnextRetryQueue,
   processErpnextProductSync,
+  sendCashbackExpiryWarnings,
   syncMauticContacts,
   detectWinbackCandidates,
   detectBirthdayCandidates,
@@ -40,13 +42,15 @@ export async function handleScheduled(
     ctx.waitUntil(promise.catch(() => {}));
   };
 
-  safeWait(checkOverdueOrders(primaryEnv as unknown as Record<string, unknown>));
-  safeWait(expireUnpaidOnlineOrders(primaryEnv as unknown as Record<string, unknown>));
+  safeWait(checkOverdueOrders(primaryEnv as unknown as Record<string, unknown>, '*'));
+  safeWait(expireUnpaidOnlineOrders(primaryEnv as unknown as Record<string, unknown>, '*'));
+  safeWait(checkInventoryAlerts(primaryEnv as unknown as Record<string, unknown>, '*'));
   safeWait(retryPendingRefundLoyaltyWork(primaryEnv));
-  safeWait(runPaymentReconciliation(primaryEnv as unknown as Record<string, unknown>));
+  safeWait(runPaymentReconciliation(primaryEnv as unknown as Record<string, unknown>, { tenantId: '*' }));
   safeWait(pruneOldMetrics(primaryDb, 7));
-  safeWait(processErpnextRetryQueue(primaryEnv as unknown as Record<string, unknown>));
-  safeWait(processErpnextProductSync(primaryEnv as unknown as Record<string, unknown>));
+  safeWait(processErpnextRetryQueue(primaryEnv as unknown as Record<string, unknown>, '*'));
+  safeWait(processErpnextProductSync(primaryEnv as unknown as Record<string, unknown>, '*'));
+  safeWait(sendCashbackExpiryWarnings(primaryEnv as unknown as Record<string, unknown>, '*'));
   safeWait((async () => {
     try {
       await syncMauticContacts(primaryEnv as unknown as Record<string, unknown>);

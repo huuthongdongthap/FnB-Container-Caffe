@@ -71,7 +71,7 @@ describe('Server-Side Pricing Contract Integration', () => {
 
   it('applies happy-hour discount when evaluation timestamp matches active window', async () => {
     // 2026-10-07 is Wednesday (day 3), 15:00 is between 14:00 and 16:00
-    const happyHourTime = new Date('2026-10-07T15:00:00');
+    const happyHourTime = new Date('2026-10-07T15:00:00+07:00');
     const res = await resolveServerProductPrice(db, {
       productId: 'prod-coffee',
       channel: 'dine_in',
@@ -115,7 +115,7 @@ describe('Server-Side Pricing Contract Integration', () => {
   });
 
   it('enforces full evaluation sequence: base -> channel -> modifier -> happy hour', () => {
-    const happyHourTime = new Date('2026-10-07T15:00:00'); // Wednesday 15:00 (20% discount)
+    const happyHourTime = new Date('2026-10-07T15:00:00+07:00'); // Wednesday 15:00 (20% discount)
     const price = resolveItemPrice({
       basePriceCents: 30000,
       channel: 'online',

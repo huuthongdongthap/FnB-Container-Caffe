@@ -12,7 +12,10 @@ import type { InventoryForecastItem } from '../types/api';
 
 export const inventoryForecastingRouter = new Hono<{ Bindings: Env }>();
 
-inventoryForecastingRouter.use('/*', requireAuth(['owner', 'admin', 'manager', 'supervisor', 'staff']));
+inventoryForecastingRouter.use(
+  '/*',
+  requireAuth(['owner', 'manager', 'supervisor', 'staff', 'admin', 'kitchen', 'barista', 'chef', 'bep', 'cashier', 'waiter'])
+);
 inventoryForecastingRouter.use('/*', async (c, next) => {
   const headerCandidates = [
     c.req.header('X-Tenant-ID'),
@@ -67,12 +70,19 @@ interface InventoryRow {
   tenant_id?: string | null;
 }
 
+function toSqliteUtcTimestamp(date: Date): string {
+  return date.toISOString().slice(0, 19).replace('T', ' ');
+}
+
 async function queryTenantDepletions(
   db: import('@cloudflare/workers-types').D1Database,
   startDate: string,
   tenantId: string,
   allowedItemIds?: Set<string>
 ): Promise<{ item_id: string; total_depleted: number }[]> {
+  const normalizedStart = startDate.includes('T')
+    ? startDate.slice(0, 19).replace('T', ' ')
+    : startDate;
   const filterRows = (rows: { item_id: string; total_depleted: number; tenant_id?: string | null }[]) =>
     (rows || []).filter((r) => {
       if (!matchesTenantRow(r as unknown as Record<string, unknown>, tenantId)) return false;
@@ -87,14 +97,26 @@ async function queryTenantDepletions(
   const queryStockMovementDepletions = async () => {
     try {
       const res = await db.prepare(`
-        SELECT ingredient_id as item_id,
-               MAX(0, SUM(CASE WHEN type IN ('release', 'restore', 'reversal', 'cancel_restore') THEN -ABS(quantity) ELSE ABS(quantity) END)) as total_depleted,
-               tenant_id
-        FROM stock_movements
-        WHERE created_at >= ? AND (type IN ('out', 'consumption', 'sale', 'waste', 'usage', 'deduction', 'order_deduction', 'order_consumption', 'reserve', 'release', 'restore', 'reversal', 'cancel_restore') OR (type = 'adjustment' AND quantity < 0))
-          AND (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?)
-        GROUP BY ingredient_id, tenant_id
-      `).bind(startDate, tenantId, tenantId).all<{ item_id: string; total_depleted: number; tenant_id?: string | null }>();
+        SELECT sm.ingredient_id as item_id,
+               MAX(0, SUM(CASE WHEN sm.type IN ('release', 'restore', 'reversal', 'cancel_restore') THEN -ABS(sm.quantity) ELSE ABS(sm.quantity) END)) as total_depleted,
+               sm.tenant_id
+        FROM stock_movements sm
+        WHERE replace(substr(sm.created_at, 1, 19), 'T', ' ') >= ?
+          AND (sm.type IN ('out', 'consumption', 'sale', 'waste', 'usage', 'deduction', 'order_deduction', 'order_consumption', 'reserve', 'release', 'restore', 'reversal', 'cancel_restore') OR (sm.type = 'adjustment' AND sm.quantity < 0))
+          AND (? = '*' OR COALESCE(NULLIF(TRIM(sm.tenant_id), ''), 'default') = ?)
+          AND NOT (
+            sm.reference_type IS NOT NULL
+            AND sm.reference_id IS NOT NULL
+            AND EXISTS (
+              SELECT 1 FROM inventory_transactions it
+              WHERE it.item_id = sm.ingredient_id
+                AND it.reference_type = sm.reference_type
+                AND it.reference_id = sm.reference_id
+                AND COALESCE(NULLIF(TRIM(it.tenant_id), ''), 'default') = COALESCE(NULLIF(TRIM(sm.tenant_id), ''), 'default')
+            )
+          )
+        GROUP BY sm.ingredient_id, sm.tenant_id
+      `).bind(normalizedStart, tenantId, tenantId).all<{ item_id: string; total_depleted: number; tenant_id?: string | null }>();
       return filterRows(res.results || []);
     } catch {
       try {
@@ -103,25 +125,41 @@ async function queryTenantDepletions(
                  MAX(0, SUM(CASE WHEN type IN ('release', 'restore', 'reversal', 'cancel_restore') THEN -ABS(quantity) ELSE ABS(quantity) END)) as total_depleted,
                  tenant_id
           FROM stock_movements
-          WHERE created_at >= ? AND (type IN ('out', 'consumption', 'sale', 'waste', 'usage', 'deduction', 'order_deduction', 'order_consumption', 'reserve', 'release', 'restore', 'reversal', 'cancel_restore') OR (type = 'adjustment' AND quantity < 0))
+          WHERE replace(substr(created_at, 1, 19), 'T', ' ') >= ?
+            AND (type IN ('out', 'consumption', 'sale', 'waste', 'usage', 'deduction', 'order_deduction', 'order_consumption', 'reserve', 'release', 'restore', 'reversal', 'cancel_restore') OR (type = 'adjustment' AND quantity < 0))
+            AND (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?)
           GROUP BY ingredient_id, tenant_id
-        `).bind(startDate).all<{ item_id: string; total_depleted: number; tenant_id?: string | null }>();
+        `).bind(normalizedStart, tenantId, tenantId).all<{ item_id: string; total_depleted: number; tenant_id?: string | null }>();
         return filterRows(res.results || []);
       } catch {
-        if (tenantId !== 'default' && tenantId !== '*') {
-          return [];
-        }
         try {
           const res = await db.prepare(`
             SELECT ingredient_id as item_id,
-                   MAX(0, SUM(CASE WHEN type IN ('release', 'restore', 'reversal', 'cancel_restore') THEN -ABS(quantity) ELSE ABS(quantity) END)) as total_depleted
+                   MAX(0, SUM(CASE WHEN type IN ('release', 'restore', 'reversal', 'cancel_restore') THEN -ABS(quantity) ELSE ABS(quantity) END)) as total_depleted,
+                   tenant_id
             FROM stock_movements
-            WHERE created_at >= ? AND (type IN ('out', 'consumption', 'sale', 'waste', 'usage', 'deduction', 'order_deduction', 'order_consumption', 'reserve', 'release', 'restore', 'reversal', 'cancel_restore') OR (type = 'adjustment' AND quantity < 0))
-            GROUP BY ingredient_id
-          `).bind(startDate).all<{ item_id: string; total_depleted: number; tenant_id?: string | null }>();
+            WHERE replace(substr(created_at, 1, 19), 'T', ' ') >= ?
+              AND (type IN ('out', 'consumption', 'sale', 'waste', 'usage', 'deduction', 'order_deduction', 'order_consumption', 'reserve', 'release', 'restore', 'reversal', 'cancel_restore') OR (type = 'adjustment' AND quantity < 0))
+            GROUP BY ingredient_id, tenant_id
+          `).bind(normalizedStart).all<{ item_id: string; total_depleted: number; tenant_id?: string | null }>();
           return filterRows(res.results || []);
         } catch {
-          return [];
+          if (tenantId !== 'default' && tenantId !== '*') {
+            return [];
+          }
+          try {
+            const res = await db.prepare(`
+              SELECT ingredient_id as item_id,
+                     MAX(0, SUM(CASE WHEN type IN ('release', 'restore', 'reversal', 'cancel_restore') THEN -ABS(quantity) ELSE ABS(quantity) END)) as total_depleted
+              FROM stock_movements
+              WHERE replace(substr(created_at, 1, 19), 'T', ' ') >= ?
+                AND (type IN ('out', 'consumption', 'sale', 'waste', 'usage', 'deduction', 'order_deduction', 'order_consumption', 'reserve', 'release', 'restore', 'reversal', 'cancel_restore') OR (type = 'adjustment' AND quantity < 0))
+              GROUP BY ingredient_id
+            `).bind(normalizedStart).all<{ item_id: string; total_depleted: number; tenant_id?: string | null }>();
+            return filterRows(res.results || []);
+          } catch {
+            return [];
+          }
         }
       }
     }
@@ -134,10 +172,11 @@ async function queryTenantDepletions(
              MAX(0, SUM(CASE WHEN type IN ('release', 'restore', 'reversal', 'cancel_restore') THEN -ABS(quantity) ELSE ABS(quantity) END)) as total_depleted,
              tenant_id
       FROM inventory_transactions
-      WHERE created_at >= ? AND type IN ('out', 'reserve', 'waste', 'usage', 'deduction', 'order_deduction', 'order_consumption', 'sale', 'consumption', 'release', 'restore', 'reversal', 'cancel_restore')
+      WHERE replace(substr(created_at, 1, 19), 'T', ' ') >= ?
+        AND type IN ('out', 'reserve', 'waste', 'usage', 'deduction', 'order_deduction', 'order_consumption', 'sale', 'consumption', 'release', 'restore', 'reversal', 'cancel_restore')
         AND (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?)
       GROUP BY item_id, tenant_id
-    `).bind(startDate, tenantId, tenantId).all<{ item_id: string; total_depleted: number; tenant_id?: string | null }>();
+    `).bind(normalizedStart, tenantId, tenantId).all<{ item_id: string; total_depleted: number; tenant_id?: string | null }>();
     depletions = filterRows(res.results || []);
   } catch {
     try {
@@ -145,10 +184,11 @@ async function queryTenantDepletions(
         SELECT inventory_item_id as item_id,
                MAX(0, SUM(CASE WHEN type IN ('release', 'restore', 'reversal', 'cancel_restore') THEN -ABS(quantity) ELSE ABS(quantity) END)) as total_depleted, tenant_id
         FROM inventory_transactions
-        WHERE created_at >= ? AND type IN ('out', 'reserve', 'waste', 'usage', 'deduction', 'order_deduction', 'order_consumption', 'sale', 'consumption', 'release', 'restore', 'reversal', 'cancel_restore')
+        WHERE replace(substr(created_at, 1, 19), 'T', ' ') >= ?
+          AND type IN ('out', 'reserve', 'waste', 'usage', 'deduction', 'order_deduction', 'order_consumption', 'sale', 'consumption', 'release', 'restore', 'reversal', 'cancel_restore')
           AND (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?)
         GROUP BY inventory_item_id, tenant_id
-      `).bind(startDate, tenantId, tenantId).all<{ item_id: string; total_depleted: number; tenant_id?: string | null }>();
+      `).bind(normalizedStart, tenantId, tenantId).all<{ item_id: string; total_depleted: number; tenant_id?: string | null }>();
       depletions = filterRows(res.results || []);
     } catch {
       if (tenantId === 'default' || tenantId === '*') {
@@ -157,9 +197,10 @@ async function queryTenantDepletions(
             SELECT item_id,
                    MAX(0, SUM(CASE WHEN type IN ('release', 'restore', 'reversal', 'cancel_restore') THEN -ABS(quantity) ELSE ABS(quantity) END)) as total_depleted
             FROM inventory_transactions
-            WHERE created_at >= ? AND type IN ('out', 'reserve', 'waste', 'usage', 'deduction', 'order_deduction', 'order_consumption', 'sale', 'consumption', 'release', 'restore', 'reversal', 'cancel_restore')
+            WHERE replace(substr(created_at, 1, 19), 'T', ' ') >= ?
+              AND type IN ('out', 'reserve', 'waste', 'usage', 'deduction', 'order_deduction', 'order_consumption', 'sale', 'consumption', 'release', 'restore', 'reversal', 'cancel_restore')
             GROUP BY item_id
-          `).bind(startDate).all<{ item_id: string; total_depleted: number; tenant_id?: string | null }>();
+          `).bind(normalizedStart).all<{ item_id: string; total_depleted: number; tenant_id?: string | null }>();
           depletions = filterRows(res.results || []);
         } catch {
           try {
@@ -167,9 +208,10 @@ async function queryTenantDepletions(
               SELECT COALESCE(inventory_item_id, item_id) as item_id,
                      MAX(0, SUM(CASE WHEN type IN ('release', 'restore', 'reversal', 'cancel_restore') THEN -ABS(quantity) ELSE ABS(quantity) END)) as total_depleted
               FROM inventory_transactions
-              WHERE created_at >= ? AND type IN ('out', 'reserve', 'waste', 'usage', 'deduction', 'order_deduction', 'order_consumption', 'sale', 'consumption', 'release', 'restore', 'reversal', 'cancel_restore')
+              WHERE replace(substr(created_at, 1, 19), 'T', ' ') >= ?
+                AND type IN ('out', 'reserve', 'waste', 'usage', 'deduction', 'order_deduction', 'order_consumption', 'sale', 'consumption', 'release', 'restore', 'reversal', 'cancel_restore')
               GROUP BY COALESCE(inventory_item_id, item_id)
-            `).bind(startDate).all<{ item_id: string; total_depleted: number; tenant_id?: string | null }>();
+            `).bind(normalizedStart).all<{ item_id: string; total_depleted: number; tenant_id?: string | null }>();
             depletions = filterRows(res.results || []);
           } catch {
             depletions = [];
@@ -180,23 +222,8 @@ async function queryTenantDepletions(
   }
 
   const smDepletions = await queryStockMovementDepletions();
-  if (depletions.length === 0) {
-    depletions = smDepletions;
-  } else if (smDepletions.length > 0) {
-    const seenItems = new Set(
-      depletions.map((d) => {
-        const raw = d as unknown as { inventory_item_id?: string; ingredient_id?: string };
-        return d.item_id || raw.inventory_item_id || raw.ingredient_id || '';
-      })
-    );
-    for (const sm of smDepletions) {
-      const raw = sm as unknown as { inventory_item_id?: string; ingredient_id?: string };
-      const id = sm.item_id || raw.inventory_item_id || raw.ingredient_id || '';
-      if (id && !seenItems.has(id)) {
-        depletions.push(sm);
-        seenItems.add(id);
-      }
-    }
+  if (smDepletions.length > 0) {
+    depletions = [...depletions, ...smDepletions];
   }
   return depletions;
 }
@@ -209,55 +236,79 @@ async function queryTenantInventoryItems(
   const unitCol = includeUnit ? ', unit' : '';
   let items: InventoryRow[] = [];
   let hasTenantCol = true;
+  let needsIngredientsFallback = false;
+
   try {
     const res = await db.prepare(`
       SELECT id, sku, name, current_stock, min_stock, max_stock${unitCol}, tenant_id
-      FROM inventory_items
-      WHERE (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?) AND active = 1
+      FROM (
+        SELECT id, sku, name, current_stock, min_stock, max_stock${unitCol}, tenant_id
+        FROM inventory_items
+        WHERE (?1 = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?2) AND active = 1
+        UNION ALL
+        SELECT id, COALESCE(sku, id) AS sku, name, current_stock, min_stock, max_stock${unitCol}, tenant_id
+        FROM ingredients
+        WHERE (?1 = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?2) AND is_active = 1
+          AND NOT EXISTS (
+            SELECT 1 FROM inventory_items ii
+            WHERE (?1 = '*' OR COALESCE(NULLIF(TRIM(ii.tenant_id), ''), 'default') = ?2) AND ii.active = 1
+          )
+      )
       ORDER BY sku ASC
     `).bind(tenantId, tenantId).all<InventoryRow>();
     items = (res.results || []).filter((r) => matchesTenantRow(r as unknown as Record<string, unknown>, tenantId));
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    if (/no such column:\s*tenant_id/i.test(msg)) {
-      hasTenantCol = false;
-    } else if (/no such column:\s*max_stock/i.test(msg)) {
-      try {
-        const res = await db.prepare(`
-          SELECT id, sku, name, current_stock, min_stock${unitCol}, tenant_id
-          FROM inventory_items
-          WHERE (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?) AND active = 1
-          ORDER BY sku ASC
-        `).bind(tenantId, tenantId).all<InventoryRow>();
-        items = (res.results || []).filter((r) => matchesTenantRow(r as unknown as Record<string, unknown>, tenantId));
-      } catch {
+  } catch {
+    needsIngredientsFallback = true;
+    try {
+      const res = await db.prepare(`
+        SELECT id, sku, name, current_stock, min_stock, max_stock${unitCol}, tenant_id
+        FROM inventory_items
+        WHERE (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?) AND active = 1
+        ORDER BY sku ASC
+      `).bind(tenantId, tenantId).all<InventoryRow>();
+      items = (res.results || []).filter((r) => matchesTenantRow(r as unknown as Record<string, unknown>, tenantId));
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      if (/no such column:\s*tenant_id/i.test(msg)) {
         hasTenantCol = false;
-      }
-    } else {
-      try {
-        const res = await db.prepare(`
-          SELECT id, COALESCE(sku, id) AS sku, name, current_stock, min_stock, max_stock${unitCol}, tenant_id
-          FROM inventory_items
-          WHERE (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?) AND COALESCE(active, is_active, 1) = 1
-          ORDER BY COALESCE(sku, id) ASC
-        `).bind(tenantId, tenantId).all<InventoryRow>();
-        items = (res.results || []).filter((r) => matchesTenantRow(r as unknown as Record<string, unknown>, tenantId));
-      } catch {
+      } else if (/no such column:\s*max_stock/i.test(msg)) {
         try {
           const res = await db.prepare(`
-            SELECT id, COALESCE(sku, id) AS sku, name, current_stock, min_stock${unitCol}, tenant_id
+            SELECT id, sku, name, current_stock, min_stock${unitCol}, tenant_id
+            FROM inventory_items
+            WHERE (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?) AND active = 1
+            ORDER BY sku ASC
+          `).bind(tenantId, tenantId).all<InventoryRow>();
+          items = (res.results || []).filter((r) => matchesTenantRow(r as unknown as Record<string, unknown>, tenantId));
+        } catch {
+          hasTenantCol = false;
+        }
+      } else {
+        try {
+          const res = await db.prepare(`
+            SELECT id, COALESCE(sku, id) AS sku, name, current_stock, min_stock, max_stock${unitCol}, tenant_id
             FROM inventory_items
             WHERE (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?) AND COALESCE(active, is_active, 1) = 1
             ORDER BY COALESCE(sku, id) ASC
           `).bind(tenantId, tenantId).all<InventoryRow>();
           items = (res.results || []).filter((r) => matchesTenantRow(r as unknown as Record<string, unknown>, tenantId));
         } catch {
-          hasTenantCol = false;
+          try {
+            const res = await db.prepare(`
+              SELECT id, COALESCE(sku, id) AS sku, name, current_stock, min_stock${unitCol}, tenant_id
+              FROM inventory_items
+              WHERE (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?) AND COALESCE(active, is_active, 1) = 1
+              ORDER BY COALESCE(sku, id) ASC
+            `).bind(tenantId, tenantId).all<InventoryRow>();
+            items = (res.results || []).filter((r) => matchesTenantRow(r as unknown as Record<string, unknown>, tenantId));
+          } catch {
+            hasTenantCol = false;
+          }
         }
       }
     }
   }
-  if ((!hasTenantCol || items.length === 0) && (tenantId === 'default' || tenantId === '*')) {
+  if (!hasTenantCol && (tenantId === 'default' || tenantId === '*')) {
     try {
       const res = await db.prepare(`
         SELECT id, COALESCE(sku, id) AS sku, name, current_stock, min_stock, max_stock${unitCol}
@@ -280,26 +331,66 @@ async function queryTenantInventoryItems(
       }
     }
   }
-  if (items.length === 0 && tenantId === 'default') {
+  if (items.length === 0 && needsIngredientsFallback) {
+    let hasIngTenantCol = true;
     try {
       const res = await db.prepare(`
-        SELECT id, COALESCE(sku, id) AS sku, name, current_stock, min_stock, max_stock${unitCol}
+        SELECT id, COALESCE(sku, id) AS sku, name, current_stock, min_stock, max_stock${unitCol}, tenant_id
         FROM ingredients
         WHERE is_active = 1
+          AND (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?)
         ORDER BY id ASC
-      `).all<InventoryRow>();
+      `).bind(tenantId, tenantId).all<InventoryRow>();
       items = (res.results || []).filter((r) => matchesTenantRow(r as unknown as Record<string, unknown>, tenantId));
-    } catch {
-      try {
-        const res = await db.prepare(`
-          SELECT id, COALESCE(sku, id) AS sku, name, current_stock, min_stock${unitCol}
-          FROM ingredients
-          WHERE is_active = 1
-          ORDER BY id ASC
-        `).all<InventoryRow>();
-        items = (res.results || []).filter((r) => matchesTenantRow(r as unknown as Record<string, unknown>, tenantId));
-      } catch {
+    } catch (ingErr) {
+      const ingMsg = ingErr instanceof Error ? ingErr.message : String(ingErr);
+      if (/no such column:\s*tenant_id|no column named\s*tenant_id/i.test(ingMsg)) {
+        hasIngTenantCol = false;
+      } else {
+        try {
+          const res = await db.prepare(`
+            SELECT id, COALESCE(sku, id) AS sku, name, current_stock, min_stock${unitCol}, tenant_id
+            FROM ingredients
+            WHERE is_active = 1
+              AND (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?)
+            ORDER BY id ASC
+          `).bind(tenantId, tenantId).all<InventoryRow>();
+          items = (res.results || []).filter((r) => matchesTenantRow(r as unknown as Record<string, unknown>, tenantId));
+        } catch (fallbackIngErr) {
+          const fbMsg = fallbackIngErr instanceof Error ? fallbackIngErr.message : String(fallbackIngErr);
+          if (/no such column:\s*tenant_id|no column named\s*tenant_id/i.test(fbMsg)) {
+            hasIngTenantCol = false;
+          } else {
+            items = [];
+          }
+        }
+      }
+    }
+    if (!hasIngTenantCol) {
+      if (tenantId !== 'default' && tenantId !== '*') {
         items = [];
+      } else {
+        try {
+          const res = await db.prepare(`
+            SELECT id, COALESCE(sku, id) AS sku, name, current_stock, min_stock, max_stock${unitCol}
+            FROM ingredients
+            WHERE is_active = 1
+            ORDER BY id ASC
+          `).all<InventoryRow>();
+          items = (res.results || []).filter((r) => matchesTenantRow(r as unknown as Record<string, unknown>, tenantId));
+        } catch {
+          try {
+            const res = await db.prepare(`
+              SELECT id, COALESCE(sku, id) AS sku, name, current_stock, min_stock${unitCol}
+              FROM ingredients
+              WHERE is_active = 1
+              ORDER BY id ASC
+            `).all<InventoryRow>();
+            items = (res.results || []).filter((r) => matchesTenantRow(r as unknown as Record<string, unknown>, tenantId));
+          } catch {
+            items = [];
+          }
+        }
       }
     }
   }
@@ -340,7 +431,7 @@ inventoryForecastingRouter.get('/run-rate', async (c) => {
     return c.json({ success: true, data: [] });
   }
 
-  const startDate = new Date(Date.now() - days * 86400000).toISOString();
+  const startDate = toSqliteUtcTimestamp(new Date(Date.now() - days * 86400000));
   const allowedItemIds = new Set(items.map((it) => it.id));
 
   // Query transaction depletion per item (with tenant scoping + fallback across schema variants)
@@ -439,7 +530,7 @@ inventoryForecastingRouter.post('/snapshot', requireAuth(['owner', 'manager', 's
     return c.json({ success: true, message: 'No items to snapshot', count: 0 });
   }
 
-  const sevenDaysAgo = new Date(Date.now() - 7 * 86400000).toISOString();
+  const sevenDaysAgo = toSqliteUtcTimestamp(new Date(Date.now() - 7 * 86400000));
   const allowedItemIds = new Set(items.map((it) => it.id));
   const depletions = await queryTenantDepletions(db, sevenDaysAgo, tenantId, allowedItemIds);
   const depMap = buildDepletionMap(depletions);

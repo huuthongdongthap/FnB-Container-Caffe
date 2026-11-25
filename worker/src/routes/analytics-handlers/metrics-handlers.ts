@@ -158,43 +158,56 @@ export function registerMetricsHandlers(router: Hono<{ Bindings: Env }>): void {
       const stmt = db.prepare(sql);
       return tenantBinds.length > 0 ? stmt.bind(...tenantBinds).first<T>() : stmt.first<T>();
     };
+    const activeOrderStatusSql =
+      "LOWER(TRIM(COALESCE(status, ''))) IN ('pending', 'paid', 'confirmed', 'preparing', 'ready', 'served', 'delivering', 'delivered', 'completed')";
+    const settledPaymentStatusSql =
+      "LOWER(TRIM(COALESCE(payment_status, ''))) IN ('paid', 'completed', 'partially_refunded')";
+    const partialRefundSubquerySql =
+      "COALESCE((SELECT SUM(COALESCE(p.refund_amount, 0)) FROM payments p WHERE p.order_id = orders.id AND COALESCE(NULLIF(TRIM(p.tenant_id), ''), 'default') = COALESCE(NULLIF(TRIM(orders.tenant_id), ''), 'default')), 0)";
+    const netOrderExprSql =
+      `MAX(0, COALESCE(total, 0) - CASE WHEN LOWER(TRIM(COALESCE(payment_status, ''))) = 'partially_refunded' THEN ${partialRefundSubquerySql} ELSE 0 END)`;
     try {
       let row: { cod_total: number; payos_total: number; refunded_total: number; net_total?: number; total_orders: number } | null = null;
       try {
         row = await runFirst<{ cod_total: number; payos_total: number; refunded_total: number; net_total?: number; total_orders: number }>(`SELECT
-          COALESCE(SUM(CASE WHEN (is_cod = 1 OR LOWER(COALESCE(payment_method, '')) IN ('cash', 'cod')) AND payment_status = 'paid' AND status = 'completed' THEN total ELSE 0 END), 0) AS cod_total,
-          COALESCE(SUM(CASE WHEN payment_method = 'payos' AND payment_status = 'paid' AND status IN ('paid', 'Confirmed', 'preparing', 'ready', 'completed') THEN total ELSE 0 END), 0) AS payos_total,
-          COALESCE(SUM(CASE WHEN status = 'refunded' OR COALESCE(payment_status, '') = 'refunded' THEN total ELSE 0 END), 0) AS refunded_total,
+          COALESCE(SUM(CASE WHEN (COALESCE(is_cod, 0) = 1 OR LOWER(TRIM(COALESCE(payment_method, ''))) IN ('cash', 'cod')) AND ${settledPaymentStatusSql} AND ${activeOrderStatusSql} THEN ${netOrderExprSql} ELSE 0 END), 0) AS cod_total,
+          COALESCE(SUM(CASE WHEN LOWER(TRIM(COALESCE(payment_method, ''))) = 'payos' AND ${settledPaymentStatusSql} AND ${activeOrderStatusSql} THEN ${netOrderExprSql} ELSE 0 END), 0) AS payos_total,
+          COALESCE(SUM(CASE WHEN LOWER(TRIM(COALESCE(status, ''))) = 'refunded' OR COALESCE(payment_status, '') = 'refunded' THEN COALESCE(total, 0) WHEN LOWER(TRIM(COALESCE(payment_status, ''))) = 'partially_refunded' THEN ${partialRefundSubquerySql} ELSE 0 END), 0) AS refunded_total,
           (
-            COALESCE(SUM(CASE WHEN (is_cod = 1 OR LOWER(COALESCE(payment_method, '')) IN ('cash', 'cod')) AND payment_status = 'paid' AND status = 'completed' THEN total ELSE 0 END), 0) +
-            COALESCE(SUM(CASE WHEN payment_method = 'payos' AND payment_status = 'paid' AND status IN ('paid', 'Confirmed', 'preparing', 'ready', 'completed') THEN total ELSE 0 END), 0)
+            COALESCE(SUM(CASE WHEN (COALESCE(is_cod, 0) = 1 OR LOWER(TRIM(COALESCE(payment_method, ''))) IN ('cash', 'cod')) AND ${settledPaymentStatusSql} AND ${activeOrderStatusSql} THEN ${netOrderExprSql} ELSE 0 END), 0) +
+            COALESCE(SUM(CASE WHEN LOWER(TRIM(COALESCE(payment_method, ''))) = 'payos' AND ${settledPaymentStatusSql} AND ${activeOrderStatusSql} THEN ${netOrderExprSql} ELSE 0 END), 0)
           ) AS net_total,
-          COALESCE(SUM(CASE WHEN LOWER(COALESCE(status, '')) NOT IN ('cancelled', 'canceled', 'refunded', 'failed', 'rejected', 'expired') AND LOWER(COALESCE(payment_status, '')) NOT IN ('refunded', 'failed') THEN 1 ELSE 0 END), 0) AS total_orders
+          COALESCE(SUM(CASE WHEN ${activeOrderStatusSql} AND ${settledPaymentStatusSql} AND NOT (COALESCE(total, 0) = 0 AND (COALESCE(customer_name, '') = 'Khách QR - cho don mon' OR COALESCE(items, '') IN ('', '[]'))) THEN 1 ELSE 0 END), 0) AS total_orders
           FROM orders${tenantWhere}`);
       } catch (queryErr) {
-        if (String((queryErr as Error)?.message || '').includes('column')) {
+        const errMsg = String((queryErr as Error)?.message || '');
+        if (errMsg.includes('column') || errMsg.includes('no such table')) {
           try {
             row = await runFirst<{ cod_total: number; payos_total: number; refunded_total: number; net_total?: number; total_orders: number }>(`SELECT
-              COALESCE(SUM(CASE WHEN LOWER(COALESCE(payment_method, '')) IN ('cash', 'cod') AND payment_status = 'paid' AND status = 'completed' THEN total ELSE 0 END), 0) AS cod_total,
-              COALESCE(SUM(CASE WHEN payment_method = 'payos' AND payment_status = 'paid' AND status IN ('paid', 'Confirmed', 'preparing', 'ready', 'completed') THEN total ELSE 0 END), 0) AS payos_total,
-              COALESCE(SUM(CASE WHEN status = 'refunded' OR COALESCE(payment_status, '') = 'refunded' THEN total ELSE 0 END), 0) AS refunded_total,
+              COALESCE(SUM(CASE WHEN LOWER(TRIM(COALESCE(payment_method, ''))) IN ('cash', 'cod') AND ${settledPaymentStatusSql} AND ${activeOrderStatusSql} THEN COALESCE(total, 0) ELSE 0 END), 0) AS cod_total,
+              COALESCE(SUM(CASE WHEN LOWER(TRIM(COALESCE(payment_method, ''))) = 'payos' AND ${settledPaymentStatusSql} AND ${activeOrderStatusSql} THEN COALESCE(total, 0) ELSE 0 END), 0) AS payos_total,
+              COALESCE(SUM(CASE WHEN LOWER(TRIM(COALESCE(status, ''))) = 'refunded' OR COALESCE(payment_status, '') = 'refunded' THEN COALESCE(total, 0) ELSE 0 END), 0) AS refunded_total,
               (
-                COALESCE(SUM(CASE WHEN LOWER(COALESCE(payment_method, '')) IN ('cash', 'cod') AND payment_status = 'paid' AND status = 'completed' THEN total ELSE 0 END), 0) +
-                COALESCE(SUM(CASE WHEN payment_method = 'payos' AND payment_status = 'paid' AND status IN ('paid', 'Confirmed', 'preparing', 'ready', 'completed') THEN total ELSE 0 END), 0)
+                COALESCE(SUM(CASE WHEN LOWER(TRIM(COALESCE(payment_method, ''))) IN ('cash', 'cod') AND ${settledPaymentStatusSql} AND ${activeOrderStatusSql} THEN COALESCE(total, 0) ELSE 0 END), 0) +
+                COALESCE(SUM(CASE WHEN LOWER(TRIM(COALESCE(payment_method, ''))) = 'payos' AND ${settledPaymentStatusSql} AND ${activeOrderStatusSql} THEN COALESCE(total, 0) ELSE 0 END), 0)
               ) AS net_total,
-              COALESCE(SUM(CASE WHEN LOWER(COALESCE(status, '')) NOT IN ('cancelled', 'canceled', 'refunded', 'failed', 'rejected', 'expired') AND LOWER(COALESCE(payment_status, '')) NOT IN ('refunded', 'failed') THEN 1 ELSE 0 END), 0) AS total_orders
+              COALESCE(SUM(CASE WHEN ${activeOrderStatusSql} AND ${settledPaymentStatusSql} THEN 1 ELSE 0 END), 0) AS total_orders
               FROM orders${tenantWhere}`);
-          } catch {
-            row = await runFirst<{ cod_total: number; payos_total: number; refunded_total: number; net_total?: number; total_orders: number }>(`SELECT
-              COALESCE(SUM(CASE WHEN LOWER(COALESCE(payment_method, '')) IN ('cash', 'cod') AND status = 'completed' THEN total ELSE 0 END), 0) AS cod_total,
-              COALESCE(SUM(CASE WHEN payment_method = 'payos' AND status IN ('paid', 'Confirmed', 'preparing', 'ready', 'completed') THEN total ELSE 0 END), 0) AS payos_total,
-              COALESCE(SUM(CASE WHEN status = 'refunded' THEN total ELSE 0 END), 0) AS refunded_total,
-              (
-                COALESCE(SUM(CASE WHEN LOWER(COALESCE(payment_method, '')) IN ('cash', 'cod') AND status = 'completed' THEN total ELSE 0 END), 0) +
-                COALESCE(SUM(CASE WHEN payment_method = 'payos' AND status IN ('paid', 'Confirmed', 'preparing', 'ready', 'completed') THEN total ELSE 0 END), 0)
-              ) AS net_total,
-              COALESCE(SUM(CASE WHEN LOWER(COALESCE(status, '')) NOT IN ('cancelled', 'canceled', 'refunded', 'failed', 'rejected', 'expired') THEN 1 ELSE 0 END), 0) AS total_orders
-              FROM orders${tenantWhere}`);
+          } catch (fbErr) {
+            if (/no such column:\s*payment_status|no column named\s*payment_status/i.test(String((fbErr as Error)?.message || ''))) {
+              row = await runFirst<{ cod_total: number; payos_total: number; refunded_total: number; net_total?: number; total_orders: number }>(`SELECT
+                COALESCE(SUM(CASE WHEN LOWER(TRIM(COALESCE(payment_method, ''))) IN ('cash', 'cod') AND LOWER(TRIM(COALESCE(status, ''))) IN ('paid', 'completed', 'delivered', 'served') THEN COALESCE(total, 0) ELSE 0 END), 0) AS cod_total,
+                COALESCE(SUM(CASE WHEN LOWER(TRIM(COALESCE(payment_method, ''))) = 'payos' AND LOWER(TRIM(COALESCE(status, ''))) IN ('paid', 'completed', 'delivered', 'served') THEN COALESCE(total, 0) ELSE 0 END), 0) AS payos_total,
+                COALESCE(SUM(CASE WHEN LOWER(TRIM(COALESCE(status, ''))) = 'refunded' THEN COALESCE(total, 0) ELSE 0 END), 0) AS refunded_total,
+                (
+                  COALESCE(SUM(CASE WHEN LOWER(TRIM(COALESCE(payment_method, ''))) IN ('cash', 'cod') AND LOWER(TRIM(COALESCE(status, ''))) IN ('paid', 'completed', 'delivered', 'served') THEN COALESCE(total, 0) ELSE 0 END), 0) +
+                  COALESCE(SUM(CASE WHEN LOWER(TRIM(COALESCE(payment_method, ''))) = 'payos' AND LOWER(TRIM(COALESCE(status, ''))) IN ('paid', 'completed', 'delivered', 'served') THEN COALESCE(total, 0) ELSE 0 END), 0)
+                ) AS net_total,
+                COALESCE(SUM(CASE WHEN LOWER(TRIM(COALESCE(status, ''))) IN ('paid', 'completed', 'delivered', 'served') THEN 1 ELSE 0 END), 0) AS total_orders
+                FROM orders${tenantWhere}`);
+            } else {
+              throw fbErr;
+            }
           }
         } else {
           throw queryErr;

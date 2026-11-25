@@ -15,7 +15,7 @@ import { getTenantId, matchesTenantRow } from '../lib/db';
 import { createAlertDispatcher } from '../lib/alert-dispatcher';
 import { notifyTelegram } from '@aura/domain-order';
 import { sendZNS } from './zalo';
-import { sendCashbackExpiryWarnings } from './cron';
+import { sendCashbackExpiryWarnings, checkInventoryAlerts } from './cron';
 
 const log = createLogger({ route: 'cron-admin' });
 
@@ -108,9 +108,10 @@ function resolveCronAdminTenant(c: {
     (user?.role === 'owner' || user?.role === 'admin') &&
     (userTenant.toLowerCase() === 'hq' || userTenant === '*');
   const headerOrQueryTenant = extractCronAdminTenantOverride(c);
+  const getSafeTenantId = () => getTenantId(c as unknown as Parameters<typeof getTenantId>[0]);
   const raw =
     (headerOrQueryTenant && headerOrQueryTenant !== '__CONFLICT__' ? headerOrQueryTenant : '') ||
-    (isStrictHq ? (getTenantId(c as any) || '*') : (userTenant || getTenantId(c as any) || 'default'));
+    (isStrictHq ? (getSafeTenantId() || '*') : (userTenant || getSafeTenantId() || 'default'));
   return raw.toLowerCase() === 'hq' ? '*' : raw;
 }
 
@@ -125,10 +126,28 @@ export function registerCronAdminRoutes(app: Hono<{ Bindings: Env }>): void {
       return c.json({ error: 'Cross-tenant access denied' }, 403);
     }
     const scopedTenant = rawTenant ? (rawTenant.toLowerCase() === 'hq' ? '*' : rawTenant) : undefined;
+    const inventoryAlerts = await checkInventoryAlerts(
+      c.env as unknown as Record<string, unknown>,
+      scopedTenant || '*'
+    ).catch(() => 0);
     const fired = await createAlertDispatcher(c.env.AURA_DB, scopedTenant).dispatchAlerts((msg, sev) =>
       sendTelegram(c.env, msg, sev)
     );
-    return c.json({ fired, at: new Date().toISOString() });
+    return c.json({ fired, inventory_alerts: inventoryAlerts, at: new Date().toISOString() });
+  });
+
+  // ── Cron: Inventory low-stock alert scan (protected by shared secret) ──
+  app.get('/cron/inventory-alerts', async(c) => {
+    if (!(await checkCronSecret(c))) {
+      return c.json({ error: 'Unauthorized' }, 401);
+    }
+    const rawTenant = extractCronAdminTenantOverride(c);
+    if (rawTenant === '__CONFLICT__') {
+      return c.json({ error: 'Cross-tenant access denied' }, 403);
+    }
+    const scopedTenant = rawTenant ? (rawTenant.toLowerCase() === 'hq' ? '*' : rawTenant) : '*';
+    const notified = await checkInventoryAlerts(c.env as unknown as Record<string, unknown>, scopedTenant);
+    return c.json({ ok: true, notified, at: new Date().toISOString() });
   });
 
   // ── Cron: Daily digest (triggered hourly, dispatched only at 21:00 ICT) ──
@@ -238,5 +257,14 @@ export function registerCronAdminRoutes(app: Hono<{ Bindings: Env }>): void {
     }
     const result = await sendCashbackExpiryWarnings(c.env as unknown as Record<string, unknown>, resolveCronAdminTenant(c));
     return c.json({ ok: true, ...result });
+  });
+
+  // ── Admin: Manual inventory alert scan ──
+  app.post('/api/admin/inventory/check-alerts', requireAuth(['owner', 'admin', 'manager', 'supervisor']), audit('check_inventory_alerts'), async(c) => {
+    if (hasCrossTenantOverride(c)) {
+      return c.json({ error: 'Cross-tenant access denied' }, 403);
+    }
+    const notified = await checkInventoryAlerts(c.env as unknown as Record<string, unknown>, resolveCronAdminTenant(c));
+    return c.json({ ok: true, notified });
   });
 }

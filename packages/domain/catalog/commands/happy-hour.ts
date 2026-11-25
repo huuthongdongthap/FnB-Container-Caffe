@@ -9,7 +9,7 @@ import { getTenantId, matchesTenantRow } from 'worker/src/lib/db';
 import { isHQSuperAdmin, resolvePublicTenantId } from 'worker/src/middleware/tenant';
 import type { Env } from 'worker/src/types/env';
 import type { HappyHourWindow } from '../model/catalog-types';
-import { happyHourDiscountFor, resolveItemPrice } from '../policies/pricing';
+import { happyHourDiscountFor, matchesHappyHourSchedule, resolveItemPrice } from '../policies/pricing';
 
 export const happyHourRouter = new Hono<{ Bindings: Env }>();
 happyHourRouter.use('*', async (c, next) => {
@@ -74,14 +74,12 @@ function findActiveWindowForTime(
   windows: ReadonlyArray<HappyHourWindow>,
   now: Date,
 ): HappyHourWindow | null {
-  const currentTime = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
-  const dayOfWeek = now.getDay();
   const matched = windows
     .filter((w) => {
-      if (w.active !== 1 || w.day_of_week !== dayOfWeek) return false;
+      if (w.active !== 1) return false;
       const start = padHHMM(String(w.start_time || ''));
       const end = padHHMM(String(w.end_time || ''));
-      if (start > end || currentTime < start || currentTime >= end) return false;
+      if (!matchesHappyHourSchedule(Number(w.day_of_week), start, end, now)) return false;
       const applyTo = String(w.apply_to || 'all').trim().toLowerCase();
       if (applyTo !== 'all' && !parseNonEmptyApplyIds(w.apply_ids)) return false;
       return true;
@@ -368,7 +366,8 @@ happyHourRouter.post('/happy-hour', staffAuth, async (c) => {
   }
   const startTime = padHHMM(rawStart);
   const endTime = padHHMM(rawEnd);
-  if (startTime >= endTime) {
+  const allowOvernight = body.allow_overnight === true || body.overnight === true;
+  if (startTime === endTime || (!allowOvernight && startTime > endTime)) {
     return c.json({ success: false, error: 'start_time must be before end_time' }, 400);
   }
   const discountRate = Number(body.discount_rate);
@@ -469,7 +468,13 @@ happyHourRouter.patch('/happy-hour/:id', staffAuth, async (c) => {
   }
   const effectiveStart = nextStart ?? (existing.start_time ? padHHMM(String(existing.start_time)) : null);
   const effectiveEnd = nextEnd ?? (existing.end_time ? padHHMM(String(existing.end_time)) : null);
-  if ((nextStart !== null || nextEnd !== null) && effectiveStart && effectiveEnd && effectiveStart >= effectiveEnd) {
+  const allowOvernightPatch = body.allow_overnight === true || body.overnight === true;
+  if (
+    (nextStart !== null || nextEnd !== null) &&
+    effectiveStart &&
+    effectiveEnd &&
+    (effectiveStart === effectiveEnd || (!allowOvernightPatch && effectiveStart > effectiveEnd))
+  ) {
     return c.json({ success: false, error: 'start_time must be before end_time' }, 400);
   }
   if (body.discount_rate != null) {
@@ -635,7 +640,7 @@ async function handleHappyHourNow(c: Context<{ Bindings: Env }>) {
   const now = new Date();
   const win =
     productId || categoryId
-      ? happyHourDiscountFor(results, now, { productId, categoryId })
+      ? happyHourDiscountFor(results, now, { productId, categoryId, categorySlug: categoryId, tenantId })
       : findActiveWindowForTime(results, now);
 
   let featuredItems: Array<Record<string, unknown>> = [];

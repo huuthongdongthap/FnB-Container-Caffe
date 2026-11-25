@@ -1,20 +1,22 @@
 import { Hono } from 'hono';
 import { getTenantId, matchesTenantRow } from 'worker/src/lib/db';
 
+interface D1StatementResult {
+  all: <T = Record<string, unknown>>() => Promise<{ results: T[] }>;
+  first: <T = Record<string, unknown>>() => Promise<T | null>;
+  run: () => Promise<{ meta: { changes: number } }>;
+}
+
 interface D1Database {
   prepare: (sql: string) => {
-    bind: (...args: any[]) => {
-      all: <T = any>() => Promise<{ results: T[] }>;
-      first: <T = any>() => Promise<T | null>;
-      run: () => Promise<{ meta: { changes: number } }>;
-    };
+    bind: (...args: unknown[]) => D1StatementResult;
   };
-  batch: (ops: any[]) => Promise<any[]>;
+  batch: (ops: unknown[]) => Promise<unknown[]>;
 }
 
 interface AppEnv {
   AURA_DB: D1Database;
-  executionCtx?: { waitUntil: (p: Promise<any>) => void };
+  executionCtx?: { waitUntil: (p: Promise<unknown>) => void };
 }
 
 type AppContext = { Bindings: AppEnv };
@@ -26,9 +28,11 @@ const SNAPSHOT_READ_ROLES = [
   'supervisor',
   'staff',
   'cashier',
+  'waiter',
   'barista',
   'kitchen',
   'chef',
+  'bep',
   'warehouse',
 ];
 const SNAPSHOT_GENERATE_ROLES = ['owner', 'admin', 'manager', 'supervisor', 'staff', 'warehouse'];
@@ -121,7 +125,7 @@ function verifySnapshotTenant(
 }
 
 export function inventorySnapshots(app: Hono<AppContext>) {
-  const handleListAllSnapshots = async (c: any) => {
+  const handleListAllSnapshots = async (c: import('hono').Context<AppContext>) => {
     const tenantCheck = verifySnapshotTenant(c as never, 'read');
     if (!tenantCheck.ok) {
       return c.json({ error: 'Cross-tenant snapshot access denied' }, 403);
@@ -153,7 +157,7 @@ export function inventorySnapshots(app: Hono<AppContext>) {
 
   app.get('/snapshots', handleListAllSnapshots);
 
-  const handleGenerateSnapshots = async (c: any) => {
+  const handleGenerateSnapshots = async (c: import('hono').Context<AppContext>) => {
     const userRole = String((c as unknown as { get?: (k: string) => { role?: string } | undefined }).get?.('user')?.role || '')
       .trim()
       .toLowerCase();
@@ -164,9 +168,218 @@ export function inventorySnapshots(app: Hono<AppContext>) {
     if (!tenantCheck.ok) {
       return c.json({ error: 'Cross-tenant snapshot generation denied' }, 403);
     }
-    const effectiveTenant = tenantCheck.tenantId === '*' ? 'default' : tenantCheck.tenantId;
-    const today = new Date(Date.now() + 7 * 3600_000).toISOString().slice(0, 10);
-    return c.json({ success: true, date: today, tenant_id: effectiveTenant }, 201);
+    const db = c.env.AURA_DB;
+    const targetScope = tenantCheck.tenantId;
+    const effectiveTenant = targetScope === '*' ? 'default' : targetScope;
+    let requestedDate = '';
+    try {
+      const body = (await c.req.json().catch(() => null)) as { date?: string } | null;
+      if (body?.date && /^\d{4}-\d{2}-\d{2}$/.test(body.date.trim())) {
+        requestedDate = body.date.trim();
+      }
+    } catch {
+      requestedDate = '';
+    }
+    const today = requestedDate || new Date(Date.now() + 7 * 3600_000).toISOString().slice(0, 10);
+
+    type CandidateItem = { id: string; current_stock?: number | null; quantity?: number | null; tenant_id?: string | null };
+    let items: CandidateItem[] = [];
+    try {
+      const res = await db
+        .prepare(
+          "SELECT id, current_stock, tenant_id FROM inventory_items WHERE COALESCE(active, 1) = 1 AND (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?)"
+        )
+        .bind(targetScope, targetScope)
+        .all<CandidateItem>();
+      items = (res.results || []).filter((r) => matchesTenantRow(r as unknown as Record<string, unknown>, targetScope));
+    } catch {
+      try {
+        const res = await db
+          .prepare(
+            "SELECT id, current_stock, tenant_id FROM inventory_items WHERE COALESCE(is_active, 1) = 1 AND (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?)"
+          )
+          .bind(targetScope, targetScope)
+          .all<CandidateItem>();
+        items = (res.results || []).filter((r) => matchesTenantRow(r as unknown as Record<string, unknown>, targetScope));
+      } catch {
+        if (targetScope === 'default' || targetScope === '*') {
+          const res = await db
+            .prepare('SELECT id, current_stock FROM inventory_items')
+            .bind()
+            .all<CandidateItem>()
+            .catch(() => ({ results: [] as CandidateItem[] }));
+          items = (res.results || []).filter((r) => matchesTenantRow(r as unknown as Record<string, unknown>, targetScope));
+        }
+      }
+    }
+
+    if (items.length === 0) {
+      try {
+        const ingRes = await db
+          .prepare(
+            "SELECT id, current_stock, tenant_id FROM ingredients WHERE COALESCE(is_active, 1) = 1 AND (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?)"
+          )
+          .bind(targetScope, targetScope)
+          .all<CandidateItem>();
+        items = (ingRes.results || []).filter((r) => matchesTenantRow(r as unknown as Record<string, unknown>, targetScope));
+      } catch {
+        if (targetScope === 'default' || targetScope === '*') {
+          const ingRes = await db
+            .prepare('SELECT id, current_stock FROM ingredients WHERE COALESCE(is_active, 1) = 1')
+            .bind()
+            .all<CandidateItem>()
+            .catch(() => ({ results: [] as CandidateItem[] }));
+          items = (ingRes.results || []).filter((r) => matchesTenantRow(r as unknown as Record<string, unknown>, targetScope));
+        }
+      }
+    }
+
+    const snapshots: Array<{
+      id: string;
+      item_id: string;
+      date: string;
+      opening_stock: number;
+      closing_stock: number;
+      tenant_id: string;
+    }> = [];
+
+    for (const item of items) {
+      const itemId = String(item.id || '').trim();
+      if (!itemId) continue;
+      const rawItemTenant = typeof item.tenant_id === 'string' ? item.tenant_id.trim() : '';
+      const itemTenant =
+        targetScope === '*'
+          ? rawItemTenant && rawItemTenant !== '*' && rawItemTenant.toLowerCase() !== 'hq'
+            ? rawItemTenant
+            : 'default'
+          : effectiveTenant;
+      const closing = Number(item.current_stock ?? item.quantity ?? 0);
+
+      let existing: { id: string; opening_stock: number } | null = null;
+      try {
+        existing = await db
+          .prepare(
+            "SELECT id, opening_stock FROM inventory_snapshots WHERE item_id = ? AND date = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
+          )
+          .bind(itemId, today, itemTenant)
+          .first<{ id: string; opening_stock: number }>();
+      } catch {
+        if (itemTenant === 'default') {
+          existing = await db
+            .prepare('SELECT id, opening_stock FROM inventory_snapshots WHERE item_id = ? AND date = ?')
+            .bind(itemId, today)
+            .first<{ id: string; opening_stock: number }>()
+            .catch(() => null);
+        }
+      }
+
+      let opening = existing?.opening_stock;
+      if (opening === undefined || opening === null) {
+        let prior: { closing_stock: number } | null = null;
+        try {
+          prior = await db
+            .prepare(
+              "SELECT closing_stock FROM inventory_snapshots WHERE item_id = ? AND date < ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ? ORDER BY date DESC LIMIT 1"
+            )
+            .bind(itemId, today, itemTenant)
+            .first<{ closing_stock: number }>();
+        } catch {
+          if (itemTenant === 'default') {
+            prior = await db
+              .prepare(
+                'SELECT closing_stock FROM inventory_snapshots WHERE item_id = ? AND date < ? ORDER BY date DESC LIMIT 1'
+              )
+              .bind(itemId, today)
+              .first<{ closing_stock: number }>()
+              .catch(() => null);
+          }
+        }
+        opening = prior?.closing_stock ?? closing;
+      }
+
+      if (existing) {
+        try {
+          await db
+            .prepare(
+              "UPDATE inventory_snapshots SET closing_stock = ? WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
+            )
+            .bind(closing, existing.id, itemTenant)
+            .run();
+          snapshots.push({
+            id: existing.id,
+            item_id: itemId,
+            date: today,
+            opening_stock: Number(opening),
+            closing_stock: closing,
+            tenant_id: itemTenant,
+          });
+        } catch {
+          if (itemTenant === 'default') {
+            await db
+              .prepare('UPDATE inventory_snapshots SET closing_stock = ? WHERE id = ?')
+              .bind(closing, existing.id)
+              .run()
+              .catch(() => {});
+            snapshots.push({
+              id: existing.id,
+              item_id: itemId,
+              date: today,
+              opening_stock: Number(opening),
+              closing_stock: closing,
+              tenant_id: itemTenant,
+            });
+          }
+        }
+      } else {
+        const snapId = crypto.randomUUID();
+        try {
+          await db
+            .prepare(
+              'INSERT INTO inventory_snapshots (id, item_id, date, opening_stock, closing_stock, tenant_id) VALUES (?, ?, ?, ?, ?, ?)'
+            )
+            .bind(snapId, itemId, today, Number(opening), closing, itemTenant)
+            .run();
+          snapshots.push({
+            id: snapId,
+            item_id: itemId,
+            date: today,
+            opening_stock: Number(opening),
+            closing_stock: closing,
+            tenant_id: itemTenant,
+          });
+        } catch (insertErr) {
+          const msg = insertErr instanceof Error ? insertErr.message : String(insertErr);
+          if (itemTenant === 'default' && /no such column:\s*tenant_id|no column named\s*tenant_id/i.test(msg)) {
+            await db
+              .prepare(
+                'INSERT INTO inventory_snapshots (id, item_id, date, opening_stock, closing_stock) VALUES (?, ?, ?, ?, ?)'
+              )
+              .bind(snapId, itemId, today, Number(opening), closing)
+              .run()
+              .catch(() => {});
+            snapshots.push({
+              id: snapId,
+              item_id: itemId,
+              date: today,
+              opening_stock: Number(opening),
+              closing_stock: closing,
+              tenant_id: itemTenant,
+            });
+          }
+        }
+      }
+    }
+
+    return c.json(
+      {
+        success: true,
+        date: today,
+        tenant_id: effectiveTenant,
+        count: snapshots.length,
+        snapshots,
+      },
+      201
+    );
   };
 
   app.post('/generate', handleGenerateSnapshots);

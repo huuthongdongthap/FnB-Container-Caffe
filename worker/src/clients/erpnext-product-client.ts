@@ -195,30 +195,45 @@ export class ErpnextProductClient {
             WHERE COALESCE(NULLIF(TRIM(erpnext_product_sync.tenant_id), ''), 'default') = excluded.tenant_id
           `).bind(productKey, product.name, now, product.modified || now, effectiveTenant).run();
         } catch {
-          if (effectiveTenant !== 'default') {
-            throw new Error('Tenant-scoped product sync failed');
-          }
           try {
             await db.prepare(`
               INSERT INTO erpnext_product_sync
-                (product_id, erpnext_item_code, last_synced_at, erpnext_modified)
-              VALUES (?, ?, ?, ?)
-              ON CONFLICT(product_id) DO UPDATE SET
-                erpnext_item_code = excluded.erpnext_item_code,
-                last_synced_at    = excluded.last_synced_at,
-                erpnext_modified  = excluded.erpnext_modified
-            `).bind(productKey, product.name, now, product.modified || now).run();
-          } catch {
-            await db.prepare(`
-              INSERT INTO erpnext_product_sync
-                (product_id, erpnext_product_id, erpnext_item_code, last_synced_at, erpnext_modified, erpnext_write_date)
-              VALUES (?, 0, ?, ?, ?, ?)
+                (product_id, erpnext_product_id, erpnext_item_code, last_synced_at, erpnext_modified, erpnext_write_date, tenant_id)
+              VALUES (?, 0, ?, ?, ?, ?, ?)
               ON CONFLICT(product_id) DO UPDATE SET
                 erpnext_item_code  = excluded.erpnext_item_code,
                 last_synced_at     = excluded.last_synced_at,
                 erpnext_modified   = excluded.erpnext_modified,
-                erpnext_write_date = excluded.erpnext_write_date
-            `).bind(productKey, product.name, now, product.modified || now, product.modified || now).run();
+                erpnext_write_date = excluded.erpnext_write_date,
+                tenant_id          = excluded.tenant_id
+              WHERE COALESCE(NULLIF(TRIM(erpnext_product_sync.tenant_id), ''), 'default') = excluded.tenant_id
+            `).bind(productKey, product.name, now, product.modified || now, product.modified || now, effectiveTenant).run();
+          } catch {
+            if (effectiveTenant !== 'default') {
+              throw new Error('Tenant-scoped product sync failed');
+            }
+            try {
+              await db.prepare(`
+                INSERT INTO erpnext_product_sync
+                  (product_id, erpnext_item_code, last_synced_at, erpnext_modified)
+                VALUES (?, ?, ?, ?)
+                ON CONFLICT(product_id) DO UPDATE SET
+                  erpnext_item_code = excluded.erpnext_item_code,
+                  last_synced_at    = excluded.last_synced_at,
+                  erpnext_modified  = excluded.erpnext_modified
+              `).bind(productKey, product.name, now, product.modified || now).run();
+            } catch {
+              await db.prepare(`
+                INSERT INTO erpnext_product_sync
+                  (product_id, erpnext_product_id, erpnext_item_code, last_synced_at, erpnext_modified, erpnext_write_date)
+                VALUES (?, 0, ?, ?, ?, ?)
+                ON CONFLICT(product_id) DO UPDATE SET
+                  erpnext_item_code  = excluded.erpnext_item_code,
+                  last_synced_at     = excluded.last_synced_at,
+                  erpnext_modified   = excluded.erpnext_modified,
+                  erpnext_write_date = excluded.erpnext_write_date
+              `).bind(productKey, product.name, now, product.modified || now, product.modified || now).run();
+            }
           }
         }
 

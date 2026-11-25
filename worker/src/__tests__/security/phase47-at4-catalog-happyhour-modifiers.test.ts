@@ -445,7 +445,7 @@ describe('Domain Catalog Happy-Hour Tenant/Window Resolution & Menu Modifier Pro
       const db = createInMemoryCatalogD1();
       const env = { AURA_DB: db as unknown as D1Database, JWT_SECRET: TEST_SECRET } as Env;
       const now = new Date();
-      const todayDow = now.getDay();
+      const todayDow = new Date(now.getTime() + 7 * 3600_000).getUTCDay();
 
       // Seed 8 default-tenant items so an unscoped LIMIT 6 query would starve store-b
       for (let i = 1; i <= 8; i++) {

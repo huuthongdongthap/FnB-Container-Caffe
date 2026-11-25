@@ -6,10 +6,22 @@ import { HelmetHead } from '@/components/seo/HelmetHead';
 import { apiFetch } from '@/lib/api-client';
 import { ThermalReceipt, type ThermalReceiptData } from '@/components/receipt/ThermalReceipt';
 
+interface CheckoutItemLine {
+  id?: string;
+  name?: string;
+  quantity?: number;
+  qty?: number;
+  price?: number;
+  notes?: string;
+}
+
 interface CheckoutEntry {
   orderId: string;
   sessionId: string;
   paymentMethod: 'cod' | 'payos';
+  paymentStatus?: string;
+  paymentUrl?: string | null;
+  items?: CheckoutItemLine[];
   total: number;
   status: string;
   printed: boolean;
@@ -55,13 +67,22 @@ export default function DinDinCheckout() {
 
   const markPrinted = async (entry: CheckoutEntry) => {
     setError(null);
+    const receiptItems =
+      Array.isArray(entry.items) && entry.items.length > 0
+        ? entry.items.map((it, idx) => ({
+            name: String(it.name || it.id || `Món #${idx + 1}`),
+            quantity: Math.max(1, Number(it.quantity ?? it.qty ?? 1)),
+            price: Number(it.price ?? 0),
+            ...(it.notes ? { notes: it.notes } : {}),
+          }))
+        : [{ name: `Đơn checkout #${entry.orderId.slice(0, 8)}`, quantity: 1, price: entry.total }];
     const receipt: ThermalReceiptData = {
       orderId: entry.orderId,
       createdAt: entry.createdAt,
-      items: [{ name: `Đơn checkout #${entry.orderId.slice(0, 8)}`, quantity: 1, price: entry.total }],
+      items: receiptItems,
       total: entry.total,
       paymentMethod: entry.paymentMethod,
-      paymentStatus: entry.status,
+      paymentStatus: entry.paymentStatus || entry.status,
     };
     setPrintReceipt(receipt);
     try {
@@ -75,6 +96,22 @@ export default function DinDinCheckout() {
         err instanceof Error
           ? err.message
           : t('dindin.printFailed', { defaultValue: 'Không thể cập nhật trạng thái in phiếu' }),
+      );
+    }
+  };
+
+  const confirmQrPayment = async (orderId: string) => {
+    setError(null);
+    try {
+      await apiFetch(`/api/admin/dindin/checkout/${orderId}/confirm-payment`, { method: 'POST' });
+      setEntries((prev) =>
+        prev.map((e) => (e.orderId === orderId ? { ...e, paymentStatus: 'paid' } : e)),
+      );
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : t('dindin.paymentConfirmFailed', { defaultValue: 'Không thể xác nhận thanh toán QR' }),
       );
     }
   };
@@ -148,9 +185,32 @@ export default function DinDinCheckout() {
                 <tr key={entry.orderId} className="hover:bg-[rgba(255,255,255,0.02)]">
                   <td className="px-4 py-3 font-mono text-[var(--aura-text-primary)]">#{entry.orderId.slice(0, 8)}</td>
                   <td className="px-4 py-3">
-                    <span className={`px-2 py-1 rounded-full text-[10px] font-semibold ${entry.paymentMethod === 'cod' ? 'bg-blue-500/20 text-blue-400' : 'bg-purple-500/20 text-purple-400'}`}>
-                      {entry.paymentMethod === 'cod' ? 'COD' : 'QRPay'}
-                    </span>
+                    <div className="flex items-center gap-2">
+                      <span className={`px-2 py-1 rounded-full text-[10px] font-semibold ${entry.paymentMethod === 'cod' ? 'bg-blue-500/20 text-blue-400' : 'bg-purple-500/20 text-purple-400'}`}>
+                        {entry.paymentMethod === 'cod' ? 'COD' : 'QRPay'}
+                      </span>
+                      {entry.paymentMethod === 'payos' &&
+                        entry.paymentStatus !== 'paid' &&
+                        entry.paymentStatus !== 'completed' && (
+                          <button
+                            type="button"
+                            onClick={() => void confirmQrPayment(entry.orderId)}
+                            className="text-[10px] text-amber-400 hover:underline"
+                          >
+                            Xác nhận đã thu
+                          </button>
+                        )}
+                      {entry.paymentUrl && (
+                        <a
+                          href={entry.paymentUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="text-[10px] text-sky-400 hover:underline"
+                        >
+                          QR
+                        </a>
+                      )}
+                    </div>
                   </td>
                   <td className="px-4 py-3 text-right text-[var(--aura-text-secondary)]">₫{entry.total.toLocaleString('vi-VN')}</td>
                   <td className="px-4 py-3 text-center">

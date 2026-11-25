@@ -87,22 +87,27 @@ export async function handleErpnextRequest(request: Request, env: Env, resolvedT
 			const keys = erpnextKvKeys(cfgTenant);
 			let cfgUrl = cfgTenant === 'default' ? env.ERPNEXT_URL : undefined;
 			let apiKey = cfgTenant === 'default' ? env.ERPNEXT_API_KEY : undefined;
+			let apiSecret = cfgTenant === 'default' ? env.ERPNEXT_API_SECRET : undefined;
 			if (env.AUTH_KV) {
-				const kvUrl = await env.AUTH_KV.get(keys.url);
-				const kvKey = await env.AUTH_KV.get(keys.key);
+				const [kvUrl, kvKey, kvSecret] = await Promise.all([
+					env.AUTH_KV.get(keys.url),
+					env.AUTH_KV.get(keys.key),
+					env.AUTH_KV.get(keys.secret),
+				]);
 				if (kvUrl) cfgUrl = kvUrl;
 				if (kvKey) apiKey = kvKey;
+				if (kvSecret) apiSecret = kvSecret;
 			}
 			return jsonResp({
 				success: true,
-				configured: !!(cfgUrl && apiKey),
+				configured: !!(cfgUrl && apiKey && apiSecret),
 				url: cfgUrl ? cfgUrl.replace(/./g, (c, i) => {
 					const slashIdx = cfgUrl.indexOf('/', 8);
 					const end = slashIdx !== -1 ? slashIdx : cfgUrl.length;
 					return i > 8 && i < end ? '*' : c;
 				}) : null,
 				key_set: !!apiKey,
-				secret_set: !!apiKey,
+				secret_set: !!apiSecret,
 				source: env.AUTH_KV ? 'kv' : 'env'
 			});
 		}

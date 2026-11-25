@@ -33,10 +33,15 @@ interface SalesCsvRow {
   customer_name: string | null;
   items: string; // JSON string
   total: number;
+  refund_amount?: number | null;
   payment_method: string | null;
+  payment_status?: string | null;
   status: string;
+  tenant_id?: string | null;
   created_at: string;
 }
+
+const ICT_OFFSET_MS = 7 * 3600_000;
 
 function getRangeHours(range: Range): number {
   switch (range) {
@@ -47,7 +52,25 @@ function getRangeHours(range: Range): number {
 }
 
 function formatDate(d: Date): string {
-  return d.toISOString().slice(0, 10);
+  return new Date(d.getTime() + ICT_OFFSET_MS).toISOString().slice(0, 10);
+}
+
+function formatIctOrderDate(rawCreatedAt: string | null | undefined): string {
+  if (!rawCreatedAt) return '';
+  const trimmed = rawCreatedAt.trim();
+  if (!trimmed) return '';
+  const isoCandidate = trimmed.includes('T')
+    ? trimmed
+    : /^\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}/.test(trimmed)
+      ? `${trimmed.replace(' ', 'T')}Z`
+      : '';
+  if (isoCandidate) {
+    const ms = Date.parse(isoCandidate);
+    if (Number.isFinite(ms)) {
+      return new Date(ms + ICT_OFFSET_MS).toISOString().slice(0, 10);
+    }
+  }
+  return trimmed.slice(0, 10);
 }
 
 /**
@@ -65,7 +88,7 @@ function escapeCsv(value: string): string {
 
 export const adminSalesRouter = new Hono<{ Bindings: Env }>();
 adminSalesRouter.use('*', async(c, next) => {
-  if (!c.get('user' as any) && c.req.header('Authorization')) {
+  if (!c.get('user' as never) && c.req.header('Authorization')) {
     return optionalAuth()(c, next);
   }
   await next();
@@ -105,7 +128,7 @@ adminSalesRouter.get('/csv', async(c) => {
   }
   const rawTenantId = getTenantId(c);
   const requestedTenant = candidateOverrides[0] || '';
-  const isHq = isHQSuperAdmin(normalizedUser as any);
+  const isHq = isHQSuperAdmin(normalizedUser as Parameters<typeof isHQSuperAdmin>[0]);
   if (!isHq) {
     if (
       userTenant === '*' ||
@@ -163,29 +186,50 @@ adminSalesRouter.get('/csv', async(c) => {
   let results: SalesCsvRow[] | undefined;
   try {
     const res = await db.prepare(`
-      SELECT id, customer_name, items, total, payment_method, status, created_at
+      SELECT id, customer_name, items, total,
+             CASE WHEN LOWER(TRIM(COALESCE(payment_status, ''))) = 'partially_refunded'
+                  THEN COALESCE((SELECT SUM(COALESCE(p.refund_amount, 0)) FROM payments p WHERE p.order_id = orders.id AND COALESCE(NULLIF(TRIM(p.tenant_id), ''), 'default') = COALESCE(NULLIF(TRIM(orders.tenant_id), ''), 'default')), 0)
+                  ELSE 0 END AS refund_amount,
+             payment_method, payment_status, status, tenant_id, created_at
       FROM orders
       WHERE (? = '*' OR tenant_id = ? OR TRIM(tenant_id) = ?2 OR (? = 'default' AND (tenant_id IS NULL OR tenant_id = '' OR TRIM(tenant_id) = '')))
         AND LOWER(TRIM(COALESCE(status, ''))) NOT IN ('cancelled', 'refunded', 'failed', 'expired')
         AND LOWER(TRIM(COALESCE(status, ''))) NOT IN ('canceled', 'rejected')
-        AND LOWER(TRIM(COALESCE(payment_status, ''))) NOT IN ('refunded', 'failed', 'cancelled', 'canceled')
-        AND created_at >= ?
-        AND created_at <= ?
+        AND LOWER(TRIM(COALESCE(payment_status, ''))) IN ('paid', 'completed', 'partially_refunded')
+        AND NOT (COALESCE(total, 0) = 0 AND (COALESCE(customer_name, '') = 'Khách QR - cho don mon' OR COALESCE(items, '') IN ('', '[]')))
+        AND DATE(datetime(created_at, '+7 hours')) >= ?
+        AND DATE(datetime(created_at, '+7 hours')) <= SUBSTR(?, 1, 10)
       ORDER BY created_at ASC
       LIMIT 5000
     `).bind(effectiveTenant, effectiveTenant, effectiveTenant, startDate, normalizedEndDate).all<SalesCsvRow>();
     results = res.results;
   } catch (err) {
     const errMsg = err instanceof Error ? err.message : String(err);
-    if (/no such column:\s*payment_status/i.test(errMsg)) {
+    if (/no such table:\s*payments/i.test(errMsg)) {
       const res = await db.prepare(`
-        SELECT id, customer_name, items, total, payment_method, status, created_at
+        SELECT id, customer_name, items, total, payment_method, payment_status, status, tenant_id, created_at
         FROM orders
         WHERE (? = '*' OR tenant_id = ? OR TRIM(tenant_id) = ?2 OR (? = 'default' AND (tenant_id IS NULL OR tenant_id = '' OR TRIM(tenant_id) = '')))
           AND LOWER(TRIM(COALESCE(status, ''))) NOT IN ('cancelled', 'refunded', 'failed', 'expired')
           AND LOWER(TRIM(COALESCE(status, ''))) NOT IN ('canceled', 'rejected')
-          AND created_at >= ?
-          AND created_at <= ?
+          AND LOWER(TRIM(COALESCE(payment_status, ''))) IN ('paid', 'completed', 'partially_refunded')
+          AND NOT (COALESCE(total, 0) = 0 AND (COALESCE(customer_name, '') = 'Khách QR - cho don mon' OR COALESCE(items, '') IN ('', '[]')))
+          AND DATE(datetime(created_at, '+7 hours')) >= ?
+          AND DATE(datetime(created_at, '+7 hours')) <= SUBSTR(?, 1, 10)
+        ORDER BY created_at ASC
+        LIMIT 5000
+      `).bind(effectiveTenant, effectiveTenant, effectiveTenant, startDate, normalizedEndDate).all<SalesCsvRow>();
+      results = res.results;
+    } else if (/no such column:\s*payment_status/i.test(errMsg)) {
+      const res = await db.prepare(`
+        SELECT id, customer_name, items, total, payment_method, status, tenant_id, created_at
+        FROM orders
+        WHERE (? = '*' OR tenant_id = ? OR TRIM(tenant_id) = ?2 OR (? = 'default' AND (tenant_id IS NULL OR tenant_id = '' OR TRIM(tenant_id) = '')))
+          AND LOWER(TRIM(COALESCE(status, ''))) NOT IN ('cancelled', 'refunded', 'failed', 'expired')
+          AND LOWER(TRIM(COALESCE(status, ''))) NOT IN ('canceled', 'rejected')
+          AND LOWER(TRIM(COALESCE(status, ''))) IN ('completed', 'paid', 'delivered', 'served')
+          AND DATE(datetime(created_at, '+7 hours')) >= ?
+          AND DATE(datetime(created_at, '+7 hours')) <= SUBSTR(?, 1, 10)
         ORDER BY created_at ASC
         LIMIT 5000
       `).bind(effectiveTenant, effectiveTenant, effectiveTenant, startDate, normalizedEndDate).all<SalesCsvRow>();
@@ -193,14 +237,25 @@ adminSalesRouter.get('/csv', async(c) => {
     } else if (/no such column:\s*tenant_id/i.test(errMsg)) {
       if (effectiveTenant === 'default' || effectiveTenant === '*') {
         const res = await db.prepare(`
-          SELECT id, customer_name, items, total, payment_method, status, created_at
+          SELECT id, customer_name, items, total, payment_method, payment_status, status, created_at
           FROM orders
           WHERE LOWER(TRIM(COALESCE(status, ''))) NOT IN ('cancelled', 'refunded', 'failed', 'expired', 'canceled', 'rejected')
-            AND created_at >= ?
-            AND created_at <= ?
+            AND LOWER(TRIM(COALESCE(payment_status, ''))) IN ('paid', 'completed', 'partially_refunded')
+            AND DATE(datetime(created_at, '+7 hours')) >= ?
+            AND DATE(datetime(created_at, '+7 hours')) <= SUBSTR(?, 1, 10)
           ORDER BY created_at ASC
           LIMIT 5000
-        `).bind(startDate, normalizedEndDate).all<SalesCsvRow>();
+        `).bind(startDate, normalizedEndDate).all<SalesCsvRow>().catch(async () =>
+          db.prepare(`
+            SELECT id, customer_name, items, total, payment_method, status, created_at
+            FROM orders
+            WHERE LOWER(TRIM(COALESCE(status, ''))) IN ('completed', 'paid', 'delivered', 'served')
+              AND DATE(datetime(created_at, '+7 hours')) >= ?
+              AND DATE(datetime(created_at, '+7 hours')) <= SUBSTR(?, 1, 10)
+            ORDER BY created_at ASC
+            LIMIT 5000
+          `).bind(startDate, normalizedEndDate).all<SalesCsvRow>()
+        );
         results = res.results;
       } else {
         results = [];
@@ -211,14 +266,26 @@ adminSalesRouter.get('/csv', async(c) => {
   }
 
   const nonRevenueStatuses = new Set(['cancelled', 'canceled', 'refunded', 'failed', 'expired', 'rejected']);
-  const nonRevenuePaymentStatuses = new Set(['refunded', 'failed', 'cancelled', 'canceled']);
-  const rows = (results || []).filter((r: SalesCsvRow & { payment_status?: string | null; tenant_id?: string | null }) => {
+  const settledPaymentStatuses = new Set(['paid', 'completed', 'partially_refunded']);
+  const rows = (results || []).filter((r: SalesCsvRow) => {
     if ('tenant_id' in r && r.tenant_id !== undefined && !matchesTenantRow(r as unknown as Record<string, unknown>, effectiveTenant)) {
       return false;
     }
     const st = String(r.status ?? '').trim().toLowerCase();
-    const pst = String(r.payment_status ?? '').trim().toLowerCase();
-    return !nonRevenueStatuses.has(st) && !nonRevenuePaymentStatuses.has(pst);
+    if (nonRevenueStatuses.has(st)) {
+      return false;
+    }
+    if (
+      Number(r.total ?? 0) === 0 &&
+      (r.customer_name === 'Khách QR - cho don mon' || r.items === '' || r.items === '[]')
+    ) {
+      return false;
+    }
+    if ('payment_status' in r && r.payment_status !== undefined) {
+      const pst = String(r.payment_status ?? '').trim().toLowerCase();
+      return settledPaymentStatuses.has(pst);
+    }
+    return true;
   });
 
   // Bilingual VN+EN headers
@@ -251,8 +318,13 @@ adminSalesRouter.get('/csv', async(c) => {
       itemCount = row.items || '0';
     }
 
-    // Format order date
-    const orderDate = row.created_at ? row.created_at.slice(0, 10) : '';
+    // Format order date in Vietnam ICT (+7h) and subtract partial refunds
+    const orderDate = formatIctOrderDate(row.created_at);
+    const pst = String(row.payment_status ?? '').trim().toLowerCase();
+    const netTotal =
+      pst === 'partially_refunded'
+        ? Math.max(0, Number(row.total ?? 0) - Number(row.refund_amount ?? 0))
+        : Number(row.total ?? 0);
 
     const fields = [
       row.id,
@@ -260,7 +332,7 @@ adminSalesRouter.get('/csv', async(c) => {
       row.customer_name || '',
       // Include both count and item names in the Items column
       itemCount + (itemNames ? `: ${itemNames}` : ''),
-      String(row.total ?? 0),
+      String(netTotal),
       row.payment_method || '',
       row.status || ''
     ];

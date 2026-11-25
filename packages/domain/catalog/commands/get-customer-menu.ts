@@ -274,16 +274,15 @@ export async function getCustomerMenu(
 
     const hasPricingOverrides = Boolean(opts.channel || opts.now || opts.channelDeltas);
     let happyHourWindows: HappyHourWindow[] = [];
-    if (hasPricingOverrides) {
-      try {
-        const hhRes = await db.prepare('SELECT * FROM happy_hour_windows WHERE active = 1').all<HappyHourWindow>();
-        happyHourWindows = ((hhRes.results || hhRes || []) as HappyHourWindow[]).filter((w) =>
-          matchesTenantRow(w as unknown as Record<string, unknown>, effectiveTenant)
-        );
-      } catch {
-        happyHourWindows = [];
-      }
+    try {
+      const hhRes = await db.prepare('SELECT * FROM happy_hour_windows WHERE active = 1').all<HappyHourWindow>();
+      happyHourWindows = ((hhRes?.results || hhRes || []) as HappyHourWindow[]).filter((w) =>
+        matchesTenantRow(w as unknown as Record<string, unknown>, effectiveTenant)
+      );
+    } catch {
+      happyHourWindows = [];
     }
+    const shouldResolvePrice = hasPricingOverrides || happyHourWindows.length > 0;
 
     const productTenantMap = new Map<string, string>();
     const items: CustomerMenuItem[] = (results ?? [])
@@ -301,7 +300,7 @@ export async function getCustomerMenu(
         effectiveTenant === '*'
           ? happyHourWindows.filter((w) => matchesTenantRow(w as unknown as Record<string, unknown>, itemConcreteTenant))
           : happyHourWindows;
-      const priceCents = hasPricingOverrides
+      const priceCents = shouldResolvePrice
         ? resolveItemPrice({
             basePriceCents: basePrice,
             channel: opts.channel || 'dine_in',
@@ -311,6 +310,8 @@ export async function getCustomerMenu(
             channelDeltas: opts.channelDeltas,
             productId: item.id,
             categoryId: item.category_id ?? item.category,
+            categorySlug: item.category,
+            tenantId: itemConcreteTenant,
           })
         : basePrice;
 
@@ -404,20 +405,25 @@ export async function getCustomerMenuItem(
     }
     const basePrice = typeof raw.price === 'string' ? parseInt(raw.price, 10) : raw.price;
 
+    const rawItemTenant = typeof raw.tenant_id === 'string' ? raw.tenant_id.trim() : '';
+    const itemConcreteTenant =
+      rawItemTenant && rawItemTenant !== '*' && rawItemTenant.toLowerCase() !== 'hq'
+        ? rawItemTenant
+        : (effectiveTenant === '*' ? 'default' : effectiveTenant);
+
     const hasPricingOverrides = Boolean(resolvedOpts.channel || resolvedOpts.now || resolvedOpts.channelDeltas);
     let happyHourWindows: HappyHourWindow[] = [];
-    if (hasPricingOverrides) {
-      try {
-        const hhRes = await db.prepare('SELECT * FROM happy_hour_windows WHERE active = 1').all<HappyHourWindow>();
-        happyHourWindows = ((hhRes.results || hhRes || []) as HappyHourWindow[]).filter((w) =>
-          matchesTenantRow(w as unknown as Record<string, unknown>, effectiveTenant)
-        );
-      } catch {
-        happyHourWindows = [];
-      }
+    try {
+      const hhRes = await db.prepare('SELECT * FROM happy_hour_windows WHERE active = 1').all<HappyHourWindow>();
+      happyHourWindows = ((hhRes?.results || hhRes || []) as HappyHourWindow[]).filter((w) =>
+        matchesTenantRow(w as unknown as Record<string, unknown>, itemConcreteTenant)
+      );
+    } catch {
+      happyHourWindows = [];
     }
+    const shouldResolvePrice = hasPricingOverrides || happyHourWindows.length > 0;
 
-    const priceCents = hasPricingOverrides
+    const priceCents = shouldResolvePrice
       ? resolveItemPrice({
           basePriceCents: basePrice,
           channel: resolvedOpts.channel || 'dine_in',
@@ -426,7 +432,9 @@ export async function getCustomerMenuItem(
           now: resolvedOpts.now || new Date(),
           channelDeltas: resolvedOpts.channelDeltas,
           productId: raw.id,
-          categoryId: raw.category,
+          categoryId: raw.category_id ?? raw.category,
+          categorySlug: raw.category,
+          tenantId: itemConcreteTenant,
         })
       : basePrice;
 
@@ -441,11 +449,6 @@ export async function getCustomerMenuItem(
       available: toAvailabilityFlag(raw.available),
       modifierChoices: [],
     };
-    const rawItemTenant = typeof raw.tenant_id === 'string' ? raw.tenant_id.trim() : '';
-    const itemConcreteTenant =
-      rawItemTenant && rawItemTenant !== '*' && rawItemTenant.toLowerCase() !== 'hq'
-        ? rawItemTenant
-        : (effectiveTenant === '*' ? 'default' : effectiveTenant);
     const singleMap = new Map<string, string>([[item.id, itemConcreteTenant]]);
     await attachProductModifiers(db, [item], effectiveTenant, singleMap);
     return item;
