@@ -79,10 +79,13 @@ export type OrderStatus =
   | 'confirmed'
   | 'preparing'
   | 'ready'
+  | 'delivering'
   | 'served'
   | 'delivered'
   | 'completed'
   | 'cancelled'
+  | 'failed'
+  | 'expired'
   | 'refunded';
 
 export type PaymentStatus =

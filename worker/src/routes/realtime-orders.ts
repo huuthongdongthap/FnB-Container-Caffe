@@ -31,14 +31,25 @@ const STAFF_REALTIME_ROLES = new Set([
   'chef',
   'cashier',
   'waiter',
+  'shipper',
+  'rider',
 ]);
 
-function isStoreWideChannel(channelId: string, tenantId: string): boolean {
+const STORE_WIDE_CHANNEL_SUFFIX_RE = /^(kds|orders|all|kitchen|pos|store|stream)$/i;
+
+export function isStoreWideChannel(channelId: string, tenantId: string): boolean {
   const trimmed = channelId.trim();
   if (!trimmed) return true;
   if (tenantId && trimmed === tenantId) return true;
   const suffix = trimmed.includes(':') ? trimmed.split(':').slice(1).join(':') : trimmed;
-  return /^(kds|orders|all|kitchen|pos|store|stream)$/i.test(suffix);
+  return STORE_WIDE_CHANNEL_SUFFIX_RE.test(suffix);
+}
+
+export function resolveCanonicalStoreChannel(tenantId: string): string {
+  const clean = tenantId.trim();
+  if (!clean || clean === 'default') return 'kitchen';
+  if (clean === '*' || clean.toLowerCase() === 'hq') return '*:kitchen';
+  return `${clean}:kitchen`;
 }
 
 async function sha256Hex(value: string): Promise<string> {
@@ -189,10 +200,11 @@ export async function handleRealtimeChannel(c: Context) {
 
   const actorRole = String(actor?.role || '').trim().toLowerCase();
   const isStaffActor = STAFF_REALTIME_ROLES.has(actorRole);
+  const storeWide = isStoreWideChannel(channelId, tenantId);
   const rawOrderId = channelId.includes(':') ? channelId.split(':').slice(1).join(':') : channelId;
 
   // Store-wide feeds require authenticated staff whenever auth runtime (JWT_SECRET) is configured
-  if (Boolean(env.JWT_SECRET) && isStoreWideChannel(channelId, tenantId)) {
+  if (Boolean(env.JWT_SECRET) && storeWide) {
     if (!actor) {
       return c.json({ error: 'Unauthorized: staff session required for store realtime channel' }, 401);
     }
@@ -209,7 +221,7 @@ export async function handleRealtimeChannel(c: Context) {
         };
       }
     | undefined;
-  if (!isStaffActor && db && typeof db.prepare === 'function') {
+  if (!isStaffActor && !storeWide && db && typeof db.prepare === 'function') {
     let orderRow: {
       id?: string;
       customer_id?: string | null;
@@ -314,12 +326,13 @@ export async function handleRealtimeChannel(c: Context) {
         ? '*'
         : channelId;
 
-  const scopedChannel =
-    tenantId &&
-    tenantId !== 'default' &&
-    tenantId !== '*' &&
-    normalizedChannel !== tenantId &&
-    !normalizedChannel.startsWith(`${tenantId}:`)
+  const scopedChannel = storeWide
+    ? resolveCanonicalStoreChannel(tenantId)
+    : tenantId &&
+        tenantId !== 'default' &&
+        tenantId !== '*' &&
+        normalizedChannel !== tenantId &&
+        !normalizedChannel.startsWith(`${tenantId}:`)
       ? `${tenantId}:${normalizedChannel}`
       : normalizedChannel;
 

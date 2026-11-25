@@ -1,5 +1,6 @@
 import type { D1Database } from '@cloudflare/workers-types';
 import type { OrderItem, CustomerOrderItem } from '../../schemas/orders';
+import { sanitizeOrderNotes } from '@aura/domain-order';
 import { getTenantId, isHQSuperAdmin, resolvePublicTenantId } from '../../middleware/tenant';
 
 type Row = Record<string, any>;
@@ -212,6 +213,7 @@ export function formatOrder(order: Row, items: Row[], payments: Row[]) {
   }
   return {
     ...order,
+    notes: sanitizeOrderNotes(order.notes),
     table: order.table_id ? { id: order.table_id, name: order.table_name } : null,
     items: items.length > 0 ? items.map(formatOrderItem) : fallbackItems,
     payments,
@@ -261,7 +263,7 @@ export function formatCustomerOrder(order: Row, items: Row[]) {
     status: order.status,
     paymentStatus: order.payment_status,
     paymentMethod: typeof order.payment_method === 'string' ? order.payment_method : undefined,
-    notes: order.notes ?? null,
+    notes: sanitizeOrderNotes(order.notes),
     createdAt: order.created_at,
     updatedAt: order.updated_at,
   };

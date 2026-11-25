@@ -6,8 +6,19 @@ import { requireAuth } from '../../middleware/auth';
 import { getTenantId } from '../../middleware/tenant';
 import { getDatabase } from '../../lib/db';
 import { audit } from '../../middleware/audit-log';
-import { publishOrderEvent } from '@aura/domain-order';
-import { executeKdsStatusTransition, buildIndexFromDbRows, isHeldOutOfKds } from '@aura/domain-kitchen';
+import {
+  fanOutOrderBroadcast,
+  normalizeBroadcastTotal,
+  parseBroadcastItems,
+  parseBroadcastTimestamp,
+  publishOrderEvent,
+} from '@aura/domain-order';
+import {
+  executeKdsStatusTransition,
+  buildIndexFromDbRows,
+  isHeldOutOfKds,
+  sanitizeKdsOrderNotes,
+} from '@aura/domain-kitchen';
 import { type OrderRecord, type OrderItem, type KdsOrder } from './types';
 
 function verifyKdsOrderTenant(
@@ -108,7 +119,13 @@ function isRecentPrepCancellation(order: Record<string, unknown>, nowMs: number)
   if (!Number.isFinite(cancelledMs) || nowMs - cancelledMs > CANCEL_ALERT_WINDOW_MS || nowMs < cancelledMs - 60_000) return false;
   const prev = String(order.previous_status ?? '').trim().toLowerCase();
   const explicit = order.cancel_alert === true || Number(order.cancel_alert) === 1;
-  return explicit || PREP_HISTORY_STATUSES.has(prev) || Boolean(order.served_at);
+  return (
+    explicit ||
+    PREP_HISTORY_STATUSES.has(prev) ||
+    Boolean(order.started_at) ||
+    Boolean(order.ready_at) ||
+    Boolean(order.served_at)
+  );
 }
 
 export async function handleGetKdsOrders(c: Context<{ Bindings: Env }>) {
@@ -176,7 +193,7 @@ export async function handleGetKdsOrders(c: Context<{ Bindings: Env }>) {
          AND COALESCE(NULLIF(TRIM(t.tenant_id), ''), 'default') = COALESCE(NULLIF(TRIM(o.tenant_id), ''), 'default')
        WHERE o.status IN ('pending', 'confirmed', 'preparing', 'ready')${tenantClauseO}
          AND NOT (TRIM(COALESCE(o.notes, '')) LIKE 'Khách QR - cho don mon%' AND TRIM(COALESCE(o.items, '')) = '[]')
-       ORDER BY CASE WHEN o.status = 'ready' THEN 1 ELSE 0 END ASC, o.created_at ASC LIMIT 200`
+       ORDER BY CASE WHEN o.status = 'ready' THEN 1 ELSE 0 END ASC, o.created_at ASC LIMIT 500`
     );
     ({ results } = await (tenantId === '*' ? joinedStmt : joinedStmt.bind(tenantId)).all<OrderRecord>());
   } catch {
@@ -184,7 +201,7 @@ export async function handleGetKdsOrders(c: Context<{ Bindings: Env }>) {
       `SELECT * FROM orders
        WHERE status IN ('pending', 'confirmed', 'preparing', 'ready')${tenantClause}
          AND NOT (TRIM(COALESCE(notes, '')) LIKE 'Khách QR - cho don mon%' AND TRIM(COALESCE(items, '')) = '[]')
-       ORDER BY CASE WHEN status = 'ready' THEN 1 ELSE 0 END ASC, created_at ASC LIMIT 200`
+       ORDER BY CASE WHEN status = 'ready' THEN 1 ELSE 0 END ASC, created_at ASC LIMIT 500`
     );
     ({ results } = await (tenantId === '*' ? statement : statement.bind(tenantId)).all<OrderRecord>());
   }
@@ -222,9 +239,11 @@ export async function handleGetKdsOrders(c: Context<{ Bindings: Env }>) {
   }
 
   const kdsOrders: KdsOrder[] = [];
+  let activeCount = 0;
   for (const order of [...(results || []), ...recentCancelled]) {
     const rawOrder = order as unknown as Record<string, unknown>;
     const isCancelAlert = rawOrder.status === 'cancelled';
+    if (!isCancelAlert && activeCount >= 200) continue;
     if (!isCancelAlert && isHeldOutOfKds(rawOrder)) continue;
     let items: OrderItem[] = [];
     if (Array.isArray(order.items)) {
@@ -244,6 +263,7 @@ export async function handleGetKdsOrders(c: Context<{ Bindings: Env }>) {
       });
       if (items.length === 0) continue;
     }
+    if (!isCancelAlert) activeCount += 1;
 
     const createdMs = parseUtcTimestampMs(order.created_at);
     const elapsed = Number.isFinite(createdMs)
@@ -267,10 +287,24 @@ export async function handleGetKdsOrders(c: Context<{ Bindings: Env }>) {
     const readyAt = typeof rawOrder.ready_at === 'string' && rawOrder.ready_at.trim()
       ? rawOrder.ready_at.trim()
       : undefined;
+    const paymentStatus = typeof rawOrder.payment_status === 'string' && rawOrder.payment_status.trim()
+      ? rawOrder.payment_status.trim()
+      : undefined;
+    const paymentMethod = typeof rawOrder.payment_method === 'string' && rawOrder.payment_method.trim()
+      ? rawOrder.payment_method.trim()
+      : undefined;
+    const deliveryTime = typeof rawOrder.delivery_time === 'string' && rawOrder.delivery_time.trim()
+      ? rawOrder.delivery_time.trim()
+      : undefined;
+    const cleanNotes = sanitizeKdsOrderNotes(order.notes);
     const entry: KdsOrder & {
       table_name?: string;
       order_number?: string;
       order_type?: string;
+      payment_status?: string;
+      payment_method?: string;
+      is_cod?: number;
+      delivery_time?: string;
       updated_at?: string;
       started_at?: string;
       ready_at?: string;
@@ -283,8 +317,12 @@ export async function handleGetKdsOrders(c: Context<{ Bindings: Env }>) {
       ...(tableName ? { table_name: tableName } : {}),
       ...(orderNumber ? { order_number: orderNumber } : {}),
       ...(orderType ? { order_type: orderType } : {}),
+      ...(paymentStatus ? { payment_status: paymentStatus } : {}),
+      ...(paymentMethod ? { payment_method: paymentMethod } : {}),
+      ...(rawOrder.is_cod !== undefined && rawOrder.is_cod !== null ? { is_cod: Number(rawOrder.is_cod) } : {}),
+      ...(deliveryTime ? { delivery_time: deliveryTime } : {}),
       items,
-      ...(order.notes ? { notes: order.notes } : {}),
+      ...(cleanNotes ? { notes: cleanNotes } : {}),
       status: order.status,
       elapsed_minutes: elapsed,
       created_at: order.created_at,
@@ -296,7 +334,32 @@ export async function handleGetKdsOrders(c: Context<{ Bindings: Env }>) {
     kdsOrders.push(entry as KdsOrder);
   }
 
-  return c.json({ success: true, data: kdsOrders });
+  let shiftAvgPrepMinutes: number | null = null;
+  try {
+    const cutoff24h = new Date(nowMs - 24 * 3600_000).toISOString();
+    const avgStmt = db.prepare(
+      `SELECT AVG((julianday(ready_at) - julianday(COALESCE(started_at, created_at))) * 1440.0) AS avg_prep
+       FROM orders
+       WHERE status IN ('ready', 'served', 'delivering', 'delivered', 'completed')
+         AND ready_at IS NOT NULL
+         AND datetime(ready_at) >= datetime(?)${tenantClause ? tenantClause.replace('?1', '?2') : ''}
+         AND julianday(ready_at) >= julianday(COALESCE(started_at, created_at))`
+    );
+    const avgRow = await (tenantId === '*'
+      ? avgStmt.bind(cutoff24h)
+      : avgStmt.bind(cutoff24h, tenantId)).first<{ avg_prep?: number | null }>();
+    if (avgRow?.avg_prep !== null && avgRow?.avg_prep !== undefined && Number.isFinite(Number(avgRow.avg_prep))) {
+      shiftAvgPrepMinutes = Math.max(0, Math.round(Number(avgRow.avg_prep)));
+    }
+  } catch {
+    // ready_at/started_at absent in minimal schemas
+  }
+
+  return c.json({
+    success: true,
+    data: kdsOrders,
+    ...(shiftAvgPrepMinutes !== null ? { meta: { avg_prep_minutes: shiftAvgPrepMinutes } } : {}),
+  });
 }
 
 export async function handleUpdateOrderStatus(c: Context<{ Bindings: Env }>, forcedStatus?: unknown) {
@@ -398,60 +461,25 @@ export async function handleMarkCodPaid(c: Context<{ Bindings: Env }>) {
   }
   if (!result.idempotent && c.env.ORDER_BROADCASTER) {
     try {
-      const ns = c.env.ORDER_BROADCASTER as unknown as {
-        idFromName?: (name: string) => unknown;
-        get?: (doId: unknown) => { fetch: (input: Request | string, init?: RequestInit) => Promise<unknown> };
+      const event = {
+        orderId: id,
+        status: result.status,
+        payment_status: 'paid',
+        items: parseBroadcastItems(orderRow?.items),
+        total: normalizeBroadcastTotal(orderRow?.total ?? orderRow?.total_amount ?? 0),
+        customer_name: orderRow?.customer_name ?? '',
+        customer_phone: orderRow?.customer_phone ?? '',
+        table_id: orderRow?.table_id ?? null,
+        ...(effectiveEventTenant !== 'default' ? { tenant_id: effectiveEventTenant } : {}),
+        createdAt: parseBroadcastTimestamp(orderRow?.created_at),
+        updatedAt: Date.now(),
       };
-      if (ns?.idFromName && ns?.get) {
-        const doChannel = effectiveEventTenant !== 'default' ? `${effectiveEventTenant}:${id}` : id;
-        const stub = ns.get(ns.idFromName(doChannel));
-        let parsedItems: unknown[] = [];
-        if (Array.isArray(orderRow?.items)) {
-          parsedItems = orderRow.items;
-        } else if (typeof orderRow?.items === 'string' && orderRow.items.trim()) {
-          try {
-            const parsed = JSON.parse(orderRow.items);
-            if (Array.isArray(parsed)) parsedItems = parsed;
-          } catch {
-            parsedItems = [];
-          }
-        }
-        const createdMs = orderRow?.created_at
-          ? Date.parse(
-              orderRow.created_at.includes('T')
-                ? orderRow.created_at
-                : `${orderRow.created_at.replace(' ', 'T')}Z`,
-            )
-          : NaN;
-        const event = {
-          orderId: id,
-          status: result.status,
-          payment_status: 'paid',
-          items: parsedItems,
-          total: Number(orderRow?.total ?? orderRow?.total_amount ?? 0),
-          customer_name: orderRow?.customer_name ?? '',
-          customer_phone: orderRow?.customer_phone ?? '',
-          table_id: orderRow?.table_id ?? null,
-          ...(effectiveEventTenant !== 'default' ? { tenant_id: effectiveEventTenant } : {}),
-          createdAt: Number.isFinite(createdMs) ? createdMs : Date.now(),
-          updatedAt: Date.now(),
-        };
-        const broadcastPromise = stub
-          .fetch(
-            new Request('https://do/broadcast', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify(event),
-            }),
-          )
-          .catch(() => {});
-        try {
-          if (c.executionCtx) c.executionCtx.waitUntil(broadcastPromise);
-          else await broadcastPromise;
-        } catch {
-          await broadcastPromise;
-        }
-      }
+      await fanOutOrderBroadcast(
+        c.env.ORDER_BROADCASTER,
+        id,
+        effectiveEventTenant,
+        event,
+      ).catch(() => {});
     } catch {
       /* Non-blocking DO broadcast after COD settlement */
     }
@@ -505,10 +533,219 @@ export async function handleMarkCodPaid(c: Context<{ Bindings: Env }>) {
  * KDS queue router, and this file all guard with the same set.
  */
 export const KDS_ROLES = ['owner', 'manager', 'supervisor', 'staff', 'waiter', 'cashier', 'admin', 'kitchen', 'barista', 'chef'];
+export const KDS_PREP_ROLES = ['owner', 'manager', 'supervisor', 'staff', 'admin', 'kitchen', 'barista', 'chef'];
 export const COD_COLLECTION_ROLES = ['owner', 'manager', 'supervisor', 'cashier', 'admin', 'waiter', 'shipper', 'rider'];
+
+export async function handleGetKdsRecentOrders(c: Context<{ Bindings: Env }>) {
+  const tenantCheck = verifyKdsOrderTenant(c, 'read');
+  if (!tenantCheck.ok) {
+    return c.json({ success: false, error: 'Cross-tenant KDS access denied' }, 403);
+  }
+  const db = getDatabase(c as unknown as { env: Record<string, unknown> });
+  const tenantId = tenantCheck.tenantId;
+  const cutoffIso = new Date(Date.now() - 8 * 3600_000).toISOString();
+  const tenantClauseO = tenantId === '*'
+    ? ''
+    : tenantId === 'default'
+      ? " AND (o.tenant_id = ?2 OR o.tenant_id IS NULL OR o.tenant_id = '' OR TRIM(o.tenant_id) = '')"
+      : ' AND (o.tenant_id = ?2 OR TRIM(o.tenant_id) = ?2)';
+  const tenantClause = tenantId === '*'
+    ? ''
+    : tenantId === 'default'
+      ? " AND (tenant_id = ?2 OR tenant_id IS NULL OR tenant_id = '' OR TRIM(tenant_id) = '')"
+      : ' AND (tenant_id = ?2 OR TRIM(tenant_id) = ?2)';
+
+  let rows: Array<Record<string, unknown>> = [];
+  try {
+    const stmt = db.prepare(
+      `SELECT o.id, o.order_number, o.customer_name, o.table_id,
+              COALESCE(NULLIF(TRIM(t.table_number), ''), NULLIF(TRIM(t.name), ''), o.table_id) AS table_name,
+              o.order_type, o.items, o.notes, o.status, o.created_at, o.updated_at, o.started_at, o.ready_at, o.served_at
+       FROM orders o
+       LEFT JOIN cafe_tables t ON t.id = o.table_id
+         AND COALESCE(NULLIF(TRIM(t.tenant_id), ''), 'default') = COALESCE(NULLIF(TRIM(o.tenant_id), ''), 'default')
+       WHERE o.status IN ('ready', 'served')
+         AND datetime(COALESCE(o.served_at, o.ready_at, o.updated_at, o.created_at)) >= datetime(?1)${tenantClauseO}
+       ORDER BY datetime(COALESCE(o.served_at, o.ready_at, o.updated_at, o.created_at)) DESC
+       LIMIT 30`,
+    );
+    const res = await (tenantId === '*' ? stmt.bind(cutoffIso) : stmt.bind(cutoffIso, tenantId)).all<Record<string, unknown>>();
+    rows = res.results ?? [];
+  } catch {
+    try {
+      const stmt = db.prepare(
+        `SELECT id, order_number, customer_name, table_id, order_type, items, notes, status, created_at, updated_at
+         FROM orders
+         WHERE status IN ('ready', 'served')
+           AND datetime(COALESCE(updated_at, created_at)) >= datetime(?1)${tenantClause}
+         ORDER BY datetime(COALESCE(updated_at, created_at)) DESC
+         LIMIT 30`,
+      );
+      const res = await (tenantId === '*' ? stmt.bind(cutoffIso) : stmt.bind(cutoffIso, tenantId)).all<Record<string, unknown>>();
+      rows = res.results ?? [];
+    } catch {
+      rows = [];
+    }
+  }
+
+  const mapped = rows.map((r) => ({
+    id: String(r.id ?? ''),
+    ...(typeof r.order_number === 'string' && r.order_number.trim() ? { order_number: r.order_number.trim() } : {}),
+    customer_name: typeof r.customer_name === 'string' ? r.customer_name : '',
+    table_id: (r.table_id as string | null) ?? null,
+    ...(typeof r.table_name === 'string' && r.table_name.trim() ? { table_name: r.table_name.trim() } : {}),
+    ...(typeof r.order_type === 'string' && r.order_type.trim() ? { order_type: r.order_type.trim() } : {}),
+    items: parseBroadcastItems(r.items),
+    ...(sanitizeKdsOrderNotes(r.notes) ? { notes: sanitizeKdsOrderNotes(r.notes) } : {}),
+    status: String(r.status ?? 'ready'),
+    created_at: String(r.created_at ?? ''),
+    ...(typeof r.started_at === 'string' && r.started_at.trim() ? { started_at: r.started_at.trim() } : {}),
+    ...(typeof r.ready_at === 'string' && r.ready_at.trim() ? { ready_at: r.ready_at.trim() } : {}),
+    ...(typeof r.served_at === 'string' && r.served_at.trim() ? { served_at: r.served_at.trim() } : {}),
+  }));
+
+  return c.json({ success: true, data: mapped });
+}
+
+export async function handleRecallKdsOrder(c: Context<{ Bindings: Env }>) {
+  const user = c.get('user' as never) as { role?: string } | undefined;
+  const role = String(user?.role ?? '').trim().toLowerCase();
+  if (role && !KDS_PREP_ROLES.includes(role)) {
+    return c.json({ success: false, error: 'Insufficient permissions to recall ticket' }, 403);
+  }
+  const tenantCheck = verifyKdsOrderTenant(c, 'write');
+  if (!tenantCheck.ok) {
+    return c.json({ success: false, error: 'Cross-tenant KDS access denied' }, 403);
+  }
+  const id = c.req.param('id');
+  if (!id) return c.json({ success: false, error: 'Missing order id' }, 400);
+
+  const db = getDatabase(c as unknown as { env: Record<string, unknown> });
+  const tenantId = tenantCheck.tenantId;
+  const tenantClause = tenantId === '*'
+    ? ''
+    : tenantId === 'default'
+      ? " AND (tenant_id = ? OR tenant_id IS NULL OR tenant_id = '' OR TRIM(tenant_id) = '')"
+      : ' AND TRIM(tenant_id) = ?';
+  const tenantBinds = tenantId === '*' ? [] : [tenantId];
+
+  const orderRow = await db
+    .prepare(
+      `SELECT id, status, items, total, payment_status, customer_name, customer_phone, table_id, created_at, tenant_id
+       FROM orders WHERE id = ?${tenantClause}`,
+    )
+    .bind(id, ...tenantBinds)
+    .first<Record<string, unknown>>()
+    .catch(() => null);
+  if (!orderRow) {
+    return c.json({ success: false, error: 'Order not found' }, 404);
+  }
+
+  const currentStatus = String(orderRow.status ?? '').trim().toLowerCase();
+  if (currentStatus !== 'ready' && currentStatus !== 'served') {
+    return c.json({ success: false, error: `Cannot recall order from '${currentStatus}' status` }, 409);
+  }
+  if (String(orderRow.payment_status ?? '').trim().toLowerCase() === 'refunded') {
+    return c.json({ success: false, error: 'Cannot recall a refunded order' }, 409);
+  }
+
+  const body = (await c.req.json().catch(() => ({}))) as { target_status?: string };
+  const requestedTarget = String(body?.target_status ?? '').trim().toLowerCase();
+  const targetStatus =
+    requestedTarget === 'preparing' || requestedTarget === 'ready'
+      ? requestedTarget
+      : currentStatus === 'served'
+        ? 'ready'
+        : 'preparing';
+
+  const now = new Date().toISOString();
+  const effectiveTenant =
+    typeof orderRow.tenant_id === 'string' &&
+    orderRow.tenant_id.trim() &&
+    orderRow.tenant_id.trim() !== '*' &&
+    orderRow.tenant_id.trim().toLowerCase() !== 'hq'
+      ? orderRow.tenant_id.trim()
+      : tenantId === '*'
+        ? 'default'
+        : tenantId;
+  const writeClause = effectiveTenant === 'default'
+    ? " AND (tenant_id = ? OR tenant_id IS NULL OR tenant_id = '' OR TRIM(tenant_id) = '')"
+    : ' AND TRIM(tenant_id) = ?';
+
+  let updatedItems = parseBroadcastItems(orderRow.items) as Array<Record<string, unknown>>;
+  if (targetStatus === 'preparing') {
+    updatedItems = updatedItems.map((it) => {
+      const copy = { ...(it ?? {}) };
+      delete copy.ready_at;
+      copy.ready = false;
+      copy.status = 'preparing';
+      return copy;
+    });
+  }
+
+  const updateRes = await db
+    .prepare(
+      targetStatus === 'preparing'
+        ? `UPDATE orders SET status = 'preparing', ready_at = NULL, served_at = NULL, items = ?, updated_at = ? WHERE id = ? AND status = ?${writeClause}`
+        : `UPDATE orders SET status = 'ready', served_at = NULL, updated_at = ? WHERE id = ? AND status = ?${writeClause}`,
+    )
+    .bind(
+      ...(targetStatus === 'preparing'
+        ? [JSON.stringify(updatedItems), now, id, orderRow.status, effectiveTenant]
+        : [now, id, orderRow.status, effectiveTenant]),
+    )
+    .run()
+    .catch(() =>
+      db
+        .prepare(`UPDATE orders SET status = ?, updated_at = ? WHERE id = ? AND status = ?${writeClause}`)
+        .bind(targetStatus, now, id, orderRow.status, effectiveTenant)
+        .run(),
+    );
+
+  const changes = (updateRes as { meta?: { changes?: number }; changes?: number } | null)?.meta?.changes
+    ?? (updateRes as { changes?: number } | null)?.changes
+    ?? 0;
+  if (changes < 1) {
+    return c.json({ success: false, error: 'Order changed concurrently; refresh and retry' }, 409);
+  }
+
+  if (targetStatus === 'preparing') {
+    await db
+      .prepare('UPDATE order_item_stations SET ready_at = NULL WHERE order_item_id LIKE ?')
+      .bind(`${id}:%`)
+      .run()
+      .catch(() => {});
+  }
+
+  if (c.env.AUTH_KV) {
+    await publishOrderEvent(c.env.AUTH_KV, id, targetStatus, {
+      previousStatus: currentStatus,
+      tenantId: effectiveTenant,
+      paymentStatus: String(orderRow.payment_status ?? 'unpaid'),
+    }).catch(() => {});
+  }
+  if (c.env.ORDER_BROADCASTER) {
+    await fanOutOrderBroadcast(c.env.ORDER_BROADCASTER, id, effectiveTenant, {
+      orderId: id,
+      status: targetStatus,
+      payment_status: String(orderRow.payment_status ?? 'unpaid'),
+      items: updatedItems,
+      total: normalizeBroadcastTotal(orderRow.total),
+      customer_name: String(orderRow.customer_name ?? ''),
+      customer_phone: String(orderRow.customer_phone ?? ''),
+      table_id: orderRow.table_id ? String(orderRow.table_id) : null,
+      ...(effectiveTenant !== 'default' ? { tenant_id: effectiveTenant } : {}),
+      createdAt: parseBroadcastTimestamp(orderRow.created_at),
+      updatedAt: Date.now(),
+    }).catch(() => {});
+  }
+
+  return c.json({ success: true, order_id: id, status: targetStatus, previous_status: currentStatus });
+}
 
 export function registerKdsHandlers(app: Hono<{ Bindings: Env }>) {
   app.get('/kds', requireAuth(KDS_ROLES), handleGetKdsOrders);
   app.patch('/:id/status', requireAuth([...KDS_ROLES, 'shipper', 'rider']), audit('order_status_change'), (c) => handleUpdateOrderStatus(c));
   app.patch('/:id/mark-cod-paid', requireAuth(COD_COLLECTION_ROLES), audit('order_cod_paid'), handleMarkCodPaid);
+  app.post('/:id/recall', requireAuth(KDS_PREP_ROLES), audit('order_status_change'), handleRecallKdsOrder);
 }

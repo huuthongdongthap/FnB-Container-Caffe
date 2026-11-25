@@ -1,9 +1,9 @@
 import { cn } from '@/lib/cn';
-import { STATUS_TRANSITIONS } from './OrderTable-constants';
+import { getStatusTransitionsForOrder } from './OrderTable-constants';
 import type { StatusActionsProps } from './OrderTable-types';
 
-export function StatusActions({ currentStatus, isUpdating, onUpdate, t }: StatusActionsProps) {
-  const nextStatuses = STATUS_TRANSITIONS[currentStatus];
+export function StatusActions({ currentStatus, orderType, isUpdating, onUpdate, t }: StatusActionsProps) {
+  const nextStatuses = getStatusTransitionsForOrder(currentStatus, orderType);
 
   if (!nextStatuses || nextStatuses.length === 0) {
     return <span className="text-xs text-muted">-</span>;

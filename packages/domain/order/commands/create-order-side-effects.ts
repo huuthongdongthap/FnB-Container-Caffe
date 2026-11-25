@@ -9,6 +9,7 @@ import { createMetricsCollector } from 'worker/src/lib/metrics-collector';
 import { generateId } from '../model/helpers';
 import { notifyTelegram } from '../notifications/telegram';
 import { deductInventoryForOrder } from '@aura/domain-inventory';
+import { isHeldOutOfKds } from '@aura/domain-kitchen';
 import { syncOrderToERPNext } from 'worker/src/tree/erpnext/sync.js';
 import type { OrderSnapshotResult } from '../policies/order-snapshot';
 import { sanitizeCustomerIdentity } from '../policies/loyalty-trigger';
@@ -34,6 +35,22 @@ export interface PostOrderParams {
   snapshot: OrderSnapshotResult;
   validatedMethod: string;
   resolvedTableId: string | null;
+  initialPaymentStatus?: string;
+}
+
+export function formatKdsPushOriginLabel(input: {
+  orderType?: string | null;
+  tableId?: string | null;
+}): string {
+  const normalizedType = typeof input.orderType === 'string' ? input.orderType.trim().toLowerCase() : '';
+  if (normalizedType === 'delivery') {
+    return 'Giao tận nơi';
+  }
+  const rawTable = typeof input.tableId === 'string' ? input.tableId.trim() : '';
+  if (rawTable) {
+    return /^(bàn|table)\b/i.test(rawTable) ? rawTable : `Bàn ${rawTable}`;
+  }
+  return 'Mang đi';
 }
 
 export async function runPostOrderSideEffects(params: PostOrderParams): Promise<void> {
@@ -225,21 +242,36 @@ export async function runPostOrderSideEffects(params: PostOrderParams): Promise<
     else await telegramPromise;
   }
 
-  const { sendPushToStaff } = await import('worker/src/tree/push/notifier.js');
-  const { STAFF_PUSH_ROLE } = await import('worker/src/tree/push/roles.js');
-  const pushEnv: import('worker/src/tree/push/notifier').PushEnv = {
-    AURA_DB: db,
-    VAPID_PUBLIC_KEY: typeof env.VAPID_PUBLIC_KEY === 'string' ? env.VAPID_PUBLIC_KEY : undefined,
-    VAPID_PRIVATE_KEY: typeof env.VAPID_PRIVATE_KEY === 'string' ? env.VAPID_PRIVATE_KEY : undefined,
-    VAPID_EMAIL: typeof env.VAPID_EMAIL === 'string' ? env.VAPID_EMAIL : undefined,
-    PILOT_STORE: typeof env.PILOT_STORE === 'string' ? env.PILOT_STORE : undefined,
-  };
-  const pushPromise = sendPushToStaff(pushEnv, {
-    title: 'Đơn hàng mới 🍳',
-    body: `Bàn ${data.table_id || 'Mang đi'} — ${snapshot.items.length} món`,
-    data: { url: '/kds', orderId }
-  }, STAFF_PUSH_ROLE, undefined, effectiveTenant).catch(e => log.warn('Push notify failed:', { message: (e as Error).message }));
-  if (ctx?.waitUntil) ctx.waitUntil(pushPromise);
+  const heldFromKds = isHeldOutOfKds({
+    notes: data.notes,
+    items: snapshot.items,
+    payment_method: validatedMethod,
+    payment_status: params.initialPaymentStatus ?? (snapshot.total === 0 ? 'paid' : 'unpaid'),
+    status: 'pending',
+    order_type: data.order_type,
+  });
+  if (!heldFromKds) {
+    const { sendPushToStaff } = await import('worker/src/tree/push/notifier.js');
+    const { STAFF_PUSH_ROLE } = await import('worker/src/tree/push/roles.js');
+    const pushEnv: import('worker/src/tree/push/notifier').PushEnv = {
+      AURA_DB: db,
+      VAPID_PUBLIC_KEY: typeof env.VAPID_PUBLIC_KEY === 'string' ? env.VAPID_PUBLIC_KEY : undefined,
+      VAPID_PRIVATE_KEY: typeof env.VAPID_PRIVATE_KEY === 'string' ? env.VAPID_PRIVATE_KEY : undefined,
+      VAPID_EMAIL: typeof env.VAPID_EMAIL === 'string' ? env.VAPID_EMAIL : undefined,
+      PILOT_STORE: typeof env.PILOT_STORE === 'string' ? env.PILOT_STORE : undefined,
+    };
+    const originLabel = formatKdsPushOriginLabel({
+      orderType: data.order_type,
+      tableId: resolvedTableId ?? data.table_id,
+    });
+    const pushPromise = sendPushToStaff(pushEnv, {
+      title: 'Đơn hàng mới 🍳',
+      body: `${originLabel} — ${snapshot.items.length} món`,
+      data: { url: '/kds', orderId }
+    }, STAFF_PUSH_ROLE, undefined, effectiveTenant).catch(e => log.warn('Push notify failed:', { message: (e as Error).message }));
+    if (ctx?.waitUntil) ctx.waitUntil(pushPromise);
+    else await pushPromise;
+  }
 
   if (ctx?.waitUntil) {
     const mc = createMetricsCollector(db);

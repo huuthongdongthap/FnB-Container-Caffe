@@ -36,6 +36,7 @@ interface HeaderProps {
   isFullscreen?: boolean;
   onToggleSound?: () => void;
   onToggleFullscreen?: () => void;
+  onOpenShiftModal?: () => void;
 }
 
 export function Header({
@@ -54,12 +55,13 @@ export function Header({
   isFullscreen = false,
   onToggleSound,
   onToggleFullscreen,
+  onOpenShiftModal,
 }: HeaderProps) {
   const { t } = useTranslation();
 
   return (
     <header
-      className="fixed left-0 top-0 z-50 flex w-full flex-wrap items-center justify-between gap-4 border-b border-[var(--aura-chrome-dim)]/20 bg-[var(--aura-noir-void,#051424)]/85 px-4 py-3 backdrop-blur-md md:px-8 md:py-4"
+      className="sticky left-0 top-0 z-50 flex w-full flex-wrap items-center justify-between gap-3 border-b border-[var(--aura-chrome-dim)]/20 bg-[var(--aura-noir-void,#051424)]/92 px-4 py-3 backdrop-blur-md md:px-8 md:py-3.5"
       aria-label={t('kds.header', 'KDS Header')}
     >
       <div className="flex min-w-0 items-center gap-3 md:gap-5">
@@ -162,6 +164,16 @@ export function Header({
           </span>
         </div>
         <div className="flex items-center gap-1.5">
+          {onOpenShiftModal && (
+            <button
+              type="button"
+              onClick={onOpenShiftModal}
+              className="inline-flex min-h-[40px] items-center gap-1.5 rounded-lg border border-white/15 bg-white/5 px-3 py-1.5 text-xs font-semibold uppercase tracking-wider text-[var(--aura-chrome-light,#C9D6DF)] transition-colors hover:bg-white/10"
+              aria-label={t('kds.shiftAttendance', 'Shift & Attendance')}
+            >
+              {t('kds.shiftAttendance', 'Ca trực')}
+            </button>
+          )}
           <button
             type="button"
             onClick={onToggleSound}

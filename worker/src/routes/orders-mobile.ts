@@ -1,6 +1,7 @@
 import { jsonResponse, errorResponse } from '../middleware/cors';
 import { createLogger } from '../middleware/logger';
 import { getTenantId, isHQSuperAdmin, matchesTenantRow } from '../middleware/tenant';
+import { sanitizeOrderNotes } from '@aura/domain-order';
 import { createOrderFromAlias } from '../../../packages/domain/order/commands/create-order-alias';
 import type { Env } from '../types/env';
 import type { Context } from 'hono';
@@ -167,6 +168,7 @@ export async function getOrdersMobile(
         maskMobileOrderPii(
           {
             ...r,
+            notes: sanitizeOrderNotes(r.notes),
             items: normalizeOrderItems(r.items),
           },
           role,
@@ -247,8 +249,13 @@ export async function createOrderMobile(
       tenantId: effectiveOrderTenant,
     });
     if (!response.ok) return response;
-    const result = await response.json() as { data: { id: string; total: number } };
-    return jsonResponse({ success: true, order_id: result.data.id, total: result.data.total }, response.status);
+    const result = await response.json() as { data: { id: string; order_number?: string; total: number } };
+    return jsonResponse({
+      success: true,
+      order_id: result.data.id,
+      ...(result.data.order_number ? { order_number: result.data.order_number } : {}),
+      total: result.data.total,
+    }, response.status);
   } catch (err) {
     const errMsg = (err as Error).message;
     log.error('createOrderMobile error:', { message: errMsg });
@@ -317,6 +324,7 @@ export async function getOrderDetail(
       order: maskMobileOrderPii(
         {
           ...data,
+          notes: sanitizeOrderNotes(data.notes),
           items: normalizeOrderItems(data.items),
         },
         role,

@@ -10,10 +10,20 @@
 import { Hono } from 'hono';
 import type { Env } from '../types/env';
 import { requireAuth } from '../middleware/auth';
-import { handleGetKdsOrders, KDS_ROLES } from './orders-hono-handlers/kds-handlers';
+import { markKdsOrderItemReady } from '@aura/domain-kitchen';
+import {
+  handleGetKdsOrders,
+  handleGetKdsRecentOrders,
+  handleRecallKdsOrder,
+  KDS_PREP_ROLES,
+  KDS_ROLES,
+} from './orders-hono-handlers/kds-handlers';
 
 export const kdsOrdersRouter = new Hono<{ Bindings: Env }>();
 
+kdsOrdersRouter.get('/recent', requireAuth(KDS_ROLES), handleGetKdsRecentOrders);
 kdsOrdersRouter.get('/', requireAuth(KDS_ROLES), handleGetKdsOrders);
+kdsOrdersRouter.post('/:id/ready', requireAuth(KDS_PREP_ROLES), (c) => markKdsOrderItemReady(c));
+kdsOrdersRouter.post('/:id/recall', requireAuth(KDS_PREP_ROLES), handleRecallKdsOrder);
 
 export default kdsOrdersRouter;

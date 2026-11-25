@@ -10,7 +10,7 @@ import {
 } from '../../../../packages/domain/payment/policies/payment-access';
 import { publishOrderEvent } from '../../../../packages/domain/order/policies/customer-order-payload';
 import {
-  dispatchOrderBroadcast,
+  fanOutOrderBroadcast,
   normalizeBroadcastTotal,
   parseBroadcastItems,
   parseBroadcastTimestamp,
@@ -309,8 +309,6 @@ export async function handleRefund(c: Context<{ Bindings: Env }>, openApi = fals
 
       if (c.env?.ORDER_BROADCASTER) {
         try {
-          const doChannel = effectivePaymentTenant !== 'default'
-            ? `${effectivePaymentTenant}:${payment.order_id}` : payment.order_id;
           const payload = {
             orderId: payment.order_id,
             status: effectiveOrderStatus,
@@ -325,7 +323,7 @@ export async function handleRefund(c: Context<{ Bindings: Env }>, openApi = fals
             createdAt: parseBroadcastTimestamp(postRefundOrder?.created_at),
             updatedAt: Date.now(),
           };
-          await dispatchOrderBroadcast(c.env.ORDER_BROADCASTER, doChannel, payload);
+          await fanOutOrderBroadcast(c.env.ORDER_BROADCASTER, payment.order_id, effectivePaymentTenant, payload);
         } catch { /* Non-blocking broadcaster notification */ }
       }
 

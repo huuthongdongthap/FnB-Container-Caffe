@@ -19,7 +19,7 @@ import type { Env } from 'worker/src/types/env';
 import { authenticateRequest } from 'worker/src/lib/staff-session-auth';
 import { StaffSessionError } from 'worker/src/lib/staff-session';
 import { getTenantId } from 'worker/src/middleware/tenant';
-import { isHeldOutOfKds } from '../policies/kds-hold-policy';
+import { isHeldOutOfKds, sanitizeKdsOrderNotes } from '../policies/kds-hold-policy';
 import { buildIndexFromDbRows } from '../src/policies/station-policy';
 
 // Max SSE connection duration: 120s — client reconnects naturally after.
@@ -46,7 +46,13 @@ function isRecentPrepCancellation(order: Record<string, unknown>, nowMs: number)
   }
   const prev = String(order.previous_status ?? '').trim().toLowerCase();
   const explicit = order.cancel_alert === true || Number(order.cancel_alert) === 1;
-  return explicit || PREP_HISTORY_STATUSES.has(prev) || Boolean(order.served_at);
+  return (
+    explicit ||
+    PREP_HISTORY_STATUSES.has(prev) ||
+    Boolean(order.started_at) ||
+    Boolean(order.ready_at) ||
+    Boolean(order.served_at)
+  );
 }
 
 interface KdsStreamOrder {
@@ -56,6 +62,10 @@ interface KdsStreamOrder {
   table_name?: string | null;
   order_number?: string | null;
   order_type?: string | null;
+  payment_status?: string | null;
+  payment_method?: string | null;
+  is_cod?: number | null;
+  delivery_time?: string | null;
   items: unknown[];
   notes?: string | null;
   status: string;
@@ -79,6 +89,9 @@ interface OrderRecord {
   status: string;
   order_type?: string | null;
   payment_status?: string | null;
+  payment_method?: string | null;
+  is_cod?: number | null;
+  delivery_time?: string | null;
   created_at: string;
   updated_at?: string | null;
   started_at?: string | null;
@@ -159,6 +172,7 @@ function mapKdsOrder(
   const elapsed = Number.isFinite(createdMs)
     ? Math.max(0, Math.round((Date.now() - createdMs) / 60000))
     : 0;
+  const cleanNotes = sanitizeKdsOrderNotes(order.notes);
 
   return {
     id: order.id,
@@ -167,8 +181,12 @@ function mapKdsOrder(
     ...(typeof order.table_name === 'string' && order.table_name.trim() ? { table_name: order.table_name.trim() } : {}),
     ...(typeof order.order_number === 'string' && order.order_number.trim() ? { order_number: order.order_number.trim() } : {}),
     ...(order.order_type ? { order_type: order.order_type } : {}),
+    ...(typeof order.payment_status === 'string' && order.payment_status.trim() ? { payment_status: order.payment_status.trim() } : {}),
+    ...(typeof order.payment_method === 'string' && order.payment_method.trim() ? { payment_method: order.payment_method.trim() } : {}),
+    ...(order.is_cod !== undefined && order.is_cod !== null ? { is_cod: Number(order.is_cod) } : {}),
+    ...(typeof order.delivery_time === 'string' && order.delivery_time.trim() ? { delivery_time: order.delivery_time.trim() } : {}),
     items,
-    ...(order.notes ? { notes: order.notes } : {}),
+    ...(cleanNotes ? { notes: cleanNotes } : {}),
     status: order.status,
     elapsed_minutes: elapsed,
     created_at: order.created_at,
@@ -341,50 +359,57 @@ kdsStreamRouter.get('/stream', async(c) => {
             ? " AND (TRIM(tenant_id) = ? OR tenant_id IS NULL OR TRIM(tenant_id) = '')"
             : ' AND TRIM(tenant_id) = ?';
         const activeQueries = [
+          `SELECT o.id, o.customer_name, o.table_id, COALESCE(NULLIF(TRIM(t.table_number), ''), NULLIF(TRIM(t.name), ''), o.table_id) AS table_name, o.order_number, o.items, o.notes, o.status, o.order_type, o.payment_status, o.payment_method, o.is_cod, o.delivery_time, o.created_at, o.updated_at, o.started_at, o.ready_at FROM orders o
+           LEFT JOIN cafe_tables t ON t.id = o.table_id
+             AND COALESCE(NULLIF(TRIM(t.tenant_id), ''), 'default') = COALESCE(NULLIF(TRIM(o.tenant_id), ''), 'default')
+           WHERE o.status IN ('pending', 'confirmed', 'preparing', 'ready')
+           ${tenantClauseO}
+           AND NOT (TRIM(COALESCE(o.notes, '')) LIKE 'Khách QR - cho don mon%' AND TRIM(COALESCE(o.items, '')) = '[]')
+           ORDER BY CASE WHEN o.status = 'ready' THEN 1 ELSE 0 END ASC, o.created_at ASC LIMIT 500`,
           `SELECT o.id, o.customer_name, o.table_id, COALESCE(NULLIF(TRIM(t.table_number), ''), NULLIF(TRIM(t.name), ''), o.table_id) AS table_name, o.order_number, o.items, o.notes, o.status, o.order_type, o.payment_status, o.payment_method, o.is_cod, o.created_at, o.updated_at, o.started_at, o.ready_at FROM orders o
            LEFT JOIN cafe_tables t ON t.id = o.table_id
              AND COALESCE(NULLIF(TRIM(t.tenant_id), ''), 'default') = COALESCE(NULLIF(TRIM(o.tenant_id), ''), 'default')
            WHERE o.status IN ('pending', 'confirmed', 'preparing', 'ready')
            ${tenantClauseO}
            AND NOT (TRIM(COALESCE(o.notes, '')) LIKE 'Khách QR - cho don mon%' AND TRIM(COALESCE(o.items, '')) = '[]')
-           ORDER BY CASE WHEN o.status = 'ready' THEN 1 ELSE 0 END ASC, o.created_at ASC LIMIT 200`,
+           ORDER BY CASE WHEN o.status = 'ready' THEN 1 ELSE 0 END ASC, o.created_at ASC LIMIT 500`,
           `SELECT o.id, o.customer_name, o.table_id, COALESCE(NULLIF(TRIM(t.table_number), ''), NULLIF(TRIM(t.name), ''), o.table_id) AS table_name, o.order_number, o.items, o.notes, o.status, o.order_type, o.payment_status, o.payment_method, o.is_cod, o.created_at, o.updated_at FROM orders o
            LEFT JOIN cafe_tables t ON t.id = o.table_id
              AND COALESCE(NULLIF(TRIM(t.tenant_id), ''), 'default') = COALESCE(NULLIF(TRIM(o.tenant_id), ''), 'default')
            WHERE o.status IN ('pending', 'confirmed', 'preparing', 'ready')
            ${tenantClauseO}
            AND NOT (TRIM(COALESCE(o.notes, '')) LIKE 'Khách QR - cho don mon%' AND TRIM(COALESCE(o.items, '')) = '[]')
-           ORDER BY CASE WHEN o.status = 'ready' THEN 1 ELSE 0 END ASC, o.created_at ASC LIMIT 200`,
+           ORDER BY CASE WHEN o.status = 'ready' THEN 1 ELSE 0 END ASC, o.created_at ASC LIMIT 500`,
           `SELECT id, customer_name, table_id, order_number, items, notes, status, order_type, payment_status, payment_method, is_cod, created_at, updated_at, started_at, ready_at FROM orders
            WHERE status IN ('pending', 'confirmed', 'preparing', 'ready')
            ${tenantClause}
            AND NOT (TRIM(COALESCE(notes, '')) LIKE 'Khách QR - cho don mon%' AND TRIM(COALESCE(items, '')) = '[]')
-           ORDER BY CASE WHEN status = 'ready' THEN 1 ELSE 0 END ASC, created_at ASC LIMIT 200`,
+           ORDER BY CASE WHEN status = 'ready' THEN 1 ELSE 0 END ASC, created_at ASC LIMIT 500`,
           `SELECT id, customer_name, table_id, items, notes, status, order_type, payment_status, payment_method, is_cod, created_at FROM orders
            WHERE status IN ('pending', 'confirmed', 'preparing', 'ready')
            ${tenantClause}
            AND NOT (TRIM(COALESCE(notes, '')) LIKE 'Khách QR - cho don mon%' AND TRIM(COALESCE(items, '')) = '[]')
-           ORDER BY CASE WHEN status = 'ready' THEN 1 ELSE 0 END ASC, created_at ASC LIMIT 200`,
+           ORDER BY CASE WHEN status = 'ready' THEN 1 ELSE 0 END ASC, created_at ASC LIMIT 500`,
           `SELECT id, customer_name, table_id, items, notes, status, order_type, payment_status, payment_method, created_at FROM orders
            WHERE status IN ('pending', 'confirmed', 'preparing', 'ready')
            ${tenantClause}
            AND NOT (TRIM(COALESCE(notes, '')) LIKE 'Khách QR - cho don mon%' AND TRIM(COALESCE(items, '')) = '[]')
-           ORDER BY CASE WHEN status = 'ready' THEN 1 ELSE 0 END ASC, created_at ASC LIMIT 200`,
+           ORDER BY CASE WHEN status = 'ready' THEN 1 ELSE 0 END ASC, created_at ASC LIMIT 500`,
           `SELECT id, customer_name, table_id, items, notes, status, payment_status, payment_method, created_at FROM orders
            WHERE status IN ('pending', 'confirmed', 'preparing', 'ready')
            ${tenantClause}
            AND NOT (TRIM(COALESCE(notes, '')) LIKE 'Khách QR - cho don mon%' AND TRIM(COALESCE(items, '')) = '[]')
-           ORDER BY CASE WHEN status = 'ready' THEN 1 ELSE 0 END ASC, created_at ASC LIMIT 200`,
+           ORDER BY CASE WHEN status = 'ready' THEN 1 ELSE 0 END ASC, created_at ASC LIMIT 500`,
           `SELECT id, customer_name, table_id, items, notes, status, order_type, payment_status, created_at FROM orders
            WHERE status IN ('pending', 'confirmed', 'preparing', 'ready')
            ${tenantClause}
            AND NOT (TRIM(COALESCE(notes, '')) LIKE 'Khách QR - cho don mon%' AND TRIM(COALESCE(items, '')) = '[]')
-           ORDER BY CASE WHEN status = 'ready' THEN 1 ELSE 0 END ASC, created_at ASC LIMIT 200`,
+           ORDER BY CASE WHEN status = 'ready' THEN 1 ELSE 0 END ASC, created_at ASC LIMIT 500`,
           `SELECT id, customer_name, table_id, items, notes, status, created_at FROM orders
            WHERE status IN ('pending', 'confirmed', 'preparing', 'ready')
            ${tenantClause}
            AND NOT (TRIM(COALESCE(notes, '')) LIKE 'Khách QR - cho don mon%' AND TRIM(COALESCE(items, '')) = '[]')
-           ORDER BY CASE WHEN status = 'ready' THEN 1 ELSE 0 END ASC, created_at ASC LIMIT 200`,
+           ORDER BY CASE WHEN status = 'ready' THEN 1 ELSE 0 END ASC, created_at ASC LIMIT 500`,
         ];
         let results: OrderRecord[] | undefined;
         let lastActiveQueryError: unknown;
@@ -401,6 +426,7 @@ kdsStreamRouter.get('/stream', async(c) => {
         if (lastActiveQueryError) throw lastActiveQueryError;
         const activeOrders: KdsStreamOrder[] = [];
         for (const r of results || []) {
+          if (activeOrders.length >= 200) break;
           if (isHeldOutOfKds(r as unknown as Record<string, unknown>)) continue;
           if (stationId && categoryIndex) {
             let parsedItems: Array<Record<string, unknown>> = [];
@@ -479,9 +505,12 @@ kdsStreamRouter.get('/stream', async(c) => {
         return [...activeOrders, ...recentCancelled];
       };
 
+      let lastPayload = '';
       try {
         // Initial snapshot so the client renders immediately on connect.
-        send('snapshot', await queryActiveOrders());
+        const initialOrders = await queryActiveOrders();
+        lastPayload = JSON.stringify(initialOrders);
+        send('snapshot', initialOrders);
       } catch {
         send('error', { message: 'initial snapshot failed' });
       }
@@ -489,7 +518,6 @@ kdsStreamRouter.get('/stream', async(c) => {
       if (closed) return;
 
       // Polling loop: emit only when the payload actually changes.
-      let lastPayload = '';
       const run = async() => {
         while (!closed) {
           await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS));

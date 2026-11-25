@@ -27,6 +27,8 @@ export interface OrderFilters {
 export interface OrderSummaryData {
   total: number;
   byStatus: Record<string, number>;
+  kdsByStatus?: Record<string, number>;
+  heldOrdersCount?: number;
   avgLeadTimeMinutes?: number | null;
   todayRevenue?: number;
   completedToday?: number;
@@ -43,7 +45,7 @@ interface AdminOrdersState {
   mutationError: string | null;
   summary: OrderSummaryData | null;
   fetchOrders: (page?: number, filters?: OrderFilters, pageSize?: number) => Promise<void>;
-  fetchSummary: () => Promise<void>;
+  fetchSummary: (filters?: OrderFilters) => Promise<void>;
   updateOrderStatus: (orderId: string, status: string) => Promise<boolean>;
   cancelOrder: (orderId: string, reason: string) => Promise<boolean>;
   updateOrderDetails: (orderId: string, patch: { notes?: string; delivery_time?: string }) => Promise<boolean>;
@@ -117,20 +119,44 @@ export function normalizeAdminOrder(raw: Record<string, unknown>): AdminOrder {
     }
     return undefined;
   };
+  const toOptionalString = (...vals: unknown[]): string | undefined => {
+    for (const v of vals) {
+      if (typeof v === 'string' && v.trim()) {
+        return v.trim();
+      }
+    }
+    return undefined;
+  };
   return {
     ...(raw as unknown as AdminOrder),
     id: String(raw.id ?? ''),
+    orderNumber: toOptionalString(raw.orderNumber, raw.order_number),
     customer: String(raw.customer ?? raw.customerName ?? raw.customer_name ?? 'Guest'),
-    customerPhone: typeof raw.customerPhone === 'string' ? raw.customerPhone : typeof raw.customer_phone === 'string' ? raw.customer_phone : undefined,
-    customerAddress: typeof raw.customerAddress === 'string' ? raw.customerAddress : typeof raw.customer_address === 'string' ? raw.customer_address : undefined,
-    orderType: typeof raw.orderType === 'string' ? raw.orderType : typeof raw.order_type === 'string' ? raw.order_type : undefined,
-    tableId: typeof raw.tableId === 'string' ? raw.tableId : typeof raw.table_id === 'string' ? raw.table_id : undefined,
-    tableNumber: typeof raw.tableNumber === 'string' ? raw.tableNumber : typeof raw.table_number === 'string' ? raw.table_number : undefined,
-    tableZone: typeof raw.tableZone === 'string' ? raw.tableZone : typeof raw.table_zone === 'string' ? raw.table_zone : undefined,
-    paymentMethod: typeof raw.paymentMethod === 'string' ? raw.paymentMethod : typeof raw.payment_method === 'string' ? raw.payment_method : undefined,
-    paymentStatus: typeof raw.paymentStatus === 'string' ? raw.paymentStatus : typeof raw.payment_status === 'string' ? raw.payment_status : undefined,
+    customerPhone: toOptionalString(raw.customerPhone, raw.customer_phone),
+    customerAddress: toOptionalString(raw.customerAddress, raw.customer_address),
+    orderType: toOptionalString(raw.orderType, raw.order_type),
+    tableId: toOptionalString(raw.tableId, raw.table_id),
+    tableNumber: toOptionalString(raw.tableNumber, raw.table_number, raw.table_name),
+    tableZone: toOptionalString(raw.tableZone, raw.table_zone),
+    paymentMethod: toOptionalString(raw.paymentMethod, raw.payment_method),
+    paymentStatus: toOptionalString(raw.paymentStatus, raw.payment_status),
+    isCod: raw.isCod !== undefined ? (raw.isCod as number | boolean) : (raw.is_cod as number | boolean | undefined),
+    isHeldOutOfKds:
+      typeof raw.isHeldOutOfKds === 'boolean'
+        ? raw.isHeldOutOfKds
+        : typeof raw.is_held_out_of_kds === 'boolean'
+          ? raw.is_held_out_of_kds
+          : undefined,
     notes: stripSystemOrderNotes(typeof raw.notes === 'string' ? raw.notes : undefined),
-    deliveryTime: typeof raw.deliveryTime === 'string' ? raw.deliveryTime : typeof raw.delivery_time === 'string' ? raw.delivery_time : undefined,
+    deliveryTime: toOptionalString(raw.deliveryTime, raw.delivery_time),
+    startedAt: toOptionalString(raw.startedAt, raw.started_at),
+    readyAt: toOptionalString(raw.readyAt, raw.ready_at),
+    servedAt: toOptionalString(raw.servedAt, raw.served_at),
+    cancelledAt: toOptionalString(raw.cancelledAt, raw.cancelled_at),
+    cancelledReason: toOptionalString(raw.cancelledReason, raw.cancelled_reason),
+    assignedShipperId: toOptionalString(raw.assignedShipperId, raw.assigned_shipper_id),
+    shipperName: toOptionalString(raw.shipperName, raw.shipper_name),
+    failureReason: toOptionalString(raw.failureReason, raw.failure_reason),
     items: itemsCount,
     ...(itemsList ? { itemsList } : {}),
     subtotal: toOptionalNumber(raw.subtotal),
@@ -225,14 +251,25 @@ export const useAdminOrdersStore = create<AdminOrdersState>((set, get) => ({
     }
   },
 
-  fetchSummary: async () => {
+  fetchSummary: async (filters?: OrderFilters) => {
     try {
+      const effectiveFilters = filters ?? get().activeFilters;
+      const summaryParams = new URLSearchParams();
+      if (effectiveFilters?.orderType && effectiveFilters.orderType !== 'all') {
+        summaryParams.set('order_type', effectiveFilters.orderType);
+      }
+      if (effectiveFilters?.dateFrom) summaryParams.set('dateFrom', effectiveFilters.dateFrom);
+      if (effectiveFilters?.dateTo) summaryParams.set('dateTo', effectiveFilters.dateTo);
+      if (effectiveFilters?.search) summaryParams.set('search', effectiveFilters.search);
+      const qs = summaryParams.toString();
       const body = await apiFetch<{
         success?: boolean;
         data?: {
           totalOrders?: number;
           total?: number;
           ordersByStatus?: Record<string, number>;
+          kdsByStatus?: Record<string, number>;
+          heldOrdersCount?: number;
           by_status?: Record<string, number>;
           byStatus?: Record<string, number>;
           statusCounts?: Record<string, number>;
@@ -247,6 +284,8 @@ export const useAdminOrdersStore = create<AdminOrdersState>((set, get) => ({
         totalOrders?: number;
         total?: number;
         ordersByStatus?: Record<string, number>;
+        kdsByStatus?: Record<string, number>;
+        heldOrdersCount?: number;
         by_status?: Record<string, number>;
         byStatus?: Record<string, number>;
         statusCounts?: Record<string, number>;
@@ -257,9 +296,10 @@ export const useAdminOrdersStore = create<AdminOrdersState>((set, get) => ({
         todayRevenue?: number;
         completed_today?: number;
         completedToday?: number;
-      }>('/api/orders/summary');
+      }>(`/api/orders/summary${qs ? `?${qs}` : ''}`);
       const payload = body?.data ?? body;
       const byStatus = payload?.ordersByStatus ?? payload?.by_status ?? payload?.byStatus ?? payload?.statusCounts ?? {};
+      const kdsByStatus = payload?.kdsByStatus;
       const total = typeof payload?.totalOrders === 'number'
         ? payload.totalOrders
         : typeof payload?.total === 'number'
@@ -269,6 +309,8 @@ export const useAdminOrdersStore = create<AdminOrdersState>((set, get) => ({
         summary: {
           total,
           byStatus,
+          ...(kdsByStatus ? { kdsByStatus } : {}),
+          ...(typeof payload?.heldOrdersCount === 'number' ? { heldOrdersCount: payload.heldOrdersCount } : {}),
           avgLeadTimeMinutes: payload?.avg_lead_time_minutes ?? payload?.avgLeadTimeMinutes ?? null,
           todayRevenue: payload?.totalRevenue ?? payload?.today_revenue ?? payload?.todayRevenue,
           completedToday: payload?.completed_today ?? payload?.completedToday,

@@ -133,7 +133,7 @@ app.route('/api/kds/orders', kdsStreamRouter);
 // The KDS queue is the only other consumer of this prefix, so it gets its own
 // router instead of re-mounting the whole unified orders surface here.
 app.route('/api/kds/orders', kdsOrdersRouter);
-app.get('/api/realtime/:channelId', requireAuth(KDS_ROLES), tenantMiddleware, (c) => {
+app.get('/api/realtime/:channelId', requireAuth([...KDS_ROLES, 'shipper', 'rider']), tenantMiddleware, (c) => {
   const user = c.get('user');
   const channelId = c.req.param('channelId');
   const rawUserTenant = (user as { tenantId?: string; tenant_id?: string } | undefined)?.tenantId ??
@@ -154,12 +154,12 @@ app.get('/api/realtime/:channelId', requireAuth(KDS_ROLES), tenantMiddleware, (c
     return c.json({ success: false, error: 'Không đủ quyền truy cập kênh thời gian thực của cửa hàng khác' }, 403);
   }
   const effectiveTenant = isHq ? (requestedTenant || c.get('tenantId') || tenantId) : tenantId;
-  const isDefaultKitchenAlias = channelId === 'kitchen' && effectiveTenant === 'default';
+  const isDefaultStoreUnprefixed = effectiveTenant === 'default' && !channelId.includes(':');
   if (
     effectiveTenant !== '*' &&
     channelId !== effectiveTenant &&
     !channelId.startsWith(`${effectiveTenant}:`) &&
-    !isDefaultKitchenAlias
+    !isDefaultStoreUnprefixed
   ) {
     return c.json({ success: false, error: 'Không đủ quyền truy cập kênh thời gian thực của cửa hàng khác' }, 403);
   }

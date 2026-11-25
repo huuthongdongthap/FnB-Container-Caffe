@@ -221,9 +221,12 @@ describe('dispatchOrderBroadcast — workerd DurableObjectStub proxy compatibili
 
     expect(response.status).toBe(200);
     expect(rpcAttempts).toEqual([]);
-    expect(fetchCalls).toHaveLength(1);
+    expect(fetchCalls).toHaveLength(2);
+    expect(fetchCalls.map((c) => c.channel)).toEqual(['ord-update-do-1', 'kitchen']);
     const events = instances.get('ord-update-do-1')?.getState(0) ?? [];
     expect(events).toHaveLength(1);
+    const storeEvents = instances.get('kitchen')?.getState(0) ?? [];
+    expect(storeEvents).toHaveLength(1);
     expect(events[0]).toMatchObject({
       orderId: 'ord-update-do-1',
       status: 'preparing',

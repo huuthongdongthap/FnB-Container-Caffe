@@ -2,9 +2,10 @@
 // model
 export { ORDER_STATUSES, ORDER_TRANSITIONS, TERMINAL_STATES, canTransition, isTerminal, isFinal } from './model/order-state-machine';
 export type { OrderStatus, TransitionResult } from './model/order-state-machine';
-export { generateId, parseJSON } from './model/helpers';
+export { generateId, generateOrderNumber, sanitizeOrderNotes, parseJSON } from './model/helpers';
 // commands
 export { createOrder } from './commands/create-order';
+export { formatKdsPushOriginLabel } from './commands/create-order-side-effects';
 export { updateOrder } from './commands/update-order';
 export { splitOrders } from './commands/split-orders';
 // queries
@@ -17,6 +18,8 @@ export { getLatestOrderTimestamp } from './queries/latest-timestamp';
 // policies
 export {
   dispatchOrderBroadcast,
+  fanOutOrderBroadcast,
+  resolveOrderBroadcastChannels,
   parseBroadcastItems,
   parseBroadcastTimestamp,
   normalizeBroadcastTotal,

@@ -626,12 +626,14 @@ export async function handleCancelOrder(c: Context<{ Bindings: Env }>) {
   const preCancelStatus = String(existing.status ?? '');
 
   // All aliases share tenant confinement, role/state validation and compare-and-set.
+  const cancelReasonText = typeof body.reason === 'string' && body.reason.trim() ? body.reason.trim() : undefined;
   const transition = await executeKdsStatusTransition(db, id, 'cancelled', user?.role, {
     tenantId: customer ? (rawExistingTenant || 'default') : (tenantId === '*' ? (rawExistingTenant || 'default') : tenantId),
     kv: c.env?.AUTH_KV,
     env: c.env as unknown as Record<string, unknown>,
     skipCancelSideEffects: true,
     allowPaidCompensation: canCompensatePaid,
+    ...(cancelReasonText ? { fields: { failure_reason: cancelReasonText } } : {}),
   });
   if (!transition.success) return c.json({ success: false, error: transition.error }, (transition.statusCode || 400) as any);
 
