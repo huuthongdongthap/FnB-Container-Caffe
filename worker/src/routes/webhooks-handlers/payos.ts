@@ -213,7 +213,9 @@ export async function handlePayosWebhook(
     if (settled.paymentChanged) {
       const metrics = createMetricsCollector(db);
       safeWaitUntil(c, metrics.recordMetric(success ? 'payment_success' : 'payment_failed', Number(payment.amount), { provider: 'payos', order_id: payment.order_id, tenant_id: settledOrderTenant }));
-      if (success) safeWaitUntil(c, metrics.recordMetric('revenue', Number(payment.amount), { provider: 'payos', tenant_id: settledOrderTenant }));
+      if (success && !isInitialTerminalOrder) {
+        safeWaitUntil(c, metrics.recordMetric('revenue', Number(payment.amount), { provider: 'payos', tenant_id: settledOrderTenant }));
+      }
     }
     if (success && (settled.orderChanged || settled.paymentChanged)) {
       const orderRecord = order as Record<string, unknown>;

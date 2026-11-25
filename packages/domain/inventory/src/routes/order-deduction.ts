@@ -88,7 +88,7 @@ async function restoreInventoryForOrderInternal(
   orderId: string,
   tenantId?: string,
   preCancelStatus?: string,
-  releaseUnconsumedReserves: boolean = false,
+  _releaseUnconsumedReserves: boolean = false,
 ): Promise<void> {
   const spoiled = isPostPrepStatus(preCancelStatus);
   const rawExplicit = tenantId && tenantId.trim() ? tenantId.trim() : '';
@@ -196,7 +196,7 @@ async function restoreInventoryForOrderInternal(
           }
         }
         if (handledItemIds.has(res.item_id)) continue;
-        const spoilThisRes = spoiled && (!releaseUnconsumedReserves || res.type === 'sale');
+        const spoilThisRes = spoiled;
         const absQty = Math.abs(res.quantity);
         const relId = crypto.randomUUID();
         const ledgerType = spoilThisRes ? 'waste' : 'release';

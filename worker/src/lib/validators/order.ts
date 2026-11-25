@@ -4,11 +4,41 @@
 
 import { z } from 'zod';
 import {
+  VN_PHONE_REGEX,
   emailSchema,
   nameSchema,
   orderItemSchema,
   paymentMethodSchema
 } from './common';
+
+export const DELIVERY_PLACEHOLDER_NAMES = new Set([
+  'khách tại quán',
+  'khach tai quan',
+  'khách tại quầy',
+  'khach tai quay',
+  'guest at store',
+  'khách vãng lai',
+  'khach vang lai',
+  'khách mang đi',
+  'khach mang di',
+]);
+
+export function isValidDeliveryRecipientName(raw: string | undefined | null): boolean {
+  const trimmed = (raw ?? '').trim();
+  if (trimmed.length < 2) return false;
+  const normalized = trimmed.normalize('NFC').replace(/\s+/g, ' ').toLowerCase();
+  return !DELIVERY_PLACEHOLDER_NAMES.has(normalized);
+}
+
+export function isValidDeliveryRecipientPhone(raw: string | undefined | null): boolean {
+  const cleaned = (raw ?? '').trim().replace(/[\s.()-]/g, '');
+  if (!cleaned || !VN_PHONE_REGEX.test(cleaned)) return false;
+  const digits = cleaned.replace(/\D/g, '');
+  if (!digits || /^0+$/.test(digits)) return false;
+  if (cleaned.startsWith('0') && /^00+/.test(cleaned)) return false;
+  if (cleaned.startsWith('+84') && /^\+840+$/.test(cleaned)) return false;
+  return true;
+}
 
 // ── Order create ──
 export const createOrderSchema = z.object({
@@ -47,12 +77,28 @@ export const createOrderSchema = z.object({
   /** Legacy compatibility only. The server never uses this field to choose the store. */
   tenant_id: z.string().optional(),
 }).superRefine((data, ctx) => {
-  if (data.order_type === 'delivery' && !(data.customer_address ?? '').trim()) {
-    ctx.addIssue({
-      code: z.ZodIssueCode.custom,
-      path: ['customer_address'],
-      message: 'Địa chỉ giao hàng là bắt buộc với đơn giao tận nơi',
-    });
+  if (data.order_type === 'delivery') {
+    if (!isValidDeliveryRecipientName(data.customer_name)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['customer_name'],
+        message: 'Tên người nhận hợp lệ (tối thiểu 2 ký tự, không dùng tên mặc định tại quầy) là bắt buộc với đơn giao tận nơi',
+      });
+    }
+    if (!isValidDeliveryRecipientPhone(data.customer_phone)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['customer_phone'],
+        message: 'Số điện thoại người nhận hợp lệ là bắt buộc với đơn giao tận nơi',
+      });
+    }
+    if (!(data.customer_address ?? '').trim()) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['customer_address'],
+        message: 'Địa chỉ giao hàng là bắt buộc với đơn giao tận nơi',
+      });
+    }
   }
   if (data.order_type === 'dine_in' && !(data.table_id ?? '').trim()) {
     ctx.addIssue({

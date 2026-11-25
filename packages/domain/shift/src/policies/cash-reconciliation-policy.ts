@@ -135,7 +135,7 @@ async function getCashPaymentsForShift(
   const now = asOf || new Date().toISOString();
   const endTime = shift.clock_out || now;
   try {
-    const queryAttributionRows = (includeAttendanceState: boolean) =>
+    const queryAttributionRows = (includeAttendanceState: boolean, includeOrderGuard: boolean = true) =>
       db.prepare(`SELECT p.id, p.amount, a.shift_id,
           (SELECT COUNT(*) FROM staff_shifts s
            WHERE COALESCE(NULLIF(TRIM(s.tenant_id), ''), 'default') = ?
@@ -147,6 +147,13 @@ async function getCashPaymentsForShift(
         FROM payments p LEFT JOIN cash_payment_attributions a ON a.payment_id = p.id AND a.tenant_id = COALESCE(NULLIF(TRIM(p.tenant_id), ''), 'default')
         WHERE p.method IN ('cash', 'cod') AND p.status = 'completed'
         AND COALESCE(NULLIF(TRIM(p.tenant_id), ''), 'default') = ?
+        ${includeOrderGuard ? `AND NOT EXISTS (
+          SELECT 1 FROM orders o
+          WHERE o.id = p.order_id
+            AND COALESCE(NULLIF(TRIM(o.tenant_id), ''), 'default') = COALESCE(NULLIF(TRIM(p.tenant_id), ''), 'default')
+            AND (LOWER(COALESCE(o.status, '')) IN ('cancelled', 'canceled', 'failed', 'expired', 'rejected')
+              OR LOWER(COALESCE(o.payment_status, '')) = 'refunded')
+        )` : ''}
         AND (a.shift_id = ? OR (a.shift_id IS NULL
           AND julianday(COALESCE(p.updated_at, p.created_at)) >= julianday(?)
           AND julianday(COALESCE(p.updated_at, p.created_at)) <= julianday(?)))`)
@@ -155,10 +162,13 @@ async function getCashPaymentsForShift(
 
     let rows: { results?: Array<{ id: string; amount: number; shift_id: string | null; candidates: number }> };
     try {
-      rows = await queryAttributionRows(true);
+      rows = await queryAttributionRows(true, true);
     } catch (innerErr) {
-      if (/no such column:.*attendance_state/i.test(String(innerErr))) {
-        rows = await queryAttributionRows(false);
+      const innerMsg = String(innerErr);
+      if (/no such table:.*\borders\b/i.test(innerMsg)) {
+        rows = await queryAttributionRows(true, false);
+      } else if (/no such column:.*attendance_state/i.test(innerMsg)) {
+        rows = await queryAttributionRows(false, true).catch(() => queryAttributionRows(false, false));
       } else {
         throw innerErr;
       }

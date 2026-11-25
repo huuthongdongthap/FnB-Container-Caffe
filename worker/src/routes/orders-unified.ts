@@ -80,7 +80,7 @@ ordersUnifiedRouter.patch('/:id/status', requireAuth(['owner', 'manager', 'super
 ordersUnifiedRouter.patch('/:id/mark-cod-paid', requireAuth(COD_COLLECTION_ROLES), audit('order_cod_paid'), handleMarkCodPaid);
 ordersUnifiedRouter.post('/:id/recall', requireAuth(KDS_PREP_ROLES), audit('order_status_change'), handleRecallKdsOrder);
 
-ordersUnifiedRouter.post('/:id/cancel', requireAuth(['owner', 'manager', 'supervisor', 'staff', 'waiter', 'cashier', 'admin', 'customer']), handleCancelOrder);
+ordersUnifiedRouter.post('/:id/cancel', requireAuth(['owner', 'manager', 'supervisor', 'staff', 'waiter', 'cashier', 'admin', 'shipper', 'rider', 'customer']), handleCancelOrder);
 ordersUnifiedRouter.post('/:id/claim', requireAuth(['owner', 'manager', 'supervisor', 'staff', 'waiter', 'cashier', 'admin', 'customer']), handleClaimOrder);
 
 // ── 3. Parameterized Base Record Handlers (/:id) ──

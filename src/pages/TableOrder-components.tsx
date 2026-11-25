@@ -42,6 +42,7 @@ export function InvalidQRPage({ submitError }: { submitError: string | null }) {
 interface GuestInfoFormProps {
   guestName: string;
   guestPhone: string;
+  paymentMethod?: 'cod' | 'payos';
   isSubmitting: boolean;
   submitError: string | null;
   onNameChange: (value: string) => void;
@@ -51,6 +52,7 @@ interface GuestInfoFormProps {
 export function GuestInfoForm({
   guestName,
   guestPhone,
+  paymentMethod = 'cod',
   isSubmitting,
   submitError,
   onNameChange,
@@ -95,9 +97,13 @@ export function GuestInfoForm({
         className="mt-2 text-[12px] font-body text-[var(--aura-chrome-bright)]"
         data-testid="table-order-payment-method"
       >
-        {t('tableOrder.paymentMethodLabel', {
-          defaultValue: 'Phương thức thanh toán: Tiền mặt tại quán',
-        })}
+        {paymentMethod === 'payos'
+          ? t('tableOrder.paymentMethodPayosLabel', {
+              defaultValue: 'Phương thức thanh toán: Chuyển khoản QR (PayOS)',
+            })
+          : t('tableOrder.paymentMethodLabel', {
+              defaultValue: 'Phương thức thanh toán: Tiền mặt tại quán',
+            })}
       </p>
       {submitError && (
         <p

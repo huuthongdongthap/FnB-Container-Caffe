@@ -170,7 +170,7 @@ describe('Phase 53 Slice AZ2 — Payment Access, Settlement State Machine & IPN 
   });
 
   describe('AZ2-F2: settlePayOS & Webhook Terminal Order Isolation', () => {
-    it('settlePayOS guards UPDATE orders SET payment_status = "paid" against terminal orders', async () => {
+    it('settlePayOS marks payment_status = "paid" on cancelled orders for refund eligibility while preserving cancelled status and guarding refunded orders', async () => {
       const fixture = paymentSqliteDB();
       const db = fixture.db;
       fixture.sqlite.prepare("INSERT INTO orders (id, total, status, payment_status, payment_method) VALUES ('ord-term-1', 40000, 'cancelled', 'unpaid', 'payos')").run();
@@ -186,13 +186,13 @@ describe('Phase 53 Slice AZ2 — Payment Access, Settlement State Machine & IPN 
       }, true, 'completed', now);
 
       expect(res.paymentChanged).toBe(true);
-      expect(res.orderChanged).toBe(false);
+      expect(res.orderChanged).toBe(true);
 
       const paymentRow = fixture.sqlite.prepare("SELECT status FROM payments WHERE id = 'pay-term-1'").get() as { status: string };
       const orderRow = fixture.sqlite.prepare("SELECT status, payment_status FROM orders WHERE id = 'ord-term-1'").get() as { status: string; payment_status: string };
       expect(paymentRow.status).toBe('completed');
       expect(orderRow.status).toBe('cancelled');
-      expect(orderRow.payment_status).toBe('unpaid');
+      expect(orderRow.payment_status).toBe('paid');
     });
 
     it('handlePayosWebhook appends [PAID_ON_CANCELLED_ORDER_REQUIRES_REVIEW] to notes and suppresses notifications on terminal orders', async () => {
@@ -226,7 +226,7 @@ describe('Phase 53 Slice AZ2 — Payment Access, Settlement State Machine & IPN 
 
       const orderRow = fixture.sqlite.prepare("SELECT notes, payment_status, status FROM orders WHERE id = 'ord-cancel-wh'").get() as { notes: string; payment_status: string; status: string };
       expect(orderRow.status).toBe('cancelled');
-      expect(orderRow.payment_status).toBe('unpaid');
+      expect(orderRow.payment_status).toBe('paid');
       expect(orderRow.notes).toContain('[PAID_ON_CANCELLED_ORDER_REQUIRES_REVIEW]');
 
       const marker = await kv.get('payment:review:pay-cancel-wh');
@@ -239,7 +239,7 @@ describe('Phase 53 Slice AZ2 — Payment Access, Settlement State Machine & IPN 
   });
 
   describe('AZ2-F3: PayOS Reconcile Command Determinism', () => {
-    it('settles payment row on terminal rejected order without marking order paid and without raising CAS error', async () => {
+    it('settles payment row on terminal rejected order, marks payment_status paid for refund eligibility while preserving rejected status, and avoids CAS error', async () => {
       const fixture = paymentSqliteDB();
       const db = fixture.db;
       const kv = createMockKV();
@@ -267,7 +267,7 @@ describe('Phase 53 Slice AZ2 — Payment Access, Settlement State Machine & IPN 
       const orderRow = fixture.sqlite.prepare("SELECT status, payment_status, notes FROM orders WHERE id = 'ord-rejected-rec'").get() as { status: string; payment_status: string; notes: string };
       expect(paymentRow.status).toBe('completed');
       expect(orderRow.status).toBe('rejected');
-      expect(orderRow.payment_status).toBe('unpaid');
+      expect(orderRow.payment_status).toBe('paid');
       expect(orderRow.notes).toContain('[PAID_ON_CANCELLED_ORDER_REQUIRES_REVIEW]');
     });
   });

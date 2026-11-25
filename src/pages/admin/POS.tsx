@@ -54,6 +54,36 @@ interface TableApiRow {
   zone?: string;
 }
 
+const POS_DELIVERY_PLACEHOLDER_NAMES = new Set([
+  'khách tại quán',
+  'khach tai quan',
+  'khách tại quầy',
+  'khach tai quay',
+  'guest at store',
+  'khách vãng lai',
+  'khach vang lai',
+  'khách mang đi',
+  'khach mang di',
+  'adminpos.customerdefaultname',
+]);
+
+function isValidPosDeliveryName(raw: string): boolean {
+  const trimmed = raw.trim();
+  if (trimmed.length < 2) return false;
+  const normalized = trimmed.normalize('NFC').replace(/\s+/g, ' ').toLowerCase();
+  return !POS_DELIVERY_PLACEHOLDER_NAMES.has(normalized);
+}
+
+function isValidPosDeliveryPhone(raw: string): boolean {
+  const cleaned = raw.trim().replace(/[\s.()-]/g, '');
+  if (!/^(0|\+84)[0-9]{9,10}$/.test(cleaned)) return false;
+  const digits = cleaned.replace(/\D/g, '');
+  if (!digits || /^0+$/.test(digits)) return false;
+  if (cleaned.startsWith('0') && /^00+/.test(cleaned)) return false;
+  if (cleaned.startsWith('+84') && /^\+840+$/.test(cleaned)) return false;
+  return true;
+}
+
 function sanitizePaymentUrl(rawUrl: string | undefined | null): string | null {
   if (!rawUrl || typeof rawUrl !== 'string') return null;
   try {
@@ -172,7 +202,8 @@ export default function AdminPOSPage() {
   const [useCashback, setUseCashback] = useState(false);
   const [selectedTableId, setSelectedTableId] = useState<string | undefined>(undefined);
   const [checkoutSuccess, setCheckoutSuccess] = useState(false);
-  const [pendingCodOrder, setPendingCodOrder] = useState<{ id: string; total: number } | null>(null);
+  const [pendingCodOrders, setPendingCodOrders] = useState<Array<{ id: string; total: number }>>([]);
+  const [cashTendered, setCashTendered] = useState('');
   const [codCollecting, setCodCollecting] = useState(false);
   const [codCollectedOrderId, setCodCollectedOrderId] = useState<string | null>(null);
   const [shiftHandoverOpen, setShiftHandoverOpen] = useState(false);
@@ -212,13 +243,18 @@ export default function AdminPOSPage() {
     setPendingPayOSOrder(null);
     setCheckoutError(null);
     setCheckoutSuccess(false);
-    setPendingCodOrder(null);
+    setPendingCodOrders([]);
+    setCashTendered('');
     setCodCollectedOrderId(null);
     setLastCompletedReceipt(null);
     setActivePrintReceipt(null);
   }, [activeTenant, sessionVersion]);
 
   const handleMarkCodPaid = useCallback(async (orderId: string) => {
+    if (!activeShift) {
+      setCheckoutError('Vui lòng mở ca làm việc trước khi xác nhận đã thu tiền mặt.');
+      return;
+    }
     setCodCollecting(true);
     setCheckoutError(null);
     try {
@@ -229,11 +265,12 @@ export default function AdminPOSPage() {
       if (res && res.success === false) {
         throw new Error(res.error || 'Không thể xác nhận đã thu tiền mặt');
       }
-      setPendingCodOrder(null);
+      setPendingCodOrders((prev) => prev.filter((item) => item.id !== orderId));
       setCodCollectedOrderId(orderId);
       setLastCompletedReceipt((prev) =>
         prev && prev.orderId === orderId ? { ...prev, paymentStatus: 'paid' } : prev,
       );
+      void refetchShifts();
       setCheckoutSuccess(true);
       if (successTimerRef.current) clearTimeout(successTimerRef.current);
       successTimerRef.current = setTimeout(() => {
@@ -250,7 +287,7 @@ export default function AdminPOSPage() {
     } finally {
       setCodCollecting(false);
     }
-  }, []);
+  }, [activeShift, refetchShifts]);
 
   const hasEmvcoQr = Boolean(paymentQrPayload && !/^https?:\/\//i.test(paymentQrPayload));
 
@@ -392,7 +429,6 @@ export default function AdminPOSPage() {
       setPaymentUrl(null);
       setPaymentQrPayload(null);
       setPendingPayOSOrder(null);
-      setPendingCodOrder(null);
       setCodCollectedOrderId(null);
 
       // Use tableId from POS component if provided, else fall back to state
@@ -400,9 +436,21 @@ export default function AdminPOSPage() {
 
       try {
         const effectiveOrderType = orderType;
-        if (effectiveOrderType === 'delivery' && !deliveryAddress.trim()) {
-          setCheckoutError('Vui lòng nhập địa chỉ giao hàng trước khi tạo đơn.');
-          return false;
+        if (effectiveOrderType === 'delivery') {
+          if (!deliveryAddress.trim()) {
+            setCheckoutError('Vui lòng nhập địa chỉ giao hàng trước khi tạo đơn.');
+            return false;
+          }
+          const candidateDeliveryName = (customer?.name || deliveryRecipientName).trim();
+          if (!isValidPosDeliveryName(candidateDeliveryName)) {
+            setCheckoutError('Vui lòng nhập tên người nhận hợp lệ (tối thiểu 2 ký tự) trước khi tạo đơn giao hàng.');
+            return false;
+          }
+          const candidateDeliveryPhone = (customer?.phone || deliveryRecipientPhone).trim();
+          if (!isValidPosDeliveryPhone(candidateDeliveryPhone)) {
+            setCheckoutError('Vui lòng nhập số điện thoại người nhận hợp lệ trước khi tạo đơn giao hàng.');
+            return false;
+          }
         }
         if (effectiveOrderType === 'dine_in' && !resolvedTableId) {
           setCheckoutError('Vui lòng chọn bàn phục vụ trước khi tạo đơn.');
@@ -424,6 +472,35 @@ export default function AdminPOSPage() {
             ? Math.max(0, Math.round(total) - 1000)
             : rawAppliedCashback;
         const payableTotal = Math.max(0, Math.round(total) - appliedCashback);
+        const parsedCashTendered =
+          effectiveMethod === 'cod' && cashTendered.trim() !== ''
+            ? Math.round(Number(cashTendered))
+            : undefined;
+        if (
+          effectiveMethod === 'cod' &&
+          parsedCashTendered !== undefined &&
+          (!Number.isFinite(parsedCashTendered) || (payableTotal > 0 && parsedCashTendered < payableTotal))
+        ) {
+          setCheckoutError('Số tiền khách đưa nhỏ hơn tổng tiền cần thanh toán.');
+          return false;
+        }
+        const shouldPayNowAtCounter =
+          effectiveMethod === 'cod' &&
+          effectiveOrderType === 'takeaway' &&
+          payableTotal > 0 &&
+          Boolean(activeShift);
+        const defaultChannelGuestName =
+          effectiveOrderType === 'takeaway'
+            ? 'Khách mang đi'
+            : t('adminPOS.customerDefaultName');
+        const resolvedCustomerName =
+          customer?.name?.trim() ||
+          (effectiveOrderType === 'delivery'
+            ? deliveryRecipientName.trim()
+            : defaultChannelGuestName);
+        const resolvedCustomerPhone =
+          customer?.phone?.trim() ||
+          (effectiveOrderType === 'delivery' ? deliveryRecipientPhone.trim() : '');
         const result = await checkoutMutation.mutateAsync({
           items: cart.map((ci) => ({
             id: ci.id,
@@ -432,14 +509,8 @@ export default function AdminPOSPage() {
             quantity: ci.quantity,
           })),
           total: payableTotal,
-          customer_name:
-            customer?.name ||
-            (effectiveOrderType === 'delivery' && deliveryRecipientName.trim()
-              ? deliveryRecipientName.trim()
-              : t('adminPOS.customerDefaultName')),
-          customer_phone:
-            customer?.phone ||
-            (effectiveOrderType === 'delivery' ? deliveryRecipientPhone.trim() : ''),
+          customer_name: resolvedCustomerName,
+          customer_phone: resolvedCustomerPhone,
           customer_id: customer?.id,
           customer_email: undefined,
           customer_address:
@@ -454,6 +525,10 @@ export default function AdminPOSPage() {
           service_fee: serviceFee,
           discount: 0,
           tip: 0,
+          ...(shouldPayNowAtCounter ? { pay_now: true } : {}),
+          ...(effectiveMethod === 'cod' && parsedCashTendered !== undefined
+            ? { cash_tendered: parsedCashTendered }
+            : {}),
           ...(appliedCashback > 0 ? { use_cashback: true, cashback_amount: appliedCashback } : {}),
           ...(effectiveOrderType === 'dine_in' && resolvedTableId ? { table_id: resolvedTableId } : {}),
         });
@@ -463,17 +538,24 @@ export default function AdminPOSPage() {
           let resolvedQrCode: string | null = null;
           const createdOrderId = result.order_id || result.order?.id;
           const serverTotal = Math.round(result.order?.total ?? result.order?.totalAmount ?? payableTotal);
+          const serverPayStatus = String(result.order?.payment_status ?? result.data?.payment_status ?? '').trim().toLowerCase();
+          const settledNow = serverTotal === 0 || serverPayStatus === 'paid' || serverPayStatus === 'completed';
+          const resolvedTendered = result.order?.cash_tendered ?? result.data?.cash_tendered ?? (settledNow ? parsedCashTendered : undefined);
+          const resolvedChange =
+            result.order?.change_due ??
+            result.data?.change_due ??
+            (settledNow && resolvedTendered !== undefined ? Math.max(0, resolvedTendered - serverTotal) : undefined);
           const resolvedTable = resolvedTableId
             ? tables.find((tbl) => tbl.id === resolvedTableId)
             : undefined;
           const receiptSnapshot: ThermalReceiptData = {
             orderId: createdOrderId || `POS-${Date.now().toString().slice(-6)}`,
             createdAt: new Date().toISOString(),
-            customerName: customer?.name || t('adminPOS.customerDefaultName'),
-            customerPhone: customer?.phone || undefined,
+            customerName: resolvedCustomerName,
+            customerPhone: resolvedCustomerPhone || undefined,
             customerAddress:
-              orderType === 'delivery' ? deliveryAddress.trim() || undefined : undefined,
-            orderType: resolvedTableId ? 'dine_in' : orderType,
+              effectiveOrderType === 'delivery' ? deliveryAddress.trim() || undefined : undefined,
+            orderType: resolvedTableId ? 'dine_in' : effectiveOrderType,
             tableName: resolvedTable?.name,
             cashierName: user?.name || user?.email || undefined,
             items: cart.map((ci) => ({
@@ -482,14 +564,18 @@ export default function AdminPOSPage() {
               price: ci.price,
             })),
             subtotal,
+            shippingFee: computedShippingFee > 0 ? computedShippingFee : undefined,
             serviceFee,
             cashbackUsed: appliedCashback,
             total: serverTotal,
-            paymentMethod,
-            paymentStatus: serverTotal === 0 ? 'paid' : 'pending',
+            cashTendered: resolvedTendered,
+            changeDue: resolvedChange,
+            paymentMethod: effectiveMethod,
+            paymentStatus: settledNow ? 'paid' : 'pending',
             isProForma: false,
           };
           setLastCompletedReceipt(receiptSnapshot);
+          setCashTendered('');
 
           if (effectiveMethod === 'payos' && serverTotal > 0) {
             if (!createdOrderId) {
@@ -552,11 +638,20 @@ export default function AdminPOSPage() {
           if (resolvedTableId) {
             void queryClient.invalidateQueries({ queryKey: ['pos-tables'] });
           }
-          const needsCodCollection = canCollectCod && effectiveMethod === 'cod' && Boolean(createdOrderId) && serverTotal > 0;
+          if (settledNow) {
+            void refetchShifts();
+            if (createdOrderId && effectiveMethod === 'cod') {
+              setCodCollectedOrderId(createdOrderId);
+            }
+          }
+          const needsCodCollection =
+            !settledNow && canCollectCod && effectiveMethod === 'cod' && Boolean(createdOrderId) && serverTotal > 0;
           if (needsCodCollection && createdOrderId) {
-            setPendingCodOrder({ id: createdOrderId, total: serverTotal });
-          } else {
-            setPendingCodOrder(null);
+            setPendingCodOrders((prev) =>
+              prev.some((o) => o.id === createdOrderId)
+                ? prev
+                : [...prev, { id: createdOrderId, total: serverTotal }],
+            );
           }
           setCheckoutSuccess(true);
           if (successTimerRef.current) {
@@ -565,6 +660,7 @@ export default function AdminPOSPage() {
           if (!needsCodCollection) {
             successTimerRef.current = setTimeout(() => {
               setCheckoutSuccess(false);
+              setCodCollectedOrderId(null);
               successTimerRef.current = null;
             }, 5000);
           }
@@ -585,7 +681,7 @@ export default function AdminPOSPage() {
         setIsCompleting(false);
       }
     },
-    [paymentMethod, orderType, deliveryAddress, checkoutMutation.mutateAsync, payOSMutation.mutateAsync, customer, useCashback, selectedTableId, tables, user?.name, user?.email, canCollectCod, queryClient, t, navigate],
+    [paymentMethod, orderType, deliveryAddress, deliveryRecipientName, deliveryRecipientPhone, cashTendered, activeShift, refetchShifts, checkoutMutation.mutateAsync, payOSMutation.mutateAsync, customer, useCashback, selectedTableId, tables, user?.name, user?.email, canCollectCod, queryClient, t, navigate],
   );
 
   const handlePrintReceipt = useCallback(
@@ -595,14 +691,25 @@ export default function AdminPOSPage() {
         const resolvedTable = selectedTableId
           ? tables.find((tbl) => tbl.id === selectedTableId)
           : undefined;
+        const effectiveType = selectedTableId ? 'dine_in' : orderType;
+        const proFormaName =
+          customer?.name?.trim() ||
+          (effectiveType === 'delivery'
+            ? deliveryRecipientName.trim() || undefined
+            : effectiveType === 'takeaway'
+              ? 'Khách mang đi'
+              : t('adminPOS.customerDefaultName'));
+        const proFormaPhone =
+          customer?.phone?.trim() ||
+          (effectiveType === 'delivery' ? deliveryRecipientPhone.trim() || undefined : undefined);
         receiptToPrint = {
           orderId: 'TAM-TINH',
           createdAt: new Date().toISOString(),
-          customerName: customer?.name || t('adminPOS.customerDefaultName'),
-          customerPhone: customer?.phone || undefined,
+          customerName: proFormaName,
+          customerPhone: proFormaPhone,
           customerAddress:
-            orderType === 'delivery' ? deliveryAddress.trim() || undefined : undefined,
-          orderType: selectedTableId ? 'dine_in' : orderType,
+            effectiveType === 'delivery' ? deliveryAddress.trim() || undefined : undefined,
+          orderType: effectiveType,
           tableName: resolvedTable?.name,
           cashierName: user?.name || user?.email || undefined,
           items: cartSnapshot.items.map((ci) => ({
@@ -632,7 +739,7 @@ export default function AdminPOSPage() {
       setCheckoutError(null);
       setActivePrintReceipt({ ...receiptToPrint });
     },
-    [selectedTableId, tables, customer, orderType, deliveryAddress, user?.name, user?.email, paymentMethod, lastCompletedReceipt, t],
+    [selectedTableId, tables, customer, orderType, deliveryAddress, deliveryRecipientName, deliveryRecipientPhone, user?.name, user?.email, paymentMethod, lastCompletedReceipt, t],
   );
 
   useEffect(() => {
@@ -758,6 +865,8 @@ export default function AdminPOSPage() {
         onDeliveryRecipientNameChange={setDeliveryRecipientName}
         deliveryRecipientPhone={deliveryRecipientPhone}
         onDeliveryRecipientPhoneChange={setDeliveryRecipientPhone}
+        cashTendered={cashTendered}
+        onCashTenderedChange={setCashTendered}
         taxRate={0}
         staffName={user?.name || user?.email || undefined}
         staffRole={user?.role || undefined}
@@ -784,7 +893,7 @@ export default function AdminPOSPage() {
         onClearCustomer={() => { setCustomer(null); setUseCashback(false); }}
         useCashback={useCashback}
         onToggleCashback={setUseCashback}
-        onOpenSchedule={() => navigate('/admin/staff')}
+        onOpenSchedule={() => navigate('/admin/staff?tab=shifts')}
         onPrintReceipt={handlePrintReceipt}
         onEndShift={() => {
           setShiftModalMode(activeShift ? 'close' : 'open');
@@ -821,60 +930,87 @@ export default function AdminPOSPage() {
         </div>
       )}
 
-      {/* ── Success Banner Overlay ─────────────────────────────────────── */}
-      {(checkoutSuccess || pendingCodOrder) && (
+      {/* ── Success Banner & Pending COD Queue Overlay ─────────────────── */}
+      {(checkoutSuccess || pendingCodOrders.length > 0) && (
         <div
-          className="fixed top-20 left-1/2 -translate-x-1/2 z-[100] flex items-center gap-3 px-5 py-3 rounded-lg shadow-lg print:hidden no-print"
+          data-testid="pos-cod-queue-banner"
+          className="fixed top-20 left-1/2 -translate-x-1/2 z-[100] flex flex-col gap-2 px-5 py-3 rounded-lg shadow-lg print:hidden no-print max-w-2xl"
           style={{
             backgroundColor: 'rgba(76,175,80,0.95)',
             color: '#fff',
           }}
         >
-          <CheckCircle2 className="w-4 h-4 shrink-0" />
-          <span className="text-sm font-medium">
-            {codCollectedOrderId
-              ? `Đã thu tiền mặt đơn #${codCollectedOrderId.slice(0, 8)}!`
-              : t('adminPOS.orderCreatedSuccess', { defaultValue: 'Tạo đơn thành công!' })}
-          </span>
-          {lastCompletedReceipt && (
-            <button
-              type="button"
-              data-testid="pos-banner-print-receipt-btn"
-              onClick={() => handlePrintReceipt()}
-              className="inline-flex items-center gap-1 rounded-md bg-white/20 px-2.5 py-1 text-xs font-semibold text-white hover:bg-white/30 cursor-pointer"
-            >
-              {t('adminPOS.printReceipt', { defaultValue: 'In hóa đơn' })}
-            </button>
-          )}
-          {pendingCodOrder && (
-            <>
-              {!activeShift && (
+          <div className="flex flex-wrap items-center gap-3">
+            <CheckCircle2 className="w-4 h-4 shrink-0" />
+            <span className="text-sm font-medium">
+              {codCollectedOrderId
+                ? `Đã thu tiền mặt đơn #${codCollectedOrderId.slice(0, 8)}!`
+                : pendingCodOrders.length > 1
+                  ? `Có ${pendingCodOrders.length} đơn tiền mặt đang chờ thu`
+                  : t('adminPOS.orderCreatedSuccess', { defaultValue: 'Tạo đơn thành công!' })}
+            </span>
+            {lastCompletedReceipt && (
+              <button
+                type="button"
+                data-testid="pos-banner-print-receipt-btn"
+                onClick={() => handlePrintReceipt()}
+                className="inline-flex items-center gap-1 rounded-md bg-white/20 px-2.5 py-1 text-xs font-semibold text-white hover:bg-white/30 cursor-pointer"
+              >
+                {t('adminPOS.printReceipt', { defaultValue: 'In hóa đơn' })}
+              </button>
+            )}
+            {pendingCodOrders.length > 0 && !activeShift && (
+              <>
                 <span className="text-xs text-amber-100 underline" data-testid="pos-cod-no-shift-warning">
-                  Chưa mở ca — mở ca để ghi nhận đối soát tiền mặt
+                  Chưa mở ca — vui lòng mở ca trước khi xác nhận thu tiền mặt
                 </span>
-              )}
-              <button
-                type="button"
-                data-testid="pos-mark-cod-paid-btn"
-                disabled={codCollecting}
-                onClick={() => void handleMarkCodPaid(pendingCodOrder.id)}
-                className="inline-flex items-center gap-1.5 rounded-md bg-white px-3 py-1 text-xs font-semibold text-emerald-800 hover:bg-emerald-50 disabled:opacity-60 cursor-pointer"
-              >
-                <Banknote className="w-3.5 h-3.5" />
-                {codCollecting ? 'Đang xác nhận...' : 'Đã thu tiền mặt'}
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setPendingCodOrder(null);
-                  setCheckoutSuccess(false);
-                }}
-                aria-label="Dismiss COD banner"
-                className="rounded px-1.5 py-0.5 text-xs text-white/90 hover:bg-white/20 cursor-pointer"
-              >
-                ×
-              </button>
-            </>
+                <button
+                  type="button"
+                  data-testid="pos-open-shift-for-cod-btn"
+                  onClick={() => {
+                    setShiftModalMode('open');
+                    setShiftHandoverOpen(true);
+                  }}
+                  className="rounded-md bg-amber-300 px-2.5 py-1 text-xs font-bold text-[#1a1008] hover:brightness-105 cursor-pointer"
+                >
+                  Mở ca ngay
+                </button>
+              </>
+            )}
+          </div>
+          {pendingCodOrders.length > 0 && (
+            <div className="flex flex-col gap-1.5 border-t border-white/20 pt-2">
+              {pendingCodOrders.map((pendingCod, idx) => (
+                <div key={pendingCod.id} className="flex items-center justify-between gap-3 text-xs">
+                  <span>
+                    Đơn <strong>#{pendingCod.id.slice(0, 8)}</strong> ({pendingCod.total.toLocaleString('vi-VN')}₫)
+                  </span>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      data-testid={idx === 0 ? 'pos-mark-cod-paid-btn' : `pos-mark-cod-paid-btn-${pendingCod.id}`}
+                      disabled={codCollecting || !activeShift}
+                      onClick={() => void handleMarkCodPaid(pendingCod.id)}
+                      className="inline-flex items-center gap-1.5 rounded-md bg-white px-3 py-1 text-xs font-semibold text-emerald-800 hover:bg-emerald-50 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+                    >
+                      <Banknote className="w-3.5 h-3.5" />
+                      {codCollecting ? 'Đang xác nhận...' : 'Đã thu tiền mặt'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setPendingCodOrders((prev) => prev.filter((item) => item.id !== pendingCod.id));
+                        if (pendingCodOrders.length <= 1) setCheckoutSuccess(false);
+                      }}
+                      aria-label={`Dismiss COD order ${pendingCod.id}`}
+                      className="rounded px-1.5 py-0.5 text-xs text-white/90 hover:bg-white/20 cursor-pointer"
+                    >
+                      ×
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
           )}
         </div>
       )}

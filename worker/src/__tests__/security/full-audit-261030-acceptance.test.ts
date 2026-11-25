@@ -6192,7 +6192,7 @@ describe('Full Security Audit Acceptance — KDS Surfaces & Collection Guards', 
       expect(validScopedJson.data.discount).toBe(20000);
       expect(validScopedJson.data.finalTotal).toBe(80000);
 
-      // AG3: KDS cancellation restores reserved inventory, and KDS station filter isolates kitchen_stations by tenant
+      // AG3: KDS pre-prep cancellation restores reserved inventory; post-prep cancellation records waste spoilage
       sql.prepare(
         `INSERT INTO inventory_items (id, code, name, current_stock, quantity, is_active, updated_at)
          VALUES ('inv-ag-1', 'MILK-AG', 'Fresh Milk', 8, 8, 1, ?)`
@@ -6203,7 +6203,7 @@ describe('Full Security Audit Acceptance — KDS Surfaces & Collection Guards', 
       ).run(nowIso);
       sql.prepare(
         `INSERT INTO orders (id, items, total, subtotal, status, customer_id, tenant_id, created_at, updated_at)
-         VALUES ('ord-ag-kds-cancel', '[]', 50000, 50000, 'preparing', 'cust-ag-validbday', 'default', ?, ?)`
+         VALUES ('ord-ag-kds-cancel', '[]', 50000, 50000, 'confirmed', 'cust-ag-validbday', 'default', ?, ?)`
       ).run(nowIso, nowIso);
 
       const kdsCancelResult = await executeKdsStatusTransition(db, 'ord-ag-kds-cancel', 'cancelled', 'manager', {

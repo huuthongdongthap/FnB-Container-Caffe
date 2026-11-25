@@ -27,8 +27,8 @@ export async function getOrder(
       : '';
     const binds = hasTenantScope ? [id, cleanTenant] : [id];
     const selectCols = cleanTenant
-      ? 'id, order_number, status, total, shipping_fee, discount, payment_status, payment_method, order_type, table_id, notes, delivery_time, started_at, ready_at, served_at, cancelled_at, failure_reason, customer_name, customer_phone, customer_address, items, tenant_id, created_at, updated_at, points_earned, cashback_earned'
-      : 'id, order_number, status, total, shipping_fee, discount, payment_status, payment_method, order_type, table_id, notes, delivery_time, started_at, ready_at, served_at, cancelled_at, failure_reason, customer_name, customer_phone, customer_address, items, created_at, updated_at, points_earned, cashback_earned';
+      ? 'id, order_number, status, total, shipping_fee, discount, payment_status, payment_method, order_type, table_id, notes, delivery_time, started_at, ready_at, served_at, cancelled_at, assigned_shipper_id, shipper_name, failure_reason, customer_name, customer_phone, customer_address, items, tenant_id, created_at, updated_at, points_earned, cashback_earned'
+      : 'id, order_number, status, total, shipping_fee, discount, payment_status, payment_method, order_type, table_id, notes, delivery_time, started_at, ready_at, served_at, cancelled_at, assigned_shipper_id, shipper_name, failure_reason, customer_name, customer_phone, customer_address, items, created_at, updated_at, points_earned, cashback_earned';
     let results: Record<string, unknown>[] = [];
     try {
       const res = await db.prepare(

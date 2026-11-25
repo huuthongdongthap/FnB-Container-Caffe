@@ -67,6 +67,10 @@ export interface StitchPOSNewProps {
   deliveryRecipientPhone?: string;
   /** Called when cashier edits delivery recipient phone */
   onDeliveryRecipientPhoneChange?: (phone: string) => void;
+  /** Optional cash tendered amount input for counter COD/cash settlement */
+  cashTendered?: string;
+  /** Called when cashier edits cash tendered amount */
+  onCashTenderedChange?: (value: string) => void;
   tableLabel?: string;
   guestLabel?: string;
   orderNumber?: string;

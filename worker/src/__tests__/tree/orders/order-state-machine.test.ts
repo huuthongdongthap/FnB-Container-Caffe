@@ -18,9 +18,13 @@ describe('canTransition', () => {
     }
   });
 
-  it('does not allow cancellation once served/delivered', () => {
-    expect(canTransition('served', 'cancelled').ok).toBe(false);
-    expect(canTransition('delivered', 'cancelled').ok).toBe(false);
+  it('allows unpaid walkout/refusal void transitions from served/delivered while blocking backward jumps', () => {
+    expect(canTransition('served', 'cancelled').ok).toBe(true);
+    expect(canTransition('served', 'failed').ok).toBe(true);
+    expect(canTransition('delivered', 'cancelled').ok).toBe(true);
+    expect(canTransition('delivered', 'failed').ok).toBe(true);
+    expect(canTransition('served', 'preparing').ok).toBe(false);
+    expect(canTransition('delivered', 'ready').ok).toBe(false);
   });
 
   it('rejects invalid transitions', () => {

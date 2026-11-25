@@ -153,8 +153,8 @@ export function StitchCheckoutNew({
     ? (new URLSearchParams(window.location.search).get('promo') || '').trim().toUpperCase()
     : '';
   const [promoInput, setPromoInput] = useState<string>(initialQueryPromo || initialState.form.promoCode || '');
-  const [appliedPromoCode, setAppliedPromoCode] = useState<string>(initialState.form.promoCode || '');
-  const [appliedDiscount, setAppliedDiscount] = useState<number>(initialState.form.discount || 0);
+  const [appliedPromoCode, setAppliedPromoCode] = useState<string>('');
+  const [appliedDiscount, setAppliedDiscount] = useState<number>(0);
   const [promoMessage, setPromoMessage] = useState<string | null>(null);
   const [promoError, setPromoError] = useState<string | null>(null);
   const [isValidatingPromo, setIsValidatingPromo] = useState(false);
@@ -168,18 +168,19 @@ export function StitchCheckoutNew({
     }
   }, [orderType, paymentMethod]);
 
-  // Clear applied promo discount when cart subtotal changes so stale discounts are never submitted
+  // Clear applied promo discount and stale form.promoCode when cart subtotal changes
   useEffect(() => {
     const currentSubtotal = summary?.subtotal;
     if (prevSubtotalRef.current !== undefined && currentSubtotal !== prevSubtotalRef.current) {
-      if (appliedDiscount > 0 || appliedPromoCode) {
+      if (appliedDiscount > 0 || appliedPromoCode || form.promoCode) {
         setAppliedDiscount(0);
         setAppliedPromoCode('');
         setPromoMessage(null);
+        setForm((prev) => ({ ...prev, promoCode: undefined, discount: 0 }));
       }
     }
     prevSubtotalRef.current = currentSubtotal;
-  }, [summary?.subtotal, appliedDiscount, appliedPromoCode]);
+  }, [summary?.subtotal, appliedDiscount, appliedPromoCode, form.promoCode]);
 
   // Loyalty lookup: query authenticated customer summary (supports both HttpOnly cookie and bearer auth)
   const authUser = useAuthStore((s) => s.user);
@@ -293,13 +294,23 @@ export function StitchCheckoutNew({
     total: effectiveTotal,
   };
 
+  const clearPromoState = () => {
+    setAppliedPromoCode('');
+    setAppliedDiscount(0);
+    setForm((prev) => ({ ...prev, promoCode: undefined, discount: 0 }));
+    try {
+      localStorage.removeItem('aura_selected_promo_code');
+    } catch {
+      /* ignore storage errors */
+    }
+  };
+
   const handleApplyPromo = async () => {
     const code = promoInput.trim().toUpperCase();
     setPromoMessage(null);
     setPromoError(null);
     if (!code) {
-      setAppliedPromoCode('');
-      setAppliedDiscount(0);
+      clearPromoState();
       return;
     }
     setIsValidatingPromo(true);
@@ -319,17 +330,17 @@ export function StitchCheckoutNew({
       const data = res?.data;
       if (data?.valid) {
         const discountAmt = Number(data.discount_amount ?? 0);
-        setAppliedPromoCode(data.code || code);
+        const validCode = data.code || code;
+        setAppliedPromoCode(validCode);
         setAppliedDiscount(discountAmt);
-        setPromoMessage(`Đã áp dụng mã ${data.code || code} (-${discountAmt.toLocaleString('vi-VN')}₫)`);
+        setForm((prev) => ({ ...prev, promoCode: validCode, discount: discountAmt }));
+        setPromoMessage(`Đã áp dụng mã ${validCode} (-${discountAmt.toLocaleString('vi-VN')}₫)`);
       } else {
-        setAppliedPromoCode('');
-        setAppliedDiscount(0);
+        clearPromoState();
         setPromoError(data?.reason || 'Mã ưu đãi không hợp lệ hoặc không đủ điều kiện');
       }
     } catch (err) {
-      setAppliedPromoCode('');
-      setAppliedDiscount(0);
+      clearPromoState();
       setPromoError(err instanceof Error ? err.message : 'Không thể kiểm tra mã ưu đãi');
     } finally {
       setIsValidatingPromo(false);
@@ -366,8 +377,9 @@ export function StitchCheckoutNew({
     }
     setIsSubmitting(true);
     try {
+      const { promoCode: _ignoredPromo, discount: _ignoredDiscount, ...cleanForm } = form;
       await onPlaceOrder({
-        ...form,
+        ...cleanForm,
         paymentMethod,
         orderType,
         ...(effectivePromoCode ? { promoCode: effectivePromoCode, discount: effectiveDiscount } : {}),
@@ -639,7 +651,14 @@ export function StitchCheckoutNew({
                     <input
                       type="text"
                       value={promoInput}
-                      onChange={(e) => setPromoInput(e.target.value.toUpperCase())}
+                      onChange={(e) => {
+                        const next = e.target.value.toUpperCase();
+                        setPromoInput(next);
+                        if (!next.trim() || (appliedPromoCode && next.trim() !== appliedPromoCode)) {
+                          setPromoMessage(null);
+                          clearPromoState();
+                        }
+                      }}
                       placeholder="VD: WELCOME"
                       aria-label="Mã ưu đãi"
                       data-testid="promo-code-input"

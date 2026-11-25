@@ -5,6 +5,7 @@
 
 import { transitionOrderStatus, isVoidStatus, type OrderStatusDb, type OrderStatusResult } from '../../order/policies/order-status-transition';
 import { releaseTableIfNoActiveOrders } from '../../order/policies/table-occupancy-release';
+import { compensateVoidedOrder } from '../../order/policies/order-rollback';
 import { restoreLoyaltyVoucherForOrder } from '../../order/loyalty-voucher';
 import {
   fanOutOrderBroadcast,
@@ -23,6 +24,8 @@ export interface KdsTransitionOptions {
   env?: Record<string, unknown>;
   skipCancelSideEffects?: boolean;
   allowPaidCompensation?: boolean;
+  actorId?: string;
+  validateAssignedShipper?: boolean;
   fields?: Record<string, unknown>;
 }
 
@@ -45,6 +48,8 @@ export async function executeKdsStatusTransition(
   const result = await transitionOrderStatus(db, orderId, targetStatus, userRole, {
     tenantId: options?.tenantId,
     allowPaidCompensation: options?.allowPaidCompensation,
+    actorId: options?.actorId,
+    validateAssignedShipper: options?.validateAssignedShipper,
     fields: options?.fields,
   });
   if (!result.success || result.idempotent) return result;
@@ -129,11 +134,30 @@ export async function executeKdsStatusTransition(
         { AURA_DB: rawDb },
         orderId,
         effectiveCancelTenant,
-        { preCancelStatus: order.previous_status, releaseUnconsumedReserves: true },
+        { preCancelStatus: order.previous_status },
       );
     } catch {
       // Non-blocking when inventory tables are absent in minimal test schemas
     }
+    const voidReason =
+      typeof options?.fields?.failure_reason === 'string' && options.fields.failure_reason.trim()
+        ? options.fields.failure_reason.trim()
+        : targetStatus === 'failed'
+          ? 'order_failed'
+          : 'order_cancelled';
+    await compensateVoidedOrder({
+      db: rawDb,
+      env: options?.env,
+      kv: (options?.kv as import('@cloudflare/workers-types').KVNamespace | null) ?? null,
+      orderId,
+      tenantId: effectiveCancelTenant,
+      now,
+      reason: voidReason,
+      preCancelStatus: order.previous_status,
+      actorId: options?.actorId ?? null,
+      skipInventoryRestore: true,
+      skipTableRelease: true,
+    }).catch(() => {});
     try {
       let earnRow = await rawDb
         .prepare("SELECT customer_id FROM cashback_transactions WHERE order_id = ? AND type = 'earn' AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ? LIMIT 1")

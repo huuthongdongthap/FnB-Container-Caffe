@@ -405,14 +405,20 @@ export function TableOrder(): ReactNode {
       <GuestInfoForm
         guestName={guestName}
         guestPhone={guestPhone}
+        paymentMethod={paymentMethod}
         isSubmitting={isSubmitting}
         submitError={submitError}
         onNameChange={(v) => { setGuestName(v); clearError(); }}
         onPhoneChange={(v) => { setGuestPhone(v); clearError(); }}
       />
 
-      {/* Payment method selector (COD / PayOS QR) */}
-      <div className="max-w-lg mx-auto px-4 pt-2 flex items-center gap-2 text-xs">
+      {!isPosRoute && <div style={{ height: '7.5rem' }} aria-hidden="true" />}
+
+      {/* Payment method selector (COD / PayOS QR) — placed below fixed nav + guest bar */}
+      <div
+        data-testid="table-order-payment-selector"
+        className="max-w-lg mx-auto px-4 pt-3 pb-1 flex items-center gap-2 text-xs relative z-10"
+      >
         <span className="text-[var(--aura-chrome-mid)]">Thanh toán:</span>
         <button
           type="button"
@@ -439,8 +445,6 @@ export function TableOrder(): ReactNode {
           PayOS QR
         </button>
       </div>
-
-      {!isPosRoute && <div style={{ height: '7.5rem' }} aria-hidden="true" />}
       {queuedOffline && <OfflineIndicator />}
 
       <StitchMobileOrderNew
