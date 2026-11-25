@@ -71,6 +71,115 @@ function maskOrderId(orderId: string): string {
   return `***${orderId.slice(-4)}`;
 }
 
+interface TenantConciergeProfile {
+  brandName: string;
+  address: string;
+  openingHours: string;
+  wifiSsid: string;
+  wifiPassword: string;
+  specials: string[];
+}
+
+async function loadTenantConciergeProfile(
+  db: import('@cloudflare/workers-types').D1Database,
+  tenantId: string
+): Promise<TenantConciergeProfile> {
+  const isDefaultTenant = !tenantId || tenantId === 'default' || tenantId === '*' || tenantId.toLowerCase() === 'hq';
+  let brandName = isDefaultTenant ? 'AURA CAFE Container' : '';
+  let address = isDefaultTenant ? 'Làng hoa Sa Đéc, Đồng Tháp' : '';
+  let openingHours = '06:30 đến 22:00';
+  let wifiSsid = isDefaultTenant ? 'AURA_CAFE_FREE_WIFI' : '';
+  let wifiPassword = isDefaultTenant ? 'auracafe2026' : '';
+  let specials: string[] = [];
+
+  if (!isDefaultTenant && db?.prepare) {
+    try {
+      const branding = await db
+        .prepare('SELECT display_name, address, receipt_footer FROM tenant_branding WHERE tenant_id = ? LIMIT 1')
+        .bind(tenantId)
+        .first<{ display_name?: string | null; address?: string | null; receipt_footer?: string | null }>();
+      if (branding?.display_name && branding.display_name.trim()) {
+        brandName = branding.display_name.trim();
+      }
+      if (branding?.address && branding.address.trim()) {
+        address = branding.address.trim();
+      }
+    } catch {
+      // tenant_branding optional
+    }
+
+    if (!brandName) {
+      try {
+        const tenantRow = await db
+          .prepare('SELECT name FROM saas_tenants WHERE id = ? OR slug = ? LIMIT 1')
+          .bind(tenantId, tenantId)
+          .first<{ name?: string | null }>();
+        if (tenantRow?.name && tenantRow.name.trim()) {
+          brandName = tenantRow.name.trim();
+        }
+      } catch {
+        // saas_tenants optional
+      }
+    }
+
+    if (!address) {
+      try {
+        const locRow = await db
+          .prepare("SELECT address, city FROM franchise_locations WHERE COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ? LIMIT 1")
+          .bind(tenantId)
+          .first<{ address?: string | null; city?: string | null }>();
+        if (locRow?.address && locRow.address.trim()) {
+          address = locRow.city && locRow.city.trim()
+            ? `${locRow.address.trim()}, ${locRow.city.trim()}`
+            : locRow.address.trim();
+        }
+      } catch {
+        // franchise_locations optional
+      }
+    }
+
+    try {
+      const settingsRes = await db
+        .prepare("SELECT key, value FROM store_settings WHERE COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?")
+        .bind(tenantId)
+        .all<{ key?: string; value?: string }>();
+      for (const s of settingsRes.results || []) {
+        const k = String(s.key || '').trim().toLowerCase();
+        const v = String(s.value || '').trim();
+        if (!v) continue;
+        if (k === 'wifi_ssid' || k === 'wifi_name') wifiSsid = v;
+        if (k === 'wifi_password' || k === 'wifi_pass') wifiPassword = v;
+        if (k === 'opening_hours' || k === 'business_hours') openingHours = v;
+        if (!address && k === 'address') address = v;
+        if (!brandName && (k === 'store_name' || k === 'brand_name')) brandName = v;
+      }
+    } catch {
+      // store_settings optional
+    }
+
+    try {
+      const prodRes = await db
+        .prepare("SELECT name FROM products WHERE is_available = 1 AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ? LIMIT 3")
+        .bind(tenantId)
+        .all<{ name?: string }>();
+      specials = (prodRes.results || [])
+        .map((p) => String(p.name || '').trim())
+        .filter(Boolean);
+    } catch {
+      // products optional
+    }
+  }
+
+  return {
+    brandName: brandName || 'Quán',
+    address,
+    openingHours,
+    wifiSsid,
+    wifiPassword,
+    specials,
+  };
+}
+
 export async function processCustomerQuery(
   db: import('@cloudflare/workers-types').D1Database,
   aiBinding: unknown,
@@ -78,75 +187,39 @@ export async function processCustomerQuery(
   data: z.infer<typeof querySchema>
 ): Promise<{ intent: string; reply: string; engine: string }> {
   const q = data.query.toLowerCase();
+  const qAscii = q
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .replace(/đ/g, 'd');
   let intent = 'general';
   let reply = '';
   let engine = 'deterministic';
 
-  if (q.includes('wifi') || q.includes('wi-fi') || q.includes('mật khẩu') || q.includes('pass')) {
+  const isWifiQuery = q.includes('wifi') || q.includes('wi-fi') || q.includes('mật khẩu') || q.includes('pass');
+  const isBillQuery =
+    q.includes('hóa đơn') ||
+    q.includes('hoá đơn') ||
+    qAscii.includes('hoa don') ||
+    q.includes('tính tiền') ||
+    qAscii.includes('tinh tien') ||
+    q.includes('thanh toán bàn') ||
+    Boolean(data.table_number) ||
+    (!data.order_id && q.includes('bàn'));
+
+  if (isWifiQuery) {
     intent = 'wifi_info';
-    reply = 'WiFi: AURA_CAFE_FREE_WIFI (Mật khẩu: auracafe2026). Sau khi kết nối, trang đăng nhập chào mừng sẽ tự động xuất hiện.';
-  } else if (q.includes('đơn') || q.includes('order') || q.includes('giao') || q.includes('làm xong') || data.order_id) {
-    intent = 'order_status';
-    let orderRow: { id: string; status: string; total: number; tenant_id?: string | null } | null = null;
-    const extractedId = data.order_id?.trim() || q.match(/(?:#([a-z0-9_-]{3,32})|\b((?:ord[_-])[a-z0-9_-]{2,32}|(?=[a-z0-9_-]*\d)[a-z0-9_-]{5,32})\b)/i)?.[1]
-      || q.match(/(?:#([a-z0-9_-]{3,32})|\b((?:ord[_-])[a-z0-9_-]{2,32}|(?=[a-z0-9_-]*\d)[a-z0-9_-]{5,32})\b)/i)?.[2];
-
-    if (extractedId) {
-      try {
-        orderRow = await db.prepare(
-          "SELECT id, status, COALESCE(total_amount, total, 0) as total, tenant_id FROM orders WHERE (? = '*' OR COALESCE(NULLIF(tenant_id, ''), 'default') = ?) AND LOWER(id) = LOWER(?) OR (?1 = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?2) AND LOWER(id) = LOWER(?3) LIMIT 1"
-        ).bind(tenantId, tenantId, extractedId).first<{ id: string; status: string; total: number; tenant_id?: string | null }>();
-      } catch (err) {
-        const msg = err instanceof Error ? err.message : String(err);
-        if (/no such column:\s*tenant_id|no column named\s*tenant_id/i.test(msg)) {
-          orderRow = (tenantId === 'default' || tenantId === '*')
-            ? await db.prepare('SELECT id, status, COALESCE(total, 0) as total FROM orders WHERE LOWER(id) = LOWER(?) LIMIT 1')
-                .bind(extractedId).first<{ id: string; status: string; total: number }>().catch(() => null)
-            : null;
-          if (orderRow && !matchesTenantRow(orderRow as unknown as Record<string, unknown>, tenantId)) {
-            orderRow = null;
-          }
-        } else {
-          orderRow = await db.prepare("SELECT id, status, COALESCE(total, 0) as total, tenant_id FROM orders WHERE (? = '*' OR COALESCE(NULLIF(tenant_id, ''), 'default') = ?) AND LOWER(id) = LOWER(?) OR (?1 = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?2) AND LOWER(id) = LOWER(?3) LIMIT 1")
-            .bind(tenantId, tenantId, extractedId).first<{ id: string; status: string; total: number; tenant_id?: string | null }>().catch(() => null);
-        }
-      }
-    } else if (data.phone) {
-      try {
-        orderRow = await db.prepare(
-          "SELECT id, status, COALESCE(total_amount, total, 0) as total, tenant_id FROM orders WHERE (? = '*' OR COALESCE(NULLIF(tenant_id, ''), 'default') = ?) AND customer_phone = ? OR (?1 = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?2) AND customer_phone = ?3 ORDER BY created_at DESC LIMIT 1"
-        ).bind(tenantId, tenantId, data.phone).first<{ id: string; status: string; total: number; tenant_id?: string | null }>();
-      } catch (err) {
-        const msg = err instanceof Error ? err.message : String(err);
-        if (/no such column:\s*tenant_id|no column named\s*tenant_id/i.test(msg)) {
-          orderRow = (tenantId === 'default' || tenantId === '*')
-            ? await db.prepare('SELECT id, status, COALESCE(total, 0) as total FROM orders WHERE customer_phone = ? ORDER BY created_at DESC LIMIT 1')
-                .bind(data.phone).first<{ id: string; status: string; total: number }>().catch(() => null)
-            : null;
-          if (orderRow && !matchesTenantRow(orderRow as unknown as Record<string, unknown>, tenantId)) {
-            orderRow = null;
-          }
-        } else {
-          orderRow = await db.prepare("SELECT id, status, COALESCE(total, 0) as total, tenant_id FROM orders WHERE (? = '*' OR COALESCE(NULLIF(tenant_id, ''), 'default') = ?) AND customer_phone = ? OR (?1 = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?2) AND customer_phone = ?3 ORDER BY created_at DESC LIMIT 1")
-            .bind(tenantId, tenantId, data.phone).first<{ id: string; status: string; total: number; tenant_id?: string | null }>().catch(() => null);
-        }
-      }
-    }
-
-    if (orderRow && !matchesOptionalTenantRow(orderRow, tenantId)) {
-      orderRow = null;
-    }
-
-    if (orderRow) {
-      const st = STATUS_MAP[orderRow.status] || orderRow.status;
-      const displayId = extractedId || data.channel === 'zalo' ? orderRow.id : maskOrderId(orderRow.id);
-      reply = `Đơn hàng #${displayId} (${Number(orderRow.total || 0).toLocaleString('vi-VN')}đ) hiện đang ở trạng thái: ${st}.`;
+    const profile = await loadTenantConciergeProfile(db, tenantId);
+    if (profile.wifiSsid) {
+      reply = profile.wifiPassword
+        ? `WiFi: ${profile.wifiSsid} (Mật khẩu: ${profile.wifiPassword}). Sau khi kết nối, trang đăng nhập chào mừng sẽ tự động xuất hiện.`
+        : `WiFi miễn phí: ${profile.wifiSsid}.`;
     } else {
-      reply = 'AURA chưa tìm thấy đơn hàng tương ứng. Bạn vui lòng cung cấp mã đơn hoặc số điện thoại đã đặt nhé!';
+      reply = `Bạn vui lòng hỏi nhân viên tại quầy để nhận thông tin WiFi của ${profile.brandName} nhé!`;
     }
-  } else if (q.includes('bàn') || q.includes('tính tiền') || q.includes('hóa đơn') || data.table_number) {
+  } else if (isBillQuery) {
     intent = 'table_bill';
-    const tbl = data.table_number || q.match(/bàn\s*([0-9a-zA-Z]+)/)?.[1];
+    const profile = await loadTenantConciergeProfile(db, tenantId);
+    const tbl = data.table_number || q.match(/bàn\s*([0-9a-zA-Z]+)/)?.[1] || qAscii.match(/ban\s*([0-9a-zA-Z]+)/)?.[1];
     if (tbl) {
       let activeOrder: { id: string; total: number; status: string; tenant_id?: string | null } | null = null;
       try {
@@ -214,7 +287,67 @@ export async function processCustomerQuery(
         reply = `Bàn ${tbl} hiện không có hóa đơn chưa thanh toán.`;
       }
     } else {
-      reply = 'Bạn đang ngồi tại bàn số mấy để AURA kiểm tra hóa đơn giúp bạn nhé?';
+      reply = `Bạn đang ngồi tại bàn số mấy để ${profile.brandName} kiểm tra hóa đơn giúp bạn nhé?`;
+    }
+  } else if (q.includes('đơn') || q.includes('order') || q.includes('giao') || q.includes('làm xong') || data.order_id) {
+    intent = 'order_status';
+    let orderRow: { id: string; status: string; total: number; tenant_id?: string | null } | null = null;
+    const extractedId = data.order_id?.trim() || q.match(/(?:#([a-z0-9_-]{3,32})|\b((?:ord[_-])[a-z0-9_-]{2,32}|(?=[a-z0-9_-]*\d)[a-z0-9_-]{5,32})\b)/i)?.[1]
+      || q.match(/(?:#([a-z0-9_-]{3,32})|\b((?:ord[_-])[a-z0-9_-]{2,32}|(?=[a-z0-9_-]*\d)[a-z0-9_-]{5,32})\b)/i)?.[2];
+
+    if (extractedId) {
+      try {
+        orderRow = await db.prepare(
+          "SELECT id, status, COALESCE(total_amount, total, 0) as total, tenant_id FROM orders WHERE (? = '*' OR COALESCE(NULLIF(tenant_id, ''), 'default') = ?) AND LOWER(id) = LOWER(?) OR (?1 = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?2) AND LOWER(id) = LOWER(?3) LIMIT 1"
+        ).bind(tenantId, tenantId, extractedId).first<{ id: string; status: string; total: number; tenant_id?: string | null }>();
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        if (/no such column:\s*tenant_id|no column named\s*tenant_id/i.test(msg)) {
+          orderRow = (tenantId === 'default' || tenantId === '*')
+            ? await db.prepare('SELECT id, status, COALESCE(total, 0) as total FROM orders WHERE LOWER(id) = LOWER(?) LIMIT 1')
+                .bind(extractedId).first<{ id: string; status: string; total: number }>().catch(() => null)
+            : null;
+          if (orderRow && !matchesTenantRow(orderRow as unknown as Record<string, unknown>, tenantId)) {
+            orderRow = null;
+          }
+        } else {
+          orderRow = await db.prepare("SELECT id, status, COALESCE(total, 0) as total, tenant_id FROM orders WHERE (? = '*' OR COALESCE(NULLIF(tenant_id, ''), 'default') = ?) AND LOWER(id) = LOWER(?) OR (?1 = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?2) AND LOWER(id) = LOWER(?3) LIMIT 1")
+            .bind(tenantId, tenantId, extractedId).first<{ id: string; status: string; total: number; tenant_id?: string | null }>().catch(() => null);
+        }
+      }
+    } else if (data.phone) {
+      try {
+        orderRow = await db.prepare(
+          "SELECT id, status, COALESCE(total_amount, total, 0) as total, tenant_id FROM orders WHERE (? = '*' OR COALESCE(NULLIF(tenant_id, ''), 'default') = ?) AND customer_phone = ? OR (?1 = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?2) AND customer_phone = ?3 ORDER BY created_at DESC LIMIT 1"
+        ).bind(tenantId, tenantId, data.phone).first<{ id: string; status: string; total: number; tenant_id?: string | null }>();
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        if (/no such column:\s*tenant_id|no column named\s*tenant_id/i.test(msg)) {
+          orderRow = (tenantId === 'default' || tenantId === '*')
+            ? await db.prepare('SELECT id, status, COALESCE(total, 0) as total FROM orders WHERE customer_phone = ? ORDER BY created_at DESC LIMIT 1')
+                .bind(data.phone).first<{ id: string; status: string; total: number }>().catch(() => null)
+            : null;
+          if (orderRow && !matchesTenantRow(orderRow as unknown as Record<string, unknown>, tenantId)) {
+            orderRow = null;
+          }
+        } else {
+          orderRow = await db.prepare("SELECT id, status, COALESCE(total, 0) as total, tenant_id FROM orders WHERE (? = '*' OR COALESCE(NULLIF(tenant_id, ''), 'default') = ?) AND customer_phone = ? OR (?1 = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?2) AND customer_phone = ?3 ORDER BY created_at DESC LIMIT 1")
+            .bind(tenantId, tenantId, data.phone).first<{ id: string; status: string; total: number; tenant_id?: string | null }>().catch(() => null);
+        }
+      }
+    }
+
+    if (orderRow && !matchesOptionalTenantRow(orderRow, tenantId)) {
+      orderRow = null;
+    }
+
+    if (orderRow) {
+      const st = STATUS_MAP[orderRow.status] || orderRow.status;
+      const displayId = extractedId || data.channel === 'zalo' ? orderRow.id : maskOrderId(orderRow.id);
+      reply = `Đơn hàng #${displayId} (${Number(orderRow.total || 0).toLocaleString('vi-VN')}đ) hiện đang ở trạng thái: ${st}.`;
+    } else {
+      const profile = await loadTenantConciergeProfile(db, tenantId);
+      reply = `${profile.brandName} chưa tìm thấy đơn hàng tương ứng. Bạn vui lòng cung cấp mã đơn hoặc số điện thoại đã đặt nhé!`;
     }
   } else if (q.includes('điểm') || q.includes('hạng') || q.includes('tích điểm')) {
     intent = 'loyalty_points';
@@ -248,18 +381,31 @@ export async function processCustomerQuery(
     }
   } else if (q.includes('menu') || q.includes('uống gì') || q.includes('món') || q.includes('đặc sản') || q.includes('gợi ý')) {
     intent = 'menu_recommendation';
-    reply = 'Đặc sản AURA hôm nay: Cà phê muối Sa Đéc đậm đà kem mặn béo ngậy, Cà phê cốt dừa Bến Tre tuyết mịn, và Trà sen Tháp Mười thanh mát.';
+    const profile = await loadTenantConciergeProfile(db, tenantId);
+    if (profile.specials.length > 0) {
+      reply = `Món gợi ý tại ${profile.brandName} hôm nay: ${profile.specials.join(', ')}.`;
+    } else if (!tenantId || tenantId === 'default' || tenantId === '*') {
+      reply = 'Đặc sản AURA hôm nay: Cà phê muối Sa Đéc đậm đà kem mặn béo ngậy, Cà phê cốt dừa Bến Tre tuyết mịn, và Trà sen Tháp Mười thanh mát.';
+    } else {
+      reply = `Mời bạn xem thực đơn trực tuyến của ${profile.brandName} để chọn món yêu thích hôm nay nhé!`;
+    }
   } else if (q.includes('giờ') || q.includes('mở cửa') || q.includes('địa chỉ') || q.includes('ở đâu')) {
     intent = 'store_info';
-    reply = 'AURA CAFE Container mở cửa phục vụ từ 06:30 đến 22:00 mỗi ngày tại Làng hoa Sa Đéc, Đồng Tháp. Rất hân hạnh đón tiếp bạn!';
+    const profile = await loadTenantConciergeProfile(db, tenantId);
+    if (profile.address) {
+      reply = `${profile.brandName} mở cửa phục vụ từ ${profile.openingHours} mỗi ngày tại ${profile.address}. Rất hân hạnh đón tiếp bạn!`;
+    } else {
+      reply = `${profile.brandName} mở cửa phục vụ từ ${profile.openingHours} mỗi ngày. Rất hân hạnh đón tiếp bạn!`;
+    }
   } else {
+    const profile = await loadTenantConciergeProfile(db, tenantId);
     // Attempt Workers AI for free-form conversation if bound
     const ai = aiBinding as { run: (_m: string, _opts: unknown) => Promise<{ response?: string }> } | undefined;
     if (ai && typeof ai.run === 'function') {
       try {
         const resp = await ai.run('@cf/meta/llama-3-8b-instruct', {
           messages: [
-            { role: 'system', content: 'You are AURA CAFE assistant in Sa Đéc. Reply warmly in Vietnamese in 1-2 sentences.' },
+            { role: 'system', content: `You are ${profile.brandName} assistant${profile.address ? ` at ${profile.address}` : ''}. Reply warmly in Vietnamese in 1-2 sentences.` },
             { role: 'user', content: data.query }
           ]
         });
@@ -270,7 +416,7 @@ export async function processCustomerQuery(
       } catch { /* fallback to default */ }
     }
     if (!reply) {
-      reply = 'Chào bạn! AURA có thể giúp bạn kiểm tra trạng thái đơn hàng, tra cứu hóa đơn bàn, xem mật khẩu WiFi hoặc gợi ý món đặc sản!';
+      reply = `Chào bạn! ${profile.brandName} có thể giúp bạn kiểm tra trạng thái đơn hàng, tra cứu hóa đơn bàn, xem mật khẩu WiFi hoặc gợi ý món đặc sản!`;
     }
   }
 

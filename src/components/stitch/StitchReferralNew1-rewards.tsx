@@ -61,7 +61,7 @@ export function RewardHistory({
                   {row.source}
                 </td>
                 <td className="p-6 text-right font-body text-base leading-[1.5] font-medium text-[var(--aura-chrome-bright)]">
-                  +${row.amount.toFixed(2)}
+                  +{Math.round(Number(row.amount) || 0).toLocaleString('vi-VN')}đ
                 </td>
               </tr>
             ))}

@@ -794,7 +794,7 @@ describe('Phase 66 Security & Multi-Tenant Suite (BM1..BM4)', () => {
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${adminTokenA}` },
-          body: JSON.stringify({ payment_method: 'payos' }),
+          body: JSON.stringify({ payment_method: 'bank_transfer' }),
         },
         { AURA_DB: db, JWT_SECRET } as unknown as Env
       );

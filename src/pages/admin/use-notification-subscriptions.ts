@@ -76,7 +76,7 @@ export function useNotificationSubscriptions() {
       if (resp.success) {
         setSubscriptions((prev) => [
           ...prev.filter((s) => s.name !== trimmedName),
-          { name: trimmedName, role, endpoint: '', subscribed: true },
+          { name: trimmedName, role, endpoint: '', subscribed: false },
         ]);
         return true;
       }

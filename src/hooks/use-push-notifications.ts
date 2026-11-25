@@ -21,12 +21,16 @@ const KNOWN_PUSH_ROLES = new Set([
   'staff-waiter',
   'owner',
   'manager',
+  'supervisor',
   'admin',
   'waiter',
   'kitchen',
+  'bep',
   'barista',
   'chef',
   'cashier',
+  'shipper',
+  'rider',
 ]);
 
 export function usePushNotifications(defaultToken?: string) {

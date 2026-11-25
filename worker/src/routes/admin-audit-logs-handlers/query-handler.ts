@@ -7,8 +7,8 @@ import { type PaginatedResponse } from './types';
 
 const log = createLogger({ route: 'admin-audit-logs:query' });
 
-export async function filterAuditRowsByTenant<T extends Record<string, any>>(
-  db: any,
+export async function filterAuditRowsByTenant<T extends Record<string, unknown>>(
+  db: import('@cloudflare/workers-types').D1Database | null | undefined,
   rows: T[],
   tenantId: string
 ): Promise<T[]> {
@@ -89,7 +89,7 @@ export function registerQueryHandler(router: Hono<{ Bindings: Env }>): void {
     if (!AUDIT_LOG_ALLOWED_ROLES.includes(String(user.role).toLowerCase())) {
       return c.json({ success: false, error: 'Insufficient permissions' }, 403);
     }
-    const rawTenantId = getTenantId(c as any);
+    const rawTenantId = getTenantId(c as unknown as Parameters<typeof getTenantId>[0]);
     const rawUserTenant = typeof (user.tenantId ?? user.tenant_id) === 'string' ? (user.tenantId ?? user.tenant_id)!.trim() : '';
     const userTenant = rawUserTenant && rawUserTenant !== '*' && rawUserTenant.toLowerCase() !== 'hq' ? rawUserTenant : 'default';
     const requestedTenant = (
@@ -103,7 +103,7 @@ export function registerQueryHandler(router: Hono<{ Bindings: Env }>): void {
       c.req.header('X-Store-ID') ||
       ''
     ).trim();
-    const isHq = isHQSuperAdmin(user as any);
+    const isHq = isHQSuperAdmin(user as Parameters<typeof isHQSuperAdmin>[0]);
     if (!isHq) {
       if (
         rawUserTenant === '*' ||
@@ -122,9 +122,9 @@ export function registerQueryHandler(router: Hono<{ Bindings: Env }>): void {
     const tenantId = isHq ? (hqTarget.toLowerCase() === 'hq' ? '*' : hqTarget) : userTenant;
     try {
       // Create AuditLogger per-request (query only needs AURA_DB)
-      let execCtx: any;
+      let execCtx: import('hono').ExecutionContext | undefined;
       try { execCtx = c.executionCtx; } catch { execCtx = undefined; }
-      const auditLogger = new AuditLogger(execCtx, c.env.AURA_DB);
+      const auditLogger = new AuditLogger(execCtx as import('hono').ExecutionContext, c.env.AURA_DB);
       const actorId = c.req.query('actor_id');
       const action = c.req.query('action');
       const resourceType = c.req.query('resource_type');
@@ -164,23 +164,22 @@ export function registerQueryHandler(router: Hono<{ Bindings: Env }>): void {
         }, 400);
       }
 
+      const normalizedDateFrom = dateFrom
+        ? (/^\d{4}-\d{2}-\d{2}$/.test(dateFrom.trim()) ? `${dateFrom.trim()} 00:00:00` : dateFrom.trim())
+        : undefined;
       const normalizedDateTo = dateTo
         ? (/^\d{4}-\d{2}-\d{2}$/.test(dateTo.trim()) ? `${dateTo.trim()}T23:59:59.999Z` : dateTo.trim())
         : undefined;
-
-      const isScoped = tenantId !== '*';
-      const batchSize = isScoped ? Math.min(Math.max(page * pageSize * 5, 500), 2500) : pageSize;
-      const queryPage = isScoped ? 1 : page;
 
       let result = await auditLogger.query({
         actorId: actorId || undefined,
         action: action || undefined,
         resourceType: resourceType || undefined,
-        dateFrom: dateFrom || undefined,
+        dateFrom: normalizedDateFrom,
         dateTo: normalizedDateTo,
-        page: queryPage,
-        pageSize: batchSize,
-        maxPageSize: isScoped ? Math.min(Math.max(batchSize, 1000), 2500) : 100,
+        page,
+        pageSize,
+        maxPageSize: 100,
         tenantId,
       });
 
@@ -197,13 +196,13 @@ export function registerQueryHandler(router: Hono<{ Bindings: Env }>): void {
             conditions.push('resource_type = ?');
             params.push(resourceType);
           }
-          if (dateFrom) {
-            conditions.push('created_at >= ?');
-            params.push(dateFrom);
+          if (normalizedDateFrom) {
+            conditions.push("replace(created_at, 'T', ' ') >= ?");
+            params.push(normalizedDateFrom.replace('T', ' '));
           }
           if (normalizedDateTo) {
-            conditions.push('created_at <= ?');
-            params.push(normalizedDateTo);
+            conditions.push("replace(created_at, 'T', ' ') <= ?");
+            params.push(normalizedDateTo.replace('T', ' '));
           }
 
           const upper = action.trim().toUpperCase();
@@ -212,41 +211,58 @@ export function registerQueryHandler(router: Hono<{ Bindings: Env }>): void {
             UPDATE: ['%.put', '%.patch', '%update%'],
             DELETE: ['%.delete', '%delete%'],
             LOGIN: ['%login%', '%auth%'],
+            LOGOUT: ['%logout%'],
             EXPORT: ['%export%'],
           };
-          const patterns = verbMethodMap[upper] ?? [`%${action.trim().toLowerCase()}%`];
-          const actionOrClauses = ['LOWER(action) = LOWER(?)', ...patterns.map(() => 'LOWER(action) LIKE ?')];
+          const patterns = verbMethodMap[upper] ?? [`%${action.trim().toLowerCase().replace(/[\\%_]/g, '\\$&')}%`];
+          const actionOrClauses = ['LOWER(action) = LOWER(?)', ...patterns.map(() => "LOWER(action) LIKE ? ESCAPE '\\'")];
           conditions.push(`(${actionOrClauses.join(' OR ')})`);
           params.push(action.trim(), ...patterns);
 
-          const offset = (queryPage - 1) * batchSize;
+          const offset = (page - 1) * pageSize;
           let countRow: { total: number } | null = null;
           let results: Array<typeof result.rows[number]> | undefined;
 
           try {
             const scopedConditions = [
               ...conditions,
-              "(? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?)",
+              "(? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ? OR json_extract(details, '$.tenant_id') = ? OR json_extract(details, '$.tenantId') = ?)",
             ];
-            const scopedParams = [...params, tenantId, tenantId];
+            const scopedParams = [...params, tenantId, tenantId, tenantId, tenantId];
             const scopedWhere = `WHERE ${scopedConditions.join(' AND ')}`;
             countRow = await c.env.AURA_DB.prepare(
               `SELECT COUNT(*) as total FROM audit_logs ${scopedWhere}`
             ).bind(...scopedParams).first<{ total: number }>();
             const scopedRes = await c.env.AURA_DB.prepare(
               `SELECT * FROM audit_logs ${scopedWhere} ORDER BY created_at DESC LIMIT ? OFFSET ?`
-            ).bind(...scopedParams, batchSize, offset).all<typeof result.rows[number]>();
+            ).bind(...scopedParams, pageSize, offset).all<typeof result.rows[number]>();
             results = scopedRes.results;
           } catch {
-            if (tenantId === 'default' || tenantId === '*') {
-              const whereClause = `WHERE ${conditions.join(' AND ')}`;
+            try {
+              const scopedConditions = [
+                ...conditions,
+                "(? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?)",
+              ];
+              const scopedParams = [...params, tenantId, tenantId];
+              const scopedWhere = `WHERE ${scopedConditions.join(' AND ')}`;
               countRow = await c.env.AURA_DB.prepare(
-                `SELECT COUNT(*) as total FROM audit_logs ${whereClause}`
-              ).bind(...params).first<{ total: number }>();
-              const unscopedRes = await c.env.AURA_DB.prepare(
-                `SELECT * FROM audit_logs ${whereClause} ORDER BY created_at DESC LIMIT ? OFFSET ?`
-              ).bind(...params, batchSize, offset).all<typeof result.rows[number]>();
-              results = unscopedRes.results;
+                `SELECT COUNT(*) as total FROM audit_logs ${scopedWhere}`
+              ).bind(...scopedParams).first<{ total: number }>();
+              const scopedRes = await c.env.AURA_DB.prepare(
+                `SELECT * FROM audit_logs ${scopedWhere} ORDER BY created_at DESC LIMIT ? OFFSET ?`
+              ).bind(...scopedParams, pageSize, offset).all<typeof result.rows[number]>();
+              results = scopedRes.results;
+            } catch {
+              if (tenantId === 'default' || tenantId === '*') {
+                const whereClause = `WHERE ${conditions.join(' AND ')}`;
+                countRow = await c.env.AURA_DB.prepare(
+                  `SELECT COUNT(*) as total FROM audit_logs ${whereClause}`
+                ).bind(...params).first<{ total: number }>();
+                const unscopedRes = await c.env.AURA_DB.prepare(
+                  `SELECT * FROM audit_logs ${whereClause} ORDER BY created_at DESC LIMIT ? OFFSET ?`
+                ).bind(...params, pageSize, offset).all<typeof result.rows[number]>();
+                results = unscopedRes.results;
+              }
             }
           }
 
@@ -262,16 +278,17 @@ export function registerQueryHandler(router: Hono<{ Bindings: Env }>): void {
         }
       }
 
-      if (isScoped && result.rows.length > 0) {
-        const filteredAll = await filterAuditRowsByTenant(c.env.AURA_DB, result.rows as any[], tenantId);
-        const startIdx = (page - 1) * pageSize;
-        const pagedRows = filteredAll.slice(startIdx, startIdx + pageSize) as any[];
-        const pagedTotal = result.rows.length < batchSize
-          ? filteredAll.length
-          : Math.max(filteredAll.length, result.total - (result.rows.length - filteredAll.length));
-        result = Object.assign([...pagedRows], {
-          rows: pagedRows,
-          total: pagedTotal,
+      if (tenantId !== '*' && result.rows.length > 0) {
+        const verifiedRows = await filterAuditRowsByTenant(
+          c.env.AURA_DB,
+          result.rows as unknown as Array<Record<string, unknown>>,
+          tenantId
+        ) as unknown as typeof result.rows;
+        const droppedOnPage = result.rows.length - verifiedRows.length;
+        const adjustedTotal = Math.max(verifiedRows.length, result.total - droppedOnPage);
+        result = Object.assign([...verifiedRows], {
+          rows: verifiedRows,
+          total: adjustedTotal,
         });
       }
 

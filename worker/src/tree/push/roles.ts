@@ -32,9 +32,12 @@ const STAFF_PUSH_ROLE_RANK: Record<string, number> = {
   waiter: 10,
   cashier: 15,
   kitchen: 10,
+  bep: 10,
   [STAFF_PUSH_ROLE]: 10,
   barista: 10,
   chef: 20,
+  shipper: 10,
+  rider: 10,
 };
 
 export function isStaffPushRole(role: string): boolean {
@@ -69,7 +72,7 @@ export function resolveStaffPushRequestedRole(
     return { ok: false, error: 'Forbidden: unknown staff push role' };
   }
   const isPrivileged = caller === 'owner' || caller === 'admin' || caller === 'manager' || caller === 'supervisor';
-  const KITCHEN_ELIGIBLE_ROLES = new Set(['kitchen', 'barista', 'chef', 'staff', 'cashier', STAFF_PUSH_ROLE]);
+  const KITCHEN_ELIGIBLE_ROLES = new Set(['kitchen', 'bep', 'barista', 'chef', 'staff', 'cashier', STAFF_PUSH_ROLE]);
   if (!isPrivileged) {
     if (
       requested !== caller &&

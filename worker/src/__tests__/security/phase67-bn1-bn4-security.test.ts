@@ -1640,7 +1640,7 @@ describe('Phase 67 Security Regression Suite (BN1..BN4)', () => {
       );
       expect(getAdminRes.status).toBe(200);
       const getAdminBody = (await getAdminRes.json()) as { autoNotifyNewOrder: boolean; soundAlerts: boolean };
-      expect(getAdminBody).toEqual({ autoNotifyNewOrder: false, soundAlerts: false });
+      expect(getAdminBody).toEqual({ autoNotifyNewOrder: true, soundAlerts: false });
 
       // Non-HQ ?store_id=store-b rejected with 403 on both admin and staff notification settings
       const crossAdminRes = await app.request(

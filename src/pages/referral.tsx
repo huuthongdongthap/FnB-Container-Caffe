@@ -119,7 +119,7 @@ export function ReferralPage() {
 
   const rewardAmount = store.cashbackEarned;
 
-  const data: ReferralPageData | undefined = store.referralCode
+  const data: ReferralPageData | undefined = isAuthenticated && store.referralCode
     ? {
         rewardAmount,
         referralCode: store.referralCode,

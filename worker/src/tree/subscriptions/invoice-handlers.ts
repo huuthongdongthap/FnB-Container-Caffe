@@ -10,7 +10,11 @@ import { generateId, today, nowStr, addMonths } from './helpers';
 import { payInvoiceSchema } from '../../lib/validators';
 import { createNowPaymentsInvoice } from './nowpayments';
 import { getTenantId, matchesTenantRow } from '../../lib/db';
+import { isHQSuperAdmin } from '../../middleware/tenant';
+import { computeHmacSha256Hex } from '../../lib/tenant-secrets';
 import { verifyJWT } from '../../lib/jwt';
+
+const PAYOS_API_URL = 'https://api-merchant.payos.vn/v2/payment-requests';
 
 function resolveJwtSecret(env: Env | undefined): string {
   return typeof env?.JWT_SECRET === 'string' ? env.JWT_SECRET.trim() : '';
@@ -165,21 +169,29 @@ export async function listInvoices(c: Context<{ Bindings: Env }>) {
   const tenantScopedQuery = `${query} AND (? = '*' OR COALESCE(NULLIF(TRIM(COALESCE(s.tenant_id, i.tenant_id)), ''), 'default') = ?) ORDER BY i.created_at DESC LIMIT 500`;
   query += ' ORDER BY i.created_at DESC LIMIT 500';
 
-  let rows: any[] = [];
+  type InvoiceListQueryRow = InvoiceRecord & {
+    tenant_id?: string | null;
+    sub_tenant_id?: string | null;
+    sub_customer_id?: string | null;
+    customer_id?: string | null;
+    sub_customer_email?: string | null;
+    customer_email?: string | null;
+  };
+  let rows: InvoiceListQueryRow[] = [];
   let usedFallback = false;
   try {
-    const invoices = await db.prepare(tenantScopedQuery).bind(...params, tenantId, tenantId).all<InvoiceRecord>();
+    const invoices = await db.prepare(tenantScopedQuery).bind(...params, tenantId, tenantId).all<InvoiceListQueryRow>();
     rows = invoices.results || [];
   } catch {
     usedFallback = true;
     try {
-      const invoices = await db.prepare(query).bind(...params).all<InvoiceRecord>();
+      const invoices = await db.prepare(query).bind(...params).all<InvoiceListQueryRow>();
       rows = invoices.results || [];
     } catch {
       const fallbackQuery = query
         .replace(', s.customer_id as sub_customer_id, s.customer_email as sub_customer_email', '')
         .replace(', s.tenant_id as sub_tenant_id', '');
-      const invoices = await db.prepare(fallbackQuery).bind(...params).all<InvoiceRecord>();
+      const invoices = await db.prepare(fallbackQuery).bind(...params).all<InvoiceListQueryRow>();
       rows = invoices.results || [];
     }
   }
@@ -270,8 +282,126 @@ export async function payInvoice(c: Context<{ Bindings: Env }>) {
       ? parentSubMap.tenant_id.trim()
       : 'default';
 
+  const requestedMethod = String(body.payment_method || '').trim().toLowerCase();
+  const ctxUser = (c as unknown as {
+    get?: (k: string) => { role?: string; tenantId?: string; tenant_id?: string } | undefined;
+  }).get?.('user');
+  const callerIsHq = Boolean(ctxUser && isHQSuperAdmin(ctxUser));
+
+  if (requestedMethod === 'manual') {
+    if (!callerIsHq) {
+      return c.json({ success: false, error: 'Manual invoice settlement requires HQ super admin' }, 403);
+    }
+  } else if (requestedMethod === 'payos') {
+    const saasClientId = c.env.SAAS_PAYOS_CLIENT_ID;
+    const saasApiKey = c.env.SAAS_PAYOS_API_KEY;
+    const saasChecksumKey = c.env.SAAS_PAYOS_CHECKSUM_KEY;
+    if (!saasClientId || !saasApiKey || !saasChecksumKey) {
+      return c.json(
+        {
+          success: false,
+          code: 'payment_gateway_not_configured',
+          error: 'Payment gateway not configured',
+        },
+        503
+      );
+    }
+
+    const amountVnd = Math.round(Number(invoice.amount_vnd));
+    if (!Number.isFinite(amountVnd) || amountVnd <= 0) {
+      return c.json({ success: false, error: 'Invalid invoice amount' }, 400);
+    }
+
+    const randBuf = new Uint32Array(1);
+    crypto.getRandomValues(randBuf);
+    const randomSuffix = String(10000 + (randBuf[0] % 90000));
+    const payosOrderCode = Number(`${Date.now().toString().slice(-8)}${randomSuffix}`);
+    const baseUrl = c.env.FE_BASE_URL || c.env.APP_URL || 'https://auraspace.cafe';
+    const returnUrl = `${baseUrl}/saas/dashboard?invoice=${encodeURIComponent(invoiceId)}&status=paid`;
+    const cancelUrl = `${baseUrl}/saas/dashboard?invoice=${encodeURIComponent(invoiceId)}&status=cancelled`;
+    const description = `SUB INV ${String(invoice.invoice_number || invoiceId).replace(/[^A-Za-z0-9]/g, '').slice(-12)}`.slice(0, 25);
+    const rawSig = `amount=${amountVnd}&cancelUrl=${cancelUrl}&description=${description}&orderCode=${payosOrderCode}&returnUrl=${returnUrl}`;
+    const signature = await computeHmacSha256Hex(saasChecksumKey, rawSig);
+
+    let checkoutUrl: string;
+    try {
+      const payosRes = await fetch(PAYOS_API_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-client-id': saasClientId,
+          'x-api-key': saasApiKey,
+        },
+        body: JSON.stringify({
+          orderCode: payosOrderCode,
+          amount: amountVnd,
+          description,
+          returnUrl,
+          cancelUrl,
+          signature,
+        }),
+      });
+      if (!payosRes.ok) {
+        return c.json(
+          { success: false, error: `PayOS gateway error (HTTP ${payosRes.status})` },
+          502
+        );
+      }
+      const payosJson = (await payosRes.json()) as {
+        code?: string;
+        desc?: string;
+        data?: { checkoutUrl?: string };
+      };
+      if (payosJson.code !== '00' || !payosJson.data?.checkoutUrl) {
+        return c.json(
+          { success: false, error: payosJson.desc || 'PayOS rejected checkout creation' },
+          502
+        );
+      }
+      checkoutUrl = payosJson.data.checkoutUrl;
+    } catch {
+      return c.json({ success: false, error: 'PayOS gateway unreachable' }, 502);
+    }
+
+    const updatedAt = nowStr();
+    const paymentRef = `payos:${payosOrderCode}`;
+    let payosUpdateRes: { meta?: { changes?: number } } | undefined;
+    try {
+      payosUpdateRes = await db.prepare(
+        "UPDATE subscription_invoices SET status = 'processing', payment_method = 'payos', payment_ref = ?, updated_at = ? WHERE id = ? AND COALESCE(LOWER(TRIM(status)), 'pending') NOT IN ('paid', 'manual', 'cancelled', 'canceled', 'processing') AND (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') IN (?, ?, 'default'))"
+      ).bind(paymentRef, updatedAt, invoiceId, tenantId, tenantId, parentSubTenant).run();
+    } catch (err) {
+      if (tenantId !== 'default' && tenantId !== '*') {
+        return c.json({ success: false, error: 'Tenant-scoped invoice payment update failed', detail: (err as Error).message }, 500);
+      }
+      payosUpdateRes = await db.prepare(
+        "UPDATE subscription_invoices SET status = 'processing', payment_method = 'payos', payment_ref = ?, updated_at = ? WHERE id = ? AND COALESCE(LOWER(TRIM(status)), 'pending') NOT IN ('paid', 'manual', 'cancelled', 'canceled', 'processing')"
+      ).bind(paymentRef, updatedAt, invoiceId).run();
+    }
+    if (payosUpdateRes?.meta && payosUpdateRes.meta.changes === 0) {
+      return c.json({ success: false, error: 'Invoice state changed concurrently' }, 409);
+    }
+
+    return c.json({
+      success: true,
+      message: 'Redirecting to PayOS payment gateway',
+      payment_url: checkoutUrl,
+      checkout_url: checkoutUrl,
+      payment_ref: paymentRef,
+      data: {
+        id: invoiceId,
+        status: 'processing',
+        payment_url: checkoutUrl,
+        checkout_url: checkoutUrl,
+        payment_ref: paymentRef,
+      },
+    });
+  }
+
   // Try NowPayments if configured
-  const npResult = await createNowPaymentsInvoice(c.env as any, invoiceId, Number(invoice.amount_vnd)).catch(() => null);
+  const npResult = requestedMethod === 'manual'
+    ? null
+    : await createNowPaymentsInvoice(c.env as unknown as Parameters<typeof createNowPaymentsInvoice>[0], invoiceId, Number(invoice.amount_vnd)).catch(() => null);
 
   if (npResult) {
     // Store payment_ref (NowPayments invoice id) and set status=processing

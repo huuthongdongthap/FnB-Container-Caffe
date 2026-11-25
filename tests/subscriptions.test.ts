@@ -145,8 +145,9 @@ describe('Subscription & MRR System', () => {
       expect(schema).toContain('CREATE TABLE IF NOT EXISTS mrr_snapshots');
     });
 
-    test('should have snapshot_date UNIQUE', () => {
-      expect(schema).toContain('snapshot_date TEXT NOT NULL UNIQUE');
+    test('should have tenant-scoped snapshot_date UNIQUE(tenant_id, snapshot_date)', () => {
+      expect(schema).toContain('snapshot_date TEXT NOT NULL');
+      expect(schema).toContain('UNIQUE(tenant_id, snapshot_date)');
     });
 
     test('should have mrr_vnd (active MRR)', () => {
@@ -218,8 +219,9 @@ describe('Subscription & MRR System', () => {
       expect(schema).toContain('payment_ref TEXT');
     });
 
-    test('should have invoice_number UNIQUE', () => {
-      expect(schema).toContain('invoice_number TEXT UNIQUE');
+    test('should have tenant-scoped invoice_number UNIQUE(tenant_id, invoice_number)', () => {
+      expect(schema).toContain('invoice_number TEXT');
+      expect(schema).toContain('UNIQUE(tenant_id, invoice_number)');
     });
 
     test('should have created_at', () => {

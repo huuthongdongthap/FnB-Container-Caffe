@@ -1,8 +1,30 @@
 import type { Hono } from 'hono';
 import { pretixWebhookBodySchema, zodErrorResponse } from '../../lib/validators';
+import { createLogger } from '../../middleware/logger';
 import { resolvePilotStore } from '../../middleware/tenant';
+import { AuditLogger } from '../../lib/audit-logger';
+import { recordMetric } from '../../lib/metrics-collector';
+import { sendPushToStaff, type PushEnv } from '../../tree/push/notifier';
+import { getPretixClient } from '../../tree/pretix/client-factory';
 import { validateWebhookSignature } from '../../tree/pretix/hmac-validator';
 import type { PretixEnv } from './types';
+
+const log = createLogger({ route: 'pretix-webhook' });
+
+type TicketOrderStatus = 'placed' | 'paid' | 'canceled' | 'expired' | 'refunded' | 'checked_in' | 'ignored';
+
+function mapPretixActionToStatus(action: string): TicketOrderStatus {
+  const norm = String(action || '').trim().toLowerCase();
+  if (norm === 'pretix.event.order.placed' || norm.endsWith('.order.placed')) return 'placed';
+  if (norm === 'pretix.event.order.paid' || norm.endsWith('.order.paid')) return 'paid';
+  if (norm === 'pretix.event.order.canceled' || norm === 'pretix.event.order.cancelled' || norm.endsWith('.order.canceled')) {
+    return 'canceled';
+  }
+  if (norm === 'pretix.event.order.expired' || norm.endsWith('.order.expired')) return 'expired';
+  if (norm.includes('refund')) return 'refunded';
+  if (norm.includes('checkin')) return 'checked_in';
+  return 'ignored';
+}
 
 
 export function registerWebhookHandler(router: Hono): void {
@@ -144,6 +166,171 @@ export function registerWebhookHandler(router: Hono): void {
       }
     }
 
-    return c.json({ success: true, message: 'Webhook received' });
+    const effectiveTenant = !activeTenant || activeTenant === '*' ? 'default' : activeTenant;
+    const syncedStatus = mapPretixActionToStatus(body.action);
+    let orderDetails: Record<string, unknown> | null = null;
+
+    if (syncedStatus !== 'ignored') {
+      const client = getPretixClient(env);
+      if (client && body.organizer && body.event && body.code) {
+        try {
+          orderDetails = await client.getOrder(body.organizer, body.event, body.code);
+        } catch (fetchErr) {
+          log.warn('pretix_webhook_order_fetch_skipped', {
+            organizer: body.organizer,
+            event: body.event,
+            code: body.code,
+            error: fetchErr instanceof Error ? fetchErr.message : String(fetchErr),
+          });
+        }
+      }
+
+      if (db && body.code) {
+        const nowIso = new Date().toISOString();
+        const totalVal = orderDetails && typeof orderDetails.total === 'string'
+          ? Number(orderDetails.total)
+          : (orderDetails && typeof orderDetails.total === 'number' ? orderDetails.total : 0);
+        const buyerEmail = orderDetails && typeof orderDetails.email === 'string' ? orderDetails.email : null;
+
+        // Sync ticket_orders table when explicitly present in schema
+        try {
+          const ticketOrdersMeta = await db
+            .prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'ticket_orders' LIMIT 1")
+            .first<{ name?: string }>()
+            .catch(() => null);
+          if (ticketOrdersMeta?.name === 'ticket_orders') {
+            await db
+              .prepare(
+                `INSERT INTO ticket_orders (id, organizer, event_slug, order_code, status, email, total_amount, tenant_id, updated_at, created_at)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                 ON CONFLICT(id) DO UPDATE SET
+                   status = excluded.status,
+                   email = COALESCE(excluded.email, ticket_orders.email),
+                   total_amount = CASE WHEN excluded.total_amount > 0 THEN excluded.total_amount ELSE ticket_orders.total_amount END,
+                   updated_at = excluded.updated_at`
+              )
+              .bind(
+                `ptx_${effectiveTenant}_${body.organizer || 'org'}_${body.event || 'evt'}_${body.code}`,
+                body.organizer || '',
+                body.event || '',
+                body.code,
+                syncedStatus,
+                buyerEmail,
+                Number.isFinite(totalVal) ? totalVal : 0,
+                effectiveTenant,
+                nowIso,
+                nowIso
+              )
+              .run();
+          }
+        } catch {
+          // ticket_orders table is optional
+        }
+
+        const kv = (env as Record<string, unknown>).AUTH_KV as import('@cloudflare/workers-types').KVNamespace | undefined;
+        if (kv && typeof kv.put === 'function') {
+          await kv
+            .put(
+              `pretix:ticket_order:${effectiveTenant}:${body.event || 'default'}:${body.code}`,
+              JSON.stringify({
+                organizer: body.organizer || '',
+                event: body.event || '',
+                code: body.code,
+                status: syncedStatus,
+                action: body.action,
+                email: buyerEmail,
+                total: Number.isFinite(totalVal) ? totalVal : 0,
+                updatedAt: nowIso,
+              }),
+              { expirationTtl: 90 * 86400 }
+            )
+            .catch(() => {});
+        }
+
+        try {
+          const auditMeta = await db
+            .prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'audit_logs' LIMIT 1")
+            .first<{ name?: string }>()
+            .catch(() => null);
+          if (auditMeta?.name === 'audit_logs') {
+            let execCtx: import('hono').ExecutionContext | undefined;
+            try { execCtx = c.executionCtx; } catch { execCtx = undefined; }
+            const auditLogger = new AuditLogger(execCtx as import('hono').ExecutionContext, db);
+            await auditLogger.log({
+              actor_id: 'system:pretix',
+              actor_name: 'Pretix Webhook',
+              action: `pretix.ticket.${syncedStatus}`,
+              resource_type: 'pretix_order',
+              resource_id: body.code,
+              tenant_id: effectiveTenant,
+              details: JSON.stringify({
+                organizer: body.organizer || '',
+                event: body.event || '',
+                code: body.code,
+                pretix_action: body.action,
+                status: syncedStatus,
+                email: buyerEmail,
+                total: Number.isFinite(totalVal) ? totalVal : 0,
+              }),
+            });
+          }
+        } catch {
+          // Best-effort audit record
+        }
+
+        try {
+          const metricsMeta = await db
+            .prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = '_metrics' LIMIT 1")
+            .first<{ name?: string }>()
+            .catch(() => null);
+          if (metricsMeta?.name === '_metrics') {
+            void recordMetric(db, 'pretix_webhook_processed', 1, {
+              action: syncedStatus,
+              tenant_id: effectiveTenant,
+            });
+          }
+        } catch {
+          // Best-effort metric
+        }
+      }
+
+      if (syncedStatus === 'paid' || syncedStatus === 'canceled') {
+        const pushEnv = env as unknown as PushEnv;
+        if (pushEnv.VAPID_PUBLIC_KEY && pushEnv.VAPID_PRIVATE_KEY && pushEnv.AURA_DB) {
+          await sendPushToStaff(
+            pushEnv,
+            {
+              title: syncedStatus === 'paid' ? 'Vé sự kiện mới đã thanh toán' : 'Vé sự kiện đã hủy',
+              body: `Mã vé #${body.code} (${body.event || 'Sự kiện'}) — trạng thái: ${syncedStatus}`,
+              data: {
+                type: 'pretix_ticket_update',
+                code: body.code,
+                event: body.event || '',
+                status: syncedStatus,
+                tenant_id: effectiveTenant,
+              },
+            },
+            'owner',
+            [],
+            effectiveTenant
+          ).catch(() => {});
+        }
+      }
+
+      log.info('pretix_webhook_synced', {
+        tenantId: effectiveTenant,
+        organizer: body.organizer,
+        event: body.event,
+        code: body.code,
+        status: syncedStatus,
+      });
+    }
+
+    return c.json({
+      success: true,
+      message: 'Webhook received',
+      synced_status: syncedStatus,
+      code: body.code,
+    });
   });
 }

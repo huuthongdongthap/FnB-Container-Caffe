@@ -373,60 +373,52 @@ export async function getMRRTrend(c: Context<{ Bindings: Env }>) {
   const parsedDays = parseInt(c.req.query('days') || '30', 10);
   const days = Number.isFinite(parsedDays) ? Math.min(Math.max(1, parsedDays), 365) : 30;
 
-  if (tenantId !== 'default') {
-    let live = await db.prepare(
-      "SELECT COALESCE(SUM(amount_vnd), 0) as mrr, COUNT(*) as count, COALESCE(SUM(CASE WHEN LOWER(TRIM(COALESCE(billing_cycle, 'monthly'))) = 'quarterly' THEN amount_vnd / 3.0 WHEN LOWER(TRIM(COALESCE(billing_cycle, 'monthly'))) IN ('annual', 'yearly') THEN amount_vnd / 12.0 ELSE amount_vnd END), 0) as normalized_mrr FROM subscriptions WHERE status = 'active' AND (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?)"
-    ).bind(tenantId, tenantId).first<{ mrr: number; count: number; normalized_mrr?: number }>().catch(() => null);
-    if (!live) {
-      live = await db.prepare(
-        'SELECT COALESCE(SUM(amount_vnd), 0) as mrr, COUNT(*) as count FROM subscriptions WHERE status = \'active\' AND (? = \'*\' OR COALESCE(NULLIF(TRIM(tenant_id), \'\'), \'default\') = ?)'
-      ).bind(tenantId, tenantId).first<{ mrr: number; count: number; normalized_mrr?: number }>().catch(() => null);
+  if (tenantId === '*') {
+    const groupedSnaps = await db.prepare(
+      'SELECT snapshot_date, COALESCE(SUM(mrr_vnd), 0) as mrr_vnd, COALESCE(SUM(arr_vnd), 0) as arr_vnd, COALESCE(SUM(active_subscriptions), 0) as active_subscriptions FROM mrr_snapshots GROUP BY snapshot_date ORDER BY snapshot_date DESC LIMIT ?'
+    ).bind(days).all<{ snapshot_date: string; mrr_vnd: number; arr_vnd?: number; active_subscriptions: number }>().catch(() => ({ results: [] }));
+    if ((groupedSnaps.results || []).length > 0) {
+      return c.json({
+        success: true,
+        data: { snapshots: (groupedSnaps.results || []).slice().reverse(), source: 'snapshots' }
+      });
     }
-    const liveMrr =
-      live?.normalized_mrr !== undefined && live?.normalized_mrr !== null
-        ? Math.round(Number(live.normalized_mrr))
-        : (live?.mrr || 0);
-    if (tenantId === '*' && (live?.count || 0) === 0 && liveMrr === 0) {
-      const groupedSnaps = await db.prepare(
-        'SELECT snapshot_date, COALESCE(SUM(mrr_vnd), 0) as mrr_vnd, COALESCE(SUM(arr_vnd), 0) as arr_vnd, COALESCE(SUM(active_subscriptions), 0) as active_subscriptions FROM mrr_snapshots GROUP BY snapshot_date ORDER BY snapshot_date DESC LIMIT ?'
-      ).bind(days).all<{ snapshot_date: string; mrr_vnd: number; arr_vnd?: number; active_subscriptions: number }>().catch(() => ({ results: [] }));
-      if ((groupedSnaps.results || []).length > 0) {
-        return c.json({
-          success: true,
-          data: { snapshots: (groupedSnaps.results || []).slice().reverse(), source: 'snapshots' }
-        });
+  } else {
+    let results: Array<{ snapshot_date: string; mrr_vnd: number; arr_vnd?: number; active_subscriptions: number }> = [];
+    try {
+      const snapshots = await db.prepare(
+        "SELECT * FROM mrr_snapshots WHERE COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ? ORDER BY snapshot_date DESC LIMIT ?"
+      ).bind(tenantId, days).all<{ snapshot_date: string; mrr_vnd: number; arr_vnd?: number; active_subscriptions: number }>();
+      results = snapshots.results || [];
+    } catch {
+      if (tenantId === 'default') {
+        const snapshots = await db.prepare(
+          'SELECT * FROM mrr_snapshots ORDER BY snapshot_date DESC LIMIT ?'
+        ).bind(days).all<{ snapshot_date: string; mrr_vnd: number; active_subscriptions: number }>();
+        results = snapshots.results || [];
       }
     }
-    return c.json({
-      success: true,
-      data: { snapshots: [{ snapshot_date: today(), mrr_vnd: liveMrr, arr_vnd: liveMrr * 12, active_subscriptions: live?.count || 0 }], source: 'live' }
-    });
+    if (results.length > 0) {
+      return c.json({ success: true, data: { snapshots: results.slice().reverse(), source: 'snapshots' } });
+    }
   }
 
-  const snapshots = await db.prepare(
-    'SELECT * FROM mrr_snapshots ORDER BY snapshot_date DESC LIMIT ?'
-  ).bind(days).all<{ snapshot_date: string; mrr_vnd: number; active_subscriptions: number }>();
-
-  const results = snapshots.results || [];
-  if (results.length === 0) {
-    const live = await db.prepare(
-      "SELECT COALESCE(SUM(amount_vnd), 0) as mrr, COUNT(*) as count, COALESCE(SUM(CASE WHEN LOWER(TRIM(COALESCE(billing_cycle, 'monthly'))) = 'quarterly' THEN amount_vnd / 3.0 WHEN LOWER(TRIM(COALESCE(billing_cycle, 'monthly'))) IN ('annual', 'yearly') THEN amount_vnd / 12.0 ELSE amount_vnd END), 0) as normalized_mrr FROM subscriptions WHERE status = 'active' AND (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?)"
-    ).bind(tenantId, tenantId).first<{ mrr: number; count: number; normalized_mrr?: number }>().catch(() =>
-      db.prepare(
-        'SELECT COALESCE(SUM(amount_vnd), 0) as mrr, COUNT(*) as count FROM subscriptions WHERE status = \'active\' AND (? = \'*\' OR COALESCE(NULLIF(TRIM(tenant_id), \'\'), \'default\') = ?)'
-      ).bind(tenantId, tenantId).first<{ mrr: number; count: number; normalized_mrr?: number }>()
-    );
-    const liveMrr =
-      live?.normalized_mrr !== undefined && live?.normalized_mrr !== null
-        ? Math.round(Number(live.normalized_mrr))
-        : (live?.mrr || 0);
-    return c.json({
-      success: true,
-      data: { snapshots: [{ snapshot_date: today(), mrr_vnd: liveMrr, active_subscriptions: live?.count || 0 }], source: 'live' }
-    });
+  let live = await db.prepare(
+    "SELECT COALESCE(SUM(amount_vnd), 0) as mrr, COUNT(*) as count, COALESCE(SUM(CASE WHEN LOWER(TRIM(COALESCE(billing_cycle, 'monthly'))) = 'quarterly' THEN amount_vnd / 3.0 WHEN LOWER(TRIM(COALESCE(billing_cycle, 'monthly'))) IN ('annual', 'yearly') THEN amount_vnd / 12.0 ELSE amount_vnd END), 0) as normalized_mrr FROM subscriptions WHERE status = 'active' AND (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?)"
+  ).bind(tenantId, tenantId).first<{ mrr: number; count: number; normalized_mrr?: number }>().catch(() => null);
+  if (!live) {
+    live = await db.prepare(
+      'SELECT COALESCE(SUM(amount_vnd), 0) as mrr, COUNT(*) as count FROM subscriptions WHERE status = \'active\' AND (? = \'*\' OR COALESCE(NULLIF(TRIM(tenant_id), \'\'), \'default\') = ?)'
+    ).bind(tenantId, tenantId).first<{ mrr: number; count: number; normalized_mrr?: number }>().catch(() => null);
   }
-
-  return c.json({ success: true, data: { snapshots: results.reverse(), source: 'snapshots' } });
+  const liveMrr =
+    live?.normalized_mrr !== undefined && live?.normalized_mrr !== null
+      ? Math.round(Number(live.normalized_mrr))
+      : (live?.mrr || 0);
+  return c.json({
+    success: true,
+    data: { snapshots: [{ snapshot_date: today(), mrr_vnd: liveMrr, arr_vnd: liveMrr * 12, active_subscriptions: live?.count || 0 }], source: 'live' }
+  });
 }
 
 export async function getSubscription(c: Context<{ Bindings: Env }>) {
@@ -527,12 +519,15 @@ export async function createSubscription(c: Context<{ Bindings: Env }>) {
     return c.json({ success: false, error: 'Plan not found or inactive' }, 400);
   }
   const planRow = plan as unknown as Record<string, unknown>;
+  const isDefaultContainerCatalogPlan =
+    matchesTenantRow(planRow, 'default') && Boolean(planRow.container_size);
   if (
     'tenant_id' in planRow &&
     planRow.tenant_id !== undefined &&
     planRow.tenant_id !== null &&
     String(planRow.tenant_id).trim() !== '' &&
-    !matchesTenantRow(planRow, rawTenantId)
+    !matchesTenantRow(planRow, rawTenantId) &&
+    !isDefaultContainerCatalogPlan
   ) {
     return c.json({ success: false, error: 'Plan not found' }, 404);
   }
@@ -578,7 +573,38 @@ export async function createSubscription(c: Context<{ Bindings: Env }>) {
 
   let customerId: string | undefined = explicitCustomerId;
   if (explicitCustomerId) {
-    const customer = await db.prepare('SELECT * FROM customers WHERE id = ?').bind(explicitCustomerId).first<Record<string, unknown>>();
+    let customer = await db.prepare('SELECT * FROM customers WHERE id = ?').bind(explicitCustomerId).first<Record<string, unknown>>();
+    const isAuthenticatedTenantOwnerSelfSubscribe =
+      Boolean(callerUserId && explicitCustomerId === callerUserId) &&
+      (callerRole === 'owner' || callerRole === 'admin') &&
+      rawTenantId !== 'default' &&
+      rawTenantId !== '*';
+    if ((!customer || !matchesTenantRow(customer, rawTenantId)) && isAuthenticatedTenantOwnerSelfSubscribe) {
+      try {
+        const custName = String(body.customer_name || explicitCustomerId).trim() || explicitCustomerId;
+        const custEmail = typeof body.customer_email === 'string' && body.customer_email.trim() ? body.customer_email.trim().toLowerCase() : null;
+        const custPhone = typeof body.customer_phone === 'string' && body.customer_phone.trim() ? body.customer_phone.trim() : null;
+        const ts = nowStr();
+        if (!customer) {
+          await db.prepare(
+            'INSERT INTO customers (id, email, name, phone, loyalty_points, lifetime_points, loyalty_tier, tenant_id, created_at, updated_at) VALUES (?, ?, ?, ?, 0, 0, ?, ?, ?, ?)'
+          ).bind(explicitCustomerId, custEmail, custName, custPhone, 'bronze', tenantId, ts, ts).run();
+          customer = await db.prepare('SELECT * FROM customers WHERE id = ?').bind(explicitCustomerId).first<Record<string, unknown>>();
+        } else if (!customer.tenant_id || String(customer.tenant_id).trim() === '' || String(customer.tenant_id).trim() === 'default') {
+          await db.prepare('UPDATE customers SET tenant_id = ?, updated_at = ? WHERE id = ?').bind(tenantId, ts, explicitCustomerId).run();
+          customer = await db.prepare('SELECT * FROM customers WHERE id = ?').bind(explicitCustomerId).first<Record<string, unknown>>();
+        } else {
+          const scopedCustId = `cust_${tenantId}_${explicitCustomerId}`.slice(0, 64);
+          await db.prepare(
+            'INSERT OR IGNORE INTO customers (id, email, name, phone, loyalty_points, lifetime_points, loyalty_tier, tenant_id, created_at, updated_at) VALUES (?, ?, ?, ?, 0, 0, ?, ?, ?, ?)'
+          ).bind(scopedCustId, custEmail, custName, custPhone, 'bronze', tenantId, ts, ts).run();
+          customerId = scopedCustId;
+          customer = await db.prepare('SELECT * FROM customers WHERE id = ?').bind(scopedCustId).first<Record<string, unknown>>();
+        }
+      } catch {
+        // Fall through to standard validation
+      }
+    }
     if (!customer || !matchesTenantRow(customer, rawTenantId)) {
       return c.json({ success: false, error: 'Customer not found' }, 400);
     }
@@ -648,9 +674,6 @@ export async function createSubscription(c: Context<{ Bindings: Env }>) {
   }
 
   await updateMRRSnapshot(db, rawTenantId);
-  if (rawTenantId !== 'default' && rawTenantId !== '*') {
-    await updateMRRSnapshot(db, 'default');
-  }
 
   const sub = await db.prepare(
     'SELECT s.*, p.name as plan_name, p.slug as plan_slug, p.container_size FROM subscriptions s LEFT JOIN subscription_plans p ON s.plan_id = p.id WHERE s.id = ?'
@@ -746,9 +769,6 @@ export async function updateSubscription(c: Context<{ Bindings: Env }>) {
   ).bind(id).first<SubscriptionRecord>();
 
   await updateMRRSnapshot(db, effectiveSubTenant).catch(() => null);
-  if (effectiveSubTenant !== 'default') {
-    await updateMRRSnapshot(db, 'default').catch(() => null);
-  }
 
   return c.json({ success: true, data: sub });
 }

@@ -42,7 +42,7 @@ export function registerExportHandler(router: Hono<{ Bindings: Env }>): void {
     if (!AUDIT_EXPORT_ALLOWED_ROLES.includes(roleLower) && !isAuthenticatedSupervisor) {
       return c.json({ success: false, error: 'Insufficient permissions' }, 403);
     }
-    const rawTenantId = getTenantId(c as any);
+    const rawTenantId = getTenantId(c as unknown as Parameters<typeof getTenantId>[0]);
     const rawUserTenant = typeof (user.tenantId ?? user.tenant_id) === 'string' ? (user.tenantId ?? user.tenant_id)!.trim() : '';
     const userTenant = rawUserTenant && rawUserTenant !== '*' && rawUserTenant.toLowerCase() !== 'hq' ? rawUserTenant : 'default';
     const requestedTenant = (
@@ -56,7 +56,7 @@ export function registerExportHandler(router: Hono<{ Bindings: Env }>): void {
       c.req.header('X-Store-ID') ||
       ''
     ).trim();
-    const isHq = isHQSuperAdmin(user as any);
+    const isHq = isHQSuperAdmin(user as Parameters<typeof isHQSuperAdmin>[0]);
     if (!isHq) {
       if (
         rawUserTenant === '*' ||
@@ -74,9 +74,9 @@ export function registerExportHandler(router: Hono<{ Bindings: Env }>): void {
     const hqTarget = requestedTenant || rawTenantId || '*';
     const tenantId = isHq ? (hqTarget.toLowerCase() === 'hq' ? '*' : hqTarget) : userTenant;
     try {
-      let execCtx: any;
+      let execCtx: import('hono').ExecutionContext | undefined;
       try { execCtx = c.executionCtx; } catch { execCtx = undefined; }
-      const auditLogger = new AuditLogger(execCtx, c.env.AURA_DB);
+      const auditLogger = new AuditLogger(execCtx as import('hono').ExecutionContext, c.env.AURA_DB);
       const actorId = c.req.query('actor_id');
       const action = c.req.query('action');
       const resourceType = c.req.query('resource_type');
@@ -96,6 +96,9 @@ export function registerExportHandler(router: Hono<{ Bindings: Env }>): void {
         }, 400);
       }
 
+      const normalizedDateFrom = dateFrom
+        ? (/^\d{4}-\d{2}-\d{2}$/.test(dateFrom.trim()) ? `${dateFrom.trim()} 00:00:00` : dateFrom.trim())
+        : undefined;
       const normalizedDateTo = dateTo
         ? (/^\d{4}-\d{2}-\d{2}$/.test(dateTo.trim()) ? `${dateTo.trim()}T23:59:59.999Z` : dateTo.trim())
         : undefined;
@@ -105,7 +108,7 @@ export function registerExportHandler(router: Hono<{ Bindings: Env }>): void {
         actorId: actorId || undefined,
         action: action || undefined,
         resourceType: resourceType || undefined,
-        dateFrom: dateFrom || undefined,
+        dateFrom: normalizedDateFrom,
         dateTo: normalizedDateTo,
         page: 1,
         pageSize: 10000,
@@ -126,13 +129,13 @@ export function registerExportHandler(router: Hono<{ Bindings: Env }>): void {
             conditions.push('resource_type = ?');
             params.push(resourceType);
           }
-          if (dateFrom) {
-            conditions.push('created_at >= ?');
-            params.push(dateFrom);
+          if (normalizedDateFrom) {
+            conditions.push("replace(created_at, 'T', ' ') >= ?");
+            params.push(normalizedDateFrom.replace('T', ' '));
           }
           if (normalizedDateTo) {
-            conditions.push('created_at <= ?');
-            params.push(normalizedDateTo);
+            conditions.push("replace(created_at, 'T', ' ') <= ?");
+            params.push(normalizedDateTo.replace('T', ' '));
           }
 
           const upper = action.trim().toUpperCase();
@@ -179,7 +182,11 @@ export function registerExportHandler(router: Hono<{ Bindings: Env }>): void {
 
       const exportRows = tenantId === '*'
         ? result.rows
-        : await filterAuditRowsByTenant(c.env.AURA_DB, result.rows as any[], tenantId);
+        : await filterAuditRowsByTenant(
+            c.env.AURA_DB,
+            result.rows as unknown as Array<Record<string, unknown>>,
+            tenantId
+          ) as unknown as typeof result.rows;
 
       const csvRows: string[] = [CSV_HEADERS.join(',')];
 

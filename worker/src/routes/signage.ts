@@ -156,12 +156,35 @@ function isPromoWithinUsageLimits(row: Record<string, unknown>, isLegacySeedMock
 }
 
 function normalizeSignagePromo(row: Record<string, unknown>): SignagePromo {
+  const rawType = String(row.discount_type ?? row.type ?? '').trim().toLowerCase();
+  const isFixedAmount =
+    rawType === 'fixed' ||
+    rawType === 'fixed_amount' ||
+    rawType === 'amount' ||
+    rawType === 'vnd';
+  const rawVal = Number(row.discount_value ?? row.value ?? row.percent ?? 0);
+  const rawPercent = Number(row.percent ?? row.discount_value ?? row.value ?? 0);
+  const expiresAt = (row.expires_at ?? row.valid_to ?? row.end_date ?? null) as string | null;
+
+  if (isFixedAmount) {
+    return {
+      code: String(row.code ?? ''),
+      discountType: 'fixed_amount',
+      amountVnd: rawVal,
+      percent: null,
+      max_discount: Number(row.max_discount ?? row.max_discount_value ?? rawVal),
+      min_order: Number(row.min_order ?? row.min_order_value ?? 0),
+      expires_at: expiresAt as unknown as string,
+    };
+  }
+
   return {
     code: String(row.code ?? ''),
-    percent: Number(row.percent ?? row.discount_value ?? row.value ?? 0),
+    ...(rawType ? { discountType: 'percentage' as const, amountVnd: null } : {}),
+    percent: rawPercent,
     max_discount: Number(row.max_discount ?? row.max_discount_value ?? 0),
     min_order: Number(row.min_order ?? row.min_order_value ?? 0),
-    expires_at: (row.expires_at ?? row.valid_to ?? row.end_date ?? null) as unknown as string,
+    expires_at: expiresAt as unknown as string,
   };
 }
 
@@ -181,7 +204,9 @@ interface SignageCategory {
 
 interface SignagePromo {
   code: string;
-  percent: number;
+  discountType?: 'percentage' | 'fixed_amount';
+  amountVnd?: number | null;
+  percent: number | null;
   max_discount: number;
   min_order: number;
   expires_at: string;
@@ -203,7 +228,7 @@ const log = createLogger({ route: 'signage' });
 
 export const signageRouter = new Hono<{ Bindings: Env }>();
 signageRouter.use('*', async(c, next) => {
-  if (!c.get('user' as any) && c.req.header('Authorization')) {
+  if (!c.get('user' as never) && c.req.header('Authorization')) {
     return optionalAuth()(c, next);
   }
   await next();
@@ -341,6 +366,8 @@ signageRouter.get('/promos', async(c) => {
       const stmt = db.prepare(
         `SELECT
            code,
+           discount_type,
+           discount_value,
            COALESCE(percent, discount_value, value, 0) AS percent,
            COALESCE(max_discount, max_discount_value, 0) AS max_discount,
            COALESCE(min_order, min_order_value, 0) AS min_order,
@@ -368,26 +395,56 @@ signageRouter.get('/promos', async(c) => {
       rawResults = res.results;
     } catch {
       try {
+        const stmt = db.prepare(
+          `SELECT
+             code,
+             COALESCE(percent, discount_value, value, 0) AS percent,
+             COALESCE(max_discount, max_discount_value, 0) AS max_discount,
+             COALESCE(min_order, min_order_value, 0) AS min_order,
+             COALESCE(expires_at, valid_to, end_date) AS expires_at,
+             tenant_id,
+             max_uses,
+             usage_limit,
+             used_count
+           FROM promotions
+           WHERE is_active = 1
+             AND (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?)
+             AND (starts_at IS NULL OR starts_at <= datetime('now'))
+             AND (expires_at IS NULL OR expires_at >= datetime('now'))
+             AND (valid_from IS NULL OR valid_from <= datetime('now'))
+             AND (valid_to IS NULL OR valid_to >= datetime('now'))
+             AND (max_uses IS NULL OR max_uses <= (0) OR COALESCE(used_count, 0) < max_uses)
+             AND (usage_limit IS NULL OR usage_limit <= (0) OR COALESCE(used_count, 0) < usage_limit)`
+        );
+        firstPromoStmt = stmt;
         const res = await bindStmt<Record<string, unknown>>(
-          db.prepare(
-            `SELECT
-               *,
-               COALESCE(discount_value, 0) AS percent,
-               COALESCE(max_discount_value, 0) AS max_discount,
-               COALESCE(min_order_value, 0) AS min_order,
-               valid_to AS expires_at
-             FROM promotions
-             WHERE is_active = 1
-               AND (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?)
-               AND (valid_from IS NULL OR valid_from <= datetime('now'))
-               AND (valid_to IS NULL OR valid_to >= datetime('now'))
-               AND (max_uses IS NULL OR max_uses <= (0) OR COALESCE(current_uses, 0) < max_uses)`
-          ),
+          stmt,
           tenantId,
           tenantId
         ).all<Record<string, unknown>>();
         rawResults = res.results;
       } catch {
+        try {
+          const res = await bindStmt<Record<string, unknown>>(
+            db.prepare(
+              `SELECT
+                 *,
+                 COALESCE(discount_value, 0) AS percent,
+                 COALESCE(max_discount_value, 0) AS max_discount,
+                 COALESCE(min_order_value, 0) AS min_order,
+                 valid_to AS expires_at
+               FROM promotions
+               WHERE is_active = 1
+                 AND (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?)
+                 AND (valid_from IS NULL OR valid_from <= datetime('now'))
+                 AND (valid_to IS NULL OR valid_to >= datetime('now'))
+                 AND (max_uses IS NULL OR max_uses <= (0) OR COALESCE(current_uses, 0) < max_uses)`
+            ),
+            tenantId,
+            tenantId
+          ).all<Record<string, unknown>>();
+          rawResults = res.results;
+        } catch {
         try {
           const res = await bindStmt<Record<string, unknown>>(
             db.prepare(
@@ -470,7 +527,8 @@ signageRouter.get('/promos', async(c) => {
                 }
               }
             } else {
-              rawResults = [];
+                rawResults = [];
+              }
             }
           }
         }

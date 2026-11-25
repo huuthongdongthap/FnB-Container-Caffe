@@ -158,11 +158,11 @@ function genReferralCode(length = 6): string {
 
 referralRouter.use('/*', authCustomer);
 
-referralRouter.get('/code', rateLimitMiddleware(REFERRAL_CODE_RATE_LIMIT), async(c) => {
+const handleGetOrProvisionReferralCode = async (c: import('hono').Context<{ Bindings: Env }>) => {
   if (hasReferralTenantMismatch(c as unknown as Parameters<typeof hasReferralTenantMismatch>[0])) {
     return c.json({ success: false, error: 'Cross-tenant access denied' }, 403);
   }
-  const cust = c.get('customer') as unknown as Customer & { tenant_id?: string | null };
+  const cust = c.get('customer' as never) as unknown as Customer & { tenant_id?: string | null };
   const db = c.env.AURA_DB;
   const tenantId = getTenantId(c as unknown as Parameters<typeof getTenantId>[0]);
   const custTenant =
@@ -236,12 +236,16 @@ referralRouter.get('/code', rateLimitMiddleware(REFERRAL_CODE_RATE_LIMIT), async
     success: true,
     data: {
       code: rc.code,
+      referral_code: rc.code,
       times_used: rc.times_used,
       total_points_earned: rc.total_points_earned,
       created_at: rc.created_at
     }
   });
-});
+};
+
+referralRouter.get('/code', rateLimitMiddleware(REFERRAL_CODE_RATE_LIMIT), handleGetOrProvisionReferralCode);
+referralRouter.post('/code', rateLimitMiddleware(REFERRAL_CODE_RATE_LIMIT), handleGetOrProvisionReferralCode);
 
 referralRouter.post('/apply', async(c) => {
   if (hasReferralTenantMismatch(c as unknown as Parameters<typeof hasReferralTenantMismatch>[0])) {
@@ -566,7 +570,8 @@ referralRouter.get('/stats', async(c) => {
       total_cashback_earned_vnd: cashbackEarned[0]?.total || 0,
       total_points_earned_legacy: rc?.total_points_earned || 0,
       code_usage: rc?.times_used || 0,
-      recent_referrals: recentRefs.map((row: Record<string, unknown>) => ({
+      recent_referrals: recentRefs.map((row: Record<string, unknown>, idx: number) => ({
+        id: row.id ? String(row.id) : `ref_${idx}`,
         referred_name: row.referred_name,
         referred_phone: maskPhone(String(row.referred_phone || '')),
         status: row.status,

@@ -23,7 +23,6 @@ import { ProgressTracker } from './StitchReferralNew1-progress';
 import { FriendNetwork } from './StitchReferralNew1-friends';
 import { RewardHistory } from './StitchReferralNew1-rewards';
 import { ReferralHeader, ReferralBottomNav } from './StitchReferralNew1-layout';
-import { DEFAULT_REFERRAL_DATA } from './StitchReferralNew1-defaults';
 
 /* ─── Re-export types for external consumers ─────────────────────── */
 export type {
@@ -47,22 +46,30 @@ export function StitchReferralNew1({
   const { t } = useTranslation();
 
   const errorMessage = externalErrorMsg || t('stitch.referral.defaultError', { defaultValue: 'Failed to load referral data.' });
-  const data = externalData ?? DEFAULT_REFERRAL_DATA;
+  const data = externalData;
 
   if (loadingState === 'loading') return <ReferralSkeleton />;
 
   if (loadingState === 'error') {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-[var(--aura-surface-container)] px-5">
-        <ReferralError message={errorMessage} />
+      <div className="min-h-screen bg-[var(--aura-surface-container)] font-body text-[var(--aura-chrome-bright, #d9e3f6)]">
+        <ReferralHeader />
+        <main className="flex min-h-screen items-center justify-center px-5 pt-20 pb-32">
+          <ReferralError message={errorMessage} />
+        </main>
+        <ReferralBottomNav />
       </div>
     );
   }
 
   if (!data) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-[var(--aura-surface-container)] px-5">
-        <ReferralEmpty />
+      <div className="min-h-screen bg-[var(--aura-surface-container)] font-body text-[var(--aura-chrome-bright, #d9e3f6)]">
+        <ReferralHeader />
+        <main className="flex min-h-screen items-center justify-center px-5 pt-20 pb-32">
+          <ReferralEmpty />
+        </main>
+        <ReferralBottomNav />
       </div>
     );
   }

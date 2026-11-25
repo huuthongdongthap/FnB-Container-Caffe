@@ -21,23 +21,31 @@ export function normalizeSubscriptionMonthlyVnd(
 
 export async function updateMRRSnapshot(
   db: import('@cloudflare/workers-types').D1Database,
-  tenantId: string = 'default'
+  tenantOrDate: string = 'default',
+  explicitTenant?: string
 ): Promise<void> {
-  const normTenant = (tenantId || '').trim() || 'default';
-  if (normTenant !== 'default') {
+  const isDateArg = /^\d{4}-\d{2}-\d{2}$/.test(String(tenantOrDate || '').trim());
+  const rawTenant = explicitTenant !== undefined
+    ? explicitTenant
+    : isDateArg
+      ? 'default'
+      : tenantOrDate;
+  const normTenant = (rawTenant || '').trim() || 'default';
+  if (normTenant === '*' || normTenant.toLowerCase() === 'hq') {
     return;
   }
-  const date = today();
+
+  const date = isDateArg ? String(tenantOrDate).trim() : today();
   let activeSubs: { count: number; mrr: number; normalized_mrr?: number } | null = null;
   try {
     activeSubs = await db.prepare(
-      "SELECT (SELECT COALESCE(SUM(CASE WHEN LOWER(TRIM(COALESCE(billing_cycle, 'monthly'))) = 'quarterly' THEN amount_vnd / 3.0 WHEN LOWER(TRIM(COALESCE(billing_cycle, 'monthly'))) IN ('annual', 'yearly') THEN amount_vnd / 12.0 ELSE amount_vnd END), 0) FROM subscriptions WHERE status = 'active' AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = 'default') as normalized_mrr, count, mrr FROM (SELECT COUNT(*) as count, COALESCE(SUM(amount_vnd), 0) as mrr FROM subscriptions WHERE status = 'active' AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = 'default')"
-    ).first<{ count: number; mrr: number; normalized_mrr?: number }>();
+      "SELECT (SELECT COALESCE(SUM(CASE WHEN LOWER(TRIM(COALESCE(billing_cycle, 'monthly'))) = 'quarterly' THEN amount_vnd / 3.0 WHEN LOWER(TRIM(COALESCE(billing_cycle, 'monthly'))) IN ('annual', 'yearly') THEN amount_vnd / 12.0 ELSE amount_vnd END), 0) FROM subscriptions WHERE status = 'active' AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?) as normalized_mrr, count, mrr FROM (SELECT COUNT(*) as count, COALESCE(SUM(amount_vnd), 0) as mrr FROM subscriptions WHERE status = 'active' AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?)"
+    ).bind(normTenant, normTenant).first<{ count: number; mrr: number; normalized_mrr?: number }>();
   } catch {
     try {
       activeSubs = await db.prepare(
-        "SELECT COUNT(*) as count, COALESCE(SUM(amount_vnd), 0) as mrr FROM subscriptions WHERE status = 'active' AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = 'default'"
-      ).first<{ count: number; mrr: number }>();
+        "SELECT COUNT(*) as count, COALESCE(SUM(amount_vnd), 0) as mrr FROM subscriptions WHERE status = 'active' AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
+      ).bind(normTenant).first<{ count: number; mrr: number }>();
     } catch {
       if (normTenant === 'default') {
         try {
@@ -59,8 +67,8 @@ export async function updateMRRSnapshot(
   let churned: { count: number } | null = null;
   try {
     churned = await db.prepare(
-      "SELECT COUNT(*) as count FROM subscriptions WHERE status = 'cancelled' AND updated_at >= ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = 'default'"
-    ).bind(monthStartIso).first<{ count: number }>();
+      "SELECT COUNT(*) as count FROM subscriptions WHERE status = 'cancelled' AND updated_at >= ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
+    ).bind(monthStartIso, normTenant).first<{ count: number }>();
   } catch {
     if (normTenant === 'default') {
       churned = await db.prepare(
@@ -72,8 +80,8 @@ export async function updateMRRSnapshot(
   let newSubs: { count: number } | null = null;
   try {
     newSubs = await db.prepare(
-      "SELECT COUNT(*) as count FROM subscriptions WHERE created_at >= ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = 'default'"
-    ).bind(monthStartIso).first<{ count: number }>();
+      "SELECT COUNT(*) as count FROM subscriptions WHERE created_at >= ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
+    ).bind(monthStartIso, normTenant).first<{ count: number }>();
   } catch {
     if (normTenant === 'default') {
       newSubs = await db.prepare(
@@ -90,24 +98,79 @@ export async function updateMRRSnapshot(
   const active = activeSubs?.count || 0;
   const churnCount = churned?.count || 0;
   const totalBase = active + churnCount;
+  const newSubsCount = newSubs?.count || 0;
+  const churnRatePct = totalBase > 0 ? Math.round((churnCount / totalBase) * 1000) / 10 : 0;
+  const avgContractValue = active > 0 ? Math.round(mrr / active) : 0;
+  const createdAt = nowStr();
 
-  await db.prepare(
-    `INSERT INTO mrr_snapshots (id, snapshot_date, mrr_vnd, arr_vnd, active_subscriptions,
-     new_subscriptions_month, churned_subscriptions_month, churn_rate_pct, avg_contract_value_vnd, created_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-     ON CONFLICT(snapshot_date) DO UPDATE SET
-     mrr_vnd = excluded.mrr_vnd, arr_vnd = excluded.arr_vnd,
-     active_subscriptions = excluded.active_subscriptions,
-     new_subscriptions_month = excluded.new_subscriptions_month,
-     churned_subscriptions_month = excluded.churned_subscriptions_month,
-     churn_rate_pct = excluded.churn_rate_pct,
-     avg_contract_value_vnd = excluded.avg_contract_value_vnd`
-  ).bind(
-    `snap_${date.replace(/-/g, '')}`,
-    date, mrr, mrr * 12, active,
-    newSubs?.count || 0, churnCount,
-    totalBase > 0 ? Math.round((churnCount / totalBase) * 1000) / 10 : 0,
-    active > 0 ? Math.round(mrr / active) : 0,
-    nowStr()
-  ).run();
+  if (normTenant !== 'default') {
+    try {
+      const colsRes = await db
+        .prepare('PRAGMA table_info(mrr_snapshots)')
+        .all<{ name?: string }>();
+      const cols = colsRes.results || [];
+      if (cols.length === 0 || !cols.some((col) => col.name === 'tenant_id')) {
+        return;
+      }
+    } catch {
+      return;
+    }
+  }
+
+  const snapId = normTenant === 'default'
+    ? `snap_${date.replace(/-/g, '')}`
+    : `mrr_${normTenant}_${date}`;
+
+  try {
+    await db.prepare(
+      `INSERT INTO mrr_snapshots (id, tenant_id, snapshot_date, mrr_vnd, arr_vnd, active_subscriptions,
+       new_subscriptions_month, churned_subscriptions_month, churn_rate_pct, avg_contract_value_vnd, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+       ON CONFLICT(tenant_id, snapshot_date) DO UPDATE SET
+       mrr_vnd = excluded.mrr_vnd, arr_vnd = excluded.arr_vnd,
+       active_subscriptions = excluded.active_subscriptions,
+       new_subscriptions_month = excluded.new_subscriptions_month,
+       churned_subscriptions_month = excluded.churned_subscriptions_month,
+       churn_rate_pct = excluded.churn_rate_pct,
+       avg_contract_value_vnd = excluded.avg_contract_value_vnd`
+    ).bind(
+      snapId,
+      normTenant,
+      date,
+      mrr,
+      mrr * 12,
+      active,
+      newSubsCount,
+      churnCount,
+      churnRatePct,
+      avgContractValue,
+      createdAt
+    ).run();
+  } catch {
+    if (normTenant === 'default') {
+      await db.prepare(
+        `INSERT INTO mrr_snapshots (id, snapshot_date, mrr_vnd, arr_vnd, active_subscriptions,
+         new_subscriptions_month, churned_subscriptions_month, churn_rate_pct, avg_contract_value_vnd, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+         ON CONFLICT(snapshot_date) DO UPDATE SET
+         mrr_vnd = excluded.mrr_vnd, arr_vnd = excluded.arr_vnd,
+         active_subscriptions = excluded.active_subscriptions,
+         new_subscriptions_month = excluded.new_subscriptions_month,
+         churned_subscriptions_month = excluded.churned_subscriptions_month,
+         churn_rate_pct = excluded.churn_rate_pct,
+         avg_contract_value_vnd = excluded.avg_contract_value_vnd`
+      ).bind(
+        `snap_${date.replace(/-/g, '')}`,
+        date,
+        mrr,
+        mrr * 12,
+        active,
+        newSubsCount,
+        churnCount,
+        churnRatePct,
+        avgContractValue,
+        createdAt
+      ).run();
+    }
+  }
 }

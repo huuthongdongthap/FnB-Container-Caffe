@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Card, CardBody } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -12,39 +12,63 @@ interface Props {
   isLoading: boolean;
 }
 
-async function handlePay(invoiceId: string) {
-  try {
-    const res = await apiFetch<{
-      payment_url?: string;
-      checkout_url?: string;
-      data?: { payment_url?: string; checkout_url?: string };
-    }>(`/api/subscriptions/invoices/${encodeURIComponent(invoiceId)}/pay`, {
-      method: 'POST',
-      body: JSON.stringify({ payment_method: 'payos' }),
-    });
-    const paymentUrl =
-      res?.payment_url ??
-      res?.checkout_url ??
-      res?.data?.payment_url ??
-      res?.data?.checkout_url;
-    if (paymentUrl) {
-      window.location.href = paymentUrl;
-    }
-  } catch {
-    // Payment request failed or gateway unavailable
-  }
-}
-
 function formatDateRange(start?: string | null, end?: string | null): string {
   if (!start || !end) return '—';
   return `${new Date(start).toLocaleDateString('vi-VN')} – ${new Date(end).toLocaleDateString('vi-VN')}`;
 }
 
 export default function InvoiceTableCard({ invoices, isLoading }: Props) {
+  const [payingId, setPayingId] = useState<string | null>(null);
+  const [paymentError, setPaymentError] = useState<string | null>(null);
+
+  async function handlePay(invoiceId: string) {
+    setPayingId(invoiceId);
+    setPaymentError(null);
+    try {
+      const res = await apiFetch<{
+        success?: boolean;
+        error?: string;
+        message?: string;
+        payment_url?: string;
+        checkout_url?: string;
+        data?: { payment_url?: string; checkout_url?: string };
+      }>(`/api/subscriptions/invoices/${encodeURIComponent(invoiceId)}/pay`, {
+        method: 'POST',
+        body: JSON.stringify({ payment_method: 'payos' }),
+      });
+      if (res?.success === false || res?.error) {
+        setPaymentError(res.error || res.message || 'Không thể khởi tạo thanh toán');
+        return;
+      }
+      const paymentUrl =
+        res?.payment_url ??
+        res?.checkout_url ??
+        res?.data?.payment_url ??
+        res?.data?.checkout_url;
+      if (paymentUrl) {
+        window.location.href = paymentUrl;
+      } else {
+        setPaymentError('Không nhận được liên kết thanh toán từ cổng thanh toán');
+      }
+    } catch (err) {
+      setPaymentError(err instanceof Error ? err.message : 'Không thể kết nối cổng thanh toán');
+    } finally {
+      setPayingId(null);
+    }
+  }
+
   return (
     <Card className="mt-6">
       <CardBody>
         <h2 className="font-display text-lg font-bold">Hóa đơn / Invoices</h2>
+        {paymentError && (
+          <div
+            role="alert"
+            className="mt-3 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-300"
+          >
+            {paymentError}
+          </div>
+        )}
         {isLoading ? (
           <div className="mt-4 space-y-2">
             <Skeleton className="h-8 w-full" />
@@ -75,7 +99,14 @@ export default function InvoiceTableCard({ invoices, isLoading }: Props) {
                       <td className="py-2"><StatusBadge status={inv.status} /></td>
                       <td className="py-2 flex gap-2">
                         {isPayable ? (
-                          <Button size="sm" onClick={() => handlePay(inv.id)}>Thanh toán</Button>
+                          <Button
+                            size="sm"
+                            loading={payingId === inv.id}
+                            disabled={payingId !== null}
+                            onClick={() => void handlePay(inv.id)}
+                          >
+                            Thanh toán
+                          </Button>
                         ) : (
                           <span className="text-xs text-muted">—</span>
                         )}

@@ -23,7 +23,14 @@ export async function sendCampaignZalo(
       data: {
         name: zaloData.name as string | undefined,
         amount: zaloData.amount as number | undefined,
-        days: (zaloData.days_left as number) || (zaloData.days as number)
+        days: (zaloData.days_left as number) || (zaloData.days as number),
+        order_id: zaloData.order_id as string | undefined,
+        promo_code: zaloData.promo_code as string | undefined,
+        discount: zaloData.discount as string | undefined,
+        expires_at: zaloData.expires_at as string | undefined,
+        qr_url: zaloData.qr_url as string | undefined,
+        title: message.subject,
+        message: message.body
       },
       tenantId: resolvedTenant
     }, resolvedTenant);

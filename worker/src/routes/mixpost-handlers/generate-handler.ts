@@ -4,6 +4,49 @@ import { getTenantId, matchesTenantRow } from '../../middleware/tenant';
 import { mixpostGenerateSchema, zodErrorResponse } from '../../lib/validators';
 import type { PromotionRow, ProductRow } from '../../tree/mixpost/types';
 
+async function resolveTenantSocialBrand(
+  db: import('@cloudflare/workers-types').D1Database | undefined,
+  tenantId: string
+): Promise<{ brandName: string; brandTag: string }> {
+  let brandName = '';
+  if (db && typeof db.prepare === 'function' && tenantId && tenantId !== 'default' && tenantId !== '*') {
+    try {
+      const branding = await db
+        .prepare('SELECT display_name FROM tenant_branding WHERE tenant_id = ? LIMIT 1')
+        .bind(tenantId)
+        .first<{ display_name?: string | null }>();
+      if (branding?.display_name && branding.display_name.trim()) {
+        brandName = branding.display_name.trim();
+      }
+    } catch {
+      // tenant_branding optional
+    }
+    if (!brandName) {
+      try {
+        const tenantRow = await db
+          .prepare('SELECT name FROM saas_tenants WHERE id = ? OR slug = ? LIMIT 1')
+          .bind(tenantId, tenantId)
+          .first<{ name?: string | null }>();
+        if (tenantRow?.name && tenantRow.name.trim()) {
+          brandName = tenantRow.name.trim();
+        }
+      } catch {
+        // saas_tenants optional
+      }
+    }
+  }
+  const finalBrand = brandName || 'Aura Cafe';
+  const normalizedTag = finalBrand
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .replace(/đ/gi, 'd')
+    .replace(/[^A-Za-z0-9]+/g, '');
+  return {
+    brandName: finalBrand,
+    brandTag: normalizedTag || 'AuraCafe',
+  };
+}
+
 export function registerGenerateHandler(router: Hono<{ Bindings: MixpostEnv }>): void {
   // POST /generate — generate social content from source
   router.post('/generate', async (c) => {
@@ -65,10 +108,17 @@ export function registerGenerateHandler(router: Hono<{ Bindings: MixpostEnv }>):
       const discountLabel = isFixedDiscount
         ? `${Math.round(rawDiscountValue).toLocaleString('vi-VN')}đ`
         : `${discountPercent}%`;
-      const content = `🔥 ${promo.code}: Giảm ${discountLabel} — Aura Cafe\n#AuraCafe #KhuyenMai`;
+      const effectiveBrandTenant =
+        tenantId === '*'
+          ? (typeof (promo as unknown as Record<string, unknown>).tenant_id === 'string'
+              ? String((promo as unknown as Record<string, unknown>).tenant_id).trim()
+              : 'default')
+          : tenantId;
+      const { brandName, brandTag } = await resolveTenantSocialBrand(db, effectiveBrandTenant);
+      const content = `${promo.code}: Giảm ${discountLabel} — ${brandName}\n#${brandTag} #KhuyenMai`;
       return c.json({
         success: true,
-        data: { content, hashtags: ['AuraCafe', 'KhuyenMai'] }
+        data: { content, hashtags: [brandTag, 'KhuyenMai'] }
       });
     }
 
@@ -114,19 +164,24 @@ export function registerGenerateHandler(router: Hono<{ Bindings: MixpostEnv }>):
           .slice(0, 5);
       }
 
+      const { brandName, brandTag } = await resolveTenantSocialBrand(
+        db,
+        tenantId === '*' ? 'default' : tenantId
+      );
+
       if (products.length === 0) {
-        const content = '☕ Aura Cafe — Hien chua co mon nao hom nay\n#AuraCafe #MenuHangNgay';
+        const content = `${brandName} — Hien chua co mon nao hom nay\n#${brandTag} #MenuHangNgay`;
         return c.json({
           success: true,
-          data: { content, hashtags: ['AuraCafe', 'MenuHangNgay'] }
+          data: { content, hashtags: [brandTag, 'MenuHangNgay'] }
         });
       }
 
       const names = products.map((p: ProductRow) => p.name).join(', ');
-      const content = `☕ Aura Cafe Menu Hom Nay: ${names}\n#AuraCafe #MenuHangNgay`;
+      const content = `${brandName} Menu Hom Nay: ${names}\n#${brandTag} #MenuHangNgay`;
       return c.json({
         success: true,
-        data: { content, hashtags: ['AuraCafe', 'MenuHangNgay'] }
+        data: { content, hashtags: [brandTag, 'MenuHangNgay'] }
       });
     }
 
