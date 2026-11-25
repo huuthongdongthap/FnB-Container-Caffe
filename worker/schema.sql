@@ -204,6 +204,8 @@ CREATE TABLE orders (
     served_at TEXT,
     completed_at TEXT,
     cancelled_at TEXT,
+    previous_status TEXT,
+    cancel_alert INTEGER DEFAULT 0,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (table_id) REFERENCES cafe_tables(id)
@@ -215,6 +217,7 @@ CREATE INDEX idx_orders_customer_phone ON orders(customer_phone);
 CREATE INDEX idx_orders_created_at ON orders(created_at);
 CREATE INDEX idx_orders_payment_status ON orders(payment_status);
 CREATE INDEX idx_orders_order_number ON orders(order_number);
+CREATE INDEX IF NOT EXISTS idx_orders_tenant_shipper_status ON orders(tenant_id, assigned_shipper_id, status);
 
 -- Same additive contract as 20261020_01_order_creation_requests.sql.
 CREATE TABLE IF NOT EXISTS order_creation_requests (
@@ -845,7 +848,7 @@ CREATE TABLE IF NOT EXISTS subscription_plans (
     tenant_id TEXT NOT NULL DEFAULT 'default',
   id TEXT PRIMARY KEY,
   name TEXT NOT NULL,
-  slug TEXT UNIQUE NOT NULL,
+  slug TEXT NOT NULL,
   description TEXT DEFAULT '',
   container_size TEXT NOT NULL DEFAULT 'standard',
   monthly_price_vnd INTEGER NOT NULL,
@@ -856,7 +859,8 @@ CREATE TABLE IF NOT EXISTS subscription_plans (
   is_active INTEGER DEFAULT 1,
   sort_order INTEGER NOT NULL DEFAULT 0,
   created_at TEXT DEFAULT (datetime('now')),
-  updated_at TEXT DEFAULT (datetime('now'))
+  updated_at TEXT DEFAULT (datetime('now')),
+  UNIQUE(tenant_id, slug)
 );
 CREATE TABLE IF NOT EXISTS subscriptions (
     tenant_id TEXT NOT NULL DEFAULT 'default',
@@ -892,16 +896,18 @@ CREATE TABLE IF NOT EXISTS subscription_invoices (
   status TEXT NOT NULL DEFAULT 'pending',
   period_start TEXT NOT NULL,
   period_end TEXT NOT NULL,
-  invoice_number TEXT UNIQUE,
+  invoice_number TEXT,
   paid_at TEXT,
   payment_method TEXT,
   payment_ref TEXT,
   created_at TEXT DEFAULT (datetime('now')),
-  updated_at TEXT DEFAULT (datetime('now'))
+  updated_at TEXT DEFAULT (datetime('now')),
+  UNIQUE(tenant_id, invoice_number)
 );
 CREATE TABLE IF NOT EXISTS mrr_snapshots (
+  tenant_id TEXT NOT NULL DEFAULT 'default',
   id TEXT PRIMARY KEY,
-  snapshot_date TEXT NOT NULL UNIQUE,
+  snapshot_date TEXT NOT NULL,
   mrr_vnd INTEGER NOT NULL DEFAULT 0,
   arr_vnd INTEGER NOT NULL DEFAULT 0,
   active_subscriptions INTEGER NOT NULL DEFAULT 0,
@@ -911,7 +917,8 @@ CREATE TABLE IF NOT EXISTS mrr_snapshots (
   contraction_mrr_vnd INTEGER DEFAULT 0,
   churn_rate_pct REAL DEFAULT 0,
   avg_contract_value_vnd INTEGER DEFAULT 0,
-  created_at TEXT DEFAULT (datetime('now'))
+  created_at TEXT DEFAULT (datetime('now')),
+  UNIQUE(tenant_id, snapshot_date)
 );
 CREATE TABLE IF NOT EXISTS erpnext_sync_logs (
     tenant_id TEXT NOT NULL DEFAULT 'default',
@@ -975,6 +982,7 @@ CREATE INDEX IF NOT EXISTS idx_subscriptions_next_billing ON subscriptions(next_
 CREATE INDEX IF NOT EXISTS idx_invoices_subscription ON subscription_invoices(subscription_id);
 CREATE INDEX IF NOT EXISTS idx_invoices_status ON subscription_invoices(status);
 CREATE INDEX IF NOT EXISTS idx_mrr_snapshots_date ON mrr_snapshots(snapshot_date);
+CREATE INDEX IF NOT EXISTS idx_mrr_snapshots_tenant_date ON mrr_snapshots(tenant_id, snapshot_date);
 CREATE INDEX IF NOT EXISTS idx_erpnext_sync_logs_status ON erpnext_sync_logs(status, retry_count);
 CREATE INDEX IF NOT EXISTS idx_erpnext_mappings_local ON erpnext_mappings(local_type, local_id);
 CREATE INDEX IF NOT EXISTS idx_notification_audit_log_channel ON notification_audit_log(channel, created_at);
@@ -1302,7 +1310,7 @@ CREATE INDEX IF NOT EXISTS idx_alerts_key_created ON _alerts(alert_key, created_
 -- 4. Domain Inventory: inventory_items
 CREATE TABLE IF NOT EXISTS inventory_items (
   id TEXT PRIMARY KEY,
-  sku TEXT UNIQUE NOT NULL,
+  sku TEXT NOT NULL,
   tenant_id TEXT NOT NULL DEFAULT 'default',
   name TEXT NOT NULL,
   name_en TEXT,
@@ -1315,10 +1323,12 @@ CREATE TABLE IF NOT EXISTS inventory_items (
   supplier TEXT,
   active INTEGER DEFAULT 1,
   created_at TEXT DEFAULT (datetime('now')),
-  updated_at TEXT DEFAULT (datetime('now'))
+  updated_at TEXT DEFAULT (datetime('now')),
+  UNIQUE(tenant_id, sku)
 );
 CREATE INDEX IF NOT EXISTS idx_inventory_items_sku ON inventory_items(sku);
 CREATE INDEX IF NOT EXISTS idx_inventory_items_category ON inventory_items(category);
+CREATE INDEX IF NOT EXISTS idx_inventory_items_tenant_id ON inventory_items(tenant_id);
 
 -- 5. Domain Inventory: inventory_transactions
 CREATE TABLE IF NOT EXISTS inventory_transactions (
@@ -1353,7 +1363,7 @@ CREATE TABLE IF NOT EXISTS ingredients (
     tenant_id TEXT NOT NULL DEFAULT 'default',
   id TEXT PRIMARY KEY,
   name TEXT NOT NULL,
-  sku TEXT UNIQUE NOT NULL,
+  sku TEXT NOT NULL,
   category TEXT NOT NULL DEFAULT 'raw_materials',
   unit TEXT NOT NULL DEFAULT 'pcs',
   cost_per_unit REAL DEFAULT 0,
@@ -1362,7 +1372,8 @@ CREATE TABLE IF NOT EXISTS ingredients (
   max_stock REAL NOT NULL DEFAULT 1000,
   is_active INTEGER NOT NULL DEFAULT 1,
   created_at TEXT DEFAULT (datetime('now')),
-  updated_at TEXT DEFAULT (datetime('now'))
+  updated_at TEXT DEFAULT (datetime('now')),
+  UNIQUE(tenant_id, sku)
 );
 CREATE INDEX IF NOT EXISTS idx_ingredients_sku ON ingredients(sku);
 CREATE INDEX IF NOT EXISTS idx_ingredients_category ON ingredients(category);
@@ -1405,7 +1416,7 @@ CREATE INDEX IF NOT EXISTS idx_suppliers_name ON suppliers(name);
 CREATE TABLE IF NOT EXISTS purchase_orders (
     tenant_id TEXT NOT NULL DEFAULT 'default',
   id TEXT PRIMARY KEY,
-  po_number TEXT UNIQUE NOT NULL,
+  po_number TEXT NOT NULL,
   supplier_id TEXT NOT NULL,
   order_date TEXT NOT NULL,
   expected_delivery_date TEXT,
@@ -1418,6 +1429,7 @@ CREATE TABLE IF NOT EXISTS purchase_orders (
   created_by TEXT,
   created_at TEXT DEFAULT (datetime('now')),
   updated_at TEXT DEFAULT (datetime('now')),
+  UNIQUE(tenant_id, po_number),
   FOREIGN KEY (supplier_id) REFERENCES suppliers(id) ON DELETE RESTRICT
 );
 CREATE INDEX IF NOT EXISTS idx_po_supplier ON purchase_orders(supplier_id);
@@ -1634,6 +1646,10 @@ CREATE TABLE IF NOT EXISTS shift_reconciliations (
   denominations TEXT NOT NULL DEFAULT '{}',
   cash_payment_total REAL NOT NULL DEFAULT 0,
   cash_payout_total REAL NOT NULL DEFAULT 0,
+  remitted_cash REAL DEFAULT 0,
+  closing_float REAL DEFAULT 0,
+  handover_to_staff_id TEXT,
+  online_sales_total REAL DEFAULT 0,
   notes TEXT,
   reconciled_by TEXT DEFAULT '',
   approved_by TEXT,
@@ -1895,7 +1911,8 @@ CREATE TABLE IF NOT EXISTS erpnext_product_sync ( tenant_id TEXT NOT NULL DEFAUL
 CREATE TABLE IF NOT EXISTS erpnext_sync_log ( tenant_id TEXT NOT NULL DEFAULT 'default',  id TEXT PRIMARY KEY, method TEXT NOT NULL DEFAULT 'POST', endpoint TEXT NOT NULL, request_body TEXT, response_body TEXT, error TEXT, status TEXT NOT NULL DEFAULT 'pending', retry_count INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL DEFAULT (datetime('now')) );
 CREATE TABLE IF NOT EXISTS erpnext_sync_queue ( tenant_id TEXT NOT NULL DEFAULT 'default',  id INTEGER PRIMARY KEY AUTOINCREMENT, entity_type TEXT NOT NULL, entity_id TEXT NOT NULL, erpnext_id TEXT, action TEXT NOT NULL, payload TEXT NOT NULL, status TEXT DEFAULT 'pending', error_message TEXT, attempts INTEGER DEFAULT 0, next_retry_at TEXT, created_at TEXT DEFAULT (datetime('now')), updated_at TEXT DEFAULT (datetime('now')) );
 CREATE TABLE IF NOT EXISTS erpnext_webhook_log ( tenant_id TEXT NOT NULL DEFAULT 'default',  id INTEGER PRIMARY KEY AUTOINCREMENT, doctype TEXT NOT NULL, docname TEXT NOT NULL, action TEXT NOT NULL, payload TEXT, created_at TEXT DEFAULT (datetime('now')) );
-CREATE TABLE IF NOT EXISTS franchise_locations ( id TEXT PRIMARY KEY, tenant_id TEXT NOT NULL DEFAULT 'default', code TEXT UNIQUE NOT NULL, name TEXT NOT NULL, address TEXT, city TEXT DEFAULT 'Sa Đéc', phone TEXT, royalty_percentage REAL DEFAULT 5.0, status TEXT DEFAULT 'active', created_at TEXT DEFAULT (datetime('now')), updated_at TEXT DEFAULT (datetime('now')) );
+CREATE TABLE IF NOT EXISTS franchise_locations ( id TEXT PRIMARY KEY, tenant_id TEXT NOT NULL DEFAULT 'default', code TEXT NOT NULL, name TEXT NOT NULL, address TEXT, city TEXT DEFAULT 'Sa Đéc', phone TEXT, royalty_percentage REAL DEFAULT 5.0, status TEXT DEFAULT 'active', created_at TEXT DEFAULT (datetime('now')), updated_at TEXT DEFAULT (datetime('now')), UNIQUE(tenant_id, code) );
+CREATE INDEX IF NOT EXISTS idx_franchise_locations_tenant_id ON franchise_locations(tenant_id);
 CREATE TABLE IF NOT EXISTS frigate_events ( tenant_id TEXT NOT NULL DEFAULT 'default',  id TEXT PRIMARY KEY, camera TEXT NOT NULL, label TEXT NOT NULL, start_time REAL NOT NULL, end_time REAL, score REAL, payload TEXT, received_at TEXT DEFAULT (datetime('now')) );
 CREATE TABLE IF NOT EXISTS ha_automation_log ( tenant_id TEXT NOT NULL DEFAULT 'default',  id INTEGER PRIMARY KEY AUTOINCREMENT, automation_id TEXT NOT NULL, trigger_entity TEXT, payload TEXT, result TEXT, executed_at TEXT DEFAULT (datetime('now')) );
 CREATE TABLE IF NOT EXISTS ha_device_states ( id INTEGER PRIMARY KEY AUTOINCREMENT, entity_id TEXT NOT NULL UNIQUE, state TEXT NOT NULL, attributes TEXT, tenant_id TEXT NOT NULL DEFAULT 'default', last_changed TEXT DEFAULT (datetime('now')), last_updated TEXT DEFAULT (datetime('now')) );
