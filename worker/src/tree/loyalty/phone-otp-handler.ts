@@ -11,6 +11,7 @@ import { verifyJWT } from '../../lib/jwt';
 import { phoneAuthSchema } from '../../lib/validators';
 import { resolvePilotStore, PilotStoreError } from '../../lib/pilot-store';
 import { StaffSessionError, isStaffIdentity, staffTenant, validateStaffSession, type StaffSession } from '../../lib/staff-session';
+import { sendSMS } from '../../lib/speedsms-client';
 import type { Env } from '../../types/env';
 import { persistOtpChallenge, resetOtpClaim, throttle } from './helpers';
 
@@ -169,6 +170,82 @@ export async function handlePhoneOtpRequest(c: Context<{ Bindings: Env }>) {
       return c.json({ success: false, code: 'AUTH_STATE_UNAVAILABLE', error: 'Dịch vụ OTP tạm thời gián đoạn' }, 503);
     }
 
+    let remoteChannel: 'zalo_zns' | 'sms' | null = null;
+    if (!isStaffCaller) {
+      const zaloToken = String(
+        c.env.ZALO_OA_ACCESS_TOKEN || c.env.ZALO_ACCESS_TOKEN || c.env.ZALO_OA_TOKEN || ''
+      ).trim();
+      const rawZaloTpl = String(c.env.ZALO_OTP_TEMPLATE_ID || c.env.ZALO_ZNS_TEMPLATE_OTP || '').trim();
+      const zaloTemplateId = rawZaloTpl && !rawZaloTpl.startsWith('YOUR_') ? rawZaloTpl : 'otp_verification';
+
+      if (zaloToken) {
+        try {
+          const normalizedZaloPhone = `84${phone.replace(/^\+?84/, '').replace(/^0/, '')}`;
+          const zaloRes = await fetch('https://business.openapi.zalo.me/message/template', {
+            method: 'POST',
+            headers: {
+              access_token: zaloToken,
+              'Content-Type': 'application/json',
+            },
+            signal: AbortSignal.timeout(8000),
+            body: JSON.stringify({
+              phone: normalizedZaloPhone,
+              template_id: zaloTemplateId,
+              template_data: { otp },
+              tracking_id: `aura_otp_${crypto.randomUUID()}`,
+            }),
+          });
+          if (zaloRes.ok) {
+            const zaloJson = (await zaloRes.json().catch(() => null)) as { error?: number } | null;
+            if (!zaloJson || zaloJson.error === undefined || zaloJson.error === 0) {
+              remoteChannel = 'zalo_zns';
+            }
+          }
+        } catch (err) {
+          log.warn('Zalo ZNS OTP delivery failed, trying fallback', { message: (err as Error).message });
+        }
+      }
+
+      if (!remoteChannel) {
+        const smsWebhookUrl = String(c.env.SMS_WEBHOOK_URL || '').trim();
+        if (smsWebhookUrl) {
+          try {
+            const smsSecret = String(c.env.SMS_WEBHOOK_SECRET || '').trim();
+            const smsRes = await fetch(smsWebhookUrl, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                ...(smsSecret ? { Authorization: `Bearer ${smsSecret}` } : {}),
+              },
+              signal: AbortSignal.timeout(8000),
+              body: JSON.stringify({
+                phone,
+                otp,
+                expiresInSeconds: OTP_TTL_SECONDS,
+                tenantId,
+                message: `[AURA CAFE] Ma xac thuc OTP cua ban la ${otp} (hieu luc 5 phut).`,
+              }),
+            });
+            if (smsRes.ok) {
+              remoteChannel = 'sms';
+            }
+          } catch (err) {
+            log.warn('SMS webhook OTP delivery failed, trying fallback', { message: (err as Error).message });
+          }
+        }
+      }
+
+      if (!remoteChannel && c.env.SPEEDSMS_API_KEY && c.env.SPEEDSMS_API_SECRET) {
+        const smsOut = await sendSMS(
+          { SPEEDSMS_API_KEY: c.env.SPEEDSMS_API_KEY, SPEEDSMS_API_SECRET: c.env.SPEEDSMS_API_SECRET },
+          { phone, message: `[AURA CAFE] Ma xac thuc OTP cua ban la ${otp} (hieu luc 5 phut).` }
+        );
+        if (smsOut.success) {
+          remoteChannel = 'sms';
+        }
+      }
+    }
+
     if (c.env.TELEGRAM_BOT_TOKEN && c.env.TELEGRAM_CHAT_ID) {
       const tgUrl = `https://api.telegram.org/bot${c.env.TELEGRAM_BOT_TOKEN}/sendMessage`;
       const text = `🔐 [AURA OTP] Khách hàng: ${customer?.name || 'Thành viên mới'} (${phone})\nMã xác thực: ${otp} (hiệu lực 5 phút)`;
@@ -182,15 +259,24 @@ export async function handlePhoneOtpRequest(c: Context<{ Bindings: Env }>) {
       );
     }
 
+    const deliveryChannel = isStaffCaller
+      ? 'staff_pos'
+      : (remoteChannel ?? 'store_counter');
+    const message = isStaffCaller
+      ? 'Đã tạo mã OTP xác thực tại quầy cho khách hàng.'
+      : deliveryChannel === 'zalo_zns'
+        ? 'Mã OTP 6 số đã được gửi qua Zalo ZNS (hiệu lực 5 phút).'
+        : deliveryChannel === 'sms'
+          ? 'Mã OTP 6 số đã được gửi qua tin nhắn SMS (hiệu lực 5 phút).'
+          : 'Mã OTP đã được tạo (hiệu lực 5 phút). Vui lòng nhận mã xác thực từ nhân viên tại quầy.';
+
     return c.json({
       success: true,
       requiresOtp: true,
       expiresInSeconds: OTP_TTL_SECONDS,
-      deliveryChannel: isStaffCaller ? 'staff_pos' : 'store_counter',
+      deliveryChannel,
       ...(isStaffCaller ? { otp } : {}),
-      message: isStaffCaller
-        ? 'Đã tạo mã OTP xác thực tại quầy cho khách hàng.'
-        : 'Mã OTP đã được tạo (hiệu lực 5 phút). Vui lòng nhận mã xác thực từ nhân viên tại quầy.',
+      message,
     });
   } catch (err) {
     log.error('phone-otp request error:', { message: (err as Error).message });

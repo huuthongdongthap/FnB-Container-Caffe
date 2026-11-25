@@ -25,6 +25,7 @@ export function LandingNav() {
     { href: '/menu', label: t('nav.menu', 'Thực đơn') },
     { href: '/table-reservation', label: t('landing.reservation', 'Đặt bàn') },
     { href: '/promotions', label: t('landing.promotions', 'Ưu đãi') },
+    { href: '/loyalty', label: t('nav.loyalty', 'Tích điểm & Ví') },
     { href: '/about', label: t('landing.about', 'Giới thiệu') },
     { href: '/gallery', label: t('landing.gallery', 'Không gian') },
     { href: '/reviews', label: t('landing.reviews', 'Đánh giá') },
@@ -114,6 +115,15 @@ export function LandingNav() {
 
         {/* Desktop CTA + Mobile hamburger row */}
         <div className="flex items-center gap-2.5">
+          {/* Member account entry point */}
+          <a
+            href="/account"
+            aria-label={t('nav.memberAccount', 'Tài khoản hội viên')}
+            className="hidden md:inline-flex items-center gap-1.5 px-3.5 py-1.5 min-h-[44px] min-w-[44px] rounded-full border border-[var(--aura-chrome-bright)]/40 text-[var(--aura-chrome-bright)] text-xs font-semibold hover:bg-white/10 transition-all"
+          >
+            <span>{t('nav.memberShort', 'Hội viên')}</span>
+          </a>
+
           {/* Staff entry point — subtle, not customer-facing */}
           <a
             href="/portal"
@@ -222,7 +232,14 @@ export function LandingNav() {
           />
 
           {/* Mobile CTA */}
-          <div className="px-5 py-4">
+          <div className="px-5 py-4 flex flex-col gap-2.5">
+            <a
+              href="/loyalty"
+              onClick={closeDrawer}
+              className="flex items-center justify-center w-full py-3 min-h-[44px] rounded-xl border border-[var(--aura-chrome-bright)]/40 text-[var(--aura-chrome-bright)] text-xs font-semibold tracking-wider uppercase font-body transition-all active:scale-[0.98]"
+            >
+              {t('nav.loyaltyLookup', 'Tra cứu Điểm & Ví hoàn tiền')}
+            </a>
             <a
               href="/menu"
               onClick={closeDrawer}

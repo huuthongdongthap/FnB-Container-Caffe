@@ -36,6 +36,17 @@ export interface LoyaltyTierLadderItem {
   is_current: boolean;
 }
 
+import type { RedeemedVoucher, CashbackTransactionEntry } from '@/hooks/stores/loyalty-store-types';
+
+export interface LoyaltyBirthdayOffer {
+  eligible: boolean;
+  discountPercent: number;
+  rewardType: string;
+  isBirthdayToday?: boolean;
+  redeemed?: boolean;
+  redeemedMessage?: string | null;
+}
+
 export interface LoyaltyDashboardData {
   tierName: string;
   memberSince: string;
@@ -51,11 +62,17 @@ export interface LoyaltyDashboardData {
   streakDays: LoyaltyStreakDay[];
   tierBenefits: LoyaltyTierBenefit[];
   tierLadder: LoyaltyTierLadderItem[];
+  isGuest?: boolean;
+  cashbackBalance?: number;
+  cashbackRate?: number;
+  cashbackTotalEarned?: number;
+  cashbackTotalSpent?: number;
+  cashbackExpiring7d?: number;
+  cashbackHistory?: CashbackTransactionEntry[];
+  birthdayOffer?: LoyaltyBirthdayOffer | null;
 }
 
 export type LoyaltyLoadingState = 'idle' | 'loading' | 'error';
-
-import type { RedeemedVoucher } from '@/hooks/stores/loyalty-store-types';
 
 export interface StitchLoyaltyNewProps {
   data?: LoyaltyDashboardData;
@@ -68,4 +85,5 @@ export interface StitchLoyaltyNewProps {
   onClaimReward?: (rewardId: string) => void;
   onCheckIn?: () => void;
   onShareReferral?: () => void;
+  onClaimBirthday?: () => void;
 }

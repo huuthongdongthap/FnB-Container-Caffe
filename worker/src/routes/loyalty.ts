@@ -8,7 +8,7 @@ import { getAuthToken, verifyJWT } from '../lib/jwt';
 import { isStaffRole } from '../lib/staff-session';
 import { redeemRewardSchema, zodErrorResponse } from '../lib/validators';
 import { resolvePilotStore } from '../lib/pilot-store';
-import { getTenantId, matchesTenantRow } from '../middleware/tenant';
+import { getTenantId, matchesTenantRow, resolvePublicTenantId } from '../middleware/tenant';
 import type { Env } from '../types/env';
 import type { Customer } from '../types/models';
 
@@ -67,7 +67,12 @@ loyaltyRouter.use('/*', async (c, next) => {
     ? `/${pathSegments.slice(2).join('/')}`
     : `/${pathSegments.join('/')}`;
   if (relPath === '/rewards' && c.req.method === 'GET') {
-    if (await shouldDelegateRewardsListToOpenApi(c)) {
+    const hasAdminPaging =
+      c.req.query('limit') !== undefined ||
+      c.req.query('page') !== undefined ||
+      c.req.query('includeInactive') !== undefined;
+    const hasAnyToken = Boolean(c.req.header('Authorization') || (c.req.raw && getAuthToken(c.req.raw)));
+    if ((await shouldDelegateRewardsListToOpenApi(c)) || (!hasAnyToken && hasAdminPaging)) {
       await next();
       return;
     }
@@ -242,51 +247,119 @@ loyaltyRouter.get('/cashback', async(c) => {
     return c.json({ success: true, data: [] });
   }
 
-  let query = 'SELECT id, type, amount, balance_after, description, created_at FROM cashback_transactions WHERE wallet_id = ?';
-  const params: unknown[] = [wallet.id];
-  if (type) {
-    query += ' AND type = ?';
-    params.push(type);
-  }
-  query += ' ORDER BY created_at DESC LIMIT ? OFFSET ?';
-  params.push(limit, offset);
+  const buildCashbackSql = (cols: string, whereCol: 'wallet_id' | 'customer_id', bindId: string): [string, unknown[]] => {
+    let sql = `SELECT ${cols} FROM cashback_transactions WHERE ${whereCol} = ?`;
+    const sqlParams: unknown[] = [bindId];
+    if (type) {
+      sql += ' AND type = ?';
+      sqlParams.push(type);
+    }
+    sql += ' ORDER BY created_at DESC LIMIT ? OFFSET ?';
+    sqlParams.push(limit, offset);
+    return [sql, sqlParams];
+  };
+
+  const filterCashbackRow = (row: unknown, enforceTenant: boolean): boolean => {
+    if (!row || typeof row !== 'object') return false;
+    const rec = row as Record<string, unknown>;
+    if (enforceTenant) {
+      return matchesTenantRow(rec, storeTenant);
+    }
+    return 'tenant_id' in rec && rec.tenant_id !== undefined ? matchesTenantRow(rec, storeTenant) : true;
+  };
 
   let results: unknown[] = [];
   try {
-    const res = await c.env.AURA_DB.prepare(query).bind(...params).all();
-    results = (res.results || []).filter((row) => {
-      if (!row || typeof row !== 'object') return false;
-      const rec = row as Record<string, unknown>;
-      return 'tenant_id' in rec && rec.tenant_id !== undefined ? matchesTenantRow(rec, storeTenant) : true;
-    });
-  } catch {
-    let fallbackQuery = 'SELECT id, type, amount, balance_after, description, created_at FROM cashback_transactions WHERE customer_id = ?';
-    const fallbackParams: unknown[] = [cust.id];
-    if (type) {
-      fallbackQuery += ' AND type = ?';
-      fallbackParams.push(type);
-    }
-    fallbackQuery += ' ORDER BY created_at DESC LIMIT ? OFFSET ?';
-    fallbackParams.push(limit, offset);
-    const res = await c.env.AURA_DB.prepare(fallbackQuery).bind(...fallbackParams).all();
-    results = (res.results || []).filter((row) =>
-      row && typeof row === 'object' ? matchesTenantRow(row as Record<string, unknown>, storeTenant) : false
+    const [qFull, pFull] = buildCashbackSql(
+      'id, type, amount, balance_after, order_id, expires_at, description, created_at',
+      'wallet_id',
+      wallet.id
     );
+    const res = await c.env.AURA_DB.prepare(qFull).bind(...pFull).all();
+    results = (res.results || []).filter((r) => filterCashbackRow(r, false));
+  } catch {
+    try {
+      const [qLegacy, pLegacy] = buildCashbackSql(
+        'id, type, amount, balance_after, description, created_at',
+        'wallet_id',
+        wallet.id
+      );
+      const res = await c.env.AURA_DB.prepare(qLegacy).bind(...pLegacy).all();
+      results = (res.results || []).filter((r) => filterCashbackRow(r, false));
+    } catch {
+      try {
+        const [fbFull, fbFullParams] = buildCashbackSql(
+          'id, type, amount, balance_after, order_id, expires_at, description, created_at',
+          'customer_id',
+          cust.id
+        );
+        const res = await c.env.AURA_DB.prepare(fbFull).bind(...fbFullParams).all();
+        results = (res.results || []).filter((r) => filterCashbackRow(r, true));
+      } catch {
+        const [fbLegacy, fbLegacyParams] = buildCashbackSql(
+          'id, type, amount, balance_after, description, created_at',
+          'customer_id',
+          cust.id
+        );
+        const res = await c.env.AURA_DB.prepare(fbLegacy).bind(...fbLegacyParams).all();
+        results = (res.results || []).filter((r) => filterCashbackRow(r, true));
+      }
+    }
   }
   return c.json({ success: true, data: results });
 });
 
 loyaltyRouter.get('/rewards', async(c, next) => {
   const cust = c.get('customer') as unknown as Customer | undefined;
-  if (!cust) {
+  const hasAdminPaging =
+    c.req.query('limit') !== undefined ||
+    c.req.query('page') !== undefined ||
+    c.req.query('includeInactive') !== undefined;
+  if (!cust && hasAdminPaging) {
     await next();
     return;
   }
-  const custRecord = cust as unknown as Record<string, unknown>;
+  const reqCandidates = [
+    c.req.query('tenant_id'),
+    c.req.query('tenantId'),
+    c.req.query('store_id'),
+    c.req.query('storeId'),
+    c.req.header('X-Tenant-ID'),
+    c.req.header('x-tenant-id'),
+    c.req.header('X-Store-ID'),
+    c.req.header('x-store-id'),
+  ]
+    .map((v) => (typeof v === 'string' ? v.trim() : ''))
+    .filter(Boolean);
+  if (new Set(reqCandidates).size > 1) {
+    return c.json({ success: false, error: 'Cross-tenant access denied' }, 403);
+  }
+  const headerTenant = reqCandidates[0] || '';
+  if (headerTenant === '*' || headerTenant.toLowerCase() === 'hq') {
+    return c.json({ success: false, error: 'Cross-tenant access denied' }, 403);
+  }
+  const custRecord = cust as unknown as Record<string, unknown> | undefined;
   const rawCustTenant = String(custRecord?.tenant_id ?? custRecord?.tenantId ?? '').trim();
-  const storeTenant = c.env.PILOT_TENANT_ID
-    ? resolvePilotStore(c.env as unknown as Record<string, unknown>)
-    : (rawCustTenant && rawCustTenant !== '*' && rawCustTenant.toLowerCase() !== 'hq' ? rawCustTenant : 'default');
+  if (
+    rawCustTenant &&
+    rawCustTenant !== '*' &&
+    rawCustTenant.toLowerCase() !== 'hq' &&
+    headerTenant &&
+    headerTenant !== rawCustTenant
+  ) {
+    return c.json({ success: false, error: 'Cross-tenant access denied' }, 403);
+  }
+  let storeTenant: string;
+  if (c.env.PILOT_TENANT_ID) {
+    storeTenant = resolvePilotStore(c.env as unknown as Record<string, unknown>);
+    if (headerTenant && headerTenant !== storeTenant) {
+      return c.json({ success: false, error: 'Cross-tenant access denied' }, 403);
+    }
+  } else if (rawCustTenant && rawCustTenant !== '*' && rawCustTenant.toLowerCase() !== 'hq') {
+    storeTenant = rawCustTenant;
+  } else {
+    storeTenant = resolvePublicTenantId(c);
+  }
   const db = c.env.AURA_DB;
 
   const filterTenantReward = (r: { id: string; title: string; point_cost: number }) => {
@@ -348,8 +421,8 @@ loyaltyRouter.get('/rewards', async(c, next) => {
 
   const tenantRewards = allRewards;
 
-  const pts = cust.loyalty_points || 0;
-  const data = tenantRewards.map(r => ({ ...r, can_redeem: pts >= r.point_cost }));
+  const pts = cust?.loyalty_points || 0;
+  const data = tenantRewards.map(r => ({ ...r, can_redeem: cust ? pts >= r.point_cost : false }));
 
   return c.json({ success: true, data });
 });

@@ -1,9 +1,16 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Star, PenLine, Loader2, X } from 'lucide-react';
+import { useAuthStore } from '@/hooks/stores/use-auth-store';
 
 interface WriteReviewFormProps {
-  onSubmit: (data: { customer_name: string; rating: number; comment: string }) => void;
+  onSubmit: (data: {
+    customer_name: string;
+    rating: number;
+    comment: string;
+    order_id?: string;
+    customer_phone?: string;
+  }) => void;
   onClose: () => void;
   isSubmitting: boolean;
   error: string | null;
@@ -16,17 +23,32 @@ export function WriteReviewForm({
   error,
 }: Readonly<WriteReviewFormProps>) {
   const { t } = useTranslation('reviews');
-  const [customerName, setCustomerName] = useState('');
+  const user = useAuthStore((s) => s.user);
+  const isAuthenticated = Boolean(user?.id);
+
+  const [customerName, setCustomerName] = useState(user?.name ?? '');
+  const [orderId, setOrderId] = useState('');
+  const [customerPhone, setCustomerPhone] = useState(user?.phone ?? '');
   const [rating, setRating] = useState(0);
   const [comment, setComment] = useState('');
   const [hoverRating, setHoverRating] = useState(0);
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (rating === 0) return;
-    onSubmit({ customer_name: customerName, rating, comment });
+    if (!isAuthenticated && (!orderId.trim() || !customerPhone.trim())) return;
+    onSubmit({
+      customer_name: customerName.trim(),
+      rating,
+      comment: comment.trim(),
+      ...(orderId.trim() ? { order_id: orderId.trim() } : {}),
+      ...(customerPhone.trim() ? { customer_phone: customerPhone.trim() } : {}),
+    });
   };
 
-  const canSubmit = rating > 0 && !isSubmitting;
+  const canSubmit =
+    rating > 0 &&
+    !isSubmitting &&
+    (isAuthenticated || (orderId.trim().length > 0 && customerPhone.trim().length >= 8));
 
   return (
     <div
@@ -86,6 +108,59 @@ export function WriteReviewForm({
             }}
           />
         </div>
+
+        {/* Order ID & Phone verification for unauthenticated guest reviews */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <label
+              className="mb-2 block text-xs font-semibold uppercase tracking-widest"
+              style={{ color: 'var(--aura-text-secondary, #a0a8b0)' }}
+            >
+              {isAuthenticated ? 'Mã đơn hàng (tùy chọn)' : 'Mã đơn hàng *'}
+            </label>
+            <input
+              type="text"
+              value={orderId}
+              onChange={(e) => setOrderId(e.target.value)}
+              placeholder="VD: ORD_..."
+              required={!isAuthenticated}
+              className="w-full rounded-lg px-4 py-3 text-sm outline-none transition-all focus:ring-2"
+              style={{
+                backgroundColor: 'var(--aura-bg-input, rgba(255,255,255,0.05))',
+                color: 'var(--aura-text-primary, #e8e8e8)',
+                border: '1px solid var(--aura-border-card, rgba(255,255,255,0.08))',
+              }}
+            />
+          </div>
+          {!isAuthenticated && (
+            <div>
+              <label
+                className="mb-2 block text-xs font-semibold uppercase tracking-widest"
+                style={{ color: 'var(--aura-text-secondary, #a0a8b0)' }}
+              >
+                Số điện thoại đặt đơn *
+              </label>
+              <input
+                type="tel"
+                value={customerPhone}
+                onChange={(e) => setCustomerPhone(e.target.value)}
+                placeholder="VD: 0901234567"
+                required
+                className="w-full rounded-lg px-4 py-3 text-sm outline-none transition-all focus:ring-2"
+                style={{
+                  backgroundColor: 'var(--aura-bg-input, rgba(255,255,255,0.05))',
+                  color: 'var(--aura-text-primary, #e8e8e8)',
+                  border: '1px solid var(--aura-border-card, rgba(255,255,255,0.08))',
+                }}
+              />
+            </div>
+          )}
+        </div>
+        {!isAuthenticated && (
+          <p className="text-xs text-slate-400">
+            Hoặc <a href="/account" className="underline text-white">đăng nhập hội viên</a> để gửi đánh giá trực tiếp không cần mã đơn.
+          </p>
+        )}
 
         {/* Rating */}
         <div>

@@ -151,7 +151,14 @@ reviewsRouter.post('/', optionalAuth(), async(c) => {
   }
 
   const body = await c.req.json() as Record<string, unknown>;
-  const parsed = createReviewSchema.safeParse(body);
+  const reviewSubmissionSchema = createReviewSchema.extend({
+    order_id: createReviewSchema.shape.order_id.optional().or(createReviewSchema.shape.order_id.transform((v) => v.trim())).optional(),
+  });
+  const normalizedBody = {
+    ...body,
+    order_id: typeof body.order_id === 'string' && body.order_id.trim() ? body.order_id.trim() : undefined,
+  };
+  const parsed = reviewSubmissionSchema.safeParse(normalizedBody);
   if (!parsed.success) {
     return c.json({ success: false, error: parsed.error.issues[0].message }, 400);
   }
@@ -357,17 +364,18 @@ reviewsRouter.post('/', optionalAuth(), async(c) => {
       ? tenantId.trim()
       : 'default');
 
+  const persistedOrderId = data.order_id || null;
   try {
     await db.prepare(
       'INSERT INTO reviews (id, order_id, rating, comment, customer_name, tenant_id, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)'
-    ).bind(id, data.order_id, rating, data.comment || '', data.customer_name || 'Anonymous', effectiveTenant, now).run();
+    ).bind(id, persistedOrderId, rating, data.comment || '', data.customer_name || 'Anonymous', effectiveTenant, now).run();
   } catch {
-    if (!data.order_id && effectiveTenant !== 'default') {
+    if (!persistedOrderId && effectiveTenant !== 'default') {
       return c.json({ success: false, error: 'Tenant-scoped standalone reviews require tenant_id column' }, 503);
     }
     await db.prepare(
       'INSERT INTO reviews (id, order_id, rating, comment, customer_name, created_at) VALUES (?, ?, ?, ?, ?, ?)'
-    ).bind(id, data.order_id, rating, data.comment || '', data.customer_name || 'Anonymous', now).run();
+    ).bind(id, persistedOrderId, rating, data.comment || '', data.customer_name || 'Anonymous', now).run();
   }
 
   const row = await db.prepare('SELECT * FROM reviews WHERE id = ?').bind(id).first<ReviewRecord>();

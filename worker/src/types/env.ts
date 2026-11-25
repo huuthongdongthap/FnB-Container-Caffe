@@ -68,8 +68,11 @@ export interface Env {
   // Resend (email)
   RESEND_API_KEY?: string;
 
-  // SpeedSMS
+  // SpeedSMS / SMS Webhook
   SPEEDSMS_API_KEY?: string;
+  SPEEDSMS_API_SECRET?: string;
+  SMS_WEBHOOK_URL?: string;
+  SMS_WEBHOOK_SECRET?: string;
 
   // Web Push
   VAPID_PUBLIC_KEY?: string;
@@ -80,8 +83,11 @@ export interface Env {
   ZALO_APP_ID?: string;
   ZALO_APP_SECRET?: string;
   ZALO_ACCESS_TOKEN?: string;
+  ZALO_OA_ACCESS_TOKEN?: string;
   ZALO_REFRESH_TOKEN?: string;
   ZALO_OA_TOKEN?: string;
+  ZALO_OTP_TEMPLATE_ID?: string;
+  ZALO_ZNS_TEMPLATE_OTP?: string;
   ZALO_ZNS_TEMPLATE_GENERAL_PROMOTION?: string;
 
   // Mautic

@@ -65,14 +65,17 @@ export function ReviewsPage() {
     customer_name: string;
     rating: number;
     comment: string;
+    order_id?: string;
+    customer_phone?: string;
   }) => {
     try {
       await submitReview.mutateAsync({
-        order_id: 'manual',
+        ...(data.order_id ? { order_id: data.order_id } : {}),
+        ...(data.customer_phone ? { customer_phone: data.customer_phone } : {}),
         customer_name: data.customer_name,
         rating: data.rating,
         comment: data.comment || undefined,
-      });
+      } as Parameters<typeof submitReview.mutateAsync>[0]);
       setShowForm(false);
     } catch {
       // Error is surfaced via submitReview.error
@@ -113,6 +116,7 @@ export function ReviewsPage() {
         data={reviewsPageData}
         loadingState={loadingState}
         errorMessage={errorMessage}
+        onWriteReview={() => setShowForm((prev) => !prev)}
         onToggleLike={() => {}}
         onLoadMore={() => handlePageChange(page + 1)}
       />
@@ -126,3 +130,5 @@ export function ReviewsPage() {
     </div>
   );
 }
+
+export default ReviewsPage;

@@ -15,7 +15,9 @@ import {
   parseMyRewards,
   parseLoyaltySummary,
   parseTierLadder,
+  parseCashbackHistory,
 } from './loyalty-store-helpers';
+import { useAuthStore, type AuthUser } from './use-auth-store';
 
 import type {
   Reward,
@@ -23,6 +25,7 @@ import type {
   LoyaltyTierLadderItem,
   NextTierInfo,
   RedeemedVoucher,
+  CashbackTransactionEntry,
 } from './loyalty-store-types';
 export type {
   Reward,
@@ -30,6 +33,7 @@ export type {
   LoyaltyTierLadderItem,
   NextTierInfo,
   RedeemedVoucher,
+  CashbackTransactionEntry,
 } from './loyalty-store-types';
 
 /* ═══════════════════════════════════════════════════════════════════
@@ -38,22 +42,41 @@ export type {
    Cashback rate is derived from the API tier_config, not hardcoded.
    ═══════════════════════════════════════════════════════════════════ */
 
+interface PhoneAuthResponseShape {
+  success?: boolean;
+  token?: string;
+  customerToken?: string;
+  customer?: Partial<ClientSessionUser> & { id?: string };
+  user?: Partial<ClientSessionUser> & { id?: string };
+  data?: {
+    token?: string;
+    customerToken?: string;
+    customer?: Partial<ClientSessionUser> & { id?: string };
+    user?: Partial<ClientSessionUser> & { id?: string };
+  };
+}
+
 interface LoyaltyState {
   tier: string;
   points: number;
   lifetimePoints: number;
   cashbackRate: number;
   cashbackBalance: number;
+  cashbackTotalEarned: number;
+  cashbackTotalSpent: number;
+  cashbackExpiring7d: number;
   nextTier: NextTierInfo | null;
   tierLadder: LoyaltyTierLadderItem[];
   rewards: Reward[];
   myVouchers: RedeemedVoucher[];
   lastRedeemedVoucher: RedeemedVoucher | null;
   history: PointsHistoryEntry[];
+  cashbackHistory: CashbackTransactionEntry[];
   loading: boolean;
   error: string | null;
 
   fetchLoyalty: () => Promise<void>;
+  fetchPublicCatalog: () => Promise<void>;
   redeemReward: (rewardId: string) => Promise<RedeemedVoucher | null>;
   calculateCashback: (amount: number) => number;
   phoneAuth: (phone: string, otp?: string) => Promise<void>;
@@ -70,12 +93,16 @@ export const useLoyaltyStore = create<LoyaltyState>((set, get) => ({
   lifetimePoints: initial?.points ?? 0,
   cashbackRate: initial?.cashbackRate ?? 3,
   cashbackBalance: 0,
+  cashbackTotalEarned: 0,
+  cashbackTotalSpent: 0,
+  cashbackExpiring7d: 0,
   nextTier: null,
   tierLadder: [],
   rewards: [],
   myVouchers: [],
   lastRedeemedVoucher: null,
   history: [],
+  cashbackHistory: [],
   loading: false,
   error: null,
 
@@ -118,6 +145,14 @@ export const useLoyaltyStore = create<LoyaltyState>((set, get) => ({
         myVouchers = parseMyRewards(rawMyRewards);
       } catch { /* my-rewards is optional */ }
 
+      let cashbackHistory: CashbackTransactionEntry[] = [];
+      try {
+        const cbBody = await apiFetch<{ success: boolean; data: Record<string, unknown>[] }>('/api/loyalty/cashback');
+        const cbData = cbBody.data || cbBody;
+        const rawCb = Array.isArray(cbData) ? cbData : [];
+        cashbackHistory = parseCashbackHistory(rawCb);
+      } catch { /* cashback history is optional */ }
+
       if (!isSameSessionSnapshot(sessionSnap, readSessionSnapshot())) return;
       const {
         tier: tierVal,
@@ -125,6 +160,9 @@ export const useLoyaltyStore = create<LoyaltyState>((set, get) => ({
         lifetimePoints: lifetimePointsVal,
         cashbackRate: cashbackRateVal,
         cashbackBalance: cashbackBalanceVal,
+        cashbackTotalEarned: cashbackTotalEarnedVal,
+        cashbackTotalSpent: cashbackTotalSpentVal,
+        cashbackExpiring7d: cashbackExpiring7dVal,
         nextTier: nextTierVal,
       } = parseLoyaltySummary(data);
       persistLoyalty(tierVal, pointsVal, cashbackRateVal);
@@ -134,11 +172,15 @@ export const useLoyaltyStore = create<LoyaltyState>((set, get) => ({
         lifetimePoints: lifetimePointsVal,
         cashbackRate: cashbackRateVal,
         cashbackBalance: cashbackBalanceVal,
+        cashbackTotalEarned: cashbackTotalEarnedVal,
+        cashbackTotalSpent: cashbackTotalSpentVal,
+        cashbackExpiring7d: cashbackExpiring7dVal,
         nextTier: nextTierVal,
         tierLadder,
         rewards,
         myVouchers,
         history,
+        cashbackHistory,
         loading: false,
         error: null,
       });
@@ -154,6 +196,31 @@ export const useLoyaltyStore = create<LoyaltyState>((set, get) => ({
         set({ loading: false, error: err instanceof Error ? err.message : 'Network error' });
       }
     }
+  },
+
+  fetchPublicCatalog: async () => {
+    let tierLadder: LoyaltyTierLadderItem[] = [];
+    let rewards: Reward[] = [];
+    try {
+      const tiersBody = await apiFetch<{ success: boolean; data: Record<string, unknown>[] }>('/api/loyalty/tiers', { silent: true });
+      const tiersData = tiersBody?.data || tiersBody;
+      if (Array.isArray(tiersData)) {
+        tierLadder = parseTierLadder(tiersData, '');
+      }
+    } catch { /* public tiers optional */ }
+
+    try {
+      const rewardsBody = await apiFetch<{ success: boolean; data: Record<string, unknown>[] }>('/api/loyalty/rewards', { silent: true });
+      const rewardsData = rewardsBody?.data || rewardsBody;
+      if (Array.isArray(rewardsData)) {
+        rewards = parseRewards(rewardsData);
+      }
+    } catch { /* public rewards optional */ }
+
+    set((state) => ({
+      tierLadder: tierLadder.length > 0 ? tierLadder : state.tierLadder,
+      rewards: rewards.length > 0 ? rewards : state.rewards,
+    }));
   },
 
   redeemReward: async (rewardId: string): Promise<RedeemedVoucher | null> => {
@@ -222,14 +289,29 @@ export const useLoyaltyStore = create<LoyaltyState>((set, get) => ({
     set({ loading: true, error: null });
     try {
       const payload = otp ? { phone, otp } : { phone };
-      const res = await apiFetch<any>('/api/loyalty/phone-auth', {
+      const res = await apiFetch<PhoneAuthResponseShape>('/api/loyalty/phone-auth', {
         method: 'POST',
         body: JSON.stringify(payload),
       });
       const token = res?.customerToken || res?.token || res?.data?.customerToken || res?.data?.token;
-      const user = (res?.user || res?.data?.user) as ClientSessionUser | undefined;
-      if (token && user) {
-        saveClientSession(token, user);
+      const rawUser = res?.customer || res?.user || res?.data?.customer || res?.data?.user;
+      if (token && rawUser?.id) {
+        const sessionUser: ClientSessionUser = {
+          id: String(rawUser.id),
+          name: String(rawUser.name || phone),
+          email: String(rawUser.email || ''),
+          phone: String(rawUser.phone || phone),
+          role: String(rawUser.role || 'customer'),
+          ...(rawUser.tenantId ? { tenantId: rawUser.tenantId } : {}),
+          ...(rawUser.tenant_id ? { tenant_id: rawUser.tenant_id } : {}),
+        };
+        saveClientSession(token, sessionUser);
+        useAuthStore.setState((state) => ({
+          user: sessionUser as AuthUser,
+          loading: false,
+          error: null,
+          sessionVersion: state.sessionVersion + 1,
+        }));
       } else if (token && typeof window !== 'undefined') {
         window.localStorage.setItem('aura_auth_token', token);
       }
@@ -253,12 +335,16 @@ export const useLoyaltyStore = create<LoyaltyState>((set, get) => ({
       lifetimePoints: 0,
       cashbackRate: 3,
       cashbackBalance: 0,
+      cashbackTotalEarned: 0,
+      cashbackTotalSpent: 0,
+      cashbackExpiring7d: 0,
       nextTier: null,
       tierLadder: [],
       rewards: [],
       myVouchers: [],
       lastRedeemedVoucher: null,
       history: [],
+      cashbackHistory: [],
       loading: false,
       error: null,
     });

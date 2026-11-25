@@ -126,4 +126,43 @@ describe('LoginForm', () => {
     fetchSpy.mockRestore();
     saveSpy.mockRestore();
   });
+
+  it('handles requiresOtp:false direct new-phone registration and change-phone reset (#215)', async () => {
+    const fetchSpy = vi.spyOn(apiClient, 'apiFetch')
+      .mockResolvedValueOnce({
+        success: true,
+        requiresOtp: false,
+        message: 'Số điện thoại mới có thể đăng ký trực tiếp.',
+      })
+      .mockResolvedValueOnce({
+        success: true,
+        token: 'new-phone-jwt',
+        customer: { id: 'c-new', name: 'Khách Mới', phone: '0988777666', email: '' },
+      });
+    const saveSpy = vi.spyOn(clientSession, 'saveClientSession').mockImplementation(() => {});
+
+    render(<AccountNotLoggedIn />);
+    fireEvent.change(screen.getByLabelText('Số điện thoại'), { target: { value: '0988777666' } });
+    fireEvent.click(screen.getByRole('button', { name: /Nhận mã OTP/i }));
+
+    await waitFor(() => {
+      expect(screen.getByText(/Số điện thoại mới có thể đăng ký trực tiếp/i)).toBeDefined();
+    });
+    // Must NOT lock behind a 6-digit OTP input when requiresOtp is false
+    expect(screen.queryByLabelText('Mã OTP')).toBeNull();
+    expect(screen.getByRole('button', { name: /Đổi số điện thoại/i })).toBeDefined();
+
+    fireEvent.change(screen.getByLabelText('Tên khách hàng'), { target: { value: 'Khách Mới' } });
+    fireEvent.click(screen.getByRole('button', { name: /Đăng ký thành viên ngay/i }));
+
+    await waitFor(() => {
+      expect(saveSpy).toHaveBeenCalledWith('new-phone-jwt', expect.objectContaining({
+        id: 'c-new',
+        phone: '0988777666',
+        role: 'customer',
+      }));
+    });
+    fetchSpy.mockRestore();
+    saveSpy.mockRestore();
+  });
 });

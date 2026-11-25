@@ -34,15 +34,25 @@ export function TierCard({
       {/* Left: tier info + progress */}
       <div className="flex flex-col justify-between flex-1">
         <div>
-          <div
-            className="inline-block px-3 py-1 border border-[var(--aura-chrome-bright)]/40 rounded-full text-[10px] font-bold tracking-[0.2em] uppercase mb-[12px]"
-            style={{
-              backgroundColor: 'color-mix(in srgb, var(--aura-chrome-bright) 20%, transparent)',
-              color: 'var(--aura-chrome-bright)',
-              fontFamily: "var(--aura-font-body)",
-            }}
-          >
-            {t('loyalty.tierBadge', { tierName: data.tierName })}
+          <div className="flex flex-wrap items-center gap-2 mb-[12px]">
+            <div
+              className="inline-block px-3 py-1 border border-[var(--aura-chrome-bright)]/40 rounded-full text-[10px] font-bold tracking-[0.2em] uppercase"
+              style={{
+                backgroundColor: 'color-mix(in srgb, var(--aura-chrome-bright) 20%, transparent)',
+                color: 'var(--aura-chrome-bright)',
+                fontFamily: "var(--aura-font-body)",
+              }}
+            >
+              {t('loyalty.tierBadge', { tierName: data.tierName })}
+            </div>
+            {data.cashbackRate !== undefined && (
+              <span
+                data-testid="tier-card-cashback-rate"
+                className="inline-block px-3 py-1 rounded-full text-[10px] font-bold tracking-wider uppercase border border-[#C69C6D]/40 bg-[#C69C6D]/15 text-[#F5EFE6]"
+              >
+                Hoàn {data.cashbackRate}% Ví AURA
+              </span>
+            )}
           </div>
           {data.memberSince ? (
             <h2

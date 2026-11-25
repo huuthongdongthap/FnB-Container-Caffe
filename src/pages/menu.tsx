@@ -8,8 +8,8 @@ import { useCartStore } from '@/hooks/stores/use-cart-store';
 import { useToast } from '@/components/ui/toast';
 import { StitchMenuNew } from '@/components/stitch/StitchMenuNew';
 import { StitchMenuNewSkeleton } from '@/components/stitch/StitchMenuNew-skeleton';
-import { LandingNav } from '@/components/stitch/StitchLandingNew-nav';
 import { CartDrawer } from '@/components/order/cart-drawer';
+import { apiFetch } from '@/lib/api-client';
 import { RecommendationSection } from '@/components/menu/recommendation-section';
 import { DrinkCustomizerModal } from '@/components/menu/DrinkCustomizerModal';
 import {
@@ -68,6 +68,28 @@ export function MenuPage() {
   }, [tableNumber]);
 
   const [cartOpen, setCartOpen] = useState(false);
+  const [activePricingRules, setActivePricingRules] = useState<
+    Array<{ id: string; name: string; discount_percent: number; start_time: string; end_time: string }>
+  >([]);
+
+  useEffect(() => {
+    let cancelled = false;
+    apiFetch<{
+      success?: boolean;
+      data?: Array<{ id: string; name: string; discount_percent: number; start_time: string; end_time: string }>;
+    }>('/api/pricing/dynamic/active', { silent: true })
+      .then((res) => {
+        if (!cancelled && Array.isArray(res?.data)) {
+          setActivePricingRules(res.data);
+        }
+      })
+      .catch(() => {
+        // Non-blocking: menu renders normally when dynamic pricing is inactive or unreachable
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const {
     items: cartItems,
@@ -173,7 +195,21 @@ export function MenuPage() {
         canonical="/menu"
       />
 
-      <LandingNav />
+      {activePricingRules.length > 0 && (
+        <div
+          data-testid="dynamic-pricing-banner"
+          className="mx-auto max-w-6xl px-4 pt-3"
+        >
+          <div className="rounded-xl border border-amber-400/30 bg-amber-500/15 px-4 py-2.5 flex flex-wrap items-center justify-between gap-2 text-xs text-amber-200">
+            <span>
+              <strong>{activePricingRules[0]!.name}</strong> — Đang giảm {activePricingRules[0]!.discount_percent}% ({activePricingRules[0]!.start_time}–{activePricingRules[0]!.end_time})
+            </span>
+            <a href="/loyalty" className="underline font-semibold text-amber-100">
+              Cộng thêm tích điểm &amp; hoàn tiền →
+            </a>
+          </div>
+        </div>
+      )}
 
       {tableNumber && <MenuTableBanner tableNumber={tableNumber} />}
 

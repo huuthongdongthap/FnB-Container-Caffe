@@ -277,6 +277,10 @@ export async function handleSummary(c: Context<{ Bindings: Env }>) {
     }
   }
 
+  const walletBalance = Math.max(0, Number(wallet.balance || 0));
+  const rawExpiring = Math.max(0, Number(expiring?.total || 0));
+  const clampedExpiring = Math.max(0, Math.min(rawExpiring, walletBalance));
+
   const custMeta = cust as unknown as { verified_at?: string | null; phone_verified?: boolean };
   const phoneVerified = Boolean(custMeta.verified_at || custMeta.phone_verified !== false);
 
@@ -297,7 +301,7 @@ export async function handleSummary(c: Context<{ Bindings: Env }>) {
         balance: wallet.balance,
         total_earned: wallet.total_earned,
         total_spent: wallet.total_spent,
-        expiring_within_7d: expiring?.total || 0
+        expiring_within_7d: clampedExpiring
       },
       next_tier: nextTier || null,
       active_rewards: activeRewards[0]?.cnt || 0,

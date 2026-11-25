@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { OFFERS } from './constants';
 import { HeroSection } from './hero-section';
 import { OfferCard } from './offer-card';
@@ -6,12 +7,15 @@ import { NewsletterSection } from './newsletter-section';
 import { LandingNav } from '@/components/stitch/StitchLandingNew-nav';
 import { LandingFooter } from '@/components/stitch/StitchLandingNew-footer';
 import { HelmetHead } from '@/components/seo/HelmetHead';
-import { Sparkles, Award, ShieldCheck, Zap } from 'lucide-react';
+import { usePromotions } from '@/hooks/use-promotions';
+import { PromotionCard } from '@/components/promotions/promotion-card';
+import { Sparkles, Award, ShieldCheck, Zap, ArrowRight } from 'lucide-react';
 
 export type { CardOffer } from './types';
 
 export default function PromotionsNew() {
   const [timer, setTimer] = useState(4 * 3600 + 22 * 60 + 15);
+  const { data: livePromotions } = usePromotions();
 
   useEffect(() => {
     const id = setInterval(() => {
@@ -95,8 +99,55 @@ export default function PromotionsNew() {
                 <span className="text-[11px] text-[var(--aura-chrome-mid)]">Từ 5.000.000₫ tích lũy</span>
               </div>
             </div>
+
+            <div className="mt-6 pt-5 border-t border-white/10 flex flex-col sm:flex-row items-center justify-between gap-4">
+              <span className="text-xs text-[var(--aura-chrome-soft)]">
+                Đã mua hàng tại AURA CAFE? Tra cứu ngay điểm thưởng, hạng thẻ và số dư Ví hoàn tiền VND của bạn.
+              </span>
+              <Link
+                to="/loyalty"
+                data-testid="promotions-loyalty-cta"
+                className="inline-flex items-center justify-center gap-2 px-6 py-2.5 rounded-full bg-[var(--aura-chrome-bright)] text-[#0A1A2E] text-xs font-bold uppercase tracking-wider hover:bg-white transition-colors shrink-0"
+              >
+                <span>Tra cứu điểm &amp; Ví hoàn tiền</span>
+                <ArrowRight className="w-4 h-4" />
+              </Link>
+            </div>
           </div>
         </section>
+
+        {/* Live API Voucher Codes */}
+        {livePromotions && livePromotions.length > 0 && (
+          <section className="px-4 sm:px-6 space-y-6 max-w-7xl mx-auto mt-8" data-testid="live-promotions-grid">
+            <div className="flex items-center gap-3 border-l-4 border-emerald-400 pl-4">
+              <div>
+                <span className="text-xs uppercase tracking-widest text-emerald-400 font-bold block mb-1">
+                  Mã Giảm Giá Trực Tuyến
+                </span>
+                <h3 className="font-display text-2xl font-bold text-white tracking-tight">
+                  Voucher Đang Áp Dụng Khi Thanh Toán
+                </h3>
+              </div>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {livePromotions.map((promo) => (
+                <PromotionCard
+                  key={promo.id}
+                  id={promo.id}
+                  code={promo.code}
+                  percent={promo.percent}
+                  maxDiscount={promo.maxDiscount}
+                  minOrder={promo.minOrder}
+                  expiresAt={promo.expiresAt}
+                  usageCount={promo.usageCount}
+                  usageLimit={promo.usageLimit}
+                  icon={promo.icon}
+                  isFeatured={promo.isFeatured}
+                />
+              ))}
+            </div>
+          </section>
+        )}
 
         {/* Feature Offers Grid */}
         <section className="px-4 sm:px-6 space-y-6 max-w-7xl mx-auto mt-10">

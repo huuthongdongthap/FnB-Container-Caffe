@@ -17,22 +17,28 @@ export const MD3_SHELL_CONFIG: ShellRouteConfig[] = [
   { match: '/loyalty', title: 'Thành viên & Tích điểm', variant: 'small', showNav: true, showTop: true },
   { match: '/referral', title: 'Giới thiệu bạn bè', variant: 'small', showNav: true, showTop: true },
 
-  // Story & Brand pages — LandingNav + LandingFooter, no mobile bottom nav
+  // Story & Brand pages — LandingNav + LandingFooter / own Stitch header, no duplicate shell header
   { match: '/about', title: 'Về AURA CAFE', variant: 'small', showNav: false, showTop: false },
   { match: '/gallery', title: 'Không gian & Góc ảnh', variant: 'small', showNav: false, showTop: false },
   { match: '/reviews', title: 'Đánh giá khách hàng', variant: 'small', showNav: false, showTop: false },
   { match: '/contact', title: 'Liên hệ', variant: 'small', showNav: false, showTop: false },
+  { match: '/events', title: 'Sự kiện AURA CAFE', variant: 'small', showNav: false, showTop: false },
+  { match: '/tuyen-dung', title: 'Tuyển dụng AURA CAFE', variant: 'small', showNav: false, showTop: false },
+  { match: '/ung-tuyen', title: 'Ứng tuyển AURA CAFE', variant: 'small', showNav: false, showTop: false },
 
   // Tenant storefronts are white-label and must not inherit flagship chrome.
   { match: '/s/', title: '', variant: 'small', showNav: false, showTop: false },
 
-  // Functional customer pages — TopAppBar only, KHÔNG Bottom Nav
+  // Functional customer pages — single TopAppBar where page has no internal header
   { match: '/checkout', title: 'Thanh toán đơn hàng', variant: 'small', showNav: false, showTop: true },
+  { match: '/subscriptions', title: 'Gói Hội Viên & Thuê Container', variant: 'small', showNav: false, showTop: true },
+  { match: '/loyalty-calculator', title: 'Tính điểm & Hoàn tiền', variant: 'small', showNav: false, showTop: true },
+  { match: '/register', title: 'Đăng ký thành viên', variant: 'small', showNav: false, showTop: true },
 
   { match: '/order-success', title: 'Đặt hàng thành công', variant: 'small', showNav: false, showTop: false },
-  { match: '/order-failure', title: 'Thanh toán chưa hoàn tất', variant: 'small', showNav: false, showTop: true },
+  { match: '/order-failure', title: 'Thanh toán chưa hoàn tất', variant: 'small', showNav: false, showTop: false },
   { match: '/order', title: 'Gọi món tại bàn', variant: 'small', showNav: false, showTop: false },
-  { match: '/checkin', title: 'Check-in tại quán', variant: 'small', showNav: false, showTop: true },
+  { match: '/checkin', title: 'Check-in tại quán', variant: 'small', showNav: false, showTop: false },
   { match: '/track-order', title: 'Tra cứu đơn hàng', variant: 'small', showNav: false, showTop: false },
   { match: '/hub', title: 'Trạm Điều Hành', variant: 'small', showNav: false, showTop: false },
   { match: '/portal', title: 'Trạm Điều Hành', variant: 'small', showNav: false, showTop: false },

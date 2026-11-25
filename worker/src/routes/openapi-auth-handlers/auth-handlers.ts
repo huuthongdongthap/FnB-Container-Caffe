@@ -99,16 +99,34 @@ export function registerAuthHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
       }
     }
 
-    const normalizedCustomerPhone = String(body.phone || '').trim() || null;
-    try {
-      await db.prepare(
-        'INSERT INTO customers (id, email, name, phone, loyalty_points, lifetime_points, loyalty_tier, tenant_id, created_at, updated_at) VALUES (?, ?, ?, ?, 0, 0, ?, ?, ?, ?)'
-      ).bind(id, normalizedEmail, body.name || 'Thành viên', normalizedCustomerPhone, 'bronze', registerTenant, now, now).run();
-    } catch {
-      if (registerTenant === 'default') {
+    const normalizedCustomerPhone = String(body.phone || '').replace(/\s+/g, '') || null;
+    let linkedExistingCustomer = false;
+    if (normalizedCustomerPhone) {
+      try {
+        const existingPhoneCustomer = (await db.prepare(
+          "SELECT id FROM customers WHERE phone = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ? LIMIT 1"
+        ).bind(normalizedCustomerPhone, registerTenant).first()) as { id?: string } | null;
+        if (existingPhoneCustomer?.id) {
+          await db.prepare(
+            'UPDATE customers SET email = ?, name = COALESCE(NULLIF(TRIM(?), \'\'), name), updated_at = ? WHERE id = ?'
+          ).bind(normalizedEmail, body.name || '', now, existingPhoneCustomer.id).run();
+          linkedExistingCustomer = true;
+        }
+      } catch {
+        // Fallback to insert if tenant_id or updated_at absent in partial test DBs
+      }
+    }
+    if (!linkedExistingCustomer) {
+      try {
         await db.prepare(
-          'INSERT INTO customers (id, email, name, phone, loyalty_points, loyalty_tier, created_at) VALUES (?, ?, ?, ?, 0, ?, ?)'
-        ).bind(id, normalizedEmail, body.name || 'Thành viên', normalizedCustomerPhone, 'bronze', now).run().catch(() => {});
+          'INSERT INTO customers (id, email, name, phone, loyalty_points, lifetime_points, loyalty_tier, tenant_id, created_at, updated_at) VALUES (?, ?, ?, ?, 0, 0, ?, ?, ?, ?)'
+        ).bind(id, normalizedEmail, body.name || 'Thành viên', normalizedCustomerPhone, 'bronze', registerTenant, now, now).run();
+      } catch {
+        if (registerTenant === 'default') {
+          await db.prepare(
+            'INSERT INTO customers (id, email, name, phone, loyalty_points, loyalty_tier, created_at) VALUES (?, ?, ?, ?, 0, ?, ?)'
+          ).bind(id, normalizedEmail, body.name || 'Thành viên', normalizedCustomerPhone, 'bronze', now).run().catch(() => {});
+        }
       }
     }
 

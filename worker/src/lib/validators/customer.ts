@@ -12,11 +12,14 @@ import {
 // ── Contact form ──
 export const contactSchema = z.object({
   name: nameSchema,
-  phone: z.string().min(8).max(15),
+  phone: z.string().min(8).max(15).optional().or(z.literal('')),
   email: emailSchema.optional().or(z.literal('')),
   category: z.enum(['service', 'food', 'space', 'booking', 'complaint', 'other']).optional(),
   content: z.string().min(1, 'Nội dung không được để trống').max(2000, 'Nội dung tối đa 2000 ký tự')
-});
+}).refine(
+  (d) => Boolean((d.phone && d.phone.trim().length >= 8) || (d.email && d.email.trim().length > 0)),
+  { message: 'Vui lòng nhập số điện thoại hoặc email hợp lệ', path: ['phone'] }
+);
 
 // ── Reservation ──
 export const reservationSchema = z.object({

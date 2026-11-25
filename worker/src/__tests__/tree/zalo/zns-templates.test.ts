@@ -87,9 +87,9 @@ describe('buildTemplateData', () => {
       expect(result.balance).toBe('0đ');
     });
 
-    it('falls back qr_url to default signup page when missing', () => {
+    it('falls back qr_url to default loyalty page when missing', () => {
       const result = buildTemplateData('welcome_signup', {});
-      expect(result.qr_url).toBe('https://fnb-caffe-container.pages.dev/dang-ky-thanh-vien');
+      expect(result.qr_url).toBe('https://fnb-caffe-container.pages.dev/loyalty');
     });
   });
 

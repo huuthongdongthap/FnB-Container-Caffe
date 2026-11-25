@@ -33,11 +33,12 @@ const CheckinNew = React.lazy(() => import('@/pages/stitch/checkin-new'));
 const ContactNew = React.lazy(() => import('@/pages/stitch/contact-new'));
 const TrackOrderNew = React.lazy(() => import('@/pages/stitch/track-order'));
 const ReservationNew = React.lazy(() => import('@/pages/stitch/reservation-new'));
-const SubscriptionsNew = React.lazy(() => import('@/pages/stitch/subscriptions-new'));
-const LoyaltyCalcNew = React.lazy(() => import('@/pages/stitch/loyalty-calc'));
+const SubscriptionsPage = React.lazy(() => import('@/pages/subscriptions'));
+const LoyaltyCalculatorPage = React.lazy(() => import('@/pages/loyalty-calculator'));
 const GalleryNew = React.lazy(() => import('@/pages/stitch/gallery-new'));
 const OurStory = React.lazy(() => import('@/pages/stitch/our-story'));
-const CustomerAccountDashboard = React.lazy(() => import('@/pages/stitch/customer-reviews'));
+const ReviewsPage = React.lazy(() => import('@/pages/ReviewsPage'));
+const RegisterPage = React.lazy(() => import('@/pages/register'));
 const StitchScreenGallery = React.lazy(() => import('@/pages/stitch-screen-gallery'));
 const SystemHubPage = React.lazy(() => import('@/pages/SystemHub'));
 const RecruitmentPage = React.lazy(() => import('@/pages/RecruitmentPage'));
@@ -64,9 +65,11 @@ export const publicRoutes = [
 
   // Tab 5: Cá nhân
   <Route key="/account" path="/account" element={guarded(<AccountPage />)} />,
+  <Route key="/register" path="/register" element={guarded(<RegisterPage />)} />,
   <Route key="/loyalty" path="/loyalty" element={guarded(<LoyaltyPage />)} />,
+  <Route key="/dang-ky-thanh-vien" path="/dang-ky-thanh-vien" element={<Navigate to="/loyalty" replace />} />,
   <Route key="/referral" path="/referral" element={guarded(<ReferralPage />)} />,
-  <Route key="/subscriptions" path="/subscriptions" element={guarded(<SubscriptionsNew />)} />,
+  <Route key="/subscriptions" path="/subscriptions" element={guarded(<SubscriptionsPage />)} />,
 
   // Các trang chức năng không có tab (checkout, order, checkin...)
   <Route key="/checkout" path="/checkout" element={guarded(<CheckoutPage />)} />,
@@ -79,7 +82,7 @@ export const publicRoutes = [
   // Legacy / other pages
   <Route key="/table-checkin" path="/table-checkin" element={guarded(<TableCheckinPage />)} />,
   <Route key="/about" path="/about" element={guarded(<OurStory />)} />,
-  <Route key="/reviews" path="/reviews" element={guarded(<CustomerAccountDashboard />)} />,
+  <Route key="/reviews" path="/reviews" element={guarded(<ReviewsPage />)} />,
   <Route key="/contact" path="/contact" element={guarded(<ContactNew />)} />,
   <Route key="/tuyen-dung" path="/tuyen-dung" element={guarded(<RecruitmentPage />)} />,
   <Route key="/ung-tuyen" path="/ung-tuyen" element={guarded(<RecruitmentPage />)} />,
@@ -89,7 +92,7 @@ export const publicRoutes = [
   <Route key="/privacy" path="/privacy" element={<Navigate to="/about" replace />} />,
   <Route key="/terms" path="/terms" element={<Navigate to="/about" replace />} />,
   <Route key="/gallery" path="/gallery" element={guarded(<GalleryNew />)} />,
-  <Route key="/loyalty-calculator" path="/loyalty-calculator" element={guarded(<LoyaltyCalcNew />)} />,
+  <Route key="/loyalty-calculator" path="/loyalty-calculator" element={guarded(<LoyaltyCalculatorPage />)} />,
   <Route key="/pricing" path="/pricing" element={guarded(<PricingPage />)} />,
   <Route key="/:locale/pricing" path="/:locale/pricing" element={guarded(<PricingPage />)} />,
   <Route key="/saas" path="/saas" element={guarded(<PricingPage />)} />,

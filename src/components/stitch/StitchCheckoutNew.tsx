@@ -183,10 +183,11 @@ export function StitchCheckoutNew({
 
   // Loyalty lookup: query authenticated customer summary (supports both HttpOnly cookie and bearer auth)
   const authUser = useAuthStore((s) => s.user);
+  const hasAuthSession = Boolean(authUser) || (typeof window !== 'undefined' && Boolean(localStorage.getItem('aura_auth_token')));
   const lookupLoyalty = useCallback(async (phone: string) => {
     const digits = phone.replace(/\D/g, '');
-    const hasAuthSession = Boolean(authUser) || (typeof window !== 'undefined' && Boolean(localStorage.getItem('aura_auth_token')));
-    if (digits.length < 9 || digits.length > 12 || !hasAuthSession) {
+    const sessionPresent = Boolean(authUser) || (typeof window !== 'undefined' && Boolean(localStorage.getItem('aura_auth_token')));
+    if (digits.length < 9 || digits.length > 12 || !sessionPresent) {
       setLoyalty(null);
       return;
     }
@@ -504,6 +505,21 @@ export function StitchCheckoutNew({
                     <p className="mt-1 text-xs text-red-400" data-testid="phone-error">
                       {t('stitch.phoneInvalid', 'Số điện thoại không hợp lệ (VD: 0901234567)')}
                     </p>
+                  )}
+
+                  {!hasAuthSession && isPhoneValid && (
+                    <div
+                      data-testid="checkout-guest-loyalty-cta"
+                      className="mt-2 rounded-xl border border-[#C69C6D]/30 bg-[#C69C6D]/10 px-3 py-2 flex flex-wrap items-center justify-between gap-2 text-xs text-[var(--aura-chrome-bright)]"
+                    >
+                      <span>Bạn có Ví Hoàn Tiền AURA? Đăng nhập nhanh để kiểm tra &amp; trừ trực tiếp vào đơn.</span>
+                      <a
+                        href="/account"
+                        className="font-bold text-[#C69C6D] hover:underline shrink-0"
+                      >
+                        Đăng nhập tra cứu ví →
+                      </a>
+                    </div>
                   )}
 
                   {/* Loyalty tier badge + wallet balance chip (debounced lookup) */}

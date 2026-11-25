@@ -53,7 +53,7 @@ export function buildTemplateData(template_key: string, data: ZnsData): Record<s
       customer_name: data.name || '',
       member_id: data.member_id || '',
       balance: `${(data.balance || 0).toLocaleString('vi-VN')}đ`,
-      qr_url: data.qr_url || 'https://fnb-caffe-container.pages.dev/dang-ky-thanh-vien'
+      qr_url: data.qr_url || 'https://fnb-caffe-container.pages.dev/loyalty'
     };
   case 'cashback_earned':
     return {

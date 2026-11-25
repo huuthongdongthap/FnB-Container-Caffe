@@ -356,6 +356,11 @@ export async function handleLookup(c: Context<{ Bindings: Env }>) {
     };
   }
 
+  const walletBalance = Math.max(0, Number(balance || 0));
+  const rawExpiring = Math.max(0, Number(expiringRow?.total || 0));
+  const clampedExpiring = Math.max(0, Math.min(rawExpiring, walletBalance));
+  const expiringCount = clampedExpiring > 0 ? Math.max(0, Number(expiringRow?.cnt || 0)) : 0;
+
   const memberPayload = {
     id: customer.id,
     customer_id: customer.id,
@@ -372,8 +377,9 @@ export async function handleLookup(c: Context<{ Bindings: Env }>) {
     cashback_balance: balance,
     cashback_balance_vnd: balance,
     lifetime_cashback: lifetimeRow?.total || 0,
-    expiring_amount: expiringRow?.total || 0,
-    expiring_within_7d: expiringRow?.cnt || 0,
+    expiring_amount: clampedExpiring,
+    expiring_within_7d: clampedExpiring,
+    expiring_count: expiringCount,
     tier_progress: tierProgress,
     member_since: customer.created_at
   };

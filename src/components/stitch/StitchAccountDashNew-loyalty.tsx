@@ -2,6 +2,7 @@
  * DashLoyaltySection — loyalty progress card for StitchAccountDashNew
  */
 import { useTranslation } from 'react-i18next';
+import { Link } from 'react-router-dom';
 import type { DashLoyaltyData } from './StitchAccountDashNew-types';
 import { BODY_FONT, DISPLAY_FONT } from './StitchAccountDashNew-constants';
 
@@ -70,6 +71,16 @@ export function DashLoyaltySection({ loyalty, tier, setGlassCardRef }: DashLoyal
       >
         <span>{tier}</span>
         <span>{loyalty.nextTier}</span>
+      </div>
+
+      <div className="pt-2 border-t border-white/10 flex items-center justify-between gap-3">
+        <Link
+          to="/loyalty"
+          data-testid="dash-loyalty-cta"
+          className="inline-flex items-center gap-1.5 text-xs font-semibold text-[var(--aura-chrome-bright)] hover:underline"
+        >
+          <span>{t('stitch.accountDashboard.viewLoyaltyWallet', 'Xem lịch sử điểm, Ví hoàn tiền & Đổi quà →')}</span>
+        </Link>
       </div>
     </section>
   );

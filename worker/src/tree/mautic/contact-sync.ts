@@ -36,42 +36,74 @@ export async function syncContacts(
     const tenantSql = isWildcard ? '' : " AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?";
     const tenantParams = isWildcard ? [] : [normalizedTenant];
 
+    const cTenantSql = isWildcard ? '' : " AND COALESCE(NULLIF(TRIM(c.tenant_id), ''), 'default') = ?";
     const excludedOrderStatusClause =
       "AND COALESCE(orders.status, '') NOT IN ('cancelled', 'rejected', 'failed', 'expired') AND COALESCE(orders.status, '') NOT IN ('canceled', 'refunded')";
-    let results: CustomerContact[] = [];
+    type ContactRow = CustomerContact & { cashback_balance?: number };
+    let results: ContactRow[] = [];
     try {
       const res = await db.prepare(
-        `SELECT id, name, phone, email, tier, total_spent, visit_count, tenant_id,
-          (SELECT MAX(created_at) FROM orders WHERE customer_id = customers.id ${excludedOrderStatusClause} AND COALESCE(NULLIF(TRIM(orders.tenant_id), ''), 'default') = COALESCE(NULLIF(TRIM(customers.tenant_id), ''), 'default')) as last_visit
-         FROM customers WHERE updated_at >= ?${tenantSql} ORDER BY updated_at ASC LIMIT 200`
-      ).bind(since, ...tenantParams).all<CustomerContact>();
+        `SELECT c.id, c.name, c.phone, c.email,
+          COALESCE(NULLIF(TRIM(c.loyalty_tier), ''), NULLIF(TRIM(c.tier), ''), 'bronze') as tier,
+          COALESCE(cw.balance, c.cashback_balance, 0) as cashback_balance,
+          CASE WHEN EXISTS (SELECT 1 FROM orders WHERE (orders.customer_id = c.id OR (c.phone IS NOT NULL AND TRIM(c.phone) != '' AND orders.customer_phone = c.phone)) AND COALESCE(NULLIF(TRIM(orders.tenant_id), ''), 'default') = COALESCE(NULLIF(TRIM(c.tenant_id), ''), 'default'))
+               THEN COALESCE((SELECT SUM(orders.total) FROM orders WHERE (orders.customer_id = c.id OR (c.phone IS NOT NULL AND TRIM(c.phone) != '' AND orders.customer_phone = c.phone)) ${excludedOrderStatusClause} AND COALESCE(NULLIF(TRIM(orders.tenant_id), ''), 'default') = COALESCE(NULLIF(TRIM(c.tenant_id), ''), 'default')), 0)
+               ELSE COALESCE(c.total_spent, 0) END as total_spent,
+          CASE WHEN EXISTS (SELECT 1 FROM orders WHERE (orders.customer_id = c.id OR (c.phone IS NOT NULL AND TRIM(c.phone) != '' AND orders.customer_phone = c.phone)) AND COALESCE(NULLIF(TRIM(orders.tenant_id), ''), 'default') = COALESCE(NULLIF(TRIM(c.tenant_id), ''), 'default'))
+               THEN (SELECT COUNT(*) FROM orders WHERE (orders.customer_id = c.id OR (c.phone IS NOT NULL AND TRIM(c.phone) != '' AND orders.customer_phone = c.phone)) ${excludedOrderStatusClause} AND COALESCE(NULLIF(TRIM(orders.tenant_id), ''), 'default') = COALESCE(NULLIF(TRIM(c.tenant_id), ''), 'default'))
+               ELSE COALESCE(c.visit_count, 0) END as visit_count,
+          c.tenant_id,
+          (SELECT MAX(created_at) FROM orders WHERE (orders.customer_id = c.id OR (c.phone IS NOT NULL AND TRIM(c.phone) != '' AND orders.customer_phone = c.phone)) ${excludedOrderStatusClause} AND COALESCE(NULLIF(TRIM(orders.tenant_id), ''), 'default') = COALESCE(NULLIF(TRIM(c.tenant_id), ''), 'default')) as last_visit
+         FROM customers c
+         LEFT JOIN cashback_wallets cw ON cw.customer_id = c.id AND COALESCE(NULLIF(TRIM(cw.tenant_id), ''), 'default') = COALESCE(NULLIF(TRIM(c.tenant_id), ''), 'default')
+         WHERE c.updated_at >= ?${cTenantSql} ORDER BY c.updated_at ASC LIMIT 200`
+      ).bind(since, ...tenantParams).all<ContactRow>();
       results = (res.results || []).filter((r) =>
         matchesMauticTenant(r as unknown as Record<string, unknown>, tenantId)
       );
     } catch (colErr) {
       const msg = String((colErr as Error)?.message || '');
-      if (msg.includes('no such column')) {
+      if (msg.includes('no such column') || msg.includes('no such table')) {
         try {
           const fallbackTenant = await db.prepare(
-            `SELECT id, name, phone, email, loyalty_tier as tier, total_spent, 0 as visit_count, tenant_id,
-              (SELECT MAX(created_at) FROM orders WHERE customer_id = customers.id ${excludedOrderStatusClause} AND COALESCE(NULLIF(TRIM(orders.tenant_id), ''), 'default') = COALESCE(NULLIF(TRIM(customers.tenant_id), ''), 'default')) as last_visit
-             FROM customers WHERE updated_at >= ?${tenantSql} ORDER BY updated_at ASC LIMIT 200`
-          ).bind(since, ...tenantParams).all<CustomerContact>();
+            `SELECT c.id, c.name, c.phone, c.email, c.loyalty_tier as tier,
+              COALESCE(cw.balance, 0) as cashback_balance,
+              COALESCE(NULLIF((SELECT SUM(orders.total) FROM orders WHERE orders.customer_id = c.id ${excludedOrderStatusClause} AND COALESCE(NULLIF(TRIM(orders.tenant_id), ''), 'default') = COALESCE(NULLIF(TRIM(c.tenant_id), ''), 'default')), 0), c.total_spent, 0) as total_spent,
+              (SELECT COUNT(*) FROM orders WHERE orders.customer_id = c.id ${excludedOrderStatusClause} AND COALESCE(NULLIF(TRIM(orders.tenant_id), ''), 'default') = COALESCE(NULLIF(TRIM(c.tenant_id), ''), 'default')) as visit_count,
+              c.tenant_id,
+              (SELECT MAX(created_at) FROM orders WHERE orders.customer_id = c.id ${excludedOrderStatusClause} AND COALESCE(NULLIF(TRIM(orders.tenant_id), ''), 'default') = COALESCE(NULLIF(TRIM(c.tenant_id), ''), 'default')) as last_visit
+             FROM customers c
+             LEFT JOIN cashback_wallets cw ON cw.customer_id = c.id
+             WHERE c.updated_at >= ?${cTenantSql} ORDER BY c.updated_at ASC LIMIT 200`
+          ).bind(since, ...tenantParams).all<ContactRow>();
           results = (fallbackTenant.results || []).filter((r) =>
             matchesMauticTenant(r as unknown as Record<string, unknown>, tenantId)
           );
         } catch {
-          if (isWildcard || normalizedTenant === 'default') {
-            const fallback = await db.prepare(
-              `SELECT id, name, phone, email, loyalty_tier as tier, total_spent, 0 as visit_count,
-                (SELECT MAX(created_at) FROM orders WHERE customer_id = customers.id ${excludedOrderStatusClause}) as last_visit
-               FROM customers WHERE updated_at >= ? ORDER BY updated_at ASC LIMIT 200`
-            ).bind(since).all<CustomerContact>();
-            results = (fallback.results || []).filter((r) =>
+          try {
+            const fallbackNoWallet = await db.prepare(
+              `SELECT id, name, phone, email, loyalty_tier as tier, total_spent,
+                (SELECT COUNT(*) FROM orders WHERE orders.customer_id = customers.id ${excludedOrderStatusClause} AND COALESCE(NULLIF(TRIM(orders.tenant_id), ''), 'default') = COALESCE(NULLIF(TRIM(customers.tenant_id), ''), 'default')) as visit_count,
+                tenant_id,
+                (SELECT MAX(created_at) FROM orders WHERE customer_id = customers.id ${excludedOrderStatusClause} AND COALESCE(NULLIF(TRIM(orders.tenant_id), ''), 'default') = COALESCE(NULLIF(TRIM(customers.tenant_id), ''), 'default')) as last_visit
+               FROM customers WHERE updated_at >= ?${tenantSql} ORDER BY updated_at ASC LIMIT 200`
+            ).bind(since, ...tenantParams).all<ContactRow>();
+            results = (fallbackNoWallet.results || []).filter((r) =>
               matchesMauticTenant(r as unknown as Record<string, unknown>, tenantId)
             );
-          } else {
-            results = [];
+          } catch {
+            if (isWildcard || normalizedTenant === 'default') {
+              const fallback = await db.prepare(
+                `SELECT id, name, phone, email, loyalty_tier as tier, total_spent, 0 as visit_count,
+                  (SELECT MAX(created_at) FROM orders WHERE customer_id = customers.id ${excludedOrderStatusClause}) as last_visit
+                 FROM customers WHERE updated_at >= ? ORDER BY updated_at ASC LIMIT 200`
+              ).bind(since).all<ContactRow>();
+              results = (fallback.results || []).filter((r) =>
+                matchesMauticTenant(r as unknown as Record<string, unknown>, tenantId)
+              );
+            } else {
+              results = [];
+            }
           }
         }
       } else {
