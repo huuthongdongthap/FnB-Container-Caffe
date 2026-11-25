@@ -28,6 +28,8 @@ export type { OrderBroadcasterNamespaceLike, OrderBroadcasterStubLike } from './
 export { creditLoyaltyIfEligible } from './policies/loyalty-trigger';
 export { restoreLoyaltyVoucherForOrder } from './loyalty-voucher';
 export { releaseTableIfNoActiveOrders } from './policies/table-occupancy-release';
+export { compensateVoidedOrder, adjustShiftCustodyForCashRefund } from './policies/order-rollback';
+export type { CompensateVoidedOrderParams, CashRefundShiftAdjustmentParams } from './policies/order-rollback';
 export { calculateOrderSnapshot } from './policies/order-snapshot';
 export { VOID_STATUSES, isVoidStatus } from './policies/order-status-transition';
 export { canActorTransition, toActorRole } from './policies/transition-authorization';

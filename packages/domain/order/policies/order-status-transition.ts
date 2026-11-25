@@ -88,10 +88,18 @@ export async function transitionOrderStatus(
   actorRole: string | undefined,
   options: {
     tenantId?: string;
-    currentOrder?: { id: string; status: string; payment_status?: string | null };
+    currentOrder?: {
+      id: string;
+      status: string;
+      payment_status?: string | null;
+      order_type?: string | null;
+      assigned_shipper_id?: string | null;
+    };
     paymentStatus?: string | null;
     allowPaidCompensation?: boolean;
-    fields?: { notes?: unknown; delivery_time?: unknown; payment_method?: unknown; payment_status?: unknown };
+    actorId?: string;
+    validateAssignedShipper?: boolean;
+    fields?: Record<string, unknown>;
   } = {},
 ): Promise<OrderStatusResult> {
   const rawTenantId = (options.tenantId ?? '').trim() || 'default';
@@ -186,66 +194,225 @@ export async function transitionOrderStatus(
     }
   }
 
-  if (targetStatus === 'preparing') {
+  const mutableFields: Record<string, unknown> = { ...(options.fields ?? {}) };
+  const normalizedActor = (actorRole ?? '').trim().toLowerCase();
+  const isShipperActor =
+    normalizedActor === 'shipper' ||
+    normalizedActor === 'rider' ||
+    normalizedActor === 'driver' ||
+    normalizedActor === 'delivery';
+  const cleanActorId = typeof options.actorId === 'string' ? options.actorId.trim() : '';
+
+  let metaRow: {
+    order_type?: string | null;
+    payment_status?: string | null;
+    payment_method?: string | null;
+    is_cod?: number | string | null;
+    assigned_shipper_id?: string | null;
+  } | null = null;
+
+  if (
+    !isNoOp ||
+    isShipperActor ||
+    options.validateAssignedShipper ||
+    mutableFields.assigned_shipper_id !== undefined
+  ) {
     try {
-      let paymentRow: {
-        order_type?: string | null;
-        payment_status?: string | null;
-        payment_method?: string | null;
-        is_cod?: number | string | null;
-      } | null = null;
+      metaRow = await db
+        .prepare(
+          `SELECT order_type, payment_status, payment_method, is_cod, assigned_shipper_id FROM orders WHERE id = ?${writeTenantClause}`,
+        )
+        .bind(orderId, ...writeTenantBinds)
+        .first();
+    } catch {
       try {
-        paymentRow = await db
+        metaRow = await db
           .prepare(`SELECT order_type, payment_status, payment_method, is_cod FROM orders WHERE id = ?${writeTenantClause}`)
           .bind(orderId, ...writeTenantBinds)
           .first();
       } catch {
         try {
-          paymentRow = await db
+          metaRow = await db
             .prepare(`SELECT order_type, payment_status, payment_method FROM orders WHERE id = ?${writeTenantClause}`)
             .bind(orderId, ...writeTenantBinds)
             .first();
         } catch {
-          paymentRow = await db
-            .prepare(`SELECT order_type, payment_status FROM orders WHERE id = ?${writeTenantClause}`)
-            .bind(orderId, ...writeTenantBinds)
-            .first();
+          try {
+            metaRow = await db
+              .prepare(`SELECT order_type, payment_status FROM orders WHERE id = ?${writeTenantClause}`)
+              .bind(orderId, ...writeTenantBinds)
+              .first();
+          } catch {
+            metaRow = null;
+          }
         }
       }
-      const incomingPaymentMethod =
-        typeof options.fields?.payment_method === 'string'
-          ? options.fields.payment_method.trim().toLowerCase()
-          : '';
-      const persistedMethod = String(paymentRow?.payment_method ?? '').trim().toLowerCase();
-      const method = incomingPaymentMethod || persistedMethod;
-      const rawPaymentStatus = String(
-        paymentRow?.payment_status ?? options.paymentStatus ?? options.currentOrder?.payment_status ?? '',
-      ).trim().toLowerCase();
-      const isPaid =
-        rawPaymentStatus === 'paid' ||
-        rawPaymentStatus === 'completed' ||
-        rawPaymentStatus === 'partially_refunded';
-      const isCodDelivery = incomingPaymentMethod
-        ? method === 'cod' || method === 'cash'
-        : persistedMethod === 'cod' || persistedMethod === 'cash' || Number(paymentRow?.is_cod ?? 0) === 1;
-      const isPrepaidOnline =
-        method === 'payos' || method === 'bank_transfer' || method === 'qr' || method === 'vietqr';
-      if (isPrepaidOnline && !isPaid) {
+    }
+  }
+
+  const persistedOrderType = String(
+    metaRow?.order_type ?? options.currentOrder?.order_type ?? '',
+  )
+    .trim()
+    .toLowerCase();
+
+  if (!isNoOp && persistedOrderType) {
+    if (
+      (persistedOrderType === 'dine_in' || persistedOrderType === 'takeaway') &&
+      (targetStatus === 'delivering' || targetStatus === 'delivered')
+    ) {
+      return {
+        success: false,
+        error: `Order type '${persistedOrderType}' cannot transition to '${targetStatus}'`,
+        statusCode: 400,
+      };
+    }
+    if (persistedOrderType === 'delivery' && targetStatus === 'served') {
+      return {
+        success: false,
+        error: "Order type 'delivery' cannot transition to 'served'",
+        statusCode: 400,
+      };
+    }
+  }
+
+  if (isShipperActor && cleanActorId) {
+    if (persistedOrderType && persistedOrderType !== 'delivery') {
+      return {
+        success: false,
+        error: 'Shippers may only update delivery orders',
+        statusCode: 403,
+      };
+    }
+    const persistedShipperId = String(
+      metaRow?.assigned_shipper_id ?? options.currentOrder?.assigned_shipper_id ?? '',
+    ).trim();
+    if (persistedShipperId && persistedShipperId !== cleanActorId) {
+      return {
+        success: false,
+        error: 'Forbidden: order is assigned to another shipper',
+        statusCode: 403,
+      };
+    }
+    const incomingShipperId =
+      typeof mutableFields.assigned_shipper_id === 'string'
+        ? mutableFields.assigned_shipper_id.trim()
+        : '';
+    if (incomingShipperId && incomingShipperId !== cleanActorId) {
+      return {
+        success: false,
+        error: 'Shippers cannot assign an order to another shipper',
+        statusCode: 403,
+      };
+    }
+    if (!persistedShipperId && !incomingShipperId && targetStatus === 'delivering') {
+      mutableFields.assigned_shipper_id = cleanActorId;
+    }
+  }
+
+  const requestedShipperId =
+    typeof mutableFields.assigned_shipper_id === 'string'
+      ? mutableFields.assigned_shipper_id.trim()
+      : '';
+  if (requestedShipperId && (options.validateAssignedShipper || Boolean(cleanActorId))) {
+    type ShipperUserRow = {
+      id?: string;
+      name?: string | null;
+      role?: string | null;
+      tenant_id?: string | null;
+      is_active?: number | null;
+    };
+    let hasUsersTable = true;
+    let shipperUser: ShipperUserRow | null = null;
+    try {
+      shipperUser = await db
+        .prepare('SELECT id, name, role, tenant_id, is_active FROM users WHERE id = ? LIMIT 1')
+        .bind(requestedShipperId)
+        .first<ShipperUserRow>();
+    } catch (userErr) {
+      const errMsg = String(userErr);
+      if (/no such table:.*\busers\b/i.test(errMsg)) {
+        hasUsersTable = false;
+      } else if (/no such column:.*tenant_id/i.test(errMsg)) {
+        shipperUser = await db
+          .prepare('SELECT id, name, role, is_active FROM users WHERE id = ? LIMIT 1')
+          .bind(requestedShipperId)
+          .first<ShipperUserRow>()
+          .catch(() => null);
+      } else {
+        throw userErr;
+      }
+    }
+    if (hasUsersTable) {
+      if (!shipperUser || Number(shipperUser.is_active ?? 1) !== 1) {
         return {
           success: false,
-          error: 'Đơn thanh toán trực tuyến phải hoàn tất thanh toán trước khi chế biến',
-          statusCode: 409,
+          error: 'Assigned shipper account not found or inactive',
+          statusCode: 400,
         };
       }
-      if (paymentRow?.order_type === 'delivery' && !isPaid && !isCodDelivery) {
+      const uRole = String(shipperUser.role ?? '').trim().toLowerCase();
+      if (uRole === 'customer' || !uRole) {
         return {
           success: false,
-          error: 'Đơn giao tận nơi phải hoàn tất thanh toán trước khi chế biến',
-          statusCode: 409,
+          error: 'Assigned shipper must be an active staff or shipper account',
+          statusCode: 400,
         };
       }
-    } catch {
-      // Allow fallback when minimal schema omits order_type or payment_status
+      if (effectiveWriteTenant !== '*' && 'tenant_id' in shipperUser && shipperUser.tenant_id !== undefined) {
+        const uTenant = (typeof shipperUser.tenant_id === 'string' && shipperUser.tenant_id.trim()) || 'default';
+        const isHqUser =
+          (uRole === 'owner' || uRole === 'admin') &&
+          (uTenant === '*' || uTenant.toLowerCase() === 'hq');
+        if (!isHqUser && uTenant !== effectiveWriteTenant) {
+          return {
+            success: false,
+            error: 'Assigned shipper does not belong to this store',
+            statusCode: 400,
+          };
+        }
+      }
+      if (!mutableFields.shipper_name && typeof shipperUser.name === 'string' && shipperUser.name.trim()) {
+        mutableFields.shipper_name = shipperUser.name.trim();
+      }
+    }
+  }
+
+  if (targetStatus === 'preparing' || targetStatus === 'delivering' || targetStatus === 'delivered') {
+    const incomingPaymentMethod =
+      typeof mutableFields.payment_method === 'string'
+        ? mutableFields.payment_method.trim().toLowerCase()
+        : '';
+    const persistedMethod = String(metaRow?.payment_method ?? '').trim().toLowerCase();
+    const method = incomingPaymentMethod || persistedMethod;
+    const rawPaymentStatus = String(
+      metaRow?.payment_status ?? options.paymentStatus ?? options.currentOrder?.payment_status ?? '',
+    ).trim().toLowerCase();
+    const isPaid =
+      rawPaymentStatus === 'paid' ||
+      rawPaymentStatus === 'completed' ||
+      rawPaymentStatus === 'partially_refunded';
+    const isCodDelivery = incomingPaymentMethod
+      ? method === 'cod' || method === 'cash'
+      : persistedMethod === 'cod' || persistedMethod === 'cash' || Number(metaRow?.is_cod ?? 0) === 1;
+    const isPrepaidOnline =
+      method === 'payos' || method === 'bank_transfer' || method === 'qr' || method === 'vietqr';
+    if (isPrepaidOnline && !isPaid) {
+      return {
+        success: false,
+        error:
+          targetStatus === 'preparing'
+            ? 'Đơn thanh toán trực tuyến phải hoàn tất thanh toán trước khi chế biến'
+            : 'Đơn thanh toán trực tuyến phải hoàn tất thanh toán trước khi giao hàng',
+        statusCode: 409,
+      };
+    }
+    if (targetStatus === 'preparing' && persistedOrderType === 'delivery' && !isPaid && !isCodDelivery) {
+      return {
+        success: false,
+        error: 'Đơn giao tận nơi phải hoàn tất thanh toán trước khi chế biến',
+        statusCode: 409,
+      };
     }
   }
 
@@ -262,17 +429,26 @@ export async function transitionOrderStatus(
       };
     }
     // A settled payment must never be dropped by a raw status transition; only management-authorized
-    // rollback paths that unwind loyalty, inventory, and wallet state may compensate a paid order.
-    const normalizedActor = (actorRole ?? '').trim().toLowerCase();
+    // rollback paths (or authorized delivery-failure reporting with an explicit reason) may compensate a paid order.
+    const hasFailureReason =
+      typeof mutableFields.failure_reason === 'string' && mutableFields.failure_reason.trim().length > 0;
+    const isManagerActor =
+      normalizedActor === 'owner' ||
+      normalizedActor === 'admin' ||
+      normalizedActor === 'manager' ||
+      normalizedActor === 'supervisor';
+    const isDispatchFailureActor =
+      targetStatus === 'failed' &&
+      order.status === 'delivering' &&
+      hasFailureReason &&
+      (normalizedActor === 'staff' || normalizedActor === 'cashier' || normalizedActor === 'waiter');
     const canCompensatePaid = Boolean(
-      options.allowPaidCompensation &&
-        (normalizedActor === 'owner' ||
-          normalizedActor === 'admin' ||
-          normalizedActor === 'manager' ||
-          normalizedActor === 'supervisor'),
+      options.allowPaidCompensation && (isManagerActor || isDispatchFailureActor),
     );
     let knownPaymentStatus: string | null | undefined =
-      options.paymentStatus ?? (options.currentOrder as { payment_status?: string | null } | undefined)?.payment_status;
+      options.paymentStatus ??
+      metaRow?.payment_status ??
+      (options.currentOrder as { payment_status?: string | null } | undefined)?.payment_status;
     if (!canCompensatePaid && (knownPaymentStatus === undefined || knownPaymentStatus === null)) {
       try {
         const row = await db
@@ -284,7 +460,13 @@ export async function transitionOrderStatus(
         // Minimal schemas without payment_status cannot hold a paid order.
       }
     }
-    if (!canCompensatePaid && String(knownPaymentStatus ?? '').trim().toLowerCase() === 'paid') {
+    const normalizedKnownPay = String(knownPaymentStatus ?? '').trim().toLowerCase();
+    if (
+      !canCompensatePaid &&
+      (normalizedKnownPay === 'paid' ||
+        normalizedKnownPay === 'completed' ||
+        normalizedKnownPay === 'partially_refunded')
+    ) {
       return { success: false, error: PAID_ORDER_CANCEL_ERROR, statusCode: 409 };
     }
   }
@@ -299,7 +481,7 @@ export async function transitionOrderStatus(
     'failure_reason',
   ]);
   const optionalDeliveryKeys = new Set(['assigned_shipper_id', 'shipper_name', 'failure_reason']);
-  const fields = Object.entries(options.fields ?? {}).filter(
+  const fields = Object.entries(mutableFields).filter(
     ([key, value]) => allowedFieldKeys.has(key) && value !== undefined,
   );
   if (isNoOp && fields.length === 0) {
@@ -313,7 +495,12 @@ export async function transitionOrderStatus(
   const fieldKeys = new Set(fields.map(([key]) => key));
   const priorLower = String(order.status ?? '').trim().toLowerCase();
   const cancelAlertFlag =
-    priorLower === 'confirmed' || priorLower === 'preparing' || priorLower === 'ready' ? 1 : 0;
+    priorLower === 'confirmed' ||
+    priorLower === 'preparing' ||
+    priorLower === 'ready' ||
+    priorLower === 'delivering'
+      ? 1
+      : 0;
   const safePriorStatus = /^[a-z_]{1,24}$/.test(priorLower) ? priorLower : null;
   type LifecycleColumnClause = {
     col: string;
@@ -336,8 +523,8 @@ export async function transitionOrderStatus(
         col: 'served_at',
         sql: ', served_at = COALESCE(served_at, ?2)',
       });
-    } else if (targetStatus === 'cancelled') {
-      if (!fieldKeys.has('cancelled_at')) {
+    } else if (targetStatus === 'cancelled' || targetStatus === 'failed') {
+      if (targetStatus === 'cancelled' && !fieldKeys.has('cancelled_at')) {
         initialLifecycleClauses.push({
           col: 'cancelled_at',
           sql: ', cancelled_at = COALESCE(cancelled_at, ?2)',

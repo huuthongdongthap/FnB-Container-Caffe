@@ -100,6 +100,9 @@ export const OrderUpdateSchema = z.object({
   status: OrderStatusEnum.optional(),
   notes: z.string().max(1000).optional(),
   customer: OrderCustomerSchema.partial().optional(),
+  assigned_shipper_id: z.string().max(120).optional(),
+  shipper_name: z.string().max(120).optional(),
+  failure_reason: z.string().max(500).optional(),
 }).openapi('OrderUpdate');
 
 export const OrderResponseSchema = z.object({
@@ -122,6 +125,12 @@ export const OrderResponseSchema = z.object({
   paymentStatus: PaymentStatusEnum,
   payments: z.array(OrderPaymentSchema),
   notes: z.string().nullable(),
+  assignedShipperId: z.string().nullable().optional(),
+  shipperName: z.string().nullable().optional(),
+  failureReason: z.string().nullable().optional(),
+  assigned_shipper_id: z.string().nullable().optional(),
+  shipper_name: z.string().nullable().optional(),
+  failure_reason: z.string().nullable().optional(),
   source: z.string(),
   servedAt: DateTimeSchema.nullable(),
   completedAt: DateTimeSchema.nullable(),

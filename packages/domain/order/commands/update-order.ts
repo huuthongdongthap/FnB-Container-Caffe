@@ -9,6 +9,7 @@ import { parseJSON } from '../model/helpers';
 import { isTerminal } from '../model/order-state-machine';
 import { transitionOrderStatus, changedRows, isVoidStatus } from '../policies/order-status-transition';
 import { releaseTableIfNoActiveOrders } from '../policies/table-occupancy-release';
+import { compensateVoidedOrder } from '../policies/order-rollback';
 import {
   fanOutOrderBroadcast,
   normalizeBroadcastTotal,
@@ -20,7 +21,7 @@ import type { ErpnextEnv } from 'worker/src/clients/erpnext-client';
 import type { WorkerEnv } from 'worker/src/clients/erpnext-accounting-client';
 
 const log = createLogger({ route: 'orders' });
-const ORDER_FIELD_STAFF_ROLES = ['owner', 'manager', 'supervisor', 'admin', 'cashier', 'waiter', 'staff', 'rider'];
+const ORDER_FIELD_STAFF_ROLES = ['owner', 'manager', 'supervisor', 'admin', 'cashier', 'waiter', 'staff', 'shipper', 'rider'];
 
 export async function updateOrder(
   request: Request,
@@ -97,7 +98,13 @@ export async function updateOrder(
 
     const currentStatus = String(results[0].status ?? '');
     const currentPaymentStatus = String((results[0] as { payment_status?: unknown }).payment_status ?? 'unpaid').trim().toLowerCase();
-    const hasFieldUpdate = body.notes !== undefined || body.delivery_time !== undefined || body.payment_method !== undefined;
+    const hasFieldUpdate =
+      body.notes !== undefined ||
+      body.delivery_time !== undefined ||
+      body.payment_method !== undefined ||
+      body.assigned_shipper_id !== undefined ||
+      body.shipper_name !== undefined ||
+      body.failure_reason !== undefined;
     if (hasFieldUpdate && isTerminal(currentStatus)) {
       return errorResponse('Cannot modify a completed or cancelled order', 400);
     }
@@ -122,20 +129,32 @@ export async function updateOrder(
     }
 
     if (body.status !== undefined) {
-      const canCompensatePaid =
-        isVoidStatus(body.status) &&
-        ['owner', 'admin', 'manager', 'supervisor'].includes(normalizedRole);
+      const isManagerVoid = ['owner', 'admin', 'manager', 'supervisor'].includes(normalizedRole);
+      const isDispatchFail =
+        String(body.status).trim().toLowerCase() === 'failed' &&
+        currentStatus === 'delivering' &&
+        typeof body.failure_reason === 'string' &&
+        body.failure_reason.trim().length > 0 &&
+        ['staff', 'cashier', 'waiter'].includes(normalizedRole);
+      const canCompensatePaid = isVoidStatus(body.status) && (isManagerVoid || isDispatchFail);
       const transition = await transitionOrderStatus(db, id, String(body.status), actorRole, {
         tenantId,
         currentOrder: results[0] as { id: string; status: string; payment_status?: string | null },
         paymentStatus: String((results[0] as { payment_status?: unknown }).payment_status ?? 'unpaid'),
         allowPaidCompensation: canCompensatePaid,
-        fields: { notes: body.notes, delivery_time: body.delivery_time, payment_method: body.payment_method },
+        fields: {
+          notes: body.notes,
+          delivery_time: body.delivery_time,
+          payment_method: body.payment_method,
+          ...(body.assigned_shipper_id !== undefined ? { assigned_shipper_id: body.assigned_shipper_id } : {}),
+          ...(body.shipper_name !== undefined ? { shipper_name: body.shipper_name } : {}),
+          ...(body.failure_reason !== undefined ? { failure_reason: body.failure_reason } : {}),
+        },
       });
       if (!transition.success) return errorResponse(transition.error!, transition.statusCode || 400);
       if (transition.idempotent) return jsonResponse({ success: true, idempotent: true });
     } else {
-      const fields = ['notes', 'delivery_time', 'payment_method'].filter(field => body[field] !== undefined);
+      const fields = ['notes', 'delivery_time', 'payment_method', 'assigned_shipper_id', 'shipper_name', 'failure_reason'].filter(field => body[field] !== undefined);
       if (!fields.length) return errorResponse('No valid fields to update', 400);
       const rawLoadedTenant = (results[0] as Record<string, unknown> | undefined)?.tenant_id;
       const loadedOrderTenant =
@@ -267,6 +286,23 @@ export async function updateOrder(
       }
 
       const effectiveCancelTenant = orderTenantForCancel || 'default';
+      const voidReasonText =
+        typeof body.failure_reason === 'string' && body.failure_reason.trim()
+          ? body.failure_reason.trim()
+          : typeof body.reason === 'string' && body.reason.trim()
+            ? body.reason.trim()
+            : 'order_cancelled';
+      await compensateVoidedOrder({
+        db,
+        env,
+        kv: (env.AUTH_KV as import('@cloudflare/workers-types').KVNamespace | undefined) ?? null,
+        orderId: id,
+        tenantId: effectiveCancelTenant,
+        reason: voidReasonText,
+        preCancelStatus: currentStatus,
+        skipInventoryRestore: true,
+        skipTableRelease: true,
+      }).catch(() => {});
 
       // Reverse loyalty accrual if order had already earned points/cashback
       try {

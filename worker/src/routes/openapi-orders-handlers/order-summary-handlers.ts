@@ -183,9 +183,9 @@ export async function handleGetOrderSummary(c: Context<{ Bindings: Env }>) {
       try {
         return await db
           .prepare(
-            `SELECT LOWER(COALESCE(NULLIF(TRIM(payment_method), ''), 'unknown')) as method, COUNT(*) as count
+            `SELECT LOWER(COALESCE(NULLIF(TRIM(payment_method), ''), CASE WHEN COALESCE(is_cod, 0) = 1 THEN 'cod' ELSE 'unknown' END)) as method, COUNT(*) as count
              FROM orders ${whereClause} ${qrExcludeClause}
-             GROUP BY LOWER(COALESCE(NULLIF(TRIM(payment_method), ''), 'unknown'))`,
+             GROUP BY LOWER(COALESCE(NULLIF(TRIM(payment_method), ''), CASE WHEN COALESCE(is_cod, 0) = 1 THEN 'cod' ELSE 'unknown' END))`,
           )
           .bind(...params)
           .all();
@@ -194,16 +194,27 @@ export async function handleGetOrderSummary(c: Context<{ Bindings: Env }>) {
           return await db
             .prepare(
               `SELECT LOWER(COALESCE(NULLIF(TRIM(payment_method), ''), 'unknown')) as method, COUNT(*) as count
-               FROM orders ${whereClause}
+               FROM orders ${whereClause} ${qrExcludeClause}
                GROUP BY LOWER(COALESCE(NULLIF(TRIM(payment_method), ''), 'unknown'))`,
             )
             .bind(...params)
             .all();
         } catch {
-          return await db
-            .prepare(`SELECT COALESCE(order_type, 'dine_in') as method, COUNT(*) as count FROM orders ${whereClause} GROUP BY COALESCE(order_type, 'dine_in')`)
-            .bind(...params)
-            .all();
+          try {
+            return await db
+              .prepare(
+                `SELECT LOWER(COALESCE(NULLIF(TRIM(payment_method), ''), 'unknown')) as method, COUNT(*) as count
+                 FROM orders ${whereClause}
+                 GROUP BY LOWER(COALESCE(NULLIF(TRIM(payment_method), ''), 'unknown'))`,
+              )
+              .bind(...params)
+              .all();
+          } catch {
+            return await db
+              .prepare(`SELECT COALESCE(order_type, 'dine_in') as method, COUNT(*) as count FROM orders ${whereClause} GROUP BY COALESCE(order_type, 'dine_in')`)
+              .bind(...params)
+              .all();
+          }
         }
       }
     })(),

@@ -57,11 +57,15 @@ const TRANSITION_ALLOWED_ROLES: Record<string, ReadonlySet<CanonicalRole>> = {
   'ready->served': new Set(['admin', 'manager', 'staff', 'kitchen']),
   'ready->delivering': new Set(['admin', 'manager', 'staff', 'rider']),
   'ready->delivered': new Set(['admin', 'manager', 'rider']),
-  'delivering->delivered': new Set(['admin', 'manager', 'rider']),
-  'delivering->failed': new Set(['admin', 'manager', 'rider']),
+  'delivering->delivered': new Set(['admin', 'manager', 'staff', 'rider']),
+  'delivering->failed': new Set(['admin', 'manager', 'staff', 'rider']),
   'delivering->cancelled': new Set(['admin', 'manager', 'rider']),
   'served->completed': new Set(['admin', 'manager', 'staff']),
-  'delivered->completed': new Set(['admin', 'manager', 'rider']),
+  'served->failed': new Set(['admin', 'manager']),
+  'served->cancelled': new Set(['admin', 'manager']),
+  'delivered->completed': new Set(['admin', 'manager', 'staff', 'rider']),
+  'delivered->failed': new Set(['admin', 'manager', 'rider']),
+  'delivered->cancelled': new Set(['admin', 'manager', 'rider']),
 };
 
 function canRoleTransition(role: CanonicalRole, from: string, to: string): boolean {
@@ -448,6 +452,47 @@ export default function AdminOrdersPage() {
   const [editNotes, setEditNotes] = useState('');
   const [editDeliveryTime, setEditDeliveryTime] = useState('');
 
+  // Shipper assignment & delivery failure modals (#226)
+  const [shipperOptions, setShipperOptions] = useState<Array<{ id: string; name: string; role: string }>>([]);
+  const [assignShipperTarget, setAssignShipperTarget] = useState<AdminOrder | null>(null);
+  const [selectedShipperId, setSelectedShipperId] = useState('');
+  const [customShipperName, setCustomShipperName] = useState('');
+  const [isSavingShipper, setIsSavingShipper] = useState(false);
+  const [failTarget, setFailTarget] = useState<AdminOrder | null>(null);
+  const [failureReasonInput, setFailureReasonInput] = useState('');
+  const [isMarkingFailed, setIsMarkingFailed] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    const normRole = (actorRole || '').trim().toLowerCase();
+    if (!['owner', 'admin', 'super_admin', 'manager', 'supervisor', 'staff', 'cashier', 'waiter', 'shipper', 'rider'].includes(normRole)) {
+      return;
+    }
+    void apiFetch<{
+      data?: Array<{ id?: string; name?: string; full_name?: string; role?: string; is_active?: number | boolean }>;
+      staff?: Array<{ id?: string; name?: string; full_name?: string; role?: string; is_active?: number | boolean }>;
+    }>('/api/staff', { silent: true })
+      .then((res) => {
+        if (!active) return;
+        const rawList = Array.isArray(res?.data) ? res.data : Array.isArray(res?.staff) ? res.staff : [];
+        const options = rawList
+          .filter((s) => s?.id && (s.is_active === undefined || Boolean(s.is_active)))
+          .map((s) => ({
+            id: String(s.id),
+            name: String(s.name || s.full_name || s.id),
+            role: String(s.role || 'staff').toLowerCase(),
+          }))
+          .filter((s) => s.role !== 'customer' && s.role !== 'barista' && s.role !== 'kitchen' && s.role !== 'chef');
+        setShipperOptions(options);
+      })
+      .catch(() => {
+        // Optional staff directory in minimal test contexts
+      });
+    return () => {
+      active = false;
+    };
+  }, [actorRole, actorTenantId]);
+
   // Debounce search input (~300ms) so typing never drops focus or fires per-keystroke
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -715,10 +760,65 @@ export default function AdminOrdersPage() {
     return ['owner', 'manager', 'supervisor', 'cashier', 'admin', 'waiter', 'shipper', 'rider'].includes(normalizedRole);
   }, [actorRole]);
 
+  const handleConfirmAssignShipper = useCallback(async () => {
+    if (!assignShipperTarget || isSavingShipper) return;
+    const chosenOption = shipperOptions.find((s) => s.id === selectedShipperId);
+    const effectiveShipperId = selectedShipperId.trim() || undefined;
+    const effectiveShipperName = (customShipperName.trim() || chosenOption?.name || '').trim() || undefined;
+    if (!effectiveShipperId && !effectiveShipperName) {
+      setActionError('Vui lòng chọn tài khoản shipper hoặc nhập tên người giao hàng.');
+      return;
+    }
+    setIsSavingShipper(true);
+    setActionError(null);
+    try {
+      const nextStatus = assignShipperTarget.status === 'ready' ? 'delivering' : assignShipperTarget.status;
+      await apiFetch(`/api/orders/${encodeURIComponent(assignShipperTarget.id)}/status`, {
+        method: 'PATCH',
+        body: JSON.stringify({
+          status: nextStatus,
+          ...(effectiveShipperId ? { assigned_shipper_id: effectiveShipperId } : {}),
+          ...(effectiveShipperName ? { shipper_name: effectiveShipperName } : {}),
+        }),
+      });
+      setAssignShipperTarget(null);
+      setSelectedShipperId('');
+      setCustomShipperName('');
+      loadOrdersAndSummary();
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : 'Không thể gán shipper cho đơn hàng.');
+    } finally {
+      setIsSavingShipper(false);
+    }
+  }, [assignShipperTarget, isSavingShipper, shipperOptions, selectedShipperId, customShipperName, loadOrdersAndSummary]);
+
+  const handleConfirmDeliveryFailed = useCallback(async () => {
+    if (!failTarget || !failureReasonInput.trim() || isMarkingFailed) return;
+    setIsMarkingFailed(true);
+    setActionError(null);
+    try {
+      await apiFetch(`/api/orders/${encodeURIComponent(failTarget.id)}/status`, {
+        method: 'PATCH',
+        body: JSON.stringify({
+          status: 'failed',
+          failure_reason: failureReasonInput.trim(),
+        }),
+      });
+      setFailTarget(null);
+      setFailureReasonInput('');
+      loadOrdersAndSummary();
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : 'Không thể đánh dấu giao thất bại.');
+    } finally {
+      setIsMarkingFailed(false);
+    }
+  }, [failTarget, failureReasonInput, isMarkingFailed, loadOrdersAndSummary]);
+
   const stitchOrders: OrderData[] = useMemo(
     () =>
       orders.map((order) => {
         const payStatus = getPaymentStatus(order);
+        const canonicalActor = normalizeActorRole(actorRole);
         const isTerminal =
           order.status === 'cancelled' ||
           order.status === 'completed' ||
@@ -738,11 +838,66 @@ export default function AdminOrdersPage() {
         const hasRefundAction =
           Boolean((order as { payment_id?: string | null }).payment_id) &&
           ['owner', 'admin', 'super_admin', 'manager'].includes((actorRole || '').trim().toLowerCase());
+        const isDeliveryChannel = order.orderType === 'delivery';
+        const canAssignShipper =
+          isDeliveryChannel &&
+          (order.status === 'ready' || order.status === 'delivering') &&
+          ['admin', 'manager', 'staff', 'rider'].includes(canonicalActor) &&
+          (isPaidStatus(payStatus) || isCodMethod(order));
+        const canMarkDeliveryFailed =
+          !isTerminal &&
+          ((order.status === 'delivering' && ['admin', 'manager', 'staff', 'rider'].includes(canonicalActor)) ||
+            (order.status === 'delivered' && !isPaidStatus(payStatus) && ['admin', 'manager', 'rider'].includes(canonicalActor)) ||
+            (order.status === 'served' && !isPaidStatus(payStatus) && ['admin', 'manager'].includes(canonicalActor)));
+        const hasMetaBadges = Boolean(order.shipperName || (order.status === 'failed' && order.failureReason));
         return {
           ...mapAdminOrder(order, actorRole, t),
           additionalActions:
-            canShowPayosQr || unpaidCod || hasRefundAction ? (
-              <div className="inline-flex items-center gap-2">
+            canShowPayosQr || unpaidCod || hasRefundAction || canAssignShipper || canMarkDeliveryFailed || hasMetaBadges ? (
+              <div className="inline-flex flex-wrap items-center gap-2">
+                {order.shipperName && (
+                  <span
+                    data-testid={`shipper-badge-${order.id}`}
+                    className="rounded bg-indigo-500/20 border border-indigo-400/30 px-2 py-0.5 text-[11px] font-medium text-indigo-200"
+                  >
+                    Shipper: {order.shipperName}
+                  </span>
+                )}
+                {order.status === 'failed' && order.failureReason && (
+                  <span
+                    data-testid={`failure-reason-badge-${order.id}`}
+                    className="rounded bg-red-500/20 border border-red-400/30 px-2 py-0.5 text-[11px] font-medium text-red-200"
+                  >
+                    Thất bại: {order.failureReason}
+                  </span>
+                )}
+                {canAssignShipper && (
+                  <button
+                    type="button"
+                    data-testid={`assign-shipper-${order.id}`}
+                    onClick={() => {
+                      setAssignShipperTarget(order);
+                      setSelectedShipperId(order.assignedShipperId || '');
+                      setCustomShipperName(order.shipperName || '');
+                    }}
+                    className="rounded-md bg-indigo-600 px-2.5 py-1 text-xs font-semibold text-white hover:bg-indigo-700 cursor-pointer"
+                  >
+                    {order.shipperName ? 'Đổi Shipper' : 'Gán Shipper'}
+                  </button>
+                )}
+                {canMarkDeliveryFailed && (
+                  <button
+                    type="button"
+                    data-testid={`mark-delivery-failed-${order.id}`}
+                    onClick={() => {
+                      setFailTarget(order);
+                      setFailureReasonInput('');
+                    }}
+                    className="rounded-md bg-rose-600/85 px-2.5 py-1 text-xs font-semibold text-white hover:bg-rose-700 cursor-pointer"
+                  >
+                    Giao thất bại
+                  </button>
+                )}
                 {canShowPayosQr && (
                   <button
                     type="button"
@@ -1129,6 +1284,140 @@ export default function AdminOrdersPage() {
                 className="rounded-lg border border-white/15 px-4 py-2 text-xs font-semibold hover:bg-white/10"
               >
                 {t('orderMgmt.close')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Assign Shipper Modal (#226) */}
+      {assignShipperTarget && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label="Gán Shipper giao hàng"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4"
+        >
+          <div className="w-full max-w-md rounded-2xl border border-white/15 bg-[#0A1A2E] p-6 text-white shadow-2xl space-y-3">
+            <h2 className="text-lg font-semibold">
+              Gán Shipper — {assignShipperTarget.orderNumber || assignShipperTarget.id}
+            </h2>
+            {shipperOptions.length > 0 && (
+              <div>
+                <label htmlFor="assign-shipper-select" className="mb-1 block text-xs text-white/70">
+                  Chọn nhân viên giao hàng (cửa hàng hiện tại)
+                </label>
+                <select
+                  id="assign-shipper-select"
+                  data-testid="assign-shipper-select"
+                  value={selectedShipperId}
+                  onChange={(e) => {
+                    const nextId = e.target.value;
+                    setSelectedShipperId(nextId);
+                    const found = shipperOptions.find((s) => s.id === nextId);
+                    if (found) setCustomShipperName(found.name);
+                  }}
+                  className="w-full rounded-lg border border-white/15 bg-[#0c1c30] p-2.5 text-sm text-white outline-none focus:border-indigo-400"
+                >
+                  <option value="">-- Chọn tài khoản shipper / nhân viên --</option>
+                  {shipperOptions.map((opt) => (
+                    <option key={opt.id} value={opt.id}>
+                      {opt.name} ({opt.role})
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+            <div>
+              <label htmlFor="assign-shipper-name-input" className="mb-1 block text-xs text-white/70">
+                Tên người giao hiển thị
+              </label>
+              <input
+                id="assign-shipper-name-input"
+                type="text"
+                data-testid="assign-shipper-name-input"
+                value={customShipperName}
+                onChange={(e) => setCustomShipperName(e.target.value)}
+                placeholder="Nhập tên shipper..."
+                className="w-full rounded-lg border border-white/15 bg-white/5 p-2.5 text-sm text-white outline-none focus:border-indigo-400"
+              />
+            </div>
+            <div className="mt-4 flex justify-end gap-2">
+              <button
+                type="button"
+                disabled={isSavingShipper}
+                onClick={() => {
+                  setAssignShipperTarget(null);
+                  setSelectedShipperId('');
+                  setCustomShipperName('');
+                }}
+                className="rounded-lg border border-white/15 px-4 py-2 text-xs font-semibold hover:bg-white/10"
+              >
+                {t('orderMgmt.close', { defaultValue: 'Đóng' })}
+              </button>
+              <button
+                type="button"
+                data-testid="confirm-assign-shipper-btn"
+                disabled={isSavingShipper || (!selectedShipperId.trim() && !customShipperName.trim())}
+                onClick={() => { void handleConfirmAssignShipper(); }}
+                className="rounded-lg bg-indigo-500 px-4 py-2 text-xs font-semibold text-white hover:bg-indigo-600 disabled:opacity-40"
+              >
+                {isSavingShipper ? 'Đang lưu...' : (assignShipperTarget.status === 'ready' ? 'Gán & Xuất giao' : 'Lưu Shipper')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Mark Delivery Failed Modal (#226) */}
+      {failTarget && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label="Báo giao hàng thất bại"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4"
+        >
+          <div className="w-full max-w-md rounded-2xl border border-white/15 bg-[#0A1A2E] p-6 text-white shadow-2xl">
+            <h2 className="mb-2 text-lg font-semibold">
+              Báo giao thất bại — {failTarget.orderNumber || failTarget.id}
+            </h2>
+            <p className="mb-3 text-xs text-amber-200/90">
+              {isPaidStatus(getPaymentStatus(failTarget))
+                ? 'Đơn đã thanh toán trước sẽ giữ trạng thái đã thu tiền kèm đánh dấu cần hoàn tiền để quản lý xử lý hoàn tiền.'
+                : 'Đơn COD chưa thu tiền sẽ được đóng ở trạng thái thất bại và ghi nhận hao hụt kho nếu đã pha chế.'}
+            </p>
+            <label htmlFor="delivery-failure-reason-input" className="mb-1 block text-xs text-white/70">
+              Lý do giao thất bại (bắt buộc)
+            </label>
+            <textarea
+              id="delivery-failure-reason-input"
+              data-testid="delivery-failure-reason-input"
+              value={failureReasonInput}
+              onChange={(e) => setFailureReasonInput(e.target.value)}
+              rows={3}
+              placeholder="VD: Khách không nghe máy / từ chối nhận hàng..."
+              className="w-full rounded-lg border border-white/15 bg-white/5 p-2.5 text-sm text-white outline-none focus:border-rose-400"
+            />
+            <div className="mt-4 flex justify-end gap-2">
+              <button
+                type="button"
+                disabled={isMarkingFailed}
+                onClick={() => {
+                  setFailTarget(null);
+                  setFailureReasonInput('');
+                }}
+                className="rounded-lg border border-white/15 px-4 py-2 text-xs font-semibold hover:bg-white/10"
+              >
+                {t('orderMgmt.close', { defaultValue: 'Đóng' })}
+              </button>
+              <button
+                type="button"
+                data-testid="confirm-delivery-failed-btn"
+                disabled={isMarkingFailed || !failureReasonInput.trim()}
+                onClick={() => { void handleConfirmDeliveryFailed(); }}
+                className="rounded-lg bg-rose-600 px-4 py-2 text-xs font-semibold text-white hover:bg-rose-700 disabled:opacity-40"
+              >
+                {isMarkingFailed ? 'Đang cập nhật...' : 'Xác nhận giao thất bại'}
               </button>
             </div>
           </div>

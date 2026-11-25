@@ -132,8 +132,11 @@ function RefundSession({ order, onRecorded }: { order: AdminOrder; onRecorded: (
   const locked = useRef(false);
 
   const canManageRefund = Boolean(role && ['owner', 'manager', 'admin', 'super_admin'].includes(role));
+  const normalizedMethod = String(payment.payment_method ?? '').trim().toLowerCase();
+  const isCashOrCod = normalizedMethod === 'cod' || normalizedMethod === 'cash';
+  const isSupportedMethod = normalizedMethod === 'payos' || isCashOrCod;
 
-  const isFullyRefunded = Boolean(payment.payment_id) && payment.payment_method === 'payos'
+  const isFullyRefunded = Boolean(payment.payment_id) && isSupportedMethod
     && (payment.refund_status === 'completed' || payment.refund_status === 'refunded' || payment.payment_status === 'refunded');
 
   if (isFullyRefunded && status !== 'loyalty_failed') {
@@ -148,10 +151,11 @@ function RefundSession({ order, onRecorded }: { order: AdminOrder; onRecorded: (
   if (!canManageRefund) return null;
 
   const hasTransactionIdField = payment.payment_transaction_id !== undefined;
-  const hasValidPayosTransactionId = !hasTransactionIdField
+  const hasValidPayosTransactionId = isCashOrCod
+    || !hasTransactionIdField
     || (typeof payment.payment_transaction_id === 'string' && /^\d+$/.test(payment.payment_transaction_id.trim()));
 
-  const baseEligible = Boolean(payment.payment_id) && payment.payment_method === 'payos'
+  const baseEligible = Boolean(payment.payment_id) && isSupportedMethod
     && ['paid', 'completed', 'partially_refunded'].includes(payment.payment_status ?? '')
     && (!payment.refund_status || payment.refund_status === 'partial')
     && Number.isSafeInteger(paid) && Number.isSafeInteger(refunded) && refunded >= 0 && remaining > 0;
@@ -377,9 +381,13 @@ function RefundSession({ order, onRecorded }: { order: AdminOrder; onRecorded: (
             </div>
 
             <p className="text-xs text-slate-400">
-              {t('orderMgmt.refund.manualNotice', {
-                defaultValue: 'Chỉ ghi nhận tiền đã chuyển thủ công. PayOS không tự chuyển tiền.',
-              })}
+              {isCashOrCod
+                ? t('orderMgmt.refund.cashNotice', {
+                    defaultValue: 'Ghi nhận hoàn trả tiền mặt tại quầy và tự động bù trừ đối soát ca trực.',
+                  })
+                : t('orderMgmt.refund.manualNotice', {
+                    defaultValue: 'Chỉ ghi nhận tiền đã chuyển thủ công. PayOS không tự chuyển tiền.',
+                  })}
             </p>
 
             <label className="block space-y-1 text-xs">
@@ -410,7 +418,11 @@ function RefundSession({ order, onRecorded }: { order: AdminOrder; onRecorded: (
             </label>
 
             <label className="block space-y-1 text-xs">
-              <span className="text-slate-300">{t('orderMgmt.refund.reference', { defaultValue: 'Mã chuyển khoản' })}</span>
+              <span className="text-slate-300">
+                {isCashOrCod
+                  ? t('orderMgmt.refund.cashReference', { defaultValue: 'Mã phiếu chi / Mã tham chiếu' })
+                  : t('orderMgmt.refund.reference', { defaultValue: 'Mã chuyển khoản' })}
+              </span>
               <input
                 className="block w-full rounded-lg border border-white/15 bg-white/5 px-3 py-2 text-sm text-white outline-none focus:border-amber-400/60"
                 required
@@ -430,9 +442,13 @@ function RefundSession({ order, onRecorded }: { order: AdminOrder; onRecorded: (
                 onChange={(e) => setConfirmed(e.target.checked)}
               />
               <span>
-                {t('orderMgmt.refund.confirmTransfer', {
-                  defaultValue: 'Tôi xác nhận khách đã nhận tiền chuyển khoản hoàn trả',
-                })}
+                {isCashOrCod
+                  ? t('orderMgmt.refund.confirmCashRefund', {
+                      defaultValue: 'Tôi xác nhận khách đã nhận tiền mặt hoàn trả',
+                    })
+                  : t('orderMgmt.refund.confirmTransfer', {
+                      defaultValue: 'Tôi xác nhận khách đã nhận tiền chuyển khoản hoàn trả',
+                    })}
               </span>
             </label>
 

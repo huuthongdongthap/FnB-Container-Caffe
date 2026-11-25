@@ -7,7 +7,10 @@ import type { OrderApiPayload } from '@/lib/validators';
    useCheckout — TanStack Query mutation for POST /api/orders.
    ═══════════════════════════════════════════════════════════════════ */
 
-interface CreateOrderPayload extends OrderApiPayload {}
+interface CreateOrderPayload extends OrderApiPayload {
+  pay_now?: boolean;
+  cash_tendered?: number;
+}
 
 interface CreateOrderResponse {
   success: boolean;
@@ -20,6 +23,8 @@ interface CreateOrderResponse {
     totalAmount?: number;
     payment_method: string;
     payment_status: string;
+    cash_tendered?: number;
+    change_due?: number;
     customer_name: string;
     customer_phone: string;
     customer_address?: string;

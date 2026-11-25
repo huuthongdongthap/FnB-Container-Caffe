@@ -26,6 +26,8 @@ export interface ThermalReceiptData {
   discount?: number;
   cashbackUsed?: number;
   total: number;
+  cashTendered?: number;
+  changeDue?: number;
   paymentMethod?: string;
   paymentStatus?: string;
   notes?: string;
@@ -281,6 +283,18 @@ export function ThermalReceipt({ receipt }: { receipt: ThermalReceiptData | null
             {receipt.paymentStatus ? ` (${formatPaymentStatusLabel(receipt.paymentStatus)})` : ''}
           </span>
         </div>
+        {typeof receipt.cashTendered === 'number' && Number.isFinite(receipt.cashTendered) && receipt.cashTendered > 0 && (
+          <div className="flex justify-between">
+            <span>Tiền khách đưa:</span>
+            <span>{formatVnd(receipt.cashTendered)}</span>
+          </div>
+        )}
+        {typeof receipt.changeDue === 'number' && Number.isFinite(receipt.changeDue) && receipt.changeDue >= 0 && receipt.cashTendered !== undefined && (
+          <div className="flex justify-between">
+            <span>Tiền thối:</span>
+            <span>{formatVnd(receipt.changeDue)}</span>
+          </div>
+        )}
         {sanitizeReceiptNotes(receipt.notes) && (
           <div className="pt-1 text-[9px] italic">Ghi chú: {sanitizeReceiptNotes(receipt.notes)}</div>
         )}

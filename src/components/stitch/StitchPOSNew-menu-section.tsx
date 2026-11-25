@@ -29,6 +29,7 @@ interface MenuSectionProps {
   onDeliveryRecipientNameChange?: (name: string) => void;
   deliveryRecipientPhone?: string;
   onDeliveryRecipientPhoneChange?: (phone: string) => void;
+  hasSelectedCustomer?: boolean;
 }
 
 export function MenuSection({
@@ -52,6 +53,7 @@ export function MenuSection({
   onDeliveryRecipientNameChange,
   deliveryRecipientPhone = '',
   onDeliveryRecipientPhoneChange,
+  hasSelectedCustomer = false,
 }: MenuSectionProps) {
   const { t } = useTranslation();
   return (
@@ -127,23 +129,33 @@ export function MenuSection({
                 {onDeliveryRecipientNameChange && (
                   <input
                     type="text"
+                    required={!hasSelectedCustomer}
+                    aria-required={!hasSelectedCustomer}
                     data-testid="pos-delivery-recipient-name"
                     value={deliveryRecipientName}
                     onChange={(e) => onDeliveryRecipientNameChange(e.target.value)}
-                    placeholder="Tên người nhận (khách vãng lai)"
+                    placeholder="Tên người nhận (bắt buộc)"
                     aria-label="Tên người nhận"
-                    className="w-full rounded-lg border border-white/15 bg-[var(--aura-noir-void,#050814)]/75 px-3.5 py-2 text-xs text-[var(--aura-text-primary,#eae1db)] placeholder:text-[var(--aura-text-muted,#8A8E96)] outline-none focus:border-amber-400"
+                    className={cn(
+                      'w-full rounded-lg border bg-[var(--aura-noir-void,#050814)]/75 px-3.5 py-2 text-xs text-[var(--aura-text-primary,#eae1db)] placeholder:text-[var(--aura-text-muted,#8A8E96)] outline-none focus:border-amber-400',
+                      !hasSelectedCustomer && !deliveryRecipientName.trim() ? 'border-amber-400/50' : 'border-white/15',
+                    )}
                   />
                 )}
                 {onDeliveryRecipientPhoneChange && (
                   <input
                     type="tel"
+                    required={!hasSelectedCustomer}
+                    aria-required={!hasSelectedCustomer}
                     data-testid="pos-delivery-recipient-phone"
                     value={deliveryRecipientPhone}
                     onChange={(e) => onDeliveryRecipientPhoneChange(e.target.value)}
-                    placeholder="SĐT người nhận"
+                    placeholder="SĐT người nhận (bắt buộc)"
                     aria-label="SĐT người nhận"
-                    className="w-full rounded-lg border border-white/15 bg-[var(--aura-noir-void,#050814)]/75 px-3.5 py-2 text-xs text-[var(--aura-text-primary,#eae1db)] placeholder:text-[var(--aura-text-muted,#8A8E96)] outline-none focus:border-amber-400"
+                    className={cn(
+                      'w-full rounded-lg border bg-[var(--aura-noir-void,#050814)]/75 px-3.5 py-2 text-xs text-[var(--aura-text-primary,#eae1db)] placeholder:text-[var(--aura-text-muted,#8A8E96)] outline-none focus:border-amber-400',
+                      !hasSelectedCustomer && !deliveryRecipientPhone.trim() ? 'border-amber-400/50' : 'border-white/15',
+                    )}
                   />
                 )}
               </div>

@@ -395,8 +395,8 @@ export async function reconcilePayOSPayment(input: ReconcilePayOSInput): Promise
     if (isTerminalNonPayable) {
       const reviewTag = '[PAID_ON_CANCELLED_ORDER_REQUIRES_REVIEW]';
       const paidStatusSet =
-        afterOrderStatus === 'cancelled' || afterOrderStatus === 'canceled'
-          ? "payment_status = 'paid',\n             "
+        afterOrderStatus !== 'refunded'
+          ? "payment_status = CASE WHEN LOWER(COALESCE(payment_status, '')) IN ('refunded', 'partially_refunded') THEN payment_status ELSE 'paid' END,\n             "
           : '';
       try {
         await input.db

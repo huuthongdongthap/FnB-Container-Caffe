@@ -9,6 +9,7 @@ import {
   verifyPayOSPaymentRequest,
 } from '../../../../packages/domain/payment/commands/payos-provider-verify';
 import { reconcilePayOSPayment } from '../../../../packages/domain/payment/commands/payos-reconcile';
+import { compensateVoidedOrder, publishOrderEvent } from '@aura/domain-order';
 import { isHeldOutOfKds } from '@aura/domain-kitchen';
 import type { Env } from '../../types/env';
 import type { D1Database, D1PreparedStatement, KVNamespace } from '@cloudflare/workers-types';
@@ -418,6 +419,28 @@ export async function expireUnpaidOnlineOrders(
       const orderUpdateResult = batchResults[batchResults.length - 1] as { meta?: { changes?: number } } | undefined;
       if (Number(orderUpdateResult?.meta?.changes ?? 0) > 0) {
         expiredCount += 1;
+        await compensateVoidedOrder({
+          db,
+          env,
+          kv: (env.AUTH_KV as KVNamespace | undefined) ?? null,
+          orderId: order.id,
+          tenantId: orderTenant,
+          now,
+          reason: 'order_expired',
+          preCancelStatus: 'pending',
+        }).catch((compErr) => {
+          log.warn('expireUnpaidOnlineOrders rollback warning', {
+            orderId: order.id,
+            message: compErr instanceof Error ? compErr.message : String(compErr),
+          });
+        });
+        if (env.AUTH_KV) {
+          await publishOrderEvent(env.AUTH_KV as KVNamespace, order.id, 'expired', {
+            previousStatus: 'pending',
+            tenantId: orderTenant,
+            paymentStatus: 'unpaid',
+          }).catch(() => {});
+        }
       }
     }
 

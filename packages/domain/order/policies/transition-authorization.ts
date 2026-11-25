@@ -29,14 +29,16 @@ const STAFF_TARGETS: Record<string, readonly string[]> = {
   confirmed: ['preparing'],
   preparing: ['ready'],
   ready: ['served', 'delivering'],
+  delivering: ['delivered', 'failed'],
   served: ['completed'],
+  delivered: ['completed'],
 };
 
 /** Fulfilment moves a rider owns once the order has left the kitchen. */
 const RIDER_TARGETS: Record<string, readonly string[]> = {
   ready: ['delivering', 'delivered'],
   delivering: ['delivered', 'failed', 'cancelled'],
-  delivered: ['completed'],
+  delivered: ['completed', 'failed', 'cancelled'],
 };
 
 /** Kitchen stations move work through prep and counter pickup, never billing completion. */

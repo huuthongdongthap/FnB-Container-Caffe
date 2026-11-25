@@ -38,6 +38,8 @@ export function StitchPOSNew({
   onDeliveryRecipientNameChange,
   deliveryRecipientPhone,
   onDeliveryRecipientPhoneChange,
+  cashTendered,
+  onCashTenderedChange,
   tableLabel,
   guestLabel,
   orderNumber,
@@ -233,6 +235,7 @@ export function StitchPOSNew({
           onDeliveryRecipientNameChange={onDeliveryRecipientNameChange}
           deliveryRecipientPhone={deliveryRecipientPhone}
           onDeliveryRecipientPhoneChange={onDeliveryRecipientPhoneChange}
+          hasSelectedCustomer={Boolean(customer?.name && customer?.phone)}
         />
 
         {/* Mobile Cart Toggle */}
@@ -278,6 +281,8 @@ export function StitchPOSNew({
           onClearCustomer={onClearCustomer}
           useCashback={useCashback}
           onToggleCashback={onToggleCashback}
+          cashTendered={cashTendered}
+          onCashTenderedChange={onCashTenderedChange}
         />
       </main>
 

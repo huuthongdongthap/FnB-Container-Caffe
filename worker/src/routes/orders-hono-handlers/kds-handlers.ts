@@ -5,6 +5,7 @@ import type { Env } from '../../types/env';
 import { requireAuth } from '../../middleware/auth';
 import { getTenantId } from '../../middleware/tenant';
 import { getDatabase } from '../../lib/db';
+import { createMetricsCollector } from '../../lib/metrics-collector';
 import { audit } from '../../middleware/audit-log';
 import {
   fanOutOrderBroadcast,
@@ -373,7 +374,15 @@ export async function handleUpdateOrderStatus(c: Context<{ Bindings: Env }>, for
   const parsed = updateOrderStatusSchema.safeParse(body);
   if (!parsed.success) return zodErrorResponse(c, parsed.error);
   const { status, assigned_shipper_id, shipper_name, failure_reason } = parsed.data;
-  const user = c.get('user' as any) as { role?: string } | undefined;
+  const user = c.get('user' as any) as { id?: string; sub?: string; role?: string } | undefined;
+  const normalizedUserRole = String(user?.role || '').trim().toLowerCase();
+  const isVoidTarget = status === 'cancelled' || status === 'failed' || status === 'expired';
+  const allowPaidCompensation =
+    isVoidTarget &&
+    (['owner', 'admin', 'manager', 'supervisor'].includes(normalizedUserRole) ||
+      (status === 'failed' &&
+        Boolean(failure_reason && failure_reason.trim()) &&
+        ['staff', 'cashier', 'waiter'].includes(normalizedUserRole)));
 
   let waitUntilFn: ((p: Promise<unknown>) => void) | undefined;
   try {
@@ -390,6 +399,9 @@ export async function handleUpdateOrderStatus(c: Context<{ Bindings: Env }>, for
     kv: c.env.AUTH_KV,
     env: c.env as unknown as Record<string, unknown>,
     waitUntil: waitUntilFn,
+    allowPaidCompensation,
+    actorId: user?.id || user?.sub,
+    validateAssignedShipper: true,
     ...(Object.keys(deliveryFields).length > 0 ? { fields: deliveryFields } : {}),
   });
 
@@ -407,6 +419,7 @@ type CodOrderLookupRow = {
   customer_name?: string | null;
   customer_phone?: string | null;
   customer_email?: string | null;
+  customer_address?: string | null;
   table_id?: string | null;
   created_at?: string | null;
   tenant_id?: string | null;
@@ -421,27 +434,49 @@ export async function handleMarkCodPaid(c: Context<{ Bindings: Env }>) {
   if (!id) return c.json({ success: false, error: 'Missing order id' }, 400);
   const db = getDatabase(c as unknown as { env: Record<string, unknown> });
   const callerTenant = tenantCheck.tenantId;
-  const actor = c.get('user' as any) as { id?: string; sub?: string } | undefined;
-  const result = await collectCodPayment(db, id, callerTenant, actor?.id || actor?.sub);
-  if (result.success === false) return c.json({ success: false, error: result.error }, result.statusCode);
+  const actor = c.get('user' as any) as { id?: string; sub?: string; role?: string } | undefined;
+  const rawBody = (await c.req.json().catch(() => null)) as { shift_id?: string; shiftId?: string } | null;
+  const explicitShiftId =
+    typeof rawBody?.shift_id === 'string'
+      ? rawBody.shift_id.trim()
+      : typeof rawBody?.shiftId === 'string'
+        ? rawBody.shiftId.trim()
+        : undefined;
+  const result = await collectCodPayment(db, id, callerTenant, actor?.id || actor?.sub, {
+    env: c.env as unknown as Record<string, unknown>,
+    actorRole: actor?.role,
+    explicitShiftId,
+  });
+  if (result.success === false) {
+    return c.json(
+      { success: false, error: result.error, ...(result.code ? { code: result.code } : {}) },
+      result.statusCode as any,
+    );
+  }
   let orderRow: CodOrderLookupRow | null = null;
-  if (!result.idempotent) {
-    try {
-      orderRow = await (callerTenant && callerTenant !== '*'
-        ? db.prepare(
+  try {
+    orderRow = await (callerTenant && callerTenant !== '*'
+      ? db.prepare(
+          "SELECT id, items, total, total_amount, customer_id, customer_name, customer_phone, customer_email, customer_address, table_id, created_at, tenant_id FROM orders WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
+        ).bind(id, callerTenant).first<CodOrderLookupRow>().catch(() =>
+          db.prepare(
             "SELECT id, items, total, total_amount, customer_id, customer_name, customer_phone, customer_email, table_id, created_at, tenant_id FROM orders WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
           ).bind(id, callerTenant).first<CodOrderLookupRow>().catch(() => null)
-        : db.prepare(
+        )
+      : db.prepare(
+          'SELECT id, items, total, total_amount, customer_id, customer_name, customer_phone, customer_email, customer_address, table_id, created_at, tenant_id FROM orders WHERE id = ?'
+        ).bind(id).first<CodOrderLookupRow>().catch(() =>
+          db.prepare(
             'SELECT id, items, total, total_amount, customer_id, customer_name, customer_phone, customer_email, table_id, created_at, tenant_id FROM orders WHERE id = ?'
-          ).bind(id).first<CodOrderLookupRow>().catch(() => null));
-      if (!orderRow) {
-        orderRow = await db.prepare(
-          'SELECT id, total, total_amount, customer_id, customer_phone, customer_email FROM orders WHERE id = ?'
-        ).bind(id).first<CodOrderLookupRow>().catch(() => null);
-      }
-    } catch {
-      orderRow = null;
+          ).bind(id).first<CodOrderLookupRow>().catch(() => null)
+        ));
+    if (!orderRow) {
+      orderRow = await db.prepare(
+        'SELECT id, total, total_amount, customer_id, customer_phone, customer_email FROM orders WHERE id = ?'
+      ).bind(id).first<CodOrderLookupRow>().catch(() => null);
     }
+  } catch {
+    orderRow = null;
   }
   const effectiveEventTenant =
     typeof orderRow?.tenant_id === 'string' &&
@@ -452,12 +487,63 @@ export async function handleMarkCodPaid(c: Context<{ Bindings: Env }>) {
       : callerTenant && callerTenant !== '*'
         ? callerTenant
         : 'default';
+  const settledAmount = Number(orderRow?.total ?? orderRow?.total_amount ?? 0);
+  if (!result.idempotent && settledAmount > 0) {
+    try {
+      const metrics = createMetricsCollector(db);
+      const metricPromise = Promise.all([
+        metrics.recordMetric('payment_success', settledAmount, { provider: 'cod', order_id: id, tenant_id: effectiveEventTenant }),
+        metrics.recordMetric('revenue', settledAmount, { provider: 'cod', tenant_id: effectiveEventTenant }),
+      ]).catch(() => {});
+      try {
+        if (c.executionCtx) c.executionCtx.waitUntil(metricPromise);
+        else await metricPromise;
+      } catch {
+        await metricPromise;
+      }
+    } catch {
+      /* Non-blocking metrics recording */
+    }
+  }
   if (!result.idempotent && c.env.AUTH_KV) {
     await publishOrderEvent(c.env.AUTH_KV, id, result.status, {
       previousStatus: result.status,
       tenantId: effectiveEventTenant,
       paymentStatus: 'paid',
     }).catch(() => {});
+    // Best-effort ERPNext invoice sync for settled COD orders when tenant ERPNext URL is configured
+    const erpTask = (async () => {
+      try {
+        const erpPrefix = effectiveEventTenant === 'default' ? 'erpnext' : `erpnext:${effectiveEventTenant}`;
+        const erpUrl = await c.env.AUTH_KV.get(`${erpPrefix}:api_url`).catch(() => null);
+        if (!erpUrl || !orderRow) return;
+        const { createErpnextClientWithKv } = await import('../../clients/erpnext-client');
+        const { ErpnextAccountingClient } = await import('../../clients/erpnext-accounting-client');
+        const erpClient = await createErpnextClientWithKv(c.env as never, effectiveEventTenant);
+        if (!erpClient) return;
+        const accounting = new ErpnextAccountingClient(erpClient, db);
+        await accounting.processOrderToInvoice(
+          {
+            id,
+            items: orderRow.items as string | Array<Record<string, unknown>> | undefined,
+            customer_phone: orderRow.customer_phone ?? undefined,
+            customer_email: orderRow.customer_email ?? undefined,
+            customer_name: orderRow.customer_name ?? undefined,
+            customer_address: orderRow.customer_address ?? undefined,
+          },
+          c.env as never,
+          effectiveEventTenant,
+        );
+      } catch {
+        /* Non-blocking ERPNext sync */
+      }
+    })();
+    try {
+      if (c.executionCtx) c.executionCtx.waitUntil(erpTask);
+      else await erpTask;
+    } catch {
+      await erpTask;
+    }
   }
   if (!result.idempotent && c.env.ORDER_BROADCASTER) {
     try {
@@ -484,46 +570,46 @@ export async function handleMarkCodPaid(c: Context<{ Bindings: Env }>) {
       /* Non-blocking DO broadcast after COD settlement */
     }
   }
-  if (!result.idempotent) {
-    try {
-      if (orderRow && (orderRow.customer_id || orderRow.customer_phone || orderRow.customer_email)) {
-        const { creditLoyaltyIfEligible } = await import('@aura/domain-order');
-        await creditLoyaltyIfEligible(db, c.env as unknown as Record<string, unknown>, id).catch(() => {});
-        const digits = String(orderRow.customer_phone || '').replace(/\D/g, '');
-        const normalizedPhone = digits.length >= 9 && digits.length <= 15 && !/^0+$/.test(digits) ? digits : null;
-        const trimmedEmail = typeof orderRow.customer_email === 'string' ? orderRow.customer_email.trim() : '';
-        const sanitizedEmail = trimmedEmail.length > 0 && trimmedEmail.includes('@') ? trimmedEmail : null;
-        let refCustomerId = orderRow.customer_id ? String(orderRow.customer_id).trim() || null : null;
-        if (!refCustomerId && (normalizedPhone || sanitizedEmail)) {
-          const orderTenant = typeof orderRow.tenant_id === 'string' && orderRow.tenant_id.trim()
-            ? orderRow.tenant_id.trim()
-            : callerTenant;
-          let cust: { id: string } | null = null;
-          try {
+  // Loyalty & referral side-effects are idempotent in D1, so running on idempotent retry
+  // safely heals any post-commit failure from an earlier attempt without double-crediting.
+  try {
+    if (orderRow && (orderRow.customer_id || orderRow.customer_phone || orderRow.customer_email)) {
+      const { creditLoyaltyIfEligible } = await import('@aura/domain-order');
+      await creditLoyaltyIfEligible(db, c.env as unknown as Record<string, unknown>, id).catch(() => {});
+      const digits = String(orderRow.customer_phone || '').replace(/\D/g, '');
+      const normalizedPhone = digits.length >= 9 && digits.length <= 15 && !/^0+$/.test(digits) ? digits : null;
+      const trimmedEmail = typeof orderRow.customer_email === 'string' ? orderRow.customer_email.trim() : '';
+      const sanitizedEmail = trimmedEmail.length > 0 && trimmedEmail.includes('@') ? trimmedEmail : null;
+      let refCustomerId = orderRow.customer_id ? String(orderRow.customer_id).trim() || null : null;
+      if (!refCustomerId && (normalizedPhone || sanitizedEmail)) {
+        const orderTenant = typeof orderRow.tenant_id === 'string' && orderRow.tenant_id.trim()
+          ? orderRow.tenant_id.trim()
+          : callerTenant;
+        let cust: { id: string } | null = null;
+        try {
+          cust = await db.prepare(
+            "SELECT id FROM customers WHERE ((email = ? AND email IS NOT NULL) OR (phone = ? AND phone IS NOT NULL)) AND (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?) LIMIT 1"
+          ).bind(sanitizedEmail, normalizedPhone, orderTenant, orderTenant).first<{ id: string }>();
+        } catch {
+          if (orderTenant === 'default' || orderTenant === '*') {
             cust = await db.prepare(
-              "SELECT id FROM customers WHERE ((email = ? AND email IS NOT NULL) OR (phone = ? AND phone IS NOT NULL)) AND (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?) LIMIT 1"
-            ).bind(sanitizedEmail, normalizedPhone, orderTenant, orderTenant).first<{ id: string }>();
-          } catch {
-            if (orderTenant === 'default' || orderTenant === '*') {
-              cust = await db.prepare(
-                'SELECT id FROM customers WHERE (email = ? AND email IS NOT NULL) OR (phone = ? AND phone IS NOT NULL) LIMIT 1'
-              ).bind(sanitizedEmail, normalizedPhone).first<{ id: string }>().catch(() => null);
-            }
+              'SELECT id FROM customers WHERE (email = ? AND email IS NOT NULL) OR (phone = ? AND phone IS NOT NULL) LIMIT 1'
+            ).bind(sanitizedEmail, normalizedPhone).first<{ id: string }>().catch(() => null);
           }
-          refCustomerId = cust?.id ?? null;
         }
-        const orderTotal = Number(orderRow.total ?? orderRow.total_amount ?? 0);
-        if (refCustomerId && orderTotal >= 20000) {
-          const { rewardReferralOnFirstOrder, resolveReferralPolicy, DEFAULT_REFERRAL_POLICY } = await import('@aura/domain-crm');
-          const orderTenantForRef = typeof orderRow.tenant_id === 'string' && orderRow.tenant_id.trim()
-            ? orderRow.tenant_id.trim()
-            : (callerTenant && callerTenant !== '*' ? callerTenant : undefined);
-          const refPolicy = await resolveReferralPolicy(c.env.AUTH_KV, orderTenantForRef).catch(() => DEFAULT_REFERRAL_POLICY);
-          await rewardReferralOnFirstOrder(db, refCustomerId, id, orderTotal, refPolicy, orderTenantForRef).catch(() => {});
-        }
+        refCustomerId = cust?.id ?? null;
       }
-    } catch { /* Non-blocking post-payment loyalty/referral trigger */ }
-  }
+      const orderTotal = Number(orderRow.total ?? orderRow.total_amount ?? 0);
+      if (refCustomerId && orderTotal >= 20000) {
+        const { rewardReferralOnFirstOrder, resolveReferralPolicy, DEFAULT_REFERRAL_POLICY } = await import('@aura/domain-crm');
+        const orderTenantForRef = typeof orderRow.tenant_id === 'string' && orderRow.tenant_id.trim()
+          ? orderRow.tenant_id.trim()
+          : (callerTenant && callerTenant !== '*' ? callerTenant : undefined);
+        const refPolicy = await resolveReferralPolicy(c.env.AUTH_KV, orderTenantForRef).catch(() => DEFAULT_REFERRAL_POLICY);
+        await rewardReferralOnFirstOrder(db, refCustomerId, id, orderTotal, refPolicy, orderTenantForRef).catch(() => {});
+      }
+    }
+  } catch { /* Non-blocking post-payment loyalty/referral trigger */ }
   return c.json({ success: true, message: result.idempotent ? 'Already paid' : 'Marked as paid', order_id: id });
 }
 

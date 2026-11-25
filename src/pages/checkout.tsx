@@ -157,6 +157,7 @@ export function CheckoutPage() {
       try {
         localStorage.removeItem('aura_active_booking');
         localStorage.removeItem('aura_checkout_form');
+        localStorage.removeItem('aura_selected_promo_code');
       } catch {
         /* ignore storage errors */
       }
@@ -179,6 +180,7 @@ export function CheckoutPage() {
       clearCheckoutIntent(intent.key);
       try {
         localStorage.removeItem('aura_checkout_form');
+        localStorage.removeItem('aura_selected_promo_code');
       } catch { /* storage unavailable */ }
       clearCart();
       navigate(`/order-success?order_id=${orderId}`);
