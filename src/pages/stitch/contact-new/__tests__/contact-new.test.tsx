@@ -23,6 +23,19 @@ vi.mock('lucide-react', () => ({
   Lock: () => null,
 }));
 
+vi.mock('@/hooks/stores/use-contact-store', () => {
+  const state = {
+    submitContact: vi.fn(async () => undefined),
+    loading: false,
+    error: null,
+    reset: vi.fn(),
+  };
+  const useContactStore = Object.assign(() => state, {
+    getState: () => state,
+  });
+  return { useContactStore };
+});
+
 describe('ContactNewPage', () => {
   it('renders contact title, address, phone and operating hours', () => {
     renderWithProviders(<ContactNewPage />);
@@ -33,7 +46,7 @@ describe('ContactNewPage', () => {
     expect(screen.getByText(/06:00 — 23:00/i)).toBeInTheDocument();
   });
 
-  it('submits contact form and renders success message', () => {
+  it('submits contact form and renders success message', async () => {
     renderWithProviders(<ContactNewPage />);
 
     const nameInput = screen.getByLabelText(/HỌ VÀ TÊN/i);
@@ -46,6 +59,6 @@ describe('ContactNewPage', () => {
     fireEvent.change(messageInput, { target: { value: 'Quán rất đẹp, muốn đặt bàn 10 người.' } });
     fireEvent.click(submitBtn);
 
-    expect(screen.getByText('Gửi Thành Công!')).toBeInTheDocument();
+    expect(await screen.findByText('Gửi Thành Công!')).toBeInTheDocument();
   });
 });

@@ -79,17 +79,16 @@ describe('POST /', () => {
     expect(body.data.rating).toBe(5);
   });
 
-  test('returns 400 on missing order_id', async () => {
+  test('returns 401 on missing order_id when unauthenticated', async () => {
     const res = await router.request('/', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ rating: 5 }),
     }, env);
 
-    expect(res.status).toBe(400);
+    expect(res.status).toBe(401);
     const body = await res.json();
     expect(body.success).toBe(false);
-    expect(body.error).toMatch(/Invalid input|expected/i);
   });
 
   test('returns 400 on invalid rating (too high)', async () => {

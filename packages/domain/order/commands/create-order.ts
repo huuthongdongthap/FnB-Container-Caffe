@@ -690,16 +690,24 @@ export async function createOrder(
       extraOrderCols.push('cod_paid_at');
       extraOrderVals.push(now);
     }
+    const loyaltyExtraOrderCols: string[] = [];
+    const loyaltyExtraOrderVals: unknown[] = [];
     if (redeemedPoints > 0) {
       extraOrderCols.push('loyalty_points_redeemed');
       extraOrderVals.push(redeemedPoints);
+      loyaltyExtraOrderCols.push('loyalty_points_redeemed');
+      loyaltyExtraOrderVals.push(redeemedPoints);
     }
     if (appliedCashback > 0) {
       extraOrderCols.push('cashback_used');
       extraOrderVals.push(appliedCashback);
+      loyaltyExtraOrderCols.push('cashback_used');
+      loyaltyExtraOrderVals.push(appliedCashback);
     }
     const extraColSql = extraOrderCols.length > 0 ? `, ${extraOrderCols.join(', ')}` : '';
     const extraPhSql = extraOrderCols.length > 0 ? `, ${extraOrderCols.map(() => '?').join(', ')}` : '';
+    const loyaltyExtraColSql = loyaltyExtraOrderCols.length > 0 ? `, ${loyaltyExtraOrderCols.join(', ')}` : '';
+    const loyaltyExtraPhSql = loyaltyExtraOrderCols.length > 0 ? `, ${loyaltyExtraOrderCols.map(() => '?').join(', ')}` : '';
     const orderInsertSql = `INSERT INTO orders (
       id, items, total, status, customer_name, customer_phone,
       customer_email, customer_address, payment_method, payment_status,
@@ -715,25 +723,25 @@ export async function createOrder(
     const orderInsertNoGuestSql = `INSERT INTO orders (
       id, items, total, status, customer_name, customer_phone,
       customer_email, customer_address, payment_method, payment_status,
-      shipping_fee, discount${extraColSql}, notes, delivery_time, table_id,
-      order_type, tip_amount, service_fee, customer_id, tenant_id, created_at, updated_at, order_number
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?${extraPhSql}, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+      shipping_fee, discount${loyaltyExtraColSql}, notes, delivery_time, table_id,
+      order_type, tip_amount, service_fee, customer_id, tenant_id, created_at, updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?${loyaltyExtraPhSql}, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
     const orderInsertNoGuestArgs = [
       orderId, snapshot.itemsJson, snapshot.total, 'pending', data.customer_name, data.customer_phone,
       data.customer_email || null, data.customer_address || null, validatedMethod, initialPaymentStatus,
-      snapshot.shipping_fee, snapshot.discount, ...extraOrderVals, data.notes || null, data.delivery_time || 'now', resolvedTableId,
-      orderType, snapshot.tip_amount, snapshot.service_fee, resolvedCustomerId, tenantId, now, now, orderNumber,
+      snapshot.shipping_fee, snapshot.discount, ...loyaltyExtraOrderVals, data.notes || null, data.delivery_time || 'now', resolvedTableId,
+      orderType, snapshot.tip_amount, snapshot.service_fee, resolvedCustomerId, tenantId, now, now,
     ];
     const orderInsertLegacySql = `INSERT INTO orders (
       id, items, total, status, customer_name, customer_phone,
       customer_email, customer_address, payment_method, payment_status,
-      shipping_fee, discount, notes, delivery_time, table_id,
+      shipping_fee, discount${loyaltyExtraColSql}, notes, delivery_time, table_id,
       order_type, tip_amount, service_fee, customer_id, tenant_id, created_at, updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?${loyaltyExtraPhSql}, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
     const orderInsertLegacyArgs = [
       orderId, snapshot.itemsJson, snapshot.total, 'pending', data.customer_name, data.customer_phone,
       data.customer_email || null, data.customer_address || null, validatedMethod, initialPaymentStatus,
-      snapshot.shipping_fee, snapshot.discount, data.notes || null, data.delivery_time || 'now', resolvedTableId,
+      snapshot.shipping_fee, snapshot.discount, ...loyaltyExtraOrderVals, data.notes || null, data.delivery_time || 'now', resolvedTableId,
       orderType, snapshot.tip_amount, snapshot.service_fee, resolvedCustomerId, tenantId, now, now,
     ] as const;
     statements.push(db.prepare(orderInsertSql).bind(...orderInsertArgs));

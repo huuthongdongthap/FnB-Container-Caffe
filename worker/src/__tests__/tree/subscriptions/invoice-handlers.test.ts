@@ -123,11 +123,23 @@ describe('payInvoice', () => {
     const updSubChain = makeChain([], null, { success: true, changes: 1 });
     const db = makeDB([selChain, updInvChain, updSubChain]);
     const env = makeEnv(db);
-    const ctx = buildCtx(
-      env,
-      { param: () => 'inv_1', header: () => 'Bearer owner-token', json: async() => ({ payment_method: 'bank_transfer', payment_ref: 'ref_1' }) },
-      jsonSpy
-    );
+    const ctx = {
+      ...buildCtx(
+        env,
+        {
+          param: () => 'inv_1',
+          header: (name?: string) => (String(name || '').toLowerCase() === 'x-tenant-id' ? 'default' : 'Bearer owner-token'),
+          json: async() => ({ payment_method: 'bank_transfer', payment_ref: 'ref_1' })
+        },
+        jsonSpy
+      ),
+      get: (key: string) =>
+        key === 'user'
+          ? { id: 'hq_admin', role: 'admin', tenant_id: 'hq', tenantId: 'hq' }
+          : key === 'tenantId'
+            ? 'default'
+            : undefined
+    };
     await payInvoice(ctx as never);
     expect(jsonSpy).toHaveBeenCalledWith({ success: true, message: 'Invoice marked as paid (manual)', data: { id: 'inv_1', status: 'manual' } });
   });

@@ -209,7 +209,7 @@ describe('AI & Edge Automation Integration', () => {
             })
           })
         };
-        if (query.includes('FROM inventory_transactions')) return {
+        if (query.includes('FROM inventory_transactions') && !query.includes('FROM stock_movements')) return {
           bind: vi.fn().mockReturnValue({
             all: vi.fn().mockResolvedValue({
               results: [

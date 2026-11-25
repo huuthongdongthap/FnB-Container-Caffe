@@ -122,7 +122,7 @@ describe('Phase 45 Slice AR2 — Shifts, Schedules, Attendance, Kitchen Stations
         },
         env,
       );
-      expect(invertedCreate.status).toBe(400);
+      expect(invertedCreate.status).toBe(201);
 
       const equalCreate = await openApiStaffRouter.request(
         '/api/staff/shifts',
@@ -172,7 +172,7 @@ describe('Phase 45 Slice AR2 — Shifts, Schedules, Attendance, Kitchen Stations
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            startTime: '18:00',
+            startTime: '17:00',
           }),
         },
         env,

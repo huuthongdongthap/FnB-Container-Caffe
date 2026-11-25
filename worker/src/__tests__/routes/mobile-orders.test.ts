@@ -288,7 +288,7 @@ describe('createOrderMobile', () => {
 
   it('returns 403 for kitchen staff creating order', async () => {
     const ctx: any = mockOrdersContext({
-      role: 'staff',
+      role: 'kitchen',
       method: 'POST',
       body: validOrderBody,
     });

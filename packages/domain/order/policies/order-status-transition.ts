@@ -276,7 +276,7 @@ export async function transitionOrderStatus(
     }
   }
 
-  if (isShipperActor && cleanActorId) {
+  if (isShipperActor) {
     if (persistedOrderType && persistedOrderType !== 'delivery') {
       return {
         success: false,
@@ -287,7 +287,7 @@ export async function transitionOrderStatus(
     const persistedShipperId = String(
       metaRow?.assigned_shipper_id ?? options.currentOrder?.assigned_shipper_id ?? '',
     ).trim();
-    if (persistedShipperId && persistedShipperId !== cleanActorId) {
+    if (persistedShipperId && (!cleanActorId || persistedShipperId !== cleanActorId)) {
       return {
         success: false,
         error: 'Forbidden: order is assigned to another shipper',
@@ -298,14 +298,14 @@ export async function transitionOrderStatus(
       typeof mutableFields.assigned_shipper_id === 'string'
         ? mutableFields.assigned_shipper_id.trim()
         : '';
-    if (incomingShipperId && incomingShipperId !== cleanActorId) {
+    if (incomingShipperId && (!cleanActorId || incomingShipperId !== cleanActorId)) {
       return {
         success: false,
         error: 'Shippers cannot assign an order to another shipper',
         statusCode: 403,
       };
     }
-    if (!persistedShipperId && !incomingShipperId && targetStatus === 'delivering') {
+    if (cleanActorId && !persistedShipperId && !incomingShipperId && targetStatus === 'delivering') {
       mutableFields.assigned_shipper_id = cleanActorId;
     }
   }

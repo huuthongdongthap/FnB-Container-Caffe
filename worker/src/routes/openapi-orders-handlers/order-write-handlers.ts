@@ -183,6 +183,16 @@ export async function handleOpenApiUpdateOrder(c: Context<{ Bindings: Env }>) {
     if (!Boolean(user?.role && ORDER_STAFF_ROLES.includes(user.role))) {
       return c.json({ success: false, error: 'Insufficient permissions to update order fields' }, 403);
     }
+    if (normalizedActorRole === 'shipper' || normalizedActorRole === 'rider') {
+      const hasCustomerPiiMutation =
+        customer_name !== undefined ||
+        customer_phone !== undefined ||
+        customer_email !== undefined ||
+        body.customer !== undefined;
+      if (hasCustomerPiiMutation) {
+        return c.json({ success: false, error: 'Shippers cannot modify customer details' }, 403);
+      }
+    }
   }
 
   if (body.status !== undefined) {

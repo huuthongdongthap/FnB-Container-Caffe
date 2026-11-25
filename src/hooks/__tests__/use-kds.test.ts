@@ -36,7 +36,7 @@ describe('useKDS authoritative session cache', () => {
     const { result } = setup('drinks');
     await waitFor(() => expect(result.current.orders).toHaveLength(1));
     expect(apiFetch).toHaveBeenCalledWith('/api/kds/orders?station=drinks', expect.any(Object));
-    expect(consumeKdsStream).toHaveBeenCalledWith(expect.any(AbortSignal), expect.any(Function), 'drinks');
+    expect(consumeKdsStream).toHaveBeenCalledWith(expect.any(AbortSignal), expect.any(Function), 'drinks', expect.any(Function));
   });
   it('removes completed tickets absent from the next authoritative REST queue', async () => {
     const { result } = setup();

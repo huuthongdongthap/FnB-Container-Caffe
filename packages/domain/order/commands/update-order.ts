@@ -116,6 +116,16 @@ export async function updateOrder(
     ) {
       return errorResponse('Insufficient permissions to update order fields', 403);
     }
+    const isShipperActor = normalizedRole === 'shipper' || normalizedRole === 'rider';
+    if (isShipperActor && hasFieldUpdate) {
+      const orderType = String((results[0] as { order_type?: unknown }).order_type ?? '').trim().toLowerCase();
+      if (orderType && orderType !== 'delivery') {
+        return errorResponse('Shippers may only update delivery orders', 403);
+      }
+      if (body.payment_method !== undefined || body.assigned_shipper_id !== undefined) {
+        return errorResponse('Shippers cannot modify payment_method or reassign shipper', 403);
+      }
+    }
     if (body.payment_method !== undefined) {
       const allowedMethods = ['payos', 'cod', 'cash', 'vietqr', 'bank_transfer', 'qr'];
       const nextMethod = String(body.payment_method).trim().toLowerCase();

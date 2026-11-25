@@ -769,7 +769,7 @@ describe('Phase 50 Slice AW4 — Orders, Split Orders, Loyalty Trigger, OpenAPI 
       expect(codPayment.status).toBe('pending');
 
       // 2) PayOS attempt reservation via getOrCreatePayOSAttempt stamps tenant_id = 'tenant-alpha'
-      vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
+      vi.spyOn(globalThis, 'fetch').mockImplementation(async () =>
         new Response(JSON.stringify({ code: '99', desc: 'unavailable' }), { status: 503 }),
       );
       await getOrCreatePayOSAttempt({

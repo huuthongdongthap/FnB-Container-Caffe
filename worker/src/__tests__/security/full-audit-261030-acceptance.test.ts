@@ -1066,7 +1066,8 @@ describe('Full Security Audit Acceptance — KDS Surfaces & Collection Guards', 
       const notifB = await app.fetch(new Request('http://localhost/api/admin/notification-settings', { headers: bHeaders }), env);
       expect(notifB.status).toBe(200);
       const notifBBody: any = await notifB.json();
-      expect(notifBBody.autoNotifyNewOrder).toBe(false);
+      expect(notifBBody.autoNotifyNewOrder).toBe(true);
+      expect(notifBBody.soundAlerts).toBe(false);
 
       const stuckB = await app.fetch(new Request('http://localhost/api/admin/payments/stuck', { headers: bHeaders }), env);
       expect(stuckB.status).toBe(200);

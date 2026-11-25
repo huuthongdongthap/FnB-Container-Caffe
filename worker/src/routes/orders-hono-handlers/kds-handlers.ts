@@ -374,7 +374,7 @@ export async function handleUpdateOrderStatus(c: Context<{ Bindings: Env }>, for
   const parsed = updateOrderStatusSchema.safeParse(body);
   if (!parsed.success) return zodErrorResponse(c, parsed.error);
   const { status, assigned_shipper_id, shipper_name, failure_reason } = parsed.data;
-  const user = c.get('user' as any) as { id?: string; sub?: string; role?: string } | undefined;
+  const user = c.get('user' as never) as { id?: string; sub?: string; role?: string } | undefined;
   const normalizedUserRole = String(user?.role || '').trim().toLowerCase();
   const isVoidTarget = status === 'cancelled' || status === 'failed' || status === 'expired';
   const allowPaidCompensation =
@@ -405,7 +405,10 @@ export async function handleUpdateOrderStatus(c: Context<{ Bindings: Env }>, for
     ...(Object.keys(deliveryFields).length > 0 ? { fields: deliveryFields } : {}),
   });
 
-  if (!result.success) return c.json({ success: false, error: result.error }, (result.statusCode || 400) as any);
+  if (!result.success) {
+    const errStatus = (result.statusCode || 400) as 400 | 401 | 403 | 404 | 409 | 500;
+    return c.json({ success: false, error: result.error }, errStatus);
+  }
   if (result.idempotent) return c.json({ success: true, message: `Order ${id} is already ${status}`, idempotent: true });
   return c.json({ success: true, message: `Order ${id} → ${status}` });
 }
@@ -434,7 +437,7 @@ export async function handleMarkCodPaid(c: Context<{ Bindings: Env }>) {
   if (!id) return c.json({ success: false, error: 'Missing order id' }, 400);
   const db = getDatabase(c as unknown as { env: Record<string, unknown> });
   const callerTenant = tenantCheck.tenantId;
-  const actor = c.get('user' as any) as { id?: string; sub?: string; role?: string } | undefined;
+  const actor = c.get('user' as never) as { id?: string; sub?: string; role?: string } | undefined;
   const rawBody = (await c.req.json().catch(() => null)) as { shift_id?: string; shiftId?: string } | null;
   const explicitShiftId =
     typeof rawBody?.shift_id === 'string'
@@ -448,9 +451,10 @@ export async function handleMarkCodPaid(c: Context<{ Bindings: Env }>) {
     explicitShiftId,
   });
   if (result.success === false) {
+    const errStatus = (result.statusCode || 400) as 400 | 401 | 403 | 404 | 409 | 500;
     return c.json(
       { success: false, error: result.error, ...(result.code ? { code: result.code } : {}) },
-      result.statusCode as any,
+      errStatus,
     );
   }
   let orderRow: CodOrderLookupRow | null = null;

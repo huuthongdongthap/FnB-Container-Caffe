@@ -39,6 +39,8 @@ export async function getStats(request: Request, env: Record<string, unknown>, t
     const today = new Date(ictNowMs).toISOString().slice(0, 10);
     // created_at is stored in UTC; the business day starts at midnight in Asia/Ho_Chi_Minh (+07:00).
     const todayStartParam = new Date(`${today}T00:00:00+07:00`).toISOString().replace('T', ' ').slice(0, 19);
+    const qrPlaceholderWithoutCustomerNameClause =
+      "NOT (COALESCE(TRIM(notes), '') = 'Khách QR - cho don mon' AND COALESCE(TRIM(items), '[]') IN ('', '[]'))";
     const qrPlaceholderExclusionClause =
       "NOT (COALESCE(total, 0) = 0 AND (COALESCE(TRIM(notes), '') = 'Khách QR - cho don mon' OR COALESCE(TRIM(customer_name), '') = 'Khách QR - cho don mon' OR COALESCE(TRIM(items), '[]') IN ('', '[]')))";
     const revenueWithoutNotesClause =
@@ -68,14 +70,14 @@ export async function getStats(request: Request, env: Record<string, unknown>, t
       } catch {
         try {
           const res = await db.prepare(`
-            SELECT COUNT(*) as total, COALESCE(SUM(COALESCE(total, total_amount, 0)), 0) as revenue
+            SELECT COUNT(*) as total, COALESCE(SUM(total), 0) as revenue
             FROM orders
             WHERE datetime(created_at) >= datetime(?) AND ${revenueWithoutNotesClause}${tenantAnd2}
           `).bind(todayStartParam, ...tenantBinds).all<{ total: number; revenue: number }>();
           ordersTodayResult = res.results || [];
         } catch {
           const res = await db.prepare(`
-            SELECT COUNT(*) as total, COALESCE(SUM(COALESCE(total, total_amount, 0)), 0) as revenue
+            SELECT COUNT(*) as total, COALESCE(SUM(total), 0) as revenue
             FROM orders
             WHERE datetime(created_at) >= datetime(?) AND ${statusOnlyExclusionClause}${tenantAnd2}
           `).bind(todayStartParam, ...tenantBinds).all<{ total: number; revenue: number }>();
@@ -99,15 +101,30 @@ export async function getStats(request: Request, env: Record<string, unknown>, t
         : await statusStmt.all<{ status: string; count: number }>();
       statusResult = res.results || [];
     } catch {
-      const statusStmt = db.prepare(`
-        SELECT status, COUNT(*) as count
-        FROM orders${tenantWhere}
-        GROUP BY status
-      `);
-      const res = tenantBinds.length > 0
-        ? await statusStmt.bind(...tenantBinds).all<{ status: string; count: number }>()
-        : await statusStmt.all<{ status: string; count: number }>();
-      statusResult = res.results || [];
+      try {
+        const statusWhere = tenantWhere
+          ? `${tenantWhere} AND ${qrPlaceholderWithoutCustomerNameClause}`
+          : ` WHERE ${qrPlaceholderWithoutCustomerNameClause}`;
+        const statusStmt = db.prepare(`
+          SELECT status, COUNT(*) as count
+          FROM orders${statusWhere}
+          GROUP BY status
+        `);
+        const res = tenantBinds.length > 0
+          ? await statusStmt.bind(...tenantBinds).all<{ status: string; count: number }>()
+          : await statusStmt.all<{ status: string; count: number }>();
+        statusResult = res.results || [];
+      } catch {
+        const statusStmt = db.prepare(`
+          SELECT status, COUNT(*) as count
+          FROM orders${tenantWhere}
+          GROUP BY status
+        `);
+        const res = tenantBinds.length > 0
+          ? await statusStmt.bind(...tenantBinds).all<{ status: string; count: number }>()
+          : await statusStmt.all<{ status: string; count: number }>();
+        statusResult = res.results || [];
+      }
     }
 
     let topProducts: { items: string; order_count: number }[] = [];
@@ -203,7 +220,7 @@ export async function getStats(request: Request, env: Record<string, unknown>, t
       } catch {
         try {
           const res = await db.prepare(`
-            SELECT DATE(datetime(created_at, '+7 hours')) as date, COALESCE(SUM(COALESCE(total, total_amount, 0)), 0) as revenue
+            SELECT DATE(datetime(created_at, '+7 hours')) as date, COALESCE(SUM(total), 0) as revenue
             FROM orders
             WHERE datetime(created_at) >= datetime(?) AND ${revenueWithoutNotesClause}${tenantAnd2}
             GROUP BY DATE(datetime(created_at, '+7 hours'))
@@ -212,7 +229,7 @@ export async function getStats(request: Request, env: Record<string, unknown>, t
           revenueResult = res.results || [];
         } catch {
           const res = await db.prepare(`
-            SELECT DATE(datetime(created_at, '+7 hours')) as date, COALESCE(SUM(COALESCE(total, total_amount, 0)), 0) as revenue
+            SELECT DATE(datetime(created_at, '+7 hours')) as date, COALESCE(SUM(total), 0) as revenue
             FROM orders
             WHERE datetime(created_at) >= datetime(?) AND ${statusOnlyExclusionClause}${tenantAnd2}
             GROUP BY DATE(datetime(created_at, '+7 hours'))

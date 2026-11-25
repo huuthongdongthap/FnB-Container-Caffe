@@ -431,7 +431,17 @@ export async function payInvoice(c: Context<{ Bindings: Env }>) {
     });
   }
 
-  // Fallback: mark manual (no gateway configured)
+  // Fallback: mark manual (no gateway configured) — strictly HQ super admin only
+  if (!callerIsHq) {
+    return c.json(
+      {
+        success: false,
+        code: 'payment_gateway_not_configured',
+        error: 'Manual invoice settlement requires HQ super admin',
+      },
+      requestedMethod === 'manual' ? 403 : 503,
+    );
+  }
   const paidAt = nowStr();
   let manualRes: { meta?: { changes?: number } } | undefined;
   try {
