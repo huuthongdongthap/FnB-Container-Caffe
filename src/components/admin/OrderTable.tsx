@@ -10,7 +10,7 @@ import { RefundAction } from './OrderTable-refund-action';
 import type { OrderTableProps } from './OrderTable-types';
 
 export type { OrderTableProps, StatusActionsProps, RefundActionProps } from './OrderTable-types';
-export { STATUS_VARIANT, STATUS_TRANSITIONS } from './OrderTable-constants';
+export { STATUS_VARIANT, STATUS_TRANSITIONS, getStatusTransitionsForOrder } from './OrderTable-constants';
 export { StatusActions } from './OrderTable-status-actions';
 export { RefundAction } from './OrderTable-refund-action';
 
@@ -45,15 +45,18 @@ export function OrderTable({
       result = result.filter(
         (o) =>
           o.id.toLowerCase().includes(q) ||
+          (o.orderNumber ? o.orderNumber.toLowerCase().includes(q) : false) ||
           o.customer.toLowerCase().includes(q)
       );
     }
 
     if (sortBy === 'date') {
-      result.sort(
-        (a, b) =>
-          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-      );
+      const toMs = (raw: string) => {
+        const trimmed = (raw || '').trim();
+        const iso = /[zZ]|[+-]\d{2}:?\d{2}$/.test(trimmed) ? trimmed.replace(' ', 'T') : `${trimmed.replace(' ', 'T')}Z`;
+        return Date.parse(iso) || 0;
+      };
+      result.sort((a, b) => toMs(b.createdAt) - toMs(a.createdAt));
     } else if (sortBy === 'total') {
       result.sort((a, b) => b.total - a.total);
     }
@@ -108,7 +111,9 @@ export function OrderTable({
           <tbody>
             {filtered.map((order) => (
               <tr key={order.id} className="border-b border-border/60 hover:bg-muted/10">
-                <td className="py-2.5 px-3 font-mono text-xs">{order.id}</td>
+                <td className="py-2.5 px-3 font-mono text-xs">
+                  {order.orderNumber ? `#${order.orderNumber.replace(/^#/, '')}` : order.id}
+                </td>
                 <td className="py-2.5 px-3">{order.customer}</td>
                 <td className="py-2.5 px-3 text-center">{order.items}</td>
                 <td className="py-2.5 px-3 text-right font-mono">
@@ -128,6 +133,7 @@ export function OrderTable({
                       {onUpdateStatus && (
                         <StatusActions
                           currentStatus={order.status}
+                          orderType={order.orderType}
                           isUpdating={updatingId === order.id}
                           onUpdate={(s) => handleUpdateStatus(order.id, s)}
                           t={t}

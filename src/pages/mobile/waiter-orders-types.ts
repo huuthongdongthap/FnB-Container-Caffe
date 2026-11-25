@@ -23,6 +23,14 @@ export interface WaiterMenuItem {
 
 export interface MobileOrder {
   id: string;
+  order_number?: string | null;
+  customer_name?: string | null;
+  order_type?: string | null;
+  payment_method?: string | null;
+  payment_status?: string | null;
+  is_cod?: number | boolean | null;
+  notes?: string | null;
+  total?: number | null;
   table_id: string;
   table_number: number;
   items: OrderItem[];

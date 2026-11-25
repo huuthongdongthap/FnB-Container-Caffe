@@ -17,10 +17,13 @@ const ORDER_STATUS_LABELS: Record<OrderStatus, string> = {
   confirmed: 'Đã xác nhận',
   preparing: 'Đang chuẩn bị',
   ready: 'Sẵn sàng',
+  delivering: 'Đang giao',
   served: 'Đã phục vụ',
   delivered: 'Đã giao',
   completed: 'Hoàn tất',
   cancelled: 'Đã huỷ',
+  failed: 'Giao thất bại',
+  expired: 'Hết hạn',
   refunded: 'Đã hoàn tiền',
 };
 
@@ -64,8 +67,19 @@ export interface CustomerOrderItemViewModel extends CustomerOrderItem {
   displayStatus: string;
 }
 
+export function parseOrderUtcDate(raw: string): Date {
+  if (!raw) return new Date(NaN);
+  const trimmed = raw.trim();
+  const iso = /[zZ]|[+-]\d{2}:?\d{2}$/.test(trimmed)
+    ? trimmed.replace(' ', 'T')
+    : `${trimmed.replace(' ', 'T')}Z`;
+  return new Date(iso);
+}
+
 /* ─── Mappers ───────────────────────────────────────────────────────────── */
 export function toCustomerOrderViewModel(order: CustomerOrder): CustomerOrderViewModel {
+  const createdDate = parseOrderUtcDate(order.createdAt);
+  const updatedDate = parseOrderUtcDate(order.updatedAt);
   return {
     ...order,
     displayTotal: formatVndCents(order.totalAmount),
@@ -75,20 +89,24 @@ export function toCustomerOrderViewModel(order: CustomerOrder): CustomerOrderVie
     displayStatus: ORDER_STATUS_LABELS[order.status] ?? order.status,
     displayPaymentStatus: PAYMENT_STATUS_LABELS[order.paymentStatus] ?? order.paymentStatus,
     displayChannel: CHANNEL_LABELS[order.channel] ?? order.channel,
-    displayCreatedAt: new Date(order.createdAt).toLocaleDateString('vi-VN', {
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit',
-    }),
-    displayUpdatedAt: new Date(order.updatedAt).toLocaleDateString('vi-VN', {
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit',
-    }),
+    displayCreatedAt: Number.isNaN(createdDate.getTime())
+      ? order.createdAt
+      : createdDate.toLocaleDateString('vi-VN', {
+          year: 'numeric',
+          month: '2-digit',
+          day: '2-digit',
+          hour: '2-digit',
+          minute: '2-digit',
+        }),
+    displayUpdatedAt: Number.isNaN(updatedDate.getTime())
+      ? order.updatedAt
+      : updatedDate.toLocaleDateString('vi-VN', {
+          year: 'numeric',
+          month: '2-digit',
+          day: '2-digit',
+          hour: '2-digit',
+          minute: '2-digit',
+        }),
     items: order.items.map(toCustomerOrderItemViewModel),
   };
 }

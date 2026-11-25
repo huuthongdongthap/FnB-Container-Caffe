@@ -221,19 +221,23 @@ export async function transitionOrderStatus(
       const rawPaymentStatus = String(
         paymentRow?.payment_status ?? options.paymentStatus ?? options.currentOrder?.payment_status ?? '',
       ).trim().toLowerCase();
+      const isPaid =
+        rawPaymentStatus === 'paid' ||
+        rawPaymentStatus === 'completed' ||
+        rawPaymentStatus === 'partially_refunded';
       const isCodDelivery = incomingPaymentMethod
-        ? method === 'cod'
-        : (persistedMethod === 'cod' || Number(paymentRow?.is_cod ?? 0) === 1);
+        ? method === 'cod' || method === 'cash'
+        : persistedMethod === 'cod' || persistedMethod === 'cash' || Number(paymentRow?.is_cod ?? 0) === 1;
       const isPrepaidOnline =
         method === 'payos' || method === 'bank_transfer' || method === 'qr' || method === 'vietqr';
-      if (isPrepaidOnline && rawPaymentStatus && rawPaymentStatus !== 'paid') {
+      if (isPrepaidOnline && !isPaid) {
         return {
           success: false,
           error: 'Đơn thanh toán trực tuyến phải hoàn tất thanh toán trước khi chế biến',
           statusCode: 409,
         };
       }
-      if (paymentRow?.order_type === 'delivery' && rawPaymentStatus !== 'paid' && !isCodDelivery) {
+      if (paymentRow?.order_type === 'delivery' && !isPaid && !isCodDelivery) {
         return {
           success: false,
           error: 'Đơn giao tận nơi phải hoàn tất thanh toán trước khi chế biến',
@@ -307,30 +311,92 @@ export async function transitionOrderStatus(
     : '';
   const nowIso = new Date().toISOString();
   const fieldKeys = new Set(fields.map(([key]) => key));
-  const prepTimestampAddition =
-    !isNoOp && targetStatus === 'preparing' && !fieldKeys.has('started_at')
-      ? ', started_at = COALESCE(started_at, ?2)'
-      : !isNoOp && targetStatus === 'ready' && !fieldKeys.has('ready_at')
-        ? ', ready_at = COALESCE(ready_at, ?2)'
-        : '';
-  const updateStatus = (guard = '', includePrepTimestamp = true, activeFields = fields) => {
+  const priorLower = String(order.status ?? '').trim().toLowerCase();
+  const cancelAlertFlag =
+    priorLower === 'confirmed' || priorLower === 'preparing' || priorLower === 'ready' ? 1 : 0;
+  const safePriorStatus = /^[a-z_]{1,24}$/.test(priorLower) ? priorLower : null;
+  type LifecycleColumnClause = {
+    col: string;
+    sql: string;
+  };
+  const initialLifecycleClauses: LifecycleColumnClause[] = [];
+  if (!isNoOp) {
+    if (targetStatus === 'preparing' && !fieldKeys.has('started_at')) {
+      initialLifecycleClauses.push({
+        col: 'started_at',
+        sql: ', started_at = COALESCE(started_at, ?2)',
+      });
+    } else if (targetStatus === 'ready' && !fieldKeys.has('ready_at')) {
+      initialLifecycleClauses.push({
+        col: 'ready_at',
+        sql: ', ready_at = COALESCE(ready_at, ?2)',
+      });
+    } else if (targetStatus === 'served' && !fieldKeys.has('served_at')) {
+      initialLifecycleClauses.push({
+        col: 'served_at',
+        sql: ', served_at = COALESCE(served_at, ?2)',
+      });
+    } else if (targetStatus === 'cancelled') {
+      if (!fieldKeys.has('cancelled_at')) {
+        initialLifecycleClauses.push({
+          col: 'cancelled_at',
+          sql: ', cancelled_at = COALESCE(cancelled_at, ?2)',
+        });
+      }
+      if (!fieldKeys.has('previous_status') && safePriorStatus) {
+        initialLifecycleClauses.push({
+          col: 'previous_status',
+          sql: `, previous_status = '${safePriorStatus}'`,
+        });
+      }
+      if (!fieldKeys.has('cancel_alert')) {
+        initialLifecycleClauses.push({
+          col: 'cancel_alert',
+          sql: `, cancel_alert = ${cancelAlertFlag}`,
+        });
+      }
+    }
+  }
+  const updateStatus = (
+    guard = '',
+    lifecycleClauses: LifecycleColumnClause[] = initialLifecycleClauses,
+    activeFields = fields,
+  ) => {
+    const lifecycleSql = lifecycleClauses.map((c) => c.sql).join('');
     const additions = activeFields.map(([key]) => `, ${key} = ?`).join('');
-    return db.prepare(
-      `UPDATE orders SET status = ?, updated_at = ?${includePrepTimestamp ? prepTimestampAddition : ''}${additions} WHERE id = ? AND status = ?${writeTenantClause}${guard}`,
-    ).bind(targetStatus, nowIso, ...activeFields.map(([, value]) => value), orderId, order.status, ...writeTenantBinds).run();
+    return db
+      .prepare(
+        `UPDATE orders SET status = ?, updated_at = ?${lifecycleSql}${additions} WHERE id = ? AND status = ?${writeTenantClause}${guard}`,
+      )
+      .bind(
+        targetStatus,
+        nowIso,
+        ...activeFields.map(([, value]) => value),
+        orderId,
+        order.status,
+        ...writeTenantBinds,
+      )
+      .run();
   };
   const runUpdateWithCompatFallback = async (initialGuard: string): Promise<unknown> => {
     let guard = initialGuard;
-    let includePrepTimestamp = Boolean(prepTimestampAddition);
+    let lifecycleClauses = [...initialLifecycleClauses];
     let activeFields = fields;
     for (;;) {
       try {
-        return await updateStatus(guard, includePrepTimestamp, activeFields);
+        return await updateStatus(guard, lifecycleClauses, activeFields);
       } catch (error) {
         const msg = String(error);
-        if (includePrepTimestamp && /no such column:\s*(started_at|ready_at)\b/i.test(msg)) {
-          includePrepTimestamp = false;
-          continue;
+        const missingLifecycleMatch = msg.match(
+          /no such column:\s*(started_at|ready_at|served_at|cancelled_at|previous_status|cancel_alert)\b/i,
+        );
+        if (missingLifecycleMatch && lifecycleClauses.length > 0) {
+          const missingCol = missingLifecycleMatch[1]!.toLowerCase();
+          const filtered = lifecycleClauses.filter((c) => c.col !== missingCol);
+          if (filtered.length < lifecycleClauses.length) {
+            lifecycleClauses = filtered;
+            continue;
+          }
         }
         if (
           activeFields.some(([key]) => optionalDeliveryKeys.has(key)) &&
@@ -355,7 +421,7 @@ export async function transitionOrderStatus(
   let result: unknown;
   if (closingOrder && !atomicMarkingPaid) {
     // Require persisted payment settlement before completing an order.
-    const paid = "LOWER(TRIM(COALESCE(payment_status, ''))) IN ('paid', 'partially_refunded')";
+    const paid = "LOWER(TRIM(COALESCE(payment_status, ''))) IN ('paid', 'completed', 'partially_refunded')";
     result = await runUpdateWithCompatFallback(` AND ${paid}${paymentMethodGuard}`);
   } else if (forwardStatuses.has(targetStatus)) {
     result = await runUpdateWithCompatFallback(

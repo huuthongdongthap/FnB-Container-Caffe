@@ -7,6 +7,7 @@ export async function consumeKdsStream(
   signal: AbortSignal,
   snapshot: (orders: unknown[]) => void,
   station?: string,
+  onConnectionChange?: (connected: boolean) => void,
 ) {
   while (!signal.aborted) {
     let reader: ReadableStreamDefaultReader<Uint8Array> | undefined;
@@ -19,11 +20,13 @@ export async function consumeKdsStream(
         headers: { Accept: 'text/event-stream', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
       });
       if (response.status === 401 || response.status === 403) {
+        onConnectionChange?.(false);
         const error = await response.json().catch(() => ({}));
         if (sessionErrorRequiresLogin(response.status, error.code)) invalidateClientSession(token, error.error);
         return;
       }
       if (!response.ok || !response.body) throw new Error('KDS stream unavailable');
+      onConnectionChange?.(true);
       reader = response.body.getReader();
       const decoder = new TextDecoder();
       let buffer = '';
@@ -52,8 +55,10 @@ export async function consumeKdsStream(
         }
       }
     } catch {
+      onConnectionChange?.(false);
       if (signal.aborted) return;
     } finally {
+      onConnectionChange?.(false);
       await reader?.cancel().catch(() => {});
     }
     if (signal.aborted) return;

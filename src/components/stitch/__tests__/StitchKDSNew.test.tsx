@@ -16,6 +16,7 @@ vi.mock('react-i18next', () => ({
 
 vi.mock('lucide-react', () => ({
   Bell: () => null,
+  BellOff: () => null,
   Settings: () => null,
   LayoutDashboard: () => null,
   History: () => null,
@@ -55,14 +56,14 @@ describe('StitchKDSNew', () => {
     expect(screen.getByText('AURA CAFE KDS')).toBeTruthy();
   });
 
-  it('renders filter buttons visible on small screens', () => {
+  it('renders non-overlapping filter buttons visible on small screens', () => {
     renderWithProviders(<StitchKDSNew />);
     const filterNav = screen.getByRole('navigation', { name: 'Filter tickets' });
     expect(filterNav.className).not.toContain('hidden');
     expect(filterNav.className).toContain('flex');
     expect(screen.getByRole('button', { name: 'ALL' })).toBeTruthy();
     expect(screen.getByRole('button', { name: 'OVERDUE' })).toBeTruthy();
-    expect(screen.getByRole('button', { name: 'PRIORITY' })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'PRIORITY' })).toBeNull();
     expect(screen.getByRole('button', { name: 'PENDING' })).toBeTruthy();
     expect(screen.getByRole('button', { name: 'PREPARING' })).toBeTruthy();
     expect(screen.getByRole('button', { name: 'READY' })).toBeTruthy();

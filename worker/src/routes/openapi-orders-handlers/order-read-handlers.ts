@@ -15,7 +15,7 @@ import { canAccessOrder, verifyGuestOrderToken } from '@aura/domain-order';
 
 export { handleGetOrderSummary };
 
-const STAFF_ROLES = ['owner', 'manager', 'supervisor', 'staff', 'admin', 'waiter', 'kitchen', 'barista', 'chef', 'cashier', 'shipper'];
+const STAFF_ROLES = ['owner', 'manager', 'supervisor', 'staff', 'admin', 'waiter', 'kitchen', 'barista', 'chef', 'cashier', 'shipper', 'rider'];
 const ALLOWED_SORT_COLUMNS: Record<string, string> = {
   created_at: 'o.created_at',
   total_amount: 'COALESCE(o.total_amount, o.total)',

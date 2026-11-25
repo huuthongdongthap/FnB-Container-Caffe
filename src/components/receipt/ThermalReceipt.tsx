@@ -10,6 +10,7 @@ export interface ThermalReceiptItem {
 
 export interface ThermalReceiptData {
   orderId: string;
+  orderNumber?: string;
   isProForma?: boolean;
   createdAt?: string;
   orderType?: string;
@@ -40,8 +41,21 @@ function formatVnd(amount: number): string {
   return `${Math.round(amount).toLocaleString('vi-VN')} ₫`;
 }
 
+function sanitizeReceiptNotes(raw?: string): string | undefined {
+  if (typeof raw !== 'string') return undefined;
+  const cleaned = raw
+    .split('|')
+    .map((part) => part.replace(/\[OVERDUE\]/gi, '').trim())
+    .filter(Boolean)
+    .join(' | ');
+  return cleaned || undefined;
+}
+
 function formatReceiptTime(iso?: string): string {
-  const d = iso ? new Date(iso) : new Date();
+  const normalized = iso && /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(iso.trim())
+    ? `${iso.trim().replace(' ', 'T')}Z`
+    : iso;
+  const d = normalized ? new Date(normalized) : new Date();
   if (Number.isNaN(d.getTime())) return iso || '';
   return d.toLocaleString('vi-VN', {
     timeZone: 'Asia/Ho_Chi_Minh',
@@ -153,7 +167,7 @@ export function ThermalReceipt({ receipt }: { receipt: ThermalReceiptData | null
       <div className="space-y-0.5 text-[10px] border-b border-dashed border-black pb-2 mb-2">
         <div className="flex justify-between gap-2">
           <span>Mã đơn:</span>
-          <span className="font-bold">#{receipt.orderId}</span>
+          <span className="font-bold">#{(receipt.orderNumber || receipt.orderId).replace(/^#/, '')}</span>
         </div>
         <div className="flex justify-between gap-2">
           <span>Thời gian:</span>
@@ -267,8 +281,8 @@ export function ThermalReceipt({ receipt }: { receipt: ThermalReceiptData | null
             {receipt.paymentStatus ? ` (${formatPaymentStatusLabel(receipt.paymentStatus)})` : ''}
           </span>
         </div>
-        {receipt.notes && (
-          <div className="pt-1 text-[9px] italic">Ghi chú: {receipt.notes}</div>
+        {sanitizeReceiptNotes(receipt.notes) && (
+          <div className="pt-1 text-[9px] italic">Ghi chú: {sanitizeReceiptNotes(receipt.notes)}</div>
         )}
       </div>
 

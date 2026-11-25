@@ -865,23 +865,29 @@ describe('Phase 67 Security Regression Suite (BN1..BN4)', () => {
           created_at TEXT DEFAULT CURRENT_TIMESTAMP,
           updated_at TEXT DEFAULT CURRENT_TIMESTAMP
         );
-        CREATE TABLE kds_station_tickets (
+        CREATE TABLE kitchen_stations (
           id TEXT PRIMARY KEY,
-          order_id TEXT,
-          station_id TEXT,
-          items_json TEXT DEFAULT '[]',
-          status TEXT DEFAULT 'preparing',
-          priority INTEGER DEFAULT 0,
-          completed_at TEXT,
-          tenant_id TEXT DEFAULT 'default',
-          created_at TEXT DEFAULT CURRENT_TIMESTAMP
+          name TEXT NOT NULL,
+          slug TEXT NOT NULL,
+          sort_order INTEGER NOT NULL DEFAULT 0,
+          active INTEGER NOT NULL DEFAULT 1,
+          tenant_id TEXT NOT NULL DEFAULT 'default'
         );
-        INSERT INTO orders (id, order_number, status, tenant_id)
-        VALUES ('ord-kds-1', 'ORD-KDS-1', 'preparing', 'store-a');
-        INSERT INTO kds_station_tickets (id, order_id, station_id, status, tenant_id)
-        VALUES ('tkt-1', 'ord-kds-1', 'bar', 'ready', 'store-a');
-        INSERT INTO kds_station_tickets (id, order_id, station_id, status, tenant_id)
-        VALUES ('tkt-2', 'ord-kds-1', 'kitchen', 'preparing', 'store-a');
+        CREATE TABLE order_item_stations (
+          order_item_id TEXT NOT NULL,
+          station_id TEXT NOT NULL,
+          started_at TEXT,
+          ready_at TEXT,
+          PRIMARY KEY (order_item_id, station_id)
+        );
+        INSERT INTO kitchen_stations (id, name, slug, tenant_id)
+        VALUES ('bar', 'Bar', 'bar', 'store-a'), ('kitchen', 'Kitchen', 'kitchen', 'store-a');
+        INSERT INTO orders (id, order_number, status, items, tenant_id)
+        VALUES ('ord-kds-1', 'ORD-KDS-1', 'preparing', '[{"id":"itm-1","name":"Latte","quantity":1},{"id":"itm-2","name":"Sandwich","quantity":1}]', 'store-a');
+        INSERT INTO order_item_stations (order_item_id, station_id, started_at, ready_at)
+        VALUES ('ord-kds-1:itm-1', 'bar', '2026-11-24T01:00:00Z', '2026-11-24T01:03:00Z');
+        INSERT INTO order_item_stations (order_item_id, station_id, started_at, ready_at)
+        VALUES ('ord-kds-1:itm-2', 'kitchen', '2026-11-24T01:00:00Z', NULL);
       `);
 
       const app = new Hono<{ Bindings: Env }>();
@@ -890,7 +896,7 @@ describe('Phase 67 Security Regression Suite (BN1..BN4)', () => {
 
       const kitchenAToken = await signJWT({ id: 'chef-a', role: 'kitchen', tenantId: 'store-a' });
       const readyRes = await app.request(
-        '/api/kitchen/tickets/tkt-2/status',
+        '/api/kitchen/tickets/kitchen:ord-kds-1/status',
         {
           method: 'PATCH',
           headers: { Authorization: `Bearer ${kitchenAToken}`, 'Content-Type': 'application/json' },

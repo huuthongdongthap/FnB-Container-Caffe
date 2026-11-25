@@ -130,7 +130,7 @@ describe('KDS payment hold, cancellation parity, cron session pinning, promotion
       expect(tbl.status).toBe('Available');
       expect(kvStore.has('order_event:sadec:ord_cancel_1')).toBe(true);
       expect(kvStore.has('latest_order_ts:sadec')).toBe(true);
-      expect(broadcastSpy).toHaveBeenCalledTimes(1);
+      expect(broadcastSpy).toHaveBeenCalledTimes(2);
     } finally {
       vi.unstubAllGlobals();
     }

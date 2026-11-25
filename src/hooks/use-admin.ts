@@ -12,6 +12,7 @@ export interface AdminStats {
 
 export interface AdminOrder {
   id: string;
+  orderNumber?: string;
   customer: string;
   customerPhone?: string;
   customerAddress?: string;
@@ -21,8 +22,18 @@ export interface AdminOrder {
   tableZone?: string;
   paymentMethod?: string;
   paymentStatus?: string;
+  isCod?: number | boolean;
+  isHeldOutOfKds?: boolean;
   notes?: string;
   deliveryTime?: string;
+  startedAt?: string;
+  readyAt?: string;
+  servedAt?: string;
+  cancelledAt?: string;
+  cancelledReason?: string;
+  assignedShipperId?: string;
+  shipperName?: string;
+  failureReason?: string;
   items: number;
   itemsList?: Array<{ name: string; quantity: number; price?: number; notes?: string; modifiers?: string[] }>;
   subtotal?: number;

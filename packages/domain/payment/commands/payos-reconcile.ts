@@ -1,7 +1,11 @@
 import type { D1Database, KVNamespace } from '@cloudflare/workers-types';
 import { settlePayOS } from '../../../../worker/src/routes/webhooks-handlers/payos-settlement';
 import {
-  dispatchOrderBroadcast,
+  sendKdsReleasePushNotification,
+  sendOrderPaidNotifications,
+} from '../../../../worker/src/routes/webhooks-handlers/notifications';
+import {
+  fanOutOrderBroadcast,
   normalizeBroadcastTotal,
   parseBroadcastItems,
   parseBroadcastTimestamp,
@@ -270,27 +274,30 @@ export async function reconcilePayOSPayment(input: ReconcilePayOSInput): Promise
           input.kv.put(`orders:latest_updated_at:${rowTenant}`, nowIso, { expirationTtl: 86400 }).catch(() => {}),
         ]);
       }
+      let reconciledOrdDetails: Record<string, unknown> | null = null;
+      if (!isTerminalNonPayable) {
+        reconciledOrdDetails = await input.db
+          .prepare(
+            "SELECT id, status, items, COALESCE(total, total_amount) AS total, customer_name, customer_phone, customer_email, customer_address, payment_method, order_type, notes, table_id, created_at FROM orders WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?",
+          )
+          .bind(row.order_id, rowTenant)
+          .first<Record<string, unknown>>()
+          .catch(() =>
+            rowTenant === 'default'
+              ? input.db
+                  .prepare('SELECT id, status, items, total, customer_name, customer_phone, table_id, created_at FROM orders WHERE id = ?')
+                  .bind(row.order_id)
+                  .first<Record<string, unknown>>()
+                  .catch(() => null)
+              : Promise.resolve(null),
+          );
+      }
       if (!isTerminalNonPayable && input.env?.ORDER_BROADCASTER) {
         try {
-          const doChannel = rowTenant !== 'default' ? `${rowTenant}:${row.order_id}` : row.order_id;
-          const ordDetails = await input.db
-            .prepare(
-              "SELECT items, COALESCE(total, total_amount) AS total, customer_name, customer_phone, table_id, created_at FROM orders WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?",
-            )
-            .bind(row.order_id, rowTenant)
-            .first<Record<string, unknown>>()
-            .catch(() =>
-              rowTenant === 'default'
-                ? input.db
-                    .prepare('SELECT items, total, customer_name, customer_phone, table_id, created_at FROM orders WHERE id = ?')
-                    .bind(row.order_id)
-                    .first<Record<string, unknown>>()
-                    .catch(() => null)
-                : Promise.resolve(null),
-            );
+          const ordDetails = reconciledOrdDetails;
           const eventPayload = {
             orderId: row.order_id,
-            status: String(after?.order_status ?? fresh.order_status ?? 'pending'),
+            status: String(after?.order_status ?? fresh.order_status ?? ordDetails?.status ?? 'pending'),
             payment_status: 'paid',
             items: parseBroadcastItems(ordDetails?.items),
             total: normalizeBroadcastTotal(ordDetails?.total ?? expectedOrderTotal ?? expectedAmount ?? 0),
@@ -301,10 +308,26 @@ export async function reconcilePayOSPayment(input: ReconcilePayOSInput): Promise
             createdAt: parseBroadcastTimestamp(ordDetails?.created_at),
             updatedAt: Date.now(),
           };
-          await dispatchOrderBroadcast(input.env.ORDER_BROADCASTER, doChannel, eventPayload);
+          await fanOutOrderBroadcast(input.env.ORDER_BROADCASTER, row.order_id, rowTenant, eventPayload);
         } catch {
           // Non-blocking realtime broadcast after reconciliation settlement
         }
+      }
+      if (!isTerminalNonPayable) {
+        const notifEnv = {
+          AURA_DB: input.db,
+          ...(input.kv ? { AUTH_KV: input.kv } : {}),
+          ...(input.env ?? {}),
+        } as unknown as import('../../../../worker/src/types/env').Env;
+        const notifRow: Record<string, unknown> = {
+          id: row.order_id,
+          status: String(after?.order_status ?? fresh.order_status ?? reconciledOrdDetails?.status ?? 'pending'),
+          payment_method: 'payos',
+          ...(reconciledOrdDetails ?? {}),
+          total: normalizeBroadcastTotal(reconciledOrdDetails?.total ?? expectedOrderTotal ?? expectedAmount ?? 0),
+        };
+        await sendKdsReleasePushNotification({ env: notifEnv }, notifRow, rowTenant).catch(() => {});
+        await sendOrderPaidNotifications({ env: notifEnv }, notifRow, nowIso).catch(() => {});
       }
       if (!isTerminalNonPayable) {
         try {

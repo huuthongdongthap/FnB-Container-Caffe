@@ -1,11 +1,80 @@
 import type { Context } from 'hono';
-import { notifyTelegram } from '@aura/domain-order';
+import { formatKdsPushOriginLabel, notifyTelegram } from '@aura/domain-order';
 import type { Env } from '../../types/env';
 import type { EmailEnv } from '../../lib/email';
 import { log } from './helpers';
 
+export interface NotificationContextLike {
+  env: Env;
+  executionCtx?: { waitUntil?: (p: Promise<unknown>) => void };
+}
+
+export async function sendKdsReleasePushNotification(
+  c: Context<{ Bindings: Env }> | NotificationContextLike,
+  orderRow: Record<string, unknown>,
+  tenantId: string,
+): Promise<void> {
+  try {
+    const db = (c.env?.AURA_DB ?? (c.env as unknown as Record<string, unknown>)?.DB) as
+      | import('@cloudflare/workers-types').D1Database
+      | undefined;
+    if (!db) return;
+    const rawStatus = String(orderRow.status ?? 'pending').trim().toLowerCase();
+    if (!['pending', 'confirmed'].includes(rawStatus)) return;
+    let parsedItems: unknown[] = [];
+    if (Array.isArray(orderRow.items)) {
+      parsedItems = orderRow.items;
+    } else if (typeof orderRow.items === 'string' && orderRow.items.trim()) {
+      try {
+        const parsed = JSON.parse(orderRow.items);
+        if (Array.isArray(parsed)) parsedItems = parsed;
+      } catch { /* ignore */ }
+    }
+    const { sendPushToStaff } = await import('../../tree/push/notifier.js');
+    const { STAFF_PUSH_ROLE } = await import('../../tree/push/roles.js');
+    const rawEnv = (c.env || {}) as unknown as Record<string, unknown>;
+    const pushEnv: import('../../tree/push/notifier').PushEnv = {
+      AURA_DB: db,
+      VAPID_PUBLIC_KEY: typeof rawEnv.VAPID_PUBLIC_KEY === 'string' ? rawEnv.VAPID_PUBLIC_KEY : undefined,
+      VAPID_PRIVATE_KEY: typeof rawEnv.VAPID_PRIVATE_KEY === 'string' ? rawEnv.VAPID_PRIVATE_KEY : undefined,
+      VAPID_EMAIL: typeof rawEnv.VAPID_EMAIL === 'string' ? rawEnv.VAPID_EMAIL : undefined,
+      PILOT_STORE: typeof rawEnv.PILOT_STORE === 'string' ? rawEnv.PILOT_STORE : undefined,
+    };
+    const originLabel = formatKdsPushOriginLabel({
+      orderType: typeof orderRow.order_type === 'string' ? orderRow.order_type : null,
+      tableId: typeof orderRow.table_id === 'string' ? orderRow.table_id : null,
+    });
+    const orderId = String(orderRow.id ?? '');
+    const pushPromise = sendPushToStaff(
+      pushEnv,
+      {
+        title: 'Đơn hàng mới 🍳',
+        body: `${originLabel} — ${parsedItems.length} món`,
+        data: { url: '/kds', orderId },
+      },
+      STAFF_PUSH_ROLE,
+      undefined,
+      tenantId || 'default',
+    ).catch((e) => log.warn('KDS release push failed:', { message: (e as Error).message }));
+
+    let waitUntilFn: ((p: Promise<unknown>) => void) | undefined;
+    try {
+      waitUntilFn = c.executionCtx?.waitUntil?.bind(c.executionCtx);
+    } catch {
+      waitUntilFn = undefined;
+    }
+    if (waitUntilFn) {
+      waitUntilFn(pushPromise);
+    } else {
+      await pushPromise;
+    }
+  } catch (err) {
+    log.warn('KDS release push error:', { message: (err as Error).message });
+  }
+}
+
 export async function sendOrderPaidNotifications(
-  c: Context<{ Bindings: Env }>,
+  c: Context<{ Bindings: Env }> | NotificationContextLike,
   orderRow: Record<string, unknown>,
   paymentTime: string
 ): Promise<void> {

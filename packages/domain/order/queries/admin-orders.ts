@@ -5,6 +5,8 @@
 
 import { jsonResponse, errorResponse } from 'worker/src/middleware/cors';
 import { createLogger } from 'worker/src/middleware/logger';
+import { isHeldOutOfKds } from '@aura/domain-kitchen';
+import { sanitizeOrderNotes } from '../model/helpers';
 import { buildOrderFilterClause, buildOrderTail, OrderSortColumn } from './shared-listing';
 
 const log = createLogger({ route: 'orders' });
@@ -29,6 +31,7 @@ const ALLOWED_ORDER_TYPES: ReadonlySet<string> = new Set(['dine_in', 'takeaway',
  */
 const ORDER_RESPONSE_FIELDS = [
   'id',
+  'order_number',
   'table_id',
   'status',
   'total',
@@ -36,6 +39,14 @@ const ORDER_RESPONSE_FIELDS = [
   'customer_name',
   'customer_phone',
   'created_at',
+  'started_at',
+  'ready_at',
+  'served_at',
+  'cancelled_at',
+  'cancelled_reason',
+  'assigned_shipper_id',
+  'shipper_name',
+  'failure_reason',
   'items',
   'shipping_fee',
   'discount',
@@ -44,7 +55,9 @@ const ORDER_RESPONSE_FIELDS = [
   'notes',
   'delivery_time',
   'payment_method',
+  'is_cod',
   'table_number',
+  'table_name',
   'table_zone',
   'payment_id',
   'payment_attempt_status',
@@ -60,6 +73,12 @@ const ORDER_RESPONSE_FIELDS = [
  * schema. Each entry must stay an explicit allowlist so legacy rows cannot leak secrets.
  */
 const LEGACY_ORDER_PROJECTIONS: ReadonlyArray<{ cols: string; hasPaymentMethod: boolean }> = [
+  {
+    cols: `o.id, o.order_number, o.table_id, o.status, o.total, o.payment_status, o.customer_name, o.customer_phone, o.created_at,
+   o.started_at, o.ready_at, o.cancelled_at, o.failure_reason,
+   o.items, o.shipping_fee, o.discount, o.order_type, o.customer_address, o.notes, o.delivery_time`,
+    hasPaymentMethod: true,
+  },
   {
     cols: `o.id, o.table_id, o.status, o.total, o.payment_status, o.customer_name, o.customer_phone, o.created_at,
    o.items, o.shipping_fee, o.discount, o.order_type, o.customer_address, o.notes, o.delivery_time`,
@@ -101,6 +120,12 @@ function buildSearchClause(
   const esc = " ESCAPE '\\'";
   switch (field) {
     case 'id':
+      if (includeTableJoin) {
+        return {
+          sql: ` AND (LOWER(o.id) LIKE ?${esc} OR LOWER(COALESCE(o.order_number, '')) LIKE ?${esc})`,
+          params: [likeTerm, likeTerm],
+        };
+      }
       return { sql: ` AND LOWER(o.id) LIKE ?${esc}`, params: [likeTerm] };
     case 'customer_name':
       return { sql: ` AND LOWER(COALESCE(o.customer_name, '')) LIKE ?${esc}`, params: [likeTerm] };
@@ -127,8 +152,8 @@ function buildSearchClause(
     default: {
       if (includeTableJoin) {
         return {
-          sql: ` AND (LOWER(o.id) LIKE ?${esc} OR LOWER(COALESCE(o.customer_name, '')) LIKE ?${esc} OR LOWER(COALESCE(o.customer_phone, '')) LIKE ?${esc} OR LOWER(CAST(COALESCE(o.table_id, '') AS TEXT)) LIKE ?${esc} OR LOWER(COALESCE(t.table_number, '')) LIKE ?${esc} OR LOWER(CAST(COALESCE(o.items, '') AS TEXT)) LIKE ?${esc} OR LOWER(COALESCE(o.customer_address, '')) LIKE ?${esc} OR LOWER(COALESCE(o.notes, '')) LIKE ?${esc})`,
-          params: [likeTerm, likeTerm, likeTerm, likeTerm, likeTerm, likeTerm, likeTerm, likeTerm],
+          sql: ` AND (LOWER(o.id) LIKE ?${esc} OR LOWER(COALESCE(o.order_number, '')) LIKE ?${esc} OR LOWER(COALESCE(o.customer_name, '')) LIKE ?${esc} OR LOWER(COALESCE(o.customer_phone, '')) LIKE ?${esc} OR LOWER(CAST(COALESCE(o.table_id, '') AS TEXT)) LIKE ?${esc} OR LOWER(COALESCE(t.table_number, '')) LIKE ?${esc} OR LOWER(CAST(COALESCE(o.items, '') AS TEXT)) LIKE ?${esc} OR LOWER(COALESCE(o.customer_address, '')) LIKE ?${esc} OR LOWER(COALESCE(o.notes, '')) LIKE ?${esc})`,
+          params: [likeTerm, likeTerm, likeTerm, likeTerm, likeTerm, likeTerm, likeTerm, likeTerm, likeTerm],
         };
       }
       return {
@@ -225,7 +250,30 @@ export async function getAdminOrders(request: Request, env: Record<string, unkno
       prefix: 'o.',
     });
 
-    const mainQuery = `SELECT o.id, o.table_id, o.status, o.total, o.payment_status, o.customer_name, o.customer_phone, o.created_at,
+    const mainQuery = `SELECT o.id, o.order_number, o.table_id, o.status, o.total, o.payment_status, o.customer_name, o.customer_phone, o.created_at,
+       o.started_at, o.ready_at, o.served_at, o.cancelled_at, o.assigned_shipper_id, o.shipper_name, o.failure_reason, o.is_cod,
+       o.items, o.shipping_fee, o.discount,
+       o.order_type, o.customer_address, o.notes, o.delivery_time,
+       COALESCE(o.payment_method, p.method) AS payment_method,
+       COALESCE(NULLIF(TRIM(t.table_number), ''), NULLIF(TRIM(t.name), '')) AS table_number,
+       t.zone AS table_zone,
+       p.id AS payment_id, p.status AS payment_attempt_status, p.payment_url, p.refund_status, p.refund_amount, p.amount AS payment_amount, p.transaction_id AS payment_transaction_id
+     FROM orders o
+     LEFT JOIN cafe_tables t ON t.id = o.table_id
+       AND COALESCE(NULLIF(TRIM(t.tenant_id), ''), 'default') = COALESCE(NULLIF(TRIM(o.tenant_id), ''), 'default')
+     LEFT JOIN payments p ON p.id = (
+       SELECT p2.id FROM payments p2
+       WHERE p2.order_id = o.id
+         AND COALESCE(NULLIF(TRIM(p2.tenant_id), ''), 'default') = COALESCE(NULLIF(TRIM(o.tenant_id), ''), 'default')
+       ORDER BY
+         CASE WHEN p2.status IN ('paid', 'completed', 'refunded', 'partially_refunded') THEN 0 ELSE 1 END ASC,
+         p2.created_at DESC,
+         p2.rowid DESC
+       LIMIT 1
+     )
+     WHERE 1=1${fullClause}${tail}`;
+
+    const midSchemaQuery = `SELECT o.id, o.table_id, o.status, o.total, o.payment_status, o.customer_name, o.customer_phone, o.created_at,
        o.items, o.shipping_fee, o.discount,
        o.order_type, o.customer_address, o.notes, o.delivery_time,
        COALESCE(o.payment_method, p.method) AS payment_method,
@@ -244,7 +292,7 @@ export async function getAdminOrders(request: Request, env: Record<string, unkno
          p2.rowid DESC
        LIMIT 1
      )
-     WHERE 1=1${fullClause}${tail}`;
+     WHERE 1=1${fallbackClause}${tail}`;
 
     let results: Record<string, unknown>[] = [];
     let usedTableJoin = true;
@@ -252,7 +300,12 @@ export async function getAdminOrders(request: Request, env: Record<string, unkno
       const res = await db.prepare(mainQuery).bind(...fullParams).all<Record<string, unknown>>();
       results = res.results ?? [];
     } catch {
-      usedTableJoin = false;
+      try {
+        const res = await db.prepare(midSchemaQuery).bind(...fallbackParams).all<Record<string, unknown>>();
+        results = res.results ?? [];
+        usedTableJoin = false;
+      } catch {
+        usedTableJoin = false;
       let loadedLegacy = false;
       for (const projection of LEGACY_ORDER_PROJECTIONS) {
         try {
@@ -301,6 +354,7 @@ export async function getAdminOrders(request: Request, env: Record<string, unkno
             }
           }
         }
+      }
       }
     }
 
@@ -393,8 +447,21 @@ export async function getAdminOrders(request: Request, env: Record<string, unkno
       const tableNumber = order.table_number ? String(order.table_number) : null;
       const pendingLoyalty = pendingLoyaltyByOrder.get(String(order.id ?? '')) ?? null;
       const safeOrder = pickOrderResponseFields(order);
+      const resolvedOrderType = order.order_type ? String(order.order_type) : (order.table_id ? 'dine_in' : 'takeaway');
+      const failureReason = order.failure_reason ? String(order.failure_reason) : null;
+      const cancelledReason =
+        order.cancelled_reason
+          ? String(order.cancelled_reason)
+          : String(order.status ?? '').toLowerCase() === 'cancelled' && failureReason
+            ? failureReason
+            : null;
+      const heldFromKds = isHeldOutOfKds({
+        ...order,
+        order_type: resolvedOrderType,
+      });
       return {
         ...safeOrder,
+        order_number: order.order_number ? String(order.order_number) : null,
         items: parsedItems,
         total: parseInt(order.total as string),
         payment_id: order.payment_id || null,
@@ -403,12 +470,22 @@ export async function getAdminOrders(request: Request, env: Record<string, unkno
         refund_amount: order.refund_amount ? Number(order.refund_amount) : null,
         shipping_fee: parseInt(String(order.shipping_fee || 0)),
         discount: parseInt(String(order.discount || 0)),
-        order_type: order.order_type ? String(order.order_type) : (order.table_id ? 'dine_in' : 'takeaway'),
+        order_type: resolvedOrderType,
         customer_address: order.customer_address ? String(order.customer_address) : null,
-        notes: order.notes ? String(order.notes) : null,
+        notes: sanitizeOrderNotes(order.notes),
         delivery_time: order.delivery_time ? String(order.delivery_time) : null,
+        started_at: order.started_at ? String(order.started_at) : null,
+        ready_at: order.ready_at ? String(order.ready_at) : null,
+        served_at: order.served_at ? String(order.served_at) : null,
+        cancelled_at: order.cancelled_at ? String(order.cancelled_at) : null,
+        assigned_shipper_id: order.assigned_shipper_id ? String(order.assigned_shipper_id) : null,
+        shipper_name: order.shipper_name ? String(order.shipper_name) : null,
+        failure_reason: failureReason,
+        cancelled_reason: cancelledReason,
+        is_cod: order.is_cod !== undefined && order.is_cod !== null ? Number(order.is_cod) : 0,
+        is_held_out_of_kds: heldFromKds,
         table_number: tableNumber,
-        table_name: tableNumber,
+        table_name: tableNumber ?? (order.table_id ? String(order.table_id) : null),
         pending_loyalty_reversal: Boolean(pendingLoyalty),
         pending_loyalty_transfer_ref: pendingLoyalty?.transferRef ?? null,
         pending_loyalty_refund_amount: pendingLoyalty?.amount ?? null,

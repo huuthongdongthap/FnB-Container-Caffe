@@ -41,6 +41,8 @@ export interface OrderItem {
 
 export interface OrderData {
   id: string;
+  displayId?: string;
+  orderNumber?: string;
   customer: string;
   customerPhone?: string;
   customerAddress?: string;
@@ -49,9 +51,15 @@ export interface OrderData {
   orderType?: OrderChannel;
   paymentMethod?: string;
   paymentStatus?: string;
+  isHeldOutOfKds?: boolean;
   notes?: string;
   deliveryTime?: string;
   createdAt?: string;
+  startedAt?: string;
+  readyAt?: string;
+  cancelledAt?: string;
+  shipperName?: string;
+  failureReason?: string;
   createdTimeLabel?: string;
   timeAgo: string;
   status: OrderStatus;

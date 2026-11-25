@@ -48,7 +48,7 @@ describe('StitchKDSNew', () => {
   it('renders status filter counts in header nav', () => {
     renderWithProviders(<StitchKDSNew />);
     expect(screen.getByRole('button', { name: /PREPARING/i })).toHaveTextContent('1');
-    expect(screen.getByRole('button', { name: /PENDING/i })).toHaveTextContent('2');
+    expect(screen.getByRole('button', { name: /PENDING/i })).toHaveTextContent('3');
     expect(screen.getByRole('button', { name: /READY/i })).toHaveTextContent('1');
     expect(screen.getByRole('button', { name: /OVERDUE/i })).toHaveTextContent('1');
   });

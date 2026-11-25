@@ -4,7 +4,7 @@ import type { D1Database, D1PreparedStatement, KVNamespace } from '@cloudflare/w
 import { jsonResponse, errorResponse } from 'worker/src/middleware/cors';
 import { createLogger } from 'worker/src/middleware/logger';
 import { orderItemSchema, paymentMethodSchema } from 'worker/src/lib/validators';
-import { generateId, parseJSON } from '../model/helpers';
+import { generateId, generateOrderNumber, parseJSON } from '../model/helpers';
 import { calculateCheckoutSnapshot } from '../policies/checkout-snapshot';
 import {
   OrderCreationError,
@@ -15,7 +15,7 @@ import {
 } from '../policies/order-creation-scope';
 import { publishOrderEvent } from '../policies/customer-order-payload';
 import {
-  dispatchOrderBroadcast,
+  fanOutOrderBroadcast,
   normalizeBroadcastTotal,
   parseBroadcastItems,
   parseBroadcastTimestamp,
@@ -375,15 +375,18 @@ export async function splitOrders(
     }
     if (parentOrder) {
       const parentStatus = String(parentOrder.status || '').trim().toLowerCase();
-      if (['cancelled', 'canceled', 'completed', 'refunded'].includes(parentStatus)) {
+      if (['cancelled', 'canceled', 'completed', 'refunded', 'failed', 'expired'].includes(parentStatus)) {
         return errorResponse(`Cannot split an order in ${parentStatus} status`, 409);
+      }
+      if (['preparing', 'ready', 'delivering', 'served', 'delivered'].includes(parentStatus)) {
+        return errorResponse(`Cannot split an order already in kitchen preparation or service (${parentStatus})`, 409);
       }
       const parentPayment = await db
         .prepare('SELECT payment_status FROM orders WHERE id = ?')
         .bind(parentOrder.id)
         .first<{ payment_status?: string | null }>()
         .catch(() => null);
-      if (['paid', 'completed', 'refunded'].includes(String(parentPayment?.payment_status || '').trim().toLowerCase())) {
+      if (['paid', 'completed', 'refunded', 'partially_refunded'].includes(String(parentPayment?.payment_status || '').trim().toLowerCase())) {
         return errorResponse('Paid order cannot be split; initiate a refund instead', 409);
       }
     }
@@ -470,6 +473,7 @@ export async function splitOrders(
     }> = [];
     const createdOrders = parsed.data.orders.map((order, index) => {
       const id = generateId('ORD_');
+      const orderNumber = generateOrderNumber();
       const snapshot = snapshots[index];
       const taxAmount = typeof order.tax === 'number' && order.tax > 0 ? Math.round(order.tax) : 0;
       const orderTotal = snapshot.total + taxAmount;
@@ -479,17 +483,17 @@ export async function splitOrders(
         orderTokens[id] = guestCap.token;
       }
       const orderInsertArgsWithHash = [
-        id, snapshot.itemsJson, orderTotal, 'pending', order.customer_name, order.customer_phone,
+        id, orderNumber, snapshot.itemsJson, orderTotal, 'pending', order.customer_name, order.customer_phone,
         order.customer_email || null, order.customer_address || null, order.payment_method, 'unpaid',
         snapshot.shipping_fee, snapshot.discount, order.notes || null, order.delivery_time || 'now',
         tableId, 'dine_in', snapshot.tip_amount, resolvedCustomerId, guestCap?.hash ?? null, tenantId, now, now,
       ] as const;
       const orderInsertSqlWithHash = `INSERT INTO orders (
-        id, items, total, status, customer_name, customer_phone,
+        id, order_number, items, total, status, customer_name, customer_phone,
         customer_email, customer_address, payment_method, payment_status,
         shipping_fee, discount, notes, delivery_time, table_id,
         order_type, tip_amount, customer_id, guest_token_hash, tenant_id, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
       const orderInsertArgs = [
         id, snapshot.itemsJson, orderTotal, 'pending', order.customer_name, order.customer_phone,
         order.customer_email || null, order.customer_address || null, order.payment_method, 'unpaid',
@@ -503,7 +507,7 @@ export async function splitOrders(
         order_type, tip_amount, customer_id, tenant_id, created_at, updated_at
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
       statements.push(db.prepare(orderInsertSqlWithHash).bind(...orderInsertArgsWithHash));
-      legacyWithHashStatements.push(db.prepare(orderInsertSqlWithHash).bind(...orderInsertArgsWithHash));
+      legacyWithHashStatements.push(db.prepare(orderInsertSql).bind(...orderInsertArgs));
       noGuestHashStatements.push(db.prepare(orderInsertSql).bind(...orderInsertArgs));
       legacyStatements.push(db.prepare(orderInsertSql).bind(...orderInsertArgs));
       for (const item of snapshot.items) {
@@ -540,7 +544,7 @@ export async function splitOrders(
       }
       sideEffectInputs.push({ id, order, snapshot: { ...snapshot, total: orderTotal }, resolvedCustomerId });
       return {
-        id, status: 'pending', payment_status: 'unpaid', items: snapshot.items, total: orderTotal,
+        id, order_number: orderNumber, status: 'pending', payment_status: 'unpaid', items: snapshot.items, total: orderTotal,
         customer_name: order.customer_name, customer_phone: order.customer_phone,
         customer_address: order.customer_address || null, payment_method: order.payment_method,
         notes: order.notes || null, table_id: tableId, created_at: now,
@@ -575,15 +579,28 @@ export async function splitOrders(
     let claimedParentPriorStatus: string | null = null;
     if (parentOrder) {
       const splitNote = `Split into children: ${createdOrders.map(o => o.id).join(', ')}`;
+      const priorStatus = String(parentOrder.status || 'pending');
+      const priorLower = priorStatus.trim().toLowerCase();
+      const cancelAlertVal = priorLower === 'confirmed' || priorLower === 'preparing' || priorLower === 'ready' ? 1 : 0;
+      const notSplitStatusClause = "LOWER(COALESCE(status, '')) NOT IN ('preparing', 'ready', 'delivering', 'served', 'delivered', 'cancelled', 'canceled', 'completed', 'refunded', 'failed', 'expired')";
+      const notPaidClause = "LOWER(COALESCE(payment_status, 'unpaid')) NOT IN ('paid', 'completed', 'refunded', 'partially_refunded')";
+      const fullClaimParentSql =
+        `UPDATE orders SET status = 'cancelled', cancelled_at = COALESCE(cancelled_at, ?), previous_status = ?, cancel_alert = ?, notes = COALESCE(NULLIF(notes, '') || ' | ', '') || ?, updated_at = ? WHERE id = ? AND ${notSplitStatusClause} AND ${notPaidClause} AND (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?)`;
       const claimParentSql =
-        "UPDATE orders SET status = 'cancelled', notes = COALESCE(NULLIF(notes, '') || ' | ', '') || ?, updated_at = ? WHERE id = ? AND LOWER(COALESCE(status, '')) NOT IN ('cancelled', 'canceled', 'completed', 'refunded') AND LOWER(COALESCE(payment_status, 'unpaid')) NOT IN ('paid', 'completed', 'refunded') AND (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?)";
+        `UPDATE orders SET status = 'cancelled', notes = COALESCE(NULLIF(notes, '') || ' | ', '') || ?, updated_at = ? WHERE id = ? AND ${notSplitStatusClause} AND ${notPaidClause} AND (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?)`;
       const legacyClaimParentSql =
-        "UPDATE orders SET status = 'cancelled', notes = COALESCE(NULLIF(notes, '') || ' | ', '') || ?, updated_at = ? WHERE id = ? AND LOWER(COALESCE(status, '')) NOT IN ('cancelled', 'canceled', 'completed', 'refunded')";
+        `UPDATE orders SET status = 'cancelled', notes = COALESCE(NULLIF(notes, '') || ' | ', '') || ?, updated_at = ? WHERE id = ? AND ${notSplitStatusClause}`;
       const claimRes = (await db
-        .prepare(claimParentSql)
-        .bind(splitNote, now, parentOrder.id, tenantId, tenantId)
+        .prepare(fullClaimParentSql)
+        .bind(now, priorStatus, cancelAlertVal, splitNote, now, parentOrder.id, tenantId, tenantId)
         .run()
-        .catch(() => db.prepare(legacyClaimParentSql).bind(splitNote, now, parentOrder!.id).run())) as
+        .catch(() =>
+          db
+            .prepare(claimParentSql)
+            .bind(splitNote, now, parentOrder!.id, tenantId, tenantId)
+            .run()
+            .catch(() => db.prepare(legacyClaimParentSql).bind(splitNote, now, parentOrder!.id).run()),
+        )) as
         | { meta?: { changes?: number }; changes?: number }
         | null;
       const claimChanges = claimRes?.meta?.changes ?? claimRes?.changes;
@@ -594,7 +611,7 @@ export async function splitOrders(
         }
         return errorResponse('Parent order is already cancelled or was split concurrently', 409);
       }
-      claimedParentPriorStatus = String(parentOrder.status || 'pending');
+      claimedParentPriorStatus = priorStatus;
     }
     // D1 rolls back the whole group if any sub-order or ledger write fails.
     try {
@@ -858,7 +875,6 @@ export async function splitOrders(
       }
       if (env.ORDER_BROADCASTER) {
         try {
-          const doChannel = effectiveTenant !== 'default' ? `${effectiveTenant}:${parentOrder.id}` : parentOrder.id;
           const cancelEvent = {
             orderId: parentOrder.id,
             status: 'cancelled',
@@ -872,13 +888,32 @@ export async function splitOrders(
             createdAt: parseBroadcastTimestamp(parentOrder.created_at),
             updatedAt: Date.now(),
           };
-          await dispatchOrderBroadcast(env.ORDER_BROADCASTER, doChannel, cancelEvent);
+          await fanOutOrderBroadcast(env.ORDER_BROADCASTER, parentOrder.id, effectiveTenant, cancelEvent);
         } catch { /* non-blocking parent DO broadcast */ }
       }
     }
     for (let i = 0; i < createdOrders.length; i++) {
       const order = createdOrders[i];
       const sideInput = sideEffectInputs[i];
+      if (env.ORDER_BROADCASTER) {
+        try {
+          const childEvent = {
+            orderId: order.id,
+            order_number: order.order_number,
+            status: 'pending',
+            payment_status: 'unpaid',
+            items: order.items,
+            total: normalizeBroadcastTotal(order.total),
+            customer_name: String(order.customer_name ?? ''),
+            customer_phone: String(order.customer_phone ?? ''),
+            table_id: tableId,
+            ...(effectiveTenant !== 'default' ? { tenant_id: effectiveTenant } : {}),
+            createdAt: Date.now(),
+            updatedAt: Date.now(),
+          };
+          await fanOutOrderBroadcast(env.ORDER_BROADCASTER, order.id, effectiveTenant, childEvent);
+        } catch { /* non-blocking child DO broadcast */ }
+      }
       // Inventory deduction (deductInventoryForOrder) runs once per sub-order inside runPostOrderSideEffects.
       if (sideInput) {
         try {

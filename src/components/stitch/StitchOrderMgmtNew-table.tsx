@@ -325,13 +325,33 @@ function OrderListSection({
                   order.status === 'completed' ||
                   order.status === 'failed' ||
                   order.status === 'expired';
+                const paymentMethodLabel = order.paymentMethod
+                  ? t(`orderMgmt.paymentMethod.${order.paymentMethod}`, { defaultValue: order.paymentMethod.toUpperCase() })
+                  : '';
+                const paymentStatusLabel = order.paymentStatus
+                  ? t(`orderMgmt.paymentStatus.${order.paymentStatus}`, { defaultValue: order.paymentStatus })
+                  : '';
+                const isPaid =
+                  order.paymentStatus === 'paid' ||
+                  order.paymentStatus === 'completed' ||
+                  order.paymentStatus === 'partially_refunded';
                 return (
                   <tr key={order.id} className="hover:bg-white/5">
-                    <td className="px-4 py-3 font-mono text-xs font-semibold">{order.id}</td>
+                    <td className="px-4 py-3 font-mono text-xs font-semibold">
+                      <div>{order.displayId || order.id}</div>
+                      {(order.timeAgo || order.createdTimeLabel) && (
+                        <div className="mt-0.5 font-sans text-[11px] font-normal text-[var(--aura-text-secondary, #a0a8b0)]">
+                          {order.timeAgo}{order.createdTimeLabel ? ` · ${order.createdTimeLabel}` : ''}
+                        </div>
+                      )}
+                    </td>
                     <td className="px-4 py-3 text-xs">
                       <div>{t(`orderMgmt.channel.${channelKey}`, { defaultValue: channelKey })}</div>
                       {(order.tableName || order.table) && (
                         <div className="text-[var(--aura-text-secondary, #a0a8b0)]">{order.tableName || order.table}</div>
+                      )}
+                      {order.deliveryTime && order.deliveryTime !== 'now' && (
+                        <div className="text-amber-200/90">{order.deliveryTime}</div>
                       )}
                     </td>
                     <td className="px-4 py-3">
@@ -339,19 +359,108 @@ function OrderListSection({
                       {order.customerPhone && (
                         <div className="text-xs text-[var(--aura-text-secondary, #a0a8b0)]">{order.customerPhone}</div>
                       )}
+                      {order.customerAddress && channelKey === 'delivery' && (
+                        <div className="max-w-[200px] truncate text-xs text-[var(--aura-text-secondary, #a0a8b0)]">
+                          {order.customerAddress}
+                        </div>
+                      )}
                     </td>
                     <td className="px-4 py-3 text-xs">
                       {order.items.map((it, idx) => (
-                        <div key={`${it.name}-${idx}`}>x{it.quantity} {it.name}</div>
+                        <div key={`${it.name}-${idx}`} className="mb-0.5">
+                          <div>x{it.quantity} {it.name}</div>
+                          {it.modifiers && it.modifiers.length > 0 && (
+                            <div className="pl-3 text-[11px] text-[var(--aura-text-secondary, #a0a8b0)]">
+                              + {it.modifiers.join(', ')}
+                            </div>
+                          )}
+                          {it.notes && (
+                            <div className="pl-3 text-[11px] italic text-amber-200/80">{it.notes}</div>
+                          )}
+                        </div>
                       ))}
+                      {order.notes && (
+                        <div className="mt-1 rounded bg-white/5 px-1.5 py-0.5 text-[11px] italic text-amber-200/90">
+                          {order.notes}
+                        </div>
+                      )}
                     </td>
-                    <td className="px-4 py-3 font-semibold">{order.total}</td>
                     <td className="px-4 py-3">
-                      <StatusBadge status={order.status} />
+                      <div className="font-semibold">{order.total}</div>
+                      {(paymentMethodLabel || paymentStatusLabel) && (
+                        <div className="mt-1 flex flex-wrap items-center gap-1 text-[11px]">
+                          {paymentMethodLabel && (
+                            <span className="text-[var(--aura-text-secondary, #a0a8b0)]">{paymentMethodLabel}</span>
+                          )}
+                          {paymentStatusLabel && (
+                            <span
+                              className={cn(
+                                'rounded px-1.5 py-0.5 text-[10px] font-semibold',
+                                isPaid
+                                  ? 'bg-emerald-500/15 text-emerald-300'
+                                  : order.paymentStatus === 'refunded'
+                                    ? 'bg-slate-500/20 text-slate-300'
+                                    : 'bg-amber-500/15 text-amber-300',
+                              )}
+                            >
+                              {paymentStatusLabel}
+                            </span>
+                          )}
+                        </div>
+                      )}
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="flex flex-col items-start gap-1">
+                        <StatusBadge status={order.status} />
+                        {order.isHeldOutOfKds && (
+                          <span className="rounded border border-amber-400/40 bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-semibold text-amber-200">
+                            {t('orderMgmt.heldOutOfKdsShort', { defaultValue: 'Giữ khỏi KDS' })}
+                          </span>
+                        )}
+                        {!order.isHeldOutOfKds && order.unpaidWarning && (
+                          <span className="text-[10px] text-amber-200">{order.unpaidWarning}</span>
+                        )}
+                      </div>
                     </td>
                     <td className="px-4 py-3 text-right">
-                      <div className="inline-flex flex-wrap items-center justify-end gap-2">
+                      <div className="inline-flex flex-wrap items-center justify-end gap-1.5">
                         {order.additionalActions}
+                        {order.canConfirm && onOrderAction && (
+                          <button
+                            type="button"
+                            onClick={() => onOrderAction(order.id, 'confirmed')}
+                            className="rounded border border-sky-400/40 bg-sky-500/15 px-2 py-1 text-xs font-semibold text-sky-200 hover:bg-sky-500/25"
+                          >
+                            {tTerminal('confirm')}
+                          </button>
+                        )}
+                        {onEditOrder && !isTerminal && (
+                          <button
+                            type="button"
+                            onClick={() => onEditOrder(order)}
+                            className="rounded border border-white/10 bg-white/5 px-2 py-1 text-xs hover:bg-white/10"
+                          >
+                            {t('orderMgmt.editNotes')}
+                          </button>
+                        )}
+                        {onPrintOrder && (
+                          <button
+                            type="button"
+                            onClick={() => onPrintOrder(order)}
+                            className="rounded border border-white/10 bg-white/5 px-2 py-1 text-xs hover:bg-white/10"
+                          >
+                            {t('orderMgmt.printTicket')}
+                          </button>
+                        )}
+                        {order.canCancel && onCancelOrder && !isTerminal && (
+                          <button
+                            type="button"
+                            onClick={() => onCancelOrder(order)}
+                            className="rounded border border-red-400/30 bg-red-500/10 px-2 py-1 text-xs text-red-300 hover:bg-red-500/20"
+                          >
+                            {tTerminal('cancel')}
+                          </button>
+                        )}
                         <button
                           type="button"
                           onClick={() => onViewDetails?.(order)}

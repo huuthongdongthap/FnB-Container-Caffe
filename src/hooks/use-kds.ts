@@ -8,18 +8,27 @@ export type { KDSOrder } from './kds-order';
 
 interface KDSResult {
   orders: KDSOrder[];
+  shiftAvgPrepMinutes: number | null;
   isLoading: boolean;
   isError: boolean;
   error: Error | null;
   refetch: () => void;
   completeOrder: (orderId: string) => void;
   updateStatus: (orderId: string, status: KDSOrder['status']) => void;
+  markItemReady: (orderId: string, itemIndex: number) => void;
+  recallOrder: (orderId: string, targetStatus?: 'preparing' | 'ready') => Promise<boolean>;
   isCompleting: boolean;
   pendingOrders: Record<string, boolean>;
   mutationErrors: Record<string, string>;
 }
 
-const POLL_INTERVAL = 5_000;
+const FALLBACK_POLL_INTERVAL = 5_000;
+
+export function notifyCrossScreenOrderSync(): void {
+  if (typeof window !== 'undefined' && typeof window.dispatchEvent === 'function') {
+    window.dispatchEvent(new CustomEvent('aura:orders-changed'));
+  }
+}
 
 export function useKDS(station: string = 'all'): KDSResult {
   const queryClient = useQueryClient();
@@ -29,24 +38,35 @@ export function useKDS(station: string = 'all'): KDSResult {
   const queryKey = ['kds-orders', identity, station];
   const enabled = Boolean(user);
   const inFlight = useRef(new Set<string>());
+  const [streamConnected, setStreamConnected] = useState(false);
+  const [shiftAvgPrepMinutes, setShiftAvgPrepMinutes] = useState<number | null>(null);
   const [pendingOrders, setPendingOrders] = useState<Record<string, boolean>>({});
   const [mutationErrors, setMutationErrors] = useState<Record<string, string>>({});
   useEffect(() => {
     inFlight.current.clear();
     setPendingOrders({});
     setMutationErrors({});
+    setStreamConnected(false);
   }, [identity, station]);
   const { data = [], isLoading, isError, error, refetch } = useQuery<KDSOrder[]>({
     queryKey,
     enabled,
-    queryFn: ({ signal }) => apiFetch<{ orders?: Record<string, unknown>[]; data?: Record<string, unknown>[] }>(
+    queryFn: ({ signal }) => apiFetch<{
+      orders?: Record<string, unknown>[];
+      data?: Record<string, unknown>[];
+      meta?: { avg_prep_minutes?: number | null };
+    }>(
       `/api/kds/orders${station !== 'all' ? `?station=${encodeURIComponent(station)}` : ''}`, { signal },
     ).then(res => {
+      if (res && typeof res === 'object' && res.meta && typeof res.meta.avg_prep_minutes === 'number') {
+        setShiftAvgPrepMinutes(res.meta.avg_prep_minutes);
+      }
       const list = Array.isArray(res?.orders) ? res.orders : Array.isArray(res?.data) ? res.data : Array.isArray(res) ? res : [];
       // The full active queue is authoritative, including removals made elsewhere.
       return list.map(normalizeKdsOrder);
     }),
-    refetchInterval: POLL_INTERVAL,
+    // Only run 5s REST polling when the SSE stream is disconnected so we never double-poll D1 every 3s+5s.
+    refetchInterval: streamConnected ? false : FALLBACK_POLL_INTERVAL,
     retry: 1,
     staleTime: 4_000,
   });
@@ -54,14 +74,24 @@ export function useKDS(station: string = 'all'): KDSResult {
   useEffect(() => {
     const controller = new AbortController();
     if (enabled) {
-      void consumeKdsStream(controller.signal, payload => {
-        if (!controller.signal.aborted) {
-          queryClient.setQueryData<KDSOrder[]>(queryKey, mapStreamOrders(payload as KdsStreamOrder[]));
-        }
-      }, station);
+      void consumeKdsStream(
+        controller.signal,
+        payload => {
+          if (!controller.signal.aborted) {
+            queryClient.setQueryData<KDSOrder[]>(queryKey, mapStreamOrders(payload as KdsStreamOrder[]));
+          }
+        },
+        station,
+        connected => {
+          if (!controller.signal.aborted) {
+            setStreamConnected(connected);
+          }
+        },
+      );
     }
     return () => {
       controller.abort();
+      setStreamConnected(false);
       void queryClient.cancelQueries({ queryKey, exact: true });
       queryClient.removeQueries({ queryKey, exact: true });
     };
@@ -77,12 +107,28 @@ export function useKDS(station: string = 'all'): KDSResult {
       }),
     onSuccess: async (_data, { orderId, status }) => {
       if (useAuthStore.getState().sessionVersion !== sessionVersion) return;
+      const nowIso = new Date().toISOString();
       queryClient.setQueryData<KDSOrder[]>(queryKey, (prev = []) =>
         status === 'served'
           ? prev.filter((o) => o.id !== orderId)
-          : prev.map((o) => (o.id === orderId ? { ...o, status } : o))
+          : prev.map((o) =>
+              o.id === orderId
+                ? {
+                    ...o,
+                    status,
+                    updatedAt: nowIso,
+                    ...(status === 'preparing' ? { startedAt: o.startedAt ?? nowIso } : {}),
+                    ...(status === 'ready' ? { readyAt: o.readyAt ?? nowIso } : {}),
+                  }
+                : o,
+            )
       );
-      await queryClient.invalidateQueries({ queryKey: ['kds-orders'] });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['kds-orders'] }),
+        queryClient.invalidateQueries({ queryKey: ['orders'] }),
+        queryClient.invalidateQueries({ queryKey: ['admin-orders'] }),
+      ]);
+      notifyCrossScreenOrderSync();
     },
     onError: (failure, { orderId }) => {
       if (useAuthStore.getState().sessionVersion !== sessionVersion) return;
@@ -95,6 +141,45 @@ export function useKDS(station: string = 'all'): KDSResult {
     },
   });
 
+  const itemReadyMutation = useMutation({
+    mutationFn: ({ orderId, itemIndex }: { orderId: string; itemIndex: number }) =>
+      apiFetch<{ success: boolean; all_items_ready?: boolean; order_status?: KDSOrder['status'] }>(
+        `/api/kds/orders/${encodeURIComponent(orderId)}/ready`,
+        {
+          method: 'POST',
+          body: JSON.stringify({ itemIndex }),
+        },
+      ),
+    onSuccess: async (res, { orderId, itemIndex }) => {
+      if (useAuthStore.getState().sessionVersion !== sessionVersion) return;
+      const nowIso = new Date().toISOString();
+      queryClient.setQueryData<KDSOrder[]>(queryKey, (prev = []) =>
+        prev.map((o) => {
+          if (o.id !== orderId) return o;
+          const nextItems = o.items.map((it, idx) =>
+            idx === itemIndex ? { ...it, ready: true, status: 'ready', readyAt: it.readyAt ?? nowIso } : it,
+          );
+          const nextStatus = res?.order_status ?? (res?.all_items_ready ? 'ready' : o.status);
+          return {
+            ...o,
+            items: nextItems,
+            status: nextStatus,
+            ...(nextStatus === 'ready' ? { readyAt: o.readyAt ?? nowIso } : {}),
+          };
+        }),
+      );
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['kds-orders'] }),
+        queryClient.invalidateQueries({ queryKey: ['orders'] }),
+      ]);
+      notifyCrossScreenOrderSync();
+    },
+    onError: (failure, { orderId }) => {
+      if (useAuthStore.getState().sessionVersion !== sessionVersion) return;
+      setMutationErrors((prev) => ({ ...prev, [orderId]: failure.message }));
+    },
+  });
+
   const updateStatus = (orderId: string, status: KDSOrder['status']) => {
     if (!enabled || inFlight.current.has(orderId)) return;
     inFlight.current.add(orderId);
@@ -103,8 +188,33 @@ export function useKDS(station: string = 'all'): KDSResult {
     statusMutation.mutate({ orderId, status });
   };
 
+  const markItemReady = (orderId: string, itemIndex: number) => {
+    if (!enabled) return;
+    itemReadyMutation.mutate({ orderId, itemIndex });
+  };
+
+  const recallOrder = async (orderId: string, targetStatus?: 'preparing' | 'ready'): Promise<boolean> => {
+    if (!enabled) return false;
+    try {
+      await apiFetch(`/api/kds/orders/${encodeURIComponent(orderId)}/recall`, {
+        method: 'POST',
+        body: JSON.stringify(targetStatus ? { target_status: targetStatus } : {}),
+      });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['kds-orders'] }),
+        queryClient.invalidateQueries({ queryKey: ['kds-recent-orders'] }),
+        queryClient.invalidateQueries({ queryKey: ['orders'] }),
+      ]);
+      notifyCrossScreenOrderSync();
+      return true;
+    } catch {
+      return false;
+    }
+  };
+
   return {
     orders: enabled ? data : [],
+    shiftAvgPrepMinutes,
     isLoading,
     isError,
     error: error as Error | null,
@@ -116,6 +226,8 @@ export function useKDS(station: string = 'all'): KDSResult {
       updateStatus(orderId, current?.status === 'pending' || current?.status === 'confirmed' ? 'preparing' : 'ready');
     },
     updateStatus,
+    markItemReady,
+    recallOrder,
     pendingOrders,
     mutationErrors,
     isCompleting: Object.values(pendingOrders).some(Boolean),

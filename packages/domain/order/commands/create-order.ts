@@ -5,11 +5,12 @@ import { createLogger } from 'worker/src/middleware/logger';
 import { createOrderSchema, paymentMethodSchema } from 'worker/src/lib/validators';
 import { assertTenantWritable } from 'worker/src/lib/saas-entitlement';
 import { isHQSuperAdmin } from 'worker/src/middleware/tenant';
-import { generateId, parseJSON } from '../model/helpers';
+import { generateId, generateOrderNumber, parseJSON } from '../model/helpers';
 import { calculateCheckoutSnapshot } from '../policies/checkout-snapshot';
 import { resolveOrderCreationScope, resolveOrderCreationTable, orderCreationIdempotency, OrderCreationError, type OrderCreationActor } from '../policies/order-creation-scope';
 import { runPostOrderSideEffects } from './create-order-side-effects';
 import { publishOrderEvent } from '../policies/customer-order-payload';
+import { fanOutOrderBroadcast } from '../policies/order-broadcast';
 import {
   generateOrderToken,
   hashOrderToken,
@@ -574,11 +575,16 @@ export async function createOrder(
       return errorResponse('Số tiền còn lại cho PayOS phải bằng 0đ hoặc tối thiểu 1.000đ', 400);
     }
     const initialPaymentStatus: 'paid' | 'unpaid' = snapshot.total === 0 ? 'paid' : 'unpaid';
+    const rawIncomingOrderNumber =
+      typeof (data as Record<string, unknown>).order_number === 'string'
+        ? String((data as Record<string, unknown>).order_number).trim()
+        : '';
+    const orderNumber = rawIncomingOrderNumber || generateOrderNumber();
     const guestOrderToken = !resolvedCustomerId ? generateOrderToken() : null;
     const guestTokenHash = guestOrderToken ? await hashOrderToken(guestOrderToken) : null;
     const responseBody = {
       success: true, data: {
-        id: orderId, status: 'pending', payment_status: initialPaymentStatus, items: snapshot.items, total: snapshot.total,
+        id: orderId, order_number: orderNumber, status: 'pending', payment_status: initialPaymentStatus, items: snapshot.items, total: snapshot.total,
         customer: { full_name: data.customer_name, phone: data.customer_phone, address: data.customer_address || null },
         customer_name: data.customer_name, customer_phone: data.customer_phone,
         customer_address: data.customer_address || null, payment_method: validatedMethod,
@@ -619,25 +625,25 @@ export async function createOrder(
       id, items, total, status, customer_name, customer_phone,
       customer_email, customer_address, payment_method, payment_status,
       shipping_fee, discount${extraColSql}, notes, delivery_time, table_id,
-      order_type, tip_amount, service_fee, customer_id, guest_token_hash, tenant_id, created_at, updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?${extraPhSql}, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+      order_type, tip_amount, service_fee, customer_id, guest_token_hash, tenant_id, created_at, updated_at, order_number
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?${extraPhSql}, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
     const orderInsertArgs = [
       orderId, snapshot.itemsJson, snapshot.total, 'pending', data.customer_name, data.customer_phone,
       data.customer_email || null, data.customer_address || null, validatedMethod, initialPaymentStatus,
       snapshot.shipping_fee, snapshot.discount, ...extraOrderVals, data.notes || null, data.delivery_time || 'now', resolvedTableId,
-      orderType, snapshot.tip_amount, snapshot.service_fee, resolvedCustomerId, guestTokenHash, tenantId, now, now,
+      orderType, snapshot.tip_amount, snapshot.service_fee, resolvedCustomerId, guestTokenHash, tenantId, now, now, orderNumber,
     ];
     const orderInsertNoGuestSql = `INSERT INTO orders (
       id, items, total, status, customer_name, customer_phone,
       customer_email, customer_address, payment_method, payment_status,
       shipping_fee, discount${extraColSql}, notes, delivery_time, table_id,
-      order_type, tip_amount, service_fee, customer_id, tenant_id, created_at, updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?${extraPhSql}, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+      order_type, tip_amount, service_fee, customer_id, tenant_id, created_at, updated_at, order_number
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?${extraPhSql}, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
     const orderInsertNoGuestArgs = [
       orderId, snapshot.itemsJson, snapshot.total, 'pending', data.customer_name, data.customer_phone,
       data.customer_email || null, data.customer_address || null, validatedMethod, initialPaymentStatus,
       snapshot.shipping_fee, snapshot.discount, ...extraOrderVals, data.notes || null, data.delivery_time || 'now', resolvedTableId,
-      orderType, snapshot.tip_amount, snapshot.service_fee, resolvedCustomerId, tenantId, now, now,
+      orderType, snapshot.tip_amount, snapshot.service_fee, resolvedCustomerId, tenantId, now, now, orderNumber,
     ];
     const orderInsertLegacySql = `INSERT INTO orders (
       id, items, total, status, customer_name, customer_phone,
@@ -753,13 +759,16 @@ export async function createOrder(
             await db.batch(noGuestHashStatements);
           } catch (subErr) {
             const subMsg = String((subErr as Error)?.message ?? '');
-            if ((subMsg.includes('tenant_id') || subMsg.includes('customer_id') || subMsg.includes('no column named')) && (tenantId === 'default' || tenantId === '*' || subMsg.includes('order_items'))) {
+            if ((subMsg.includes('tenant_id') || subMsg.includes('customer_id') || subMsg.includes('order_number') || subMsg.includes('no column named')) && (tenantId === 'default' || tenantId === '*' || subMsg.includes('order_items') || subMsg.includes('order_number'))) {
               await db.batch(legacyStatements);
             } else {
               throw subErr;
             }
           }
-        } else if ((msg.includes('tenant_id') || msg.includes('customer_id') || msg.includes('no column named')) && (tenantId === 'default' || tenantId === '*' || msg.includes('order_items'))) {
+        } else if (
+          (msg.includes('tenant_id') || msg.includes('customer_id') || msg.includes('order_number') || msg.includes('no column named')) &&
+          (tenantId === 'default' || tenantId === '*' || msg.includes('order_items') || msg.includes('order_number'))
+        ) {
           await db.batch(legacyStatements);
         } else {
           throw batchErr;
@@ -894,24 +903,22 @@ export async function createOrder(
     // Notifications and cache writes run only after commit and cannot turn success into a retryable 500.
     try {
       if (env.ORDER_BROADCASTER) {
-        const ns = env.ORDER_BROADCASTER as import('@cloudflare/workers-types').DurableObjectNamespace;
-        const doTenant = tenantId && tenantId.trim() && tenantId !== '*' ? tenantId.trim() : 'default';
-        const doChannel = doTenant !== 'default' ? `${doTenant}:${orderId}` : orderId;
-        const stub = ns.get(ns.idFromName(doChannel));
+        const doTenant = tenantId && tenantId.trim() && tenantId !== '*' && tenantId.trim().toLowerCase() !== 'hq'
+          ? tenantId.trim()
+          : 'default';
         const event = {
-          orderId, status: 'pending', payment_status: initialPaymentStatus, items: snapshot.items, total: snapshot.total,
+          orderId, order_number: orderNumber, status: 'pending', payment_status: initialPaymentStatus, items: snapshot.items, total: snapshot.total,
           customer_name: data.customer_name, customer_phone: data.customer_phone, table_id: resolvedTableId,
+          order_type: orderType,
           ...(doTenant !== 'default' ? { tenant_id: doTenant } : {}),
           createdAt: Date.now(), updatedAt: Date.now(),
         };
-        const broadcast = stub.fetch('https://do/broadcast', {
-          method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(event),
-        }).then(result => { if (!result.ok) throw new Error(`Broadcast returned ${result.status}`); })
+        const broadcast = fanOutOrderBroadcast(env.ORDER_BROADCASTER, orderId, doTenant, event)
           .catch(error => log.warn('Order broadcast failed after commit', { orderId, message: (error as Error).message }));
         if (ctx?.waitUntil) ctx.waitUntil(broadcast); else await broadcast;
       }
       await runPostOrderSideEffects({
-        db, env, ctx, orderId, tenantId, data: { ...data, customer_id: resolvedCustomerId, order_type: orderType }, snapshot, validatedMethod, resolvedTableId,
+        db, env, ctx, orderId, tenantId, data: { ...data, customer_id: resolvedCustomerId, order_type: orderType }, snapshot, validatedMethod, resolvedTableId, initialPaymentStatus,
       });
     } catch (error) {
       log.warn('Order side effect failed after persistence', { orderId, message: (error as Error).message });

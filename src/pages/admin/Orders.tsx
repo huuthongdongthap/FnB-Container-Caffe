@@ -15,9 +15,10 @@ import {
   type OrderSummaryData,
 } from '@/hooks/stores/admin/use-admin-orders-store';
 import type { AdminOrder } from '@/hooks/use-admin';
-import { useAuthStore } from '@/hooks/stores/use-auth-store';
+import { formatTableWithPrefix } from '@/hooks/kds-order';
+import { AUTH_TOKEN_KEY, useAuthStore } from '@/hooks/stores/use-auth-store';
 import { ManualOrderRefund } from '@/components/admin/manual-order-refund';
-import { apiFetch, ApiClientError } from '@/lib/api-client';
+import { API_BASE, apiFetch, ApiClientError } from '@/lib/api-client';
 import { ThermalReceipt, type ThermalReceiptData } from '@/components/receipt/ThermalReceipt';
 
 /* ─── Status & Transition Logic ──────────────────────────────────────── */
@@ -50,7 +51,7 @@ function normalizeActorRole(raw: string): CanonicalRole {
 
 const TRANSITION_ALLOWED_ROLES: Record<string, ReadonlySet<CanonicalRole>> = {
   'pending->confirmed': new Set(['admin', 'manager', 'staff']),
-  'pending->preparing': new Set(['admin', 'manager']),
+  'pending->preparing': new Set(['admin', 'manager', 'staff', 'kitchen']),
   'confirmed->preparing': new Set(['admin', 'manager', 'staff', 'kitchen']),
   'preparing->ready': new Set(['admin', 'manager', 'staff', 'kitchen']),
   'ready->served': new Set(['admin', 'manager', 'staff', 'kitchen']),
@@ -119,6 +120,25 @@ interface NextActionInfo {
   unpaidWarning?: string;
 }
 
+const ONLINE_QR_PAYMENT_METHODS = new Set(['payos', 'bank_transfer', 'qr', 'vietqr']);
+const PAID_STATUS_SET = new Set(['paid', 'completed', 'partially_refunded']);
+
+function isPaidStatus(raw: string | undefined | null): boolean {
+  if (!raw) return false;
+  return PAID_STATUS_SET.has(raw.trim().toLowerCase());
+}
+
+function canActorCancelStatus(role: CanonicalRole, status: OrderStatus): boolean {
+  if (status === 'cancelled' || status === 'completed' || status === 'failed' || status === 'expired') {
+    return false;
+  }
+  if (role === 'admin' || role === 'manager') return true;
+  if (role === 'staff') return status !== 'served' && status !== 'delivered';
+  if (role === 'kitchen') return status === 'confirmed' || status === 'preparing';
+  if (role === 'rider') return status === 'delivering';
+  return false;
+}
+
 function computeNextAction(
   ao: AdminOrder,
   actorRole: string,
@@ -140,23 +160,19 @@ function computeNextAction(
         ? 'dine_in'
         : 'takeaway';
 
-  const method = (ao.paymentMethod ?? '').toLowerCase();
-  const isCod = method === 'cod' || method === 'cash';
-  const isPrepaidOnline =
-    method === 'payos' || method === 'bank_transfer' || method === 'qr' || method === 'vietqr';
+  const rawRecord = ao as unknown as Record<string, unknown>;
+  const method = String(ao.paymentMethod ?? rawRecord.payment_method ?? '').trim().toLowerCase();
+  const isCod = method === 'cod' || method === 'cash' || Number(ao.isCod ?? rawRecord.is_cod ?? 0) === 1;
+  const isPrepaidOnline = ONLINE_QR_PAYMENT_METHODS.has(method);
   const requiresPrepayment = isPrepaidOnline || (orderType === 'delivery' && !isCod);
-  const isUnpaid = ao.paymentStatus !== 'paid' && ao.paymentStatus !== 'completed';
+  const rawPayStatus = String(ao.paymentStatus ?? rawRecord.payment_status ?? '').trim().toLowerCase();
+  const isUnpaid = !isPaidStatus(rawPayStatus);
   const unpaidWarning =
     requiresPrepayment && isUnpaid && (status === 'pending' || status === 'confirmed')
       ? t('orderMgmt.unpaidOnlineWarning')
       : undefined;
 
-  const canCancel =
-    (role === 'admin' || role === 'manager') &&
-    status !== 'cancelled' &&
-    status !== 'completed' &&
-    status !== 'failed' &&
-    status !== 'expired';
+  const canCancel = canActorCancelStatus(role, status);
 
   if (status === 'pending') {
     const canConfirm = canRoleTransition(role, 'pending', 'confirmed');
@@ -256,37 +272,56 @@ function mapAdminOrder(
   actorRole: string,
   t: (k: string, opts?: Record<string, unknown>) => string,
 ): OrderData {
-  const tableDisplay = ao.tableNumber
-    ? `${t('orderMgmt.tablePrefix', { defaultValue: 'Bàn' })} ${ao.tableNumber}${ao.tableZone ? ` (${ao.tableZone})` : ''}`
-    : ao.tableId || '';
+  const rawTable = ao.tableNumber || ao.tableId || '';
+  const baseTableLabel = rawTable
+    ? formatTableWithPrefix(rawTable, (clean) => `${t('orderMgmt.tablePrefix', { defaultValue: 'Bàn' })} ${clean}`)
+    : '';
+  const tableDisplay = baseTableLabel
+    ? `${baseTableLabel}${ao.tableZone ? ` (${ao.tableZone})` : ''}`
+    : '';
   const lineItems =
     Array.isArray(ao.itemsList) && ao.itemsList.length > 0
       ? ao.itemsList
       : [{ name: `${ao.items} ${t('terminal.items').toLowerCase()}`, quantity: 1 }];
   const nextInfo = computeNextAction(ao, actorRole, t);
+  const normalizedStatus = normalizeOrderStatus(ao.status);
   const orderType: OrderChannel =
     ao.orderType === 'delivery' || ao.orderType === 'takeaway' || ao.orderType === 'dine_in'
       ? ao.orderType
       : ao.tableNumber || ao.tableId
         ? 'dine_in'
         : 'takeaway';
+  const displayId = ao.orderNumber ? `#${ao.orderNumber.replace(/^#/, '')}` : ao.id;
+  const isHeldOutOfKds =
+    typeof ao.isHeldOutOfKds === 'boolean'
+      ? ao.isHeldOutOfKds
+      : Boolean(nextInfo.unpaidWarning && (normalizedStatus === 'pending' || normalizedStatus === 'confirmed'));
 
   return {
     id: ao.id,
+    displayId,
+    orderNumber: ao.orderNumber,
     customer: ao.customer || t('terminal.guest', { defaultValue: 'Guest' }),
     customerPhone: ao.customerPhone,
     customerAddress: ao.customerAddress,
     table: tableDisplay,
     tableName: tableDisplay || undefined,
     orderType,
-    paymentMethod: ao.paymentMethod,
-    paymentStatus: ao.paymentStatus,
+    paymentMethod: ao.paymentMethod || getPaymentMethod(ao) || undefined,
+    paymentStatus: ao.paymentStatus || getPaymentStatus(ao),
+    isHeldOutOfKds,
     notes: ao.notes,
     deliveryTime: ao.deliveryTime,
     createdAt: ao.createdAt,
+    startedAt: ao.startedAt,
+    readyAt: ao.readyAt,
+    cancelledAt: ao.cancelledAt,
+    shipperName: ao.shipperName,
+    failureReason: ao.failureReason,
+    cancelledReason: ao.cancelledReason || (normalizedStatus === 'cancelled' ? ao.failureReason : undefined),
     createdTimeLabel: formatCreatedTime(ao.createdAt),
     timeAgo: formatTimeAgo(ao.createdAt, t),
-    status: normalizeOrderStatus(ao.status),
+    status: normalizedStatus,
     items: lineItems,
     subtotal: ao.subtotal,
     shippingFee: ao.shippingFee,
@@ -318,13 +353,15 @@ function computeStats(
   summary: OrderSummaryData | null,
   t: (k: string, opts?: Record<string, unknown>) => string,
 ): StatCardData[] {
-  const counts = summary?.byStatus;
+  const counts = summary?.kdsByStatus ?? summary?.byStatus;
   const activeOrders = counts
     ? Object.entries(counts).reduce((sum, [status, count]) => {
         const normalized = status.trim().toLowerCase();
-        return TERMINAL_ORDER_STATUSES.has(normalized) ? sum : sum + Number(count || 0);
+        return TERMINAL_ORDER_STATUSES.has(normalized) || normalized === 'served' || normalized === 'delivered'
+          ? sum
+          : sum + Number(count || 0);
       }, 0)
-    : orders.filter((o) => !TERMINAL_ORDER_STATUSES.has(o.status)).length;
+    : orders.filter((o) => !TERMINAL_ORDER_STATUSES.has(o.status) && !o.isHeldOutOfKds).length;
   const inPrep = counts
     ? (counts.preparing ?? 0)
     : orders.filter((o) => o.status === 'preparing').length;
@@ -352,7 +389,9 @@ const POLL_INTERVAL_MS = 30_000;
 
 export default function AdminOrdersPage() {
   const { t } = useTranslation();
-  const actorRole = useAuthStore((s) => s.user?.role ?? 'staff');
+  const actorUser = useAuthStore((s) => s.user);
+  const actorRole = actorUser?.role ?? 'staff';
+  const actorTenantId = actorUser?.tenantId ?? 'default';
   const {
     orders,
     totalCount,
@@ -429,21 +468,75 @@ export default function AdminOrdersPage() {
 
   const loadOrdersAndSummary = useCallback(() => {
     void fetchOrders(currentPage, currentFilters, ADMIN_ORDERS_PAGE_SIZE);
-    void fetchSummary?.();
+    void fetchSummary?.(currentFilters);
   }, [fetchOrders, fetchSummary, currentPage, currentFilters]);
 
   useEffect(() => {
     loadOrdersAndSummary();
   }, [loadOrdersAndSummary]);
 
-  // Background polling every 30s
+  // Background polling + cross-screen event + store-wide DO WebSocket realtime sync
   useEffect(() => {
     const interval = setInterval(() => {
       void fetchOrders(currentPage, currentFilters, ADMIN_ORDERS_PAGE_SIZE);
-      void fetchSummary?.();
+      void fetchSummary?.(currentFilters);
     }, POLL_INTERVAL_MS);
-    return () => clearInterval(interval);
-  }, [fetchOrders, fetchSummary, currentPage, currentFilters]);
+
+    let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+    const scheduleRefresh = () => {
+      if (debounceTimer) clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(() => {
+        void fetchOrders(currentPage, currentFilters, ADMIN_ORDERS_PAGE_SIZE);
+        void fetchSummary?.(currentFilters);
+      }, 250);
+    };
+
+    if (typeof window !== 'undefined') {
+      window.addEventListener('aura:orders-changed', scheduleRefresh);
+    }
+
+    let ws: WebSocket | null = null;
+    if (actorUser && typeof WebSocket === 'function' && typeof window !== 'undefined') {
+      try {
+        const token = typeof localStorage !== 'undefined' ? localStorage.getItem(AUTH_TOKEN_KEY) : null;
+        if (token) {
+          const baseOrigin = API_BASE || window.location.origin;
+          const wsOrigin = baseOrigin.replace(/^http/i, 'ws');
+          const channel =
+            actorTenantId && actorTenantId !== 'default' && actorTenantId !== '*'
+              ? `${actorTenantId}:orders`
+              : 'orders';
+          ws = new WebSocket(`${wsOrigin}/api/realtime/${encodeURIComponent(channel)}?token=${encodeURIComponent(token)}`);
+          ws.onmessage = (evt) => {
+            try {
+              const msg = JSON.parse(String(evt.data)) as { type?: string };
+              if (msg?.type === 'order_update') {
+                scheduleRefresh();
+              }
+            } catch {
+              // ignore non-JSON frames
+            }
+          };
+          ws.onerror = () => {};
+        }
+      } catch {
+        ws = null;
+      }
+    }
+
+    return () => {
+      clearInterval(interval);
+      if (debounceTimer) clearTimeout(debounceTimer);
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('aura:orders-changed', scheduleRefresh);
+      }
+      try {
+        ws?.close();
+      } catch {
+        // ignore close errors
+      }
+    };
+  }, [fetchOrders, fetchSummary, currentPage, currentFilters, actorUser, actorTenantId]);
 
   // Trigger window.print() only after ThermalReceipt has committed to the DOM
   useEffect(() => {
@@ -634,13 +727,13 @@ export default function AdminOrdersPage() {
         const unpaidCod =
           canCollectCod &&
           isCodMethod(order) &&
-          payStatus !== 'paid' &&
-          payStatus !== 'completed' &&
+          !isPaidStatus(payStatus) &&
           payStatus !== 'refunded' &&
           !isTerminal;
         const canShowPayosQr =
-          getPaymentMethod(order) === 'payos' &&
-          (payStatus === 'pending' || payStatus === 'unpaid') &&
+          ONLINE_QR_PAYMENT_METHODS.has(getPaymentMethod(order)) &&
+          !isPaidStatus(payStatus) &&
+          payStatus !== 'refunded' &&
           !isTerminal;
         const hasRefundAction =
           Boolean((order as { payment_id?: string | null }).payment_id) &&
@@ -733,23 +826,24 @@ export default function AdminOrdersPage() {
       const targetStatus =
         normalized === 'serve'
           ? 'served'
-          : normalized === 'deliver'
-            ? 'delivered'
-            : normalized === 'complete'
-              ? 'completed'
-              : normalized === 'cancel'
-                ? 'cancelled'
-                : normalized;
+          : normalized === 'dispatch' || normalized === 'delivering'
+            ? 'delivering'
+            : normalized === 'deliver'
+              ? 'delivered'
+              : normalized === 'complete'
+                ? 'completed'
+                : normalized === 'cancel'
+                  ? 'cancelled'
+                  : normalized;
       if (!VALID_STATUSES.has(targetStatus)) return;
-      if (targetStatus === 'delivered' || targetStatus === 'completed') {
+      if (targetStatus === 'served' || targetStatus === 'delivered' || targetStatus === 'completed') {
         const targetOrder = orders.find((o) => o.id === orderId);
         if (
           targetOrder &&
           isCodMethod(targetOrder) &&
-          getPaymentStatus(targetOrder) !== 'paid' &&
-          getPaymentStatus(targetOrder) !== 'completed'
+          !isPaidStatus(getPaymentStatus(targetOrder))
         ) {
-          setActionError('Đơn tiền mặt/COD chưa thu tiền. Vui lòng bấm "Thu tiền COD" trước khi hoàn tất đơn.');
+          setActionError('Đơn tiền mặt/COD chưa thu tiền. Vui lòng bấm "Thu tiền COD" trước khi phục vụ/hoàn tất đơn.');
           return;
         }
       }
@@ -815,6 +909,7 @@ export default function AdminOrdersPage() {
     if (!found) return;
     setPrintReceipt({
       orderId: found.id,
+      orderNumber: found.orderNumber,
       createdAt: found.createdAt,
       orderType: found.orderType,
       tableName: found.tableNumber || found.tableId,
@@ -904,7 +999,7 @@ export default function AdminOrdersPage() {
           <div className="w-full max-w-lg rounded-2xl border border-white/15 bg-[#0A1A2E] p-6 text-white shadow-2xl">
             <div className="mb-4 flex items-center justify-between">
               <h2 className="text-lg font-semibold">
-                {t('orderMgmt.detailsModalTitle')} — {detailsOrder.id}
+                {t('orderMgmt.detailsModalTitle')} — {detailsOrder.orderNumber ? `#${detailsOrder.orderNumber.replace(/^#/, '')} (${detailsOrder.id})` : detailsOrder.id}
               </h2>
               <button
                 type="button"
@@ -923,13 +1018,32 @@ export default function AdminOrdersPage() {
               {detailsOrder.customerAddress && (
                 <p><strong>{t('orderMgmt.searchField.address')}:</strong> {detailsOrder.customerAddress}</p>
               )}
-              {detailsOrder.tableNumber && (
-                <p><strong>{t('orderMgmt.searchField.table')}:</strong> {detailsOrder.tableNumber}</p>
+              {(detailsOrder.tableNumber || detailsOrder.tableId) && (
+                <p><strong>{t('orderMgmt.searchField.table')}:</strong> {detailsOrder.tableNumber || detailsOrder.tableId}</p>
+              )}
+              {detailsOrder.deliveryTime && detailsOrder.deliveryTime !== 'now' && (
+                <p><strong>{t('orderMgmt.deliveryTimeLabel')}:</strong> {detailsOrder.deliveryTime}</p>
+              )}
+              {detailsOrder.shipperName && (
+                <p><strong>{t('orderMgmt.shipperLabel', { defaultValue: 'Shipper' })}:</strong> {detailsOrder.shipperName}</p>
               )}
               <p>
                 <strong>{t('orderMgmt.statusColumn')}:</strong>{' '}
                 {t(`orderMgmt.${normalizeOrderStatus(detailsOrder.status)}`, { defaultValue: detailsOrder.status })}
+                {detailsOrder.isHeldOutOfKds ? ` — ${t('orderMgmt.heldOutOfKds', { defaultValue: 'Đang giữ khỏi KDS (chờ thanh toán)' })}` : ''}
               </p>
+              {(detailsOrder.startedAt || detailsOrder.readyAt || detailsOrder.cancelledAt) && (
+                <p className="text-xs text-white/65">
+                  {detailsOrder.startedAt ? `${t('kds.preparing', { defaultValue: 'Bắt đầu' })}: ${formatCreatedTime(detailsOrder.startedAt)} ` : ''}
+                  {detailsOrder.readyAt ? `· ${t('kds.ready', { defaultValue: 'Sẵn sàng' })}: ${formatCreatedTime(detailsOrder.readyAt)} ` : ''}
+                  {detailsOrder.cancelledAt ? `· ${t('orderMgmt.cancelled', { defaultValue: 'Đã hủy' })}: ${formatCreatedTime(detailsOrder.cancelledAt)}` : ''}
+                </p>
+              )}
+              {(detailsOrder.cancelledReason || detailsOrder.failureReason) && (
+                <p className="text-red-300">
+                  <strong>{t('orderMgmt.cancelReasonLabel')}:</strong> {detailsOrder.cancelledReason || detailsOrder.failureReason}
+                </p>
+              )}
               <p>
                 <strong>{t('orderMgmt.paymentLabel')}:</strong>{' '}
                 {detailsOrder.paymentMethod
