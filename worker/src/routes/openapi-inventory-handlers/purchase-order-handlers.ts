@@ -428,21 +428,33 @@ function buildMirrorUpdateStatement(
     tenant: string;
     scopeTenant: boolean;
     invHasCost: boolean;
+    invHasUnitCost: boolean;
     invHasLastRestocked: boolean;
     invHasUpdatedAt: boolean;
   }
 ) {
   const setParts: string[] = [];
   const bindVals: unknown[] = [];
-  if (opts.effectiveUnitCost !== null && opts.invHasCost) {
-    setParts.push(
-      `cost_per_unit = CASE
+  if (opts.effectiveUnitCost !== null && (opts.invHasCost || opts.invHasUnitCost)) {
+    const existingCostExpr =
+      opts.invHasCost && opts.invHasUnitCost
+        ? 'COALESCE(cost_per_unit, unit_cost, 0)'
+        : opts.invHasCost
+          ? 'COALESCE(cost_per_unit, 0)'
+          : 'COALESCE(unit_cost, 0)';
+    const wacExpr = `CASE
                WHEN (MAX(0, COALESCE(current_stock, 0)) + ?) > 0
-               THEN ((MAX(0, COALESCE(current_stock, 0)) * COALESCE(cost_per_unit, 0)) + (? * ?)) / (MAX(0, COALESCE(current_stock, 0)) + ?)
+               THEN ((MAX(0, COALESCE(current_stock, 0)) * ${existingCostExpr}) + (? * ?)) / (MAX(0, COALESCE(current_stock, 0)) + ?)
                ELSE ?
-             END`
-    );
-    bindVals.push(opts.receiveQty, opts.receiveQty, opts.effectiveUnitCost, opts.receiveQty, opts.effectiveUnitCost);
+             END`;
+    if (opts.invHasCost) {
+      setParts.push(`cost_per_unit = ${wacExpr}`);
+      bindVals.push(opts.receiveQty, opts.receiveQty, opts.effectiveUnitCost, opts.receiveQty, opts.effectiveUnitCost);
+    }
+    if (opts.invHasUnitCost) {
+      setParts.push(`unit_cost = ${wacExpr}`);
+      bindVals.push(opts.receiveQty, opts.receiveQty, opts.effectiveUnitCost, opts.receiveQty, opts.effectiveUnitCost);
+    }
   }
   setParts.push('current_stock = COALESCE(current_stock, 0) + ?');
   bindVals.push(opts.receiveQty);
@@ -518,6 +530,7 @@ async function buildReceiveStatements(input: BuildReceiveStatementsInput): Promi
   const invTableExists = !pragmaSupported || invShape.known;
   const invHasTenant = hasColumn(invShape, 'tenant_id');
   const invHasCost = hasColumn(invShape, 'cost_per_unit');
+  const invHasUnitCost = invShape.known ? invShape.columns.has('unit_cost') : false;
   const invHasLastRestocked = hasColumn(invShape, 'last_restocked_at');
   const invHasUpdatedAt = hasColumn(invShape, 'updated_at');
 
@@ -612,9 +625,9 @@ async function buildReceiveStatements(input: BuildReceiveStatementsInput): Promi
   for (const line of lines) {
     const movId = `mov_${Date.now()}_${crypto.randomUUID().replace(/-/g, '').slice(0, 12)}`;
     const { ingredientId, receiveQty, unitCost: effectiveUnitCost, ingredient, usingCanonical } = line;
-    const ingHasTenant = requireTenantColumn(ingShape, 'ingredients', ingredient);
 
     if (!usingCanonical) {
+      const ingHasTenant = requireTenantColumn(ingShape, 'ingredients', ingredient);
       const ingScopeTenant = isConcreteTenant && ingHasTenant;
       const ingWhere = ingScopeTenant ? `id = ? AND ${TENANT_MATCH}` : 'id = ?';
       const ingWhereBinds = ingScopeTenant ? [ingredientId, tenant] : [ingredientId];
@@ -678,6 +691,7 @@ async function buildReceiveStatements(input: BuildReceiveStatementsInput): Promi
             tenant,
             scopeTenant: isConcreteTenant && invHasTenant,
             invHasCost,
+            invHasUnitCost,
             invHasLastRestocked,
             invHasUpdatedAt,
           })
@@ -725,6 +739,7 @@ async function buildReceiveStatements(input: BuildReceiveStatementsInput): Promi
           tenant,
           scopeTenant: isConcreteTenant && canInvHasTenant,
           invHasCost,
+          invHasUnitCost,
           invHasLastRestocked,
           invHasUpdatedAt,
         })

@@ -801,6 +801,7 @@ export async function createOrder(
       }
       legacyStatements.push(legacyItemStmt);
     }
+    let settledPayNowPaymentId: string | null = null;
     if (validatedMethod === 'cod' && snapshot.total > 0) {
       const payId = generateId('PAY_');
       const codPayStatus = settledPayNow ? 'completed' : 'pending';
@@ -813,6 +814,7 @@ export async function createOrder(
         VALUES (?, ?, ?, ?, ?, ?, ?)`)
         .bind(payId, orderId, 'cod', snapshot.total, codPayStatus, now, now));
       if (settledPayNow && payNowShift && actor?.id) {
+        settledPayNowPaymentId = payId;
         const attrStmt = db
           .prepare(
             `INSERT INTO cash_payment_attributions (payment_id, tenant_id, shift_id, collected_by, settled_at)
@@ -904,6 +906,17 @@ export async function createOrder(
         const rollbackCommittedOrder = async () => {
           await db.prepare('DELETE FROM order_creation_requests WHERE order_id = ?').bind(orderId).run().catch(() => {});
           await db.prepare('DELETE FROM order_items WHERE order_id = ?').bind(orderId).run().catch(() => {});
+          if (settledPayNowPaymentId && payNowShift) {
+            await db.prepare('DELETE FROM cash_payment_attributions WHERE payment_id = ?').bind(settledPayNowPaymentId).run().catch(() => {});
+            await db.prepare(
+              `UPDATE staff_shifts
+               SET cash_sales = MAX(0, COALESCE(cash_sales, 0) - ?),
+                   total_sales = MAX(0, COALESCE(total_sales, 0) - ?),
+                   order_count = MAX(0, COALESCE(order_count, 0) - 1)
+               WHERE CAST(id AS TEXT) = ?
+                 AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?`
+            ).bind(snapshot.total, snapshot.total, payNowShift.id, effectiveShiftTenant).run().catch(() => {});
+          }
           await db.prepare('DELETE FROM payments WHERE order_id = ?').bind(orderId).run().catch(() => {});
           await db.prepare('DELETE FROM loyalty_transactions WHERE order_id = ?').bind(orderId).run().catch(() => {});
           await db.prepare('DELETE FROM cashback_transactions WHERE order_id = ?').bind(orderId).run().catch(() => {});

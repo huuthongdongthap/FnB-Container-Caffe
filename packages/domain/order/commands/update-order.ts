@@ -28,7 +28,8 @@ export async function updateOrder(
   env: Record<string, unknown>,
   id: string,
   actorRole?: string,
-  tenantId: string = 'default'
+  tenantId: string = 'default',
+  actorId?: string
 ) {
   try {
     const body = await parseJSON(request);
@@ -58,35 +59,42 @@ export async function updateOrder(
     let results: Record<string, unknown>[];
     try {
       const q = await db.prepare(
-        `SELECT id, status, items, total, order_number, payment_status, payment_method, order_type, customer_name, customer_phone, customer_address, notes, delivery_time, started_at, ready_at, table_id, created_at, tenant_id, session_id FROM orders WHERE id = ?${tenantClause}`
+        `SELECT id, status, items, total, order_number, payment_status, payment_method, order_type, assigned_shipper_id, customer_name, customer_phone, customer_address, notes, delivery_time, started_at, ready_at, table_id, created_at, tenant_id, session_id FROM orders WHERE id = ?${tenantClause}`
       ).bind(id, ...tenantBinds).all<Record<string, unknown>>();
       results = q.results ?? [];
     } catch {
       try {
         const q = await db.prepare(
-          `SELECT id, status, items, total, payment_status, payment_method, order_type, customer_name, customer_phone, customer_address, notes, delivery_time, table_id, created_at, tenant_id, session_id FROM orders WHERE id = ?${tenantClause}`
+          `SELECT id, status, items, total, order_number, payment_status, payment_method, order_type, customer_name, customer_phone, customer_address, notes, delivery_time, started_at, ready_at, table_id, created_at, tenant_id, session_id FROM orders WHERE id = ?${tenantClause}`
         ).bind(id, ...tenantBinds).all<Record<string, unknown>>();
         results = q.results ?? [];
       } catch {
         try {
           const q = await db.prepare(
-            `SELECT id, status, items, total, payment_status, order_type, customer_name, customer_phone, table_id, created_at, tenant_id FROM orders WHERE id = ?${tenantClause}`
+            `SELECT id, status, items, total, payment_status, payment_method, order_type, customer_name, customer_phone, customer_address, notes, delivery_time, table_id, created_at, tenant_id, session_id FROM orders WHERE id = ?${tenantClause}`
           ).bind(id, ...tenantBinds).all<Record<string, unknown>>();
           results = q.results ?? [];
         } catch {
           try {
             const q = await db.prepare(
-              `SELECT id, status, items, total, payment_status, customer_name, customer_phone, table_id, created_at, tenant_id FROM orders WHERE id = ?${tenantClause}`
+              `SELECT id, status, items, total, payment_status, order_type, customer_name, customer_phone, table_id, created_at, tenant_id FROM orders WHERE id = ?${tenantClause}`
             ).bind(id, ...tenantBinds).all<Record<string, unknown>>();
             results = q.results ?? [];
-          } catch (selectErr) {
-            if (!/no such column:\s*tenant_id/i.test(String(selectErr)) || (tenantId !== 'default' && tenantId !== '*')) {
-              throw selectErr;
+          } catch {
+            try {
+              const q = await db.prepare(
+                `SELECT id, status, items, total, payment_status, customer_name, customer_phone, table_id, created_at, tenant_id FROM orders WHERE id = ?${tenantClause}`
+              ).bind(id, ...tenantBinds).all<Record<string, unknown>>();
+              results = q.results ?? [];
+            } catch (selectErr) {
+              if (!/no such column:\s*tenant_id/i.test(String(selectErr)) || (tenantId !== 'default' && tenantId !== '*')) {
+                throw selectErr;
+              }
+              const q = await db.prepare(
+                `SELECT id, status, items, total, payment_status, customer_name, customer_phone, table_id, created_at FROM orders WHERE id = ?`
+              ).bind(id).all<Record<string, unknown>>();
+              results = q.results ?? [];
             }
-            const q = await db.prepare(
-              `SELECT id, status, items, total, payment_status, customer_name, customer_phone, table_id, created_at FROM orders WHERE id = ?`
-            ).bind(id).all<Record<string, unknown>>();
-            results = q.results ?? [];
           }
         }
       }
@@ -122,6 +130,11 @@ export async function updateOrder(
       if (orderType && orderType !== 'delivery') {
         return errorResponse('Shippers may only update delivery orders', 403);
       }
+      const persistedShipperId = String((results[0] as { assigned_shipper_id?: unknown }).assigned_shipper_id ?? '').trim();
+      const cleanActorId = String(actorId ?? '').trim();
+      if (persistedShipperId && (!cleanActorId || persistedShipperId !== cleanActorId)) {
+        return errorResponse('Shippers may only update orders assigned to them', 403);
+      }
       if (body.payment_method !== undefined || body.assigned_shipper_id !== undefined) {
         return errorResponse('Shippers cannot modify payment_method or reassign shipper', 403);
       }
@@ -149,6 +162,7 @@ export async function updateOrder(
       const canCompensatePaid = isVoidStatus(body.status) && (isManagerVoid || isDispatchFail);
       const transition = await transitionOrderStatus(db, id, String(body.status), actorRole, {
         tenantId,
+        actorId,
         currentOrder: results[0] as { id: string; status: string; payment_status?: string | null },
         paymentStatus: String((results[0] as { payment_status?: unknown }).payment_status ?? 'unpaid'),
         allowPaidCompensation: canCompensatePaid,

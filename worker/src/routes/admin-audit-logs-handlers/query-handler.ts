@@ -168,7 +168,7 @@ export function registerQueryHandler(router: Hono<{ Bindings: Env }>): void {
         ? (/^\d{4}-\d{2}-\d{2}$/.test(dateFrom.trim()) ? `${dateFrom.trim()} 00:00:00` : dateFrom.trim())
         : undefined;
       const normalizedDateTo = dateTo
-        ? (/^\d{4}-\d{2}-\d{2}$/.test(dateTo.trim()) ? `${dateTo.trim()}T23:59:59.999Z` : dateTo.trim())
+        ? (/^\d{4}-\d{2}-\d{2}$/.test(dateTo.trim()) ? `${dateTo.trim()} 23:59:59.999Z` : dateTo.trim())
         : undefined;
 
       let result = await auditLogger.query({

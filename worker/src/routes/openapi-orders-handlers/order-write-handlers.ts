@@ -84,7 +84,13 @@ export async function handleOpenApiUpdateOrder(c: Context<{ Bindings: Env }>) {
   const rawTenantId = (tenantCheck.tenantId || 'default').trim() || 'default';
   const tenantId = rawTenantId.toLowerCase() === 'hq' ? '*' : rawTenantId;
   const existing = (await db.prepare('SELECT * FROM orders WHERE id = ?').bind(id).first()) as {
-    id: string; status: string; payment_status?: string | null; customer_id?: string | null; tenant_id?: string | null;
+    id: string;
+    status: string;
+    payment_status?: string | null;
+    customer_id?: string | null;
+    tenant_id?: string | null;
+    order_type?: string | null;
+    assigned_shipper_id?: string | null;
   } | null;
   if (!existing || !matchesOrderTenant(existing as unknown as Record<string, unknown>, tenantId)) {
     return c.json({ success: false, error: 'Order not found' }, 404);
@@ -184,6 +190,15 @@ export async function handleOpenApiUpdateOrder(c: Context<{ Bindings: Env }>) {
       return c.json({ success: false, error: 'Insufficient permissions to update order fields' }, 403);
     }
     if (normalizedActorRole === 'shipper' || normalizedActorRole === 'rider') {
+      const orderType = String(existing.order_type || '').trim().toLowerCase();
+      if (orderType && orderType !== 'delivery') {
+        return c.json({ success: false, error: 'Shippers may only update delivery orders' }, 403);
+      }
+      const persistedShipperId = String(existing.assigned_shipper_id || '').trim();
+      const actorId = String(user?.id || '').trim();
+      if (persistedShipperId && (!actorId || persistedShipperId !== actorId)) {
+        return c.json({ success: false, error: 'Shippers may only update orders assigned to them' }, 403);
+      }
       const hasCustomerPiiMutation =
         customer_name !== undefined ||
         customer_phone !== undefined ||

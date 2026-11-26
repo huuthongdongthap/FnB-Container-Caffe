@@ -301,12 +301,7 @@ export function checkBirthdayWindow(
 // GET /api/admin/birthday/config — fetch birthday campaign configuration
 birthdayRouter.get(
   '/config',
-  async (c, next) => {
-    if (c.env?.JWT_SECRET || c.req.header('Authorization')) {
-      return requireAuth(['owner', 'manager', 'supervisor', 'admin', 'staff', 'waiter', 'cashier'])(c, next);
-    }
-    await next();
-  },
+  requireAuth(['owner', 'manager', 'supervisor', 'admin', 'staff', 'waiter', 'cashier']),
   async (c) => {
   if (hasCrossTenantBirthdayOverride(c)) {
     return c.json({ success: false, error: 'Cross-tenant access denied' }, 403);
@@ -330,12 +325,7 @@ birthdayRouter.get(
 // PUT /api/admin/birthday/config — update birthday campaign configuration
 birthdayRouter.put(
   '/config',
-  async (c, next) => {
-    if (c.env?.JWT_SECRET || c.req.header('Authorization')) {
-      return requireAuth(['owner', 'manager', 'supervisor', 'admin'])(c, next);
-    }
-    await next();
-  },
+  requireAuth(['owner', 'manager', 'supervisor', 'admin']),
   async (c) => {
   const user = c.get('user' as never) as { role?: string } | undefined;
   if (user?.role && !['owner', 'manager', 'supervisor', 'admin'].includes(user.role)) {
