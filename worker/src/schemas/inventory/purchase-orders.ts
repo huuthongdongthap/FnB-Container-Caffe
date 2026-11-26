@@ -134,6 +134,8 @@ export const purchaseOrderRoutes = {
                 ingredient_id: z.string().min(1).optional(),
                 receivedQuantity: z.number().int().nonnegative().optional(),
                 received_quantity: z.number().int().nonnegative().optional(),
+                unitCost: z.number().nonnegative().optional(),
+                unit_cost: z.number().nonnegative().optional(),
               })).min(1).max(200),
             }),
           },

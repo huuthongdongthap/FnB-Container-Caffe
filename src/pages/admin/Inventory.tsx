@@ -86,6 +86,8 @@ export default function InventoryPage() {
     ingredientId: string;
     type: 'in' | 'out' | 'adjustment' | 'adjust' | 'waste';
     quantity: number;
+    expectedStock?: number;
+    expectedUpdatedAt?: string;
     notes?: string;
   }) => {
     const normalizedType = payload.type === 'adjust' ? 'adjustment' : payload.type;
