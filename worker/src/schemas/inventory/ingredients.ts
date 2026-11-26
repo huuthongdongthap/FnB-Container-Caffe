@@ -47,6 +47,9 @@ export const IngredientUpdateSchema = z.object({
   supplierId: z.string().min(1).nullable().optional(),
   translations: z.array(IngredientTranslationSchema).max(20).optional(),
   metadata: z.record(z.string(), z.unknown()).optional(),
+  expectedUpdatedAt: z.string().min(1).optional(),
+  expectedCurrentStock: z.number().optional(),
+  expectedCostPerUnit: z.number().nonnegative().optional(),
 }).openapi('IngredientUpdate');
 
 export const IngredientResponseSchema = z.object({

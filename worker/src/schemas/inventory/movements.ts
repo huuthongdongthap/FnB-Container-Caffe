@@ -40,7 +40,13 @@ export const StockMovementCreateSchema = z.object({
   ingredientId: z.string().min(1).optional(),
   ingredient_id: z.string().min(1).optional(),
   type: z.enum(['in', 'out', 'adjustment', 'adjust', 'waste', 'transfer', 'purchase_receipt']),
-  quantity: z.number(),
+  quantity: z.number().optional(),
+  targetStock: z.number().nonnegative().optional(),
+  target_stock: z.number().nonnegative().optional(),
+  expectedStock: z.number().optional(),
+  expected_stock: z.number().optional(),
+  expectedUpdatedAt: z.string().min(1).optional(),
+  expected_updated_at: z.string().min(1).optional(),
   unitCost: MoneySchema.optional(),
   unit_cost: MoneySchema.optional(),
   referenceId: z.string().min(1).optional(),
@@ -51,7 +57,16 @@ export const StockMovementCreateSchema = z.object({
 }).refine((d) => Boolean((d.ingredientId && d.ingredientId.trim()) || (d.ingredient_id && d.ingredient_id.trim())), {
   message: 'ingredientId is required',
   path: ['ingredientId'],
-}).openapi('StockMovementCreate');
+}).refine(
+  (d) =>
+    d.quantity !== undefined ||
+    ((d.type === 'adjustment' || d.type === 'adjust') &&
+      (d.targetStock !== undefined || d.target_stock !== undefined)),
+  {
+    message: 'quantity or targetStock (for adjustment) is required',
+    path: ['quantity'],
+  }
+).openapi('StockMovementCreate');
 
 export const StockMovementListResponseSchema = z.object({
   movements: z.array(StockMovementSchema),

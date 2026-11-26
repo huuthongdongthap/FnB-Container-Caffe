@@ -710,6 +710,41 @@ export function registerIngredientHandlers(app: OpenAPIHono<{ Bindings: Env }>) 
     if (!existing || !hasVerifiedTenantOwnership) {
       return c.json({ success: false, error: 'Ingredient not found' }, 404);
     }
+
+    // Optimistic concurrency precondition checks to prevent stale form snapshots from overwriting live stock/cost
+    const hasPrecondition =
+      body.expectedUpdatedAt !== undefined ||
+      body.expectedCurrentStock !== undefined ||
+      body.expectedCostPerUnit !== undefined;
+    if (
+      body.expectedUpdatedAt !== undefined &&
+      existing.updated_at !== undefined &&
+      existing.updated_at !== null &&
+      String(existing.updated_at) !== String(body.expectedUpdatedAt)
+    ) {
+      return c.json(
+        { success: false, error: 'Ingredient was modified concurrently. Please reload and try again.' },
+        409
+      );
+    }
+    if (
+      body.expectedCurrentStock !== undefined &&
+      Number(existing.current_stock ?? 0) !== Number(body.expectedCurrentStock)
+    ) {
+      return c.json(
+        { success: false, error: 'Ingredient stock changed concurrently. Please reload and try again.' },
+        409
+      );
+    }
+    if (
+      body.expectedCostPerUnit !== undefined &&
+      Number(existing.cost_per_unit ?? 0) !== Number(body.expectedCostPerUnit)
+    ) {
+      return c.json(
+        { success: false, error: 'Ingredient cost changed concurrently. Please reload and try again.' },
+        409
+      );
+    }
     const isLegacyUnscopedRow =
       existing.tenant_id === undefined || existing.tenant_id === null;
     const rawExistingTenant = existing?.tenant_id && String(existing.tenant_id).trim() && String(existing.tenant_id).trim() !== '*'
@@ -790,12 +825,34 @@ export function registerIngredientHandlers(app: OpenAPIHono<{ Bindings: Env }>) 
     updates.push('updated_at = ?');
     params.push(now, id);
 
+    const casClauses: string[] = [];
+    const casParams: (string | number)[] = [];
+    if (body.expectedCurrentStock !== undefined) {
+      casClauses.push('COALESCE(current_stock, 0) = ?');
+      casParams.push(Number(body.expectedCurrentStock));
+    }
+    if (body.expectedCostPerUnit !== undefined) {
+      casClauses.push('COALESCE(cost_per_unit, 0) = ?');
+      casParams.push(Number(body.expectedCostPerUnit));
+    }
+    if (body.expectedUpdatedAt !== undefined && existing.updated_at !== undefined && existing.updated_at !== null) {
+      casClauses.push('updated_at = ?');
+      casParams.push(String(body.expectedUpdatedAt));
+    }
+    const casSql = casClauses.length > 0 ? ` AND ${casClauses.join(' AND ')}` : '';
+
     if (!usingCanonical) {
       try {
         const upd = await db.prepare(
-          `UPDATE ingredients SET ${updates.join(', ')} WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?`
-        ).bind(...params, effectiveRowTenant).run();
+          `UPDATE ingredients SET ${updates.join(', ')} WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?${casSql}`
+        ).bind(...params, effectiveRowTenant, ...casParams).run();
         if (upd?.meta && typeof upd.meta.changes === 'number' && upd.meta.changes === 0) {
+          if (hasPrecondition) {
+            return c.json(
+              { success: false, error: 'Ingredient was modified concurrently. Please reload and try again.' },
+              409
+            );
+          }
           if (isLegacyUnscopedRow && hasVerifiedTenantOwnership) {
             await db.prepare(`UPDATE ingredients SET ${updates.join(', ')} WHERE id = ?`).bind(...params).run();
           } else {
@@ -804,7 +861,13 @@ export function registerIngredientHandlers(app: OpenAPIHono<{ Bindings: Env }>) 
         }
       } catch {
         if (isLegacyUnscopedRow && hasVerifiedTenantOwnership) {
-          await db.prepare(`UPDATE ingredients SET ${updates.join(', ')} WHERE id = ?`).bind(...params).run();
+          const fallbackUpd = await db.prepare(`UPDATE ingredients SET ${updates.join(', ')} WHERE id = ?${casSql}`).bind(...params, ...casParams).run();
+          if (hasPrecondition && fallbackUpd?.meta && typeof fallbackUpd.meta.changes === 'number' && fallbackUpd.meta.changes === 0) {
+            return c.json(
+              { success: false, error: 'Ingredient was modified concurrently. Please reload and try again.' },
+              409
+            );
+          }
         } else {
           return c.json({ success: false, error: 'Ingredient not found' }, 404);
         }

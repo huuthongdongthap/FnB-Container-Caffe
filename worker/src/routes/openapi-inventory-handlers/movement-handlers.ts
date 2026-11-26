@@ -474,12 +474,39 @@ export function registerMovementHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
       return c.json({ success: false, error: 'Ingredient not found' }, 404);
     }
 
-    const signedQty = isOutboundType
-      ? -Math.abs(body.quantity)
-      : (rawType === 'in' || rawType === 'purchase_receipt')
-        ? Math.abs(body.quantity)
-        : Number(body.quantity);
+    const expectedStock = body.expectedStock ?? body.expected_stock;
+    const expectedUpdatedAt = body.expectedUpdatedAt ?? body.expected_updated_at;
+    const targetStock = body.targetStock ?? body.target_stock;
     const previousStock = Number(ingredient.current_stock || 0);
+
+    if (
+      expectedUpdatedAt !== undefined &&
+      ingredient.updated_at !== undefined &&
+      ingredient.updated_at !== null &&
+      String(ingredient.updated_at) !== String(expectedUpdatedAt)
+    ) {
+      return c.json(
+        { success: false, error: 'Stock changed concurrently. Please reload and recount.' },
+        409
+      );
+    }
+    if (expectedStock !== undefined && previousStock !== Number(expectedStock)) {
+      return c.json(
+        { success: false, error: 'Stock changed concurrently. Please reload and recount.' },
+        409
+      );
+    }
+
+    const isTargetStocktake =
+      (rawType === 'adjustment' || rawType === 'adjust') && targetStock !== undefined;
+    const rawQty = Number(body.quantity ?? 0);
+    const signedQty = isTargetStocktake
+      ? Number(targetStock) - previousStock
+      : isOutboundType
+        ? -Math.abs(rawQty)
+        : (rawType === 'in' || rawType === 'purchase_receipt')
+          ? Math.abs(rawQty)
+          : rawQty;
     const newStock = previousStock + signedQty;
     if (newStock < 0) {
       return c.json({ success: false, error: 'Insufficient stock' }, 400);

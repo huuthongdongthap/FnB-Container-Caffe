@@ -10,6 +10,8 @@ interface InventoryMovementModalProps {
     ingredientId: string;
     type: 'in' | 'out' | 'adjustment' | 'adjust' | 'waste';
     quantity: number;
+    expectedStock?: number;
+    expectedUpdatedAt?: string;
     notes?: string;
   }) => Promise<void>;
 }
@@ -60,6 +62,12 @@ export function InventoryMovementModal({
         ingredientId: ingredient.id,
         type,
         quantity: signedQuantity,
+        ...(type === 'adjustment'
+          ? {
+              expectedStock: ingredient.current_stock,
+              expectedUpdatedAt: ingredient.updated_at || undefined,
+            }
+          : {}),
         notes: notes.trim() || undefined,
       });
       onClose();

@@ -471,56 +471,6 @@ export async function deductInventoryForOrder(
     }
     return effectiveTenant === 'default';
   };
-  if (orderId) {
-    try {
-      let existingMovement: { id?: string } | null = null;
-      try {
-        existingMovement = await env.AURA_DB.prepare(
-          "SELECT id FROM stock_movements WHERE reference_id = ? AND reference_type = 'order' AND type IN ('order_consumption', 'consumption', 'sale', 'out') AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ? LIMIT 1"
-        )
-          .bind(orderId, effectiveTenant)
-          .first<{ id?: string }>();
-      } catch {
-        if (effectiveTenant === 'default') {
-          existingMovement = await env.AURA_DB.prepare(
-            "SELECT id FROM stock_movements WHERE reference_id = ? AND reference_type = 'order' AND type IN ('order_consumption', 'consumption', 'sale', 'out') LIMIT 1"
-          )
-            .bind(orderId)
-            .first<{ id?: string }>()
-            .catch(() => null);
-        }
-      }
-      if (existingMovement?.id) {
-        return;
-      }
-    } catch {
-      // Optional stock_movements query in partial test mocks
-    }
-    try {
-      let existingTx: { id?: string } | null = null;
-      try {
-        existingTx = await env.AURA_DB.prepare(
-          "SELECT id FROM inventory_transactions WHERE reference_id = ? AND reference_type = 'order' AND type IN ('reserve', 'sale', 'out', 'release') AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ? LIMIT 1"
-        )
-          .bind(orderId, effectiveTenant)
-          .first<{ id?: string }>();
-      } catch {
-        if (effectiveTenant === 'default') {
-          existingTx = await env.AURA_DB.prepare(
-            "SELECT id FROM inventory_transactions WHERE reference_id = ? AND reference_type = 'order' AND type IN ('reserve', 'sale', 'out', 'release') LIMIT 1"
-          )
-            .bind(orderId)
-            .first<{ id?: string }>()
-            .catch(() => null);
-        }
-      }
-      if (existingTx?.id) {
-        return;
-      }
-    } catch {
-      // Optional inventory_transactions query in partial test mocks
-    }
-  }
   let bomProductIds = new Set<string>();
   try {
     const bomRes = await deductOrderStock(
@@ -529,20 +479,46 @@ export async function deductInventoryForOrder(
       orderItems.map(i => ({ productId: i.product_id, quantity: i.quantity })),
       { allowNegative: true, tenantId: effectiveTenant }
     );
-    if (bomRes.alreadyDeducted) {
-      return;
-    }
     if (bomRes.ok && bomRes.depletions.length > 0) {
       for (const dep of bomRes.depletions) {
         try {
           await env.AURA_DB.prepare(
-            "UPDATE inventory_items SET current_stock = MAX(0, current_stock - ?), updated_at = datetime('now') WHERE id = ? AND (COALESCE(NULLIF(tenant_id, ''), 'default') = ? OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?3)"
+            "UPDATE inventory_items SET current_stock = MAX(0, COALESCE((SELECT current_stock FROM ingredients WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?), current_stock - ?)), updated_at = datetime('now') WHERE id = ? AND (COALESCE(NULLIF(tenant_id, ''), 'default') = ? OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?2)"
           )
-            .bind(dep.quantity, dep.ingredientId, effectiveTenant)
+            .bind(dep.ingredientId, effectiveTenant, dep.quantity, dep.ingredientId, effectiveTenant)
             .run();
         } catch {
-          // Best-effort sync when inventory_items shares ingredient IDs
+          try {
+            await env.AURA_DB.prepare(
+              "UPDATE inventory_items SET current_stock = MAX(0, current_stock - ?), updated_at = datetime('now') WHERE id = ? AND (COALESCE(NULLIF(tenant_id, ''), 'default') = ? OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?3)"
+            )
+              .bind(dep.quantity, dep.ingredientId, effectiveTenant)
+              .run();
+          } catch {
+            // Best-effort sync when inventory_items shares ingredient IDs
+          }
         }
+      }
+    }
+    // Also reconcile any previously-deducted BOM ingredients whose mirror may have missed sync during a partial failure
+    if (bomRes.ok && orderId) {
+      try {
+        const syncedRows = await env.AURA_DB.prepare(
+          "SELECT DISTINCT ingredient_id FROM stock_movements WHERE reference_id = ? AND reference_type = 'order' AND type IN ('order_consumption', 'consumption', 'sale', 'out') AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
+        )
+          .bind(orderId, effectiveTenant)
+          .all<{ ingredient_id?: string }>();
+        for (const row of syncedRows?.results || []) {
+          if (!row?.ingredient_id) continue;
+          await env.AURA_DB.prepare(
+            "UPDATE inventory_items SET current_stock = MAX(0, COALESCE((SELECT current_stock FROM ingredients WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?), current_stock)), updated_at = datetime('now') WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
+          )
+            .bind(row.ingredient_id, effectiveTenant, row.ingredient_id, effectiveTenant)
+            .run()
+            .catch(() => {});
+        }
+      } catch {
+        // Optional reconciliation in partial test mocks
       }
     }
     bomProductIds = new Set(
@@ -555,14 +531,15 @@ export async function deductInventoryForOrder(
     const itemsWithProductId = orderItems.filter(i => Boolean(i.product_id));
     if (
       bomRes.ok &&
-      bomRes.depletions.length > 0 &&
+      (bomRes.alreadyDeducted || bomRes.depletions.length > 0) &&
       itemsWithProductId.length > 0 &&
       itemsWithProductId.every(i => bomProductIds.has(i.product_id))
     ) {
       return;
     }
   } catch (err) {
-    console.warn('[inventory] BOM deduction fallback:', (err as Error).message);
+    console.warn('[inventory] BOM deduction failed (retryable):', (err as Error).message);
+    return;
   }
 
   if (orderId) {
