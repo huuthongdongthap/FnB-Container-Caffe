@@ -65,13 +65,15 @@ export async function triggerAutomation(
     let failureReason = '';
 
     if (liveDispatch) {
+      if (!/^(?:automation\.)?[a-zA-Z0-9_-]{1,128}$/.test(automationId)) {
+        return c.json({ success: false, error: 'Invalid automation_id format' }, 400);
+      }
       const entityId = automationId.startsWith('automation.') ? automationId : `automation.${automationId}`;
       const headers: Record<string, string> = { 'Content-Type': 'application/json' };
       if (haToken) {
         headers.Authorization = `Bearer ${haToken}`;
       }
       const serviceBody: Record<string, unknown> = {
-        ...(typeof payload === 'object' && payload !== null ? (payload as Record<string, unknown>) : {}),
         entity_id: entityId
       };
 

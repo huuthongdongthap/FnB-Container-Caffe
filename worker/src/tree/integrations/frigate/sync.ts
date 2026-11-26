@@ -110,7 +110,10 @@ export async function syncFrigateEvents(
               (res as unknown as { changes?: number })?.changes ??
               0
           );
-        } catch {
+        } catch (err) {
+          if (!/no such column.*tenant_id/i.test(String(err))) {
+            throw err;
+          }
           const fallbackRes = await db
             .prepare(
               `INSERT INTO frigate_events
