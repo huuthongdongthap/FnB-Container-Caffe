@@ -220,9 +220,19 @@ describe('Phase 19: Mobile Staff, KDS Lifecycle & Admin Integrations Contracts',
       const app = new Hono<{ Bindings: any }>();
       app.route('/api/admin/birthday', birthdayRouter);
 
+      const token = await generateJWT(
+        { id: 'USR_OWNER', email: 'owner@aura.cafe', name: 'Owner', role: 'owner', tenantId: 'default', authVersion: 1, authTime: Math.floor(Date.now() / 1000), sessionType: 'staff-web' },
+        TEST_JWT_SECRET,
+        3600
+      );
+      const authEnv = { AUTH_KV: mockKv, JWT_SECRET: TEST_JWT_SECRET };
+
       const getRes = await app.fetch(
-        new Request('https://test.aura/api/admin/birthday/config', { method: 'GET' }),
-        { AUTH_KV: mockKv }
+        new Request('https://test.aura/api/admin/birthday/config', {
+          method: 'GET',
+          headers: { Authorization: `Bearer ${token}` },
+        }),
+        authEnv
       );
       expect(getRes.status).toBe(200);
       const config = await getRes.json() as any;
@@ -232,10 +242,10 @@ describe('Phase 19: Mobile Staff, KDS Lifecycle & Admin Integrations Contracts',
       const putRes = await app.fetch(
         new Request('https://test.aura/api/admin/birthday/config', {
           method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
           body: JSON.stringify({ discountPercent: 20, freeItemEnabled: false }),
         }),
-        { AUTH_KV: mockKv }
+        authEnv
       );
       expect(putRes.status).toBe(200);
       const updated = await putRes.json() as any;
