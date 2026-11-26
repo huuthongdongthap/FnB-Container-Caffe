@@ -277,16 +277,19 @@ export async function getStatsHandler(c: Context<{ Bindings: Env }>) {
       ).bind(tenantId, tenantId).all<{ name: string; slug: string; count: number; revenue: number }>();
     }
 
-    const monthStart = new Date();
-    monthStart.setDate(1); monthStart.setHours(0, 0, 0, 0);
+    const ICT_OFFSET_MS = 7 * 3600_000;
+    const nowIct = new Date(Date.now() + ICT_OFFSET_MS);
+    const monthStartIso = new Date(
+      Date.UTC(nowIct.getUTCFullYear(), nowIct.getUTCMonth(), 1) - ICT_OFFSET_MS
+    ).toISOString();
 
     const newThisMonth = await db.prepare(
       'SELECT COUNT(*) as count FROM subscriptions WHERE status = \'active\' AND created_at >= ? AND (? = \'*\' OR COALESCE(NULLIF(TRIM(tenant_id), \'\'), \'default\') = ?)'
-    ).bind(monthStart.toISOString(), tenantId, tenantId).first<{ count: number }>();
+    ).bind(monthStartIso, tenantId, tenantId).first<{ count: number }>();
 
     const churned = await db.prepare(
       'SELECT COUNT(*) as count FROM subscriptions WHERE status = \'cancelled\' AND updated_at >= ? AND (? = \'*\' OR COALESCE(NULLIF(TRIM(tenant_id), \'\'), \'default\') = ?)'
-    ).bind(monthStart.toISOString(), tenantId, tenantId).first<{ count: number }>();
+    ).bind(monthStartIso, tenantId, tenantId).first<{ count: number }>();
 
     const avgResult = await db.prepare(
       'SELECT COALESCE(AVG(amount_vnd), 0) as avg FROM subscriptions WHERE status = \'active\' AND (? = \'*\' OR COALESCE(NULLIF(TRIM(tenant_id), \'\'), \'default\') = ?)'

@@ -96,7 +96,7 @@ export async function listInvoices(c: Context<{ Bindings: Env }>) {
     typeof ctx.get !== 'function' &&
     typeof ctx.set !== 'function' &&
     (!authHeader || authHeader === 'Bearer tok');
-  if (!isBareUnitStub && !authUser && Boolean(c.env?.JWT_SECRET || authHeader)) {
+  if (!isBareUnitStub && !authUser) {
     return c.json({ success: false, error: 'Authentication required' }, 401);
   }
   const allowedInvoiceRoles = ['owner', 'admin', 'manager', 'supervisor', 'vendor', 'customer'];

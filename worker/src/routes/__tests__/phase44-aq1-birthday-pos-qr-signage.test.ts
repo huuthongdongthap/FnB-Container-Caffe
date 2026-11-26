@@ -266,20 +266,23 @@ describe('Phase 44 Slice AQ1 — Birthday Loyalty, POS Customer Lookup, Admin QR
     it('enforces positive RBAC allowlist on PUT /config and POST /redeem', async () => {
       const sqlite = setupBirthdayDb();
       const db = createSqliteD1Adapter(sqlite);
-      const env = createMockEnv({ AURA_DB: db, JWT_SECRET: '' });
+      const env = createMockEnv({ AURA_DB: db, JWT_SECRET: TEST_JWT_SECRET });
+      const driverToken = await generateJWT(
+        { id: 'u-driver', role: 'customer', tenantId: 'default' },
+        TEST_JWT_SECRET
+      );
 
       const app = new Hono<{ Bindings: Env }>();
-      app.use('*', async (c, next) => {
-        c.set('user' as never, { id: 'u-driver', role: 'driver', tenantId: 'default' } as never);
-        await next();
-      });
       app.route('/birthday', birthdayRouter);
 
       const configRes = await app.request(
         'http://localhost/birthday/config',
         {
           method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${driverToken}`,
+          },
           body: JSON.stringify({ discountPercent: 20 }),
         },
         env
@@ -290,7 +293,10 @@ describe('Phase 44 Slice AQ1 — Birthday Loyalty, POS Customer Lookup, Admin QR
         'http://localhost/birthday/redeem',
         {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${driverToken}`,
+          },
           body: JSON.stringify({ customer_id: 'cust-any' }),
         },
         env

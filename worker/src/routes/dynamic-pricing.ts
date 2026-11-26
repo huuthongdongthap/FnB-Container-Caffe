@@ -255,119 +255,22 @@ dynamicPricingRouter.post('/calculate', async (c) => {
   const lookupProductIds = Array.from(new Set(items.map((it) => it.product_id)));
 
   if (lookupProductIds.length > 0) {
-    const placeholders = lookupProductIds.map(() => '?').join(', ');
+    const D1_PRODUCT_BATCH_SIZE = 90;
+    const productIdBatches: string[][] = [];
+    for (let i = 0; i < lookupProductIds.length; i += D1_PRODUCT_BATCH_SIZE) {
+      productIdBatches.push(lookupProductIds.slice(i, i + D1_PRODUCT_BATCH_SIZE));
+    }
     let batchMatchedAny = false;
     try {
-      const batchStmt = db
-        .prepare(
-          `SELECT id, price, cost_price, category, category_id, tenant_id FROM products WHERE id IN (${placeholders}) AND (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?)`
-        )
-        .bind(...lookupProductIds, tenantId, tenantId);
-      if (typeof (batchStmt as { all?: unknown }).all === 'function') {
-        const { results: prodRows } = await batchStmt.all<{
-          id: string;
-          price?: number | null;
-          cost_price?: number | null;
-          category?: string | null;
-          category_id?: string | null;
-          name?: string | null;
-          tenant_id?: string | null;
-        }>().catch(() =>
-          db
-            .prepare(
-              `SELECT id, price, cost_price, category_id, name, tenant_id FROM products WHERE id IN (${placeholders}) AND (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?)`
-            )
-            .bind(...lookupProductIds, tenantId, tenantId)
-            .all<{
-              id: string;
-              price?: number | null;
-              cost_price?: number | null;
-              category?: string | null;
-              category_id?: string | null;
-              name?: string | null;
-              tenant_id?: string | null;
-            }>()
-            .catch(() =>
-              db
-                .prepare(
-                  `SELECT id, price, category, category_id, name, tenant_id FROM products WHERE id IN (${placeholders}) AND (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?)`
-                )
-                .bind(...lookupProductIds, tenantId, tenantId)
-                .all<{
-                  id: string;
-                  price?: number | null;
-                  cost_price?: number | null;
-                  category?: string | null;
-                  category_id?: string | null;
-                  name?: string | null;
-                  tenant_id?: string | null;
-                }>()
-            )
-            .catch(() =>
-              db
-                .prepare(
-                  `SELECT id, price, category_id, name, tenant_id FROM products WHERE id IN (${placeholders}) AND (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?)`
-                )
-                .bind(...lookupProductIds, tenantId, tenantId)
-                .all<{
-                  id: string;
-                  price?: number | null;
-                  cost_price?: number | null;
-                  category?: string | null;
-                  category_id?: string | null;
-                  name?: string | null;
-                  tenant_id?: string | null;
-                }>()
-            )
-            .catch(() =>
-              db
-                .prepare(
-                  `SELECT id, price, cost_price, tenant_id FROM products WHERE id IN (${placeholders}) AND (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?)`
-                )
-                .bind(...lookupProductIds, tenantId, tenantId)
-                .all<{
-                  id: string;
-                  price?: number | null;
-                  cost_price?: number | null;
-                  category?: string | null;
-                  category_id?: string | null;
-                  name?: string | null;
-                  tenant_id?: string | null;
-                }>()
-            )
-        );
-        const rowsList = prodRows || [];
-        if (
-          allowRuleOnlyUnitMock &&
-          rowsList.length > 0 &&
-          rowsList.every((r) => r && 'rule_type' in (r as unknown as Record<string, unknown>))
-        ) {
-          isRuleOnlyMockStub = true;
-        }
-        for (const row of rowsList) {
-          if (row && lookupProductIds.includes(row.id) && matchesTenantRow(row as unknown as Record<string, unknown>, tenantId)) {
-            batchMatchedAny = true;
-            if (Number(row.cost_price) > 0) {
-              serverCostByProduct.set(row.id, Number(row.cost_price));
-            }
-            if (Number(row.price) > 0) {
-              serverPriceByProduct.set(row.id, Number(row.price));
-            }
-            recordServerCategories(row.id, row as unknown as Record<string, unknown>);
-          }
-        }
-      }
-    } catch {
-      // Fallback to unscoped batch query or per-id query below when tenant_id column is unsupported
-    }
-
-    if (!batchMatchedAny && !isRuleOnlyMockStub) {
-      try {
-        const fallbackBatchStmt = db
-          .prepare(`SELECT id, price, category, category_id, name, tenant_id FROM products WHERE id IN (${placeholders})`)
-          .bind(...lookupProductIds);
-        if (typeof (fallbackBatchStmt as { all?: unknown }).all === 'function') {
-          const { results: prodRows } = await fallbackBatchStmt.all<{
+      for (const batchIds of productIdBatches) {
+        const placeholders = batchIds.map(() => '?').join(', ');
+        const batchStmt = db
+          .prepare(
+            `SELECT id, price, cost_price, category, category_id, tenant_id FROM products WHERE id IN (${placeholders}) AND (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?)`
+          )
+          .bind(...batchIds, tenantId, tenantId);
+        if (typeof (batchStmt as { all?: unknown }).all === 'function') {
+          const { results: prodRows } = await batchStmt.all<{
             id: string;
             price?: number | null;
             cost_price?: number | null;
@@ -377,8 +280,10 @@ dynamicPricingRouter.post('/calculate', async (c) => {
             tenant_id?: string | null;
           }>().catch(() =>
             db
-              .prepare(`SELECT id, price, cost_price, tenant_id FROM products WHERE id IN (${placeholders})`)
-              .bind(...lookupProductIds)
+              .prepare(
+                `SELECT id, price, cost_price, category_id, name, tenant_id FROM products WHERE id IN (${placeholders}) AND (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?)`
+              )
+              .bind(...batchIds, tenantId, tenantId)
               .all<{
                 id: string;
                 price?: number | null;
@@ -388,6 +293,54 @@ dynamicPricingRouter.post('/calculate', async (c) => {
                 name?: string | null;
                 tenant_id?: string | null;
               }>()
+              .catch(() =>
+                db
+                  .prepare(
+                    `SELECT id, price, category, category_id, name, tenant_id FROM products WHERE id IN (${placeholders}) AND (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?)`
+                  )
+                  .bind(...batchIds, tenantId, tenantId)
+                  .all<{
+                    id: string;
+                    price?: number | null;
+                    cost_price?: number | null;
+                    category?: string | null;
+                    category_id?: string | null;
+                    name?: string | null;
+                    tenant_id?: string | null;
+                  }>()
+              )
+              .catch(() =>
+                db
+                  .prepare(
+                    `SELECT id, price, category_id, name, tenant_id FROM products WHERE id IN (${placeholders}) AND (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?)`
+                  )
+                  .bind(...batchIds, tenantId, tenantId)
+                  .all<{
+                    id: string;
+                    price?: number | null;
+                    cost_price?: number | null;
+                    category?: string | null;
+                    category_id?: string | null;
+                    name?: string | null;
+                    tenant_id?: string | null;
+                  }>()
+              )
+              .catch(() =>
+                db
+                  .prepare(
+                    `SELECT id, price, cost_price, tenant_id FROM products WHERE id IN (${placeholders}) AND (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?)`
+                  )
+                  .bind(...batchIds, tenantId, tenantId)
+                  .all<{
+                    id: string;
+                    price?: number | null;
+                    cost_price?: number | null;
+                    category?: string | null;
+                    category_id?: string | null;
+                    name?: string | null;
+                    tenant_id?: string | null;
+                  }>()
+              )
           );
           const rowsList = prodRows || [];
           if (
@@ -396,6 +349,7 @@ dynamicPricingRouter.post('/calculate', async (c) => {
             rowsList.every((r) => r && 'rule_type' in (r as unknown as Record<string, unknown>))
           ) {
             isRuleOnlyMockStub = true;
+            break;
           }
           for (const row of rowsList) {
             if (row && lookupProductIds.includes(row.id) && matchesTenantRow(row as unknown as Record<string, unknown>, tenantId)) {
@@ -407,6 +361,77 @@ dynamicPricingRouter.post('/calculate', async (c) => {
                 serverPriceByProduct.set(row.id, Number(row.price));
               }
               recordServerCategories(row.id, row as unknown as Record<string, unknown>);
+            }
+          }
+        }
+      }
+    } catch {
+      // Fallback to unscoped batch query or per-id query below when tenant_id column is unsupported
+    }
+
+    if (!batchMatchedAny && !isRuleOnlyMockStub) {
+      try {
+        for (const batchIds of productIdBatches) {
+          const placeholders = batchIds.map(() => '?').join(', ');
+          const fallbackBatchStmt = db
+            .prepare(`SELECT id, price, cost_price, category, category_id, name, tenant_id FROM products WHERE id IN (${placeholders})`)
+            .bind(...batchIds);
+          if (typeof (fallbackBatchStmt as { all?: unknown }).all === 'function') {
+            const { results: prodRows } = await fallbackBatchStmt.all<{
+              id: string;
+              price?: number | null;
+              cost_price?: number | null;
+              category?: string | null;
+              category_id?: string | null;
+              name?: string | null;
+              tenant_id?: string | null;
+            }>().catch(() =>
+              db
+                .prepare(`SELECT id, price, category, category_id, name, tenant_id FROM products WHERE id IN (${placeholders})`)
+                .bind(...batchIds)
+                .all<{
+                  id: string;
+                  price?: number | null;
+                  cost_price?: number | null;
+                  category?: string | null;
+                  category_id?: string | null;
+                  name?: string | null;
+                  tenant_id?: string | null;
+                }>()
+            ).catch(() =>
+              db
+                .prepare(`SELECT id, price, cost_price, tenant_id FROM products WHERE id IN (${placeholders})`)
+                .bind(...batchIds)
+                .all<{
+                  id: string;
+                  price?: number | null;
+                  cost_price?: number | null;
+                  category?: string | null;
+                  category_id?: string | null;
+                  name?: string | null;
+                  tenant_id?: string | null;
+                }>()
+            );
+            const rowsList = prodRows || [];
+            if (
+              allowRuleOnlyUnitMock &&
+              rowsList.length > 0 &&
+              rowsList.every((r) => r && 'rule_type' in (r as unknown as Record<string, unknown>))
+            ) {
+              isRuleOnlyMockStub = true;
+              break;
+            }
+            for (const row of rowsList) {
+              if (row && lookupProductIds.includes(row.id) && matchesTenantRow(row as unknown as Record<string, unknown>, tenantId)) {
+                batchMatchedAny = true;
+                if (Number(row.cost_price) > 0) {
+                  serverCostByProduct.set(row.id, Number(row.cost_price));
+                }
+                if (Number(row.price) > 0) {
+                  serverPriceByProduct.set(row.id, Number(row.price));
+                }
+                recordServerCategories(row.id, row as unknown as Record<string, unknown>);
+              }
             }
           }
         }
