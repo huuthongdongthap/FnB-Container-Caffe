@@ -61,9 +61,11 @@ export async function updateMRRSnapshot(
     }
   }
 
-  const monthStart = new Date();
-  monthStart.setDate(1); monthStart.setHours(0, 0, 0, 0);
-  const monthStartIso = monthStart.toISOString();
+  const ICT_OFFSET_MS = 7 * 3600_000;
+  const nowIct = new Date(Date.now() + ICT_OFFSET_MS);
+  const monthStartIso = new Date(
+    Date.UTC(nowIct.getUTCFullYear(), nowIct.getUTCMonth(), 1) - ICT_OFFSET_MS
+  ).toISOString();
   let churned: { count: number } | null = null;
   try {
     churned = await db.prepare(
