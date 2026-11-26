@@ -58,21 +58,17 @@ export async function restoreInventoryForOrder(
   env: Env,
   orderId: string,
   tenantId?: string,
-  preCancelStatus?: string | { preCancelStatus?: string; releaseUnconsumedReserves?: boolean },
+  preCancelStatus?: string | { preCancelStatus?: string },
 ): Promise<void> {
   const resolvedPreStatus =
     typeof preCancelStatus === 'string'
       ? preCancelStatus
       : preCancelStatus?.preCancelStatus;
-  const releaseUnconsumedReserves =
-    typeof preCancelStatus === 'object' && preCancelStatus !== null
-      ? Boolean(preCancelStatus.releaseUnconsumedReserves)
-      : false;
   const lockKey = String(orderId || '');
   const previous = inFlightOrderRestorations.get(lockKey) ?? Promise.resolve();
   const current = previous
     .catch(() => {})
-    .then(() => restoreInventoryForOrderInternal(env, orderId, tenantId, resolvedPreStatus, releaseUnconsumedReserves));
+    .then(() => restoreInventoryForOrderInternal(env, orderId, tenantId, resolvedPreStatus));
   inFlightOrderRestorations.set(lockKey, current);
   try {
     await current;
@@ -88,7 +84,6 @@ async function restoreInventoryForOrderInternal(
   orderId: string,
   tenantId?: string,
   preCancelStatus?: string,
-  _releaseUnconsumedReserves: boolean = false,
 ): Promise<void> {
   const spoiled = isPostPrepStatus(preCancelStatus);
   const rawExplicit = tenantId && tenantId.trim() ? tenantId.trim() : '';

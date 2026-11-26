@@ -414,6 +414,19 @@ export async function provisionSelfServeTenant(
       prod.bom.forEach((bomItem, bIdx) => {
         const ingId = ingredientIdMap.get(bomItem.ingredientKey);
         if (!ingId) return;
+        const bomId = `ri_${slug}_${prod.key}_${bIdx + 1}`;
+        // Ingredient deduction (`deductOrderStock` / `getCanonicalRecipe`) reads
+        // `recipe_items`; the ingredient delete guard also inspects `recipe_ingredients`.
+        // Seeding only one of the two silently disables BOM deduction for the new tenant.
+        statements.push(
+          db
+            .prepare(
+              `INSERT INTO recipe_items (
+                tenant_id, id, recipe_id, ingredient_id, quantity, unit
+              ) VALUES (?, ?, ?, ?, ?, ?)`
+            )
+            .bind(tenantId, bomId, recipeId, ingId, bomItem.quantity, bomItem.unit)
+        );
         statements.push(
           db
             .prepare(
@@ -423,7 +436,7 @@ export async function provisionSelfServeTenant(
             )
             .bind(
               tenantId,
-              `ri_${slug}_${prod.key}_${bIdx + 1}`,
+              bomId,
               recipeId,
               prodId,
               ingId,

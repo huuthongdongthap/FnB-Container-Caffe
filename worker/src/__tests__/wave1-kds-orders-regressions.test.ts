@@ -573,6 +573,99 @@ describe('Wave 1 KDS & Orders Regressions (#213, #216, #219, #220, #221, #235)',
     }
   });
 
+  it('#219b: cancelling a paid order with credited accrual decrements customers.total_spent exactly once', async () => {
+    const { sqlite, db } = createProductionSchemaDb();
+    try {
+      // An `earn` ledger row means the accrual was already credited, so both the
+      // unified void compensation and the cancel handlers' legacy loyalty block
+      // see it. Only one of them may touch total_spent.
+      sqlite
+        .prepare(
+          `INSERT INTO customers (id, email, name, phone, loyalty_points, lifetime_points, total_spent, tenant_id)
+           VALUES ('cust-earn', 'earn@aura.test', 'Earn Cust', '0907778888', 120, 120, 200000, 'default')`,
+        )
+        .run();
+      sqlite
+        .prepare(
+          `INSERT INTO cashback_wallets (id, customer_id, balance, total_earned, total_spent, tenant_id)
+           VALUES ('wal-earn', 'cust-earn', 6000, 6000, 0, 'default')`,
+        )
+        .run();
+      sqlite
+        .prepare(
+          `INSERT INTO orders (id, order_number, items, total, status, customer_id, customer_name, customer_phone, payment_method, payment_status, points_earned, cashback_earned, tenant_id)
+           VALUES ('ord-kds-earn', 'ORD-KE1', '[]', 60000, 'preparing', 'cust-earn', 'Earn Cust', '0907778888', 'cash', 'paid', 60, 6000, 'default')`,
+        )
+        .run();
+      sqlite
+        .prepare(
+          `INSERT INTO cashback_transactions (id, wallet_id, customer_id, type, amount, balance_after, order_id, tenant_id)
+           VALUES ('tx-earn-kds', 'wal-earn', 'cust-earn', 'earn', 6000, 6000, 'ord-kds-earn', 'default')`,
+        )
+        .run();
+
+      const kdsCancel = await executeKdsStatusTransition(db, 'ord-kds-earn', 'cancelled', 'manager', {
+        tenantId: 'default',
+        allowPaidCompensation: true,
+      });
+      expect(kdsCancel.success).toBe(true);
+
+      const afterKds = sqlite
+        .prepare('SELECT total_spent, loyalty_points FROM customers WHERE id = ?')
+        .get('cust-earn') as { total_spent: number; loyalty_points: number };
+      // 200000 - 60000, once. A double reversal would land on 80000.
+      expect(afterKds.total_spent).toBe(140000);
+      expect(afterKds.loyalty_points).toBe(60);
+
+      // Same shape through the OpenAPI/updateOrder cancel path.
+      sqlite
+        .prepare(
+          `INSERT INTO customers (id, email, name, phone, loyalty_points, lifetime_points, total_spent, tenant_id)
+           VALUES ('cust-earn-2', 'earn2@aura.test', 'Earn Cust 2', '0907779999', 200, 200, 200000, 'default')`,
+        )
+        .run();
+      sqlite
+        .prepare(
+          `INSERT INTO cashback_wallets (id, customer_id, balance, total_earned, total_spent, tenant_id)
+           VALUES ('wal-earn-2', 'cust-earn-2', 8000, 8000, 0, 'default')`,
+        )
+        .run();
+      sqlite
+        .prepare(
+          `INSERT INTO orders (id, order_number, items, total, status, customer_id, customer_name, customer_phone, payment_method, payment_status, points_earned, cashback_earned, tenant_id)
+           VALUES ('ord-upd-earn', 'ORD-UE1', '[]', 60000, 'preparing', 'cust-earn-2', 'Earn Cust 2', '0907779999', 'cash', 'paid', 80, 8000, 'default')`,
+        )
+        .run();
+      sqlite
+        .prepare(
+          `INSERT INTO cashback_transactions (id, wallet_id, customer_id, type, amount, balance_after, order_id, tenant_id)
+           VALUES ('tx-earn-upd', 'wal-earn-2', 'cust-earn-2', 'earn', 8000, 8000, 'ord-upd-earn', 'default')`,
+        )
+        .run();
+
+      const updateRes = await updateOrder(
+        new Request('http://localhost/api/orders/ord-upd-earn', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ status: 'cancelled', reason: 'staff error' }),
+        }),
+        { AURA_DB: db },
+        'ord-upd-earn',
+        'manager',
+        'default',
+      );
+      expect(updateRes.status).toBe(200);
+
+      const afterUpdate = sqlite
+        .prepare('SELECT total_spent, loyalty_points FROM customers WHERE id = ?')
+        .get('cust-earn-2') as { total_spent: number; loyalty_points: number };
+      expect(afterUpdate.total_spent).toBe(140000);
+      expect(afterUpdate.loyalty_points).toBe(120);
+    } finally {
+      sqlite.close();
+    }
+  });
+
   it('#220: unifies hold policy (delivery+cash COD, completed paid, fail-closed null payment_status), PayOS reconcile notifications, updateOrder payment_method, and rider list RBAC', async () => {
     // 1. Hold policy unit checks
     expect(isHeldOutOfKds({ order_type: 'delivery', payment_method: 'cash', payment_status: 'unpaid', status: 'pending' })).toBe(false);

@@ -157,6 +157,10 @@ export async function executeKdsStatusTransition(
       actorId: options?.actorId ?? null,
       skipInventoryRestore: true,
       skipTableRelease: true,
+      // The legacy loyalty block below already reverses accrual and decrements
+      // `customers.total_spent`; letting the policy do it as well double-counts
+      // the reversal for every paid order that earned points/cashback.
+      skipAccrualReversal: true,
     }).catch(() => {});
     try {
       let earnRow = await rawDb

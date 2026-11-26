@@ -312,6 +312,10 @@ export async function updateOrder(
         preCancelStatus: currentStatus,
         skipInventoryRestore: true,
         skipTableRelease: true,
+        // The legacy loyalty block below already reverses accrual and decrements
+        // `customers.total_spent`; letting the policy do it as well double-counts
+        // the reversal for every paid order that earned points/cashback.
+        skipAccrualReversal: true,
       }).catch(() => {});
 
       // Reverse loyalty accrual if order had already earned points/cashback

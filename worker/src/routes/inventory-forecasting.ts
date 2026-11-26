@@ -251,7 +251,8 @@ async function queryTenantInventoryItems(
         WHERE (?1 = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?2) AND is_active = 1
           AND NOT EXISTS (
             SELECT 1 FROM inventory_items ii
-            WHERE (?1 = '*' OR COALESCE(NULLIF(TRIM(ii.tenant_id), ''), 'default') = ?2) AND ii.active = 1
+            WHERE (ii.id = ingredients.id OR (ii.sku IS NOT NULL AND ingredients.sku IS NOT NULL AND ii.sku = ingredients.sku))
+              AND (?1 = '*' OR COALESCE(NULLIF(TRIM(ii.tenant_id), ''), 'default') = ?2) AND ii.active = 1
           )
       )
       ORDER BY sku ASC
