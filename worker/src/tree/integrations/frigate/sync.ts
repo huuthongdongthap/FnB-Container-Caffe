@@ -68,18 +68,31 @@ export async function syncFrigateEvents(
       if (!db) {
         throw new Error('AURA_DB missing');
       }
-      const { events } = await client.getRecentEvents(camera, limit);
+      const { events, mock } = await client.getRecentEvents(camera, limit);
+      if (mock) {
+        return { ok: true, mock: true, synced: 0, reason: 'mock_mode' };
+      }
 
       let persisted = 0;
       const rawTenant = opts?.tenantId ? opts.tenantId.trim() : '';
       const effectiveTenant = rawTenant && rawTenant !== '*' && rawTenant.toLowerCase() !== 'hq' ? rawTenant : 'default';
       for (const evt of events) {
+        let changes = 0;
         try {
-          await db
+          const res = await db
             .prepare(
-              `INSERT OR IGNORE INTO frigate_events
+              `INSERT INTO frigate_events
                (id, camera, label, start_time, end_time, score, payload, received_at, tenant_id)
-               VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'), ?)`
+               VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'), ?)
+               ON CONFLICT(id) DO UPDATE SET
+                 camera = excluded.camera,
+                 label = excluded.label,
+                 start_time = excluded.start_time,
+                 end_time = excluded.end_time,
+                 score = COALESCE(excluded.score, frigate_events.score),
+                 payload = COALESCE(excluded.payload, frigate_events.payload),
+                 received_at = datetime('now')
+               WHERE COALESCE(NULLIF(TRIM(frigate_events.tenant_id), ''), 'default') = excluded.tenant_id`
             )
             .bind(
               evt.id,
@@ -92,12 +105,25 @@ export async function syncFrigateEvents(
               effectiveTenant
             )
             .run();
+          changes = Number(
+            (res as unknown as { meta?: { changes?: number }; changes?: number })?.meta?.changes ??
+              (res as unknown as { changes?: number })?.changes ??
+              0
+          );
         } catch {
           const fallbackRes = await db
             .prepare(
-              `INSERT OR IGNORE INTO frigate_events
+              `INSERT INTO frigate_events
                (id, camera, label, start_time, end_time, score, payload, received_at)
-               VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'))`
+               VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'))
+               ON CONFLICT(id) DO UPDATE SET
+                 camera = excluded.camera,
+                 label = excluded.label,
+                 start_time = excluded.start_time,
+                 end_time = excluded.end_time,
+                 score = COALESCE(excluded.score, frigate_events.score),
+                 payload = COALESCE(excluded.payload, frigate_events.payload),
+                 received_at = datetime('now')`
             )
             .bind(
               evt.id,
@@ -110,12 +136,12 @@ export async function syncFrigateEvents(
             )
             .run();
 
-          const insertedChanges = Number(
+          changes = Number(
             (fallbackRes as unknown as { meta?: { changes?: number }; changes?: number })?.meta?.changes ??
               (fallbackRes as unknown as { changes?: number })?.changes ??
               0
           );
-          if (insertedChanges > 0 && effectiveTenant !== 'default') {
+          if (changes > 0 && effectiveTenant !== 'default') {
             await db
               .prepare("UPDATE frigate_events SET tenant_id = ? WHERE id = ? AND (tenant_id IS NULL OR TRIM(tenant_id) = '')")
               .bind(effectiveTenant, evt.id)
@@ -124,14 +150,16 @@ export async function syncFrigateEvents(
           }
         }
 
-        persisted++;
+        if (changes > 0) {
+          persisted++;
+        }
       }
 
       log.info('frigate_events_synced', { persisted, camera });
       return { ok: true, mock: false, synced: persisted };
     } catch (err) {
       log.error('frigate_sync_error', { error: (err as Error).message });
-      return { ok: false, mock: false, reason: (err as Error).message };
+      return { ok: false, mock: false, synced: 0, reason: (err as Error).message };
     }
   })();
 

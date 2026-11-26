@@ -132,6 +132,9 @@ export function createFrigateRoutes() {
         { camera: camera ?? undefined, limit: parsedLimit, tenantId: syncTenant },
         c.executionCtx as unknown as ExecutionContext
       );
+      if (!result.ok) {
+        return c.json({ success: false, ...result, error: result.reason ?? 'Frigate sync failed' }, 502);
+      }
       return c.json({ success: true, ...result });
     } catch (err) {
       log.error('frigate_sync_error', { error: (err as Error).message });

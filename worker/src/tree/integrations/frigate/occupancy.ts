@@ -66,10 +66,9 @@ export async function getOccupancyAnalytics(
   }
 
   try {
-    const fiveMinutesAgoSec = Math.floor(Date.now() / 1000) - 300;
     const twentyFourHoursAgoSec = Math.floor(Date.now() / 1000) - 86400;
 
-    // 1. Current active person detections (last 5 minutes)
+    // 1. Current active person tracks (ongoing: end_time IS NULL, started within last 24h)
     const cleanTenant = tenantId ? tenantId.trim() : '';
     const scopedTenant = cleanTenant && cleanTenant !== '*' ? cleanTenant : null;
     let activeRows: { results?: Array<{ camera: string; count: number; last_seen: string | null }> };
@@ -79,11 +78,11 @@ export async function getOccupancyAnalytics(
           .prepare(
             `SELECT camera, COUNT(*) as count, MAX(received_at) as last_seen
              FROM frigate_events
-             WHERE label = 'person' AND start_time >= ?
+             WHERE label = 'person' AND end_time IS NULL AND start_time >= ?
                AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?
              GROUP BY camera`
           )
-          .bind(fiveMinutesAgoSec, scopedTenant)
+          .bind(twentyFourHoursAgoSec, scopedTenant)
           .all<{ camera: string; count: number; last_seen: string | null }>();
       } catch {
         if (scopedTenant !== 'default') {
@@ -93,10 +92,10 @@ export async function getOccupancyAnalytics(
             .prepare(
               `SELECT camera, COUNT(*) as count, MAX(received_at) as last_seen
                FROM frigate_events
-               WHERE label = 'person' AND start_time >= ?
+               WHERE label = 'person' AND end_time IS NULL AND start_time >= ?
                GROUP BY camera`
             )
-            .bind(fiveMinutesAgoSec)
+            .bind(twentyFourHoursAgoSec)
             .all<{ camera: string; count: number; last_seen: string | null }>();
         }
       }
@@ -105,10 +104,10 @@ export async function getOccupancyAnalytics(
         .prepare(
           `SELECT camera, COUNT(*) as count, MAX(received_at) as last_seen
            FROM frigate_events
-           WHERE label = 'person' AND start_time >= ?
+           WHERE label = 'person' AND end_time IS NULL AND start_time >= ?
            GROUP BY camera`
         )
-        .bind(fiveMinutesAgoSec)
+        .bind(twentyFourHoursAgoSec)
         .all<{ camera: string; count: number; last_seen: string | null }>();
     }
 

@@ -81,7 +81,7 @@ export class FrigateClient {
       return { events: Array.isArray(data) ? data : [] };
     } catch (err) {
       log.warn('frigate_getRecentEvents_failed', { error: (err as Error).message, camera });
-      return this.mockEvents(camera, limit);
+      throw err;
     }
   }
 
