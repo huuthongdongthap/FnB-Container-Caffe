@@ -543,6 +543,32 @@ export async function deductInventoryForOrder(
   }
 
   if (orderId) {
+    if (bomProductIds.size === 0) {
+      try {
+        let existingMovement: { id?: string } | null = null;
+        try {
+          existingMovement = await env.AURA_DB.prepare(
+            "SELECT id FROM stock_movements WHERE reference_id = ? AND reference_type = 'order' AND type IN ('order_consumption', 'consumption', 'sale', 'out') AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ? LIMIT 1"
+          )
+            .bind(orderId, effectiveTenant)
+            .first<{ id?: string }>();
+        } catch {
+          if (effectiveTenant === 'default') {
+            existingMovement = await env.AURA_DB.prepare(
+              "SELECT id FROM stock_movements WHERE reference_id = ? AND reference_type = 'order' AND type IN ('order_consumption', 'consumption', 'sale', 'out') LIMIT 1"
+            )
+              .bind(orderId)
+              .first<{ id?: string }>()
+              .catch(() => null);
+          }
+        }
+        if (existingMovement?.id) {
+          return;
+        }
+      } catch {
+        // Optional stock_movements query in partial test mocks
+      }
+    }
     try {
       let existingReserve: { id?: string } | null = null;
       try {

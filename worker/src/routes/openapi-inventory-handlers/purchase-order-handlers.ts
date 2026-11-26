@@ -1440,42 +1440,39 @@ export function registerPurchaseOrderHandlers(app: OpenAPIHono<{ Bindings: Env }
           if (effectiveTenant && effectiveTenant !== '*') {
             try {
               await db.prepare(
-                `UPDATE ingredients
-                 SET cost_per_unit = CASE
+                `UPDATE ingredients SET current_stock = COALESCE(current_stock, 0) + ?,
+                     cost_per_unit = CASE
                        WHEN (MAX(0, COALESCE(current_stock, 0)) + ?) > 0
                        THEN ((MAX(0, COALESCE(current_stock, 0)) * COALESCE(cost_per_unit, 0)) + (? * ?)) / (MAX(0, COALESCE(current_stock, 0)) + ?)
                        ELSE ?
                      END,
-                     current_stock = COALESCE(current_stock, 0) + ?,
                      updated_at = ?
                  WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?`
-              ).bind(receiveQty, receiveQty, effectiveUnitCost, receiveQty, effectiveUnitCost, receiveQty, now, item.ingredientId, effectiveTenant).run();
+              ).bind(receiveQty, receiveQty, receiveQty, effectiveUnitCost, receiveQty, effectiveUnitCost, now, item.ingredientId, effectiveTenant).run();
             } catch (err) {
               if (effectiveTenant !== 'default' || hasIngTenantCol) throw err;
               await db.prepare(
-                `UPDATE ingredients
-                 SET cost_per_unit = CASE
+                `UPDATE ingredients SET current_stock = COALESCE(current_stock, 0) + ?,
+                     cost_per_unit = CASE
                        WHEN (MAX(0, COALESCE(current_stock, 0)) + ?) > 0
                        THEN ((MAX(0, COALESCE(current_stock, 0)) * COALESCE(cost_per_unit, 0)) + (? * ?)) / (MAX(0, COALESCE(current_stock, 0)) + ?)
                        ELSE ?
                      END,
-                     current_stock = COALESCE(current_stock, 0) + ?,
                      updated_at = ?
                  WHERE id = ?`
-              ).bind(receiveQty, receiveQty, effectiveUnitCost, receiveQty, effectiveUnitCost, receiveQty, now, item.ingredientId).run();
+              ).bind(receiveQty, receiveQty, receiveQty, effectiveUnitCost, receiveQty, effectiveUnitCost, now, item.ingredientId).run();
             }
           } else {
             await db.prepare(
-              `UPDATE ingredients
-               SET cost_per_unit = CASE
+              `UPDATE ingredients SET current_stock = COALESCE(current_stock, 0) + ?,
+                   cost_per_unit = CASE
                      WHEN (MAX(0, COALESCE(current_stock, 0)) + ?) > 0
                      THEN ((MAX(0, COALESCE(current_stock, 0)) * COALESCE(cost_per_unit, 0)) + (? * ?)) / (MAX(0, COALESCE(current_stock, 0)) + ?)
                      ELSE ?
                    END,
-                   current_stock = COALESCE(current_stock, 0) + ?,
                    updated_at = ?
                WHERE id = ?`
-            ).bind(receiveQty, receiveQty, effectiveUnitCost, receiveQty, effectiveUnitCost, receiveQty, now, item.ingredientId).run();
+            ).bind(receiveQty, receiveQty, receiveQty, effectiveUnitCost, receiveQty, effectiveUnitCost, now, item.ingredientId).run();
           }
         } else if (effectiveTenant && effectiveTenant !== '*') {
           try {
