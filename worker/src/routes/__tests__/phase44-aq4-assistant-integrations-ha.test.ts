@@ -490,8 +490,9 @@ describe('AI Customer Assistant, TastyIgniter, Frigate & HomeAssistant Hardening
         }),
         { AURA_DB: d1, HA_TOKEN: 'ha-secret-token' }
       );
-      expect(webhookRes.status).toBe(200);
-      const webhookBody = (await webhookRes.json()) as { action_taken: string };
+      expect(webhookRes.status).toBe(409);
+      const webhookBody = (await webhookRes.json()) as { success: boolean; action_taken: string };
+      expect(webhookBody.success).toBe(false);
       expect(webhookBody.action_taken).toBe('cross_tenant_blocked:light.sadec_garden');
 
       const deviceAfter = sqlite.prepare('SELECT state FROM ha_device_states WHERE entity_id = ?').get('light.sadec_garden') as { state: string };
