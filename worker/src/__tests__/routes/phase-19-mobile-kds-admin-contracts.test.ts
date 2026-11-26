@@ -225,7 +225,7 @@ describe('Phase 19: Mobile Staff, KDS Lifecycle & Admin Integrations Contracts',
         TEST_JWT_SECRET,
         3600
       );
-      const authEnv = { AUTH_KV: mockKv, JWT_SECRET: TEST_JWT_SECRET };
+      const authEnv = { AURA_DB: mockDb, AUTH_KV: mockKv, JWT_SECRET: TEST_JWT_SECRET };
 
       const getRes = await app.fetch(
         new Request('https://test.aura/api/admin/birthday/config', {
