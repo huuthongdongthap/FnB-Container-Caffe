@@ -47,41 +47,43 @@ export default function AdminLogin({ onSubmit, onSuccess, error: externalError }
     }
   }, [onSubmit, onSuccess, navigate, t]);
 
+  const isDemoGuestEnabled = import.meta.env.VITE_ENABLE_DEMO_GUEST === 'true';
+
   const handleGuestLogin = useCallback(async () => {
+    if (!isDemoGuestEnabled) return;
     setStatus('loading');
     setLastError(undefined);
-    const demoEmail = import.meta.env.VITE_DEMO_ADMIN_EMAIL || 'admin@auraspace.vn';
-    const demoPassword = import.meta.env.VITE_DEMO_ADMIN_PASSWORD || 'AuraAdmin2026!';
+    const demoEmail = import.meta.env.VITE_DEMO_ADMIN_EMAIL;
+    const demoPassword = import.meta.env.VITE_DEMO_ADMIN_PASSWORD;
+    if (!demoEmail || !demoPassword) {
+      setLastError(t('adminLogin.loginFailed'));
+      setStatus('error');
+      return;
+    }
     try {
       await useAuthStore.getState().login(demoEmail, demoPassword);
-    } catch {
-      // Fall back to local demo session when backend is unreachable
+      const currentUser = useAuthStore.getState().user;
+      if (!currentUser) {
+        throw new Error(useAuthStore.getState().error || t('adminLogin.loginFailed'));
+      }
+      setStatus('success');
+      if (onSuccess) {
+        onSuccess();
+      } else {
+        navigate('/admin');
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : t('adminLogin.loginFailed');
+      setLastError(msg);
+      setStatus('error');
     }
-    if (!useAuthStore.getState().user) {
-      useAuthStore.setState({
-        user: {
-          id: 'guest-admin',
-          name: 'Demo Manager',
-          email: demoEmail,
-          role: 'owner',
-          tenantId: 'default',
-        },
-        loading: false,
-        error: null,
-      });
-    }
-    setStatus('success');
-    if (onSuccess) {
-      onSuccess();
-    } else {
-      navigate('/admin');
-    }
-  }, [navigate, onSuccess]);
+  }, [isDemoGuestEnabled, navigate, onSuccess, t]);
 
   return (
     <StitchAdminLoginNew
       onLogin={handleLogin}
-      onGuestLogin={handleGuestLogin}
+      onGuestLogin={isDemoGuestEnabled ? handleGuestLogin : undefined}
+      forgotPasswordHref="/forgot-password"
       status={status}
       errorMessage={lastError ?? externalError ?? undefined}
       brandName={brandConfig.brand.nameShort}

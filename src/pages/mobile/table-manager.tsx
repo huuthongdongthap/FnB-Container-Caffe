@@ -1,9 +1,11 @@
 'use client';
 
 import { useState, useCallback, useEffect } from 'react';
-import { useMobileAuth as _useMobileAuth } from '@/hooks/use-mobile-auth';
+import { useMobileAuth } from '@/hooks/use-mobile-auth';
 import { apiFetch } from '@/lib/api-client';
-import { isSameSessionSnapshot, readSessionSnapshot, subscribeSessionChange } from '@/lib/client-session';
+import { isSameSessionSnapshot, readClientSession, readSessionSnapshot, subscribeSessionChange } from '@/lib/client-session';
+
+const TABLE_MUTATION_ROLES = new Set(['owner', 'manager', 'supervisor', 'staff', 'waiter', 'phuc_vu', 'admin', 'cashier']);
 
 /* ── Types ────────────────────────────────────────────────────────── */
 
@@ -67,6 +69,9 @@ function actionBtn(color: string, active: boolean): React.CSSProperties {
 /* ── Component ──────────────────────────────────────────────────────*/
 
 export default function TableManager() {
+  const { user } = useMobileAuth();
+  const effectiveRole = (user?.role || readClientSession().user?.role || '').trim().toLowerCase();
+  const canMutateTableStatus = !effectiveRole || TABLE_MUTATION_ROLES.has(effectiveRole);
   const [tables, setTables] = useState<TableRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -190,16 +195,18 @@ export default function TableManager() {
             <div style={number}>Bàn {table.table_number}</div>
             <div style={capacity}>{table.capacity} chỗ / seats</div>
             <div style={statusBadge}>{STATUS_LABELS[table.status]}</div>
-            <div style={btns}>
-              {STATUS_LIST.map(({ key, color }) => (
-                <button key={key}
-                  style={actionBtn(color, table.status === key)}
-                  onMouseDown={(e) => e.preventDefault()}
-                  onClick={() => handleStatusClick(table, key)}>
-                  {STATUS_TAB_LABELS[key]}
-                </button>
-              ))}
-            </div>
+            {canMutateTableStatus && (
+              <div style={btns} data-testid={`table-actions-${table.id}`}>
+                {STATUS_LIST.map(({ key, color }) => (
+                  <button key={key}
+                    style={actionBtn(color, table.status === key)}
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => handleStatusClick(table, key)}>
+                    {STATUS_TAB_LABELS[key]}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         ))}
       </div>

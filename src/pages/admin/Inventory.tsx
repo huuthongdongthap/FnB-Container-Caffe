@@ -122,8 +122,56 @@ export default function InventoryPage() {
           </div>
 
           {ingredientsQ.isError && (
-            <div role="alert" className="rounded-xl border border-rose-500/30 bg-rose-500/10 px-4 py-3 text-xs text-rose-300">
-              Không thể tải dữ liệu kho hàng. Vui lòng thử lại.
+            <div role="alert" className="rounded-xl border border-rose-500/30 bg-rose-500/10 px-4 py-3 text-xs text-rose-300 flex items-center justify-between gap-3">
+              <span>
+                {ingredientsQ.error instanceof Error && ingredientsQ.error.message
+                  ? `Không thể tải danh sách nguyên liệu: ${ingredientsQ.error.message}`
+                  : 'Không thể tải dữ liệu kho hàng. Vui lòng thử lại.'}
+              </span>
+              <button
+                type="button"
+                onClick={() => void ingredientsQ.refetch()}
+                className="shrink-0 rounded-lg border border-rose-400/40 px-3 py-1 font-semibold text-rose-200 hover:bg-rose-500/20"
+              >
+                Thử lại
+              </button>
+            </div>
+          )}
+          {activeTab === 'movements' && movementsQ.isError && (
+            <div role="alert" className="rounded-xl border border-rose-500/30 bg-rose-500/10 px-4 py-3 text-xs text-rose-300 flex items-center justify-between gap-3">
+              <span>
+                {movementsQ.error instanceof Error && movementsQ.error.message
+                  ? `Không thể tải lịch sử biến động kho: ${movementsQ.error.message}`
+                  : 'Không thể tải lịch sử biến động kho. Vui lòng thử lại.'}
+              </span>
+              <button
+                type="button"
+                onClick={() => void movementsQ.refetch()}
+                className="shrink-0 rounded-lg border border-rose-400/40 px-3 py-1 font-semibold text-rose-200 hover:bg-rose-500/20"
+              >
+                Thử lại
+              </button>
+            </div>
+          )}
+          {activeTab === 'suppliers' && (suppliersQ.isError || purchaseOrdersQ.isError) && (
+            <div role="alert" className="rounded-xl border border-rose-500/30 bg-rose-500/10 px-4 py-3 text-xs text-rose-300 flex items-center justify-between gap-3">
+              <span>
+                {suppliersQ.error instanceof Error && suppliersQ.error.message
+                  ? `Không thể tải nhà cung cấp: ${suppliersQ.error.message}`
+                  : purchaseOrdersQ.error instanceof Error && purchaseOrdersQ.error.message
+                    ? `Không thể tải đơn đặt mua hàng: ${purchaseOrdersQ.error.message}`
+                    : 'Không thể tải dữ liệu nhà cung cấp hoặc đơn mua hàng. Vui lòng thử lại.'}
+              </span>
+              <button
+                type="button"
+                onClick={() => {
+                  if (suppliersQ.isError) void suppliersQ.refetch();
+                  if (purchaseOrdersQ.isError) void purchaseOrdersQ.refetch();
+                }}
+                className="shrink-0 rounded-lg border border-rose-400/40 px-3 py-1 font-semibold text-rose-200 hover:bg-rose-500/20"
+              >
+                Thử lại
+              </button>
             </div>
           )}
 
@@ -169,7 +217,17 @@ export default function InventoryPage() {
             />
           )}
           {activeTab === 'forecasting' && (
-            <InventoryForecastTab forecastItems={forecastItems} loading={forecastQ.isLoading} />
+            <InventoryForecastTab
+              forecastItems={forecastItems}
+              loading={forecastQ.isLoading}
+              isError={forecastQ.isError}
+              errorMessage={
+                forecastQ.error instanceof Error && forecastQ.error.message
+                  ? `Không thể tải dự báo tiêu hao: ${forecastQ.error.message}`
+                  : undefined
+              }
+              onRetry={() => void forecastQ.refetch()}
+            />
           )}
         </div>
       </div>

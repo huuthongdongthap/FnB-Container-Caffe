@@ -7,7 +7,11 @@
  * createErpnextClient returns null → endpoint returns a stub response.
  */
 
-import { createErpnextClient, createErpnextClientWithKv } from '../clients/erpnext-client';
+import { createErpnextClient, createErpnextClientWithKv, type ErpnextClient } from '../clients/erpnext-client';
+import { ErpnextProductClient } from '../clients/erpnext-product-client';
+import { processErpnextRetryQueue } from './cron-handlers/erpnext-sync';
+import { processErpnextWebhookLog } from './erpnext-pos';
+import { syncOrderToERPNext } from '../tree/erpnext/sync.js';
 import { requireAuth } from '../middleware/auth';
 import { createLogger } from '../middleware/logger';
 import { getTenantId, matchesTenantRow } from '../lib/db';
@@ -600,6 +604,221 @@ export function erpnextSyncRoutes(app: import('hono').Hono<{ Bindings: Env }>): 
     }
   });
 
+  async function syncSingleEntityForTenant(
+    entity: 'orders' | 'products' | 'customers' | 'inventory' | 'invoices',
+    client: ErpnextClient,
+    effectiveTenant: string,
+    envForSync: Env,
+    now: string,
+  ): Promise<number> {
+    const db = envForSync.AURA_DB;
+    if (!db) {
+      const probe = await client.list(
+        entity === 'orders'
+          ? 'Sales Order'
+          : entity === 'products'
+            ? 'Item'
+            : entity === 'customers'
+              ? 'Customer'
+              : entity === 'inventory'
+                ? 'Bin'
+                : 'Sales Invoice',
+        { fields: ['name'], limit: 1 }
+      );
+      return Array.isArray(probe?.data) ? probe.data.length : 0;
+    }
+
+    if (entity === 'products') {
+      const prodClient = new ErpnextProductClient(client, {
+        AURA_DB: db as unknown as import('../clients/erpnext-product-client').ProductEnv['AURA_DB'],
+        AURA_KV: envForSync.AUTH_KV as unknown as import('../clients/erpnext-product-client').KVNamespace,
+      });
+      const since = new Date(Date.now() - 30 * 86400_000).toISOString();
+      const changed = await prodClient.searchChangedProducts(since);
+      if (changed.length === 0) return 0;
+      const syncRes = await prodClient.syncProductsToLocal(
+        {
+          AURA_DB: db as unknown as import('../clients/erpnext-product-client').ProductEnv['AURA_DB'],
+          AURA_KV: envForSync.AUTH_KV as unknown as import('../clients/erpnext-product-client').KVNamespace,
+        },
+        changed,
+        effectiveTenant,
+      );
+      return syncRes.updated;
+    }
+
+    if (entity === 'customers') {
+      let localCustomers: Array<{
+        id: string;
+        name: string;
+        phone?: string | null;
+        email?: string | null;
+        erpnext_id?: string | null;
+      }> = [];
+      try {
+        const res = await db
+          .prepare(
+            `SELECT id, name, phone, email, erpnext_id
+             FROM customers
+             WHERE COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?
+               AND COALESCE(sync_status, 'pending') != 'synced'
+             ORDER BY created_at ASC
+             LIMIT 50`
+          )
+          .bind(effectiveTenant)
+          .all<typeof localCustomers[number]>();
+        localCustomers = res.results || [];
+      } catch {
+        localCustomers = [];
+      }
+      if (localCustomers.length === 0) {
+        const remote = await client.list('Customer', { fields: ['name'], limit: 50 });
+        return Array.isArray(remote?.data) ? remote.data.length : 0;
+      }
+      let syncedCount = 0;
+      for (const cust of localCustomers) {
+        const payload = {
+          customer_name: cust.name || cust.id,
+          mobile_no: cust.phone || '',
+          email_id: cust.email || '',
+        };
+        const existingErpId = cust.erpnext_id?.trim() || '';
+        const erpRes = existingErpId
+          ? await client.update('Customer', existingErpId, payload)
+          : await client.create('Customer', payload);
+        const erpName = (erpRes?.data as Record<string, string> | undefined)?.name || existingErpId || cust.name;
+        await db
+          .prepare(
+            "UPDATE customers SET erpnext_id = ?, sync_status = 'synced' WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
+          )
+          .bind(erpName, cust.id, effectiveTenant)
+          .run()
+          .catch(() => {});
+        syncedCount++;
+      }
+      return syncedCount;
+    }
+
+    if (entity === 'orders') {
+      const queueRes = await processErpnextRetryQueue(
+        envForSync as unknown as Record<string, unknown>,
+        effectiveTenant,
+      );
+      let unsyncedOrders: Array<Record<string, unknown>> = [];
+      try {
+        const ordRes = await db
+          .prepare(
+            `SELECT o.id, o.items, o.total, o.customer_name, o.customer_phone, o.payment_method, o.payment_status, o.status, o.tenant_id
+             FROM orders o
+             WHERE COALESCE(NULLIF(TRIM(o.tenant_id), ''), 'default') = ?
+               AND LOWER(TRIM(COALESCE(o.payment_status, ''))) IN ('paid', 'completed', 'partially_refunded')
+               AND LOWER(TRIM(COALESCE(o.status, ''))) NOT IN ('cancelled', 'canceled', 'failed', 'rejected', 'expired', 'refunded')
+               AND NOT EXISTS (
+                 SELECT 1 FROM erpnext_mappings m
+                 WHERE m.local_type = 'order'
+                   AND m.local_id = o.id
+                   AND COALESCE(NULLIF(TRIM(m.tenant_id), ''), 'default') = ?
+                   AND m.sync_status = 'synced'
+               )
+             ORDER BY o.created_at DESC
+             LIMIT 25`
+          )
+          .bind(effectiveTenant, effectiveTenant)
+          .all<Record<string, unknown>>();
+        unsyncedOrders = ordRes.results || [];
+      } catch {
+        unsyncedOrders = [];
+      }
+      if (unsyncedOrders.length === 0 && queueRes.succeeded === 0) {
+        await client.list('Sales Order', { fields: ['name'], limit: 1 });
+        return 0;
+      }
+      let directSynced = 0;
+      for (const ord of unsyncedOrders) {
+        const ordId = String(ord.id || '');
+        if (!ordId) continue;
+        let syncOk = false;
+        try {
+          const syncRes = await syncOrderToERPNext(
+            envForSync as unknown as { ERPNEXT_URL: string; ERPNEXT_API_KEY: string; ERPNEXT_API_SECRET: string },
+            ordId,
+            ord,
+          );
+          syncOk = !syncRes || !('ok' in syncRes) || syncRes.ok !== false;
+        } catch {
+          syncOk = false;
+        }
+        if (syncOk) {
+          await db
+            .prepare(
+              `INSERT INTO erpnext_mappings (id, local_type, local_id, erpnext_id, erpnext_model, sync_status, last_synced_at, tenant_id)
+               VALUES (?, 'order', ?, ?, 'Sales Order', 'synced', ?, ?)
+               ON CONFLICT(id) DO UPDATE SET sync_status = 'synced', last_synced_at = excluded.last_synced_at`
+            )
+            .bind(`map_order_${effectiveTenant}_${ordId}`, ordId, ordId, now, effectiveTenant)
+            .run()
+            .catch(() => {});
+          directSynced++;
+        }
+      }
+      return queueRes.succeeded + directSynced;
+    }
+
+    if (entity === 'inventory') {
+      const binRes = await client.list('Bin', {
+        fields: ['name', 'item_code', 'actual_qty'],
+        limit: 100,
+      });
+      const bins = Array.isArray(binRes?.data) ? (binRes.data as Array<Record<string, unknown>>) : [];
+      let updatedBins = 0;
+      for (const bin of bins) {
+        const itemCode = typeof bin.item_code === 'string' ? bin.item_code.trim() : '';
+        if (!itemCode) continue;
+        const productKey = effectiveTenant !== 'default' ? `${effectiveTenant}::${itemCode}` : itemCode;
+        const qty = typeof bin.actual_qty === 'number' ? Math.floor(bin.actual_qty) : Number(bin.actual_qty) || 0;
+        await db
+          .prepare(
+            `INSERT INTO erpnext_product_sync
+              (product_id, erpnext_product_id, erpnext_item_code, cached_stock, last_synced_at, erpnext_modified, tenant_id)
+             VALUES (?, 0, ?, ?, ?, ?, ?)
+             ON CONFLICT(product_id) DO UPDATE SET
+              cached_stock = excluded.cached_stock,
+              last_synced_at = excluded.last_synced_at
+             WHERE COALESCE(NULLIF(TRIM(erpnext_product_sync.tenant_id), ''), 'default') = excluded.tenant_id`
+          )
+          .bind(productKey, itemCode, qty, now, now, effectiveTenant)
+          .run()
+          .catch(() => {});
+        updatedBins++;
+      }
+      return updatedBins;
+    }
+
+    // entity === 'invoices'
+    const invRes = await client.list('Sales Invoice', {
+      fields: ['name', 'po_no', 'posting_date', 'grand_total'],
+      limit: 100,
+    });
+    const invoices = Array.isArray(invRes?.data) ? (invRes.data as Array<Record<string, unknown>>) : [];
+    let mappedInvoices = 0;
+    for (const inv of invoices) {
+      const invName = typeof inv.name === 'string' ? inv.name.trim() : '';
+      if (!invName) continue;
+      const localRef = typeof inv.po_no === 'string' && inv.po_no.trim() ? inv.po_no.trim() : invName;
+      await db
+        .prepare(
+          `INSERT INTO erpnext_mappings (id, local_type, local_id, erpnext_id, erpnext_model, sync_status, last_synced_at, tenant_id)
+           VALUES (?, 'invoice', ?, ?, 'Sales Invoice', 'synced', ?, ?)
+           ON CONFLICT(id) DO UPDATE SET erpnext_id = excluded.erpnext_id, sync_status = 'synced', last_synced_at = excluded.last_synced_at`
+        )
+        .bind(`map_invoice_${effectiveTenant}_${localRef}`, localRef, invName, now, effectiveTenant)
+        .run()
+        .catch(() => {});
+      mappedInvoices++;
+    }
+    return mappedInvoices;
+  }
+
   // POST /api/admin/erpnext-sync/sync-all — Trigger full entity sync
   app.post('/api/admin/erpnext-sync/sync-all', adminTriggerAllow, async (c) => {
     const tenantId = resolveErpnextTenant(c);
@@ -625,20 +844,15 @@ export function erpnextSyncRoutes(app: import('hono').Hono<{ Bindings: Env }>): 
       );
     }
     const entities = ['orders', 'products', 'customers', 'inventory', 'invoices'] as const;
-    const doctypeMap: Record<(typeof entities)[number], string> = {
-      orders: 'Sales Order',
-      products: 'Item',
-      customers: 'Customer',
-      inventory: 'Bin',
-      invoices: 'Sales Invoice',
-    };
     let synced = 0;
+    let recordsSynced = 0;
     let failed = 0;
     const errors: string[] = [];
     for (const ent of entities) {
       try {
-        await client.list(doctypeMap[ent], { fields: ['name'], limit: 1 });
+        const entCount = await syncSingleEntityForTenant(ent, client, effectiveTenant, c.env, now);
         synced++;
+        recordsSynced += entCount;
       } catch (err: unknown) {
         failed++;
         const rawErr = err instanceof Error ? err.message : String(err);
@@ -646,13 +860,21 @@ export function erpnextSyncRoutes(app: import('hono').Hono<{ Bindings: Env }>): 
         errors.push(`${ent}: ${rawErr}`);
       }
     }
+    let webhooksProcessed = 0;
+    if (c.env.AURA_DB) {
+      webhooksProcessed = await processErpnextWebhookLog(
+        c.env.AURA_DB as unknown as Parameters<typeof processErpnextWebhookLog>[0],
+        c.env.AUTH_KV as unknown as Parameters<typeof processErpnextWebhookLog>[1],
+        effectiveTenant,
+      ).catch(() => 0);
+    }
     const errorSummary = errors.length > 0 ? errors.join('; ') : null;
     await writeSyncLog(
       c.env.AURA_DB,
       'POST',
       '/api/admin/erpnext-sync/sync-all',
       JSON.stringify({ entities, tenant_id: effectiveTenant }),
-      JSON.stringify({ synced, failed, timestamp: now }),
+      JSON.stringify({ synced, recordsSynced, webhooksProcessed, failed, timestamp: now }),
       errorSummary,
       effectiveTenant
     );
@@ -661,6 +883,8 @@ export function erpnextSyncRoutes(app: import('hono').Hono<{ Bindings: Env }>): 
         success: failed === 0,
         entity: 'all',
         synced,
+        recordsSynced,
+        webhooksProcessed,
         failed,
         count: synced,
         syncedAt: now,
@@ -677,14 +901,8 @@ export function erpnextSyncRoutes(app: import('hono').Hono<{ Bindings: Env }>): 
       return c.json({ success: false, error: 'Cross-tenant access denied' }, 403);
     }
     const entity = String(c.req.param('entity') || '').toLowerCase();
-    const doctypeMap: Record<string, string> = {
-      orders: 'Sales Order',
-      products: 'Item',
-      customers: 'Customer',
-      inventory: 'Bin',
-      invoices: 'Sales Invoice',
-    };
-    if (!doctypeMap[entity]) {
+    const validEntities = new Set(['orders', 'products', 'customers', 'inventory', 'invoices']);
+    if (!validEntities.has(entity)) {
       return c.json({ success: false, error: `Unsupported sync entity: ${entity}` }, 400);
     }
     const now = new Date().toISOString();
@@ -706,8 +924,13 @@ export function erpnextSyncRoutes(app: import('hono').Hono<{ Bindings: Env }>): 
       );
     }
     try {
-      const res = await client.list(doctypeMap[entity], { fields: ['name'], limit: 100 });
-      const count = Array.isArray(res?.data) ? res.data.length : 0;
+      const count = await syncSingleEntityForTenant(
+        entity as 'orders' | 'products' | 'customers' | 'inventory' | 'invoices',
+        client,
+        effectiveTenant,
+        c.env,
+        now,
+      );
       await writeSyncLog(
         c.env.AURA_DB,
         'POST',

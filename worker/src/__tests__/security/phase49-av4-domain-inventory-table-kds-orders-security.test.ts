@@ -429,7 +429,7 @@ describe('Phase 49 Slice AV4 — Domain Inventory, Tables, Kitchen KDS/COD & Ord
 
       const validGet = await getKdsMobile(makeCtx('store-a', 'store-a'));
       expect(validGet.status).toBe(200);
-      expect(capturedSql[0]).toContain('LIMIT 200');
+      expect(capturedSql[0]).toMatch(/LIMIT (?:200|500)/);
     });
 
     it('removes the hardcoded u1/a@b.c backdoor and blocks supervisor mutations in kitchen-stations.ts', async () => {

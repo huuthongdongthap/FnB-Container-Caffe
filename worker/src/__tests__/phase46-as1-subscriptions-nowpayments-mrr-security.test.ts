@@ -321,7 +321,12 @@ describe('Phase 46 Slice AS1 — Subscriptions, NowPayments IPN, MRR/ARR, Plan C
       const db = {
         prepare: vi.fn((sql: string) => ({
           bind: (...args: unknown[]) => ({
-            first: async () => ({ count: 0 }),
+            first: async () => {
+              if (sql.includes('normalized_mrr')) {
+                return { count: 2, mrr: 150_000_000, normalized_mrr: 20_000_000 };
+              }
+              return { count: 0 };
+            },
             run: async () => {
               if (sql.includes('INSERT INTO mrr_snapshots')) {
                 boundSnapshotArgs = args;
@@ -343,10 +348,11 @@ describe('Phase 46 Slice AS1 — Subscriptions, NowPayments IPN, MRR/ARR, Plan C
         'default'
       );
 
-      expect(boundSnapshotArgs[2]).toBe(20_000_000);
-      expect(boundSnapshotArgs[3]).toBe(240_000_000);
-      expect(boundSnapshotArgs[4]).toBe(2);
-      expect(boundSnapshotArgs[8]).toBe(10_000_000);
+      // Args: [snapId, normTenant, date, mrr, arr, active, newSubsCount, churnCount, churnRatePct, avgContractValue, createdAt]
+      expect(boundSnapshotArgs[3]).toBe(20_000_000);
+      expect(boundSnapshotArgs[4]).toBe(240_000_000);
+      expect(boundSnapshotArgs[5]).toBe(2);
+      expect(boundSnapshotArgs[9]).toBe(10_000_000);
     });
   });
 

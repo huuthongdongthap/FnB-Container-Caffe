@@ -68,7 +68,7 @@ describe('broadcast smoke', () => {
             if (sql.includes('FROM inventory_items')) {
               return { results: [{ id: 'ITM_1', sku: 'SKU_1', name: 'Coffee Beans', current_stock: 20, min_stock: 5, tenant_id: 'tenant_sadec_02' }] };
             }
-            if (sql.includes('FROM inventory_transactions')) {
+            if (sql.includes('FROM inventory_transactions') && !sql.includes('FROM stock_movements')) {
               return {
                 results: [
                   { item_id: 'ITM_1', total_depleted: 14, tenant_id: 'tenant_sadec_02' },

@@ -124,8 +124,8 @@ describe('canActorTransition role-based matrix', () => {
     });
 
     it('admin cannot override structural boundaries', () => {
-      // served -> cancelled is structurally illegal; admin cannot bypass this
-      expect(canActorTransition('admin', 'served', 'cancelled').ok).toBe(false);
+      // served -> preparing is structurally illegal; admin cannot bypass this
+      expect(canActorTransition('admin', 'served', 'preparing').ok).toBe(false);
     });
 
     it('admin can authorize any structurally-valid non-terminal move', () => {

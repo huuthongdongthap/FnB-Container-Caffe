@@ -1,9 +1,14 @@
 -- Tenant-scoped composite primary and unique keys for loyalty_tier_configs, tier_configs, promotions, and customers.
 -- Replaces legacy global single-column PK/UNIQUE constraints with tenant-scoped constraints while
 -- preserving all canonical and post-ALTER columns, foreign-key references, indexes, and triggers.
-
-PRAGMA foreign_keys = OFF;
-PRAGMA defer_foreign_keys = ON;
+--
+-- D1 foreign-key safety:
+--   D1 pins `PRAGMA foreign_keys = 1` and ignores attempts to disable it, committing each
+--   statement independently, so `PRAGMA defer_foreign_keys` cannot span a table swap. A plain
+--   `DROP TABLE customers` aborts on the eleven NO ACTION children. Section 3 therefore stages
+--   child rows into `_skip_*_data`, drops the children, drops `customers`, renames the staged
+--   copy into place, then recreates the children against the final table and repopulates them.
+--   Customer ids are preserved 1:1 by the dedupe below, so every child reference stays valid.
 
 -- 1a. loyalty_tier_configs: composite PRIMARY KEY (tenant_id, tier)
 DROP TABLE IF EXISTS _skip_loyalty_tier_configs_staging;
@@ -518,6 +523,63 @@ SELECT
   anonymized_at
 FROM ranked_customers;
 
+-- Every NO ACTION child that can hold rows is snapshotted and emptied below. The set differs by
+-- schema revision: live D1 carries the legacy `feedback`, `campaign_logs` and
+-- `notification_audit_log` children, while `worker/schema.sql` adds foreign keys to
+-- `cashback_wallets`, `loyalty_point_logs` and `user_rewards` (with `cashback_transactions`
+-- referring to the wallet). Both revisions are covered. The legacy `feedback` table (created only by
+-- 20260707_01, absent from worker/schema.sql, no writers) is not touched: it holds no rows, and an
+-- empty child never blocks the parent drop, so this migration runs identically on live and on a
+-- replica that never created it, so it is deliberately left alone. D1 cannot defer foreign-key
+-- checks across the swap, so each child is snapshotted and emptied first: an emptied child satisfies every
+-- foreign key while `customers` is dropped and rebuilt, and repopulating afterwards restores
+-- the exact rows. Customer ids survive the dedupe 1:1, so no reference can dangle.
+DROP TABLE IF EXISTS _skip_birthday_redemptions_data;
+CREATE TABLE IF NOT EXISTS _skip_birthday_redemptions_data AS SELECT * FROM birthday_redemptions;
+DROP TABLE IF EXISTS _skip_cashback_transactions_data;
+CREATE TABLE IF NOT EXISTS _skip_cashback_transactions_data AS SELECT * FROM cashback_transactions;
+DROP TABLE IF EXISTS _skip_cashback_wallets_data;
+CREATE TABLE IF NOT EXISTS _skip_cashback_wallets_data AS SELECT * FROM cashback_wallets;
+DROP TABLE IF EXISTS _skip_campaign_logs_data;
+CREATE TABLE IF NOT EXISTS _skip_campaign_logs_data AS SELECT * FROM campaign_logs;
+DROP TABLE IF EXISTS _skip_checkins_data;
+CREATE TABLE IF NOT EXISTS _skip_checkins_data AS SELECT * FROM checkins;
+DROP TABLE IF EXISTS _skip_consents_data;
+CREATE TABLE IF NOT EXISTS _skip_consents_data AS SELECT * FROM consents;
+DROP TABLE IF EXISTS _skip_customer_events_data;
+CREATE TABLE IF NOT EXISTS _skip_customer_events_data AS SELECT * FROM customer_events;
+DROP TABLE IF EXISTS _skip_customer_identities_data;
+CREATE TABLE IF NOT EXISTS _skip_customer_identities_data AS SELECT * FROM customer_identities;
+DROP TABLE IF EXISTS _skip_loyalty_point_logs_data;
+CREATE TABLE IF NOT EXISTS _skip_loyalty_point_logs_data AS SELECT * FROM loyalty_point_logs;
+DROP TABLE IF EXISTS _skip_notification_audit_log_data;
+CREATE TABLE IF NOT EXISTS _skip_notification_audit_log_data AS SELECT * FROM notification_audit_log;
+DROP TABLE IF EXISTS _skip_referral_codes_data;
+CREATE TABLE IF NOT EXISTS _skip_referral_codes_data AS SELECT * FROM referral_codes;
+DROP TABLE IF EXISTS _skip_referrals_data;
+CREATE TABLE IF NOT EXISTS _skip_referrals_data AS SELECT * FROM referrals;
+DROP TABLE IF EXISTS _skip_user_rewards_data;
+CREATE TABLE IF NOT EXISTS _skip_user_rewards_data AS SELECT * FROM user_rewards;
+DROP TABLE IF EXISTS _skip_visits_data;
+CREATE TABLE IF NOT EXISTS _skip_visits_data AS SELECT * FROM visits;
+
+DELETE FROM birthday_redemptions;
+DELETE FROM campaign_logs;
+-- cashback_transactions is a NO ACTION child of cashback_wallets, so it has to be emptied
+-- before the wallet rows can be removed.
+DELETE FROM cashback_transactions;
+DELETE FROM cashback_wallets;
+DELETE FROM checkins;
+DELETE FROM consents;
+DELETE FROM customer_events;
+DELETE FROM customer_identities;
+DELETE FROM loyalty_point_logs;
+DELETE FROM notification_audit_log;
+DELETE FROM referral_codes;
+DELETE FROM referrals;
+DELETE FROM user_rewards;
+DELETE FROM visits;
+
 DROP TABLE IF EXISTS customers;
 CREATE TABLE IF NOT EXISTS customers (
   id TEXT PRIMARY KEY,
@@ -582,11 +644,52 @@ FROM _skip_customers_staging;
 
 DROP TABLE IF EXISTS _skip_customers_staging;
 
+INSERT INTO birthday_redemptions SELECT * FROM _skip_birthday_redemptions_data;
+INSERT INTO campaign_logs SELECT * FROM _skip_campaign_logs_data;
+INSERT INTO cashback_wallets SELECT * FROM _skip_cashback_wallets_data;
+INSERT INTO cashback_transactions SELECT * FROM _skip_cashback_transactions_data;
+INSERT INTO checkins SELECT * FROM _skip_checkins_data;
+INSERT INTO consents SELECT * FROM _skip_consents_data;
+INSERT INTO customer_events SELECT * FROM _skip_customer_events_data;
+INSERT INTO customer_identities SELECT * FROM _skip_customer_identities_data;
+INSERT INTO loyalty_point_logs SELECT * FROM _skip_loyalty_point_logs_data;
+INSERT INTO notification_audit_log SELECT * FROM _skip_notification_audit_log_data;
+INSERT INTO referral_codes SELECT * FROM _skip_referral_codes_data;
+INSERT INTO referrals SELECT * FROM _skip_referrals_data;
+INSERT INTO user_rewards SELECT * FROM _skip_user_rewards_data;
+INSERT INTO visits SELECT * FROM _skip_visits_data;
+
+DROP TABLE IF EXISTS _skip_birthday_redemptions_data;
+DROP TABLE IF EXISTS _skip_campaign_logs_data;
+DROP TABLE IF EXISTS _skip_cashback_transactions_data;
+DROP TABLE IF EXISTS _skip_cashback_wallets_data;
+DROP TABLE IF EXISTS _skip_checkins_data;
+DROP TABLE IF EXISTS _skip_consents_data;
+DROP TABLE IF EXISTS _skip_customer_events_data;
+DROP TABLE IF EXISTS _skip_customer_identities_data;
+DROP TABLE IF EXISTS _skip_loyalty_point_logs_data;
+DROP TABLE IF EXISTS _skip_notification_audit_log_data;
+DROP TABLE IF EXISTS _skip_referral_codes_data;
+DROP TABLE IF EXISTS _skip_referrals_data;
+DROP TABLE IF EXISTS _skip_user_rewards_data;
+DROP TABLE IF EXISTS _skip_visits_data;
+
 CREATE INDEX IF NOT EXISTS idx_customers_email ON customers(email);
 CREATE INDEX IF NOT EXISTS idx_customers_loyalty_tier ON customers(loyalty_tier);
 CREATE INDEX IF NOT EXISTS idx_customers_tenant ON customers(tenant_id);
 CREATE INDEX IF NOT EXISTS idx_customers_erpnext_id ON customers(erpnext_id);
 CREATE INDEX IF NOT EXISTS idx_customers_sync_status ON customers(sync_status);
+
+-- Live D1 carries two more `customers` indexes that no canonical DDL ever declared
+-- (`idx_customers_tier` came from 20261029_10, `idx_customers_phone` from an ad-hoc
+-- production index). A parent rebuild drops every index on the table, so both must be
+-- recreated here or they vanish silently on apply. Each has an active reader:
+-- wifi session lookup filters on `phone`, campaign enrollment filters on `tier`.
+-- `idx_promotions_active` (live-only, from 20261029_01) is intentionally NOT recreated:
+-- it is column-for-column identical to `idx_promo_active` above, so the rebuild
+-- collapses the duplicate instead of paying double write cost for it.
+CREATE INDEX IF NOT EXISTS idx_customers_phone ON customers(phone);
+CREATE INDEX IF NOT EXISTS idx_customers_tier ON customers(tier);
 
 CREATE TRIGGER IF NOT EXISTS update_customers_timestamp
 AFTER UPDATE ON customers

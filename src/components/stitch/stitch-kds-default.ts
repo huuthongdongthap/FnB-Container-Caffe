@@ -6,11 +6,10 @@
 
 import type { Ticket, FilterTab } from './stitch-kds-types';
 
-/** Filter tabs for the top navigation bar */
+/** Filter tabs for the top navigation bar (non-overlapping workflow + SLA breach) */
 export const FILTERS: FilterTab[] = [
   { key: 'all', tKey: 'kds.all', label: 'ALL' },
   { key: 'overdue', tKey: 'kds.overdue', label: 'OVERDUE' },
-  { key: 'priority', tKey: 'kds.priority', label: 'PRIORITY' },
   { key: 'pending', tKey: 'kds.pending', label: 'PENDING' },
   { key: 'preparing', tKey: 'kds.preparing', label: 'PREPARING' },
   { key: 'ready', tKey: 'kds.ready', label: 'READY' },

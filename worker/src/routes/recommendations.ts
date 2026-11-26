@@ -89,20 +89,57 @@ async function handleFrequentlyBoughtTogether(c: Context<{ Bindings: Env }>) {
   const tenantId = resolveRecommendationsTenant(c);
   const db = (c.env.AURA_DB ?? (c.env as Record<string, unknown>).DB) as import('@cloudflare/workers-types').D1Database;
 
-  const { results: affinities } = await db.prepare(`
-    SELECT item_b AS id, co_occurrence_count, affinity_score
-    FROM ai_product_affinities
-    WHERE (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?) AND item_a = ?
-    ORDER BY affinity_score DESC, co_occurrence_count DESC
-    LIMIT ?
-  `).bind(tenantId, tenantId, itemId, limit).all<{ id: string; co_occurrence_count: number; affinity_score: number }>().catch(() => ({ results: [] }));
+  type AffinityJoinedRow = {
+    id: string;
+    co_occurrence_count: number;
+    affinity_score: number;
+    product_name?: string | null;
+    price?: number | null;
+    image_url?: string | null;
+  };
+  let affinities: AffinityJoinedRow[] = [];
+  try {
+    const joinedRes = await db.prepare(`
+      SELECT
+        a.item_b AS id,
+        a.co_occurrence_count,
+        a.affinity_score,
+        p.name AS product_name,
+        p.price AS price,
+        p.image_url AS image_url
+      FROM ai_product_affinities a
+      LEFT JOIN products p
+        ON CAST(p.id AS TEXT) = CAST(a.item_b AS TEXT)
+        AND (? = '*' OR COALESCE(NULLIF(TRIM(p.tenant_id), ''), 'default') = COALESCE(NULLIF(TRIM(a.tenant_id), ''), 'default'))
+      WHERE (? = '*' OR COALESCE(NULLIF(TRIM(a.tenant_id), ''), 'default') = ?) AND a.item_a = ?
+      ORDER BY a.affinity_score DESC, a.co_occurrence_count DESC
+      LIMIT ?
+    `).bind(tenantId, tenantId, tenantId, itemId, limit).all<AffinityJoinedRow>();
+    affinities = joinedRes.results || [];
+  } catch {
+    const plainRes = await db.prepare(`
+      SELECT item_b AS id, co_occurrence_count, affinity_score
+      FROM ai_product_affinities
+      WHERE (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?) AND item_a = ?
+      ORDER BY affinity_score DESC, co_occurrence_count DESC
+      LIMIT ?
+    `).bind(tenantId, tenantId, itemId, limit).all<AffinityJoinedRow>().catch(() => ({ results: [] }));
+    affinities = plainRes.results || [];
+  }
 
   if (affinities && affinities.length > 0) {
     const data = affinities.map(a => ({
       id: a.id,
-      name: a.id.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
+      name: (typeof a.product_name === 'string' && a.product_name.trim())
+        ? a.product_name.trim()
+        : FALLBACK_PAIRINGS.find(p => p.id === a.id)?.name
+          || a.id.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
+      ...(a.price !== undefined && a.price !== null ? { price: Number(a.price) } : {}),
+      ...(typeof a.image_url === 'string' && a.image_url ? { image_url: a.image_url } : {}),
       reason: `Thường được khách gọi cùng (${Math.round(a.affinity_score * 100)}% độ phù hợp)`,
-      score: a.affinity_score
+      score: a.affinity_score,
+      orders_count: Number(a.co_occurrence_count ?? 0),
+      is_fallback: false,
     }));
     return c.json({ success: true, data });
   }
@@ -111,9 +148,9 @@ async function handleFrequentlyBoughtTogether(c: Context<{ Bindings: Env }>) {
   const fallbacks = FALLBACK_PAIRINGS
     .filter(p => p.id !== itemId)
     .slice(0, limit)
-    .map(p => ({ id: p.id, name: p.name, reason: p.reason, score: 0.75 }));
+    .map(p => ({ id: p.id, name: p.name, reason: p.reason, score: 0.75, orders_count: 0, is_fallback: true }));
 
-  return c.json({ success: true, data: fallbacks });
+  return c.json({ success: true, data: fallbacks, is_fallback: true });
 }
 
 async function handleTrending(c: Context<{ Bindings: Env }>) {
@@ -123,7 +160,7 @@ async function handleTrending(c: Context<{ Bindings: Env }>) {
   const tenantId = resolveRecommendationsTenant(c);
   const db = (c.env.AURA_DB ?? (c.env as Record<string, unknown>).DB) as import('@cloudflare/workers-types').D1Database;
 
-  const hoursAgo = new Date(Date.now() - range * 3600000).toISOString();
+  const hoursAgo = new Date(Date.now() - range * 3600000).toISOString().replace('T', ' ').replace(/\.\d{3}Z$/, '');
   let orders: { items: string; status?: string; payment_status?: string }[] = [];
   try {
     const res = await db.prepare(`
@@ -131,7 +168,7 @@ async function handleTrending(c: Context<{ Bindings: Env }>) {
       WHERE (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?)
         AND LOWER(COALESCE(status, '')) NOT IN ('cancelled', 'canceled', 'failed', 'rejected', 'expired', 'refunded')
         AND LOWER(COALESCE(payment_status, '')) NOT IN ('refunded', 'failed', 'cancelled', 'canceled')
-        AND created_at >= ?
+        AND replace(created_at, 'T', ' ') >= ?
       ORDER BY created_at DESC LIMIT 200
     `).bind(tenantId, tenantId, hoursAgo).all<{ items: string; status?: string; payment_status?: string }>();
     orders = res.results || [];
@@ -141,14 +178,14 @@ async function handleTrending(c: Context<{ Bindings: Env }>) {
         SELECT items FROM orders
         WHERE (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?)
           AND LOWER(COALESCE(status, '')) NOT IN ('cancelled', 'canceled', 'failed', 'rejected', 'expired', 'refunded')
-          AND created_at >= ?
+          AND replace(created_at, 'T', ' ') >= ?
         ORDER BY created_at DESC LIMIT 200
       `).bind(tenantId, tenantId, hoursAgo).all<{ items: string; status?: string }>();
       orders = res.results || [];
     } catch {
       const res = await db.prepare(`
         SELECT items FROM orders
-        WHERE (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?) AND status != 'cancelled' AND created_at >= ?
+        WHERE (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?) AND status != 'cancelled' AND replace(created_at, 'T', ' ') >= ?
         ORDER BY created_at DESC LIMIT 200
       `).bind(tenantId, tenantId, hoursAgo).all<{ items: string; status?: string }>().catch(() => ({ results: [] }));
       orders = res.results || [];
@@ -174,15 +211,15 @@ async function handleTrending(c: Context<{ Bindings: Env }>) {
   }
 
   const sorted = Array.from(counts.entries())
-    .map(([id, info]) => ({ id, name: info.name, orders_count: info.count, reason: 'Xu hướng bán chạy tại Sa Đéc' }))
+    .map(([id, info]) => ({ id, name: info.name, orders_count: info.count, reason: 'Xu hướng bán chạy', is_fallback: false }))
     .sort((a, b) => b.orders_count - a.orders_count)
     .slice(0, limit);
 
   const finalTrending = sorted.length > 0 ? sorted : FALLBACK_PAIRINGS.slice(0, limit).map(p => ({
-    id: p.id, name: p.name, orders_count: 10, reason: 'Món đặc trưng được ưa chuộng'
+    id: p.id, name: p.name, orders_count: 0, reason: 'Món đặc trưng được ưa chuộng', is_fallback: true
   }));
 
-  return c.json({ success: true, data: finalTrending });
+  return c.json({ success: true, data: finalTrending, is_fallback: sorted.length === 0 });
 }
 
 // GET /api/recommendations
@@ -199,44 +236,10 @@ recommendationsRouter.get('/frequently-bought-together', handleFrequentlyBoughtT
 // GET /api/recommendations/trending
 recommendationsRouter.get('/trending', handleTrending);
 
-// POST /api/recommendations/mine-affinities (Owner/Manager/Supervisor/Admin)
-recommendationsRouter.post('/mine-affinities', requireAuth(['owner', 'admin', 'manager', 'supervisor']), async (c) => {
-  const user = c.get('user' as never) as { role?: string; tenantId?: string; tenant_id?: string } | undefined;
-  if (user?.role && !['owner', 'admin', 'manager', 'supervisor'].includes(user.role)) {
-    return c.json({ success: false, error: 'Insufficient permissions' }, 403);
-  }
-  const rawTenantValue = getTenantId(c).trim() || 'default';
-  const rawTenant = rawTenantValue.toLowerCase() === 'hq' ? '*' : rawTenantValue;
-  const boundTenant = (user?.tenantId || user?.tenant_id || '').trim() || 'default';
-  const requestedOverride = (
-    c.req.query('tenant_id') ||
-    c.req.query('tenantId') ||
-    c.req.query('store_id') ||
-    c.req.query('storeId') ||
-    c.req.header('X-Tenant-ID') ||
-    c.req.header('x-tenant-id') ||
-    c.req.header('X-Store-ID') ||
-    c.req.header('x-store-id') ||
-    ''
-  ).trim();
-  if (
-    user &&
-    !isHQSuperAdmin(user) &&
-    (boundTenant === '*' ||
-      boundTenant.toLowerCase() === 'hq' ||
-      (requestedOverride && (requestedOverride === '*' || requestedOverride.toLowerCase() === 'hq' || requestedOverride !== boundTenant)))
-  ) {
-    return c.json({ success: false, error: 'Cross-tenant affinity mining denied' }, 403);
-  }
-  const explicitTarget = (
-    requestedOverride ||
-    resolvePilotStore(c.env)
-  ).trim();
-  const targetTenant = rawTenant === '*'
-    ? (!explicitTarget || explicitTarget === '*' || explicitTarget.toLowerCase() === 'hq' ? (resolvePilotStore(c.env) || 'default') : explicitTarget)
-    : rawTenant;
-  const db = (c.env.AURA_DB ?? (c.env as Record<string, unknown>).DB) as import('@cloudflare/workers-types').D1Database;
-
+export async function mineProductAffinitiesForTenant(
+  db: import('@cloudflare/workers-types').D1Database,
+  targetTenant: string
+): Promise<{ minedPairs: number }> {
   let orders: { items: string; status?: string; payment_status?: string; tenant_id?: string | null }[] = [];
   try {
     const res = await db.prepare(`
@@ -340,16 +343,106 @@ recommendationsRouter.post('/mine-affinities', requireAuth(['owner', 'admin', 'm
 
   if (statements.length > 0) {
     try {
-      // Execute in chunks of 50
       for (let i = 0; i < statements.length; i += 50) {
         await db.batch(statements.slice(i, i + 50));
       }
-    } catch {
+    } catch (err) {
       if (targetTenant !== 'default') {
-        return c.json({ success: false, error: 'Failed to persist affinity pairs' }, 500);
+        throw err;
       }
     }
   }
 
-  return c.json({ success: true, message: `Mined ${minedPairs} affinity pairs`, mined_pairs: minedPairs });
+  return { minedPairs };
+}
+
+export async function mineProductAffinitiesForAllTenants(
+  env: Env | Record<string, unknown>
+): Promise<{ tenantsProcessed: number; totalMinedPairs: number }> {
+  const db = ((env as Env).AURA_DB ?? (env as Record<string, unknown>).DB) as import('@cloudflare/workers-types').D1Database | undefined;
+  if (!db || typeof db.prepare !== 'function') {
+    return { tenantsProcessed: 0, totalMinedPairs: 0 };
+  }
+
+  let pilotTenant = 'default';
+  try {
+    pilotTenant = resolvePilotStore(env as Parameters<typeof resolvePilotStore>[0]) || 'default';
+  } catch {
+    pilotTenant = 'default';
+  }
+
+  const tenants = new Set<string>([pilotTenant]);
+  try {
+    const res = await db
+      .prepare("SELECT id FROM saas_tenants WHERE status IS NULL OR LOWER(status) IN ('active', 'trial', 'trialing')")
+      .all<{ id?: string | null }>();
+    for (const row of res.results || []) {
+      const id = typeof row.id === 'string' ? row.id.trim() : '';
+      if (id && id !== '*' && id.toLowerCase() !== 'hq') {
+        tenants.add(id);
+      }
+    }
+  } catch {
+    // saas_tenants optional in minimal schemas
+  }
+
+  let tenantsProcessed = 0;
+  let totalMinedPairs = 0;
+  for (const tenantId of tenants) {
+    try {
+      const { minedPairs } = await mineProductAffinitiesForTenant(db, tenantId);
+      tenantsProcessed += 1;
+      totalMinedPairs += minedPairs;
+    } catch {
+      // Isolate single-tenant cron failure so other tenants still update
+    }
+  }
+
+  return { tenantsProcessed, totalMinedPairs };
+}
+
+// POST /api/recommendations/mine-affinities (Owner/Manager/Supervisor/Admin)
+recommendationsRouter.post('/mine-affinities', requireAuth(['owner', 'admin', 'manager', 'supervisor']), async (c) => {
+  const user = c.get('user' as never) as { role?: string; tenantId?: string; tenant_id?: string } | undefined;
+  if (user?.role && !['owner', 'admin', 'manager', 'supervisor'].includes(user.role)) {
+    return c.json({ success: false, error: 'Insufficient permissions' }, 403);
+  }
+  const rawTenantValue = getTenantId(c).trim() || 'default';
+  const rawTenant = rawTenantValue.toLowerCase() === 'hq' ? '*' : rawTenantValue;
+  const boundTenant = (user?.tenantId || user?.tenant_id || '').trim() || 'default';
+  const requestedOverride = (
+    c.req.query('tenant_id') ||
+    c.req.query('tenantId') ||
+    c.req.query('store_id') ||
+    c.req.query('storeId') ||
+    c.req.header('X-Tenant-ID') ||
+    c.req.header('x-tenant-id') ||
+    c.req.header('X-Store-ID') ||
+    c.req.header('x-store-id') ||
+    ''
+  ).trim();
+  if (
+    user &&
+    !isHQSuperAdmin(user) &&
+    (boundTenant === '*' ||
+      boundTenant.toLowerCase() === 'hq' ||
+      (requestedOverride && (requestedOverride === '*' || requestedOverride.toLowerCase() === 'hq' || requestedOverride !== boundTenant)))
+  ) {
+    return c.json({ success: false, error: 'Cross-tenant affinity mining denied' }, 403);
+  }
+  const explicitTarget = (
+    requestedOverride ||
+    resolvePilotStore(c.env)
+  ).trim();
+  const targetTenant = rawTenant === '*'
+    ? (!explicitTarget || explicitTarget === '*' || explicitTarget.toLowerCase() === 'hq' ? (resolvePilotStore(c.env) || 'default') : explicitTarget)
+    : rawTenant;
+  const db = (c.env.AURA_DB ?? (c.env as Record<string, unknown>).DB) as import('@cloudflare/workers-types').D1Database;
+
+  try {
+    const { minedPairs } = await mineProductAffinitiesForTenant(db, targetTenant);
+    return c.json({ success: true, message: `Mined ${minedPairs} affinity pairs`, mined_pairs: minedPairs });
+  } catch {
+    return c.json({ success: false, error: 'Failed to persist affinity pairs' }, 500);
+  }
 });

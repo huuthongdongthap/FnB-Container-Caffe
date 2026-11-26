@@ -1,4 +1,4 @@
-import { useMutation } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiFetch } from '@/lib/api-client';
 import { captureGuestOrderTokenFromResponse, getGuestOrderToken } from '@/lib/guest-order-token';
 import type { OrderApiPayload } from '@/lib/validators';
@@ -7,7 +7,10 @@ import type { OrderApiPayload } from '@/lib/validators';
    useCheckout — TanStack Query mutation for POST /api/orders.
    ═══════════════════════════════════════════════════════════════════ */
 
-interface CreateOrderPayload extends OrderApiPayload {}
+interface CreateOrderPayload extends OrderApiPayload {
+  pay_now?: boolean;
+  cash_tendered?: number;
+}
 
 interface CreateOrderResponse {
   success: boolean;
@@ -20,6 +23,8 @@ interface CreateOrderResponse {
     totalAmount?: number;
     payment_method: string;
     payment_status: string;
+    cash_tendered?: number;
+    change_due?: number;
     customer_name: string;
     customer_phone: string;
     customer_address?: string;
@@ -39,6 +44,7 @@ interface CreateOrderResponse {
 }
 
 export function useCheckout() {
+  const queryClient = useQueryClient();
   return useMutation<CreateOrderResponse, Error, CreateOrderPayload>({
     mutationFn: async (payload) => {
       const res = await apiFetch<CreateOrderResponse>('/api/orders', {
@@ -65,6 +71,16 @@ export function useCheckout() {
         };
       }
       return res;
+    },
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['kds-orders'] }),
+        queryClient.invalidateQueries({ queryKey: ['orders'] }),
+        queryClient.invalidateQueries({ queryKey: ['admin-orders'] }),
+      ]);
+      if (typeof window !== 'undefined' && typeof window.dispatchEvent === 'function') {
+        window.dispatchEvent(new CustomEvent('aura:orders-changed'));
+      }
     },
   });
 }

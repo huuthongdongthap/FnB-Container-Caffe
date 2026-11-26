@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { apiFetch } from '@/lib/api-client';
+import { saveClientSession, type ClientSessionUser } from '@/lib/client-session';
+import { useAuthStore, type AuthUser } from '@/hooks/stores/use-auth-store';
 
 const VerifyEmailPage: React.FC = () => {
   const [email, setEmail] = useState('');
@@ -29,21 +31,41 @@ const VerifyEmailPage: React.FC = () => {
 
     setLoading(true);
     try {
-      const data = await apiFetch<{ token?: string; error?: string; message?: string }>('/api/auth/verify-email', {
+      const data = await apiFetch<{
+        success?: boolean;
+        token?: string;
+        user?: ClientSessionUser;
+        error?: string;
+        message?: string;
+      }>('/api/auth/verify-email', {
         method: 'POST',
         body: JSON.stringify({ email, code }),
       });
 
-      if ((data as { error?: string }).error || (data as { message?: string }).message) {
-        setError((data as { error?: string }).error || (data as { message?: string }).message || 'Xác thực thất bại');
+      if (data.success === false || data.error) {
+        setError(data.error || data.message || 'Xác thực thất bại');
         setLoading(false);
         return;
       }
 
-      setSuccess('Xác thực email thành công!');
+      if (data.token && data.user) {
+        saveClientSession(data.token, data.user);
+        useAuthStore.setState((state) => ({
+          user: data.user as AuthUser,
+          loading: false,
+          error: null,
+          sessionVersion: state.sessionVersion + 1,
+        }));
+      }
+
+      setSuccess(data.message || 'Xác thực email thành công!');
+
+      const params = new URLSearchParams(window.location.search);
+      const nextPath = params.get('next');
+      const safeNext = nextPath && nextPath.startsWith('/') && !nextPath.startsWith('//') ? nextPath : '/account';
 
       setTimeout(() => {
-        window.location.href = '/account';
+        window.location.href = safeNext;
       }, 2000);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Lỗi kết nối');

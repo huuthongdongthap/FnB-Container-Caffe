@@ -93,7 +93,7 @@ export const useReferralStore = create<ReferralState>((set, get) => ({
         try {
           const codeRes = await apiFetch<{ data?: { referral_code?: string; code?: string }; referral_code?: string; code?: string }>(
             '/api/loyalty/referral/code',
-            { method: 'POST' },
+            { method: 'GET' },
           );
           if (!isSameSessionSnapshot(sessionSnap, readSessionSnapshot())) return;
           referralCode =
@@ -110,9 +110,9 @@ export const useReferralStore = create<ReferralState>((set, get) => ({
       const totalReferrals: number = (raw.total_referrals as number) ?? 0;
       const cashbackEarned: number = (raw.total_cashback_earned_vnd as number) ?? 0;
       const codeUsage: number = (raw.code_usage as number) ?? 0;
-      const recentReferrals: RecentReferral[] = ((raw.recent_referrals as Array<Record<string, unknown>>) ?? []).map((r) => ({
-        id: String(r.id),
-        referredName: (r.referred_name as string) || (r.referred_phone as string) || 'An danh',
+      const recentReferrals: RecentReferral[] = ((raw.recent_referrals as Array<Record<string, unknown>>) ?? []).map((r, idx) => ({
+        id: r.id ? String(r.id) : `ref_${idx}`,
+        referredName: (r.referred_name as string) || (r.referred_phone as string) || 'Ẩn danh',
         status: String(r.status),
         cashbackAwarded: Number(r.cashback_awarded_vnd ?? 0),
         createdAt: String(r.created_at),

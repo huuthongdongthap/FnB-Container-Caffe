@@ -293,8 +293,21 @@ export function registerOrderHandlers(router: Hono<{ Bindings: Env }>): void {
       }
     }
 
+    const parseNormalizedTimestampMs = (raw: unknown): number | null => {
+      if (typeof raw !== 'string') return null;
+      const trimmed = raw.trim();
+      if (!trimmed) return null;
+      const normalized = /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}/.test(trimmed)
+        ? `${trimmed.replace(' ', 'T')}Z`
+        : trimmed.includes('T') && !/(Z|[+-]\d{2}:?\d{2})$/i.test(trimmed)
+          ? `${trimmed}Z`
+          : trimmed;
+      const ms = Date.parse(normalized);
+      return Number.isNaN(ms) ? null : ms;
+    };
+
     const effectiveSession: TableSessionRecord = session ?? currentSession;
-    const effectiveOpenedAt = effectiveSession.opened_at || effectiveSession.started_at || effectiveSession.created_at || null;
+    const effectiveOpenedAt = effectiveSession.started_at || effectiveSession.opened_at || effectiveSession.created_at || null;
     let effectiveSessionTenant = '';
     const rawSessionTenant = typeof effectiveSession.tenant_id === 'string' ? effectiveSession.tenant_id.trim() : '';
     if (rawSessionTenant && rawSessionTenant !== '*' && rawSessionTenant.toLowerCase() !== 'hq') {
@@ -314,14 +327,59 @@ export function registerOrderHandlers(router: Hono<{ Bindings: Env }>): void {
     if (effectiveOpenedAt) {
       try {
         const res = await db.prepare(
-          "SELECT * FROM orders WHERE table_id = (SELECT table_id FROM table_sessions WHERE id = ?) AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ? AND created_at >= ? ORDER BY created_at DESC LIMIT 200"
-        ).bind(id, effectiveSessionTenant, effectiveOpenedAt).all<Record<string, unknown>>();
+          `SELECT * FROM orders
+           WHERE COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?
+             AND (
+               session_id = ?
+               OR (
+                 (session_id IS NULL OR TRIM(session_id) = '')
+                 AND table_id = (SELECT table_id FROM table_sessions WHERE id = ?)
+                 AND julianday(created_at) >= julianday(?)
+               )
+             )
+           ORDER BY created_at DESC LIMIT 200`
+        ).bind(effectiveSessionTenant, id, id, effectiveOpenedAt).all<Record<string, unknown>>();
         results = res.results || [];
       } catch {
         try {
           const res = await db.prepare(
-            'SELECT * FROM orders WHERE table_id = (SELECT table_id FROM table_sessions WHERE id = ?) AND created_at >= ? ORDER BY created_at DESC LIMIT 200'
-          ).bind(id, effectiveOpenedAt).all<Record<string, unknown>>();
+            "SELECT * FROM orders WHERE table_id = (SELECT table_id FROM table_sessions WHERE id = ?) AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ? AND julianday(created_at) >= julianday(?) ORDER BY created_at DESC LIMIT 200"
+          ).bind(id, effectiveSessionTenant, effectiveOpenedAt).all<Record<string, unknown>>();
+          results = res.results || [];
+        } catch {
+          try {
+            const res = await db.prepare(
+              'SELECT * FROM orders WHERE table_id = (SELECT table_id FROM table_sessions WHERE id = ?) AND julianday(created_at) >= julianday(?) ORDER BY created_at DESC LIMIT 200'
+            ).bind(id, effectiveOpenedAt).all<Record<string, unknown>>();
+            results = res.results || [];
+          } catch {
+            const res = await db.prepare(
+              'SELECT * FROM orders WHERE table_id = (SELECT table_id FROM table_sessions WHERE id = ?) ORDER BY created_at DESC LIMIT 200'
+            ).bind(id).all<Record<string, unknown>>();
+            results = res.results || [];
+          }
+        }
+      }
+    } else {
+      try {
+        const res = await db.prepare(
+          `SELECT * FROM orders
+           WHERE COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?
+             AND (
+               session_id = ?
+               OR (
+                 (session_id IS NULL OR TRIM(session_id) = '')
+                 AND table_id = (SELECT table_id FROM table_sessions WHERE id = ?)
+               )
+             )
+           ORDER BY created_at DESC LIMIT 200`
+        ).bind(effectiveSessionTenant, id, id).all<Record<string, unknown>>();
+        results = res.results || [];
+      } catch {
+        try {
+          const res = await db.prepare(
+            "SELECT * FROM orders WHERE table_id = (SELECT table_id FROM table_sessions WHERE id = ?) AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ? ORDER BY created_at DESC LIMIT 200"
+          ).bind(id, effectiveSessionTenant).all<Record<string, unknown>>();
           results = res.results || [];
         } catch {
           const res = await db.prepare(
@@ -330,28 +388,23 @@ export function registerOrderHandlers(router: Hono<{ Bindings: Env }>): void {
           results = res.results || [];
         }
       }
-    } else {
-      try {
-        const res = await db.prepare(
-          "SELECT * FROM orders WHERE table_id = (SELECT table_id FROM table_sessions WHERE id = ?) AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ? ORDER BY created_at DESC LIMIT 200"
-        ).bind(id, effectiveSessionTenant).all<Record<string, unknown>>();
-        results = res.results || [];
-      } catch {
-        const res = await db.prepare(
-          'SELECT * FROM orders WHERE table_id = (SELECT table_id FROM table_sessions WHERE id = ?) ORDER BY created_at DESC LIMIT 200'
-        ).bind(id).all<Record<string, unknown>>();
-        results = res.results || [];
-      }
     }
+
+    const openedMs = parseNormalizedTimestampMs(effectiveOpenedAt);
+    const closedMs = parseNormalizedTimestampMs(effectiveSession.closed_at);
 
     const scoped = (results || []).filter((o) => {
       if (!matchesTenantRow(o, tenantId) || !matchesTenantRow(o, effectiveSessionTenant)) return false;
-      const createdTs = o.created_at ? String(o.created_at) : '';
-      if (effectiveOpenedAt && createdTs) {
-        if (createdTs < String(effectiveOpenedAt)) return false;
+      const orderSessionId = typeof o.session_id === 'string' ? o.session_id.trim() : '';
+      if (orderSessionId) {
+        return orderSessionId === id;
       }
-      if (session?.closed_at && createdTs) {
-        if (createdTs > String(session.closed_at)) return false;
+      const createdMs = parseNormalizedTimestampMs(o.created_at);
+      if (openedMs !== null && createdMs !== null && createdMs < openedMs) {
+        return false;
+      }
+      if (closedMs !== null && createdMs !== null && createdMs > closedMs) {
+        return false;
       }
       return true;
     });

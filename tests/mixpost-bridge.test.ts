@@ -593,16 +593,18 @@ describe('autoPostDailySpecials', () => {
     });
   });
 
-  test('generates post from available products with Vietnamese content', async () => {
+  test('generates post from available products with Vietnamese content and configured store hotline', async () => {
     mockFetchResponse({ id: 101 });
     const { autoPostDailySpecials } = await loadModule();
+    env.STORE_HOTLINE = '0909 888 777';
     await autoPostDailySpecials(env, undefined, new Date('2026-11-23T00:00:00.000Z'));
 
     expect(mockFetch).toHaveBeenCalledTimes(1);
     const [, opts] = mockFetch.mock.calls[0] as [string, RequestInit];
     const body = JSON.parse(opts.body as string);
     expect(body.versions[0].content[0].body).toMatch(/Aura Cafe/);
-    expect(body.versions[0].content[0].body).toMatch(/1900 1234/);
+    expect(body.versions[0].content[0].body).toMatch(/0909 888 777/);
+    expect(body.versions[0].content[0].body).not.toMatch(/1900 1234/);
     expect(body.versions[0].content[0].body).toMatch(/#MenuHangNgay/);
     expect(body.versions[0].content[0].body).toMatch(/Espresso|Cappuccino|TRA CHANH|Croissant/);
   });

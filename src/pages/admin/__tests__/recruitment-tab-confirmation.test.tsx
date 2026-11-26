@@ -62,7 +62,7 @@ describe('admin recruitment confirmation', () => {
     await act(async () => b.resolve(false));
     expect(screen.getByDisplayValue('Form B')).toBeTruthy();
   });
-  it.each(['staff', 'admin', 'cashier', 'waiter', 'kitchen'])('hides direct recruitment rendering for %s', role => {
+  it.each(['staff', 'cashier', 'waiter', 'kitchen'])('hides direct recruitment rendering for %s', role => {
     saveClientSession('restricted', { id: 'restricted', role, name: 'R' });
     render(<RecruitmentTab />);
     expect(screen.queryByText('Private Candidate A')).toBeNull();

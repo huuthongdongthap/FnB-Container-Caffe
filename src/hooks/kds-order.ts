@@ -4,12 +4,20 @@ export interface KDSOrder {
   customerName?: string;
   table: string;
   orderType?: string;
+  paymentStatus?: string;
+  paymentMethod?: string;
+  deliveryTime?: string;
   status: 'pending' | 'confirmed' | 'preparing' | 'ready' | 'served' | 'cancelled';
   items: Array<{
+    id?: string;
     name: string;
     quantity: number;
     modifiers?: string[];
     notes?: string;
+    ready?: boolean;
+    status?: string;
+    startedAt?: string;
+    readyAt?: string;
   }>;
   notes?: string;
   station?: string;
@@ -20,6 +28,19 @@ export interface KDSOrder {
   readyAt?: string;
 }
 
+/** Avoids duplicate 'Bàn Bàn 1' or 'Table Table 1' when cafe_tables.name already carries the prefix. */
+export function formatTableWithPrefix(
+  rawTable: string | null | undefined,
+  prefixFormatter: (cleanTable: string) => string,
+): string {
+  const trimmed = typeof rawTable === 'string' ? rawTable.trim() : '';
+  if (!trimmed) return '';
+  if (/^(bàn|ban|table)\s+/i.test(trimmed)) {
+    return trimmed;
+  }
+  return prefixFormatter(trimmed);
+}
+
 /** Snapshot payload from GET /api/kds/orders/stream (D1-backed). */
 export interface KdsStreamOrder {
   id: string;
@@ -28,6 +49,9 @@ export interface KdsStreamOrder {
   table_id: string | null;
   table_name?: string | null;
   order_type?: string | null;
+  payment_status?: string | null;
+  payment_method?: string | null;
+  delivery_time?: string | null;
   items: Array<{ product_name: string; product_id?: string; quantity: number; unit_price?: number; notes?: string }>;
   notes?: string | null;
   status: string;
@@ -69,15 +93,26 @@ export function mapStreamOrders(orders: KdsStreamOrder[]): KDSOrder[] {
       ...(typeof o.customer_name === 'string' && o.customer_name.trim() ? { customerName: o.customer_name.trim() } : {}),
       table: (typeof o.table_name === 'string' && o.table_name.trim()) || o.table_id || '',
       ...(typeof o.order_type === 'string' && o.order_type.trim() ? { orderType: o.order_type.trim().toLowerCase() } : {}),
+      ...(typeof o.payment_status === 'string' && o.payment_status.trim() ? { paymentStatus: o.payment_status.trim().toLowerCase() } : {}),
+      ...(typeof o.payment_method === 'string' && o.payment_method.trim() ? { paymentMethod: o.payment_method.trim().toLowerCase() } : {}),
+      ...(typeof o.delivery_time === 'string' && o.delivery_time.trim() ? { deliveryTime: o.delivery_time.trim() } : {}),
       status: o.status as KDSOrder['status'],
       items: (o.items || []).map((item) => {
         const rawItem = item as Record<string, unknown>;
         const modifiers = normalizeModifiers(rawItem.modifiers);
+        const itemId = rawItem.id ?? rawItem.product_id ?? rawItem.productId ?? rawItem.menuItemId;
+        const itemReadyAt = rawItem.ready_at ?? rawItem.readyAt;
+        const itemStartedAt = rawItem.started_at ?? rawItem.startedAt;
+        const isReady = rawItem.ready === true || rawItem.status === 'ready' || Boolean(itemReadyAt);
         return {
+          ...(typeof itemId === 'string' && itemId.trim() ? { id: itemId.trim() } : {}),
           name: String(item.product_name ?? rawItem.name ?? ''),
           quantity: Number(item.quantity ?? rawItem.qty ?? 1),
           ...(modifiers ? { modifiers } : {}),
           ...(item.notes || rawItem.note ? { notes: String(item.notes ?? rawItem.note) } : {}),
+          ...(isReady ? { ready: true, status: 'ready' } : typeof rawItem.status === 'string' ? { status: rawItem.status } : {}),
+          ...(typeof itemStartedAt === 'string' && itemStartedAt.trim() ? { startedAt: itemStartedAt.trim() } : {}),
+          ...(typeof itemReadyAt === 'string' && itemReadyAt.trim() ? { readyAt: itemReadyAt.trim() } : {}),
         };
       }),
       ...(cleanedNotes ? { notes: cleanedNotes } : {}),
@@ -121,6 +156,9 @@ export function normalizeKdsOrder(raw: Record<string, unknown>): KDSOrder {
   }
 
   const rawOrderType = raw.orderType ?? raw.order_type;
+  const rawPaymentStatus = raw.paymentStatus ?? raw.payment_status;
+  const rawPaymentMethod = raw.paymentMethod ?? raw.payment_method;
+  const rawDeliveryTime = raw.deliveryTime ?? raw.delivery_time;
   const cleanedNotes = stripInternalOrderTags(raw.notes);
   const rawCustomerName = raw.customerName ?? raw.customer_name;
   const rawOrderNumber = raw.orderNumber ?? raw.order_number;
@@ -133,14 +171,25 @@ export function normalizeKdsOrder(raw: Record<string, unknown>): KDSOrder {
     ...(typeof rawCustomerName === 'string' && rawCustomerName.trim() ? { customerName: rawCustomerName.trim() } : {}),
     table: String(raw.table_name ?? raw.table ?? raw.table_number ?? raw.table_id ?? ''),
     ...(typeof rawOrderType === 'string' && rawOrderType.trim() ? { orderType: rawOrderType.trim().toLowerCase() } : {}),
+    ...(typeof rawPaymentStatus === 'string' && rawPaymentStatus.trim() ? { paymentStatus: rawPaymentStatus.trim().toLowerCase() } : {}),
+    ...(typeof rawPaymentMethod === 'string' && rawPaymentMethod.trim() ? { paymentMethod: rawPaymentMethod.trim().toLowerCase() } : {}),
+    ...(typeof rawDeliveryTime === 'string' && rawDeliveryTime.trim() ? { deliveryTime: rawDeliveryTime.trim() } : {}),
     status: (raw.status as KDSOrder['status']) || 'pending',
     items: parsedItems.map((item) => {
       const modifiers = normalizeModifiers(item.modifiers);
+      const itemId = item.id ?? item.product_id ?? item.productId ?? item.menuItemId;
+      const itemReadyAt = item.ready_at ?? item.readyAt;
+      const itemStartedAt = item.started_at ?? item.startedAt;
+      const isReady = item.ready === true || item.status === 'ready' || Boolean(itemReadyAt);
       return {
+        ...(typeof itemId === 'string' && itemId.trim() ? { id: itemId.trim() } : {}),
         name: String(item.name ?? item.product_name ?? ''),
         quantity: Number(item.quantity ?? item.qty ?? 1),
         ...(modifiers ? { modifiers } : {}),
         ...(item.notes || item.note ? { notes: String(item.notes ?? item.note) } : {}),
+        ...(isReady ? { ready: true, status: 'ready' } : typeof item.status === 'string' ? { status: item.status } : {}),
+        ...(typeof itemStartedAt === 'string' && itemStartedAt.trim() ? { startedAt: itemStartedAt.trim() } : {}),
+        ...(typeof itemReadyAt === 'string' && itemReadyAt.trim() ? { readyAt: itemReadyAt.trim() } : {}),
       };
     }),
     ...(cleanedNotes ? { notes: cleanedNotes } : {}),

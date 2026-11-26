@@ -36,6 +36,7 @@ interface TopCustomer {
   name: string;
   phone: string;
   tier: string;
+  cashback_balance?: number;
   total_spent: number;
   visit_count: number;
 }
@@ -174,107 +175,168 @@ adminLoyaltyRouter.get('/widgets', async(c) => {
       const activeScoped = scopedCustomers.filter((r) => String(r.updated_at || '') >= thirtyDaysAgoIso).length;
       const churnScoped = scopedCustomers.filter((r) => r.updated_at && String(r.updated_at) < ninetyDaysAgoIso).length;
 
-      let cashbackScoped = scopedCustomers.reduce((sum, r) => sum + Number(r.cashback_balance || 0), 0);
-      if (cashbackScoped === 0 && scopedIds.size > 0) {
-        const walRes = await db
-          .prepare("SELECT customer_id, balance, tenant_id FROM cashback_wallets WHERE (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?)")
-          .bind(tenantId, tenantId)
-          .all<{ customer_id: string; balance: number; tenant_id?: string | null }>()
-          .catch(() =>
-            tenantId === 'default'
-              ? db
-                  .prepare('SELECT customer_id, balance FROM cashback_wallets')
-                  .all<{ customer_id: string; balance: number }>()
-                  .catch(() => ({ results: [] as Array<{ customer_id: string; balance: number }> }))
-              : ({ results: [] as Array<{ customer_id: string; balance: number; tenant_id?: string | null }> })
-          );
-        cashbackScoped = (walRes.results || [])
-          .filter(
-            (w) =>
+      let cashbackScoped = 0;
+      if (scopedIds.size > 0) {
+        let walRows: Array<{ customer_id: string; balance: number; tenant_id?: string | null }> | null = null;
+        try {
+          const walRes = await db
+            .prepare("SELECT customer_id, balance, tenant_id FROM cashback_wallets WHERE (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?)")
+            .bind(tenantId, tenantId)
+            .all<{ customer_id: string; balance: number; tenant_id?: string | null }>();
+          walRows = walRes.results || [];
+        } catch {
+          if (tenantId === 'default' || tenantId === '*') {
+            const walRes = await db
+              .prepare('SELECT customer_id, balance FROM cashback_wallets')
+              .all<{ customer_id: string; balance: number }>()
+              .catch(() => null);
+            walRows = walRes?.results || null;
+          }
+        }
+        if (walRows) {
+          const walletByCust = new Map<string, number>();
+          for (const w of walRows) {
+            if (
               scopedIds.has(String(w.customer_id)) &&
               (!('tenant_id' in w) || w.tenant_id === undefined || matchesTenantRow(w, tenantId))
-          )
-          .reduce((sum, w) => sum + Number(w.balance || 0), 0);
-      }
-
-      let spentScoped = scopedCustomers.reduce((sum, r) => sum + Number(r.total_spent || 0), 0);
-      if (spentScoped === 0) {
-        const scopedPhones = new Set(
-          scopedCustomers
-            .map((r) => String(r.phone || '').trim())
-            .filter(Boolean)
-        );
-        const ordRes = await db
-          .prepare("SELECT customer_id, customer_phone, total, tenant_id, status, payment_status FROM orders WHERE status != 'cancelled' AND COALESCE(status, '') NOT IN ('cancelled', 'canceled', 'rejected', 'refunded', 'failed', 'expired') AND COALESCE(payment_status, '') NOT IN ('refunded', 'failed', 'cancelled', 'canceled') AND (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?)")
-          .bind(tenantId, tenantId)
-          .all<{ customer_id?: string; customer_phone?: string; total?: number; tenant_id?: string | null; status?: string | null; payment_status?: string | null }>()
-          .catch(() =>
-            db
-              .prepare("SELECT customer_id, customer_phone, total, tenant_id FROM orders WHERE status != 'cancelled' AND (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?)")
-              .bind(tenantId, tenantId)
-              .all<{ customer_id?: string; customer_phone?: string; total?: number; tenant_id?: string | null }>()
-              .catch(() => ({ results: [] as Array<{ customer_id?: string; customer_phone?: string; total?: number; tenant_id?: string | null }> }))
-          );
-        spentScoped = (ordRes.results || [])
-          .filter((o) => {
-            const st = String((o as { status?: string | null }).status ?? '').trim().toLowerCase();
-            const pst = String((o as { payment_status?: string | null }).payment_status ?? '').trim().toLowerCase();
-            if (
-              ['cancelled', 'canceled', 'rejected', 'refunded', 'failed', 'expired'].includes(st) ||
-              ['refunded', 'failed', 'cancelled', 'canceled'].includes(pst)
             ) {
-              return false;
+              const cid = String(w.customer_id);
+              walletByCust.set(cid, (walletByCust.get(cid) || 0) + Number(w.balance || 0));
             }
-            return 'tenant_id' in o && o.tenant_id !== undefined
-              ? matchesTenantRow(o, tenantId)
-              : Boolean(
-                  (o.customer_id && scopedIds.has(String(o.customer_id))) ||
-                  (o.customer_phone && scopedPhones.has(String(o.customer_phone).trim()))
-                );
-          })
-          .reduce((sum, o) => sum + Number(o.total || 0), 0);
+          }
+          cashbackScoped = scopedCustomers.reduce((sum, r) => {
+            const cid = String(r.id);
+            const bal = walletByCust.has(cid) ? walletByCust.get(cid)! : Number(r.cashback_balance || 0);
+            return sum + bal;
+          }, 0);
+        } else {
+          cashbackScoped = scopedCustomers.reduce((sum, r) => sum + Number(r.cashback_balance || 0), 0);
+        }
       }
 
-      let avgVisitsScoped =
-        totalCustomersScoped > 0
-          ? Math.round(
-              scopedCustomers.reduce((sum, r) => sum + Number(r.visit_count || 0), 0) / totalCustomersScoped
-            )
-          : 0;
-      if (avgVisitsScoped === 0 && scopedIds.size > 0) {
-        const ordRes = await db
-          .prepare("SELECT customer_id, customer_phone, tenant_id, status, payment_status FROM orders WHERE status != 'cancelled' AND COALESCE(status, '') NOT IN ('cancelled', 'canceled', 'rejected', 'refunded', 'failed', 'expired') AND COALESCE(payment_status, '') NOT IN ('refunded', 'failed', 'cancelled', 'canceled') AND (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?)")
-          .bind(tenantId, tenantId)
-          .all<{ customer_id?: string; customer_phone?: string; tenant_id?: string | null; status?: string | null; payment_status?: string | null }>()
-          .catch(() =>
-            db
-              .prepare("SELECT customer_id, customer_phone, tenant_id FROM orders WHERE status != 'cancelled' AND (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?)")
+      const scopedPhones = new Set(
+        scopedCustomers
+          .map((r) => String(r.phone || '').trim())
+          .filter(Boolean)
+      );
+      const custIdByPhone = new Map<string, string>();
+      for (const r of scopedCustomers) {
+        const ph = String(r.phone || '').trim();
+        if (ph && !custIdByPhone.has(ph)) {
+          custIdByPhone.set(ph, String(r.id));
+        }
+      }
+
+      let liveOrdRows: Array<{
+        customer_id?: string;
+        customer_phone?: string;
+        total?: number;
+        tenant_id?: string | null;
+        status?: string | null;
+        payment_status?: string | null;
+      }> | null = null;
+      if (scopedIds.size > 0) {
+        try {
+          const ordRes = await db
+            .prepare("SELECT customer_id, customer_phone, total, tenant_id, status, payment_status FROM orders WHERE (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?)")
+            .bind(tenantId, tenantId)
+            .all<{ customer_id?: string; customer_phone?: string; total?: number; tenant_id?: string | null; status?: string | null; payment_status?: string | null }>();
+          liveOrdRows = ordRes.results || [];
+        } catch {
+          try {
+            const ordRes = await db
+              .prepare("SELECT customer_id, customer_phone, total, tenant_id, status FROM orders WHERE (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?)")
               .bind(tenantId, tenantId)
-              .all<{ customer_id?: string; customer_phone?: string; tenant_id?: string | null }>()
-              .catch(() => ({ results: [] as Array<{ customer_id?: string; customer_phone?: string; tenant_id?: string | null }> }))
-          );
-        const validOrders = (ordRes.results || []).filter((o) => {
-          const st = String((o as { status?: string | null }).status ?? '').trim().toLowerCase();
-          const pst = String((o as { payment_status?: string | null }).payment_status ?? '').trim().toLowerCase();
+              .all<{ customer_id?: string; customer_phone?: string; total?: number; tenant_id?: string | null; status?: string | null }>();
+            liveOrdRows = ordRes.results || [];
+          } catch {
+            if (tenantId === 'default' || tenantId === '*') {
+              const ordRes = await db
+                .prepare('SELECT customer_id, customer_phone, total, status FROM orders')
+                .all<{ customer_id?: string; customer_phone?: string; total?: number; status?: string | null }>()
+                .catch(() => null);
+              liveOrdRows = ordRes?.results || null;
+            }
+          }
+        }
+      }
+
+      let spentScoped = 0;
+      let avgVisitsScoped = 0;
+      if (liveOrdRows) {
+        const seenAnyOrderForCust = new Set<string>();
+        const validSpendByCust = new Map<string, number>();
+        const validCntByCust = new Map<string, number>();
+        let unmatchedValidSpend = 0;
+
+        for (const o of liveOrdRows) {
+          const inTenant = 'tenant_id' in o && o.tenant_id !== undefined
+            ? matchesTenantRow(o, tenantId)
+            : Boolean(
+                (o.customer_id && scopedIds.has(String(o.customer_id))) ||
+                (o.customer_phone && scopedPhones.has(String(o.customer_phone).trim()))
+              );
+          if (!inTenant) continue;
+
+          const rawCid = o.customer_id ? String(o.customer_id) : '';
+          const rawPh = o.customer_phone ? String(o.customer_phone).trim() : '';
+          const resolvedCid = (rawCid && scopedIds.has(rawCid))
+            ? rawCid
+            : (rawPh && custIdByPhone.has(rawPh) ? custIdByPhone.get(rawPh)! : '');
+          if (resolvedCid) {
+            seenAnyOrderForCust.add(resolvedCid);
+          }
+
+          const st = String(o.status ?? '').trim().toLowerCase();
+          const pst = String(o.payment_status ?? '').trim().toLowerCase();
           if (
             ['cancelled', 'canceled', 'rejected', 'refunded', 'failed', 'expired'].includes(st) ||
             ['refunded', 'failed', 'cancelled', 'canceled'].includes(pst)
           ) {
-            return false;
+            continue;
           }
-          return 'tenant_id' in o && o.tenant_id !== undefined
-            ? matchesTenantRow(o, tenantId)
-            : Boolean(o.customer_id && scopedIds.has(String(o.customer_id)));
-        });
-        const byCust = new Map<string, number>();
-        for (const o of validOrders) {
-          const key = String(o.customer_id || o.customer_phone || '');
-          if (key) byCust.set(key, (byCust.get(key) || 0) + 1);
+          if (resolvedCid) {
+            validSpendByCust.set(resolvedCid, (validSpendByCust.get(resolvedCid) || 0) + Number(o.total || 0));
+            validCntByCust.set(resolvedCid, (validCntByCust.get(resolvedCid) || 0) + 1);
+          } else {
+            unmatchedValidSpend += Number(o.total || 0);
+            const guestKey = rawCid || rawPh;
+            if (guestKey) {
+              validCntByCust.set(`guest:${guestKey}`, (validCntByCust.get(`guest:${guestKey}`) || 0) + 1);
+            }
+          }
         }
-        if (byCust.size > 0) {
-          const sumCnt = Array.from(byCust.values()).reduce((a, b) => a + b, 0);
-          avgVisitsScoped = Math.round(sumCnt / byCust.size);
+
+        spentScoped = unmatchedValidSpend + scopedCustomers.reduce((sum, r) => {
+          const cid = String(r.id);
+          if (seenAnyOrderForCust.has(cid)) {
+            return sum + (validSpendByCust.get(cid) || 0);
+          }
+          return sum + Number(r.total_spent || 0);
+        }, 0);
+
+        const visitValues: number[] = [];
+        for (const r of scopedCustomers) {
+          const cid = String(r.id);
+          const v = seenAnyOrderForCust.has(cid)
+            ? (validCntByCust.get(cid) || 0)
+            : Number(r.visit_count || 0);
+          if (v > 0) visitValues.push(v);
         }
+        for (const [k, cnt] of validCntByCust.entries()) {
+          if (k.startsWith('guest:') && cnt > 0) visitValues.push(cnt);
+        }
+        if (visitValues.length > 0) {
+          avgVisitsScoped = Math.round(visitValues.reduce((a, b) => a + b, 0) / (scopedCustomers.length || visitValues.length));
+        }
+      } else {
+        spentScoped = scopedCustomers.reduce((sum, r) => sum + Number(r.total_spent || 0), 0);
+        avgVisitsScoped =
+          totalCustomersScoped > 0
+            ? Math.round(
+                scopedCustomers.reduce((sum, r) => sum + Number(r.visit_count || 0), 0) / totalCustomersScoped
+              )
+            : 0;
       }
 
       const tierCounts = new Map<string, number>();
@@ -358,47 +420,64 @@ adminLoyaltyRouter.get('/widgets', async(c) => {
   } catch {}
 
   try {
-    const cb = await db.prepare('SELECT COALESCE(SUM(cashback_balance), 0) as total FROM customers').first<{ total: number }>();
-    if (cb && typeof cb.total === 'number' && cb.total > 0) {
-      totalCashback = cb.total;
+    const wal = await db.prepare('SELECT COALESCE(SUM(balance), 0) as total FROM cashback_wallets').first<{ total: number }>();
+    if (wal && typeof wal.total === 'number' && wal.total > 0) {
+      const legacyOnlyCb = await db.prepare(
+        'SELECT COALESCE(SUM(cashback_balance), 0) as total FROM customers c WHERE NOT EXISTS (SELECT 1 FROM cashback_wallets cw WHERE cw.customer_id = c.id)'
+      ).first<{ total: number }>().catch(() => null);
+      totalCashback = wal.total + Number(legacyOnlyCb?.total || 0);
     } else {
-      const wal = await db.prepare('SELECT COALESCE(SUM(balance), 0) as total FROM cashback_wallets').first<{ total: number }>();
-      totalCashback = wal?.total || cb?.total || 0;
+      const cb = await db.prepare('SELECT COALESCE(SUM(cashback_balance), 0) as total FROM customers').first<{ total: number }>();
+      totalCashback = cb?.total || wal?.total || 0;
     }
   } catch {
     try {
-      const cb = await db.prepare('SELECT COALESCE(SUM(balance), 0) as total FROM cashback_wallets').first<{ total: number }>();
+      const cb = await db.prepare('SELECT COALESCE(SUM(cashback_balance), 0) as total FROM customers').first<{ total: number }>();
       totalCashback = cb?.total || 0;
     } catch {}
   }
 
   try {
-    const sp = await db.prepare('SELECT COALESCE(SUM(total_spent), 0) as total FROM customers').first<{ total: number }>();
-    if (sp && typeof sp.total === 'number' && sp.total > 0) {
-      totalSpent = sp.total;
+    const ord = await db.prepare(
+      "SELECT COALESCE(SUM(total), 0) as total FROM orders WHERE COALESCE(status, '') NOT IN ('cancelled', 'canceled', 'rejected', 'refunded', 'failed', 'expired') AND COALESCE(payment_status, '') NOT IN ('refunded', 'failed', 'cancelled', 'canceled')"
+    ).first<{ total: number }>();
+    if (ord && typeof ord.total === 'number' && ord.total > 0) {
+      totalSpent = ord.total;
     } else {
-      const ord = await db.prepare("SELECT COALESCE(SUM(total), 0) as total FROM orders WHERE COALESCE(status, '') NOT IN ('cancelled', 'refunded', 'failed', 'expired') AND COALESCE(payment_status, '') NOT IN ('refunded', 'failed')").first<{ total: number }>();
-      totalSpent = ord?.total || sp?.total || 0;
+      const ordCountRow = await db.prepare('SELECT COUNT(*) as cnt FROM orders').first<{ cnt: number }>().catch(() => null);
+      if (ordCountRow && Number(ordCountRow.cnt || 0) > 0) {
+        totalSpent = ord?.total || 0;
+      } else {
+        const sp = await db.prepare('SELECT COALESCE(SUM(total_spent), 0) as total FROM customers').first<{ total: number }>();
+        totalSpent = sp?.total || 0;
+      }
     }
   } catch {
     try {
-      const sp = await db.prepare("SELECT COALESCE(SUM(total), 0) as total FROM orders WHERE COALESCE(status, '') NOT IN ('cancelled', 'refunded', 'failed', 'expired') AND COALESCE(payment_status, '') NOT IN ('refunded', 'failed')").first<{ total: number }>();
+      const sp = await db.prepare('SELECT COALESCE(SUM(total_spent), 0) as total FROM customers').first<{ total: number }>();
       totalSpent = sp?.total || 0;
     } catch {}
   }
 
   try {
-    const v = await db.prepare('SELECT COALESCE(AVG(visit_count), 0) as avg FROM customers').first<{ avg: number }>();
-    if (v && typeof v.avg === 'number' && v.avg > 0) {
-      avgVisits = Math.round(v.avg);
+    const ord = await db.prepare(
+      "SELECT COALESCE(AVG(cnt), 0) as avg FROM (SELECT COUNT(*) as cnt FROM orders WHERE status != 'cancelled' AND COALESCE(status, '') NOT IN ('cancelled', 'canceled', 'rejected', 'refunded', 'failed', 'expired') AND COALESCE(payment_status, '') NOT IN ('refunded', 'failed', 'cancelled', 'canceled') GROUP BY COALESCE(NULLIF(customer_id, ''), customer_phone))"
+    ).first<{ avg: number }>();
+    if (ord && typeof ord.avg === 'number' && ord.avg > 0) {
+      avgVisits = Math.round(ord.avg);
     } else {
-      const ord = await db.prepare("SELECT COALESCE(AVG(cnt), 0) as avg FROM (SELECT COUNT(*) as cnt FROM orders WHERE status != 'cancelled' AND COALESCE(status, '') NOT IN ('cancelled', 'refunded', 'failed', 'expired') AND COALESCE(payment_status, '') NOT IN ('refunded', 'failed') GROUP BY COALESCE(NULLIF(customer_id, ''), customer_phone))").first<{ avg: number }>();
-      avgVisits = Math.round(ord?.avg || v?.avg || 0);
+      const ordCountRow = await db.prepare('SELECT COUNT(*) as cnt FROM orders').first<{ cnt: number }>().catch(() => null);
+      if (ordCountRow && Number(ordCountRow.cnt || 0) > 0) {
+        avgVisits = Math.round(ord?.avg || 0);
+      } else {
+        const v = await db.prepare('SELECT COALESCE(AVG(visit_count), 0) as avg FROM customers').first<{ avg: number }>();
+        avgVisits = Math.round(v?.avg || 0);
+      }
     }
   } catch {
     try {
-      const ord = await db.prepare("SELECT COALESCE(AVG(cnt), 0) as avg FROM (SELECT COUNT(*) as cnt FROM orders WHERE status != 'cancelled' AND COALESCE(status, '') NOT IN ('cancelled', 'refunded', 'failed', 'expired') AND COALESCE(payment_status, '') NOT IN ('refunded', 'failed') GROUP BY COALESCE(NULLIF(customer_id, ''), customer_phone))").first<{ avg: number }>();
-      avgVisits = Math.round(ord?.avg || 0);
+      const v = await db.prepare('SELECT COALESCE(AVG(visit_count), 0) as avg FROM customers').first<{ avg: number }>();
+      avgVisits = Math.round(v?.avg || 0);
     } catch {}
   }
 
@@ -552,6 +631,7 @@ adminLoyaltyRouter.get('/top-customers', async(c) => {
     if (tenantId !== '*') {
       res = await db.prepare(`
         SELECT c.id, c.name, c.phone, c.loyalty_tier as tier, c.tenant_id,
+               COALESCE(cw.balance, 0) as cashback_balance,
                COALESCE((SELECT SUM(o.total) FROM orders o WHERE (o.customer_id = c.id OR (c.phone IS NOT NULL AND TRIM(c.phone) != '' AND o.customer_phone = c.phone)) AND COALESCE(NULLIF(TRIM(o.tenant_id), ''), 'default') = COALESCE(NULLIF(TRIM(c.tenant_id), ''), 'default') AND LOWER(TRIM(COALESCE(o.status, ''))) NOT IN ('cancelled', 'canceled', 'failed', 'rejected', 'expired', 'refunded') AND LOWER(TRIM(COALESCE(o.payment_status, ''))) NOT IN ('refunded', 'failed', 'cancelled', 'canceled')), 0) as total_spent,
                (SELECT COUNT(*) FROM orders o WHERE (o.customer_id = c.id OR (c.phone IS NOT NULL AND c.phone != '' AND o.customer_phone = c.phone)) AND o.status != 'cancelled' AND COALESCE(o.status, '') NOT IN ('cancelled', 'refunded', 'failed', 'expired') AND COALESCE(o.payment_status, '') NOT IN ('refunded', 'failed') AND COALESCE(NULLIF(o.tenant_id, ''), 'default') = COALESCE(NULLIF(c.tenant_id, ''), 'default')) as visit_count
         FROM customers c
@@ -564,6 +644,7 @@ adminLoyaltyRouter.get('/top-customers', async(c) => {
     if (tenantId === '*' || (!res && tenantId === 'default')) {
       res = await db.prepare(`
         SELECT c.id, c.name, c.phone, c.loyalty_tier as tier, c.tenant_id,
+               COALESCE(cw.balance, 0) as cashback_balance,
                COALESCE((SELECT SUM(o.total) FROM orders o WHERE (o.customer_id = c.id OR (c.phone IS NOT NULL AND TRIM(c.phone) != '' AND o.customer_phone = c.phone)) AND COALESCE(NULLIF(TRIM(o.tenant_id), ''), 'default') = COALESCE(NULLIF(TRIM(c.tenant_id), ''), 'default') AND LOWER(TRIM(COALESCE(o.status, ''))) NOT IN ('cancelled', 'canceled', 'failed', 'rejected', 'expired', 'refunded') AND LOWER(TRIM(COALESCE(o.payment_status, ''))) NOT IN ('refunded', 'failed', 'cancelled', 'canceled')), 0) as total_spent,
                (SELECT COUNT(*) FROM orders o WHERE (o.customer_id = c.id OR (c.phone IS NOT NULL AND c.phone != '' AND o.customer_phone = c.phone)) AND o.status != 'cancelled' AND COALESCE(o.status, '') NOT IN ('cancelled', 'refunded', 'failed', 'expired') AND COALESCE(o.payment_status, '') NOT IN ('refunded', 'failed') AND COALESCE(NULLIF(o.tenant_id, ''), 'default') = COALESCE(NULLIF(c.tenant_id, ''), 'default')) as visit_count
         FROM customers c
@@ -640,38 +721,48 @@ adminLoyaltyRouter.get('/export', requireAuth(['owner', 'admin', 'manager', 'sup
 
   let results: CustomerExportRow[] = [];
   try {
-    let res: { results?: CustomerExportRow[] } | null = null;
+    let liveRes: { results?: CustomerExportRow[] } | null = null;
     if (tenantId !== '*') {
-      res = await db.prepare(
-        "SELECT id, name, phone, email, date_of_birth AS birthday, loyalty_tier AS tier, cashback_balance, total_spent, visit_count, created_at, tenant_id FROM customers WHERE COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ? ORDER BY created_at DESC LIMIT 5000"
-      ).bind(tenantId).all<CustomerExportRow>().catch(() => null);
-    }
-    if (tenantId === '*' || (!res && tenantId === 'default')) {
-      res = await db.prepare(
-        'SELECT id, name, phone, email, date_of_birth AS birthday, loyalty_tier AS tier, cashback_balance, total_spent, visit_count, created_at, tenant_id FROM customers ORDER BY created_at DESC LIMIT 5000'
-      ).all<CustomerExportRow>();
-    }
-    if (!res) {
-      throw new Error('Scoped export query failed');
-    }
-    if (res.results && res.results.length > 0) {
-      results = res.results;
-    } else if (tenantId === '*' || tenantId === 'default') {
-      const liveRes = await db.prepare(`
+      liveRes = await db.prepare(`
         SELECT c.id, c.name, c.phone, c.email, c.date_of_birth AS birthday,
                c.loyalty_tier AS tier,
-               COALESCE(cw.balance, 0) AS cashback_balance,
-               COALESCE((SELECT SUM(o.total) FROM orders o WHERE (o.customer_id = c.id OR (c.phone IS NOT NULL AND TRIM(c.phone) != '' AND o.customer_phone = c.phone)) AND COALESCE(NULLIF(TRIM(o.tenant_id), ''), 'default') = COALESCE(NULLIF(TRIM(c.tenant_id), ''), 'default') AND LOWER(TRIM(COALESCE(o.status, ''))) NOT IN ('cancelled', 'canceled', 'failed', 'rejected', 'expired', 'refunded') AND LOWER(TRIM(COALESCE(o.payment_status, ''))) NOT IN ('refunded', 'failed', 'cancelled', 'canceled')), 0) AS total_spent,
-               (SELECT COUNT(*) FROM orders o WHERE (o.customer_id = c.id OR (c.phone IS NOT NULL AND c.phone != '' AND o.customer_phone = c.phone)) AND o.status != 'cancelled' AND COALESCE(o.status, '') NOT IN ('cancelled', 'refunded', 'failed', 'expired') AND COALESCE(o.payment_status, '') NOT IN ('refunded', 'failed') AND COALESCE(NULLIF(TRIM(o.tenant_id), ''), 'default') = COALESCE(NULLIF(TRIM(c.tenant_id), ''), 'default')) AS visit_count,
+               COALESCE(cw.balance, c.cashback_balance, 0) AS cashback_balance,
+               CASE WHEN EXISTS (SELECT 1 FROM orders o WHERE (o.customer_id = c.id OR (c.phone IS NOT NULL AND TRIM(c.phone) != '' AND o.customer_phone = c.phone)) AND COALESCE(NULLIF(TRIM(o.tenant_id), ''), 'default') = COALESCE(NULLIF(TRIM(c.tenant_id), ''), 'default'))
+                    THEN COALESCE((SELECT SUM(o.total) FROM orders o WHERE (o.customer_id = c.id OR (c.phone IS NOT NULL AND TRIM(c.phone) != '' AND o.customer_phone = c.phone)) AND COALESCE(NULLIF(TRIM(o.tenant_id), ''), 'default') = COALESCE(NULLIF(TRIM(c.tenant_id), ''), 'default') AND LOWER(TRIM(COALESCE(o.status, ''))) NOT IN ('cancelled', 'canceled', 'failed', 'rejected', 'expired', 'refunded') AND LOWER(TRIM(COALESCE(o.payment_status, ''))) NOT IN ('refunded', 'failed', 'cancelled', 'canceled')), 0)
+                    ELSE COALESCE(c.total_spent, 0) END AS total_spent,
+               CASE WHEN EXISTS (SELECT 1 FROM orders o WHERE (o.customer_id = c.id OR (c.phone IS NOT NULL AND TRIM(c.phone) != '' AND o.customer_phone = c.phone)) AND COALESCE(NULLIF(TRIM(o.tenant_id), ''), 'default') = COALESCE(NULLIF(TRIM(c.tenant_id), ''), 'default'))
+                    THEN (SELECT COUNT(*) FROM orders o WHERE (o.customer_id = c.id OR (c.phone IS NOT NULL AND c.phone != '' AND o.customer_phone = c.phone)) AND o.status != 'cancelled' AND COALESCE(o.status, '') NOT IN ('cancelled', 'canceled', 'rejected', 'refunded', 'failed', 'expired') AND COALESCE(o.payment_status, '') NOT IN ('refunded', 'failed', 'cancelled', 'canceled') AND COALESCE(NULLIF(TRIM(o.tenant_id), ''), 'default') = COALESCE(NULLIF(TRIM(c.tenant_id), ''), 'default'))
+                    ELSE COALESCE(c.visit_count, 0) END AS visit_count,
                c.created_at, c.tenant_id
         FROM customers c
         LEFT JOIN cashback_wallets cw ON cw.customer_id = c.id AND COALESCE(NULLIF(TRIM(cw.tenant_id), ''), 'default') = COALESCE(NULLIF(TRIM(c.tenant_id), ''), 'default')
-        WHERE (? = '*' OR COALESCE(NULLIF(TRIM(c.tenant_id), ''), 'default') = ?)
+        WHERE COALESCE(NULLIF(TRIM(c.tenant_id), ''), 'default') = ?
         ORDER BY c.created_at DESC
         LIMIT 5000
-      `).bind(tenantId, tenantId).all<CustomerExportRow>();
-      results = liveRes.results || [];
+      `).bind(tenantId).all<CustomerExportRow>().catch(() => null);
     }
+    if (tenantId === '*' || (!liveRes && tenantId === 'default')) {
+      liveRes = await db.prepare(`
+        SELECT c.id, c.name, c.phone, c.email, c.date_of_birth AS birthday,
+               c.loyalty_tier AS tier,
+               COALESCE(cw.balance, c.cashback_balance, 0) AS cashback_balance,
+               CASE WHEN EXISTS (SELECT 1 FROM orders o WHERE (o.customer_id = c.id OR (c.phone IS NOT NULL AND TRIM(c.phone) != '' AND o.customer_phone = c.phone)) AND COALESCE(NULLIF(TRIM(o.tenant_id), ''), 'default') = COALESCE(NULLIF(TRIM(c.tenant_id), ''), 'default'))
+                    THEN COALESCE((SELECT SUM(o.total) FROM orders o WHERE (o.customer_id = c.id OR (c.phone IS NOT NULL AND TRIM(c.phone) != '' AND o.customer_phone = c.phone)) AND COALESCE(NULLIF(TRIM(o.tenant_id), ''), 'default') = COALESCE(NULLIF(TRIM(c.tenant_id), ''), 'default') AND LOWER(TRIM(COALESCE(o.status, ''))) NOT IN ('cancelled', 'canceled', 'failed', 'rejected', 'expired', 'refunded') AND LOWER(TRIM(COALESCE(o.payment_status, ''))) NOT IN ('refunded', 'failed', 'cancelled', 'canceled')), 0)
+                    ELSE COALESCE(c.total_spent, 0) END AS total_spent,
+               CASE WHEN EXISTS (SELECT 1 FROM orders o WHERE (o.customer_id = c.id OR (c.phone IS NOT NULL AND TRIM(c.phone) != '' AND o.customer_phone = c.phone)) AND COALESCE(NULLIF(TRIM(o.tenant_id), ''), 'default') = COALESCE(NULLIF(TRIM(c.tenant_id), ''), 'default'))
+                    THEN (SELECT COUNT(*) FROM orders o WHERE (o.customer_id = c.id OR (c.phone IS NOT NULL AND c.phone != '' AND o.customer_phone = c.phone)) AND o.status != 'cancelled' AND COALESCE(o.status, '') NOT IN ('cancelled', 'canceled', 'rejected', 'refunded', 'failed', 'expired') AND COALESCE(o.payment_status, '') NOT IN ('refunded', 'failed', 'cancelled', 'canceled') AND COALESCE(NULLIF(TRIM(o.tenant_id), ''), 'default') = COALESCE(NULLIF(TRIM(c.tenant_id), ''), 'default'))
+                    ELSE COALESCE(c.visit_count, 0) END AS visit_count,
+               c.created_at, c.tenant_id
+        FROM customers c
+        LEFT JOIN cashback_wallets cw ON cw.customer_id = c.id AND COALESCE(NULLIF(TRIM(cw.tenant_id), ''), 'default') = COALESCE(NULLIF(TRIM(c.tenant_id), ''), 'default')
+        ORDER BY c.created_at DESC
+        LIMIT 5000
+      `).all<CustomerExportRow>();
+    }
+    if (!liveRes) {
+      throw new Error('Scoped live export with legacy customer columns failed');
+    }
+    results = liveRes.results || [];
   } catch {
     try {
       let liveRes: { results?: CustomerExportRow[] } | null = null;
@@ -710,12 +801,20 @@ adminLoyaltyRouter.get('/export', requireAuth(['owner', 'admin', 'manager', 'sup
       results = liveRes.results || [];
     } catch {
       try {
-        if (tenantId !== '*' && tenantId !== 'default') {
-          throw new Error('Skip unscoped customer export for non-default tenant');
+        let res: { results?: CustomerExportRow[] } | null = null;
+        if (tenantId !== '*') {
+          res = await db.prepare(
+            "SELECT id, name, phone, email, date_of_birth AS birthday, loyalty_tier AS tier, cashback_balance, total_spent, visit_count, created_at, tenant_id FROM customers WHERE COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ? ORDER BY created_at DESC LIMIT 5000"
+          ).bind(tenantId).all<CustomerExportRow>().catch(() => null);
         }
-        const res = await db.prepare(
-          'SELECT id, name, phone, email, date_of_birth AS birthday, loyalty_tier AS tier, cashback_balance, total_spent, visit_count, created_at, tenant_id FROM customers ORDER BY created_at DESC LIMIT 5000'
-        ).all<CustomerExportRow>();
+        if (tenantId === '*' || (!res && tenantId === 'default')) {
+          res = await db.prepare(
+            'SELECT id, name, phone, email, date_of_birth AS birthday, loyalty_tier AS tier, cashback_balance, total_spent, visit_count, created_at, tenant_id FROM customers ORDER BY created_at DESC LIMIT 5000'
+          ).all<CustomerExportRow>();
+        }
+        if (!res) {
+          throw new Error('Scoped customer-only export failed');
+        }
         results = res.results || [];
       } catch {
         try {

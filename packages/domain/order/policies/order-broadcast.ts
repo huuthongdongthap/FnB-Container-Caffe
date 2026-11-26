@@ -49,6 +49,21 @@ export function normalizeBroadcastTotal(raw: unknown): number {
   return Math.round(num);
 }
 
+export function resolveOrderBroadcastChannels(orderId: string, rawTenant?: string | null): {
+  tenantId: string;
+  orderChannel: string;
+  storeChannel: string;
+} {
+  const trimmed = typeof rawTenant === 'string' ? rawTenant.trim() : '';
+  const tenantId =
+    trimmed && trimmed !== '*' && trimmed.toLowerCase() !== 'hq'
+      ? trimmed
+      : 'default';
+  const orderChannel = tenantId !== 'default' ? `${tenantId}:${orderId}` : orderId;
+  const storeChannel = tenantId !== 'default' ? `${tenantId}:kitchen` : 'kitchen';
+  return { tenantId, orderChannel, storeChannel };
+}
+
 export async function dispatchOrderBroadcast(
   broadcaster: unknown,
   channel: string,
@@ -60,11 +75,13 @@ export async function dispatchOrderBroadcast(
   if (!stub) return;
 
   if (typeof stub.fetch === 'function') {
-    const res = await stub.fetch('https://do/broadcast', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-    });
+    const res = await stub.fetch(
+      new Request('https://do/broadcast', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      }),
+    );
     if (res && typeof res.ok === 'boolean' && !res.ok) {
       throw new Error(`Order broadcast returned HTTP ${res.status}`);
     }
@@ -73,5 +90,28 @@ export async function dispatchOrderBroadcast(
 
   if (typeof stub.broadcast === 'function') {
     await stub.broadcast(payload);
+  }
+}
+
+/**
+ * Fans out an order event to BOTH the per-order tracking channel and the
+ * tenant-scoped store-wide channel (`kitchen` for `'default'`, `${tenant}:kitchen`
+ * for non-default stores) so KDS, POS, and Order Management WebSocket subscribers
+ * receive live events alongside single-order guest trackers.
+ */
+export async function fanOutOrderBroadcast(
+  broadcaster: unknown,
+  orderId: string,
+  rawTenant: string | null | undefined,
+  payload: Record<string, unknown>,
+): Promise<void> {
+  const { orderChannel, storeChannel } = resolveOrderBroadcastChannels(orderId, rawTenant);
+  const channels = orderChannel === storeChannel ? [orderChannel] : [orderChannel, storeChannel];
+  const results = await Promise.allSettled(
+    channels.map((ch) => dispatchOrderBroadcast(broadcaster, ch, payload)),
+  );
+  const firstFailure = results.find((r): r is PromiseRejectedResult => r.status === 'rejected');
+  if (firstFailure) {
+    throw firstFailure.reason;
   }
 }

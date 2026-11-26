@@ -54,6 +54,8 @@ export interface CustomerExportRow {
 
 export interface ReconciliationRow {
   shift_id: string;
+  staff_id?: string;
+  reconciled_by?: string;
   date: string;
   opening_float: number;
   cash_payments: number;
@@ -61,6 +63,10 @@ export interface ReconciliationRow {
   expected_cash: number;
   actual_cash: number | null;
   variance: number | null;
+  remitted_cash: number;
+  closing_float: number;
+  handover_to_staff_id: string | null;
+  online_sales_total: number;
   status: string;
   denominated: boolean;
 }
@@ -80,6 +86,7 @@ export interface CategorySummary {
 export interface UnreconciledShiftSummary {
   shift_id: string;
   staff_name: string;
+  role?: string;
   date: string;
   status: 'open' | 'unreconciled';
   opening_float: number;
@@ -95,6 +102,11 @@ export interface DailyReconciliationReport {
   categories: CategorySummary[];
   totals: {
     revenue: number;
+    opening_float?: number;
+    cash_payments?: number;
+    cash_payouts?: number;
+    remitted_cash?: number;
+    closing_float?: number;
     cash_expected: number;
     cash_actual: number;
     cash_variance: number;

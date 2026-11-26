@@ -7,10 +7,22 @@ import { apiFetch } from '@/lib/api-client';
 import { useAuthStore } from '@/hooks/stores/use-auth-store';
 import type { PushSettings } from './notification-settings-types';
 
+const SOUND_ALERTS_STORAGE_KEY = 'aura_admin_sound_alerts';
+
 const DEFAULT_SETTINGS: PushSettings = {
-  autoNotifyNewOrder: false,
+  autoNotifyNewOrder: true,
   soundAlerts: false,
 };
+
+function persistSoundAlertsPreference(enabled: boolean): void {
+  try {
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem(SOUND_ALERTS_STORAGE_KEY, enabled ? '1' : '0');
+    }
+  } catch {
+    // Storage unavailable
+  }
+}
 
 export function useNotificationSettings() {
   const user = useAuthStore((s) => s.user);
@@ -47,9 +59,10 @@ export function useNotificationSettings() {
         if (resp && resp.ok !== false && resp.success !== false && !controller.signal.aborted) {
           const source = resp.data ?? resp;
           const nextSettings: PushSettings = {
-            autoNotifyNewOrder: Boolean(source.autoNotifyNewOrder),
+            autoNotifyNewOrder: source.autoNotifyNewOrder !== false,
             soundAlerts: Boolean(source.soundAlerts),
           };
+          persistSoundAlertsPreference(nextSettings.soundAlerts);
           settingsRef.current = nextSettings;
           setSettings(nextSettings);
         }
@@ -81,6 +94,9 @@ export function useNotificationSettings() {
       });
       if (!res || res.ok === false || res.success === false) {
         throw new Error('Failed to save notification settings');
+      }
+      if (key === 'soundAlerts') {
+        persistSoundAlertsPreference(nextValue);
       }
       setSaved(true);
       savedTimerRef.current = setTimeout(() => {

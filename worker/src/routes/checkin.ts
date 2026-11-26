@@ -257,6 +257,51 @@ checkinRouter.post('/', rateLimitMiddleware(CHECKIN_RATE_LIMIT),
     if (byPhone && !matchesTenantRow(byPhone, tenantId)) {
       byPhone = null;
     }
+    if (!byPhone) {
+      const guestId = `cust_walkin_${orderTenant.replace(/[^a-zA-Z0-9_-]/g, '_')}_${rawPhone}`;
+      const guestName = data.customer_name || `Khách vãng lai (${rawPhone.slice(-4)})`;
+      const guestNow = new Date().toISOString();
+      let insertedGuest = false;
+      try {
+        await db
+          .prepare(
+            "INSERT INTO customers (id, tenant_id, name, phone, source, created_at, updated_at) VALUES (?, ?, ?, ?, 'walkin_checkin', ?, ?) ON CONFLICT(id) DO UPDATE SET updated_at = excluded.updated_at",
+          )
+          .bind(guestId, orderTenant, guestName, rawPhone, guestNow, guestNow)
+          .run();
+        insertedGuest = true;
+      } catch {
+        try {
+          await db
+            .prepare('INSERT OR IGNORE INTO customers (id, tenant_id, name, phone) VALUES (?, ?, ?, ?)')
+            .bind(guestId, orderTenant, guestName, rawPhone)
+            .run();
+          insertedGuest = true;
+        } catch {
+          if (orderTenant === 'default') {
+            try {
+              await db
+                .prepare('INSERT OR IGNORE INTO customers (id, name, phone) VALUES (?, ?, ?)')
+                .bind(guestId, guestName, rawPhone)
+                .run();
+              insertedGuest = true;
+            } catch {
+              insertedGuest = false;
+            }
+          }
+        }
+      }
+      if (insertedGuest) {
+        const refetched = await db
+          .prepare(
+            "SELECT id, name, tenant_id FROM customers WHERE phone = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ? LIMIT 1",
+          )
+          .bind(rawPhone, orderTenant)
+          .first<{ id: string; name: string; tenant_id?: string | null }>()
+          .catch(() => null);
+        byPhone = refetched || { id: guestId, name: guestName, tenant_id: orderTenant };
+      }
+    }
     resolvedCustomerId = byPhone?.id || rawPhone;
     resolvedPhoneCustomerName = byPhone?.name;
     resolvedPhoneCustomerTenant = byPhone?.tenant_id;
@@ -378,6 +423,36 @@ const handleApproveCheckin = async(c: import('hono').Context<{ Bindings: Env }>)
       .bind(checkin.customer_id, effectiveTenant)
       .first<{ id: string }>()
       .catch(() => null);
+  }
+  if (!custRow && checkin.customer_id && /^\+?\d{8,15}$/.test(String(checkin.customer_id).trim())) {
+    const rawPhoneId = String(checkin.customer_id).trim();
+    const foreignCust = await db
+      .prepare('SELECT id, tenant_id FROM customers WHERE id = ? LIMIT 1')
+      .bind(rawPhoneId)
+      .first<{ id: string; tenant_id?: string | null }>()
+      .catch(() => null);
+    if (!foreignCust) {
+      const approveNow = new Date().toISOString();
+      const guestName = checkin.customer_name || `Khách vãng lai (${rawPhoneId.slice(-4)})`;
+      const createdLegacy = await db
+        .prepare(
+          "INSERT INTO customers (id, tenant_id, name, phone, source, created_at, updated_at) VALUES (?, ?, ?, ?, 'walkin_checkin', ?, ?) ON CONFLICT(id) DO NOTHING",
+        )
+        .bind(rawPhoneId, effectiveTenant, guestName, rawPhoneId, approveNow, approveNow)
+        .run()
+        .then(() => true)
+        .catch(() =>
+          db
+            .prepare('INSERT OR IGNORE INTO customers (id, tenant_id, name, phone) VALUES (?, ?, ?, ?)')
+            .bind(rawPhoneId, effectiveTenant, guestName, rawPhoneId)
+            .run()
+            .then(() => true)
+            .catch(() => false),
+        );
+      if (createdLegacy) {
+        custRow = { id: rawPhoneId, tenant_id: effectiveTenant };
+      }
+    }
   }
   const isUnauthedContractStub =
     !c.get('user') && !c.req.header('Authorization') && !c.req.header('authorization');

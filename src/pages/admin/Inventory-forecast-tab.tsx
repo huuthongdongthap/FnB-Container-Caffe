@@ -11,14 +11,39 @@ type RawForecastRecord = ForecastItem & {
 interface InventoryForecastTabProps {
   forecastItems: ForecastItem[];
   loading?: boolean;
+  isError?: boolean;
+  errorMessage?: string;
+  onRetry?: () => void;
 }
 
 export function InventoryForecastTab({
   forecastItems,
   loading,
+  isError,
+  errorMessage,
+  onRetry,
 }: Readonly<InventoryForecastTabProps>) {
   return (
     <div className="space-y-4">
+      {isError && (
+        <div
+          role="alert"
+          className="rounded-xl border border-rose-500/30 bg-rose-500/10 px-4 py-3 text-xs text-rose-300 flex items-center justify-between gap-3"
+        >
+          <span>
+            {errorMessage || 'Không thể tải dữ liệu dự báo tiêu hao. Vui lòng kiểm tra quyền truy cập hoặc thử lại.'}
+          </span>
+          {onRetry && (
+            <button
+              type="button"
+              onClick={onRetry}
+              className="shrink-0 rounded-lg border border-rose-400/40 px-3 py-1 font-semibold text-rose-200 hover:bg-rose-500/20"
+            >
+              Thử lại
+            </button>
+          )}
+        </div>
+      )}
       {/* AI banner */}
       <div className="p-4 rounded-xl border border-[var(--glass-border)] bg-[rgba(201,214,223,0.04)] flex items-start gap-3">
         <Cpu className="w-5 h-5 text-[var(--aura-chrome-light)] mt-0.5 shrink-0" />
@@ -55,14 +80,21 @@ export function InventoryForecastTab({
                   </td>
                 </tr>
               )}
-              {!loading && forecastItems.length === 0 && (
+              {!loading && isError && (
+                <tr>
+                  <td colSpan={7} className="py-8 text-center text-rose-300">
+                    Không thể tải dự báo tiêu hao kho hàng.
+                  </td>
+                </tr>
+              )}
+              {!loading && !isError && forecastItems.length === 0 && (
                 <tr>
                   <td colSpan={7} className="py-8 text-center text-[var(--aura-text-muted)]">
                     Chưa có đủ dữ liệu lịch sử để dự báo
                   </td>
                 </tr>
               )}
-              {!loading &&
+              {!loading && !isError &&
                 forecastItems.map((rawItem, idx) => {
                   const item = rawItem as RawForecastRecord;
                   const id = item.id || item.item_id || `forecast-${idx}`;

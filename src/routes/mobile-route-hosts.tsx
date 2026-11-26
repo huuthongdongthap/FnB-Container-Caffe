@@ -1,5 +1,6 @@
-import { type ReactNode, lazy, Suspense } from 'react';
+import { type ReactNode, lazy, Suspense, useState } from 'react';
 import { useLocation, useNavigate, Link } from 'react-router-dom';
+import { ShiftHandoverModal } from '@/components/admin/ShiftHandoverModal';
 import { useMobileAuth } from '@/hooks/use-mobile-auth';
 import { TABS, canAccess } from '@/pages/mobile/mobile-layout-constants';
 import type { MobileUser, Tab } from '@/pages/mobile/mobile-layout-types';
@@ -49,22 +50,42 @@ export function MobileStationHost({
   header?: ReactNode;
 }) {
   const { user } = useSafeUser();
+  const [shiftModalOpen, setShiftModalOpen] = useState(false);
   return (
     <div data-shell="ops" className="flex min-h-dvh flex-col bg-[var(--aura-noir-void,#050814)] text-[var(--aura-text-primary,#F5F5F5)]">
       <header className="flex h-12 items-center justify-between border-b border-[rgba(201,214,223,0.15)] bg-[var(--aura-noir-deep,#0A1A2E)] px-4">
         <span className="font-bold text-[var(--md-sys-color-primary)] text-sm">AURA Mobile</span>
-        {user?.name && (
-          <div className="flex items-center gap-2 text-xs text-[var(--aura-text-secondary,#C9D6DF)]">
-            <span>{user.name.split(' ').pop() ?? user.name}</span>
-            <span className="rounded-full bg-[rgba(255,255,255,0.08)] px-2 py-0.5 uppercase text-[10px]">{user.role}</span>
-          </div>
-        )}
+        <div className="flex items-center gap-2 text-xs text-[var(--aura-text-secondary,#C9D6DF)]">
+          {user?.id && (
+            <button
+              type="button"
+              onClick={() => setShiftModalOpen(true)}
+              data-testid="mobile-shift-btn"
+              className="rounded-lg border border-[rgba(201,214,223,0.25)] bg-[rgba(255,255,255,0.06)] px-2.5 py-1 text-[11px] font-semibold text-[var(--aura-text-primary,#F5F5F5)] hover:bg-[rgba(255,255,255,0.12)]"
+            >
+              Ca làm / Shift
+            </button>
+          )}
+          {user?.name && (
+            <>
+              <span>{user.name.split(' ').pop() ?? user.name}</span>
+              <span className="rounded-full bg-[rgba(255,255,255,0.08)] px-2 py-0.5 uppercase text-[10px]">{user.role}</span>
+            </>
+          )}
+        </div>
       </header>
       {header}
       <main className="flex-1" aria-label={title}>
         {children}
       </main>
       <MobileTabBar />
+      {shiftModalOpen && (
+        <ShiftHandoverModal
+          isOpen={shiftModalOpen}
+          onClose={() => setShiftModalOpen(false)}
+          actorOverride={user}
+        />
+      )}
     </div>
   );
 }

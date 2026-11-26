@@ -3,8 +3,7 @@ import type { D1Database } from '@cloudflare/workers-types';
 import type { Env } from '../../types/env';
 import { executeKdsStatusTransition } from '@aura/domain-kitchen';
 import { restoreInventoryForOrder } from '@aura/domain-inventory';
-import { releaseTableIfNoActiveOrders, restoreLoyaltyVoucherForOrder } from '@aura/domain-order';
-import { cancelOpenPayOSAttemptForOrder } from '@aura/domain-payment';
+import { compensateVoidedOrder, releaseTableIfNoActiveOrders } from '@aura/domain-order';
 import { getDatabase, matchesTenantRow } from '../../lib/db';
 import { fetchOrderItemsAndPayments, formatCustomerOrder, formatOrder, resolveOpenApiOrdersTenant } from './helpers';
 import { fetchOrderForRead } from './order-read-handlers';
@@ -56,44 +55,17 @@ export async function runOrderCancellationRollback(params: {
   reason?: string;
   /** Order status captured before it became 'cancelled'; decides restock vs waste. */
   preCancelStatus?: string;
+  actorId?: string | null;
 }): Promise<void> {
-  const { db, env, id, existing, cancelTenant, now, reason, preCancelStatus } = params;
+  const { db, env, id, existing, cancelTenant, now, reason, preCancelStatus, actorId } = params;
+  const effectivePreStatus = preCancelStatus ?? (typeof existing.status === 'string' ? existing.status : undefined);
 
   await restoreInventoryForOrder(
     { AURA_DB: db as any, ...(env || {}) },
     id,
     cancelTenant,
-    preCancelStatus ?? (typeof existing.status === 'string' ? existing.status : undefined),
+    effectivePreStatus,
   ).catch(() => {});
-
-  await cancelOpenPayOSAttemptForOrder(
-    db,
-    (env || {}) as unknown as Record<string, unknown>,
-    id,
-    cancelTenant,
-  ).catch(() => {});
-
-  try {
-    await db.prepare(
-      "UPDATE payments SET status = 'cancelled', updated_at = ? WHERE order_id = ? AND status = 'pending' AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
-    ).bind(now, id, cancelTenant).run().catch(async () => {
-      try {
-        await db.prepare(
-          "UPDATE payments SET status = 'cancelled' WHERE order_id = ? AND status = 'pending' AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
-        ).bind(id, cancelTenant).run();
-      } catch {
-        if (cancelTenant === 'default') {
-          await db.prepare(
-            "UPDATE payments SET status = 'cancelled', updated_at = ? WHERE order_id = ? AND status = 'pending'"
-          ).bind(now, id).run().catch(() =>
-            db.prepare("UPDATE payments SET status = 'cancelled' WHERE order_id = ? AND status = 'pending'").bind(id).run().catch(() => {})
-          );
-        }
-      }
-    });
-  } catch {
-    // Optional payments table in partial schemas
-  }
 
   try {
     await db.prepare(
@@ -109,358 +81,20 @@ export async function runOrderCancellationRollback(params: {
     // Column status/updated_at absent in canonical order_items schema
   }
 
-  let accruedCustomerDecremented = false;
-  try {
-    let earnRow = await db.prepare(
-      "SELECT customer_id FROM cashback_transactions WHERE order_id = ? AND type = 'earn' AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ? LIMIT 1"
-    ).bind(id, cancelTenant).first<{ customer_id?: string }>().catch(() => null);
-    if (!earnRow && cancelTenant === 'default') {
-      const fallbackEarn = await db.prepare(
-        "SELECT customer_id FROM cashback_transactions WHERE order_id = ? AND type = 'earn' LIMIT 1"
-      ).bind(id).first<{ customer_id?: string; tenant_id?: string | null }>().catch(() => null);
-      if (
-        fallbackEarn &&
-        (!('tenant_id' in fallbackEarn) ||
-          fallbackEarn.tenant_id === undefined ||
-          matchesTenantRow(fallbackEarn as Record<string, unknown>, cancelTenant))
-      ) {
-        earnRow = fallbackEarn;
-      }
-    }
-    if (!earnRow) {
-      let ptRow = await db.prepare(
-        "SELECT customer_id FROM loyalty_point_logs WHERE order_id = ? AND points_change > 0 AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ? LIMIT 1"
-      ).bind(id, cancelTenant).first<{ customer_id?: string }>().catch(() => null);
-      if (!ptRow && cancelTenant === 'default') {
-        const fallbackPt = await db.prepare(
-          'SELECT customer_id FROM loyalty_point_logs WHERE order_id = ? AND points_change > 0 LIMIT 1'
-        ).bind(id).first<{ customer_id?: string; tenant_id?: string | null }>().catch(() => null);
-        if (
-          fallbackPt &&
-          (!('tenant_id' in fallbackPt) ||
-            fallbackPt.tenant_id === undefined ||
-            matchesTenantRow(fallbackPt as Record<string, unknown>, cancelTenant))
-        ) {
-          ptRow = fallbackPt;
-        }
-      }
-      if (ptRow?.customer_id) {
-        earnRow = ptRow;
-      }
-    }
-    if (earnRow?.customer_id) {
-      const totalVnd = Number(existing.total ?? existing.total_amount ?? 0);
-      const { loadPolicy, reverseAccrual } = await import('@aura/domain-crm');
-      const policy = await loadPolicy(db, env?.AUTH_KV, new Date(), cancelTenant).catch(() => null);
-      if (policy) {
-        await reverseAccrual(db, policy, {
-          orderId: id,
-          customerId: earnRow.customer_id,
-          refundAmountVnd: totalVnd,
-          tenantId: cancelTenant,
-          reason: reason || 'order_cancelled',
-        }).catch(() => {});
-      }
-      if (totalVnd > 0) {
-        accruedCustomerDecremented = true;
-        await db.prepare(
-          "UPDATE customers SET total_spent = MAX(0, COALESCE(total_spent, 0) - ?) WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
-        ).bind(totalVnd, earnRow.customer_id, cancelTenant).run().catch(() => {
-          if (cancelTenant === 'default') {
-            return db.prepare(
-              'UPDATE customers SET total_spent = MAX(0, COALESCE(total_spent, 0) - ?) WHERE id = ?'
-            ).bind(totalVnd, earnRow!.customer_id).run().catch(() => {});
-          }
-        });
-      }
-    }
-  } catch {
-    // Optional loyalty tables in partial schemas
-  }
-
-  try {
-    const existingRefund = await db.prepare(
-      "SELECT id FROM cashback_transactions WHERE order_id = ? AND type = 'refund' AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ? LIMIT 1"
-    ).bind(id, cancelTenant).first<{ id?: string }>().catch(() =>
-      cancelTenant === 'default'
-        ? db.prepare(
-            "SELECT id FROM cashback_transactions WHERE order_id = ? AND type = 'refund' LIMIT 1"
-          ).bind(id).first<{ id?: string }>().catch(() => null)
-        : null
-    );
-    if (!existingRefund?.id) {
-      const spendRow = await db.prepare(
-        "SELECT id, customer_id, amount FROM cashback_transactions WHERE order_id = ? AND type IN ('spend', 'redeem') AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ? LIMIT 1"
-      ).bind(id, cancelTenant).first<{ id?: string; customer_id?: string; amount?: number }>().catch(() =>
-        cancelTenant === 'default'
-          ? db.prepare(
-              "SELECT id, customer_id, amount FROM cashback_transactions WHERE order_id = ? AND type = 'spend' LIMIT 1"
-            ).bind(id).first<{ id?: string; customer_id?: string; amount?: number }>().catch(() => null)
-          : null
-      );
-      let refundCustomerId = spendRow?.customer_id ? String(spendRow.customer_id).trim() : '';
-      let refundAmount = Math.abs(Number(spendRow?.amount ?? 0));
-      if (!refundCustomerId && existing.customer_id) {
-        refundCustomerId = String(existing.customer_id).trim();
-      }
-      if (!(refundAmount > 0)) {
-        const orderCashbackUsed = Number(existing.cashback_used ?? 0);
-        if (orderCashbackUsed > 0) refundAmount = orderCashbackUsed;
-      }
-      if (refundCustomerId && refundAmount > 0) {
-        const wRow = await db.prepare(
-          "SELECT id, balance FROM cashback_wallets WHERE customer_id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ? LIMIT 1"
-        ).bind(refundCustomerId, cancelTenant).first<{ id?: string; balance?: number }>().catch(() =>
-          cancelTenant === 'default'
-            ? db.prepare(
-                'SELECT id, balance FROM cashback_wallets WHERE customer_id = ? LIMIT 1'
-              ).bind(refundCustomerId).first<{ id?: string; balance?: number }>().catch(() => null)
-            : null
-        );
-        const walletId = wRow?.id || `wal_${refundCustomerId}`;
-        const balanceAfter = Number(wRow?.balance ?? 0) + refundAmount;
-        const refundTxId = `cb_ref_${id}`;
-        let insertedRefund = true;
-        try {
-          const insRes = await db.prepare(
-            `INSERT INTO cashback_transactions (id, wallet_id, customer_id, order_id, type, amount, balance_after, tenant_id, created_at)
-             SELECT ?, ?, ?, ?, 'refund', ?, ?, ?, datetime('now')
-             WHERE NOT EXISTS (SELECT 1 FROM cashback_transactions WHERE order_id = ? AND type = 'refund' AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?)`
-          ).bind(refundTxId, walletId, refundCustomerId, id, refundAmount, balanceAfter, cancelTenant, id, cancelTenant).run().catch(() =>
-            db.prepare(
-              `INSERT INTO cashback_transactions (id, wallet_id, customer_id, order_id, type, amount, tenant_id, created_at)
-               SELECT ?, ?, ?, ?, 'refund', ?, ?, datetime('now')
-               WHERE NOT EXISTS (SELECT 1 FROM cashback_transactions WHERE order_id = ? AND type = 'refund' AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?)`
-            ).bind(refundTxId, walletId, refundCustomerId, id, refundAmount, cancelTenant, id, cancelTenant).run()
-          );
-          const changes = (insRes as unknown as { meta?: { changes?: number }; changes?: number })?.meta?.changes
-            ?? (insRes as unknown as { changes?: number })?.changes;
-          if (changes !== undefined && Number(changes) === 0) insertedRefund = false;
-        } catch {
-          if (cancelTenant === 'default') {
-            try {
-              const insRes = await db.prepare(
-                `INSERT INTO cashback_transactions (id, wallet_id, customer_id, order_id, type, amount, balance_after, created_at)
-                 SELECT ?, ?, ?, ?, 'refund', ?, ?, datetime('now')
-                 WHERE NOT EXISTS (SELECT 1 FROM cashback_transactions WHERE order_id = ? AND type = 'refund')`
-              ).bind(refundTxId, walletId, refundCustomerId, id, refundAmount, balanceAfter, id).run().catch(() =>
-                db.prepare(
-                  `INSERT INTO cashback_transactions (id, wallet_id, customer_id, order_id, type, amount, created_at)
-                   SELECT ?, ?, ?, ?, 'refund', ?, datetime('now')
-                   WHERE NOT EXISTS (SELECT 1 FROM cashback_transactions WHERE order_id = ? AND type = 'refund')`
-                ).bind(refundTxId, walletId, refundCustomerId, id, refundAmount, id).run()
-              );
-              const changes = (insRes as unknown as { meta?: { changes?: number }; changes?: number })?.meta?.changes
-                ?? (insRes as unknown as { changes?: number })?.changes;
-              if (changes !== undefined && Number(changes) === 0) insertedRefund = false;
-            } catch {
-              try {
-                await db.prepare(
-                  "INSERT INTO cashback_transactions (id, customer_id, order_id, type, amount, created_at) VALUES (?, ?, ?, 'refund', ?, datetime('now'))"
-                ).bind(refundTxId, refundCustomerId, id, refundAmount).run();
-              } catch {
-                // Optional cashback_transactions schema differences
-              }
-            }
-          } else {
-            insertedRefund = false;
-          }
-        }
-        if (insertedRefund) {
-          await db.prepare(
-            "UPDATE cashback_wallets SET balance = balance + ?, total_spent = MAX(0, COALESCE(total_spent, 0) - ?), updated_at = datetime('now') WHERE customer_id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
-          ).bind(refundAmount, refundAmount, refundCustomerId, cancelTenant).run().catch(async () => {
-            try {
-              await db.prepare(
-                "UPDATE cashback_wallets SET balance = balance + ?, updated_at = datetime('now') WHERE customer_id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
-              ).bind(refundAmount, refundCustomerId, cancelTenant).run();
-            } catch {
-              if (cancelTenant === 'default') {
-                await db.prepare(
-                  "UPDATE cashback_wallets SET balance = balance + ?, total_spent = MAX(0, COALESCE(total_spent, 0) - ?), updated_at = datetime('now') WHERE customer_id = ?"
-                ).bind(refundAmount, refundAmount, refundCustomerId).run().catch(() =>
-                  db.prepare(
-                    "UPDATE cashback_wallets SET balance = balance + ?, updated_at = datetime('now') WHERE customer_id = ?"
-                  ).bind(refundAmount, refundCustomerId).run().catch(() => {})
-                );
-              }
-            }
-          });
-          if (!accruedCustomerDecremented) {
-            await db.prepare(
-              "UPDATE customers SET total_spent = MAX(0, COALESCE(total_spent, 0) - ?) WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
-            ).bind(refundAmount, refundCustomerId, cancelTenant).run().catch(() => {
-              if (cancelTenant === 'default') {
-                return db.prepare(
-                  'UPDATE customers SET total_spent = MAX(0, COALESCE(total_spent, 0) - ?) WHERE id = ?'
-                ).bind(refundAmount, refundCustomerId).run().catch(() => {});
-              }
-            });
-          }
-          await db.prepare(
-            "UPDATE orders SET cashback_used = 0 WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
-          ).bind(id, cancelTenant).run().catch(() => {
-            if (cancelTenant === 'default') {
-              return db.prepare(
-                'UPDATE orders SET cashback_used = 0 WHERE id = ?'
-              ).bind(id).run().catch(() => {});
-            }
-          });
-        }
-      }
-    }
-  } catch {
-    // Optional cashback tables in partial schemas
-  }
-
-  try {
-    await restoreLoyaltyVoucherForOrder(db, id, cancelTenant);
-  } catch {
-    // Optional loyalty voucher tables in partial schemas
-  }
-
-  try {
-    const refRow = await db.prepare(
-      "SELECT id FROM referrals WHERE first_order_id = ? AND status = 'completed' AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ? LIMIT 1"
-    ).bind(id, cancelTenant).first<{ id?: string }>().catch(() =>
-      cancelTenant === 'default'
-        ? db.prepare(
-            "SELECT id FROM referrals WHERE first_order_id = ? AND status = 'completed' LIMIT 1"
-          ).bind(id).first<{ id?: string }>().catch(() => null)
-        : null
-    );
-    if (refRow?.id) {
-      const { reverseReferralCashback } = await import('@aura/domain-crm');
-      await reverseReferralCashback(db, refRow.id, cancelTenant).catch(() => {});
-    }
-  } catch {
-    // Optional referrals table in partial schemas
-  }
-
-  const decrementedPromoIds = new Set<string>();
-  try {
-    const redRow = await db.prepare(
-      "SELECT promotion_id, code FROM promotion_redemptions WHERE order_id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ? LIMIT 1"
-    ).bind(id, cancelTenant).first<{ promotion_id?: string; code?: string }>().catch(() =>
-      cancelTenant === 'default'
-        ? db.prepare(
-            'SELECT promotion_id, code FROM promotion_redemptions WHERE order_id = ? LIMIT 1'
-          ).bind(id).first<{ promotion_id?: string; code?: string }>().catch(() => null)
-        : null
-    );
-    if (redRow && (redRow.promotion_id || redRow.code)) {
-      const promoTenant = cancelTenant;
-      if (redRow.promotion_id) {
-        decrementedPromoIds.add(String(redRow.promotion_id).trim());
-        await db.prepare(
-          `UPDATE promotions
-           SET current_uses = CASE WHEN COALESCE(current_uses, 0) > 0 THEN current_uses - 1 ELSE 0 END,
-               used_count = CASE WHEN COALESCE(used_count, 0) > 0 THEN used_count - 1 ELSE 0 END,
-               usage_count = CASE WHEN COALESCE(usage_count, 0) > 0 THEN usage_count - 1 ELSE 0 END
-           WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?`
-        ).bind(redRow.promotion_id, promoTenant).run().catch(async () => {
-          try {
-            await db.prepare(
-              "UPDATE promotions SET usage_count = CASE WHEN COALESCE(usage_count, 0) > 0 THEN usage_count - 1 ELSE 0 END WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
-            ).bind(redRow.promotion_id, promoTenant).run();
-          } catch {
-            if (promoTenant === 'default') {
-              await db.prepare(
-                'UPDATE promotions SET usage_count = CASE WHEN usage_count > 0 THEN usage_count - 1 ELSE 0 END WHERE id = ?'
-              ).bind(redRow.promotion_id).run().catch(() => {});
-            }
-          }
-        });
-      } else if (redRow.code) {
-        await db.prepare(
-          `UPDATE promotions
-           SET current_uses = CASE WHEN COALESCE(current_uses, 0) > 0 THEN current_uses - 1 ELSE 0 END,
-               used_count = CASE WHEN COALESCE(used_count, 0) > 0 THEN used_count - 1 ELSE 0 END,
-               usage_count = CASE WHEN COALESCE(usage_count, 0) > 0 THEN usage_count - 1 ELSE 0 END
-           WHERE UPPER(code) = UPPER(?) AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?`
-        ).bind(redRow.code, promoTenant).run().catch(async () => {
-          try {
-            await db.prepare(
-              "UPDATE promotions SET usage_count = CASE WHEN COALESCE(usage_count, 0) > 0 THEN usage_count - 1 ELSE 0 END WHERE UPPER(code) = UPPER(?) AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
-            ).bind(redRow.code, promoTenant).run();
-          } catch {
-            if (promoTenant === 'default') {
-              await db.prepare(
-                'UPDATE promotions SET usage_count = CASE WHEN usage_count > 0 THEN usage_count - 1 ELSE 0 END WHERE UPPER(code) = UPPER(?)'
-              ).bind(redRow.code).run().catch(() => {});
-            }
-          }
-        });
-      }
-      await db.prepare(
-        "DELETE FROM promotion_redemptions WHERE order_id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
-      ).bind(id, cancelTenant).run().catch(() => {
-        if (cancelTenant === 'default') {
-          return db.prepare('DELETE FROM promotion_redemptions WHERE order_id = ?').bind(id).run().catch(() => {});
-        }
-      });
-    }
-  } catch {
-    // Optional promotion_redemptions table in partial schemas
-  }
-
-  try {
-    const usageRes = await db.prepare(
-      "SELECT id, promotion_id FROM promotion_usages WHERE order_id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
-    ).bind(id, cancelTenant).all<{ id?: string; promotion_id?: string }>().catch(async () => {
-      if (cancelTenant !== 'default') {
-        const singleTenant = await db.prepare(
-          "SELECT id, promotion_id FROM promotion_usages WHERE order_id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ? LIMIT 1"
-        ).bind(id, cancelTenant).first<{ id?: string; promotion_id?: string }>().catch(() => null);
-        return { results: singleTenant ? [singleTenant] : [] };
-      }
-      const fallbackAll = await db.prepare(
-        'SELECT id, promotion_id FROM promotion_usages WHERE order_id = ?'
-      ).bind(id).all<{ id?: string; promotion_id?: string }>().catch(() => null);
-      if (fallbackAll?.results) return fallbackAll;
-      const single = await db.prepare(
-        'SELECT id, promotion_id FROM promotion_usages WHERE order_id = ? LIMIT 1'
-      ).bind(id).first<{ id?: string; promotion_id?: string }>().catch(() => null);
-      return { results: single ? [single] : [] };
-    });
-    const usageRows = usageRes?.results ?? [];
-    for (const usageRow of usageRows) {
-      const promoId = usageRow.promotion_id ? String(usageRow.promotion_id).trim() : '';
-      if (promoId && !decrementedPromoIds.has(promoId)) {
-        decrementedPromoIds.add(promoId);
-        await db.prepare(
-          `UPDATE promotions
-           SET current_uses = MAX(0, COALESCE(current_uses, 0) - 1),
-               used_count = MAX(0, COALESCE(used_count, 0) - 1),
-               usage_count = MAX(0, COALESCE(usage_count, 0) - 1)
-           WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?`
-        ).bind(promoId, cancelTenant).run().catch(async () => {
-          try {
-            await db.prepare(
-              "UPDATE promotions SET usage_count = MAX(0, COALESCE(usage_count, 0) - 1) WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
-            ).bind(promoId, cancelTenant).run();
-          } catch {
-            if (cancelTenant === 'default') {
-              await db.prepare(
-                'UPDATE promotions SET usage_count = MAX(0, COALESCE(usage_count, 0) - 1) WHERE id = ?'
-              ).bind(promoId).run().catch(() => {});
-            }
-          }
-        });
-      }
-    }
-    if (usageRows.length > 0) {
-      await db.prepare(
-        "DELETE FROM promotion_usages WHERE order_id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
-      ).bind(id, cancelTenant).run().catch(() => {
-        if (cancelTenant === 'default') {
-          return db.prepare('DELETE FROM promotion_usages WHERE order_id = ?').bind(id).run().catch(() => {});
-        }
-      });
-    }
-  } catch {
-    // Optional promotion_usages table in partial schemas
-  }
+  // Delegates paid COD/cash refund, cashback_used, loyalty_points_redeemed, loyalty_vouchers,
+  // promotion_redemptions, promotion_usages, and table_sessions rollback to compensateVoidedOrder.
+  await compensateVoidedOrder({
+    db,
+    env: (env || {}) as unknown as Record<string, unknown>,
+    kv: env?.AUTH_KV ?? null,
+    orderId: id,
+    tenantId: cancelTenant,
+    now,
+    reason: reason || 'order_cancelled',
+    preCancelStatus: effectivePreStatus,
+    actorId,
+    skipInventoryRestore: true,
+  });
 
   if (existing.table_id) {
     await releaseTableIfNoActiveOrders(db, String(existing.table_id), cancelTenant).catch(() => false);
@@ -607,6 +241,19 @@ export async function handleCancelOrder(c: Context<{ Bindings: Env }>) {
   }
 
   const normalizedCancelRole = String(user?.role || '').trim().toLowerCase();
+  const isShipperCancel = normalizedCancelRole === 'shipper' || normalizedCancelRole === 'rider';
+  if (isShipperCancel) {
+    const existingRec = existing as Record<string, unknown>;
+    const existingType = typeof existingRec.order_type === 'string' ? existingRec.order_type.trim().toLowerCase() : '';
+    const assignedShipper = typeof existingRec.assigned_shipper_id === 'string' ? existingRec.assigned_shipper_id.trim() : '';
+    const callerId = String(user?.id || (user as unknown as Record<string, unknown> | undefined)?.sub || '').trim();
+    if (existingType && existingType !== 'delivery') {
+      return c.json({ success: false, error: 'Shippers may only cancel assigned delivery orders' }, 403);
+    }
+    if (assignedShipper && assignedShipper !== callerId) {
+      return c.json({ success: false, error: 'Forbidden: order is assigned to another shipper' }, 403);
+    }
+  }
   const canCompensatePaid = ['owner', 'admin', 'manager', 'supervisor'].includes(normalizedCancelRole);
   if (!canCompensatePaid && String(existing.payment_status || '').trim().toLowerCase() === 'paid') {
     return c.json({
@@ -626,12 +273,15 @@ export async function handleCancelOrder(c: Context<{ Bindings: Env }>) {
   const preCancelStatus = String(existing.status ?? '');
 
   // All aliases share tenant confinement, role/state validation and compare-and-set.
+  const cancelReasonText = typeof body.reason === 'string' && body.reason.trim() ? body.reason.trim() : undefined;
   const transition = await executeKdsStatusTransition(db, id, 'cancelled', user?.role, {
     tenantId: customer ? (rawExistingTenant || 'default') : (tenantId === '*' ? (rawExistingTenant || 'default') : tenantId),
     kv: c.env?.AUTH_KV,
     env: c.env as unknown as Record<string, unknown>,
     skipCancelSideEffects: true,
     allowPaidCompensation: canCompensatePaid,
+    actorId: user?.id,
+    ...(cancelReasonText ? { fields: { failure_reason: cancelReasonText } } : {}),
   });
   if (!transition.success) return c.json({ success: false, error: transition.error }, (transition.statusCode || 400) as any);
 
@@ -644,6 +294,7 @@ export async function handleCancelOrder(c: Context<{ Bindings: Env }>) {
     now,
     reason: body.reason || 'order_cancelled',
     preCancelStatus,
+    actorId: user?.id || null,
   });
 
   const actor = user?.id || 'system';

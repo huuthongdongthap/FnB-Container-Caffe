@@ -4,14 +4,41 @@
 
 import type { HappyHourWindow, ModifierChoice } from '../model/catalog-types';
 
-const toHHMM = (d: Date): string =>
-  `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+const ICT_OFFSET_MS = 7 * 3600_000;
+
+export function getIctWallClock(d: Date): { currentTime: string; dayOfWeek: number; prevDayOfWeek: number } {
+  const ict = new Date(d.getTime() + ICT_OFFSET_MS);
+  const currentTime = `${String(ict.getUTCHours()).padStart(2, '0')}:${String(ict.getUTCMinutes()).padStart(2, '0')}`;
+  const dayOfWeek = ict.getUTCDay();
+  const prevDayOfWeek = (dayOfWeek + 6) % 7;
+  return { currentTime, dayOfWeek, prevDayOfWeek };
+}
 
 const normalizeHHMM = (timeStr: string): string => {
   const parts = String(timeStr || '').trim().split(':');
   if (parts.length < 2) return String(timeStr || '').trim();
   return `${(parts[0] ?? '').padStart(2, '0')}:${(parts[1] ?? '').padStart(2, '0')}`;
 };
+
+export function matchesHappyHourSchedule(
+  winDayOfWeek: number,
+  rawStart: string,
+  rawEnd: string,
+  now: Date,
+): boolean {
+  const { currentTime, dayOfWeek, prevDayOfWeek } = getIctWallClock(now);
+  const start = normalizeHHMM(rawStart);
+  const end = normalizeHHMM(rawEnd);
+  if (!start || !end || start === end) return false;
+  if (start < end) {
+    return winDayOfWeek === dayOfWeek && currentTime >= start && currentTime < end;
+  }
+  // Overnight window (start > end), e.g. 22:00 -> 02:00
+  return (
+    (winDayOfWeek === dayOfWeek && currentTime >= start) ||
+    (winDayOfWeek === prevDayOfWeek && currentTime < end)
+  );
+}
 
 const parseApplyIds = (raw: string | null | undefined): string[] => {
   if (!raw) return [];
@@ -44,14 +71,12 @@ export function happyHourDiscountFor(
   now: Date,
   context?: HappyHourMatchContext,
 ): HappyHourWindow | null {
-  const currentTime = toHHMM(now);
-  const dayOfWeek = now.getDay();
   const reqTenant = context?.tenantId && context.tenantId.trim() && context.tenantId.trim() !== '*'
     ? context.tenantId.trim()
     : null;
   const matched = windows
     .filter((w) => {
-      if (w.active !== 1 || w.day_of_week !== dayOfWeek) return false;
+      if (w.active !== 1) return false;
       if (reqTenant) {
         const row = w as unknown as Record<string, unknown>;
         if ('tenant_id' in row && row.tenant_id !== undefined) {
@@ -59,9 +84,9 @@ export function happyHourDiscountFor(
           if (wTenant !== reqTenant) return false;
         }
       }
-      const start = normalizeHHMM(w.start_time);
-      const end = normalizeHHMM(w.end_time);
-      if (start > end || currentTime < start || currentTime >= end) return false;
+      if (!matchesHappyHourSchedule(Number(w.day_of_week), w.start_time, w.end_time, now)) {
+        return false;
+      }
 
       const applyTo = (w.apply_to || 'all').toLowerCase();
       if (

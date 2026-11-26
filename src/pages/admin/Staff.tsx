@@ -21,12 +21,23 @@ export default function StaffPage() {
   return <StaffSession key={session} />;
 }
 
+function resolveRequestedStaffTab(canViewStaffList: boolean, canRecruit: boolean): StaffTab {
+  if (typeof window !== 'undefined') {
+    const param = new URLSearchParams(window.location.search).get('tab');
+    if (param === 'shifts') return 'shifts';
+    if (param === 'recruitment' && canRecruit) return 'recruitment';
+    if (param === 'list' && canViewStaffList) return 'list';
+  }
+  return canViewStaffList ? 'list' : 'shifts';
+}
+
 function StaffSession() {
-  const canRecruit = useAuthStore(state => ['owner', 'manager'].includes(state.user?.role || ''));
-  const { t } = useTranslation();
-  const [tab, setTab] = useState<StaffTab>('list');
-  const userId = useAuthStore(state => state.user?.id);
   const userRole = useAuthStore(state => state.user?.role);
+  const canRecruit = ['owner', 'manager'].includes(userRole || '');
+  const canViewStaffList = ['owner', 'manager', 'supervisor', 'admin'].includes(userRole || '');
+  const { t } = useTranslation();
+  const [tab, setTab] = useState<StaffTab>(() => resolveRequestedStaffTab(canViewStaffList, canRecruit));
+  const userId = useAuthStore(state => state.user?.id);
   const [attendanceAvailable, setAttendanceAvailable] = useState(false);
   const [attendanceMessage, setAttendanceMessage] = useState('');
 
@@ -34,10 +45,10 @@ function StaffSession() {
     let cancelled = false;
     setAttendanceAvailable(false);
     setAttendanceMessage('');
-    setTab('list');
+    setTab(resolveRequestedStaffTab(canViewStaffList, canRecruit));
     if (!userId) return;
     // Operational staff cannot read management profiles; use their self-scoped shifts route.
-    const canReadProfile = ['owner', 'manager', 'supervisor', 'admin'].includes(userRole || '');
+    const canReadProfile = canViewStaffList;
     const path = canReadProfile ? `/api/staff/${encodeURIComponent(userId)}` : '/api/staff/shifts?limit=1';
     apiFetch<unknown>(path).then(response => {
       if (cancelled) return;
@@ -52,27 +63,29 @@ function StaffSession() {
       if (!cancelled) setAttendanceMessage('Không thể tải quyền chấm công. Vui lòng tải lại. / Unable to load attendance access. Please reload.');
     });
     return () => { cancelled = true; };
-  }, [userId, userRole]);
+  }, [userId, userRole, canViewStaffList, canRecruit]);
 
   return (
     <div className="space-y-6">
       <HelmetHead title={`${t('adminStaff.title')} — AURA CAFE`} description={t('adminStaff.subtitle')} />
 
       <div className="flex gap-2 border-b border-border pb-2">
-        <button
-          onClick={() => setTab('list')}
-          className={`px-4 py-2 text-sm font-medium rounded-t-lg transition-colors ${
-            tab === 'list'
-              ? 'bg-surface text-foreground border-b-2 border-primary'
-              : 'text-muted hover:text-foreground'
-          }`}
-        >
-          {t('adminStaff.title')}
-        </button>
+        {canViewStaffList && (
+          <button
+            onClick={() => setTab('list')}
+            className={`px-4 py-2 text-sm font-medium rounded-t-lg transition-colors ${
+              tab === 'list'
+                ? 'bg-surface text-foreground border-b-2 border-primary'
+                : 'text-muted hover:text-foreground'
+            }`}
+          >
+            {t('adminStaff.title')}
+          </button>
+        )}
         <button
           disabled={!attendanceAvailable}
           onClick={() => setTab('shifts')}
-          className={`px-4 py-2 text-sm font-medium rounded-t-lg transition-colors ${
+          className={`px-4 py-2 text-sm font-medium rounded-t-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
             tab === 'shifts'
               ? 'bg-surface text-foreground border-b-2 border-primary'
               : 'text-muted hover:text-foreground'
@@ -92,7 +105,7 @@ function StaffSession() {
         </button>}
       </div>
 
-      {tab === 'list' && <StaffListTab />}
+      {canViewStaffList && tab === 'list' && <StaffListTab />}
       {attendanceMessage && <p role="status">{attendanceMessage}</p>}
       {tab === 'shifts' && attendanceAvailable && <ShiftsTab />}
       {canRecruit && tab === 'recruitment' && <RecruitmentTab />}

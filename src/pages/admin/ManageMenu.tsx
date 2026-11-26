@@ -16,6 +16,8 @@ import { ModifierGroupList } from './modifier-group-list';
 import { ModifierLinkEditor } from './modifier-link-editor';
 import { ModifierGroupModal } from './modifier-group-modal';
 import { ModifierChoiceModal } from './modifier-choice-modal';
+import { useHappyHourManager } from './use-happy-hour-manager';
+import { HappyHourSection } from './happy-hour-section';
 
 export default function ManageMenuPage() {
   const { t } = useTranslation();
@@ -25,6 +27,7 @@ export default function ManageMenuPage() {
   const category = useCategoryManager();
   const modifiers = useModifierManager();
   const linkEditor = useModifierLinkEditor();
+  const happyHour = useHappyHourManager();
 
   const products = product.query.data?.data ?? [];
   const categories = category.query.data?.data ?? [];
@@ -32,6 +35,18 @@ export default function ManageMenuPage() {
 
   const [confirmDeleteChoice, setConfirmDeleteChoice] = useState<ModifierChoice | null>(null);
   const choiceGroup = modifiers.groupsQuery.data?.data?.find((g) => g.id === modifiers.choiceGroupId);
+  const activeBannerError =
+    (activeTab === 'products' && product.actionError) ||
+    (activeTab === 'categories' && category.actionError) ||
+    (activeTab === 'modifiers' && modifiers.actionError) ||
+    (activeTab === 'happy-hour' && happyHour.actionError) ||
+    null;
+  const clearActiveBannerError = () => {
+    product.clearActionError();
+    category.clearActionError();
+    modifiers.clearActionError();
+    happyHour.clearActionError();
+  };
 
   return (
     <>
@@ -44,6 +59,22 @@ export default function ManageMenuPage() {
           <div className="mb-6 flex items-center justify-between">
             <h1 className="text-2xl font-display font-bold">{t('adminMenu.title')}</h1>
           </div>
+
+          {activeBannerError && (
+            <div
+              role="alert"
+              className="mb-4 flex items-center justify-between gap-3 rounded-xl border border-rose-500/30 bg-rose-500/10 px-4 py-3 text-sm text-rose-300"
+            >
+              <span>{activeBannerError}</span>
+              <button
+                type="button"
+                onClick={clearActiveBannerError}
+                className="shrink-0 text-xs font-semibold underline"
+              >
+                Đóng
+              </button>
+            </div>
+          )}
 
           {/* Tabs */}
           <ManageMenuTabBar activeTab={activeTab} onChange={setActiveTab} />
@@ -105,6 +136,30 @@ export default function ManageMenuPage() {
                 onDelete={modifiers.setConfirmDeleteGroup}
               />
             </>
+          )}
+
+          {activeTab === 'happy-hour' && (
+            <HappyHourSection
+              windows={happyHour.query.data?.data ?? []}
+              categories={categories}
+              products={products}
+              isLoading={happyHour.query.isLoading}
+              isError={happyHour.query.isError}
+              modalOpen={happyHour.modalOpen}
+              editing={happyHour.editing}
+              form={happyHour.form}
+              errors={happyHour.errors}
+              saving={happyHour.saveMutation.isPending}
+              togglePending={happyHour.toggleActiveMutation.isPending}
+              onRefetch={() => happyHour.query.refetch()}
+              onAdd={happyHour.openAddModal}
+              onEdit={happyHour.openEditModal}
+              onToggleActive={(w) => happyHour.toggleActiveMutation.mutate(w)}
+              onDelete={(id) => happyHour.setDeleteId(id)}
+              onFormChange={happyHour.handleFormChange}
+              onSave={happyHour.handleSave}
+              onCloseModal={happyHour.closeModal}
+            />
           )}
         </div>
 
@@ -214,6 +269,17 @@ export default function ManageMenuPage() {
           }}
           onClose={() => setConfirmDeleteChoice(null)}
           loading={modifiers.deleteChoiceMutation.isPending}
+        />
+
+        <ConfirmDeleteModal
+          open={happyHour.deleteId !== null}
+          title="Xác nhận xoá khung giờ vàng"
+          message="Bạn có chắc chắn muốn xoá khung giờ Happy Hour này? Hành động này không thể hoàn tác."
+          onConfirm={() => {
+            if (happyHour.deleteId !== null) happyHour.deleteMutation.mutate(happyHour.deleteId);
+          }}
+          onClose={() => happyHour.setDeleteId(null)}
+          loading={happyHour.deleteMutation.isPending}
         />
       </div>
     </>

@@ -53,6 +53,8 @@ import {
 } from '../lib/tenant-secrets';
 import { buildVietQrImageUrl, resolveMerchantPaymentConfig } from '../lib/merchant-payment';
 import { buildMerchantPayosWebhookUrls } from '../lib/saas-webhook-url';
+import { updateMRRSnapshot } from '../tree/subscriptions/mrr-calculator';
+import { settleSubscriptionInvoiceByPayOS } from '../tree/subscriptions/saas-payos-subscription-settlement';
 
 const PAYOS_API_URL = 'https://api-merchant.payos.vn/v2/payment-requests';
 const PENDING_DOMAIN_CLAIM_TTL_MS = 24 * 60 * 60 * 1000;
@@ -397,6 +399,27 @@ export function createSaasCommercialRoutes() {
     const orderCode = String(data.orderCode || '');
     const amountPaid = Number(data.amount ?? NaN);
     const isPaid = payload.success === true && String(data.code || '') === '00';
+
+    // Merchant subscription invoices (`subscription_invoices`) settle first: they share the
+    // platform PayOS account and are identified by `payos:<orderCode>` in payment_ref.
+    const subscriptionSettlement = await settleSubscriptionInvoiceByPayOS(db, {
+      orderCode,
+      amountPaid,
+      isPaid,
+      nowIso: new Date().toISOString(),
+    }).catch(() => null);
+    if (subscriptionSettlement?.handled) {
+      if (subscriptionSettlement.subscriptionAdvanced && subscriptionSettlement.tenantId) {
+        await updateMRRSnapshot(db, subscriptionSettlement.tenantId).catch(() => {});
+      }
+      if (subscriptionSettlement.amountMismatch) {
+        return c.json(
+          { error: 1, code: 'amount_mismatch', message: subscriptionSettlement.message },
+          409
+        );
+      }
+      return c.json({ error: 0, message: subscriptionSettlement.message, data: null });
+    }
 
     const invoice = await db
       .prepare('SELECT * FROM tenant_invoices WHERE payos_order_code = ? LIMIT 1')

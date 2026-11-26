@@ -65,6 +65,9 @@ export function resolveErpnextTenant(c: import('hono').Context<{ Bindings: Env }
 }
 
 const ExpenseSyncSchema = z.object({
+  id: z.string().optional(),
+  erpnext_id: z.string().optional(),
+  employee: z.string().optional(),
   amount: z.number().positive(),
   category: z.string().min(1),
   date: z.string().min(1),
@@ -108,7 +111,7 @@ export function expenseRoutes(app: import('hono').Hono<{ Bindings: Env }>): void
         binds.push(to);
       }
 
-      let results: any[] = [];
+      let results: Record<string, unknown>[] = [];
       try {
         if (tenantId !== '*') {
           try {
@@ -152,25 +155,95 @@ export function expenseRoutes(app: import('hono').Hono<{ Bindings: Env }>): void
       }
       const data = parsed.data;
 
-      if (c.env.ERPNEXT_MOCK === 'true') {
-        return c.json({ success: true, data: { name: `mock-expense-${Date.now()}`, mock: true, ...data }, synced: true });
+      const db = c.env.AURA_DB;
+      let effectiveTenant = tenantId === '*' ? 'default' : tenantId;
+      let existingExpenseId: string | null = data.id?.trim() || null;
+      let existingErpnextId: string | null = data.erpnext_id?.trim() || null;
+
+      if (db && existingExpenseId) {
+        const existingRow = await db
+          .prepare('SELECT id, erpnext_id, tenant_id FROM expenses WHERE id = ? LIMIT 1')
+          .bind(existingExpenseId)
+          .first<{ id?: string; erpnext_id?: string | null; tenant_id?: string | null }>()
+          .catch(() => null);
+        if (existingRow) {
+          if (tenantId !== '*' && !matchesTenantRow(existingRow as unknown as Record<string, unknown>, tenantId)) {
+            return c.json({ success: false, error: 'Expense not found' }, 404);
+          }
+          const rowTenant = typeof existingRow.tenant_id === 'string' ? existingRow.tenant_id.trim() : '';
+          if (rowTenant && rowTenant !== '*' && rowTenant.toLowerCase() !== 'hq') {
+            effectiveTenant = rowTenant;
+          }
+          if (!existingErpnextId && typeof existingRow.erpnext_id === 'string' && existingRow.erpnext_id.trim()) {
+            existingErpnextId = existingRow.erpnext_id.trim();
+          }
+        }
       }
 
-      const isNonDefaultTenant = Boolean(tenantId && tenantId !== 'default' && tenantId !== '*');
+      if (c.env.ERPNEXT_MOCK === 'true') {
+        const mockErpId = existingErpnextId || `mock-expense-${Date.now()}`;
+        if (db) {
+          const targetId = existingExpenseId || `exp_${crypto.randomUUID()}`;
+          await db
+            .prepare(
+              `INSERT INTO expenses (id, amount, category, date, description, erpnext_id, sync_status, tenant_id)
+               VALUES (?, ?, ?, ?, ?, ?, 'synced', ?)
+               ON CONFLICT(id) DO UPDATE SET erpnext_id = excluded.erpnext_id, sync_status = 'synced'`
+            )
+            .bind(targetId, data.amount, data.category, data.date, data.description || '', mockErpId, effectiveTenant)
+            .run()
+            .catch(() => {});
+        }
+        return c.json({ success: true, data: { name: mockErpId, mock: true, ...data }, synced: true });
+      }
+
+      const isNonDefaultTenant = Boolean(effectiveTenant && effectiveTenant !== 'default' && effectiveTenant !== '*');
       const envForKv = isNonDefaultTenant
         ? { ...c.env, ERPNEXT_URL: undefined, ERPNEXT_API_KEY: undefined, ERPNEXT_API_SECRET: undefined }
         : c.env;
       const client =
         c.env.AUTH_KV && typeof createErpnextClientWithKv === 'function'
-          ? (await createErpnextClientWithKv(envForKv, tenantId)) ??
+          ? (await createErpnextClientWithKv(envForKv, effectiveTenant)) ??
             (isNonDefaultTenant ? null : createErpnextClient(c.env))
           : createErpnextClient(c.env);
       if (!client) {
         return c.json({ success: false, error: 'ERPNext not configured' }, 503);
       }
 
-      const result = await client.create('Expense Claim', {
-        employee: '',
+      let resolvedEmployee = (data.employee || '').trim();
+      if (!resolvedEmployee) {
+        const envWithEmployee = c.env as Env & { ERPNEXT_DEFAULT_EMPLOYEE?: string };
+        if (typeof envWithEmployee.ERPNEXT_DEFAULT_EMPLOYEE === 'string' && envWithEmployee.ERPNEXT_DEFAULT_EMPLOYEE.trim()) {
+          resolvedEmployee = envWithEmployee.ERPNEXT_DEFAULT_EMPLOYEE.trim();
+        }
+      }
+      if (!resolvedEmployee && c.env.AUTH_KV && typeof c.env.AUTH_KV.get === 'function') {
+        const kvEmpKey =
+          effectiveTenant === 'default'
+            ? 'erpnext:default_employee'
+            : `erpnext:${effectiveTenant}:default_employee`;
+        const kvEmp = await c.env.AUTH_KV.get(kvEmpKey).catch(() => null);
+        if (kvEmp && kvEmp.trim()) {
+          resolvedEmployee = kvEmp.trim();
+        }
+      }
+      if (!resolvedEmployee) {
+        try {
+          const empList = await client.list('Employee', { fields: ['name'], filters: [['status', '=', 'Active']], limit: 1 });
+          const firstEmp = Array.isArray(empList?.data) ? (empList.data[0] as Record<string, unknown> | undefined) : undefined;
+          if (firstEmp && typeof firstEmp.name === 'string' && firstEmp.name.trim()) {
+            resolvedEmployee = firstEmp.name.trim();
+          }
+        } catch {
+          // Fall back to canonical ERPNext default employee ID below
+        }
+      }
+      if (!resolvedEmployee) {
+        resolvedEmployee = 'HR-EMP-00001';
+      }
+
+      const claimPayload = {
+        employee: resolvedEmployee,
         employee_name: 'System',
         posting_date: data.date,
         total_claimed_amount: data.amount,
@@ -183,9 +256,67 @@ export function expenseRoutes(app: import('hono').Hono<{ Bindings: Env }>): void
             to_date: data.date
           }
         ]
-      });
+      };
 
-      return c.json({ success: true, data: result });
+      const result = existingErpnextId
+        ? await client.update('Expense Claim', existingErpnextId, claimPayload)
+        : await client.create('Expense Claim', claimPayload);
+
+      const erpnextName =
+        (result?.data as Record<string, string> | undefined)?.name ||
+        (typeof (result as unknown as { name?: string })?.name === 'string'
+          ? (result as unknown as { name: string }).name
+          : existingErpnextId);
+
+      if (db) {
+        const targetExpenseId = existingExpenseId || `exp_${crypto.randomUUID()}`;
+        if (existingExpenseId) {
+          const upd = await db
+            .prepare(
+              "UPDATE expenses SET erpnext_id = ?, sync_status = 'synced' WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
+            )
+            .bind(erpnextName, existingExpenseId, effectiveTenant)
+            .run()
+            .catch(() => null);
+          if (!upd?.meta?.changes) {
+            await db
+              .prepare(
+                `INSERT INTO expenses (id, amount, category, date, description, erpnext_id, sync_status, tenant_id)
+                 VALUES (?, ?, ?, ?, ?, ?, 'synced', ?)`
+              )
+              .bind(
+                existingExpenseId,
+                data.amount,
+                data.category,
+                data.date,
+                data.description || '',
+                erpnextName,
+                effectiveTenant
+              )
+              .run()
+              .catch(() => {});
+          }
+        } else {
+          await db
+            .prepare(
+              `INSERT INTO expenses (id, amount, category, date, description, erpnext_id, sync_status, tenant_id)
+               VALUES (?, ?, ?, ?, ?, ?, 'synced', ?)`
+            )
+            .bind(
+              targetExpenseId,
+              data.amount,
+              data.category,
+              data.date,
+              data.description || '',
+              erpnextName,
+              effectiveTenant
+            )
+            .run()
+            .catch(() => {});
+        }
+      }
+
+      return c.json({ success: true, data: result, erpnext_id: erpnextName, sync_status: 'synced' });
     } catch {
       return c.json({ success: false, error: 'Failed to sync expense' }, 500);
     }

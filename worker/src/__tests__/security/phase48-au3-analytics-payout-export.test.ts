@@ -71,7 +71,7 @@ describe('Phase 48 Slice AU3 — Analytics Summary, Payout Financial Arithmetic,
                     o.payment_method === 'payos' &&
                     o.payment_status === 'paid' &&
                     (acceptsFulfilledPayos
-                      ? ['paid', 'Confirmed', 'preparing', 'ready', 'completed'].includes(o.status)
+                      ? ['paid', 'confirmed', 'Confirmed', 'preparing', 'ready', 'completed'].includes(o.status)
                       : o.status === 'paid')
                 )
                 .reduce((s, o) => s + o.total, 0);
@@ -106,7 +106,8 @@ describe('Phase 48 Slice AU3 — Analytics Summary, Payout Financial Arithmetic,
       expect(body.data.refunded).toBe(50000);
       expect(body.data.net).toBe(350000);
       expect(body.data.total_orders).toBe(5);
-      expect(capturedSqls[0]).toContain("status IN ('paid', 'Confirmed', 'preparing', 'ready', 'completed')");
+      expect(capturedSqls[0]).toContain("'confirmed'");
+      expect(capturedSqls[0]).not.toContain("'Confirmed'");
       expect(capturedSqls[0]).toContain("COALESCE(payment_status, '') = 'refunded'");
     });
 

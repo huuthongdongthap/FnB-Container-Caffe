@@ -1,7 +1,10 @@
 'use client';
 
 import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useMobileAuth } from '@/hooks/use-mobile-auth';
+import { formatTableWithPrefix, stripInternalOrderTags } from '@/hooks/kds-order';
+import { parseKdsTimestampMs } from '@/pages/kds-types';
 import { apiFetch } from '@/lib/api-client';
 import type { TableInfo, MobileOrder, OrderItem, WaiterMenuItem } from './waiter-orders-types';
 import {
@@ -17,7 +20,32 @@ export { TABLE_STATUS_LABELS, tableCardStyle, tabStyle, orderStatusColor } from 
 
 /* ── Component ────────────────────────────────────────────────────── */
 
+export const WAITER_ORDER_CREATE_ROLES = new Set([
+  'owner',
+  'admin',
+  'manager',
+  'supervisor',
+  'waiter',
+  'cashier',
+]);
+
+const WAITER_SERVE_ROLES = new Set([
+  'owner',
+  'admin',
+  'manager',
+  'supervisor',
+  'waiter',
+  'cashier',
+  'staff',
+  'kitchen',
+  'barista',
+  'chef',
+]);
+
+const WAITER_POLL_INTERVAL_MS = 10_000;
+
 export default function WaiterOrders() {
+  const { t } = useTranslation();
   const { token, user } = useMobileAuth();
   const [tab, setTab] = useState<'orders' | 'tables'>('orders');
   const [rawOrders, setRawOrders] = useState<MobileOrder[]>([]);
@@ -27,8 +55,13 @@ export default function WaiterOrders() {
   const [selectedTableId, setSelectedTableId] = useState('');
   const [newOrderItems, setNewOrderItems] = useState<OrderItem[]>([{ name: '', quantity: 1, price: 0, note: '' }]);
   const [submitting, setSubmitting] = useState(false);
+  const [servingId, setServingId] = useState<string | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const submittingRef = useRef(false);
+
+  const normalizedUserRole = String(user?.role ?? '').trim().toLowerCase();
+  const canCreateMobileOrder = WAITER_ORDER_CREATE_ROLES.has(normalizedUserRole);
+  const canServeReadyOrder = !normalizedUserRole || WAITER_SERVE_ROLES.has(normalizedUserRole);
 
   const fetchTables = useCallback(async () => {
     try {
@@ -84,6 +117,52 @@ export default function WaiterOrders() {
     void fetchOrders();
     void fetchMenu();
   }, [fetchTables, fetchOrders, fetchMenu]);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      void fetchOrders();
+      void fetchTables();
+    }, WAITER_POLL_INTERVAL_MS);
+    const handleSync = () => {
+      void fetchOrders();
+      void fetchTables();
+    };
+    if (typeof window !== 'undefined') {
+      window.addEventListener('aura:orders-changed', handleSync);
+    }
+    return () => {
+      clearInterval(interval);
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('aura:orders-changed', handleSync);
+      }
+    };
+  }, [fetchOrders, fetchTables]);
+
+  const handleMarkServed = useCallback(async (order: MobileOrder) => {
+    if (servingId) return;
+    const method = String(order.payment_method ?? '').trim().toLowerCase();
+    const payStatus = String(order.payment_status ?? '').trim().toLowerCase();
+    const isCod = method === 'cod' || method === 'cash' || Number(order.is_cod ?? 0) === 1;
+    const isPaid = payStatus === 'paid' || payStatus === 'completed' || payStatus === 'partially_refunded';
+    if (isCod && !isPaid) {
+      setSubmitError(t('orderMgmt.codUnpaidServeError', 'Đơn COD/tiền mặt chưa thu tiền — vui lòng thu tiền trước khi xác nhận đã phục vụ.'));
+      return;
+    }
+    setServingId(order.id);
+    setSubmitError(null);
+    try {
+      await apiFetch(`/mobile/kds/orders/${encodeURIComponent(order.id)}/status`, {
+        method: 'PATCH',
+        body: JSON.stringify({ status: 'served' }),
+      });
+      await fetchOrders();
+      await fetchTables();
+    } catch (err) {
+      setSubmitError(err instanceof Error ? err.message : 'Failed to update order status');
+    } finally {
+      setServingId(null);
+    }
+  }, [servingId, fetchOrders, fetchTables, t]);
 
   const submitOrder = useCallback(async () => {
     if (submittingRef.current) return;
@@ -152,12 +231,33 @@ export default function WaiterOrders() {
 
   return (
     <div style={wrap}>
-      <div style={header}>
-        <h1 style={headerTitle}>Đơn hàng / Orders</h1>
+      <div style={{ ...header, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <h1 style={headerTitle}>{t('orderMgmt.all', 'Đơn hàng')}</h1>
+        <button
+          type="button"
+          onClick={() => {
+            setSubmitError(null);
+            void fetchOrders();
+            void fetchTables();
+          }}
+          aria-label={t('terminal.refresh', 'Làm mới')}
+          style={{
+            padding: '6px 12px',
+            borderRadius: 8,
+            border: '1px solid rgba(201, 214, 223, 0.25)',
+            background: 'rgba(255, 255, 255, 0.06)',
+            color: 'var(--md-sys-color-on-surface, #E8EEF3)',
+            fontSize: 12,
+            fontWeight: 600,
+            cursor: 'pointer',
+          }}
+        >
+          {t('terminal.refresh', 'Làm mới')}
+        </button>
       </div>
       <div style={tabBar}>
-        <button style={tabStyle(tab === 'orders')} onClick={() => setTab('orders')}>Đơn hàng / Orders</button>
-        <button style={tabStyle(tab === 'tables')} onClick={() => setTab('tables')}>Bàn / Tables</button>
+        <button style={tabStyle(tab === 'orders')} onClick={() => setTab('orders')}>{t('terminal.nav.orders', 'Đơn hàng')}</button>
+        <button style={tabStyle(tab === 'tables')} onClick={() => setTab('tables')}>{t('orderMgmt.searchField.table', 'Bàn')}</button>
       </div>
 
       {tab === 'orders' && (
@@ -165,34 +265,112 @@ export default function WaiterOrders() {
           {orders.length === 0 && (
             <div style={empty}>
               <div style={{ fontSize: 36, marginBottom: 8 }}>📋</div>
-              <div>Chưa có đơn nào hôm nay / No orders today</div>
+              <div>{t('terminal.noOrders', 'Chưa có đơn nào hôm nay')}</div>
             </div>
           )}
-          {orders.map((o) => (
-            <div key={o.id} style={{ ...orderCard, borderLeft: `4px solid ${orderStatusColor(o.status)}` }}>
-              <div style={orderHeader}>
-                <span style={orderTable}>Bàn {o.table_number ?? '?'}</span>
-                <span style={orderTime}>
-                  {new Date(o.created_at).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}
-                </span>
-              </div>
-              {o.items.map((item, idx) => {
-                const modStr = Array.isArray((item as any).modifiers)
-                  ? (item as any).modifiers
-                      .map((m: any) => (typeof m === 'string' ? m : m?.name || ''))
-                      .filter(Boolean)
-                      .join(', ')
-                  : '';
-                return (
-                  <div key={idx} style={orderItem}>
-                    {item.quantity}x {item.name}
-                    {modStr ? ` (${modStr})` : ''}
-                    {item.note ? ` (${item.note})` : ''}
+          {orders.map((o) => {
+            const displayCode = o.order_number ? `#${o.order_number.replace(/^#/, '')}` : `#${o.id.slice(-4)}`;
+            const orderType = String(o.order_type ?? '').trim().toLowerCase();
+            const hasRealTable = Boolean(o.table_id && Number(o.table_number) > 0) || Boolean(o.table_id && String(o.table_id).trim());
+            const originLabel =
+              orderType === 'delivery'
+                ? t('kds.delivery', 'Giao hàng')
+                : orderType === 'takeaway'
+                  ? t('kds.togo', 'Mang đi')
+                  : Number(o.table_number) > 0
+                    ? formatTableWithPrefix(String(o.table_number), (clean) => t('kds.tablePrefix', { table: clean, defaultValue: `Bàn ${clean}` }))
+                    : hasRealTable
+                      ? formatTableWithPrefix(String(o.table_id), (clean) => t('kds.tablePrefix', { table: clean, defaultValue: `Bàn ${clean}` }))
+                      : t('kds.togo', 'Mang đi');
+            const createdMs = parseKdsTimestampMs(o.created_at);
+            const timeLabel = Number.isFinite(createdMs)
+              ? new Date(createdMs).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })
+              : o.created_at;
+            const cleanNotes = stripInternalOrderTags(o.notes);
+            const statusLabel = t(`orderMgmt.${o.status}`, { defaultValue: o.status });
+            return (
+              <div key={o.id} style={{ ...orderCard, borderLeft: `4px solid ${orderStatusColor(o.status)}` }}>
+                <div style={orderHeader}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                    <span style={{ fontFamily: 'monospace', fontSize: 12, fontWeight: 700, color: '#93C5FD' }}>
+                      {displayCode}
+                    </span>
+                    <span style={orderTable}>{originLabel}</span>
+                    <span
+                      style={{
+                        fontSize: 11,
+                        fontWeight: 700,
+                        padding: '2px 8px',
+                        borderRadius: 10,
+                        background: 'rgba(255,255,255,0.08)',
+                        color: orderStatusColor(o.status),
+                      }}
+                    >
+                      {statusLabel}
+                    </span>
                   </div>
-                );
-              })}
-            </div>
-          ))}
+                  <span style={orderTime}>{timeLabel}</span>
+                </div>
+                {(o.customer_name || o.payment_status) && (
+                  <div style={{ fontSize: 12, color: 'var(--md-sys-color-on-surface-variant, #9CA3AF)', marginBottom: 6, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                    {o.customer_name && <span>{o.customer_name}</span>}
+                    {o.payment_method && (
+                      <span>
+                        · {t(`orderMgmt.paymentMethod.${o.payment_method}`, { defaultValue: o.payment_method.toUpperCase() })}
+                        {o.payment_status ? ` (${t(`orderMgmt.paymentStatus.${o.payment_status}`, { defaultValue: o.payment_status })})` : ''}
+                      </span>
+                    )}
+                  </div>
+                )}
+                {o.items.map((item, idx) => {
+                  const rawMods = (item as unknown as { modifiers?: Array<string | { name?: string }> }).modifiers;
+                  const modStr = Array.isArray(rawMods)
+                    ? rawMods
+                        .map((m) => (typeof m === 'string' ? m : m?.name || ''))
+                        .filter(Boolean)
+                        .join(', ')
+                    : '';
+                  return (
+                    <div key={idx} style={orderItem}>
+                      {item.quantity}x {item.name}
+                      {modStr ? ` (${modStr})` : ''}
+                      {item.note ? ` (${item.note})` : ''}
+                    </div>
+                  );
+                })}
+                {cleanNotes && (
+                  <div style={{ marginTop: 6, fontSize: 12, fontStyle: 'italic', color: '#FCD34D' }}>
+                    {t('kds.orderNotes', 'Ghi chú đơn')}: {cleanNotes}
+                  </div>
+                )}
+                {o.status === 'ready' && orderType !== 'delivery' && canServeReadyOrder && (
+                  <div style={{ marginTop: 10 }}>
+                    <button
+                      type="button"
+                      disabled={servingId === o.id}
+                      onClick={() => { void handleMarkServed(o); }}
+                      style={{
+                        width: '100%',
+                        padding: '10px 14px',
+                        borderRadius: 10,
+                        border: 'none',
+                        background: '#10B981',
+                        color: '#052E16',
+                        fontSize: 13,
+                        fontWeight: 700,
+                        cursor: servingId === o.id ? 'not-allowed' : 'pointer',
+                        opacity: servingId === o.id ? 0.6 : 1,
+                      }}
+                    >
+                      {servingId === o.id
+                        ? t('kds.updating', 'Đang cập nhật…')
+                        : t('kds.served', 'Đã phục vụ')}
+                    </button>
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </>
       )}
 
@@ -212,7 +390,20 @@ export default function WaiterOrders() {
         </div>
       )}
 
-      <button style={fab} onClick={() => { setSelectedTableId(''); setNewOrderItems([{ name: '', quantity: 1, price: 0, note: '' }]); setSubmitError(null); setShowNewOrder(true); }} aria-label="New order">+</button>
+      {canCreateMobileOrder && (
+        <button
+          style={fab}
+          onClick={() => {
+            setSelectedTableId('');
+            setNewOrderItems([{ name: '', quantity: 1, price: 0, note: '' }]);
+            setSubmitError(null);
+            setShowNewOrder(true);
+          }}
+          aria-label="New order"
+        >
+          +
+        </button>
+      )}
 
       {submitError && (
         <div role="alert" style={{ padding: '8px 12px', margin: '8px 16px', borderRadius: 8, background: 'rgba(220,53,69,0.15)', color: '#ff6b6b', fontSize: 12 }}>

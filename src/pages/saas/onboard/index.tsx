@@ -53,22 +53,22 @@ export default function OnboardingWizard() {
         return;
       }
 
-      const subRes = await apiFetch<{ error?: string; message?: string }>('/api/subscriptions', {
+      const subRes = await apiFetch<{ success?: boolean; error?: string; message?: string }>('/api/subscriptions', {
         method: 'POST',
         body: JSON.stringify({
           plan_id: (plan as { id: string }).id,
           ...(user?.id ? { customer_id: user.id } : {}),
           customer_name: businessName,
           customer_email: user?.email || '',
-          customer_phone: user?.phone || '',
+          customer_phone: user?.phone || '0000000000',
           container_number: `${zone}-${containerSize}`,
           zone,
           ...(tenantId ? { tenant_id: tenantId } : {}),
         }),
       });
 
-      if ((subRes as { error?: string }).error || (subRes as { message?: string }).message) {
-        setError((subRes as { error?: string }).error || (subRes as { message?: string }).message || 'Tạo subscription thất bại');
+      if (subRes.success === false || subRes.error) {
+        setError(subRes.error || subRes.message || 'Tạo subscription thất bại');
         setLoading(false);
         return;
       }

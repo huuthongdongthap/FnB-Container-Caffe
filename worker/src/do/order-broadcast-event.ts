@@ -1,7 +1,7 @@
 /** Internal-only DTO validation shared by Durable Object fetch and RPC-style tests. */
 import type { OrderEvent } from './OrderBroadcaster';
 
-const statuses = new Set(['pending', 'confirmed', 'preparing', 'ready', 'served', 'completed', 'delivered', 'cancelled', 'refunded', 'failed', 'expired']);
+const statuses = new Set(['pending', 'confirmed', 'preparing', 'ready', 'delivering', 'served', 'completed', 'delivered', 'cancelled', 'refunded', 'failed', 'expired']);
 const paymentStatuses = new Set(['pending', 'unpaid', 'paid', 'completed', 'failed', 'refunded', 'partially_refunded']);
 export function parseOrderBroadcast(raw: unknown, previous?: OrderEvent): OrderEvent | null {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;

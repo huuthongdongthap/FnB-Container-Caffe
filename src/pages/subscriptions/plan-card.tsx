@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { useAuthStore } from '@/hooks/stores/use-auth-store';
@@ -16,14 +17,22 @@ export interface PlanCardProps {
 export function PlanCard({ plan, isCurrentPlan, isLoggedIn, subscribe, subscribing }: PlanCardProps) {
   const { t } = useTranslation();
   const user = useAuthStore((s) => s.user);
+  const [phoneInput, setPhoneInput] = useState(user?.phone ?? '');
+  const [phoneError, setPhoneError] = useState<string | null>(null);
 
   function handleSubscribe() {
     if (!user) return;
+    const candidatePhone = (phoneInput || user.phone || '').replace(/\s+/g, '');
+    if (!/^(\+?84|0)\d{8,10}$/.test(candidatePhone)) {
+      setPhoneError('Vui lòng nhập số điện thoại hợp lệ (VD: 0901234567)');
+      return;
+    }
+    setPhoneError(null);
     subscribe({
       plan_id: plan.id,
       customer_name: user.name,
       customer_email: user.email,
-      customer_phone: '',
+      customer_phone: candidatePhone,
     });
   }
 
@@ -76,28 +85,50 @@ export function PlanCard({ plan, isCurrentPlan, isLoggedIn, subscribe, subscribi
           ))}
         </ul>
 
-        <div className="mt-6">
+        <div className="mt-6 space-y-2.5">
           {isCurrentPlan ? (
             <div className="text-center">
               {statusBadge('active')}
               <p className="mt-1.5 text-xs text-[color:var(--aura-chrome-bright)]/50">{t('subsPage.currentPlan')}</p>
             </div>
           ) : !isLoggedIn ? (
-            <Link to="/menu">
+            <Link to="/account">
               <Button variant="secondary" className="w-full" size="md">
-                {t('subsPage.loginToSubscribe')}
+                {t('subsPage.loginToSubscribe', 'Đăng nhập để đăng ký')}
               </Button>
             </Link>
           ) : (
-            <Button
-              className="w-full"
-              size="md"
-              onClick={handleSubscribe}
-              loading={subscribing}
-              disabled={subscribing}
-            >
-              {subscribing ? t('subsPage.subscribing') : t('subsPage.subscribeNow')}
-            </Button>
+            <>
+              {!user?.phone && (
+                <div>
+                  <input
+                    type="tel"
+                    value={phoneInput}
+                    onChange={(e) => {
+                      setPhoneInput(e.target.value);
+                      if (phoneError) setPhoneError(null);
+                    }}
+                    placeholder="Số điện thoại liên hệ *"
+                    aria-label={`Số điện thoại đăng ký ${plan.name}`}
+                    className="w-full rounded-lg border border-white/15 bg-black/20 px-3 py-2 text-xs text-white placeholder:text-white/40"
+                  />
+                  {phoneError && (
+                    <p role="alert" className="mt-1 text-[11px] text-rose-400">
+                      {phoneError}
+                    </p>
+                  )}
+                </div>
+              )}
+              <Button
+                className="w-full"
+                size="md"
+                onClick={handleSubscribe}
+                loading={subscribing}
+                disabled={subscribing}
+              >
+                {subscribing ? t('subsPage.subscribing') : t('subsPage.subscribeNow')}
+              </Button>
+            </>
           )}
         </div>
       </div>

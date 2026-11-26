@@ -5,7 +5,14 @@
 
 import { transitionOrderStatus, isVoidStatus, type OrderStatusDb, type OrderStatusResult } from '../../order/policies/order-status-transition';
 import { releaseTableIfNoActiveOrders } from '../../order/policies/table-occupancy-release';
+import { compensateVoidedOrder } from '../../order/policies/order-rollback';
 import { restoreLoyaltyVoucherForOrder } from '../../order/loyalty-voucher';
+import {
+  fanOutOrderBroadcast,
+  normalizeBroadcastTotal,
+  parseBroadcastItems,
+  parseBroadcastTimestamp,
+} from '../../order/policies/order-broadcast';
 
 export type TransitionKdsResult = OrderStatusResult;
 export type KdsTransitionDb = OrderStatusDb;
@@ -17,6 +24,8 @@ export interface KdsTransitionOptions {
   env?: Record<string, unknown>;
   skipCancelSideEffects?: boolean;
   allowPaidCompensation?: boolean;
+  actorId?: string;
+  validateAssignedShipper?: boolean;
   fields?: Record<string, unknown>;
 }
 
@@ -39,6 +48,8 @@ export async function executeKdsStatusTransition(
   const result = await transitionOrderStatus(db, orderId, targetStatus, userRole, {
     tenantId: options?.tenantId,
     allowPaidCompensation: options?.allowPaidCompensation,
+    actorId: options?.actorId,
+    validateAssignedShipper: options?.validateAssignedShipper,
     fields: options?.fields,
   });
   if (!result.success || result.idempotent) return result;
@@ -56,7 +67,9 @@ export async function executeKdsStatusTransition(
       total?: number;
       total_amount?: number;
       table_id?: string | null;
+      session_id?: string | null;
       payment_status?: string | null;
+      loyalty_points_redeemed?: number | null;
       tenant_id?: string | null;
       customer_id?: string | null;
       cashback_used?: number | null;
@@ -64,24 +77,46 @@ export async function executeKdsStatusTransition(
     const ordRow = await (requestedCancelTenant && requestedCancelTenant !== '*'
       ? rawDb
           .prepare(
-            "SELECT total, total_amount, tenant_id, customer_id, cashback_used FROM orders WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?",
+            "SELECT total, total_amount, payment_status, table_id, session_id, loyalty_points_redeemed, tenant_id, customer_id, cashback_used FROM orders WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?",
           )
           .bind(orderId, requestedCancelTenant)
           .first<CancelOrdRow>()
           .catch(() =>
-            requestedCancelTenant === 'default'
-              ? rawDb
-                  .prepare('SELECT total, total_amount, tenant_id, customer_id, cashback_used FROM orders WHERE id = ?')
-                  .bind(orderId)
+            rawDb
+              .prepare(
+                "SELECT total, total_amount, payment_status, table_id, tenant_id, customer_id, cashback_used FROM orders WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?",
+              )
+              .bind(orderId, requestedCancelTenant)
+              .first<CancelOrdRow>()
+              .catch(() =>
+                rawDb
+                  .prepare(
+                    "SELECT total, total_amount, tenant_id, customer_id, cashback_used FROM orders WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?",
+                  )
+                  .bind(orderId, requestedCancelTenant)
                   .first<CancelOrdRow>()
-                  .catch(() => null)
-              : null,
+                  .catch(() =>
+                    requestedCancelTenant === 'default'
+                      ? rawDb
+                          .prepare('SELECT total, total_amount, tenant_id, customer_id, cashback_used FROM orders WHERE id = ?')
+                          .bind(orderId)
+                          .first<CancelOrdRow>()
+                          .catch(() => null)
+                      : null,
+                  ),
+              ),
           )
       : rawDb
-          .prepare('SELECT total, total_amount, tenant_id, customer_id, cashback_used FROM orders WHERE id = ?')
+          .prepare('SELECT total, total_amount, payment_status, table_id, session_id, loyalty_points_redeemed, tenant_id, customer_id, cashback_used FROM orders WHERE id = ?')
           .bind(orderId)
           .first<CancelOrdRow>()
-          .catch(() => null));
+          .catch(() =>
+            rawDb
+              .prepare('SELECT total, total_amount, tenant_id, customer_id, cashback_used FROM orders WHERE id = ?')
+              .bind(orderId)
+              .first<CancelOrdRow>()
+              .catch(() => null),
+          ));
     const ordTenantAttr =
       ordRow?.tenant_id &&
       String(ordRow.tenant_id).trim() &&
@@ -99,11 +134,34 @@ export async function executeKdsStatusTransition(
         { AURA_DB: rawDb },
         orderId,
         effectiveCancelTenant,
-        { preCancelStatus: order.previous_status, releaseUnconsumedReserves: true },
+        { preCancelStatus: order.previous_status },
       );
     } catch {
       // Non-blocking when inventory tables are absent in minimal test schemas
     }
+    const voidReason =
+      typeof options?.fields?.failure_reason === 'string' && options.fields.failure_reason.trim()
+        ? options.fields.failure_reason.trim()
+        : targetStatus === 'failed'
+          ? 'order_failed'
+          : 'order_cancelled';
+    await compensateVoidedOrder({
+      db: rawDb,
+      env: options?.env,
+      kv: (options?.kv as import('@cloudflare/workers-types').KVNamespace | null) ?? null,
+      orderId,
+      tenantId: effectiveCancelTenant,
+      now,
+      reason: voidReason,
+      preCancelStatus: order.previous_status,
+      actorId: options?.actorId ?? null,
+      skipInventoryRestore: true,
+      skipTableRelease: true,
+      // The legacy loyalty block below already reverses accrual and decrements
+      // `customers.total_spent`; letting the policy do it as well double-counts
+      // the reversal for every paid order that earned points/cashback.
+      skipAccrualReversal: true,
+    }).catch(() => {});
     try {
       let earnRow = await rawDb
         .prepare("SELECT customer_id FROM cashback_transactions WHERE order_id = ? AND type = 'earn' AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ? LIMIT 1")
@@ -347,6 +405,83 @@ export async function executeKdsStatusTransition(
         }
       }
       await restoreLoyaltyVoucherForOrder(rawDb, orderId, effectiveCancelTenant).catch(() => {});
+      // Refund redeemed loyalty points on order cancellation if not already refunded
+      try {
+        let redeemedPts = Math.max(0, Math.floor(Number(ordRow?.loyalty_points_redeemed ?? 0)));
+        let redeemCustId = ordRow?.customer_id ? String(ordRow.customer_id).trim() : '';
+        if (!redeemedPts || !redeemCustId) {
+          const redeemTx = await rawDb
+            .prepare(
+              "SELECT customer_id, ABS(points) AS pts FROM loyalty_transactions WHERE order_id = ? AND type = 'redeem' LIMIT 1",
+            )
+            .bind(orderId)
+            .first<{ customer_id?: string; pts?: number }>()
+            .catch(() => null);
+          if (redeemTx?.pts && !redeemedPts) redeemedPts = Number(redeemTx.pts);
+          if (redeemTx?.customer_id && !redeemCustId) redeemCustId = String(redeemTx.customer_id);
+        }
+        if (redeemedPts > 0 && redeemCustId) {
+          const alreadyRefunded = await rawDb
+            .prepare("SELECT id FROM loyalty_transactions WHERE order_id = ? AND type = 'refund_redeem' LIMIT 1")
+            .bind(orderId)
+            .first<{ id: string }>()
+            .catch(() => null);
+          if (!alreadyRefunded) {
+            const refundDesc = `Hoàn trả ${redeemedPts} điểm do hủy đơn ${orderId}`;
+            let txClaimed = false;
+            try {
+              const txRes = await rawDb
+                .prepare(
+                  `INSERT INTO loyalty_transactions (id, customer_id, order_id, points, type, description, idempotency_key, tenant_id, created_at)
+                   VALUES (?, ?, ?, ?, 'refund_redeem', ?, ?, ?, ?)`,
+                )
+                .bind(`LTX_REF_${orderId}`, redeemCustId, orderId, redeemedPts, refundDesc, `refund_redeem:${orderId}`, effectiveCancelTenant, now)
+                .run();
+              txClaimed = (txRes?.meta?.changes ?? 1) > 0;
+            } catch {
+              const txRes2 = await rawDb
+                .prepare(
+                  `INSERT INTO loyalty_transactions (id, customer_id, order_id, points, type, description, tenant_id, created_at)
+                   VALUES (?, ?, ?, ?, 'refund_redeem', ?, ?, ?)`,
+                )
+                .bind(`LTX_REF_${orderId}`, redeemCustId, orderId, redeemedPts, refundDesc, effectiveCancelTenant, now)
+                .run()
+                .catch(() =>
+                  effectiveCancelTenant === 'default'
+                    ? rawDb
+                        .prepare(
+                          `INSERT INTO loyalty_transactions (id, customer_id, order_id, points, type, description, created_at)
+                           VALUES (?, ?, ?, ?, 'refund_redeem', ?, ?)`,
+                        )
+                        .bind(`LTX_REF_${orderId}`, redeemCustId, orderId, redeemedPts, refundDesc, now)
+                        .run()
+                        .catch(() => null)
+                    : Promise.resolve(null),
+                );
+              txClaimed = Boolean(txRes2 && (txRes2.meta?.changes ?? 1) > 0);
+            }
+            if (txClaimed) {
+              await rawDb
+                .prepare(
+                  "UPDATE customers SET loyalty_points = COALESCE(loyalty_points, 0) + ? WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?",
+                )
+                .bind(redeemedPts, redeemCustId, effectiveCancelTenant)
+                .run()
+                .catch(async () => {
+                  if (effectiveCancelTenant === 'default') {
+                    await rawDb
+                      .prepare('UPDATE customers SET loyalty_points = COALESCE(loyalty_points, 0) + ? WHERE id = ?')
+                      .bind(redeemedPts, redeemCustId)
+                      .run()
+                      .catch(() => {});
+                  }
+                });
+            }
+          }
+        }
+      } catch {
+        // Optional loyalty_transactions table in minimal schemas
+      }
       const refRow = await rawDb
         .prepare("SELECT id FROM referrals WHERE first_order_id = ? AND status = 'completed' AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ? LIMIT 1")
         .bind(orderId, effectiveCancelTenant)
@@ -556,7 +691,38 @@ export async function executeKdsStatusTransition(
       } catch {
         // Optional payments table in partial schemas
       }
+      try {
+        const cancelSessionId = ordRow?.session_id ? String(ordRow.session_id).trim() : '';
+        if (cancelSessionId) {
+          await rawDb
+            .prepare(
+              `UPDATE table_sessions
+               SET order_count = CASE WHEN COALESCE(order_count, 0) > 0 THEN order_count - 1 ELSE 0 END,
+                   total_amount = MAX(0, COALESCE(total_amount, 0) - ?),
+                   current_order_id = CASE WHEN current_order_id = ? THEN NULL ELSE current_order_id END,
+                   updated_at = CURRENT_TIMESTAMP
+               WHERE id = ? AND (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?)`,
+            )
+            .bind(cancelTotalVnd, orderId, cancelSessionId, effectiveCancelTenant, effectiveCancelTenant)
+            .run()
+            .catch(() =>
+              rawDb
+                .prepare(
+                  `UPDATE table_sessions
+                   SET order_count = CASE WHEN COALESCE(order_count, 0) > 0 THEN order_count - 1 ELSE 0 END,
+                       total_amount = MAX(0, COALESCE(total_amount, 0) - ?)
+                   WHERE id = ? AND (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?)`,
+                )
+                .bind(cancelTotalVnd, cancelSessionId, effectiveCancelTenant, effectiveCancelTenant)
+                .run()
+                .catch(() => {}),
+            );
+        }
+      } catch {
+        // Optional table_sessions table in partial schemas
+      }
       const cancelTableId =
+        ordRow?.table_id ??
         (order as Record<string, unknown>).table_id ??
         (
           await rawDb
@@ -573,7 +739,7 @@ export async function executeKdsStatusTransition(
     }
   }
 
-  if (targetStatus === 'completed') {
+  if (targetStatus === 'served' || targetStatus === 'completed') {
     try {
       const rawDb = db as unknown as import('@cloudflare/workers-types').D1Database;
       const { creditLoyaltyIfEligible, sanitizeCustomerIdentity } = await import('../../order/policies/loyalty-trigger');
@@ -688,7 +854,7 @@ export async function executeKdsStatusTransition(
               // Optional customer visit table in minimal test schemas
             }
           }
-          if (totalVnd >= 20000 && (!ordRow.payment_status || ordRow.payment_status === 'paid')) {
+          if (totalVnd >= 20000 && (!ordRow.payment_status || ordRow.payment_status === 'paid' || ordRow.payment_status === 'completed')) {
             try {
               const { rewardReferralOnFirstOrder, resolveReferralPolicy, DEFAULT_REFERRAL_POLICY } = await import('@aura/domain-crm');
               const refTenant = ordTenant !== '*' ? ordTenant : undefined;
@@ -699,8 +865,50 @@ export async function executeKdsStatusTransition(
             }
           }
         }
-        if (ordRow.table_id) {
+        if (targetStatus === 'completed' && ordRow.table_id) {
           await releaseTableIfNoActiveOrders(rawDb, ordRow.table_id, ordTenant).catch(() => false);
+        }
+        const kvNs = (options?.kv ?? options?.env?.AUTH_KV) as import('@cloudflare/workers-types').KVNamespace | undefined;
+        if (kvNs && typeof kvNs.get === 'function') {
+          const erpTask = (async () => {
+            try {
+              const erpPrefix = ordTenant === 'default' ? 'erpnext' : `erpnext:${ordTenant}`;
+              const erpnextUrl = await kvNs.get(`${erpPrefix}:api_url`);
+              if (!erpnextUrl) return;
+              const fullOrdRow = await rawDb
+                .prepare('SELECT id, items, customer_phone, customer_email, customer_name, customer_address FROM orders WHERE id = ?')
+                .bind(orderId)
+                .first<Record<string, unknown>>();
+              if (!fullOrdRow) return;
+              const { createErpnextClientWithKv } = await import('worker/src/clients/erpnext-client');
+              const { ErpnextAccountingClient } = await import('worker/src/clients/erpnext-accounting-client');
+              const erpnextClient = await createErpnextClientWithKv(
+                { ...(options?.env ?? {}), AUTH_KV: kvNs } as never,
+                ordTenant,
+              );
+              if (!erpnextClient) return;
+              const accountingClient = new ErpnextAccountingClient(erpnextClient, rawDb);
+              await accountingClient.processOrderToInvoice(
+                {
+                  id: String(fullOrdRow.id ?? orderId),
+                  items: fullOrdRow.items as string | Array<Record<string, unknown>> | undefined,
+                  customer_phone: fullOrdRow.customer_phone as string | undefined,
+                  customer_email: fullOrdRow.customer_email as string | undefined,
+                  customer_name: fullOrdRow.customer_name as string | undefined,
+                  customer_address: fullOrdRow.customer_address as string | undefined,
+                },
+                (options?.env ?? {}) as never,
+                ordTenant,
+              );
+            } catch {
+              // Non-blocking ERPNext e-invoice trigger
+            }
+          })();
+          if (options?.waitUntil) {
+            options.waitUntil(erpTask);
+          } else {
+            await erpTask;
+          }
         }
       }
     } catch {
@@ -753,11 +961,8 @@ export async function executeKdsStatusTransition(
   if (options?.env) {
     const sideEffects = (async () => {
       try {
-        const broadcaster = options.env?.ORDER_BROADCASTER as {
-          idFromName?: (name: string) => unknown;
-          get?: (id: unknown) => { fetch: (req: Request) => Promise<unknown> };
-        } | undefined;
-        if (broadcaster?.idFromName && broadcaster?.get) {
+        const broadcaster = options.env?.ORDER_BROADCASTER;
+        if (broadcaster) {
           let tenantId = options?.tenantId ?? 'default';
           if (tenantId === '*') {
             const ordTenantRow = await db
@@ -784,28 +989,21 @@ export async function executeKdsStatusTransition(
               customer_name: string; customer_phone: string; table_id?: string | null; created_at: string;
             }>();
           if (!row) return;
-          const items = Array.isArray(row.items) ? row.items : JSON.parse(row.items);
-          if (!Array.isArray(items)) return;
-          const createdAt = Date.parse(row.created_at.includes('T') ? row.created_at : `${row.created_at.replace(' ', 'T')}Z`);
+          const items = parseBroadcastItems(row.items);
           const doTenant = tenantId && tenantId !== '*' && tenantId.toLowerCase() !== 'hq' ? tenantId : 'default';
-          const doChannel = doTenant !== 'default' ? `${doTenant}:${orderId}` : orderId;
-          const doId = broadcaster.idFromName(doChannel);
-          const stub = broadcaster.get(doId);
-          await stub.fetch(
-            new Request('https://do/broadcast', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                orderId,
-                status: targetStatus,
-                payment_status: row.payment_status,
-                items, total: row.total, customer_name: row.customer_name, customer_phone: row.customer_phone,
-                table_id: row.table_id,
-                ...(doTenant !== 'default' ? { tenant_id: doTenant } : {}),
-                createdAt: Number.isFinite(createdAt) ? createdAt : Date.now(), updatedAt: Date.now(),
-              }),
-            })
-          );
+          await fanOutOrderBroadcast(broadcaster, orderId, doTenant, {
+            orderId,
+            status: targetStatus,
+            payment_status: row.payment_status || 'unpaid',
+            items,
+            total: normalizeBroadcastTotal(row.total),
+            customer_name: row.customer_name || '',
+            customer_phone: row.customer_phone || '',
+            table_id: row.table_id ?? null,
+            ...(doTenant !== 'default' ? { tenant_id: doTenant } : {}),
+            createdAt: parseBroadcastTimestamp(row.created_at),
+            updatedAt: Date.now(),
+          });
         }
       } catch {
         // Non-blocking broadcaster notification

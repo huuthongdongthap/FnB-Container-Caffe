@@ -1,6 +1,6 @@
 import type { Hono, Context } from 'hono';
 import {
-  dispatchOrderBroadcast,
+  fanOutOrderBroadcast,
   normalizeBroadcastTotal,
   parseBroadcastItems,
   parseBroadcastTimestamp,
@@ -11,7 +11,7 @@ import { payosWebhookSchema } from '../../lib/validators';
 import { createMetricsCollector } from '../../lib/metrics-collector';
 import type { Env } from '../../types/env';
 import { log, verifySignature } from './helpers';
-import { sendOrderPaidNotifications } from './notifications';
+import { sendKdsReleasePushNotification, sendOrderPaidNotifications } from './notifications';
 import { isEnrolledSaasTenant, resolveMerchantPaymentConfig } from '../../lib/merchant-payment';
 import { settlePayOS, type SettlementPayment } from './payos-settlement';
 import { writePaymentReviewMarker } from '../../../../packages/domain/payment/commands/payos-reconcile-lease';
@@ -213,7 +213,9 @@ export async function handlePayosWebhook(
     if (settled.paymentChanged) {
       const metrics = createMetricsCollector(db);
       safeWaitUntil(c, metrics.recordMetric(success ? 'payment_success' : 'payment_failed', Number(payment.amount), { provider: 'payos', order_id: payment.order_id, tenant_id: settledOrderTenant }));
-      if (success) safeWaitUntil(c, metrics.recordMetric('revenue', Number(payment.amount), { provider: 'payos', tenant_id: settledOrderTenant }));
+      if (success && !isInitialTerminalOrder) {
+        safeWaitUntil(c, metrics.recordMetric('revenue', Number(payment.amount), { provider: 'payos', tenant_id: settledOrderTenant }));
+      }
     }
     if (success && (settled.orderChanged || settled.paymentChanged)) {
       const orderRecord = order as Record<string, unknown>;
@@ -289,10 +291,6 @@ export async function handlePayosWebhook(
         }
         if (c.env.ORDER_BROADCASTER) {
           try {
-            const doChannel =
-              settledOrderTenant !== 'default'
-                ? `${settledOrderTenant}:${payment.order_id}`
-                : payment.order_id;
             const eventPayload = {
               orderId: payment.order_id,
               status: String(effectiveOrderRecord.status || 'pending'),
@@ -306,16 +304,22 @@ export async function handlePayosWebhook(
               createdAt: parseBroadcastTimestamp(effectiveOrderRecord.created_at),
               updatedAt: Date.now(),
             };
-            safeWaitUntil(c, dispatchOrderBroadcast(c.env.ORDER_BROADCASTER, doChannel, eventPayload));
+            safeWaitUntil(
+              c,
+              fanOutOrderBroadcast(c.env.ORDER_BROADCASTER, payment.order_id, settledOrderTenant, eventPayload),
+            );
           } catch {
             /* Non-blocking realtime broadcast */
           }
         }
         // One notification per successful payment transition; repair/replay cannot double-send.
-        if (settled.paymentChanged && details) {
-          try {
-            await sendOrderPaidNotifications(c, { ...details, total: details.total ?? details.total_amount }, now);
-          } catch (err) { log.error('Order notifications failed', { message: (err as Error).message }); }
+        if (settled.paymentChanged) {
+          await sendKdsReleasePushNotification(c, effectiveOrderRecord, settledOrderTenant);
+          if (details) {
+            try {
+              await sendOrderPaidNotifications(c, { ...details, total: details.total ?? details.total_amount }, now);
+            } catch (err) { log.error('Order notifications failed', { message: (err as Error).message }); }
+          }
         }
       }
       if (!isCancelledOrFailedOrder && (orderRecord.customer_id || orderRecord.customer_phone || orderRecord.customer_email)) {

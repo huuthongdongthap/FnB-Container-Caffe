@@ -211,13 +211,18 @@ export const ProductStatusEnum = z.enum(['active', 'inactive', 'archived', 'out_
 // Staff role enum
 export const StaffRoleEnum = z.enum([
   'owner',
+  'admin',
   'manager',
+  'supervisor',
   'staff',
   'barista',
   'cashier',
   'waiter',
   'kitchen',
-  'admin',
+  'chef',
+  'bep',
+  'shipper',
+  'rider',
 ]).openapi({
   example: 'barista',
   description: 'Staff role',

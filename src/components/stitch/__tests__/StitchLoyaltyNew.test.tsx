@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { renderWithProviders, screen } from '@/test-utils';
+import { renderWithProviders, screen, fireEvent } from '@/test-utils';
 import { StitchLoyaltyNew } from '../StitchLoyaltyNew';
 import type { LoyaltyDashboardData } from '../stitch-loyalty-types';
 
@@ -123,5 +123,66 @@ describe('StitchLoyaltyNew', () => {
     renderWithProviders(<StitchLoyaltyNew data={MOCK_DATA} />);
     expect(screen.getByText('Available Rewards')).toBeTruthy();
     expect(screen.getByText('Free Espresso')).toBeTruthy();
+  });
+
+  it('renders cashback wallet summary, 7-day expiry warning, and cashback history tab (#217, #218)', () => {
+    const { container } = renderWithProviders(
+      <StitchLoyaltyNew
+        data={{
+          ...MOCK_DATA,
+          cashbackBalance: 35000,
+          cashbackRate: 7,
+          cashbackTotalEarned: 80000,
+          cashbackTotalSpent: 45000,
+          cashbackExpiring7d: 15000,
+          cashbackHistory: [
+            {
+              id: 'cbt_1',
+              type: 'earn',
+              amount: 15000,
+              balanceAfter: 35000,
+              orderId: 'ORD_12345678',
+              expiresAt: '2026-12-01T00:00:00Z',
+              description: 'Hoàn tiền đơn cà phê Sa Đéc',
+              createdAt: '2026-11-25T08:00:00Z',
+            },
+          ],
+        }}
+      />,
+    );
+    // No duplicate fixed header inside StitchLoyaltyNew
+    expect(container.querySelector('header.fixed')).toBeNull();
+    expect(screen.getByTestId('loyalty-cashback-wallet-card')).toBeTruthy();
+    expect(screen.getByTestId('cashback-expiry-warning')).toBeTruthy();
+    expect(screen.getByTestId('loyalty-cashback-balance').textContent).toContain('35.000₫');
+
+    fireEvent.click(screen.getByTestId('tab-cashback-history'));
+    expect(screen.getByText('Hoàn tiền đơn cà phê Sa Đéc')).toBeTruthy();
+    expect(screen.getByText(/Đơn #12345678/)).toBeTruthy();
+  });
+
+  it('renders guest discovery CTA with tier ladder instead of dead-end empty screen (#214)', () => {
+    renderWithProviders(
+      <StitchLoyaltyNew
+        data={{
+          ...MOCK_DATA,
+          pointsBalance: 0,
+          pointsHistory: [],
+          isGuest: true,
+          tierLadder: [
+            {
+              tier_name: 'bronze',
+              display_name_vi: 'Đồng',
+              min_points: 0,
+              point_multiplier: 1,
+              cashback_rate: 0.03,
+              is_current: false,
+            },
+          ],
+        }}
+      />,
+    );
+    expect(screen.getByTestId('loyalty-guest-cta')).toBeTruthy();
+    expect(screen.getByText('Đồng')).toBeTruthy();
   });
 });

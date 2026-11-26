@@ -1,14 +1,15 @@
 import { jsonResponse, errorResponse } from '../middleware/cors';
 import { createLogger } from '../middleware/logger';
 import { getTenantId, isHQSuperAdmin, matchesTenantRow } from '../middleware/tenant';
+import { sanitizeOrderNotes } from '@aura/domain-order';
 import { createOrderFromAlias } from '../../../packages/domain/order/commands/create-order-alias';
 import type { Env } from '../types/env';
 import type { Context } from 'hono';
 
 const log = createLogger({ route: 'orders-mobile' });
 
-const VIEW_ROLES: string[] = ['owner', 'manager', 'supervisor', 'staff', 'waiter', 'kitchen', 'barista', 'chef', 'admin', 'cashier', 'shipper'];
-const CREATE_ROLES: string[] = ['owner', 'manager', 'supervisor', 'waiter', 'admin', 'cashier'];
+const VIEW_ROLES: string[] = ['owner', 'manager', 'supervisor', 'staff', 'waiter', 'phuc_vu', 'kitchen', 'barista', 'chef', 'bep', 'admin', 'cashier', 'shipper', 'rider'];
+const CREATE_ROLES: string[] = ['owner', 'manager', 'supervisor', 'staff', 'waiter', 'phuc_vu', 'admin', 'cashier', 'shipper', 'rider'];
 const PII_MASKED_ROLES: string[] = ['kitchen', 'barista', 'chef'];
 const PII_UNMASKED_ROLES: string[] = ['owner', 'manager', 'admin', 'shipper'];
 
@@ -53,7 +54,9 @@ function maskMobileOrderPii(
   user?: { id?: string; tenantId?: string; tenant_id?: string }
 ): Record<string, unknown> {
   const normalizedRole = role.toLowerCase();
-  if (PII_UNMASKED_ROLES.includes(normalizedRole) && !PII_MASKED_ROLES.includes(normalizedRole)) {
+  const isMaskedKitchen = PII_MASKED_ROLES.includes(normalizedRole) || normalizedRole === 'bep';
+  const isUnmasked = PII_UNMASKED_ROLES.includes(normalizedRole) || normalizedRole === 'rider';
+  if (isUnmasked && !isMaskedKitchen) {
     return row;
   }
   const hasExplicitUserTenant =
@@ -167,6 +170,7 @@ export async function getOrdersMobile(
         maskMobileOrderPii(
           {
             ...r,
+            notes: sanitizeOrderNotes(r.notes),
             items: normalizeOrderItems(r.items),
           },
           role,
@@ -247,8 +251,13 @@ export async function createOrderMobile(
       tenantId: effectiveOrderTenant,
     });
     if (!response.ok) return response;
-    const result = await response.json() as { data: { id: string; total: number } };
-    return jsonResponse({ success: true, order_id: result.data.id, total: result.data.total }, response.status);
+    const result = await response.json() as { data: { id: string; order_number?: string; total: number } };
+    return jsonResponse({
+      success: true,
+      order_id: result.data.id,
+      ...(result.data.order_number ? { order_number: result.data.order_number } : {}),
+      total: result.data.total,
+    }, response.status);
   } catch (err) {
     const errMsg = (err as Error).message;
     log.error('createOrderMobile error:', { message: errMsg });
@@ -317,6 +326,7 @@ export async function getOrderDetail(
       order: maskMobileOrderPii(
         {
           ...data,
+          notes: sanitizeOrderNotes(data.notes),
           items: normalizeOrderItems(data.items),
         },
         role,

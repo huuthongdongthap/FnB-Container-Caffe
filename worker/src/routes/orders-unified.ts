@@ -28,7 +28,10 @@ import {
 
 import {
   handleGetKdsOrders,
+  handleGetKdsRecentOrders,
+  handleRecallKdsOrder,
   COD_COLLECTION_ROLES,
+  KDS_PREP_ROLES,
   KDS_ROLES,
   handleUpdateOrderStatus,
   handleMarkCodPaid,
@@ -55,6 +58,7 @@ ordersUnifiedRouter.post('/sync', orderRateLimit, handleSyncOrders);
 ordersUnifiedRouter.post('/split', orderRateLimit, handleSplitOrders);
 ordersUnifiedRouter.get('/latest', handleLatestOrderTimestamp);
 
+ordersUnifiedRouter.get('/kds/recent', requireAuth(KDS_ROLES), handleGetKdsRecentOrders);
 ordersUnifiedRouter.get('/kds', requireAuth(KDS_ROLES), handleGetKdsOrders);
 // POS checkout is staff-only, but a stuck till retrying in a loop must still be
 // throttled before it reaches order creation.
@@ -74,8 +78,9 @@ ordersUnifiedRouter.get('/:id/track', optionalAuth(), handleTrackOrder);
 
 ordersUnifiedRouter.patch('/:id/status', requireAuth(['owner', 'manager', 'supervisor', 'staff', 'waiter', 'cashier', 'admin', 'kitchen', 'barista', 'chef', 'shipper', 'rider']), audit('order_status_change'), handleUpdateOrderStatus);
 ordersUnifiedRouter.patch('/:id/mark-cod-paid', requireAuth(COD_COLLECTION_ROLES), audit('order_cod_paid'), handleMarkCodPaid);
+ordersUnifiedRouter.post('/:id/recall', requireAuth(KDS_PREP_ROLES), audit('order_status_change'), handleRecallKdsOrder);
 
-ordersUnifiedRouter.post('/:id/cancel', requireAuth(['owner', 'manager', 'supervisor', 'staff', 'waiter', 'cashier', 'admin', 'customer']), handleCancelOrder);
+ordersUnifiedRouter.post('/:id/cancel', requireAuth(['owner', 'manager', 'supervisor', 'staff', 'waiter', 'cashier', 'admin', 'shipper', 'rider', 'customer']), handleCancelOrder);
 ordersUnifiedRouter.post('/:id/claim', requireAuth(['owner', 'manager', 'supervisor', 'staff', 'waiter', 'cashier', 'admin', 'customer']), handleClaimOrder);
 
 // ── 3. Parameterized Base Record Handlers (/:id) ──

@@ -9,6 +9,22 @@ export const VALID_REVENUE_ORDER_SQL =
   "LOWER(TRIM(COALESCE(status, ''))) NOT IN ('cancelled', 'canceled', 'refunded', 'failed', 'rejected', 'expired') AND LOWER(TRIM(COALESCE(payment_status, ''))) IN ('paid', 'partially_refunded', 'completed') AND NOT (COALESCE(total, 0) = 0 AND (COALESCE(customer_name, '') = 'Khách QR - cho don mon' OR COALESCE(items, '') IN ('', '[]')))";
 export const VALID_REVENUE_ORDER_ALIAS_SQL =
   "LOWER(TRIM(COALESCE(o.status, ''))) NOT IN ('cancelled', 'canceled', 'refunded', 'failed', 'rejected', 'expired') AND LOWER(TRIM(COALESCE(o.payment_status, ''))) IN ('paid', 'partially_refunded', 'completed') AND NOT (COALESCE(o.total, 0) = 0 AND (COALESCE(o.customer_name, '') = 'Khách QR - cho don mon' OR COALESCE(o.items, '') IN ('', '[]')))";
+export const NET_ORDER_TOTAL_SQL =
+  "MAX(0, COALESCE(total, 0) - CASE WHEN LOWER(TRIM(COALESCE(payment_status, ''))) = 'partially_refunded' THEN COALESCE((SELECT SUM(COALESCE(p.refund_amount, 0)) FROM payments p WHERE p.order_id = orders.id AND COALESCE(NULLIF(TRIM(p.tenant_id), ''), 'default') = COALESCE(NULLIF(TRIM(orders.tenant_id), ''), 'default')), 0) ELSE 0 END)";
+export const NET_ORDER_ALIAS_TOTAL_SQL =
+  "MAX(0, COALESCE(o.total, 0) - CASE WHEN LOWER(TRIM(COALESCE(o.payment_status, ''))) = 'partially_refunded' THEN COALESCE((SELECT SUM(COALESCE(p.refund_amount, 0)) FROM payments p WHERE p.order_id = o.id AND COALESCE(NULLIF(TRIM(p.tenant_id), ''), 'default') = COALESCE(NULLIF(TRIM(o.tenant_id), ''), 'default')), 0) ELSE 0 END)";
+
+interface ReportAccessContext {
+  env?: Env;
+  get?: (k: string) => unknown;
+  set?: (k: string, v: unknown) => void;
+  req?: {
+    raw?: Request;
+    query?: (k: string) => string | undefined;
+    header?: (k: string) => string | undefined;
+  };
+  json: (data: unknown, status?: 200 | 400 | 401 | 403 | 500) => Response;
+}
 
 export function isStrictHQReportAdmin(role: string, userTenant: string): boolean {
   const normTenant = (userTenant || '').trim().toLowerCase();
@@ -16,7 +32,7 @@ export function isStrictHQReportAdmin(role: string, userTenant: string): boolean
 }
 
 export async function verifyReportAnalyticsAccess(
-  c: any,
+  c: ReportAccessContext,
   options?: { allowUnauthenticatedDefaultInTest?: boolean }
 ): Promise<Response | null> {
   let user = (typeof c.get === 'function' ? c.get('user') : undefined) as
@@ -192,97 +208,125 @@ export function registerAnalyticsHandlers(app: Hono<{ Bindings: Env }>) {
        GROUP BY DATE(datetime(created_at, '+7 hours')) ORDER BY date`
     ).bind(from, to, ...tf.binds).all<{ date: string; count: number }>();
 
-    // Orders by day (ICT UTC+7)
-    const { results: orders } = await db.prepare(
-      `SELECT DATE(datetime(created_at, '+7 hours')) as date, COUNT(*) as count, COALESCE(SUM(total), 0) as revenue
-       FROM orders WHERE DATE(datetime(created_at, '+7 hours')) BETWEEN ? AND ? AND ${VALID_REVENUE_ORDER_SQL}${tf.and}
-       GROUP BY DATE(datetime(created_at, '+7 hours')) ORDER BY date`
-    ).bind(from, to, ...tf.binds).all<{ date: string; count: number; revenue: number }>();
+    // Orders by day (ICT UTC+7) — net of partial refunds
+    let orders: { date: string; count: number; revenue: number }[] = [];
+    try {
+      const ordRes = await db.prepare(
+        `SELECT DATE(datetime(created_at, '+7 hours')) as date, COUNT(*) as count, COALESCE(SUM(${NET_ORDER_TOTAL_SQL}), 0) as revenue
+         FROM orders WHERE DATE(datetime(created_at, '+7 hours')) BETWEEN ? AND ? AND ${VALID_REVENUE_ORDER_SQL}${tf.and}
+         GROUP BY DATE(datetime(created_at, '+7 hours')) ORDER BY date`
+      ).bind(from, to, ...tf.binds).all<{ date: string; count: number; revenue: number }>();
+      orders = ordRes.results || [];
+    } catch {
+      const ordRes = await db.prepare(
+        `SELECT DATE(datetime(created_at, '+7 hours')) as date, COUNT(*) as count, COALESCE(SUM(total), 0) as revenue
+         FROM orders WHERE DATE(datetime(created_at, '+7 hours')) BETWEEN ? AND ? AND ${VALID_REVENUE_ORDER_SQL}${tf.and}
+         GROUP BY DATE(datetime(created_at, '+7 hours')) ORDER BY date`
+      ).bind(from, to, ...tf.binds).all<{ date: string; count: number; revenue: number }>();
+      orders = ordRes.results || [];
+    }
 
-    // Cashback earned by day (ICT UTC+7)
+    // Cashback earned by day (ICT UTC+7) — primarily from cashback_transactions (earn/bonus), fallback to checkins only if cashback_transactions is absent
     let cashbackEarned: { date: string; amount: number }[] = [];
+    const txWalletTenantAnd = !tenantId || tenantId === '*'
+      ? ''
+      : " AND COALESCE(NULLIF(TRIM(t.tenant_id), ''), NULLIF(TRIM(cw.tenant_id), ''), NULLIF(TRIM(c.tenant_id), ''), 'default') = ?";
+    const txWalletBinds = !tenantId || tenantId === '*' ? [] : [tenantId];
     try {
       const res = await db.prepare(
-        `SELECT DATE(datetime(t.created_at, '+7 hours')) as date, COALESCE(SUM(t.reward_amount), 0) as amount
-         FROM checkins t${cjf.join}
-         WHERE DATE(datetime(t.created_at, '+7 hours')) BETWEEN ? AND ? AND t.status = 'approved'${cjf.and}
+        `SELECT DATE(datetime(t.created_at, '+7 hours')) as date, COALESCE(SUM(t.amount), 0) as amount
+         FROM cashback_transactions t
+         LEFT JOIN cashback_wallets cw ON cw.id = t.wallet_id
+         LEFT JOIN customers c ON c.id = cw.customer_id
+         WHERE DATE(datetime(t.created_at, '+7 hours')) BETWEEN ? AND ?
+           AND t.type IN ('earn', 'bonus')${txWalletTenantAnd}
          GROUP BY DATE(datetime(t.created_at, '+7 hours')) ORDER BY date`
-      ).bind(from, to, ...cjf.binds).all<{ date: string; amount: number }>();
+      ).bind(from, to, ...txWalletBinds).all<{ date: string; amount: number }>();
       cashbackEarned = res.results || [];
-    } catch {
-      try {
-        const res = await db.prepare(
-          `SELECT DATE(datetime(t.created_at, '+7 hours')) as date, COALESCE(SUM(t.amount), 0) as amount
-           FROM cashback_transactions t${cjf.join}
-           WHERE DATE(datetime(t.created_at, '+7 hours')) BETWEEN ? AND ? AND t.type = 'earn'${cjf.and}
-           GROUP BY DATE(datetime(t.created_at, '+7 hours')) ORDER BY date`
-        ).bind(from, to, ...cjf.binds).all<{ date: string; amount: number }>();
-        cashbackEarned = res.results || [];
-      } catch {
-        cashbackEarned = [];
+    } catch (txErr1) {
+      const msg1 = txErr1 instanceof Error ? txErr1.message : String(txErr1);
+      const txTableMissing = /no such table:\s*cashback_transactions/i.test(msg1);
+      if (!txTableMissing) {
+        try {
+          const res = await db.prepare(
+            `SELECT DATE(datetime(t.created_at, '+7 hours')) as date, COALESCE(SUM(t.amount), 0) as amount
+             FROM cashback_transactions t${cjf.join}
+             WHERE DATE(datetime(t.created_at, '+7 hours')) BETWEEN ? AND ?
+               AND t.type IN ('earn', 'bonus')${cjf.and}
+             GROUP BY DATE(datetime(t.created_at, '+7 hours')) ORDER BY date`
+          ).bind(from, to, ...cjf.binds).all<{ date: string; amount: number }>();
+          cashbackEarned = res.results || [];
+        } catch {
+          try {
+            const txDirectTf = buildTenantClause(tenantId, 't');
+            const res = await db.prepare(
+              `SELECT DATE(datetime(t.created_at, '+7 hours')) as date, COALESCE(SUM(t.amount), 0) as amount
+               FROM cashback_transactions t
+               WHERE DATE(datetime(t.created_at, '+7 hours')) BETWEEN ? AND ?
+                 AND t.type IN ('earn', 'bonus')${txDirectTf.and}
+               GROUP BY DATE(datetime(t.created_at, '+7 hours')) ORDER BY date`
+            ).bind(from, to, ...txDirectTf.binds).all<{ date: string; amount: number }>();
+            cashbackEarned = res.results || [];
+          } catch {
+            cashbackEarned = [];
+          }
+        }
+      } else {
+        try {
+          const res = await db.prepare(
+            `SELECT DATE(datetime(t.created_at, '+7 hours')) as date, COALESCE(SUM(t.reward_amount), 0) as amount
+             FROM checkins t${cjf.join}
+             WHERE DATE(datetime(t.created_at, '+7 hours')) BETWEEN ? AND ? AND t.status = 'approved'${cjf.and}
+             GROUP BY DATE(datetime(t.created_at, '+7 hours')) ORDER BY date`
+          ).bind(from, to, ...cjf.binds).all<{ date: string; amount: number }>();
+          cashbackEarned = res.results || [];
+        } catch {
+          cashbackEarned = [];
+        }
       }
     }
 
-    // Cashback redeemed by day
+    // Cashback redeemed by day — read from cashback_transactions (type = 'spend'), never promotion_redemptions promo discounts
     let cashbackRedeemed: { date: string; amount: number }[] = [];
-    const promoJoin = !tenantId || tenantId === '*'
-      ? ''
-      : ' LEFT JOIN orders o ON o.id = t.order_id LEFT JOIN customers c ON c.id = t.customer_id';
-    const promoAndWithTenantCol = !tenantId || tenantId === '*'
-      ? ''
-      : " AND COALESCE(NULLIF(TRIM(t.tenant_id), ''), NULLIF(TRIM(o.tenant_id), ''), NULLIF(TRIM(c.tenant_id), ''), 'default') = ?";
-    const promoAndJoinOnly = !tenantId || tenantId === '*'
-      ? ''
-      : " AND COALESCE(NULLIF(TRIM(o.tenant_id), ''), NULLIF(TRIM(c.tenant_id), ''), 'default') = ?";
-    const promoBinds = !tenantId || tenantId === '*' ? [] : [tenantId];
     try {
       const res = await db.prepare(
-        `SELECT DATE(datetime(COALESCE(t.redeemed_at, t.created_at), '+7 hours')) as date, COALESCE(SUM(t.discount_amount), 0) as amount
-         FROM promotion_redemptions t${promoJoin}
-         WHERE DATE(datetime(COALESCE(t.redeemed_at, t.created_at), '+7 hours')) BETWEEN ? AND ?${promoAndWithTenantCol}
-         GROUP BY DATE(datetime(COALESCE(t.redeemed_at, t.created_at), '+7 hours')) ORDER BY date`
-      ).bind(from, to, ...promoBinds).all<{ date: string; amount: number }>();
+        `SELECT DATE(datetime(t.created_at, '+7 hours')) as date, COALESCE(SUM(ABS(t.amount)), 0) as amount
+         FROM cashback_transactions t
+         LEFT JOIN cashback_wallets cw ON cw.id = t.wallet_id
+         LEFT JOIN customers c ON c.id = cw.customer_id
+         WHERE DATE(datetime(t.created_at, '+7 hours')) BETWEEN ? AND ?
+           AND t.type = 'spend'${txWalletTenantAnd}
+         GROUP BY DATE(datetime(t.created_at, '+7 hours')) ORDER BY date`
+      ).bind(from, to, ...txWalletBinds).all<{ date: string; amount: number }>();
       cashbackRedeemed = res.results || [];
     } catch {
       try {
         const res = await db.prepare(
-          `SELECT DATE(datetime(t.redeemed_at, '+7 hours')) as date, COALESCE(SUM(t.discount_amount), 0) as amount
-           FROM promotion_redemptions t${promoJoin}
-           WHERE DATE(datetime(t.redeemed_at, '+7 hours')) BETWEEN ? AND ?${promoAndWithTenantCol}
-           GROUP BY DATE(datetime(t.redeemed_at, '+7 hours')) ORDER BY date`
-        ).bind(from, to, ...promoBinds).all<{ date: string; amount: number }>();
+          `SELECT DATE(datetime(t.created_at, '+7 hours')) as date, COALESCE(SUM(ABS(t.amount)), 0) as amount
+           FROM cashback_transactions t${cjf.join}
+           WHERE DATE(datetime(t.created_at, '+7 hours')) BETWEEN ? AND ? AND t.type = 'spend'${cjf.and}
+           GROUP BY DATE(datetime(t.created_at, '+7 hours')) ORDER BY date`
+        ).bind(from, to, ...cjf.binds).all<{ date: string; amount: number }>();
         cashbackRedeemed = res.results || [];
       } catch {
         try {
+          const txDirectTf = buildTenantClause(tenantId, 't');
           const res = await db.prepare(
-            `SELECT DATE(datetime(t.redeemed_at, '+7 hours')) as date, COALESCE(SUM(t.discount_amount), 0) as amount
-             FROM promotion_redemptions t${promoJoin}
-             WHERE DATE(datetime(t.redeemed_at, '+7 hours')) BETWEEN ? AND ?${promoAndJoinOnly}
-             GROUP BY DATE(datetime(t.redeemed_at, '+7 hours')) ORDER BY date`
-          ).bind(from, to, ...promoBinds).all<{ date: string; amount: number }>();
+            `SELECT DATE(datetime(COALESCE(t.redeemed_at, t.created_at), '+7 hours')) as date, COALESCE(SUM(ABS(t.amount)), 0) as amount
+             FROM cashback_transactions t
+             WHERE DATE(datetime(COALESCE(t.redeemed_at, t.created_at), '+7 hours')) BETWEEN ? AND ? AND t.type = 'spend'${txDirectTf.and}
+             GROUP BY DATE(datetime(COALESCE(t.redeemed_at, t.created_at), '+7 hours')) ORDER BY date`
+          ).bind(from, to, ...txDirectTf.binds).all<{ date: string; amount: number }>().catch(() =>
+            db.prepare(
+              `SELECT DATE(datetime(t.created_at, '+7 hours')) as date, COALESCE(SUM(ABS(t.amount)), 0) as amount
+               FROM cashback_transactions t
+               WHERE DATE(datetime(t.created_at, '+7 hours')) BETWEEN ? AND ? AND t.type = 'spend'${txDirectTf.and}
+               GROUP BY DATE(datetime(t.created_at, '+7 hours')) ORDER BY date`
+            ).bind(from, to, ...txDirectTf.binds).all<{ date: string; amount: number }>()
+          );
           cashbackRedeemed = res.results || [];
         } catch {
-          try {
-            const res = await db.prepare(
-              `SELECT DATE(datetime(t.created_at, '+7 hours')) as date, COALESCE(SUM(t.discount_amount), 0) as amount
-               FROM promotion_redemptions t${promoJoin}
-               WHERE DATE(datetime(t.created_at, '+7 hours')) BETWEEN ? AND ?${promoAndJoinOnly}
-               GROUP BY DATE(datetime(t.created_at, '+7 hours')) ORDER BY date`
-            ).bind(from, to, ...promoBinds).all<{ date: string; amount: number }>();
-            cashbackRedeemed = res.results || [];
-          } catch {
-            try {
-              const res = await db.prepare(
-                `SELECT DATE(datetime(t.created_at, '+7 hours')) as date, COALESCE(SUM(ABS(t.amount)), 0) as amount
-                 FROM cashback_transactions t${cjf.join}
-                 WHERE DATE(datetime(t.created_at, '+7 hours')) BETWEEN ? AND ? AND t.type = 'spend'${cjf.and}
-                 GROUP BY DATE(datetime(t.created_at, '+7 hours')) ORDER BY date`
-              ).bind(from, to, ...cjf.binds).all<{ date: string; amount: number }>();
-              cashbackRedeemed = res.results || [];
-            } catch {
-              cashbackRedeemed = [];
-            }
-          }
+          cashbackRedeemed = [];
         }
       }
     }
@@ -332,6 +376,11 @@ export function registerAnalyticsHandlers(app: Hono<{ Bindings: Env }>) {
     };
     const thirtyDaysAgo = new Date(Date.now() - 30 * 86400000).toISOString().replace('T', ' ').slice(0, 19);
 
+    const txWalletSummaryWhere = !tenantId || tenantId === '*'
+      ? ''
+      : " AND COALESCE(NULLIF(TRIM(t.tenant_id), ''), NULLIF(TRIM(cw.tenant_id), ''), NULLIF(TRIM(c.tenant_id), ''), 'default') = ?";
+    const txWalletSummaryBinds = !tenantId || tenantId === '*' ? [] : [tenantId];
+
     const [
       totalCustomers,
       totalRevenue,
@@ -342,7 +391,11 @@ export function registerAnalyticsHandlers(app: Hono<{ Bindings: Env }>) {
     ] = await Promise.all([
       runFirst<{ count: number }>(`SELECT COUNT(*) as count FROM customers${tf.where}`),
       runFirst<{ total: number }>(
-        `SELECT COALESCE(SUM(total), 0) as total FROM orders WHERE ${VALID_REVENUE_ORDER_SQL}${tf.and}`
+        `SELECT COALESCE(SUM(${NET_ORDER_TOTAL_SQL}), 0) as total FROM orders WHERE ${VALID_REVENUE_ORDER_SQL}${tf.and}`
+      ).catch(() =>
+        runFirst<{ total: number }>(
+          `SELECT COALESCE(SUM(total), 0) as total FROM orders WHERE ${VALID_REVENUE_ORDER_SQL}${tf.and}`
+        )
       ),
       runFirst<{ count: number }>(
         `SELECT COUNT(*) as count FROM orders WHERE ${VALID_REVENUE_ORDER_SQL}${tf.and}`
@@ -350,13 +403,39 @@ export function registerAnalyticsHandlers(app: Hono<{ Bindings: Env }>) {
       (async () => {
         try {
           const stmt = db.prepare(
-            `SELECT COALESCE(SUM(t.reward_amount), 0) as total FROM checkins t${cjf.join} WHERE t.status = 'approved'${cjf.and}`
+            `SELECT COALESCE(SUM(t.amount), 0) as total
+             FROM cashback_transactions t
+             LEFT JOIN cashback_wallets cw ON cw.id = t.wallet_id
+             LEFT JOIN customers c ON c.id = cw.customer_id
+             WHERE t.type IN ('earn', 'bonus')${txWalletSummaryWhere}`
           );
-          return cjf.binds.length > 0 ? await stmt.bind(...cjf.binds).first<{ total: number }>() : await stmt.first<{ total: number }>();
-        } catch {
+          return txWalletSummaryBinds.length > 0
+            ? await stmt.bind(...txWalletSummaryBinds).first<{ total: number }>()
+            : await stmt.first<{ total: number }>();
+        } catch (sumTxErr) {
+          const sumMsg = sumTxErr instanceof Error ? sumTxErr.message : String(sumTxErr);
+          const txTableMissing = /no such table:\s*cashback_transactions/i.test(sumMsg);
+          if (!txTableMissing) {
+            try {
+              const stmt = db.prepare(
+                `SELECT COALESCE(SUM(t.amount), 0) as total FROM cashback_transactions t${cjf.join} WHERE t.type IN ('earn', 'bonus')${cjf.and}`
+              );
+              return cjf.binds.length > 0 ? await stmt.bind(...cjf.binds).first<{ total: number }>() : await stmt.first<{ total: number }>();
+            } catch {
+              try {
+                const txDirectTf = buildTenantClause(tenantId, 't');
+                const stmt = db.prepare(
+                  `SELECT COALESCE(SUM(t.amount), 0) as total FROM cashback_transactions t WHERE t.type IN ('earn', 'bonus')${txDirectTf.and}`
+                );
+                return txDirectTf.binds.length > 0 ? await stmt.bind(...txDirectTf.binds).first<{ total: number }>() : await stmt.first<{ total: number }>();
+              } catch {
+                return { total: 0 };
+              }
+            }
+          }
           try {
             const stmt = db.prepare(
-              `SELECT COALESCE(SUM(t.amount), 0) as total FROM cashback_transactions t${cjf.join} WHERE t.type = 'earn'${cjf.and}`
+              `SELECT COALESCE(SUM(t.reward_amount), 0) as total FROM checkins t${cjf.join} WHERE t.status = 'approved'${cjf.and}`
             );
             return cjf.binds.length > 0 ? await stmt.bind(...cjf.binds).first<{ total: number }>() : await stmt.first<{ total: number }>();
           } catch {
@@ -377,7 +456,11 @@ export function registerAnalyticsHandlers(app: Hono<{ Bindings: Env }>) {
     ]);
 
     const activeCount = active30d?.count || 0;
-    const totalCount = totalActive?.count || 1;
+    const rawTotalCount = totalActive?.count ?? 0;
+    const churnRate =
+      rawTotalCount > 0
+        ? Math.max(0, Math.round(((rawTotalCount - Math.min(activeCount, rawTotalCount)) / rawTotalCount) * 1000) / 10)
+        : 0;
 
     const summary: SummaryReport = {
       total_customers: totalCustomers?.count || 0,
@@ -385,13 +468,13 @@ export function registerAnalyticsHandlers(app: Hono<{ Bindings: Env }>) {
       total_orders: totalOrders?.count || 0,
       total_cashback_issued: totalCashback?.total || 0,
       active_customers_30d: activeCount,
-      churn_rate_30d: Math.round(((totalCount - activeCount) / totalCount) * 1000) / 10
+      churn_rate_30d: churnRate
     };
 
     return c.json({ success: true, data: summary });
   });
 
-  // GET /api/reports/orders — order metrics (Vietnam UTC+7 day boundary)
+  // GET /api/reports/orders — order metrics (Vietnam UTC+7 day boundary, settled revenue only)
   app.get('/orders', async (c) => {
     const from = c.req.query('from') || defaultStoreFromDate(30);
     const to = c.req.query('to') || defaultStoreToDate();
@@ -409,11 +492,41 @@ export function registerAnalyticsHandlers(app: Hono<{ Bindings: Env }>) {
     const db = c.env.AURA_DB;
     const tf = buildTenantClause(getTenantId(c));
 
-    const { results } = await db.prepare(
-      `SELECT status, COUNT(*) as count, COALESCE(SUM(total), 0) as revenue
-       FROM orders WHERE DATE(datetime(created_at, '+7 hours')) BETWEEN ? AND ?${tf.and}
-       GROUP BY status ORDER BY revenue DESC`
-    ).bind(from, to, ...tf.binds).all<{ status: string; count: number; revenue: number }>();
+    let results: { status: string; count: number; revenue: number }[] = [];
+    try {
+      const res = await db.prepare(
+        `SELECT status,
+                COUNT(*) as count,
+                COALESCE(SUM(CASE WHEN ${VALID_REVENUE_ORDER_SQL} THEN ${NET_ORDER_TOTAL_SQL} ELSE 0 END), 0) as revenue
+         FROM orders
+         WHERE DATE(datetime(created_at, '+7 hours')) BETWEEN ? AND ?
+           AND NOT (COALESCE(total, 0) = 0 AND (COALESCE(customer_name, '') = 'Khách QR - cho don mon' OR COALESCE(items, '') IN ('', '[]')))${tf.and}
+         GROUP BY status ORDER BY revenue DESC`
+      ).bind(from, to, ...tf.binds).all<{ status: string; count: number; revenue: number }>();
+      results = res.results || [];
+    } catch {
+      try {
+        const res = await db.prepare(
+          `SELECT status,
+                  COUNT(*) as count,
+                  COALESCE(SUM(CASE WHEN ${VALID_REVENUE_ORDER_SQL} THEN total ELSE 0 END), 0) as revenue
+           FROM orders
+           WHERE DATE(datetime(created_at, '+7 hours')) BETWEEN ? AND ?${tf.and}
+           GROUP BY status ORDER BY revenue DESC`
+        ).bind(from, to, ...tf.binds).all<{ status: string; count: number; revenue: number }>();
+        results = res.results || [];
+      } catch {
+        const res = await db.prepare(
+          `SELECT status,
+                  COUNT(*) as count,
+                  COALESCE(SUM(CASE WHEN LOWER(TRIM(COALESCE(status, ''))) IN ('completed', 'paid', 'delivered', 'served') THEN total ELSE 0 END), 0) as revenue
+           FROM orders
+           WHERE DATE(datetime(created_at, '+7 hours')) BETWEEN ? AND ?${tf.and}
+           GROUP BY status ORDER BY revenue DESC`
+        ).bind(from, to, ...tf.binds).all<{ status: string; count: number; revenue: number }>();
+        results = res.results || [];
+      }
+    }
 
     return c.json({ success: true, data: results || [] });
   });

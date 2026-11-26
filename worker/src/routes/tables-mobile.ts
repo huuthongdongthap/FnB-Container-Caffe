@@ -41,8 +41,8 @@ function getRequestedTenantOverride(context: Context<{ Bindings: Env }>): string
   return unique[0] || '';
 }
 
-const VIEW_ROLES: string[] = ['owner', 'manager', 'supervisor', 'staff', 'waiter', 'kitchen', 'barista', 'chef', 'admin', 'cashier'];
-const UPDATE_ROLES: string[] = ['owner', 'manager', 'supervisor', 'waiter', 'admin', 'cashier'];
+const VIEW_ROLES: string[] = ['owner', 'manager', 'supervisor', 'staff', 'waiter', 'phuc_vu', 'kitchen', 'barista', 'chef', 'bep', 'admin', 'cashier', 'shipper', 'rider'];
+const UPDATE_ROLES: string[] = ['owner', 'manager', 'supervisor', 'staff', 'waiter', 'phuc_vu', 'admin', 'cashier'];
 
 const D1_TO_MOBILE_STATUS: Record<string, 'free' | 'occupied' | 'reserved'> = {
   available: 'free',
@@ -312,29 +312,46 @@ export async function updateTableStatus(
             try {
               if (isDefaultUnitMock) {
                 await context.env.AURA_DB
-                  .prepare("UPDATE cafe_tables SET status = ?, current_order_id = NULL WHERE COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = 'default' AND id = ?")
+                  .prepare("UPDATE cafe_tables SET status = ?, current_order_id = NULL, current_session_id = NULL WHERE COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = 'default' AND id = ?")
                   .bind(normalizedStatus, tableId)
                   .run();
               } else {
                 await context.env.AURA_DB
-                  .prepare("UPDATE cafe_tables SET status = ?, current_order_id = NULL WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?")
+                  .prepare("UPDATE cafe_tables SET status = ?, current_order_id = NULL, current_session_id = NULL WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?")
                   .bind(normalizedStatus, tableId, effectiveTableTenant)
                   .run();
               }
-            } catch (clearErr) {
-              if (String((clearErr as Error)?.message || '').includes('no such table')) {
-                throw clearErr;
+            } catch (clearSessionErr) {
+              if (String((clearSessionErr as Error)?.message || '').includes('no such table')) {
+                throw clearSessionErr;
               }
-              if (isDefaultUnitMock) {
-                await context.env.AURA_DB
-                  .prepare("UPDATE cafe_tables SET status = ? WHERE COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = 'default' AND id = ?")
-                  .bind(normalizedStatus, tableId)
-                  .run();
-              } else {
-                await context.env.AURA_DB
-                  .prepare("UPDATE cafe_tables SET status = ? WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?")
-                  .bind(normalizedStatus, tableId, effectiveTableTenant)
-                  .run();
+              try {
+                if (isDefaultUnitMock) {
+                  await context.env.AURA_DB
+                    .prepare("UPDATE cafe_tables SET status = ?, current_order_id = NULL WHERE COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = 'default' AND id = ?")
+                    .bind(normalizedStatus, tableId)
+                    .run();
+                } else {
+                  await context.env.AURA_DB
+                    .prepare("UPDATE cafe_tables SET status = ?, current_order_id = NULL WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?")
+                    .bind(normalizedStatus, tableId, effectiveTableTenant)
+                    .run();
+                }
+              } catch (clearErr) {
+                if (String((clearErr as Error)?.message || '').includes('no such table')) {
+                  throw clearErr;
+                }
+                if (isDefaultUnitMock) {
+                  await context.env.AURA_DB
+                    .prepare("UPDATE cafe_tables SET status = ? WHERE COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = 'default' AND id = ?")
+                    .bind(normalizedStatus, tableId)
+                    .run();
+                } else {
+                  await context.env.AURA_DB
+                    .prepare("UPDATE cafe_tables SET status = ? WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?")
+                    .bind(normalizedStatus, tableId, effectiveTableTenant)
+                    .run();
+                }
               }
             }
           } else if (isDefaultUnitMock) {
@@ -355,14 +372,21 @@ export async function updateTableStatus(
           if (requestedStatus === 'free') {
             try {
               await context.env.AURA_DB
-                .prepare('UPDATE cafe_tables SET status = ?, current_order_id = NULL WHERE id = ?')
+                .prepare('UPDATE cafe_tables SET status = ?, current_order_id = NULL, current_session_id = NULL WHERE id = ?')
                 .bind(normalizedStatus, tableId)
                 .run();
             } catch {
-              await context.env.AURA_DB
-                .prepare('UPDATE cafe_tables SET status = ? WHERE id = ?')
-                .bind(normalizedStatus, tableId)
-                .run();
+              try {
+                await context.env.AURA_DB
+                  .prepare('UPDATE cafe_tables SET status = ?, current_order_id = NULL WHERE id = ?')
+                  .bind(normalizedStatus, tableId)
+                  .run();
+              } catch {
+                await context.env.AURA_DB
+                  .prepare('UPDATE cafe_tables SET status = ? WHERE id = ?')
+                  .bind(normalizedStatus, tableId)
+                  .run();
+              }
             }
           } else {
             await context.env.AURA_DB
@@ -407,13 +431,13 @@ export async function updateTableStatus(
     if (requestedStatus === 'free') {
       try {
         await context.env.AURA_DB
-          .prepare("UPDATE table_sessions SET status = 'closed', closed_at = ?, updated_at = ? WHERE table_id = ? AND (status IN ('active', 'ordering') OR status IN ('occupied', 'seated')) AND (COALESCE(tenant_id, 'default') = ? OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?4)")
+          .prepare("UPDATE table_sessions SET status = 'closed', closed_at = ?, updated_at = ? WHERE table_id = ? AND (status IN ('active', 'ordering') OR status IN ('occupied', 'seated', 'paying')) AND (COALESCE(tenant_id, 'default') = ? OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?4)")
           .bind(now, now, tableId, effectiveTableTenant)
           .run()
           .catch(() => {
             if (effectiveTableTenant === 'default') {
               return context.env.AURA_DB
-                .prepare("UPDATE table_sessions SET status = 'closed', closed_at = ?, updated_at = ? WHERE table_id = ? AND (status IN ('active', 'ordering') OR status IN ('occupied', 'seated'))")
+                .prepare("UPDATE table_sessions SET status = 'closed', closed_at = ?, updated_at = ? WHERE table_id = ? AND (status IN ('active', 'ordering') OR status IN ('occupied', 'seated', 'paying'))")
                 .bind(now, now, tableId)
                 .run();
             }

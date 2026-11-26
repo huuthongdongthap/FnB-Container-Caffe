@@ -296,12 +296,12 @@ export function registerPromotionValidationHandlers(router: Hono<{ Bindings: Env
       return c.json({ success: true, data: { valid: false, reason: 'Chương trình chưa bắt đầu' } });
     }
 
-    // Check expiration (WELCOME never expires per store policy)
-    if (!isWelcome && promo.expires_at && new Date(promo.expires_at) < new Date()) {
+    // Check expiration
+    if (promo.expires_at && new Date(promo.expires_at) < new Date()) {
       return c.json({ success: true, data: { valid: false, reason: 'Code has expired' } });
     }
 
-    // Check usage limit (WELCOME has no global cap)
+    // Check usage limit
     const validatePromoRow = promo as unknown as Record<string, unknown>;
     const validateMaxUses = Math.max(
       Number(promo.usage_limit ?? 0) > 0 ? Number(promo.usage_limit) : 0,
@@ -311,7 +311,7 @@ export function registerPromotionValidationHandlers(router: Hono<{ Bindings: Env
       Number(promo.usage_count ?? 0),
       Number(validatePromoRow.current_uses ?? validatePromoRow.used_count ?? 0),
     );
-    if (!isWelcome && validateMaxUses > 0 && validateCurrentUses >= validateMaxUses) {
+    if (validateMaxUses > 0 && validateCurrentUses >= validateMaxUses) {
       return c.json({ success: true, data: { valid: false, reason: 'Mã đã hết lượt sử dụng' } });
     }
 
@@ -358,7 +358,7 @@ export function registerPromotionValidationHandlers(router: Hono<{ Bindings: Env
     const validatePerCustomerLimit = Number(
       validatePromoRow.usage_limit_per_customer ?? validatePromoRow.max_uses_per_customer ?? validatePromoRow.per_customer_limit ?? 0
     );
-    if (!isWelcome && validatePerCustomerLimit > 0 && validateCustomerId) {
+    if (validatePerCustomerLimit > 0 && validateCustomerId) {
       try {
         const custRedemptions = await db
           .prepare(
@@ -450,7 +450,7 @@ export function registerPromotionValidationHandlers(router: Hono<{ Bindings: Env
       return c.json({ success: false, error: 'Chương trình chưa bắt đầu' }, 400);
     }
 
-    if (!isWelcome && promo.expires_at && new Date(promo.expires_at) < new Date()) {
+    if (promo.expires_at && new Date(promo.expires_at) < new Date()) {
       return c.json({ success: false, error: 'Code has expired' }, 400);
     }
 
@@ -687,14 +687,14 @@ export function registerPromotionValidationHandlers(router: Hono<{ Bindings: Env
       Number(promo.usage_count ?? 0),
       Number(promoRow.current_uses ?? promoRow.used_count ?? 0),
     );
-    if (!isWelcome && maxUsesLimit > 0 && currentUsesCount >= maxUsesLimit) {
+    if (maxUsesLimit > 0 && currentUsesCount >= maxUsesLimit) {
       return c.json({ success: false, error: 'Usage limit reached' }, 400);
     }
 
     const perCustomerLimit = Number(
       promoRow.usage_limit_per_customer ?? promoRow.max_uses_per_customer ?? promoRow.per_customer_limit ?? 0
     );
-    if (!isWelcome && perCustomerLimit > 0 && effectiveCustomerId) {
+    if (perCustomerLimit > 0 && effectiveCustomerId) {
       try {
         const custRedemptions = await db
           .prepare(
@@ -722,7 +722,7 @@ export function registerPromotionValidationHandlers(router: Hono<{ Bindings: Env
     const discountAmount = computePromotionDiscountAmount(promoRow, effectiveOrderTotal, percent, maxDiscount);
 
     // Increment usage with atomic conditional guard
-    if (!isWelcome && promo.usage_limit && promo.usage_limit > 0) {
+    if (promo.usage_limit && promo.usage_limit > 0) {
       let usageRes: { meta?: { changes?: number } } | null = null;
       if (promo.id !== undefined && promo.id !== null) {
         if (tenantId !== '*') {
@@ -852,7 +852,7 @@ export function registerPromotionValidationHandlers(router: Hono<{ Bindings: Env
     const targetTenantId = tenantId === '*'
       ? ((orderRow?.tenant_id ? String(orderRow.tenant_id).trim() : '') || (promo.tenant_id ? String(promo.tenant_id).trim() : '') || 'default')
       : (tenantId || 'default');
-    const enforcePerCustomer = !isWelcome && perCustomerLimit > 0 && Boolean(effectiveCustomerId);
+    const enforcePerCustomer = perCustomerLimit > 0 && Boolean(effectiveCustomerId);
     let guardedInsert: { meta?: { changes?: number } } | null = null;
     try {
       // The per-customer count is evaluated inside the INSERT so concurrent redemptions cannot both pass.

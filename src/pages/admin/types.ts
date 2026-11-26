@@ -34,7 +34,44 @@ export interface CategoryFormData {
   sort_order: string;
 }
 
-export type Tab = 'products' | 'categories' | 'modifiers';
+export type Tab = 'products' | 'categories' | 'modifiers' | 'happy-hour';
+
+export interface HappyHourWindowAdmin {
+  id: string;
+  name: string;
+  day_of_week: number;
+  start_time: string;
+  end_time: string;
+  discount_rate: number;
+  apply_to: string;
+  apply_ids: string | null;
+  priority: number;
+  active: number;
+}
+
+export interface HappyHourFormData {
+  name: string;
+  day_of_week: string;
+  start_time: string;
+  end_time: string;
+  discount_percent: string;
+  apply_to: 'all' | 'category' | 'product';
+  apply_ids: string;
+  priority: string;
+  active: boolean;
+}
+
+export const EMPTY_HAPPY_HOUR_WINDOW: HappyHourFormData = {
+  name: '',
+  day_of_week: '1',
+  start_time: '14:00',
+  end_time: '17:00',
+  discount_percent: '20',
+  apply_to: 'all',
+  apply_ids: '',
+  priority: '0',
+  active: true,
+};
 
 /** An option group (e.g. "Kích cỡ") the customer picks from. */
 export interface ModifierGroup {

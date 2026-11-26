@@ -1,21 +1,49 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useChat } from '@/hooks/use-chat';
+import { useAuthStore } from '@/hooks/stores/use-auth-store';
 import { LS_NAME_KEY, LS_PHONE_KEY } from './ChatWidget-constants';
 
 export function useChatWidget() {
   const { t } = useTranslation();
+  const user = useAuthStore((s) => s.user);
   const [isOpen, setIsOpen] = useState(false);
-  const [name, setName] = useState(() => localStorage.getItem(LS_NAME_KEY) || '');
-  const [phone, setPhone] = useState(() => localStorage.getItem(LS_PHONE_KEY) || '');
+  const [name, setName] = useState(() => localStorage.getItem(LS_NAME_KEY) || user?.name || '');
+  const [phone, setPhone] = useState(() => localStorage.getItem(LS_PHONE_KEY) || user?.phone || '');
   const [showForm, setShowForm] = useState(!name || !phone);
   const [inputText, setInputText] = useState('');
   const [unreadCount, setUnreadCount] = useState(0);
-  const { sendMessage, sendState, messages, fetchMessages: _fetchMessages } = useChat();
+  const { sendMessage, sendState, messages, fetchMessages } = useChat();
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const lastCountedMsgId = useRef<number | null>(null);
+
+  // Sync logged-in customer profile when local fields are empty
+  useEffect(() => {
+    if (!user) return;
+    const nextName = name || user.name || '';
+    const nextPhone = phone || user.phone || '';
+    if (nextName && nextName !== name) setName(nextName);
+    if (nextPhone && nextPhone !== phone) setPhone(nextPhone);
+    if (nextName && nextPhone) {
+      setShowForm(false);
+    }
+  }, [user, name, phone]);
+
+  // Fetch conversation history and poll for staff replies when authenticated
+  useEffect(() => {
+    const activePhone = (user?.phone || phone || '').trim();
+    if (!user || activePhone.length < 8) return;
+    if (!isOpen && showForm) return;
+
+    void fetchMessages(activePhone);
+    const intervalId = setInterval(() => {
+      void fetchMessages(activePhone);
+    }, isOpen ? 8_000 : 30_000);
+
+    return () => clearInterval(intervalId);
+  }, [user, phone, isOpen, showForm, fetchMessages]);
 
   // Scroll to bottom when messages update
   useEffect(() => {

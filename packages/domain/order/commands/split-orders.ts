@@ -4,7 +4,7 @@ import type { D1Database, D1PreparedStatement, KVNamespace } from '@cloudflare/w
 import { jsonResponse, errorResponse } from 'worker/src/middleware/cors';
 import { createLogger } from 'worker/src/middleware/logger';
 import { orderItemSchema, paymentMethodSchema } from 'worker/src/lib/validators';
-import { generateId, parseJSON } from '../model/helpers';
+import { generateId, generateOrderNumber, parseJSON } from '../model/helpers';
 import { calculateCheckoutSnapshot } from '../policies/checkout-snapshot';
 import {
   OrderCreationError,
@@ -15,7 +15,7 @@ import {
 } from '../policies/order-creation-scope';
 import { publishOrderEvent } from '../policies/customer-order-payload';
 import {
-  dispatchOrderBroadcast,
+  fanOutOrderBroadcast,
   normalizeBroadcastTotal,
   parseBroadcastItems,
   parseBroadcastTimestamp,
@@ -26,7 +26,7 @@ import {
   hashOrderToken,
 } from '../../customer/policies/order-ownership-policy';
 import { runPostOrderSideEffects } from './create-order-side-effects';
-import { cancelOpenPayOSAttemptForOrder } from '../../payment/commands/payos-attempt';
+import { compensateVoidedOrder } from '../policies/order-rollback';
 import {
   hasIssuedEInvoiceForOrder,
   ISSUED_EINVOICE_CANCEL_ERROR,
@@ -36,7 +36,7 @@ import {
 const log = createLogger({ route: 'orders' });
 const splitOrderEntrySchema = z.object({
   items: z.array(orderItemSchema).min(1, 'Phải có ít nhất 1 sản phẩm').max(100, 'Tối đa 100 sản phẩm mỗi đơn'),
-  total: z.number().min(1000, 'Tổng tiền tối thiểu 1,000đ').optional(),
+  total: z.number().nonnegative('Tổng tiền không hợp lệ').optional(),
   customer_name: z.string().min(1), customer_phone: z.string().min(8).max(15),
   customer_email: z.string().optional().or(z.literal('')), customer_address: z.string().optional(),
   customer_id: z.string().optional().nullable(),
@@ -46,6 +46,14 @@ const splitOrderEntrySchema = z.object({
   // Accepted for client compatibility only; tax is never taken from the request.
   tax: z.number().nonnegative().optional(),
   tip: z.number().nonnegative().optional(),
+}).superRefine((entry, ctx) => {
+  if (entry.total !== undefined && entry.total < 1000 && !(entry.discount && entry.discount > 0)) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['total'],
+      message: 'Tổng tiền tối thiểu 1,000đ',
+    });
+  }
 });
 const splitOrdersSchema = z.object({
   orders: z.array(splitOrderEntrySchema).min(2, 'Cần ít nhất 2 đơn để chia bill').max(4, 'Tối đa 4 đơn'),
@@ -223,7 +231,12 @@ export async function splitOrders(
       }
       if (!parentOrder) return errorResponse('Order not found', 404);
       const parentPayStatus = String(parentOrder.payment_status ?? '').trim().toLowerCase();
-      if (parentPayStatus === 'paid' || parentPayStatus === 'completed' || parentPayStatus === 'refunded') {
+      if (
+        parentPayStatus === 'paid' ||
+        parentPayStatus === 'completed' ||
+        parentPayStatus === 'refunded' ||
+        parentPayStatus === 'partially_refunded'
+      ) {
         return errorResponse(PAID_ORDER_CANCEL_ERROR, 409);
       }
       if (await hasIssuedEInvoiceForOrder(db, parentOrder.id)) {
@@ -375,15 +388,18 @@ export async function splitOrders(
     }
     if (parentOrder) {
       const parentStatus = String(parentOrder.status || '').trim().toLowerCase();
-      if (['cancelled', 'canceled', 'completed', 'refunded'].includes(parentStatus)) {
+      if (['cancelled', 'canceled', 'completed', 'refunded', 'failed', 'expired'].includes(parentStatus)) {
         return errorResponse(`Cannot split an order in ${parentStatus} status`, 409);
+      }
+      if (['preparing', 'ready', 'delivering', 'served', 'delivered'].includes(parentStatus)) {
+        return errorResponse(`Cannot split an order already in kitchen preparation or service (${parentStatus})`, 409);
       }
       const parentPayment = await db
         .prepare('SELECT payment_status FROM orders WHERE id = ?')
         .bind(parentOrder.id)
         .first<{ payment_status?: string | null }>()
         .catch(() => null);
-      if (['paid', 'completed', 'refunded'].includes(String(parentPayment?.payment_status || '').trim().toLowerCase())) {
+      if (['paid', 'completed', 'refunded', 'partially_refunded'].includes(String(parentPayment?.payment_status || '').trim().toLowerCase())) {
         return errorResponse('Paid order cannot be split; initiate a refund instead', 409);
       }
     }
@@ -470,29 +486,31 @@ export async function splitOrders(
     }> = [];
     const createdOrders = parsed.data.orders.map((order, index) => {
       const id = generateId('ORD_');
+      const orderNumber = generateOrderNumber();
       const snapshot = snapshots[index];
       const taxAmount = typeof order.tax === 'number' && order.tax > 0 ? Math.round(order.tax) : 0;
       const orderTotal = snapshot.total + taxAmount;
+      const childPaymentStatus: 'paid' | 'unpaid' = orderTotal === 0 ? 'paid' : 'unpaid';
       const resolvedCustomerId = ownerships[index]?.customerId ?? null;
       const guestCap = guestTokens[index];
       if (guestCap?.token) {
         orderTokens[id] = guestCap.token;
       }
       const orderInsertArgsWithHash = [
-        id, snapshot.itemsJson, orderTotal, 'pending', order.customer_name, order.customer_phone,
-        order.customer_email || null, order.customer_address || null, order.payment_method, 'unpaid',
+        id, orderNumber, snapshot.itemsJson, orderTotal, 'pending', order.customer_name, order.customer_phone,
+        order.customer_email || null, order.customer_address || null, order.payment_method, childPaymentStatus,
         snapshot.shipping_fee, snapshot.discount, order.notes || null, order.delivery_time || 'now',
         tableId, 'dine_in', snapshot.tip_amount, resolvedCustomerId, guestCap?.hash ?? null, tenantId, now, now,
       ] as const;
       const orderInsertSqlWithHash = `INSERT INTO orders (
-        id, items, total, status, customer_name, customer_phone,
+        id, order_number, items, total, status, customer_name, customer_phone,
         customer_email, customer_address, payment_method, payment_status,
         shipping_fee, discount, notes, delivery_time, table_id,
         order_type, tip_amount, customer_id, guest_token_hash, tenant_id, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
       const orderInsertArgs = [
         id, snapshot.itemsJson, orderTotal, 'pending', order.customer_name, order.customer_phone,
-        order.customer_email || null, order.customer_address || null, order.payment_method, 'unpaid',
+        order.customer_email || null, order.customer_address || null, order.payment_method, childPaymentStatus,
         snapshot.shipping_fee, snapshot.discount, order.notes || null, order.delivery_time || 'now',
         tableId, 'dine_in', snapshot.tip_amount, resolvedCustomerId, tenantId, now, now,
       ] as const;
@@ -503,7 +521,7 @@ export async function splitOrders(
         order_type, tip_amount, customer_id, tenant_id, created_at, updated_at
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
       statements.push(db.prepare(orderInsertSqlWithHash).bind(...orderInsertArgsWithHash));
-      legacyWithHashStatements.push(db.prepare(orderInsertSqlWithHash).bind(...orderInsertArgsWithHash));
+      legacyWithHashStatements.push(db.prepare(orderInsertSql).bind(...orderInsertArgs));
       noGuestHashStatements.push(db.prepare(orderInsertSql).bind(...orderInsertArgs));
       legacyStatements.push(db.prepare(orderInsertSql).bind(...orderInsertArgs));
       for (const item of snapshot.items) {
@@ -525,7 +543,7 @@ export async function splitOrders(
         legacyStatements.push(legacyItemStmt);
       }
       // PayOS reserves its own identified attempt when creating the provider link.
-      if (order.payment_method === 'cod') {
+      if (order.payment_method === 'cod' && orderTotal > 0) {
         const payId = generateId('PAY_');
         const payStmt = db.prepare(`INSERT INTO payments (id, order_id, method, amount, status, tenant_id, created_at, updated_at)
           VALUES (?, ?, ?, ?, ?, ?, ?, ?)`)
@@ -540,7 +558,7 @@ export async function splitOrders(
       }
       sideEffectInputs.push({ id, order, snapshot: { ...snapshot, total: orderTotal }, resolvedCustomerId });
       return {
-        id, status: 'pending', payment_status: 'unpaid', items: snapshot.items, total: orderTotal,
+        id, order_number: orderNumber, status: 'pending', payment_status: childPaymentStatus, items: snapshot.items, total: orderTotal,
         customer_name: order.customer_name, customer_phone: order.customer_phone,
         customer_address: order.customer_address || null, payment_method: order.payment_method,
         notes: order.notes || null, table_id: tableId, created_at: now,
@@ -575,15 +593,41 @@ export async function splitOrders(
     let claimedParentPriorStatus: string | null = null;
     if (parentOrder) {
       const splitNote = `Split into children: ${createdOrders.map(o => o.id).join(', ')}`;
+      const priorStatus = String(parentOrder.status || 'pending');
+      const priorLower = priorStatus.trim().toLowerCase();
+      const cancelAlertVal = priorLower === 'confirmed' || priorLower === 'preparing' || priorLower === 'ready' ? 1 : 0;
+      const notSplitStatusClause = "LOWER(COALESCE(status, '')) NOT IN ('preparing', 'ready', 'delivering', 'served', 'delivered', 'cancelled', 'canceled', 'completed', 'refunded', 'failed', 'expired')";
+      const notPaidClause = "LOWER(COALESCE(payment_status, 'unpaid')) NOT IN ('paid', 'completed', 'refunded', 'partially_refunded')";
+      const fullClaimParentSql =
+        `UPDATE orders SET status = 'cancelled', cancelled_at = COALESCE(cancelled_at, ?), previous_status = ?, cancel_alert = ?, notes = COALESCE(NULLIF(notes, '') || ' | ', '') || ?, updated_at = ? WHERE id = ? AND ${notSplitStatusClause} AND ${notPaidClause} AND (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?)`;
       const claimParentSql =
-        "UPDATE orders SET status = 'cancelled', notes = COALESCE(NULLIF(notes, '') || ' | ', '') || ?, updated_at = ? WHERE id = ? AND LOWER(COALESCE(status, '')) NOT IN ('cancelled', 'canceled', 'completed', 'refunded') AND LOWER(COALESCE(payment_status, 'unpaid')) NOT IN ('paid', 'completed', 'refunded') AND (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?)";
+        `UPDATE orders SET status = 'cancelled', notes = COALESCE(NULLIF(notes, '') || ' | ', '') || ?, updated_at = ? WHERE id = ? AND ${notSplitStatusClause} AND ${notPaidClause} AND (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?)`;
       const legacyClaimParentSql =
-        "UPDATE orders SET status = 'cancelled', notes = COALESCE(NULLIF(notes, '') || ' | ', '') || ?, updated_at = ? WHERE id = ? AND LOWER(COALESCE(status, '')) NOT IN ('cancelled', 'canceled', 'completed', 'refunded')";
+        `UPDATE orders SET status = 'cancelled', notes = COALESCE(NULLIF(notes, '') || ' | ', '') || ?, updated_at = ? WHERE id = ? AND ${notSplitStatusClause} AND ${notPaidClause}`;
+      const bareLegacyClaimParentSql =
+        `UPDATE orders SET status = 'cancelled', notes = COALESCE(NULLIF(notes, '') || ' | ', '') || ?, updated_at = ? WHERE id = ? AND ${notSplitStatusClause}`;
       const claimRes = (await db
-        .prepare(claimParentSql)
-        .bind(splitNote, now, parentOrder.id, tenantId, tenantId)
+        .prepare(fullClaimParentSql)
+        .bind(now, priorStatus, cancelAlertVal, splitNote, now, parentOrder.id, tenantId, tenantId)
         .run()
-        .catch(() => db.prepare(legacyClaimParentSql).bind(splitNote, now, parentOrder!.id).run())) as
+        .catch(() =>
+          db
+            .prepare(claimParentSql)
+            .bind(splitNote, now, parentOrder!.id, tenantId, tenantId)
+            .run()
+            .catch(() =>
+              db
+                .prepare(legacyClaimParentSql)
+                .bind(splitNote, now, parentOrder!.id)
+                .run()
+                .catch((err) => {
+                  if (/no such column:\s*payment_status/i.test(String(err))) {
+                    return db.prepare(bareLegacyClaimParentSql).bind(splitNote, now, parentOrder!.id).run();
+                  }
+                  throw err;
+                }),
+            ),
+        )) as
         | { meta?: { changes?: number }; changes?: number }
         | null;
       const claimChanges = claimRes?.meta?.changes ?? claimRes?.changes;
@@ -594,7 +638,7 @@ export async function splitOrders(
         }
         return errorResponse('Parent order is already cancelled or was split concurrently', 409);
       }
-      claimedParentPriorStatus = String(parentOrder.status || 'pending');
+      claimedParentPriorStatus = priorStatus;
     }
     // D1 rolls back the whole group if any sub-order or ledger write fails.
     try {
@@ -629,6 +673,7 @@ export async function splitOrders(
             const order = parsed.data.orders[i];
             const snapshot = snapshots[i];
             const resolvedCustomerId = ownerships[i]?.customerId ?? null;
+            const fallbackPayStatus = ord.total === 0 ? 'paid' : 'unpaid';
             try {
               await db
                 .prepare(
@@ -641,7 +686,7 @@ export async function splitOrders(
                 )
                 .bind(
                   ord.id, snapshot.itemsJson, ord.total, 'pending', order.customer_name, order.customer_phone,
-                  order.customer_email || null, order.customer_address || null, order.payment_method, 'unpaid',
+                  order.customer_email || null, order.customer_address || null, order.payment_method, fallbackPayStatus,
                   snapshot.shipping_fee, snapshot.discount, order.notes || null, order.delivery_time || 'now',
                   tableId, 'dine_in', snapshot.tip_amount, resolvedCustomerId, tenantId, now, now
                 )
@@ -656,19 +701,25 @@ export async function splitOrders(
                 )
                 .bind(
                   ord.id, snapshot.itemsJson, ord.total, 'pending', order.customer_name, order.customer_phone,
-                  order.payment_method, 'unpaid', tableId, tenantId, now, now
+                  order.payment_method, fallbackPayStatus, tableId, tenantId, now, now
                 )
                 .run();
             }
-            if (order.payment_method === 'cod') {
+            if (order.payment_method === 'cod' && ord.total > 0) {
               const payId = generateId('PAY_');
               await db
                 .prepare(
-                  'INSERT INTO payments (id, order_id, amount, status, tenant_id) VALUES (?, ?, ?, ?, ?)'
+                  'INSERT INTO payments (id, order_id, method, amount, status, tenant_id) VALUES (?, ?, ?, ?, ?, ?)'
                 )
-                .bind(payId, ord.id, ord.total, 'pending', tenantId)
+                .bind(payId, ord.id, 'cod', ord.total, 'pending', tenantId)
                 .run()
-                .catch(() => {});
+                .catch(() =>
+                  db
+                    .prepare('INSERT INTO payments (id, order_id, method, amount, status) VALUES (?, ?, ?, ?, ?)')
+                    .bind(payId, ord.id, 'cod', ord.total, 'pending')
+                    .run()
+                    .catch(() => {}),
+                );
             }
           }
           await db.prepare(tableOccupySql).bind(tableId, tenantId).run().catch(() => {});
@@ -770,81 +821,26 @@ export async function splitOrders(
           }
         }
       }
-      await cancelOpenPayOSAttemptForOrder(db, env as Record<string, unknown>, parentOrder.id, tenantId).catch(err => {
-        log.warn('Failed to cancel open parent PayOS attempt on split', { parentId: parentOrder?.id, message: (err as Error)?.message });
+      // Full idempotent compensation for the cancelled parent order: cancels all pending parent
+      // payments (COD & PayOS), releases BOM/SKU inventory, refunds cashback_used, restores
+      // loyalty_points_redeemed, loyalty_vouchers, and promotions/promotion_redemptions.
+      await compensateVoidedOrder({
+        db,
+        env: env as Record<string, unknown>,
+        kv: (env.AUTH_KV as KVNamespace | undefined) ?? null,
+        orderId: parentOrder.id,
+        tenantId: effectiveTenant,
+        now,
+        reason: 'order_split_into_children',
+        preCancelStatus: claimedParentPriorStatus || 'pending',
+        actorId: actor?.id ?? null,
+        skipTableRelease: true,
+      }).catch((err) => {
+        log.warn('Failed to compensate split parent order side-effects', {
+          parentId: parentOrder?.id,
+          message: (err as Error)?.message,
+        });
       });
-      // Restore BOM ingredients reserved by the cancelled parent order before deducting sub-order stock.
-      try {
-        const { restoreInventoryForOrder } = await import('@aura/domain-inventory');
-        await restoreInventoryForOrder(env as any, parentOrder.id, effectiveTenant);
-      } catch (invErr) {
-        log.warn('Failed to restore parent order inventory on split', { parentId: parentOrder.id, message: (invErr as Error)?.message });
-      }
-      // Refund any held cashback on the cancelled parent order idempotently via atomic cashback_used CAS.
-      try {
-        const parentSpend = await db
-          .prepare("SELECT customer_id, cashback_used FROM orders WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?")
-          .bind(parentOrder.id, effectiveTenant)
-          .first<{ customer_id?: string | null; cashback_used?: number | null }>()
-          .catch(() =>
-            effectiveTenant === 'default'
-              ? db.prepare('SELECT customer_id, cashback_used FROM orders WHERE id = ?').bind(parentOrder!.id).first<{ customer_id?: string | null; cashback_used?: number | null }>().catch(() => null)
-              : null
-          );
-        const refundCustId = parentSpend?.customer_id ? String(parentSpend.customer_id).trim() : '';
-        const refundAmt = Number(parentSpend?.cashback_used ?? 0);
-        if (refundCustId && refundAmt > 0) {
-          const zeroed = await db
-            .prepare("UPDATE orders SET cashback_used = 0 WHERE id = ? AND COALESCE(cashback_used, 0) > 0 AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?")
-            .bind(parentOrder.id, effectiveTenant)
-            .run()
-            .catch(() =>
-              effectiveTenant === 'default'
-                ? db.prepare('UPDATE orders SET cashback_used = 0 WHERE id = ? AND COALESCE(cashback_used, 0) > 0').bind(parentOrder!.id).run().catch(() => null)
-                : null
-            );
-          const zeroChanges = (zeroed as { meta?: { changes?: number }; changes?: number } | null)?.meta?.changes
-            ?? (zeroed as { changes?: number } | null)?.changes;
-          if (zeroed && (zeroChanges === undefined || Number(zeroChanges) > 0)) {
-            await db
-              .prepare("UPDATE cashback_wallets SET balance = COALESCE(balance, 0) + ?, total_spent = MAX(0, COALESCE(total_spent, 0) - ?), updated_at = datetime('now') WHERE customer_id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?")
-              .bind(refundAmt, refundAmt, refundCustId, effectiveTenant)
-              .run()
-              .catch(() => {});
-            await db
-              .prepare("UPDATE customers SET cashback_balance = COALESCE(cashback_balance, 0) + ? WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?")
-              .bind(refundAmt, refundCustId, effectiveTenant)
-              .run()
-              .catch(() => {});
-            const wRow = await db
-              .prepare("SELECT id, balance FROM cashback_wallets WHERE customer_id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ? LIMIT 1")
-              .bind(refundCustId, effectiveTenant)
-              .first<{ id?: string; balance?: number }>()
-              .catch(() => null);
-            const walletId = wRow?.id || `wal_${refundCustId}`;
-            const balAfter = Number(wRow?.balance ?? refundAmt);
-            await db
-              .prepare(
-                `INSERT INTO cashback_transactions (id, wallet_id, customer_id, order_id, type, amount, balance_after, tenant_id, created_at)
-                 SELECT ?, ?, ?, ?, 'refund', ?, ?, ?, datetime('now')
-                 WHERE NOT EXISTS (SELECT 1 FROM cashback_transactions WHERE order_id = ? AND type = 'refund' AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?)`
-              )
-              .bind(`cb_ref_${parentOrder.id}`, walletId, refundCustId, parentOrder.id, refundAmt, balAfter, effectiveTenant, parentOrder.id, effectiveTenant)
-              .run()
-              .catch(() =>
-                db
-                  .prepare(
-                    `INSERT INTO cashback_transactions (id, customer_id, order_id, type, amount, balance_after, tenant_id)
-                     SELECT ?, ?, ?, 'refund', ?, ?, ?
-                     WHERE NOT EXISTS (SELECT 1 FROM cashback_transactions WHERE order_id = ? AND type = 'refund' AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?)`
-                  )
-                  .bind(`cb_ref_${parentOrder.id}`, refundCustId, parentOrder.id, refundAmt, balAfter, effectiveTenant, parentOrder.id, effectiveTenant)
-                  .run()
-                  .catch(() => {})
-              );
-          }
-        }
-      } catch { /* non-blocking parent cashback cleanup */ }
       if (env.AUTH_KV) {
         const kv = env.AUTH_KV as KVNamespace;
         await Promise.all([
@@ -858,7 +854,6 @@ export async function splitOrders(
       }
       if (env.ORDER_BROADCASTER) {
         try {
-          const doChannel = effectiveTenant !== 'default' ? `${effectiveTenant}:${parentOrder.id}` : parentOrder.id;
           const cancelEvent = {
             orderId: parentOrder.id,
             status: 'cancelled',
@@ -872,13 +867,32 @@ export async function splitOrders(
             createdAt: parseBroadcastTimestamp(parentOrder.created_at),
             updatedAt: Date.now(),
           };
-          await dispatchOrderBroadcast(env.ORDER_BROADCASTER, doChannel, cancelEvent);
+          await fanOutOrderBroadcast(env.ORDER_BROADCASTER, parentOrder.id, effectiveTenant, cancelEvent);
         } catch { /* non-blocking parent DO broadcast */ }
       }
     }
     for (let i = 0; i < createdOrders.length; i++) {
       const order = createdOrders[i];
       const sideInput = sideEffectInputs[i];
+      if (env.ORDER_BROADCASTER) {
+        try {
+          const childEvent = {
+            orderId: order.id,
+            order_number: order.order_number,
+            status: 'pending',
+            payment_status: 'unpaid',
+            items: order.items,
+            total: normalizeBroadcastTotal(order.total),
+            customer_name: String(order.customer_name ?? ''),
+            customer_phone: String(order.customer_phone ?? ''),
+            table_id: tableId,
+            ...(effectiveTenant !== 'default' ? { tenant_id: effectiveTenant } : {}),
+            createdAt: Date.now(),
+            updatedAt: Date.now(),
+          };
+          await fanOutOrderBroadcast(env.ORDER_BROADCASTER, order.id, effectiveTenant, childEvent);
+        } catch { /* non-blocking child DO broadcast */ }
+      }
       // Inventory deduction (deductInventoryForOrder) runs once per sub-order inside runPostOrderSideEffects.
       if (sideInput) {
         try {

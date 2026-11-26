@@ -77,7 +77,7 @@ export function ReviewsError({ message }: { message: string }) {
 
 /* ─── Empty State ──────────────────────────────────────────────────── */
 
-export function ReviewsEmpty() {
+export function ReviewsEmpty({ onWriteReview }: { onWriteReview?: () => void } = {}) {
   const { t } = useTranslation();
   return (
     <div
@@ -100,6 +100,15 @@ export function ReviewsEmpty() {
       <p style={{ color: 'var(--aura-chrome-soft)' }}>
         {t('stitch.beFirstToShare', { defaultValue: 'Be the first to share your experience' })}
       </p>
+      {onWriteReview && (
+        <button
+          type="button"
+          onClick={onWriteReview}
+          className="mt-2 px-6 py-2.5 rounded-full bg-[var(--aura-chrome-bright,#d3e4ff)] text-[#0A1A2E] text-xs font-bold uppercase tracking-widest cursor-pointer"
+        >
+          {t('stitch.writeAReview', { defaultValue: 'Viết đánh giá đầu tiên' })}
+        </button>
+      )}
     </div>
   );
 }

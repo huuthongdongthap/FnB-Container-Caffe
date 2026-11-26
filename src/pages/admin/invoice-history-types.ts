@@ -1,24 +1,39 @@
 export interface InvoiceRecord {
-  id: number;
-  order_id: string;
-  erpnext_id: string;
-  erpnext_model: string;
-  sync_status: string;
-  attempts: number;
-  error_message: string | null;
+  id: number | string;
+  order_id?: string;
+  erpnext_id?: string;
+  erpnext_model?: string;
+  sync_status?: string;
+  attempts?: number;
+  error_message?: string | null;
   created_at: string;
-  last_synced_at: string;
+  last_synced_at?: string;
   customer_name: string | null;
-  total_amount: string | number | null;
-  customer_email: string | null;
-  customer_phone: string | null;
+  total_amount?: string | number | null;
+  customer_email?: string | null;
+  customer_phone?: string | null;
+  // Subscription invoice fields (`/api/subscriptions/invoices/list`)
+  subscription_id?: string;
+  invoice_number?: string | null;
+  amount_vnd?: number | null;
+  status?: string;
+  period_start?: string;
+  period_end?: string;
+  paid_at?: string | null;
+  payment_method?: string | null;
+  plan_name?: string | null;
 }
 
-export function getStatusLabel(status: string, t: (key: string) => string): string {
+export function getStatusLabel(status: string, t: (key: string, opts?: { defaultValue?: string }) => string): string {
   const LABELS: Record<string, string> = {
-    synced: t('invoices.status.synced'),
-    failed: t('invoices.status.failed'),
-    pending: t('invoices.status.pending'),
+    synced: t('invoices.status.synced', { defaultValue: 'Đã đồng bộ' }),
+    failed: t('invoices.status.failed', { defaultValue: 'Thất bại' }),
+    pending: t('invoices.status.pending', { defaultValue: 'Chờ thanh toán' }),
+    paid: t('invoices.status.paid', { defaultValue: 'Đã thanh toán' }),
+    manual: t('invoices.status.manual', { defaultValue: 'Thanh toán thủ công' }),
+    processing: t('invoices.status.processing', { defaultValue: 'Đang xử lý' }),
+    cancelled: t('invoices.status.cancelled', { defaultValue: 'Đã hủy' }),
+    canceled: t('invoices.status.cancelled', { defaultValue: 'Đã hủy' }),
   };
   return LABELS[status] || status;
 }

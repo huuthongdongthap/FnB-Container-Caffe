@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { X, AlertCircle, CheckCircle2, Clock, Wallet } from 'lucide-react';
 import { apiFetch, ApiClientError } from '@/lib/api-client';
 import { useAuthStore } from '@/hooks/stores/use-auth-store';
+import { useAdminStaffStore } from '@/hooks/stores/admin/use-admin-staff-store';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import type {
@@ -12,11 +13,10 @@ import type {
   TodayResponse,
 } from '@/hooks/stores/admin/admin-shifts-store-types';
 
-import { deriveShiftSlotLabel, formatTime } from '@/pages/admin/staff-utils';
+import { CASH_DRAWER_ROLES, deriveShiftSlotLabel, formatTime } from '@/pages/admin/staff-utils';
 
 const VND_DENOMINATIONS = [500_000, 200_000, 100_000, 50_000, 20_000, 10_000, 5_000, 2_000, 1_000] as const;
 const MANAGER_ROLES = new Set(['owner', 'manager', 'supervisor', 'admin']);
-const CASH_DRAWER_ROLES = new Set(['owner', 'admin', 'manager', 'supervisor', 'cashier', 'waiter', 'shipper']);
 
 interface ReconciliationResponse {
   success: boolean;
@@ -27,7 +27,9 @@ export interface ShiftHandoverModalProps {
   isOpen: boolean;
   onClose: () => void;
   initialShiftId?: string;
+  initialShift?: ShiftRecord;
   mode?: 'open' | 'close' | 'auto';
+  actorOverride?: { id: string; name?: string; role: string; tenantId?: string };
   onCompleted?: () => void;
 }
 
@@ -81,11 +83,15 @@ export function ShiftHandoverModal({
   isOpen,
   onClose,
   initialShiftId,
+  initialShift,
   mode = 'auto',
+  actorOverride,
   onCompleted,
 }: ShiftHandoverModalProps) {
-  const user = useAuthStore((s) => s.user);
+  const storeUser = useAuthStore((s) => s.user);
+  const user = actorOverride ?? storeUser;
   const canManage = MANAGER_ROLES.has(user?.role || '');
+  const { staff: storeStaff, fetchStaff } = useAdminStaffStore();
 
   const [loading, setLoading] = useState(false);
   const [loadingReconciliation, setLoadingReconciliation] = useState(false);
@@ -94,7 +100,9 @@ export function ShiftHandoverModal({
   const [actionError, setActionError] = useState<string | null>(null);
 
   const [todayShifts, setTodayShifts] = useState<ShiftRecord[]>([]);
+  const [suggestedOpeningFloat, setSuggestedOpeningFloat] = useState<number>(0);
   const [selectedShiftId, setSelectedShiftId] = useState<string>('');
+  const [openTargetStaffId, setOpenTargetStaffId] = useState<string>('');
   const [selectedScheduledId, setSelectedScheduledId] = useState<string>('');
   const [openingCashInput, setOpeningCashInput] = useState<string>('0');
   const [clockInNotes, setClockInNotes] = useState<string>('');
@@ -102,6 +110,8 @@ export function ShiftHandoverModal({
   const [counts, setCounts] = useState<Record<number, number>>(makeEmptyCounts);
   const [handoverNotes, setHandoverNotes] = useState<string>('');
   const [remittedCashInput, setRemittedCashInput] = useState<string>('0');
+  const [remittedTouched, setRemittedTouched] = useState<boolean>(false);
+  const [handoverToStaffId, setHandoverToStaffId] = useState<string>('');
 
   const [reconciliation, setReconciliation] = useState<ShiftReconciliationRecord | null>(null);
   const [reconciliationDisabled, setReconciliationDisabled] = useState(false);
@@ -117,6 +127,30 @@ export function ShiftHandoverModal({
 
   const submittingRef = useRef(false);
 
+  const staffOptions = useMemo(() => {
+    const map = new Map<string, { id: string; name: string; role?: string }>();
+    if (user?.id) {
+      map.set(user.id, { id: user.id, name: user.name || user.id, role: user.role });
+    }
+    for (const s of storeStaff) {
+      if (s.isActive !== false && s.id) {
+        map.set(s.id, { id: s.id, name: s.name || s.id, role: s.role });
+      }
+    }
+    for (const sh of todayShifts) {
+      if (sh.staff_id && !map.has(sh.staff_id)) {
+        map.set(sh.staff_id, {
+          id: sh.staff_id,
+          name: sh.staff_name || sh.staff_id,
+          role: sh.role ?? undefined,
+        });
+      }
+    }
+    return Array.from(map.values());
+  }, [storeStaff, todayShifts, user?.id, user?.name, user?.role]);
+
+  const effectiveOpenStaffId = canManage ? (openTargetStaffId || user?.id || '') : (user?.id || '');
+
   const scopedShifts = useMemo(() => {
     if (canManage || !user?.id) return todayShifts;
     return todayShifts.filter((s) => s.staff_id === user.id);
@@ -127,6 +161,19 @@ export function ShiftHandoverModal({
     [scopedShifts],
   );
 
+  const reconcilableShifts = useMemo(() => {
+    const list = [...activeShifts];
+    if (initialShiftId) {
+      const closedTarget =
+        scopedShifts.find((s) => s.id === initialShiftId && Boolean(s.clock_in) && Boolean(s.clock_out)) ||
+        (initialShift && initialShift.id === initialShiftId ? initialShift : undefined);
+      if (closedTarget && !list.some((s) => s.id === closedTarget.id)) {
+        list.push(closedTarget);
+      }
+    }
+    return list;
+  }, [activeShifts, initialShift, initialShiftId, scopedShifts]);
+
   const scheduledShifts = useMemo(
     () =>
       scopedShifts.filter(
@@ -135,10 +182,21 @@ export function ShiftHandoverModal({
     [scopedShifts],
   );
 
-  const selectedShift = useMemo(
-    () => activeShifts.find((s) => s.id === selectedShiftId) ?? activeShifts[0] ?? null,
-    [activeShifts, selectedShiftId],
+  const matchingOpenScheduledShifts = useMemo(
+    () => scheduledShifts.filter((s) => !effectiveOpenStaffId || s.staff_id === effectiveOpenStaffId),
+    [scheduledShifts, effectiveOpenStaffId],
   );
+
+  const selectedShift = useMemo(() => {
+    if (mode === 'open') return null;
+    if (selectedShiftId) {
+      return reconcilableShifts.find((s) => s.id === selectedShiftId) ?? null;
+    }
+    if (initialShiftId) {
+      return reconcilableShifts.find((s) => s.id === initialShiftId) ?? null;
+    }
+    return activeShifts[0] ?? null;
+  }, [activeShifts, initialShiftId, mode, reconcilableShifts, selectedShiftId]);
 
   const isOvernightShift = useMemo(() => {
     if (!selectedShift?.date) return false;
@@ -149,6 +207,12 @@ export function ShiftHandoverModal({
     () => VND_DENOMINATIONS.reduce((sum, denom) => sum + denom * (counts[denom] || 0), 0),
     [counts],
   );
+
+  const autoRemittedCash = useMemo(
+    () => Math.max(0, countedTotal - (selectedShift?.opening_cash ?? 0)),
+    [countedTotal, selectedShift?.opening_cash],
+  );
+  const effectiveRemittedInput = remittedTouched ? remittedCashInput : String(autoRemittedCash);
 
   const activeReconRequestRef = useRef(0);
   const requiresCashForShift = useCallback(
@@ -227,34 +291,61 @@ export function ShiftHandoverModal({
     setReconciliationDisabled(false);
     try {
       const res = await apiFetch<TodayResponse>('/api/shifts/today', { silent: true });
-      const rows = Array.isArray(res?.data) ? res.data : [];
-      setTodayShifts(rows);
+      const fetchedRows = Array.isArray(res?.data) ? res.data : [];
+      const mergedRows = [...fetchedRows];
+      if (initialShift && !mergedRows.some((r) => r.id === initialShift.id)) {
+        mergedRows.push(initialShift);
+      } else if (initialShiftId && mode !== 'open' && !mergedRows.some((r) => r.id === initialShiftId)) {
+        try {
+          const singleRes = await apiFetch<SingleShiftResponse>(
+            `/api/staff/shifts/${encodeURIComponent(initialShiftId)}`,
+            { silent: true },
+          );
+          if (singleRes?.data && !mergedRows.some((r) => r.id === singleRes.data.id)) {
+            mergedRows.push(singleRes.data);
+          }
+        } catch {
+          // Ignore when shift detail lookup fails
+        }
+      }
+      setTodayShifts(mergedRows);
 
-      const visible = canManage || !user?.id ? rows : rows.filter((s) => s.staff_id === user.id);
+      const suggested =
+        typeof res?.meta?.suggested_opening_cash === 'number' && Number.isFinite(res.meta.suggested_opening_cash)
+          ? Math.max(0, res.meta.suggested_opening_cash)
+          : 0;
+      setSuggestedOpeningFloat(suggested);
+
+      const visible = canManage || !user?.id ? mergedRows : mergedRows.filter((s) => s.staff_id === user.id);
       const visibleActive = visible.filter((s) => Boolean(s.clock_in) && !s.clock_out);
       const visibleScheduled = visible.filter(
         (s) => !s.clock_in && !s.clock_out && (s.attendance_state === 'scheduled' || s.status === 'scheduled'),
       );
+      const explicitTarget = initialShiftId ? visible.find((s) => s.id === initialShiftId && Boolean(s.clock_in)) : undefined;
 
       const preferred =
         mode === 'open'
           ? null
-          : (initialShiftId && visibleActive.find((s) => s.id === initialShiftId)) ||
-            visibleActive.find((s) => s.staff_id === user?.id) ||
-            visibleActive[0] ||
-            null;
+          : explicitTarget ||
+            (initialShiftId ? null : visibleActive.find((s) => s.staff_id === user?.id) || visibleActive[0] || null);
 
       if (preferred) {
         setSelectedShiftId(preferred.id);
         await fetchExistingReconciliation(preferred.id, preferred);
       } else {
         setSelectedShiftId('');
-        const ownScheduled = visibleScheduled.find((s) => s.staff_id === user?.id) ?? visibleScheduled[0];
+        const targetOpenStaff = user?.id || '';
+        setOpenTargetStaffId(targetOpenStaff);
+        const ownScheduled = visibleScheduled.find((s) => s.staff_id === targetOpenStaff) ?? null;
         setSelectedScheduledId(ownScheduled?.id ?? '');
-        setOpeningCashInput(
+        const presetFloat =
           typeof ownScheduled?.opening_cash === 'number' && Number.isFinite(ownScheduled.opening_cash)
-            ? String(ownScheduled.opening_cash)
-            : '0',
+            ? ownScheduled.opening_cash
+            : null;
+        setOpeningCashInput(
+          presetFloat !== null && (presetFloat > 0 || suggested === 0)
+            ? String(presetFloat)
+            : String(suggested),
         );
       }
     } catch (err) {
@@ -263,29 +354,37 @@ export function ShiftHandoverModal({
     } finally {
       setLoading(false);
     }
-  }, [canManage, fetchExistingReconciliation, initialShiftId, mode, user?.id]);
+  }, [canManage, fetchExistingReconciliation, initialShift, initialShiftId, mode, user?.id]);
 
   useEffect(() => {
     if (!isOpen) return;
+    if (canManage && storeStaff.length === 0) {
+      void fetchStaff();
+    }
     setCounts(makeEmptyCounts());
     setHandoverNotes('');
     setRemittedCashInput('0');
+    setRemittedTouched(false);
+    setHandoverToStaffId('');
+    setOpenTargetStaffId(user?.id || '');
     setOpeningCashInput('0');
     setClockInNotes('');
     setOpenedShift(null);
     setCompletedShift(null);
     setAmbiguousPaymentIds([]);
     void loadShifts();
-  }, [isOpen, loadShifts]);
+  }, [canManage, fetchStaff, isOpen, loadShifts, storeStaff.length, user?.id]);
 
   if (!isOpen) return null;
 
   const handleSelectActiveShift = async (shiftId: string) => {
-    const nextShift = activeShifts.find((s) => s.id === shiftId) ?? null;
+    const nextShift = reconcilableShifts.find((s) => s.id === shiftId) ?? null;
     setSelectedShiftId(shiftId);
     setCounts(makeEmptyCounts());
     setHandoverNotes('');
     setRemittedCashInput('0');
+    setRemittedTouched(false);
+    setHandoverToStaffId('');
     setPayoutAmount('');
     setPayoutReason('');
     setConfirmZeroCash(false);
@@ -303,8 +402,8 @@ export function ShiftHandoverModal({
       return;
     }
 
-    const scheduledTarget = scheduledShifts.find((s) => s.id === selectedScheduledId);
-    const targetStaffId = scheduledTarget?.staff_id || user.id;
+    const scheduledTarget = matchingOpenScheduledShifts.find((s) => s.id === selectedScheduledId);
+    const targetStaffId = scheduledTarget?.staff_id || effectiveOpenStaffId || user.id;
     const presetOpeningCash =
       typeof scheduledTarget?.opening_cash === 'number' && Number.isFinite(scheduledTarget.opening_cash)
         ? scheduledTarget.opening_cash
@@ -420,6 +519,7 @@ export function ShiftHandoverModal({
 
     try {
       let activeRecon = matchedRecon;
+      const isShiftAlreadyClosed = Boolean(selectedShift.clock_out);
 
       if (!activeRecon) {
         const denominations: CashDenominationEntry[] = VND_DENOMINATIONS.filter(
@@ -428,17 +528,20 @@ export function ShiftHandoverModal({
           denomination: denom,
           count: counts[denom] || 0,
         }));
-        let remittedCash = 0;
-        if (remittedCashInput.trim() !== '') {
-          const parsedRemitted = Number(remittedCashInput);
-          if (!Number.isFinite(parsedRemitted) || parsedRemitted < 0 || parsedRemitted > countedTotal) {
-            setActionError(
-              `Tiền nộp chủ phải nằm trong khoảng 0 đến ${countedTotal.toLocaleString('vi-VN')} ₫. / Remitted cash must be between 0 and ${countedTotal.toLocaleString('vi-VN')} ₫.`,
-            );
-            return;
-          }
-          remittedCash = parsedRemitted;
+        if (effectiveRemittedInput.trim() === '') {
+          setActionError(
+            `Tiền nộp chủ phải nằm trong khoảng 0 đến ${countedTotal.toLocaleString('vi-VN')} ₫. / Remitted cash must be between 0 and ${countedTotal.toLocaleString('vi-VN')} ₫.`,
+          );
+          return;
         }
+        const parsedRemitted = Number(effectiveRemittedInput);
+        if (!Number.isFinite(parsedRemitted) || !Number.isInteger(parsedRemitted) || parsedRemitted < 0 || parsedRemitted > countedTotal) {
+          setActionError(
+            `Tiền nộp chủ phải nằm trong khoảng 0 đến ${countedTotal.toLocaleString('vi-VN')} ₫. / Remitted cash must be between 0 and ${countedTotal.toLocaleString('vi-VN')} ₫.`,
+          );
+          return;
+        }
+        const remittedCash = parsedRemitted;
         const closingFloat = countedTotal - remittedCash;
 
         try {
@@ -451,12 +554,29 @@ export function ShiftHandoverModal({
                 denominations: { denominations },
                 remitted_cash: remittedCash,
                 closing_float: closingFloat,
+                ...(!isShiftAlreadyClosed ? { close_shift: true } : {}),
+                ...(handoverToStaffId.trim() ? { handover_to_staff_id: handoverToStaffId.trim() } : {}),
                 ...(handoverNotes.trim() ? { notes: handoverNotes.trim() } : {}),
               }),
             },
           );
           activeRecon = reconRes.data;
           setReconciliation(activeRecon);
+          if (isShiftAlreadyClosed) {
+            setCompletedShift(selectedShift);
+            onCompleted?.();
+            return;
+          }
+          if (activeRecon?.shift_closed) {
+            setCompletedShift({
+              ...selectedShift,
+              clock_out: activeRecon.clock_out || activeRecon.created_at,
+              hours_worked: activeRecon.hours_worked ?? selectedShift.hours_worked,
+              attendance_state: 'completed',
+            });
+            onCompleted?.();
+            return;
+          }
         } catch (err) {
           const info = getErrorInfo(err, 'Đối soát tiền mặt thất bại. Ca làm việc chưa được đóng.');
           if (info.status === 501 || info.code === 'PILOT_CASH_RECONCILIATION_DISABLED') {
@@ -478,6 +598,12 @@ export function ShiftHandoverModal({
           setActionError(info.message);
           return;
         }
+      }
+
+      if (isShiftAlreadyClosed) {
+        setCompletedShift(selectedShift);
+        onCompleted?.();
+        return;
       }
 
       try {
@@ -597,20 +723,44 @@ export function ShiftHandoverModal({
               </div>
 
               {reconciliation && (
-                <div className="grid grid-cols-3 gap-3 text-sm rounded-lg border border-border p-3 bg-background/50">
-                  <div>
-                    <p className="text-xs text-muted">Kỳ vọng / Expected</p>
-                    <p className="font-semibold">{formatVnd(reconciliation.expected_cash)}</p>
+                <div className="space-y-3 rounded-lg border border-border p-3 bg-background/50">
+                  <div className="grid grid-cols-3 gap-3 text-sm">
+                    <div>
+                      <p className="text-xs text-muted">Kỳ vọng / Expected</p>
+                      <p className="font-semibold">{formatVnd(reconciliation.expected_cash)}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted">Thực đếm / Actual</p>
+                      <p className="font-semibold">{formatVnd(reconciliation.actual_cash)}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted">Chênh lệch / Variance</p>
+                      <p className="font-semibold">
+                        {formatVnd(reconciliation.variance)} ({reconciliation.variance_status})
+                      </p>
+                    </div>
                   </div>
-                  <div>
-                    <p className="text-xs text-muted">Thực đếm / Actual</p>
-                    <p className="font-semibold">{formatVnd(reconciliation.actual_cash)}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-muted">Chênh lệch / Variance</p>
-                    <p className="font-semibold">
-                      {formatVnd(reconciliation.variance)} ({reconciliation.variance_status})
-                    </p>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-2 border-t border-border text-xs" data-testid="handover-summary-fields">
+                    <div>
+                      <span className="text-muted block">Tiền nộp chủ / Remitted</span>
+                      <strong>{formatVnd(reconciliation.remitted_cash ?? 0)}</strong>
+                    </div>
+                    <div>
+                      <span className="text-muted block">Quỹ ca sau / Closing Float</span>
+                      <strong>{formatVnd(reconciliation.closing_float ?? 0)}</strong>
+                    </div>
+                    <div>
+                      <span className="text-muted block">Doanh thu CK / Online</span>
+                      <strong>{formatVnd(reconciliation.online_sales_total ?? 0)}</strong>
+                    </div>
+                    <div>
+                      <span className="text-muted block">Bàn giao cho / Handover To</span>
+                      <strong>
+                        {reconciliation.handover_to_staff_id
+                          ? (staffOptions.find((m) => m.id === reconciliation.handover_to_staff_id)?.name || reconciliation.handover_to_staff_id)
+                          : '—'}
+                      </strong>
+                    </div>
                   </div>
                 </div>
               )}
@@ -634,7 +784,42 @@ export function ShiftHandoverModal({
                 </div>
               )}
 
-              {scheduledShifts.length > 0 && (
+              {canManage && staffOptions.length > 0 && (
+                <div className="space-y-1.5">
+                  <label htmlFor="handover-open-staff" className="block text-xs font-medium text-muted">
+                    Nhân viên mở ca / Target Staff
+                  </label>
+                  <select
+                    id="handover-open-staff"
+                    data-testid="handover-open-staff-select"
+                    value={effectiveOpenStaffId}
+                    onChange={(e) => {
+                      const nextStaffId = e.target.value;
+                      setOpenTargetStaffId(nextStaffId);
+                      const ownScheduled = scheduledShifts.find((s) => s.staff_id === nextStaffId) ?? null;
+                      setSelectedScheduledId(ownScheduled?.id ?? '');
+                      const presetFloat =
+                        typeof ownScheduled?.opening_cash === 'number' && Number.isFinite(ownScheduled.opening_cash)
+                          ? ownScheduled.opening_cash
+                          : null;
+                      setOpeningCashInput(
+                        presetFloat !== null && (presetFloat > 0 || suggestedOpeningFloat === 0)
+                          ? String(presetFloat)
+                          : String(suggestedOpeningFloat),
+                      );
+                    }}
+                    className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm"
+                  >
+                    {staffOptions.map((m) => (
+                      <option key={m.id} value={m.id}>
+                        {m.name}{m.role ? ` (${m.role})` : ''}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              {matchingOpenScheduledShifts.length > 0 && (
                 <div className="space-y-1.5">
                   <label htmlFor="handover-scheduled-shift" className="block text-xs font-medium text-muted">
                     Ca đã lên lịch hôm nay / Scheduled Shift (optional)
@@ -645,17 +830,21 @@ export function ShiftHandoverModal({
                     onChange={(e) => {
                       const nextId = e.target.value;
                       setSelectedScheduledId(nextId);
-                      const nextScheduled = scheduledShifts.find((s) => s.id === nextId);
-                      setOpeningCashInput(
+                      const nextScheduled = matchingOpenScheduledShifts.find((s) => s.id === nextId);
+                      const presetFloat =
                         typeof nextScheduled?.opening_cash === 'number' && Number.isFinite(nextScheduled.opening_cash)
-                          ? String(nextScheduled.opening_cash)
-                          : '0',
+                          ? nextScheduled.opening_cash
+                          : null;
+                      setOpeningCashInput(
+                        presetFloat !== null && (presetFloat > 0 || suggestedOpeningFloat === 0)
+                          ? String(presetFloat)
+                          : String(suggestedOpeningFloat),
                       );
                     }}
                     className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm"
                   >
                     <option value="">Mở ca ngoài lịch / Ad-hoc shift</option>
-                    {scheduledShifts.map((s) => (
+                    {matchingOpenScheduledShifts.map((s) => (
                       <option key={s.id} value={s.id}>
                         #{s.id} — {s.staff_name || s.staff_id} ({s.start_time || s.date})
                       </option>
@@ -665,7 +854,7 @@ export function ShiftHandoverModal({
               )}
 
               {(() => {
-                const selectedScheduled = scheduledShifts.find((s) => s.id === selectedScheduledId);
+                const selectedScheduled = matchingOpenScheduledShifts.find((s) => s.id === selectedScheduledId);
                 const presetFloat =
                   typeof selectedScheduled?.opening_cash === 'number' && Number.isFinite(selectedScheduled.opening_cash)
                     ? selectedScheduled.opening_cash
@@ -686,6 +875,11 @@ export function ShiftHandoverModal({
                       onChange={(e) => setOpeningCashInput(e.target.value)}
                       className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm disabled:opacity-60"
                     />
+                    {suggestedOpeningFloat > 0 && !openingCashLocked && (
+                      <p className="text-[11px] text-muted" data-testid="suggested-opening-float-hint">
+                        Gợi ý từ quỹ để lại ca trước / Suggested from previous closing float: {formatVnd(suggestedOpeningFloat)}
+                      </p>
+                    )}
                   </div>
                 );
               })()}
@@ -747,7 +941,13 @@ export function ShiftHandoverModal({
                         Ca qua đêm / Overnight ({selectedShift.date})
                       </Badge>
                     )}
-                    <Badge color="success">Đang mở / Active</Badge>
+                    {selectedShift.clock_out ? (
+                      <Badge color="warning" data-testid="closed-unreconciled-badge">
+                        Đã đóng — Đối soát bổ sung
+                      </Badge>
+                    ) : (
+                      <Badge color="success">Đang mở / Active</Badge>
+                    )}
                   </div>
                 </div>
                 <div className="flex flex-wrap items-center gap-4 text-xs text-muted">
@@ -817,6 +1017,28 @@ export function ShiftHandoverModal({
                       <strong>{formatVnd(reconciliation.variance)}</strong>
                     </div>
                   </div>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-2 border-t border-emerald-500/25 text-xs">
+                    <div>
+                      <span className="text-muted block">Tiền nộp chủ / Remitted</span>
+                      <strong>{formatVnd(reconciliation.remitted_cash ?? 0)}</strong>
+                    </div>
+                    <div>
+                      <span className="text-muted block">Quỹ ca sau / Closing Float</span>
+                      <strong>{formatVnd(reconciliation.closing_float ?? 0)}</strong>
+                    </div>
+                    <div>
+                      <span className="text-muted block">Doanh thu CK / Online</span>
+                      <strong>{formatVnd(reconciliation.online_sales_total ?? 0)}</strong>
+                    </div>
+                    <div>
+                      <span className="text-muted block">Bàn giao cho / Handover To</span>
+                      <strong>
+                        {reconciliation.handover_to_staff_id
+                          ? (staffOptions.find((m) => m.id === reconciliation.handover_to_staff_id)?.name || reconciliation.handover_to_staff_id)
+                          : '—'}
+                      </strong>
+                    </div>
+                  </div>
                 </div>
               ) : (
                 <div className="space-y-3">
@@ -860,8 +1082,11 @@ export function ShiftHandoverModal({
                         inputMode="numeric"
                         aria-label="Tiền nộp chủ / Remitted Cash"
                         data-testid="remitted-cash-input"
-                        value={remittedCashInput}
-                        onChange={(e) => setRemittedCashInput(e.target.value)}
+                        value={effectiveRemittedInput}
+                        onChange={(e) => {
+                          setRemittedTouched(true);
+                          setRemittedCashInput(e.target.value);
+                        }}
                         disabled={submitting || reconciliationDisabled}
                         className="w-full rounded border border-border bg-surface px-2 py-1 text-sm font-medium"
                       />
@@ -870,17 +1095,38 @@ export function ShiftHandoverModal({
                       <span className="text-muted font-medium">Tiền để lại ca sau / Closing Float</span>
                       <span className="text-sm font-semibold" data-testid="closing-float-display">
                         {(() => {
-                          if (remittedCashInput.trim() === '') {
-                            return `${countedTotal.toLocaleString('vi-VN')} ₫`;
+                          if (effectiveRemittedInput.trim() === '') {
+                            return 'Không hợp lệ / Invalid';
                           }
-                          const parsed = Number(remittedCashInput);
-                          if (!Number.isFinite(parsed) || parsed < 0 || parsed > countedTotal) {
+                          const parsed = Number(effectiveRemittedInput);
+                          if (!Number.isFinite(parsed) || !Number.isInteger(parsed) || parsed < 0 || parsed > countedTotal) {
                             return 'Không hợp lệ / Invalid';
                           }
                           return `${(countedTotal - parsed).toLocaleString('vi-VN')} ₫`;
                         })()}
                       </span>
                     </div>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label htmlFor="handover-recipient-staff" className="block text-xs font-medium text-muted">
+                      Người nhận bàn giao quỹ ca sau / Handover Recipient (optional)
+                    </label>
+                    <select
+                      id="handover-recipient-staff"
+                      data-testid="handover-recipient-select"
+                      value={handoverToStaffId}
+                      onChange={(e) => setHandoverToStaffId(e.target.value)}
+                      disabled={submitting || reconciliationDisabled}
+                      className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm"
+                    >
+                      <option value="">-- Chưa chỉ định / Unassigned --</option>
+                      {staffOptions.map((m) => (
+                        <option key={m.id} value={m.id}>
+                          {m.name}{m.role ? ` (${m.role})` : ''}
+                        </option>
+                      ))}
+                    </select>
                   </div>
                 </div>
               )}
@@ -983,7 +1229,7 @@ export function ShiftHandoverModal({
                 <Button variant="secondary" onClick={onClose} disabled={submitting}>
                   Hủy / Cancel
                 </Button>
-                {(!isCashDrawerRole || reconciliationDisabled) && (
+                {(!isCashDrawerRole || reconciliationDisabled) && !selectedShift.clock_out && (
                   <Button
                     disabled={submitting}
                     onClick={() => void handleClockOutOnly()}
@@ -1000,9 +1246,11 @@ export function ShiftHandoverModal({
                   >
                     {submitting
                       ? 'Đang xử lý...'
-                      : reconciliation
-                        ? 'Hoàn tất kết ca / Complete Clock-Out'
-                        : 'Đối soát & Kết ca / Reconcile & End Shift'}
+                      : selectedShift.clock_out
+                        ? 'Lưu đối soát bổ sung / Save Reconciliation'
+                        : reconciliation
+                          ? 'Hoàn tất kết ca / Complete Clock-Out'
+                          : 'Đối soát & Kết ca / Reconcile & End Shift'}
                   </Button>
                 )}
               </div>

@@ -15,20 +15,34 @@ export interface TicketItem {
   quantity: number;
   modifier?: string;
   notes?: string;
+  ready?: boolean;
 }
 
 export interface Ticket {
   id: string;
+  orderId?: string;
   table: string;
   type: 'DINE IN' | 'TOGO' | 'DELIVERY';
   status: TicketStatus;
   rawStatus?: string;
   isOverdue?: boolean;
   isWarning?: boolean;
+  isStale?: boolean;
+  queueRank?: number;
   items: TicketItem[];
   notes?: string;
   elapsedSeconds: number;
   totalTimeSeconds?: number;
+  readyWaitSeconds?: number;
+  blockPickupReason?: string;
+}
+
+export interface KdsRecentTicket {
+  id: string;
+  displayId: string;
+  table: string;
+  status: string;
+  itemsSummary: string;
 }
 
 export interface KdsStationOption {
@@ -38,6 +52,7 @@ export interface KdsStationOption {
 
 export interface StitchKDSNewProps {
   tickets?: Ticket[];
+  storeName?: string;
   stationName?: string;
   stationLabel?: string;
   stationLocation?: string;
@@ -53,6 +68,11 @@ export interface StitchKDSNewProps {
   onCompleteTicket?: (id: string) => void;
   onStartPrep?: (id: string) => void;
   onPickupOrder?: (id: string) => void;
+  onToggleItemReady?: (ticketId: string, itemIndex: number) => void;
+  recentTickets?: KdsRecentTicket[];
+  onRecallTicket?: (orderId: string, targetStatus?: 'preparing' | 'ready') => void;
+  onOpenRecallDrawer?: () => void;
+  onOpenShiftModal?: () => void;
   onRefresh?: () => void;
   activeFilter?: KdsFilterKey;
   onFilterChange?: (filter: KdsFilterKey) => void;
@@ -68,12 +88,4 @@ export interface FilterTab {
   key: KdsFilterKey;
   tKey: string;
   label: string;
-}
-
-/** Status badge visual configuration */
-export interface StatusBadgeConfig {
-  tKey: string;
-  bg: string;
-  text: string;
-  pulse?: boolean;
 }

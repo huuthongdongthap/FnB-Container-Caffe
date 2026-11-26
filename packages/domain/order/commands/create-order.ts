@@ -2,14 +2,22 @@
 import type { D1Database, D1PreparedStatement, KVNamespace } from '@cloudflare/workers-types';
 import { jsonResponse, errorResponse } from 'worker/src/middleware/cors';
 import { createLogger } from 'worker/src/middleware/logger';
+import { createMetricsCollector } from 'worker/src/lib/metrics-collector';
 import { createOrderSchema, paymentMethodSchema } from 'worker/src/lib/validators';
 import { assertTenantWritable } from 'worker/src/lib/saas-entitlement';
 import { isHQSuperAdmin } from 'worker/src/middleware/tenant';
-import { generateId, parseJSON } from '../model/helpers';
+import {
+  assertCashSettlementWrite,
+  isCashReconciliationActiveForTenant,
+  resolveCashCollectingShift,
+  type CashCollectingShift,
+} from '../../shift/commands/cash-settlement';
+import { generateId, generateOrderNumber, parseJSON } from '../model/helpers';
 import { calculateCheckoutSnapshot } from '../policies/checkout-snapshot';
 import { resolveOrderCreationScope, resolveOrderCreationTable, orderCreationIdempotency, OrderCreationError, type OrderCreationActor } from '../policies/order-creation-scope';
 import { runPostOrderSideEffects } from './create-order-side-effects';
 import { publishOrderEvent } from '../policies/customer-order-payload';
+import { fanOutOrderBroadcast } from '../policies/order-broadcast';
 import {
   generateOrderToken,
   hashOrderToken,
@@ -573,15 +581,84 @@ export async function createOrder(
       await rollbackPreOrderReservations();
       return errorResponse('Số tiền còn lại cho PayOS phải bằng 0đ hoặc tối thiểu 1.000đ', 400);
     }
-    const initialPaymentStatus: 'paid' | 'unpaid' = snapshot.total === 0 ? 'paid' : 'unpaid';
+    const effectiveShiftTenant =
+      tenantId && tenantId.trim() && tenantId !== '*' && tenantId.trim().toLowerCase() !== 'hq'
+        ? tenantId.trim()
+        : 'default';
+    let settledPayNow = false;
+    let payNowShift: CashCollectingShift | null = null;
+    let cashTenderedAmount: number | undefined;
+    let changeDueAmount: number | undefined;
+
+    if (validatedMethod === 'cod') {
+      if (data.cash_tendered !== undefined && snapshot.total > 0 && data.cash_tendered < snapshot.total) {
+        await rollbackPreOrderReservations();
+        return errorResponse('Số tiền khách đưa nhỏ hơn tổng thanh toán', 400);
+      }
+      if (data.pay_now === true && snapshot.total > 0) {
+        const payNowActorRole = String(actor?.role ?? '').trim().toLowerCase();
+        const isAllowedPayNowStaff = Boolean(
+          actor?.id &&
+            ['owner', 'admin', 'manager', 'supervisor', 'cashier', 'waiter', 'staff'].includes(payNowActorRole),
+        );
+        if (!isAllowedPayNowStaff) {
+          await rollbackPreOrderReservations();
+          return errorResponse('Chỉ nhân viên thu ngân mới được xác nhận thu tiền mặt ngay khi tạo đơn', 403);
+        }
+        let collecting: { shift: CashCollectingShift | null; hasShifts: boolean };
+        try {
+          collecting = await resolveCashCollectingShift(db, String(actor!.id), effectiveShiftTenant);
+        } catch {
+          await rollbackPreOrderReservations();
+          return errorResponse('Collecting shift schema requires reconciliation', 409);
+        }
+        if (collecting.shift) {
+          payNowShift = collecting.shift;
+          settledPayNow = true;
+        } else if (!collecting.hasShifts) {
+          settledPayNow = true;
+        } else {
+          const reconActive = await isCashReconciliationActiveForTenant(env, db, effectiveShiftTenant);
+          if (reconActive) {
+            await rollbackPreOrderReservations();
+            return jsonResponse(
+              {
+                success: false,
+                code: 'SHIFT_REQUIRED_FOR_CASH',
+                error: 'Cần mở ca làm việc trước khi thu tiền mặt tại quầy (SHIFT_REQUIRED_FOR_CASH)',
+              },
+              409,
+            );
+          }
+        }
+        if (settledPayNow) {
+          cashTenderedAmount = data.cash_tendered !== undefined ? Math.round(data.cash_tendered) : snapshot.total;
+          changeDueAmount = Math.max(0, cashTenderedAmount - snapshot.total);
+        }
+      } else if (snapshot.total === 0 && data.cash_tendered !== undefined) {
+        cashTenderedAmount = Math.round(data.cash_tendered);
+        changeDueAmount = Math.max(0, cashTenderedAmount);
+      }
+    }
+
+    const initialPaymentStatus: 'paid' | 'unpaid' = snapshot.total === 0 || settledPayNow ? 'paid' : 'unpaid';
+    const rawIncomingOrderNumber =
+      typeof (data as Record<string, unknown>).order_number === 'string'
+        ? String((data as Record<string, unknown>).order_number).trim()
+        : '';
+    const orderNumber = rawIncomingOrderNumber || generateOrderNumber();
     const guestOrderToken = !resolvedCustomerId ? generateOrderToken() : null;
     const guestTokenHash = guestOrderToken ? await hashOrderToken(guestOrderToken) : null;
     const responseBody = {
       success: true, data: {
-        id: orderId, status: 'pending', payment_status: initialPaymentStatus, items: snapshot.items, total: snapshot.total,
+        id: orderId, order_number: orderNumber, status: 'pending', payment_status: initialPaymentStatus, items: snapshot.items, total: snapshot.total,
         customer: { full_name: data.customer_name, phone: data.customer_phone, address: data.customer_address || null },
         customer_name: data.customer_name, customer_phone: data.customer_phone,
         customer_address: data.customer_address || null, payment_method: validatedMethod,
+        ...(validatedMethod === 'cod' ? { is_cod: 1 } : {}),
+        ...(settledPayNow ? { cod_paid_at: now } : {}),
+        ...(cashTenderedAmount !== undefined ? { cash_tendered: cashTenderedAmount } : {}),
+        ...(changeDueAmount !== undefined ? { change_due: changeDueAmount } : {}),
         shipping_fee: snapshot.shipping_fee, discount: snapshot.discount,
         ...(redeemedPoints > 0 ? { loyalty_points_redeemed: redeemedPoints } : {}),
         ...(appliedCashback > 0 ? { cashback_used: appliedCashback } : {}),
@@ -605,50 +682,66 @@ export async function createOrder(
     }
     const extraOrderCols: string[] = [];
     const extraOrderVals: unknown[] = [];
+    if (validatedMethod === 'cod') {
+      extraOrderCols.push('is_cod');
+      extraOrderVals.push(1);
+    }
+    if (settledPayNow) {
+      extraOrderCols.push('cod_paid_at');
+      extraOrderVals.push(now);
+    }
+    const loyaltyExtraOrderCols: string[] = [];
+    const loyaltyExtraOrderVals: unknown[] = [];
     if (redeemedPoints > 0) {
       extraOrderCols.push('loyalty_points_redeemed');
       extraOrderVals.push(redeemedPoints);
+      loyaltyExtraOrderCols.push('loyalty_points_redeemed');
+      loyaltyExtraOrderVals.push(redeemedPoints);
     }
     if (appliedCashback > 0) {
       extraOrderCols.push('cashback_used');
       extraOrderVals.push(appliedCashback);
+      loyaltyExtraOrderCols.push('cashback_used');
+      loyaltyExtraOrderVals.push(appliedCashback);
     }
     const extraColSql = extraOrderCols.length > 0 ? `, ${extraOrderCols.join(', ')}` : '';
     const extraPhSql = extraOrderCols.length > 0 ? `, ${extraOrderCols.map(() => '?').join(', ')}` : '';
+    const loyaltyExtraColSql = loyaltyExtraOrderCols.length > 0 ? `, ${loyaltyExtraOrderCols.join(', ')}` : '';
+    const loyaltyExtraPhSql = loyaltyExtraOrderCols.length > 0 ? `, ${loyaltyExtraOrderCols.map(() => '?').join(', ')}` : '';
     const orderInsertSql = `INSERT INTO orders (
       id, items, total, status, customer_name, customer_phone,
       customer_email, customer_address, payment_method, payment_status,
       shipping_fee, discount${extraColSql}, notes, delivery_time, table_id,
-      order_type, tip_amount, service_fee, customer_id, guest_token_hash, tenant_id, created_at, updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?${extraPhSql}, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+      order_type, tip_amount, service_fee, customer_id, guest_token_hash, tenant_id, created_at, updated_at, order_number
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?${extraPhSql}, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
     const orderInsertArgs = [
       orderId, snapshot.itemsJson, snapshot.total, 'pending', data.customer_name, data.customer_phone,
       data.customer_email || null, data.customer_address || null, validatedMethod, initialPaymentStatus,
       snapshot.shipping_fee, snapshot.discount, ...extraOrderVals, data.notes || null, data.delivery_time || 'now', resolvedTableId,
-      orderType, snapshot.tip_amount, snapshot.service_fee, resolvedCustomerId, guestTokenHash, tenantId, now, now,
+      orderType, snapshot.tip_amount, snapshot.service_fee, resolvedCustomerId, guestTokenHash, tenantId, now, now, orderNumber,
     ];
     const orderInsertNoGuestSql = `INSERT INTO orders (
       id, items, total, status, customer_name, customer_phone,
       customer_email, customer_address, payment_method, payment_status,
-      shipping_fee, discount${extraColSql}, notes, delivery_time, table_id,
+      shipping_fee, discount${loyaltyExtraColSql}, notes, delivery_time, table_id,
       order_type, tip_amount, service_fee, customer_id, tenant_id, created_at, updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?${extraPhSql}, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?${loyaltyExtraPhSql}, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
     const orderInsertNoGuestArgs = [
       orderId, snapshot.itemsJson, snapshot.total, 'pending', data.customer_name, data.customer_phone,
       data.customer_email || null, data.customer_address || null, validatedMethod, initialPaymentStatus,
-      snapshot.shipping_fee, snapshot.discount, ...extraOrderVals, data.notes || null, data.delivery_time || 'now', resolvedTableId,
+      snapshot.shipping_fee, snapshot.discount, ...loyaltyExtraOrderVals, data.notes || null, data.delivery_time || 'now', resolvedTableId,
       orderType, snapshot.tip_amount, snapshot.service_fee, resolvedCustomerId, tenantId, now, now,
     ];
     const orderInsertLegacySql = `INSERT INTO orders (
       id, items, total, status, customer_name, customer_phone,
       customer_email, customer_address, payment_method, payment_status,
-      shipping_fee, discount, notes, delivery_time, table_id,
+      shipping_fee, discount${loyaltyExtraColSql}, notes, delivery_time, table_id,
       order_type, tip_amount, service_fee, customer_id, tenant_id, created_at, updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?${loyaltyExtraPhSql}, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
     const orderInsertLegacyArgs = [
       orderId, snapshot.itemsJson, snapshot.total, 'pending', data.customer_name, data.customer_phone,
       data.customer_email || null, data.customer_address || null, validatedMethod, initialPaymentStatus,
-      snapshot.shipping_fee, snapshot.discount, data.notes || null, data.delivery_time || 'now', resolvedTableId,
+      snapshot.shipping_fee, snapshot.discount, ...loyaltyExtraOrderVals, data.notes || null, data.delivery_time || 'now', resolvedTableId,
       orderType, snapshot.tip_amount, snapshot.service_fee, resolvedCustomerId, tenantId, now, now,
     ] as const;
     statements.push(db.prepare(orderInsertSql).bind(...orderInsertArgs));
@@ -710,14 +803,49 @@ export async function createOrder(
     }
     if (validatedMethod === 'cod' && snapshot.total > 0) {
       const payId = generateId('PAY_');
+      const codPayStatus = settledPayNow ? 'completed' : 'pending';
       const scopedPayStmt = db.prepare(`INSERT INTO payments (id, order_id, method, amount, status, tenant_id, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`)
-        .bind(payId, orderId, 'cod', snapshot.total, 'pending', tenantId, now, now);
+        .bind(payId, orderId, 'cod', snapshot.total, codPayStatus, tenantId, now, now);
       statements.push(scopedPayStmt);
       noGuestHashStatements.push(scopedPayStmt);
       legacyStatements.push(db.prepare(`INSERT INTO payments (id, order_id, method, amount, status, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?, ?, ?)`)
-        .bind(payId, orderId, 'cod', snapshot.total, 'pending', now, now));
+        .bind(payId, orderId, 'cod', snapshot.total, codPayStatus, now, now));
+      if (settledPayNow && payNowShift && actor?.id) {
+        const attrStmt = db
+          .prepare(
+            `INSERT INTO cash_payment_attributions (payment_id, tenant_id, shift_id, collected_by, settled_at)
+             VALUES (?, ?, ?, ?, ?)`,
+          )
+          .bind(payId, effectiveShiftTenant, payNowShift.id, actor.id, now);
+        const shiftSalesStmt = db
+          .prepare(
+            `UPDATE staff_shifts
+             SET cash_sales = COALESCE(cash_sales, 0) + ?,
+                 total_sales = COALESCE(total_sales, 0) + ?,
+                 order_count = COALESCE(order_count, 0) + 1
+             WHERE CAST(id AS TEXT) = ? AND staff_id = ? AND clock_in = ? AND clock_out IS NULL
+               AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?
+               AND NOT EXISTS (
+                 SELECT 1 FROM shift_reconciliations r
+                 WHERE r.shift_id = ?
+                   AND COALESCE(NULLIF(TRIM(r.tenant_id), ''), 'default') = ?
+               )`,
+          )
+          .bind(
+            snapshot.total,
+            snapshot.total,
+            payNowShift.id,
+            actor.id,
+            payNowShift.clock_in,
+            effectiveShiftTenant,
+            payNowShift.id,
+            effectiveShiftTenant,
+          );
+        statements.push(attrStmt, assertCashSettlementWrite(db), shiftSalesStmt, assertCashSettlementWrite(db));
+        noGuestHashStatements.push(attrStmt, assertCashSettlementWrite(db), shiftSalesStmt, assertCashSettlementWrite(db));
+      }
     }
     if (appliedPromo) {
       // The redemption ledger row commits atomically with the order; order_id UNIQUE makes it replay-safe.
@@ -753,13 +881,17 @@ export async function createOrder(
             await db.batch(noGuestHashStatements);
           } catch (subErr) {
             const subMsg = String((subErr as Error)?.message ?? '');
-            if ((subMsg.includes('tenant_id') || subMsg.includes('customer_id') || subMsg.includes('no column named')) && (tenantId === 'default' || tenantId === '*' || subMsg.includes('order_items'))) {
+            if ((subMsg.includes('tenant_id') || subMsg.includes('customer_id') || subMsg.includes('order_number') || subMsg.includes('no column named')) && (tenantId === 'default' || tenantId === '*' || subMsg.includes('order_items') || subMsg.includes('order_number'))) {
               await db.batch(legacyStatements);
             } else {
               throw subErr;
             }
           }
-        } else if ((msg.includes('tenant_id') || msg.includes('customer_id') || msg.includes('no column named')) && (tenantId === 'default' || tenantId === '*' || msg.includes('order_items'))) {
+        } else if (
+          !payNowShift &&
+          (msg.includes('tenant_id') || msg.includes('customer_id') || msg.includes('order_number') || msg.includes('is_cod') || msg.includes('no column named') || msg.includes('no such column')) &&
+          (tenantId === 'default' || tenantId === '*' || msg.includes('order_items') || msg.includes('order_number') || msg.includes('is_cod'))
+        ) {
           await db.batch(legacyStatements);
         } else {
           throw batchErr;
@@ -861,6 +993,9 @@ export async function createOrder(
     }
     catch (error) {
       await rollbackPreOrderReservations();
+      if (/integer overflow/i.test(String(error))) {
+        return errorResponse('Ca làm việc vừa đóng hoặc đã đối soát; vui lòng làm mới và thử lại', 409);
+      }
       // A concurrent same-key request either committed the entire order or nothing.
       const saved = idem ? await findReplay() : null;
       if (saved) return replayResponse(saved, idem!.fingerprint);
@@ -894,24 +1029,35 @@ export async function createOrder(
     // Notifications and cache writes run only after commit and cannot turn success into a retryable 500.
     try {
       if (env.ORDER_BROADCASTER) {
-        const ns = env.ORDER_BROADCASTER as import('@cloudflare/workers-types').DurableObjectNamespace;
-        const doTenant = tenantId && tenantId.trim() && tenantId !== '*' ? tenantId.trim() : 'default';
-        const doChannel = doTenant !== 'default' ? `${doTenant}:${orderId}` : orderId;
-        const stub = ns.get(ns.idFromName(doChannel));
+        const doTenant = tenantId && tenantId.trim() && tenantId !== '*' && tenantId.trim().toLowerCase() !== 'hq'
+          ? tenantId.trim()
+          : 'default';
         const event = {
-          orderId, status: 'pending', payment_status: initialPaymentStatus, items: snapshot.items, total: snapshot.total,
+          orderId, order_number: orderNumber, status: 'pending', payment_status: initialPaymentStatus, items: snapshot.items, total: snapshot.total,
           customer_name: data.customer_name, customer_phone: data.customer_phone, table_id: resolvedTableId,
+          order_type: orderType,
           ...(doTenant !== 'default' ? { tenant_id: doTenant } : {}),
           createdAt: Date.now(), updatedAt: Date.now(),
         };
-        const broadcast = stub.fetch('https://do/broadcast', {
-          method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(event),
-        }).then(result => { if (!result.ok) throw new Error(`Broadcast returned ${result.status}`); })
+        const broadcast = fanOutOrderBroadcast(env.ORDER_BROADCASTER, orderId, doTenant, event)
           .catch(error => log.warn('Order broadcast failed after commit', { orderId, message: (error as Error).message }));
         if (ctx?.waitUntil) ctx.waitUntil(broadcast); else await broadcast;
       }
+      if (settledPayNow && snapshot.total > 0) {
+        try {
+          const metrics = createMetricsCollector(db);
+          const metricTask = Promise.all([
+            metrics.recordMetric('payment_success', snapshot.total, { provider: 'cod', order_id: orderId, tenant_id: orderEventTenant }),
+            metrics.recordMetric('revenue', snapshot.total, { provider: 'cod', tenant_id: orderEventTenant }),
+          ]).catch(() => {});
+          if (ctx?.waitUntil) ctx.waitUntil(metricTask);
+          else await metricTask;
+        } catch {
+          // Non-blocking metrics recording
+        }
+      }
       await runPostOrderSideEffects({
-        db, env, ctx, orderId, tenantId, data: { ...data, customer_id: resolvedCustomerId, order_type: orderType }, snapshot, validatedMethod, resolvedTableId,
+        db, env, ctx, orderId, tenantId, data: { ...data, customer_id: resolvedCustomerId, order_type: orderType }, snapshot, validatedMethod, resolvedTableId, initialPaymentStatus,
       });
     } catch (error) {
       log.warn('Order side effect failed after persistence', { orderId, message: (error as Error).message });

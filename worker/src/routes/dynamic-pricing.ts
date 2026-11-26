@@ -17,8 +17,17 @@ import type { DynamicPricingRule as DynamicPricingRuleRow } from '../types/api';
 
 const PRIVILEGED_PRICING_ROLES = new Set(['owner', 'manager', 'supervisor', 'admin']);
 
+interface PricingRequestContext {
+  env: Env;
+  req: {
+    header: (k: string) => string | undefined;
+    query: (k: string) => string | undefined;
+  };
+  get: (k: string) => unknown;
+}
+
 function verifyPricingTenant(
-  c: any,
+  c: PricingRequestContext,
   mode: 'read' | 'write' | 'delete' = 'read'
 ): { ok: true; tenantId: string } | { ok: false; status: 400 | 401 | 403; error: string } {
   const user = c.get('user' as never) as { id?: string; role?: string; tenant_id?: string; tenantId?: string } | undefined;
@@ -131,14 +140,15 @@ export function isRuleActiveAt(rule: DynamicPricingRuleRow, date: Date = new Dat
   if (!rule.is_active) return false;
   const { day, minutes } = getVietnamTime(date);
   const days = rule.days_of_week.split(',').map((d) => parseInt(d.trim(), 10));
-  if (!days.includes(day)) return false;
 
   const pad = (n: number) => String(Math.floor(n)).padStart(2, '0');
   const timeStr = `${pad(Math.floor(minutes / 60))}:${pad(minutes % 60)}`;
   if (rule.start_time <= rule.end_time) {
-    return timeStr >= rule.start_time && timeStr <= rule.end_time;
+    return days.includes(day) && timeStr >= rule.start_time && timeStr <= rule.end_time;
   }
-  return timeStr >= rule.start_time || timeStr <= rule.end_time;
+  const inOvernightWindow = timeStr >= rule.start_time || timeStr <= rule.end_time;
+  if (!inOvernightWindow) return false;
+  return timeStr >= rule.start_time ? days.includes(day) : days.includes((day + 6) % 7);
 }
 
 const calculateSchema = z.object({

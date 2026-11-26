@@ -307,6 +307,27 @@ export async function runCampaignTriggers(
 
   for (const tenantId of tenants) {
     const configMap = await loadTriggerConfigs(db, tenantId);
+    const kv = env.AUTH_KV as { get?: (k: string) => Promise<string | null> } | undefined;
+    if (kv && typeof kv.get === 'function') {
+      try {
+        let rawBdayCfg = await kv.get(`config:birthday:${tenantId}`);
+        if (!rawBdayCfg && tenantId === 'default') {
+          rawBdayCfg = await kv.get('config:birthday');
+        }
+        if (rawBdayCfg) {
+          const parsedBday = JSON.parse(rawBdayCfg) as { autoSendEnabled?: boolean };
+          if (typeof parsedBday.autoSendEnabled === 'boolean') {
+            const existing = configMap.get('birthday');
+            configMap.set('birthday', {
+              isActive: parsedBday.autoSendEnabled,
+              channels: existing?.channels ?? CHANNEL_PRIORITY.birthday.map((c) => c.channel),
+            });
+          }
+        }
+      } catch {
+        // Ignore malformed KV birthday config
+      }
+    }
     for (const { trigger, detect } of triggerDetectors) {
       const cfg = configMap.get(trigger);
       if (!cfg || !cfg.isActive) {

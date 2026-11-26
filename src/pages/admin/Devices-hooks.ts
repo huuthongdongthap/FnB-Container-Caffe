@@ -2,6 +2,17 @@ import { useState, useEffect } from 'react';
 import { apiFetch } from '@/lib/api-client';
 import type { DeviceRow, StaffOption } from './Devices-types';
 
+const ROLE_ALIASES: Record<string, string> = {
+  bep: 'kitchen',
+  rider: 'shipper',
+  phuc_vu: 'waiter',
+};
+
+function normalizeDeviceRoleForApi(rawRole: string): string {
+  const clean = rawRole.trim().toLowerCase();
+  return ROLE_ALIASES[clean] || clean;
+}
+
 export function useDevices() {
 
   const [devices, setDevices] = useState<DeviceRow[]>([]);
@@ -64,15 +75,34 @@ export function useDevices() {
     setRevokeTarget(d); setShowRevoke(true);
   };
 
+  const handleStaffIdChange = (nextStaffId: string) => {
+    setRegStaffId(nextStaffId);
+    const selected = staffList.find((s) => s.id === nextStaffId);
+    if (selected?.role) {
+      setRegRole(selected.role);
+    }
+  };
+
   const handleRegister = async (): Promise<void> => {
     if (!regStaffId || !regPin) { setRegisterError('Vui lòng chọn nhân viên và nhập PIN'); return; }
     setActionLoading(true); setRegisterError(null);
     const effectiveToken = regDeviceToken.trim() || `dev-${crypto.randomUUID().slice(0, 12)}`;
-    const effectiveRole = regRole;
+    const selectedStaff = staffList.find((s) => s.id === regStaffId);
+    const accountRole = selectedStaff?.role ? normalizeDeviceRoleForApi(selectedStaff.role) : undefined;
+    const requestedRole = regRole ? normalizeDeviceRoleForApi(regRole) : accountRole;
+    const shouldSendExplicitRole = Boolean(
+      requestedRole && (!accountRole || accountRole === 'staff' || requestedRole === accountRole)
+    );
     try {
       await apiFetch('/mobile/devices/register', {
         method: 'POST',
-        body: JSON.stringify({ device_token: effectiveToken, device_name: regDeviceName || undefined, staff_id: regStaffId, role: effectiveRole, pin: regPin }),
+        body: JSON.stringify({
+          device_token: effectiveToken,
+          device_name: regDeviceName || undefined,
+          staff_id: regStaffId,
+          ...(shouldSendExplicitRole ? { role: requestedRole } : {}),
+          pin: regPin,
+        }),
       });
       setShowRegister(false);
       refresh();
@@ -97,7 +127,7 @@ export function useDevices() {
     devices, staffList, loading, error, actionLoading,
     showRegister, setShowRegister, showRevoke, setShowRevoke, revokeTarget, setRevokeTarget,
     regDeviceToken, setRegDeviceToken, regDeviceName, setRegDeviceName,
-    regStaffId, setRegStaffId, regRole, setRegRole, regPin, setRegPin,
+    regStaffId, setRegStaffId: handleStaffIdChange, regRole, setRegRole, regPin, setRegPin,
     registerError,
     refresh, openRegister, openRevoke, handleRegister, handleRevoke,
   };

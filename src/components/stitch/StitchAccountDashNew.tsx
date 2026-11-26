@@ -30,7 +30,6 @@ import { DashLoyaltySection } from './StitchAccountDashNew-loyalty';
 import { DashFavoritesSection } from './StitchAccountDashNew-favorites';
 import { DashOrdersSection } from './StitchAccountDashNew-orders';
 import { DashMembershipCard } from './StitchAccountDashNew-membership';
-import { DashBottomNav } from './StitchAccountDashNew-footer';
 
 export function StitchAccountDashNew({
   profile: profileProp,
@@ -106,9 +105,7 @@ export function StitchAccountDashNew({
         <DashOrdersSection orders={orders} setGlassCardRef={setGlassCardRef} />
         <DashMembershipCard profile={profile} />
       </main>
-
-      {/* ═══════════════ Bottom Navigation ═══════════════ */}
-      <DashBottomNav />
+      {/* Mobile Bottom Navigation is owned exclusively by CustomerShell (MD3NavigationBar) */}
     </div>
   );
 }

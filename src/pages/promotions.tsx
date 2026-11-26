@@ -130,7 +130,7 @@ export function PromotionsPage() {
           href="/loyalty"
           className="inline-flex items-center justify-center rounded-full bg-[color:var(--aura-chrome-bright)] px-6 py-2.5 text-sm font-medium text-black transition-all hover:bg-[color:var(--aura-chrome-bright)]/90"
         >
-          Xem Chi Tiết Hạng Thẻ & Tra Cứu Ví
+          Tra cứu điểm &amp; Ví hoàn tiền
         </a>
       </div>
     </Card>

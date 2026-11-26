@@ -3,6 +3,7 @@ import type { Env } from '../../types/env';
 import { authenticateRequest } from '../../middleware/auth';
 import { getTenantId } from '../../middleware/tenant';
 import {
+  NET_ORDER_TOTAL_SQL,
   VALID_REVENUE_ORDER_ALIAS_SQL,
   VALID_REVENUE_ORDER_SQL,
   buildTenantClause,
@@ -49,10 +50,10 @@ function buildTenantFilter(tenantId: string, alias?: string, c?: Context<{ Bindi
 
 const NON_REVENUE_STATUS_SQL = VALID_REVENUE_ORDER_SQL;
 const NON_REVENUE_STATUS_FALLBACK_SQL =
-  "LOWER(TRIM(COALESCE(status, ''))) NOT IN ('cancelled', 'canceled', 'refunded', 'failed', 'rejected', 'expired')";
+  "LOWER(TRIM(COALESCE(status, ''))) IN ('completed', 'paid', 'delivered', 'served')";
 const NON_REVENUE_ORDER_ALIAS_STATUS_SQL = VALID_REVENUE_ORDER_ALIAS_SQL;
 const NON_REVENUE_ORDER_ALIAS_STATUS_FALLBACK_SQL =
-  "LOWER(TRIM(COALESCE(o.status, ''))) NOT IN ('cancelled', 'canceled', 'refunded', 'failed', 'rejected', 'expired')";
+  "LOWER(TRIM(COALESCE(o.status, ''))) IN ('completed', 'paid', 'delivered', 'served')";
 
 export async function resolveReportScope(
   c: Context<{ Bindings: Env }>
@@ -149,29 +150,44 @@ export async function handleOverview(c: Context<{ Bindings: Env }>) {
   try {
     [current, previous] = await Promise.all([
       db.prepare(`
-        SELECT COALESCE(SUM(total), 0) as revenue, COUNT(*) as orders_count
+        SELECT COALESCE(SUM(${NET_ORDER_TOTAL_SQL}), 0) as revenue, COUNT(*) as orders_count
         FROM orders
         WHERE DATE(datetime(created_at, '+7 hours')) BETWEEN ? AND ? AND ${NON_REVENUE_STATUS_SQL}${tenantClause}
       `).bind(from, to, ...tenantBinds).first<{ revenue: number; orders_count: number }>(),
       db.prepare(`
-        SELECT COALESCE(SUM(total), 0) as revenue, COUNT(*) as orders_count
+        SELECT COALESCE(SUM(${NET_ORDER_TOTAL_SQL}), 0) as revenue, COUNT(*) as orders_count
         FROM orders
         WHERE DATE(datetime(created_at, '+7 hours')) BETWEEN ? AND ? AND ${NON_REVENUE_STATUS_SQL}${tenantClause}
       `).bind(prevStart, prevEnd, ...tenantBinds).first<{ revenue: number; orders_count: number }>(),
     ]);
   } catch {
-    [current, previous] = await Promise.all([
-      db.prepare(`
-        SELECT COALESCE(SUM(total), 0) as revenue, COUNT(*) as orders_count
-        FROM orders
-        WHERE DATE(created_at) BETWEEN ? AND ? AND ${NON_REVENUE_STATUS_FALLBACK_SQL}${tenantClause}
-      `).bind(from, to, ...tenantBinds).first<{ revenue: number; orders_count: number }>(),
-      db.prepare(`
-        SELECT COALESCE(SUM(total), 0) as revenue, COUNT(*) as orders_count
-        FROM orders
-        WHERE DATE(created_at) BETWEEN ? AND ? AND ${NON_REVENUE_STATUS_FALLBACK_SQL}${tenantClause}
-      `).bind(prevStart, prevEnd, ...tenantBinds).first<{ revenue: number; orders_count: number }>(),
-    ]);
+    try {
+      [current, previous] = await Promise.all([
+        db.prepare(`
+          SELECT COALESCE(SUM(total), 0) as revenue, COUNT(*) as orders_count
+          FROM orders
+          WHERE DATE(datetime(created_at, '+7 hours')) BETWEEN ? AND ? AND ${NON_REVENUE_STATUS_SQL}${tenantClause}
+        `).bind(from, to, ...tenantBinds).first<{ revenue: number; orders_count: number }>(),
+        db.prepare(`
+          SELECT COALESCE(SUM(total), 0) as revenue, COUNT(*) as orders_count
+          FROM orders
+          WHERE DATE(datetime(created_at, '+7 hours')) BETWEEN ? AND ? AND ${NON_REVENUE_STATUS_SQL}${tenantClause}
+        `).bind(prevStart, prevEnd, ...tenantBinds).first<{ revenue: number; orders_count: number }>(),
+      ]);
+    } catch {
+      [current, previous] = await Promise.all([
+        db.prepare(`
+          SELECT COALESCE(SUM(total), 0) as revenue, COUNT(*) as orders_count
+          FROM orders
+          WHERE DATE(datetime(created_at, '+7 hours')) BETWEEN ? AND ? AND ${NON_REVENUE_STATUS_FALLBACK_SQL}${tenantClause}
+        `).bind(from, to, ...tenantBinds).first<{ revenue: number; orders_count: number }>(),
+        db.prepare(`
+          SELECT COALESCE(SUM(total), 0) as revenue, COUNT(*) as orders_count
+          FROM orders
+          WHERE DATE(datetime(created_at, '+7 hours')) BETWEEN ? AND ? AND ${NON_REVENUE_STATUS_FALLBACK_SQL}${tenantClause}
+        `).bind(prevStart, prevEnd, ...tenantBinds).first<{ revenue: number; orders_count: number }>(),
+      ]);
+    }
   }
 
   const todayRevenue = current?.revenue || 0;
@@ -234,7 +250,7 @@ export function registerGroupedSalesHandlers(app: Hono<{ Bindings: Env }>) {
     try {
       const res = await db.prepare(`
         SELECT CAST(strftime('%H', datetime(created_at, '+7 hours')) AS INTEGER) as hour,
-               COALESCE(SUM(total), 0) as value,
+               COALESCE(SUM(${NET_ORDER_TOTAL_SQL}), 0) as value,
                COUNT(*) as count
         FROM orders
         WHERE DATE(datetime(created_at, '+7 hours')) BETWEEN ? AND ? AND ${NON_REVENUE_STATUS_SQL}${tenantClause}
@@ -242,15 +258,27 @@ export function registerGroupedSalesHandlers(app: Hono<{ Bindings: Env }>) {
       `).bind(from, to, ...tenantBinds).all<{ hour: number; value: number; count: number }>();
       results = res.results || [];
     } catch {
-      const res = await db.prepare(`
-        SELECT CAST(strftime('%H', created_at) AS INTEGER) as hour,
-               COALESCE(SUM(total), 0) as value,
-               COUNT(*) as count
-        FROM orders
-        WHERE DATE(created_at) BETWEEN ? AND ? AND ${NON_REVENUE_STATUS_FALLBACK_SQL}${tenantClause}
-        GROUP BY hour ORDER BY hour
-      `).bind(from, to, ...tenantBinds).all<{ hour: number; value: number; count: number }>();
-      results = res.results || [];
+      try {
+        const res = await db.prepare(`
+          SELECT CAST(strftime('%H', datetime(created_at, '+7 hours')) AS INTEGER) as hour,
+                 COALESCE(SUM(total), 0) as value,
+                 COUNT(*) as count
+          FROM orders
+          WHERE DATE(datetime(created_at, '+7 hours')) BETWEEN ? AND ? AND ${NON_REVENUE_STATUS_SQL}${tenantClause}
+          GROUP BY hour ORDER BY hour
+        `).bind(from, to, ...tenantBinds).all<{ hour: number; value: number; count: number }>();
+        results = res.results || [];
+      } catch {
+        const res = await db.prepare(`
+          SELECT CAST(strftime('%H', datetime(created_at, '+7 hours')) AS INTEGER) as hour,
+                 COALESCE(SUM(total), 0) as value,
+                 COUNT(*) as count
+          FROM orders
+          WHERE DATE(datetime(created_at, '+7 hours')) BETWEEN ? AND ? AND ${NON_REVENUE_STATUS_FALLBACK_SQL}${tenantClause}
+          GROUP BY hour ORDER BY hour
+        `).bind(from, to, ...tenantBinds).all<{ hour: number; value: number; count: number }>();
+        results = res.results || [];
+      }
     }
 
     const resultMap = new Map((results || []).map((r) => [r.hour, r]));
@@ -291,7 +319,7 @@ export function registerGroupedSalesHandlers(app: Hono<{ Bindings: Env }>) {
     try {
       const res = await db.prepare(`
         SELECT DATE(datetime(created_at, '+7 hours')) as label,
-               COALESCE(SUM(total), 0) as value,
+               COALESCE(SUM(${NET_ORDER_TOTAL_SQL}), 0) as value,
                COUNT(*) as count
         FROM orders
         WHERE DATE(datetime(created_at, '+7 hours')) BETWEEN ? AND ? AND ${NON_REVENUE_STATUS_SQL}${tenantClause}
@@ -299,15 +327,27 @@ export function registerGroupedSalesHandlers(app: Hono<{ Bindings: Env }>) {
       `).bind(from, to, ...tenantBinds).all<GroupedSalesGroup>();
       results = res.results || [];
     } catch {
-      const res = await db.prepare(`
-        SELECT DATE(created_at) as label,
-               COALESCE(SUM(total), 0) as value,
-               COUNT(*) as count
-        FROM orders
-        WHERE DATE(created_at) BETWEEN ? AND ? AND ${NON_REVENUE_STATUS_FALLBACK_SQL}${tenantClause}
-        GROUP BY label ORDER BY label
-      `).bind(from, to, ...tenantBinds).all<GroupedSalesGroup>();
-      results = res.results || [];
+      try {
+        const res = await db.prepare(`
+          SELECT DATE(datetime(created_at, '+7 hours')) as label,
+                 COALESCE(SUM(total), 0) as value,
+                 COUNT(*) as count
+          FROM orders
+          WHERE DATE(datetime(created_at, '+7 hours')) BETWEEN ? AND ? AND ${NON_REVENUE_STATUS_SQL}${tenantClause}
+          GROUP BY label ORDER BY label
+        `).bind(from, to, ...tenantBinds).all<GroupedSalesGroup>();
+        results = res.results || [];
+      } catch {
+        const res = await db.prepare(`
+          SELECT DATE(datetime(created_at, '+7 hours')) as label,
+                 COALESCE(SUM(total), 0) as value,
+                 COUNT(*) as count
+          FROM orders
+          WHERE DATE(datetime(created_at, '+7 hours')) BETWEEN ? AND ? AND ${NON_REVENUE_STATUS_FALLBACK_SQL}${tenantClause}
+          GROUP BY label ORDER BY label
+        `).bind(from, to, ...tenantBinds).all<GroupedSalesGroup>();
+        results = res.results || [];
+      }
     }
 
     return c.json({ success: true, data: { groups: results || [] } });
@@ -362,7 +402,7 @@ export function registerGroupedSalesHandlers(app: Hono<{ Bindings: Env }>) {
           JOIN orders o ON o.id = oi.order_id
           LEFT JOIN products p ON p.id = oi.product_id AND COALESCE(NULLIF(TRIM(p.tenant_id), ''), 'default') = COALESCE(NULLIF(TRIM(o.tenant_id), ''), 'default')
           LEFT JOIN categories c ON c.id = p.category_id AND COALESCE(NULLIF(TRIM(c.tenant_id), ''), 'default') = COALESCE(NULLIF(TRIM(o.tenant_id), ''), 'default')
-          WHERE ${NON_REVENUE_ORDER_ALIAS_STATUS_FALLBACK_SQL} AND DATE(o.created_at) BETWEEN ? AND ?${tenantOrderClause}
+          WHERE ${NON_REVENUE_ORDER_ALIAS_STATUS_FALLBACK_SQL} AND DATE(datetime(o.created_at, '+7 hours')) BETWEEN ? AND ?${tenantOrderClause}
           GROUP BY COALESCE(c.name, 'Món khác') ORDER BY value DESC
         `).bind(from, to, ...tenantBinds).all<GroupedSalesGroup>();
         results = res.results || [];
@@ -379,7 +419,7 @@ export function registerGroupedSalesHandlers(app: Hono<{ Bindings: Env }>) {
               JOIN orders o ON o.id = oi.order_id
               LEFT JOIN products p ON p.id = oi.product_id
               LEFT JOIN categories c ON c.id = p.category_id
-              WHERE ${NON_REVENUE_ORDER_ALIAS_STATUS_FALLBACK_SQL} AND DATE(o.created_at) BETWEEN ? AND ?${tenantOrderClause}
+              WHERE ${NON_REVENUE_ORDER_ALIAS_STATUS_FALLBACK_SQL} AND DATE(datetime(o.created_at, '+7 hours')) BETWEEN ? AND ?${tenantOrderClause}
               GROUP BY COALESCE(c.name, 'Món khác') ORDER BY value DESC
             `).bind(from, to, ...tenantBinds).all<GroupedSalesGroup>();
             results = res.results || [];
@@ -535,7 +575,7 @@ export function registerGroupedSalesHandlers(app: Hono<{ Bindings: Env }>) {
     try {
       const res = await db.prepare(`
         SELECT LOWER(TRIM(COALESCE(NULLIF(TRIM(payment_method), ''), 'other'))) as label,
-               COALESCE(SUM(total), 0) as value,
+               COALESCE(SUM(${NET_ORDER_TOTAL_SQL}), 0) as value,
                COUNT(*) as count
         FROM orders
         WHERE DATE(datetime(created_at, '+7 hours')) BETWEEN ? AND ? AND ${NON_REVENUE_STATUS_SQL}${tenantClause}
@@ -543,15 +583,27 @@ export function registerGroupedSalesHandlers(app: Hono<{ Bindings: Env }>) {
       `).bind(from, to, ...tenantBinds).all<GroupedSalesGroup>();
       results = res.results || [];
     } catch {
-      const res = await db.prepare(`
-        SELECT LOWER(TRIM(COALESCE(NULLIF(TRIM(payment_method), ''), 'other'))) as label,
-               COALESCE(SUM(total), 0) as value,
-               COUNT(*) as count
-        FROM orders
-        WHERE DATE(created_at) BETWEEN ? AND ? AND ${NON_REVENUE_STATUS_FALLBACK_SQL}${tenantClause}
-        GROUP BY LOWER(TRIM(COALESCE(NULLIF(TRIM(payment_method), ''), 'other'))) ORDER BY value DESC
-      `).bind(from, to, ...tenantBinds).all<GroupedSalesGroup>();
-      results = res.results || [];
+      try {
+        const res = await db.prepare(`
+          SELECT LOWER(TRIM(COALESCE(NULLIF(TRIM(payment_method), ''), 'other'))) as label,
+                 COALESCE(SUM(total), 0) as value,
+                 COUNT(*) as count
+          FROM orders
+          WHERE DATE(datetime(created_at, '+7 hours')) BETWEEN ? AND ? AND ${NON_REVENUE_STATUS_SQL}${tenantClause}
+          GROUP BY LOWER(TRIM(COALESCE(NULLIF(TRIM(payment_method), ''), 'other'))) ORDER BY value DESC
+        `).bind(from, to, ...tenantBinds).all<GroupedSalesGroup>();
+        results = res.results || [];
+      } catch {
+        const res = await db.prepare(`
+          SELECT LOWER(TRIM(COALESCE(NULLIF(TRIM(payment_method), ''), 'other'))) as label,
+                 COALESCE(SUM(total), 0) as value,
+                 COUNT(*) as count
+          FROM orders
+          WHERE DATE(datetime(created_at, '+7 hours')) BETWEEN ? AND ? AND ${NON_REVENUE_STATUS_FALLBACK_SQL}${tenantClause}
+          GROUP BY LOWER(TRIM(COALESCE(NULLIF(TRIM(payment_method), ''), 'other'))) ORDER BY value DESC
+        `).bind(from, to, ...tenantBinds).all<GroupedSalesGroup>();
+        results = res.results || [];
+      }
     }
 
     return c.json({ success: true, data: { groups: results || [] } });

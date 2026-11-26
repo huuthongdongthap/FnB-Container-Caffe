@@ -385,7 +385,7 @@ describe('Phase 49 Slice AV2 — Mobile POS, Check-in, Admin Sales/Metrics/Audit
       expect(crossExportRes.status).toBe(403);
     });
 
-    it('clamps page (<= 1000) and batchSize (<= 2500), normalizes YYYY-MM-DD dateTo to end-of-day, and neutralizes | and multiline formulas in escapeCsv', async () => {
+    it('clamps page (<= 1000) and pageSize (<= 100), normalizes YYYY-MM-DD dateTo to end-of-day, and neutralizes | and multiline formulas in escapeCsv', async () => {
       const { db, executedQueries } = createStatefulSqlMock({
         auditRows: [
           {
@@ -421,8 +421,8 @@ describe('Phase 49 Slice AV2 — Mobile POS, Check-in, Admin Sales/Metrics/Audit
         (q) => q.sql.includes('SELECT * FROM audit_logs') || q.sql.includes('SELECT * FROM audit_log')
       );
       expect(auditQuery).toBeDefined();
-      expect(auditQuery?.args).toContain(2500);
-      expect(auditQuery?.args).toContain('2026-11-03T23:59:59.999Z');
+      expect(auditQuery?.args).toContain(100);
+      expect(auditQuery?.args).toContain('2026-11-03 23:59:59.999Z');
 
       // CSV helper formula injection hardening
       expect(escapeCsv('|/bin/sh')).toBe("\"'|/bin/sh\"");

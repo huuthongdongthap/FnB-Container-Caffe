@@ -1,34 +1,49 @@
 'use client';
 
 import { useTranslation } from 'react-i18next';
+import { Link, useNavigate } from 'react-router-dom';
 import { X, UtensilsCrossed, UserPlus, Medal, User } from 'lucide-react';
+import { useAuthStore } from '@/hooks/stores/use-auth-store';
 
 export function ReferralHeader() {
   const { t } = useTranslation();
+  const navigate = useNavigate();
+  const user = useAuthStore((s) => s.user);
+  const initials = (user?.name || 'AC')
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase() || '')
+    .join('') || 'AC';
+
   return (
     <header
-      className="fixed top-0 w-full z-50 bg-[var(--aura-noir-void, #050D1A)]/80 backdrop-blur-[8px] border-b border-white/10 flex justify-between items-center px-5 h-16 shadow-none"
+      className="w-full bg-[var(--aura-noir-void, #050D1A)]/80 backdrop-blur-[8px] border-b border-white/10 flex justify-between items-center px-5 h-16 shadow-none"
       role="banner"
       aria-label={t('stitch.referral.headerAria')}
     >
       <button
-       type="button"
-        className="text-[var(--aura-chrome-bright)] hover:opacity-80 transition-opacity active:scale-95 transition-transform"
-        aria-label={t('stitch.referral.closeAria')}
+        type="button"
+        onClick={() => navigate('/account')}
+        className="text-[var(--aura-chrome-bright)] hover:opacity-80 transition-opacity active:scale-95 transition-transform cursor-pointer"
+        aria-label={t('stitch.referral.closeAria', { defaultValue: 'Quay lại tài khoản' })}
       >
         <X className="h-6 w-6" />
       </button>
-      <span className="font-display text-[24px] leading-[1.2] font-medium tracking-widest text-[var(--aura-chrome-bright)]">
+      <Link
+        to="/"
+        className="font-display text-[24px] leading-[1.2] font-medium tracking-widest text-[var(--aura-chrome-bright)]"
+      >
         AURA CAFE
-      </span>
-      <div className="w-8 h-8 rounded-full overflow-hidden" style={{ border: '1px solid color-mix(in srgb, var(--aura-chrome-bright) 30%, transparent)' }}>
-        <img
-          className="w-full h-full object-cover"
-          src="/photos/IMG_6631.webp"
-          alt={t('stitch.referral.profileAvatarAlt')}
-          loading="lazy"
-        />
-      </div>
+      </Link>
+      <Link
+        to="/account"
+        aria-label={t('stitch.referral.profileAvatarAlt', { defaultValue: 'Tài khoản hội viên' })}
+        className="w-8 h-8 rounded-full flex items-center justify-center bg-white/10 text-[11px] font-bold text-[var(--aura-chrome-bright)] hover:bg-white/20 transition-colors"
+        style={{ border: '1px solid color-mix(in srgb, var(--aura-chrome-bright) 30%, transparent)' }}
+      >
+        {user ? initials : <User className="h-4 w-4" />}
+      </Link>
     </header>
   );
 }

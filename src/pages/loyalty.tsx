@@ -36,13 +36,53 @@ export function LoyaltyPage({
   const user = useAuthStore((s) => s.user);
   const isAuthenticated = !!user;
 
+  const [checkinError, setCheckinError] = useState<string | null>(null);
+  const [checkedInToday, setCheckedInToday] = useState(false);
+  const [birthdayOffer, setBirthdayOffer] = useState<{
+    eligible: boolean;
+    discountPercent: number;
+    rewardType: string;
+    isBirthdayToday?: boolean;
+    redeemed?: boolean;
+    redeemedMessage?: string | null;
+  } | null>(null);
+
   useEffect(() => {
     if (isAuthenticated) {
       void store.fetchLoyalty();
       void useReferralStore.getState().fetchReferralData();
+      if (user?.id) {
+        apiFetch<{
+          success?: boolean;
+          data?: {
+            eligible?: boolean;
+            discount_percent?: number;
+            reward_type?: string;
+            is_birthday_today?: boolean;
+          };
+        }>(`/api/loyalty/birthday/check?customer_id=${encodeURIComponent(user.id)}`, { silent: true })
+          .then((res) => {
+            if (res?.data?.eligible) {
+              setBirthdayOffer({
+                eligible: true,
+                discountPercent: Number(res.data.discount_percent ?? 15),
+                rewardType: String(res.data.reward_type ?? 'discount'),
+                isBirthdayToday: Boolean(res.data.is_birthday_today),
+              });
+            } else {
+              setBirthdayOffer(null);
+            }
+          })
+          .catch(() => {
+            setBirthdayOffer(null);
+          });
+      }
+    } else {
+      setBirthdayOffer(null);
+      void store.fetchPublicCatalog();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isAuthenticated]);
+  }, [isAuthenticated, user?.id]);
 
   const resolveTierString = (val: unknown, fallback = 'bronze'): string => {
     if (typeof val === 'string' && val.trim()) return val.trim();
@@ -70,8 +110,6 @@ export function LoyaltyPage({
   const storeLoading = store.loading;
   const storeReferralCode = useReferralStore((s) => s.referralCode);
   const referralCode = propReferralCode ?? storeReferralCode ?? '';
-  const [checkinError, setCheckinError] = useState<string | null>(null);
-  const [checkedInToday, setCheckedInToday] = useState(false);
 
   const checkinDays = useMemo<Record<string, boolean>>(() => {
     if (propCheckinDays) return propCheckinDays;
@@ -107,7 +145,7 @@ export function LoyaltyPage({
   const hasExplicitProps = propPoints !== undefined || propRewards !== undefined || propHistory !== undefined;
   const activeTierLadder = store.tierLadder.length > 0
     ? store.tierLadder
-    : (isAuthenticated || hasExplicitProps ? getDefaultLoyaltyData(t).tierLadder : []);
+    : getDefaultLoyaltyData(t).tierLadder;
   const normalizedTier = (tier || 'bronze').toLowerCase();
   const sortedTiers = [...activeTierLadder].sort((a, b) => a.min_points - b.min_points);
   const currentTierIdx = Math.max(
@@ -247,6 +285,27 @@ export function LoyaltyPage({
     }
   };
 
+  const handleClaimBirthday = async () => {
+    if (!user?.id || !birthdayOffer) return;
+    try {
+      await apiFetch('/api/loyalty/birthday/redeem', {
+        method: 'POST',
+        body: JSON.stringify({ customer_id: user.id }),
+      });
+      setBirthdayOffer((prev) =>
+        prev
+          ? {
+              ...prev,
+              redeemed: true,
+              redeemedMessage: 'Đã ghi nhận ưu đãi sinh nhật! Vui lòng báo nhân viên tại quầy hoặc thanh toán đơn hàng.',
+            }
+          : null,
+      );
+    } catch (err) {
+      setCheckinError(err instanceof Error ? err.message : 'Không thể nhận ưu đãi sinh nhật lúc này.');
+    }
+  };
+
   const dashboardData: LoyaltyDashboardData = {
     tierName: formattedTier,
     memberSince: memberSinceYear,
@@ -262,6 +321,14 @@ export function LoyaltyPage({
     streakDays: streakDays,
     tierBenefits: tierBenefits,
     tierLadder: resolvedTierLadder,
+    isGuest: !isAuthenticated && !hasExplicitProps,
+    cashbackBalance: store.cashbackBalance,
+    cashbackRate: store.cashbackRate,
+    cashbackTotalEarned: store.cashbackTotalEarned,
+    cashbackTotalSpent: store.cashbackTotalSpent,
+    cashbackExpiring7d: store.cashbackExpiring7d,
+    cashbackHistory: store.cashbackHistory,
+    birthdayOffer,
   };
 
   return (
@@ -291,9 +358,16 @@ export function LoyaltyPage({
           lastRedeemedVoucher={store.lastRedeemedVoucher}
           onDismissVoucherBanner={store.clearLastRedeemedVoucher}
           onRedeemPoints={handleRedeemPointsScroll}
-          onClaimReward={(rewardId) => { void store.redeemReward(rewardId); }}
+          onClaimReward={(rewardId) => {
+            if (!isAuthenticated) {
+              if (typeof window !== 'undefined') window.location.assign('/account');
+              return;
+            }
+            void store.redeemReward(rewardId);
+          }}
           onCheckIn={handleCheckIn}
           onShareReferral={handleShareReferral}
+          onClaimBirthday={handleClaimBirthday}
         />
       </div>
     </>

@@ -12,15 +12,16 @@ export default function ContactNew() {
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    if (!formData.name || !formData.contact) return;
-    setSubmitted(true);
+    if (!formData.name.trim() || !formData.contact.trim() || !formData.message.trim()) return;
     try {
       await submitContact(
         formData.name.trim(),
         formData.contact.trim(),
         formData.message.trim(),
       );
-      if (useContactStore.getState().error) {
+      if (!useContactStore.getState().error) {
+        setSubmitted(true);
+      } else {
         setSubmitted(false);
       }
     } catch {

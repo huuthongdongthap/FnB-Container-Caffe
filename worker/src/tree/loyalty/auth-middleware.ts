@@ -2,7 +2,7 @@
 
 import type { MiddlewareHandler } from 'hono';
 import type { Env } from '../../types/env';
-import { verifyJWT } from '../../lib/jwt';
+import { cookieWriteBlockReason, getAuthToken, verifyJWT } from '../../lib/jwt';
 import { isStaffRole } from '../../lib/staff-session';
 import { resolvePilotStore, PilotStoreError } from '../../lib/pilot-store';
 import type { Customer } from '../../types/models';
@@ -18,10 +18,23 @@ export const authCustomer: MiddlewareHandler<{ Bindings: Env }> = async(c, next)
     return;
   }
   const auth = c.req.header('Authorization');
-  if (!auth || !auth.startsWith('Bearer ')) {
+  if (relPath === '/rewards' && c.req.method === 'GET' && !auth && (!c.req.raw || !getAuthToken(c.req.raw))) {
+    await next();
+    return;
+  }
+  let token: string | null = null;
+  if (auth && auth.startsWith('Bearer ')) {
+    token = auth.substring(7);
+  } else if (!auth && c.req.raw) {
+    const csrfReason = cookieWriteBlockReason(c.req.method, c.req.raw);
+    if (csrfReason) {
+      return c.json({ success: false, code: 'CSRF_TOKEN_REQUIRED', error: csrfReason }, 403);
+    }
+    token = getAuthToken(c.req.raw);
+  }
+  if (!token) {
     return c.json({ success: false, error: 'Unauthorized' }, 401);
   }
-  const token = auth.substring(7);
   if (c.env.AUTH_KV) {
     try {
       const revoked = await c.env.AUTH_KV.get(`revoked:${token}`);
@@ -269,10 +282,19 @@ export const authCustomer: MiddlewareHandler<{ Bindings: Env }> = async(c, next)
 
 export const authStaff: MiddlewareHandler<{ Bindings: Env }> = async (c, next) => {
   const auth = c.req.header('Authorization');
-  if (!auth || !auth.startsWith('Bearer ')) {
+  let token: string | null = null;
+  if (auth && auth.startsWith('Bearer ')) {
+    token = auth.substring(7);
+  } else if (!auth && c.req.raw) {
+    const csrfReason = cookieWriteBlockReason(c.req.method, c.req.raw);
+    if (csrfReason) {
+      return c.json({ success: false, code: 'CSRF_TOKEN_REQUIRED', error: csrfReason }, 403);
+    }
+    token = getAuthToken(c.req.raw);
+  }
+  if (!token) {
     return c.json({ success: false, error: 'Unauthorized' }, 401);
   }
-  const token = auth.substring(7);
   const payload = await verifyJWT(token, c.env.JWT_SECRET);
   if (!payload) {
     return c.json({ success: false, error: 'Token không hợp lệ' }, 401);

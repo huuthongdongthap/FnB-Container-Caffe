@@ -134,7 +134,7 @@ describe('Order Persistence Tamper & Schema Validation', () => {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        customer_name: 'Khách Vãng Lai',
+        customer_name: 'Nguyễn Văn A',
         customer_phone: '0904445566',
         fulfillment_type: 'DELIVERY',
         delivery_address: '123 Đường Hoa, Sa Đéc',

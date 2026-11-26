@@ -34,16 +34,42 @@ export const useContactStore = create<ContactState>((set) => ({
   error: null,
 
   submitContact: async (name, phone, message, email) => {
-    // Client-side validation
-    const nameErr = validateRequired(name, 'Tên');
-    const phoneErr = validateRequired(phone, 'Số điện thoại');
+    const trimmedName = name.trim();
+    const rawContact = phone.trim();
+    const explicitEmail = (email || '').trim();
+    const isCombinedEmail = rawContact.includes('@') && !explicitEmail;
+    const resolvedPhone = isCombinedEmail ? '' : rawContact;
+    const resolvedEmail = isCombinedEmail ? rawContact : explicitEmail;
+
+    const nameErr = validateRequired(trimmedName, 'Tên');
+    const contactErr = !resolvedPhone && !resolvedEmail
+      ? 'Số điện thoại hoặc email không được để trống'
+      : null;
     const msgErr = validateRequired(message, 'Nội dung');
 
-    if (nameErr || phoneErr || msgErr) {
+    if (nameErr || contactErr || msgErr) {
       set({
         submitted: false,
         loading: false,
-        error: nameErr || phoneErr || msgErr || 'Vui lòng điền đầy đủ thông tin',
+        error: nameErr || contactErr || msgErr || 'Vui lòng điền đầy đủ thông tin',
+      });
+      return;
+    }
+
+    if (resolvedEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(resolvedEmail)) {
+      set({
+        submitted: false,
+        loading: false,
+        error: 'Địa chỉ email không hợp lệ',
+      });
+      return;
+    }
+
+    if (resolvedPhone && (resolvedPhone.replace(/\s+/g, '').length < 8 || resolvedPhone.replace(/\s+/g, '').length > 15)) {
+      set({
+        submitted: false,
+        loading: false,
+        error: 'Số điện thoại không hợp lệ (8–15 ký tự)',
       });
       return;
     }
@@ -51,15 +77,17 @@ export const useContactStore = create<ContactState>((set) => ({
     set({ loading: true, error: null, submitted: false });
     try {
       const body: Record<string, string> = {
-        name: name.trim(),
-        phone: phone.trim(),
+        name: trimmedName,
         content: message.trim(),
       };
-      if (email?.trim()) {
-        body.email = email.trim();
+      if (resolvedPhone) {
+        body.phone = resolvedPhone.replace(/\s+/g, '');
+      }
+      if (resolvedEmail) {
+        body.email = resolvedEmail;
       }
 
-      await apiFetch<any>('/api/contact', {
+      await apiFetch<{ success?: boolean; message?: string; id?: string | number }>('/api/contact', {
         method: 'POST',
         body: JSON.stringify(body),
       });

@@ -98,7 +98,7 @@ function createMockD1(config: {
             return { results: config.topCustomers ?? [] };
           }
           // Export — all customers
-          if (sql.includes('ORDER BY created_at')) {
+          if (sql.includes('ORDER BY created_at') || sql.includes('ORDER BY c.created_at')) {
             return { results: config.allCustomers ?? [] };
           }
           return { results: [] };

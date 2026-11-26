@@ -201,40 +201,100 @@ const DEFAULT_BIRTHDAY_CONFIG = {
   autoSendEnabled: true,
 };
 
-function checkBirthdayWindow(
+const ICT_OFFSET_MS = 7 * 3600 * 1000;
+
+export function getIctCalendarParts(date: Date): { year: number; month: number; day: number } {
+  const safe = Number.isNaN(date.getTime()) ? new Date() : date;
+  const ict = new Date(safe.getTime() + ICT_OFFSET_MS);
+  return {
+    year: ict.getUTCFullYear(),
+    month: ict.getUTCMonth(),
+    day: ict.getUTCDate(),
+  };
+}
+
+function parseBirthdayMonthDay(birthdayStr: string): { month: number; day: number } | null {
+  const trimmed = String(birthdayStr || '').trim();
+  if (!trimmed) return null;
+  const isoMatch = /^(\d{4})-(\d{1,2})-(\d{1,2})/.exec(trimmed);
+  if (isoMatch) {
+    const m = Number(isoMatch[2]) - 1;
+    const d = Number(isoMatch[3]);
+    if (m >= 0 && m <= 11 && d >= 1 && d <= 31) {
+      return { month: m, day: d };
+    }
+  }
+  const parsed = new Date(trimmed);
+  if (Number.isNaN(parsed.getTime())) return null;
+  return { month: parsed.getUTCMonth(), day: parsed.getUTCDate() };
+}
+
+export function checkBirthdayWindow(
   birthdayStr: string,
   today: Date,
   earlyWindowDays: number,
   lateWindowDays: number
-): { validDate: boolean; isEligible: boolean; isBirthdayDay: boolean; daysOffset: number } {
-  const birthday = new Date(birthdayStr);
-  if (Number.isNaN(birthday.getTime())) {
-    return { validDate: false, isEligible: false, isBirthdayDay: false, daysOffset: 0 };
+): {
+  validDate: boolean;
+  isEligible: boolean;
+  isBirthdayDay: boolean;
+  daysOffset: number;
+  cycleYear: number;
+  cycleStart: string;
+} {
+  const parsedBd = parseBirthdayMonthDay(birthdayStr);
+  const ictToday = getIctCalendarParts(today);
+  if (!parsedBd) {
+    return {
+      validDate: false,
+      isEligible: false,
+      isBirthdayDay: false,
+      daysOffset: 0,
+      cycleYear: ictToday.year,
+      cycleStart: `${ictToday.year}-01-01`,
+    };
   }
-  const bMonth = birthday.getMonth();
-  const bDate = birthday.getDate();
-  const isBirthdayDay = today.getMonth() === bMonth && today.getDate() === bDate;
-  const todayUtc = Date.UTC(today.getFullYear(), today.getMonth(), today.getDate());
+  const { month: bMonth, day: bDate } = parsedBd;
+  const isLeapYear = (yr: number) => (yr % 4 === 0 && yr % 100 !== 0) || yr % 400 === 0;
+  const resolveDayForYear = (yr: number) => (bMonth === 1 && bDate === 29 && !isLeapYear(yr) ? 28 : bDate);
+
+  const todayEffDay = resolveDayForYear(ictToday.year);
+  const isBirthdayDay = ictToday.month === bMonth && ictToday.day === todayEffDay;
+  const todayUtc = Date.UTC(ictToday.year, ictToday.month, ictToday.day);
   const MS_PER_DAY = 86400000;
   let isEligible = false;
   let closestDiff = Number.POSITIVE_INFINITY;
+  let cycleYear = ictToday.year;
+
   for (const yearOffset of [-1, 0, 1]) {
-    const candidateUtc = Date.UTC(today.getFullYear() + yearOffset, bMonth, bDate);
+    const candidateYear = ictToday.year + yearOffset;
+    const effDay = resolveDayForYear(candidateYear);
+    const candidateUtc = Date.UTC(candidateYear, bMonth, effDay);
     const dayDiff = Math.round((todayUtc - candidateUtc) / MS_PER_DAY);
     if (Math.abs(dayDiff) < Math.abs(closestDiff)) {
       closestDiff = dayDiff;
+      cycleYear = candidateYear;
     }
     if (dayDiff >= -earlyWindowDays && dayDiff <= lateWindowDays) {
       isEligible = true;
       closestDiff = dayDiff;
+      cycleYear = candidateYear;
       break;
     }
   }
+
+  const anchorDay = resolveDayForYear(cycleYear);
+  const anchorUtcMs = Date.UTC(cycleYear, bMonth, anchorDay);
+  const cycleStartMs = anchorUtcMs - Math.max(earlyWindowDays + 2, 45) * MS_PER_DAY;
+  const cycleStart = new Date(cycleStartMs).toISOString().slice(0, 10);
+
   return {
     validDate: true,
     isEligible,
     isBirthdayDay,
     daysOffset: Number.isFinite(closestDiff) ? closestDiff : 0,
+    cycleYear,
+    cycleStart,
   };
 }
 
@@ -398,18 +458,17 @@ birthdayRouter.get('/check', async(c) => {
     const rewardType = freeItemEnabled ? 'free_item_or_discount' : 'discount';
 
     const today = new Date();
-    const { isEligible, isBirthdayDay, daysOffset } = checkBirthdayWindow(
+    const { isEligible, isBirthdayDay, daysOffset, cycleStart } = checkBirthdayWindow(
       customer.birthday,
       today,
       earlyWindowDays,
       lateWindowDays
     );
 
-    // Check if already redeemed this year
-    const yearStart = `${today.getFullYear()}-01-01`;
+    // Check if already redeemed within this customer's birthday cycle
     let redeemed = await db.prepare(
       'SELECT id FROM birthday_redemptions WHERE customer_id = ? AND redeemed_at >= ?'
-    ).bind(customer.id, yearStart).first<{ id: string; tenant_id?: string | null }>();
+    ).bind(customer.id, cycleStart).first<{ id: string; tenant_id?: string | null }>();
 
     if (redeemed && checkTenant !== '*') {
       const fullRedemption = ('tenant_id' in redeemed && redeemed.tenant_id !== undefined)
@@ -418,7 +477,7 @@ birthdayRouter.get('/check', async(c) => {
       if (!fullRedemption || !matchesTenantRow(fullRedemption as unknown as Record<string, unknown>, checkTenant)) {
         const scopedRedemption = await db.prepare(
           "SELECT id, tenant_id FROM birthday_redemptions WHERE customer_id = ? AND redeemed_at >= ? AND (COALESCE(NULLIF(tenant_id, ''), 'default') = ? OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?3)"
-        ).bind(customer.id, yearStart, checkTenant).first<{ id: string; tenant_id?: string | null }>().catch(() => null);
+        ).bind(customer.id, cycleStart, checkTenant).first<{ id: string; tenant_id?: string | null }>().catch(() => null);
         redeemed = scopedRedemption && matchesTenantRow(scopedRedemption as unknown as Record<string, unknown>, checkTenant) ? scopedRedemption : null;
       }
     }
@@ -682,8 +741,8 @@ birthdayRouter.post(
 
   const effectiveTenant =
     (tenantId && tenantId !== '*' ? tenantId : (customer.tenant_id || matchedOrderTenant)) || 'default';
-  const currentYear = today.getFullYear();
-  const yearStart = `${currentYear}-01-01`;
+  const currentYear = windowCheck.cycleYear;
+  const cycleStart = windowCheck.cycleStart;
   const lockKey = `${tenantId}:${customer.id}:${currentYear}`;
   const effectiveLockKey = `${effectiveTenant}:${customer.id}:${currentYear}`;
   if (inFlightBirthdayRedemptions.has(lockKey) || inFlightBirthdayRedemptions.has(effectiveLockKey)) {
@@ -695,7 +754,7 @@ birthdayRouter.post(
   try {
     let redeemed = await db.prepare(
       'SELECT id FROM birthday_redemptions WHERE customer_id = ? AND redeemed_at >= ?'
-    ).bind(customer.id, yearStart).first<{ id: string; tenant_id?: string | null }>();
+    ).bind(customer.id, cycleStart).first<{ id: string; tenant_id?: string | null }>();
 
     if (redeemed && effectiveTenant !== '*') {
       const fullRedemption = ('tenant_id' in redeemed && redeemed.tenant_id !== undefined)
@@ -704,7 +763,7 @@ birthdayRouter.post(
       if (!fullRedemption || !matchesTenantRow(fullRedemption as unknown as Record<string, unknown>, effectiveTenant)) {
         const scopedRedemption = await db.prepare(
           "SELECT id, tenant_id FROM birthday_redemptions WHERE customer_id = ? AND redeemed_at >= ? AND (COALESCE(NULLIF(tenant_id, ''), 'default') = ? OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?3)"
-        ).bind(customer.id, yearStart, effectiveTenant).first<{ id: string; tenant_id?: string | null }>().catch(() => null);
+        ).bind(customer.id, cycleStart, effectiveTenant).first<{ id: string; tenant_id?: string | null }>().catch(() => null);
         redeemed = scopedRedemption && matchesTenantRow(scopedRedemption as unknown as Record<string, unknown>, effectiveTenant) ? scopedRedemption : null;
       }
     }

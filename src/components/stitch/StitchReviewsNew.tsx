@@ -89,7 +89,7 @@ export function StitchReviewsNew({
   if (!data || data.reviews.length === 0) {
     return (
       <div className="flex min-h-screen items-center justify-center p-6" style={{ backgroundColor: 'var(--aura-surface-container)' }}>
-        <ReviewsEmpty />
+        <ReviewsEmpty onWriteReview={onWriteReview} />
       </div>
     );
   }

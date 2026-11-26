@@ -1066,7 +1066,8 @@ describe('Full Security Audit Acceptance — KDS Surfaces & Collection Guards', 
       const notifB = await app.fetch(new Request('http://localhost/api/admin/notification-settings', { headers: bHeaders }), env);
       expect(notifB.status).toBe(200);
       const notifBBody: any = await notifB.json();
-      expect(notifBBody.autoNotifyNewOrder).toBe(false);
+      expect(notifBBody.autoNotifyNewOrder).toBe(true);
+      expect(notifBBody.soundAlerts).toBe(false);
 
       const stuckB = await app.fetch(new Request('http://localhost/api/admin/payments/stuck', { headers: bHeaders }), env);
       expect(stuckB.status).toBe(200);
@@ -6192,7 +6193,7 @@ describe('Full Security Audit Acceptance — KDS Surfaces & Collection Guards', 
       expect(validScopedJson.data.discount).toBe(20000);
       expect(validScopedJson.data.finalTotal).toBe(80000);
 
-      // AG3: KDS cancellation restores reserved inventory, and KDS station filter isolates kitchen_stations by tenant
+      // AG3: KDS pre-prep cancellation restores reserved inventory; post-prep cancellation records waste spoilage
       sql.prepare(
         `INSERT INTO inventory_items (id, code, name, current_stock, quantity, is_active, updated_at)
          VALUES ('inv-ag-1', 'MILK-AG', 'Fresh Milk', 8, 8, 1, ?)`
@@ -6203,7 +6204,7 @@ describe('Full Security Audit Acceptance — KDS Surfaces & Collection Guards', 
       ).run(nowIso);
       sql.prepare(
         `INSERT INTO orders (id, items, total, subtotal, status, customer_id, tenant_id, created_at, updated_at)
-         VALUES ('ord-ag-kds-cancel', '[]', 50000, 50000, 'preparing', 'cust-ag-validbday', 'default', ?, ?)`
+         VALUES ('ord-ag-kds-cancel', '[]', 50000, 50000, 'confirmed', 'cust-ag-validbday', 'default', ?, ?)`
       ).run(nowIso, nowIso);
 
       const kdsCancelResult = await executeKdsStatusTransition(db, 'ord-ag-kds-cancel', 'cancelled', 'manager', {
@@ -8586,7 +8587,8 @@ describe('Phase 48 (AU1..AU4) — Loyalty Tiers/Phone Auth/Referral Reversal, Mo
     const { resolveAnalyticsTenant } = await import('../../tree/analytics/summary');
     const { escapeCsvField } = await import('../../tree/analytics/csv-export');
 
-    expect(metricsHandlersSrc).toContain("status IN ('paid', 'Confirmed', 'preparing', 'ready', 'completed')");
+    expect(metricsHandlersSrc).toContain("'confirmed'");
+    expect(metricsHandlersSrc).not.toContain("'Confirmed'");
     expect(metricsHandlersSrc).toContain("COALESCE(payment_status, '') = 'refunded'");
     expect(summaryHandlersSrc).toContain('resolveAnalyticsTenant');
     expect(exportHandlersSrc).toContain("const EXPORT_ALLOWED_ROLES = new Set(['owner', 'manager', 'admin']);");

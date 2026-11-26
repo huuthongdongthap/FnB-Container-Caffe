@@ -51,3 +51,14 @@ export interface RedeemedVoucher {
   discountType?: string;
   discountValue?: number;
 }
+
+export interface CashbackTransactionEntry {
+  id: string;
+  type: string;
+  amount: number;
+  balanceAfter: number;
+  orderId: string | null;
+  expiresAt: string | null;
+  description: string;
+  createdAt: string;
+}

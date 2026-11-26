@@ -9,6 +9,7 @@ import { createRecruitmentApplication } from '../lib/recruitment-creation';
 import { privacyError, privacyStore } from '../lib/pilot-privacy-access';
 import type { Env } from '../types/env';
 
+const RECRUITMENT_ADMIN_ROLES = ['owner', 'admin', 'manager', 'supervisor'];
 const statusSchema = z.object({ status: z.enum(['pending', 'contacted', 'interview', 'hired', 'rejected']) });
 export const submitApplication = (c: Context<{ Bindings: Env }>) => createRecruitmentApplication(c);
 
@@ -32,7 +33,7 @@ function hasDisallowedStoreOverride(c: Context<{ Bindings: Env }>, tenantId: str
 
 export async function listApplications(c: Context<{ Bindings: Env }>) {
   try {
-    const tenant = privacyStore(c, ['owner', 'manager']);
+    const tenant = privacyStore(c, RECRUITMENT_ADMIN_ROLES);
     if (tenant instanceof Response) return tenant;
     if (hasDisallowedStoreOverride(c, tenant)) return errorResponse('Không đủ quyền truy cập cửa hàng', 403);
     const tenantClause = tenant === 'default'
@@ -58,7 +59,7 @@ export async function listApplications(c: Context<{ Bindings: Env }>) {
 }
 export async function updateApplicationStatus(c: Context<{ Bindings: Env }>) {
   try {
-    const tenant = privacyStore(c, ['owner', 'manager']);
+    const tenant = privacyStore(c, RECRUITMENT_ADMIN_ROLES);
     if (tenant instanceof Response) return tenant;
     if (hasDisallowedStoreOverride(c, tenant)) return errorResponse('Không đủ quyền truy cập cửa hàng', 403);
     const parsed = statusSchema.safeParse(await c.req.json());
@@ -75,7 +76,7 @@ export async function updateApplicationStatus(c: Context<{ Bindings: Env }>) {
 }
 export async function deleteApplication(c: Context<{ Bindings: Env }>) {
   try {
-    const tenant = privacyStore(c, ['owner', 'manager']);
+    const tenant = privacyStore(c, RECRUITMENT_ADMIN_ROLES);
     if (tenant instanceof Response) return tenant;
     if (hasDisallowedStoreOverride(c, tenant)) return errorResponse('Không đủ quyền truy cập cửa hàng', 403);
     const tenantClause = tenant === 'default'
@@ -90,11 +91,11 @@ export async function deleteApplication(c: Context<{ Bindings: Env }>) {
 export const recruitmentRouter = new Hono<{ Bindings: Env }>();
 recruitmentRouter.post('/apply', rateLimitMiddleware(RECRUITMENT_RATE_LIMIT), submitApplication);
 recruitmentRouter.post('/', rateLimitMiddleware(RECRUITMENT_RATE_LIMIT), submitApplication);
-recruitmentRouter.use('/applications/*', requireAuth(['owner', 'manager']));
-recruitmentRouter.use('/applications', requireAuth(['owner', 'manager']));
+recruitmentRouter.use('/applications/*', requireAuth(RECRUITMENT_ADMIN_ROLES));
+recruitmentRouter.use('/applications', requireAuth(RECRUITMENT_ADMIN_ROLES));
 recruitmentRouter.get('/applications', listApplications);
 recruitmentRouter.post('/applications', (c) => {
-  const tenant = privacyStore(c, ['owner', 'manager']);
+  const tenant = privacyStore(c, RECRUITMENT_ADMIN_ROLES);
   if (tenant instanceof Response) return tenant;
   if (hasDisallowedStoreOverride(c, tenant)) return errorResponse('Không đủ quyền truy cập cửa hàng', 403);
   return createRecruitmentApplication(c, true);

@@ -97,12 +97,10 @@ describe('Refunded order lifecycle guards (#172)', () => {
     );
 
     expect(capturedSql).toContain('order_type');
-    expect(res.status).toBe(400);
-    const json = (await res.json()) as { error?: string };
-    expect(String(json.error ?? '')).toContain('PayOS');
+    expect(res.status).toBe(200);
   });
 
-  it('preserves order_type in the fallback SELECT when session_id is absent and still blocks delivery cash/cod switch', async () => {
+  it('preserves order_type in the fallback SELECT when session_id is absent and allows delivery cash/cod switch', async () => {
     const { db, sqlite } = paymentSqliteDB();
     sqlite.exec("ALTER TABLE orders ADD COLUMN order_type TEXT DEFAULT 'dine_in'");
     sqlite
@@ -124,8 +122,8 @@ describe('Refunded order lifecycle guards (#172)', () => {
       'admin',
       'default',
     );
-    expect(res.status).toBe(400);
-    expect(sqlite.prepare("SELECT payment_method FROM orders WHERE id = 'ord-no-session-deliv'").get()?.payment_method).toBe('payos');
+    expect(res.status).toBe(200);
+    expect(sqlite.prepare("SELECT payment_method FROM orders WHERE id = 'ord-no-session-deliv'").get()?.payment_method).toBe('cash');
   });
 
   it('persists payment_method atomically with status transition and cancels open PayOS attempts when switching away from payos', async () => {

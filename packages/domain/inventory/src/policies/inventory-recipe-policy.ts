@@ -53,6 +53,26 @@ export function convertRecipeQuantity(quantity: number, recipeUnit?: string | nu
   return Math.round((quantity * fromDef.factor / toDef.factor) * 1e6) / 1e6;
 }
 
+/**
+ * Order-time variant of {@link convertRecipeQuantity}. An ingredient stocked in a unit that
+ * cannot express its recipe unit (a `g` recipe against a `pcs` stock row) is one bad line; it
+ * must not abort the whole order. `calculateOrderConsumption` feeds `deductOrderStock`, whose
+ * caller falls back to SKU matching on any throw — that fallback loses every ingredient line
+ * for the order, not just the incompatible one.
+ */
+function tryConvertRecipeQuantity(
+  quantity: number,
+  recipeUnit?: string | null,
+  stockUnit?: string | null
+): number | null {
+  try {
+    return convertRecipeQuantity(quantity, recipeUnit, stockUnit);
+  } catch (err) {
+    console.warn('[inventory] Skipping BOM component with incompatible units:', (err as Error).message);
+    return null;
+  }
+}
+
 export interface CanonicalRecipeComponent {
   ingredientId: string;
   ingredientName?: string;
@@ -223,10 +243,10 @@ export async function getCanonicalRecipe(
     costPerUnit: Number(r.cost_per_unit || 0),
   }));
 
-  const unitCost = components.reduce(
-    (sum, c) => sum + (convertRecipeQuantity(c.quantity, c.unit, c.stockUnit) * c.costPerUnit),
-    0
-  );
+  const unitCost = components.reduce((sum, c) => {
+    const stockQuantity = tryConvertRecipeQuantity(c.quantity, c.unit, c.stockUnit);
+    return stockQuantity === null ? sum : sum + stockQuantity * c.costPerUnit;
+  }, 0);
 
   return {
     id: recipe.id,
@@ -272,7 +292,8 @@ export async function calculateOrderConsumption(
 
     for (const comp of recipe.components) {
       // Recipes are written in kitchen units (g, ml) while stock is counted in purchase units (kg, l).
-      const needed = convertRecipeQuantity(comp.quantity * item.quantity, comp.unit, comp.stockUnit);
+      const needed = tryConvertRecipeQuantity(comp.quantity * item.quantity, comp.unit, comp.stockUnit);
+      if (needed === null) continue;
       const depletionUnit = comp.stockUnit || comp.unit;
       const existing = depletionsMap.get(comp.ingredientId);
       if (existing) {

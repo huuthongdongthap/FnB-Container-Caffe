@@ -78,10 +78,13 @@ export const FILTER_TABS: FilterTab[] = [
   { key: 'confirmed', tKey: 'orderMgmt.confirmed' },
   { key: 'preparing', tKey: 'orderMgmt.preparing' },
   { key: 'ready', tKey: 'orderMgmt.ready' },
+  { key: 'delivering', tKey: 'orderMgmt.delivering' },
   { key: 'served', tKey: 'orderMgmt.served' },
   { key: 'delivered', tKey: 'orderMgmt.delivered' },
   { key: 'completed', tKey: 'orderMgmt.completed' },
   { key: 'cancelled', tKey: 'orderMgmt.cancelled' },
+  { key: 'failed', tKey: 'orderMgmt.failed' },
+  { key: 'expired', tKey: 'orderMgmt.expired' },
 ];
 
 /* ─── Status Badge Styles (High-contrast FnB semantic colors) ────────── */
@@ -177,7 +180,7 @@ export function getActionForStatus(status: OrderStatus, orderType?: string): str
     case 'pending': return 'preparing';
     case 'confirmed': return 'preparing';
     case 'preparing': return 'ready';
-    case 'ready': return orderType === 'delivery' ? 'deliver' : 'serve';
+    case 'ready': return orderType === 'delivery' ? 'delivering' : 'serve';
     case 'delivering': return 'deliver';
     case 'served':
     case 'delivered': return 'complete';

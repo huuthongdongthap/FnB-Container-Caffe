@@ -78,11 +78,13 @@ describe('update-order', () => {
   describe('updateOrder', () => {
     it('allows valid transition: pending → confirmed', async() => {
       // chain[0]: SELECT orders WHERE id = ?
-      // chain[1]: UPDATE orders SET status = ? WHERE id = ?
-      // chain[2]: kv.put(event)  [silent via .catch()]
-      // chain[3]: kv.put(latest_ts)  [silent via .catch()]
+      // chain[1]: SELECT order_type, payment_status, ... FROM orders WHERE id = ?
+      // chain[2]: UPDATE orders SET status = ? WHERE id = ?
+      // chain[3]: kv.put(event)  [silent via .catch()]
+      // chain[4]: kv.put(latest_ts)  [silent via .catch()]
       const db = makeDB([
         makeChain(undefined, [{ id: 'ORD_1', status: 'pending' }]),
+        makeChain({ order_type: 'dine_in', payment_status: 'unpaid' }),
         makeChain(undefined, undefined, { success: true, changes: 1 }),
         makeChain(),
         makeChain()
@@ -136,6 +138,7 @@ describe('update-order', () => {
     it('allows valid transition: preparing → ready', async() => {
       const db = makeDB([
         makeChain(undefined, [{ id: 'ORD_1', status: 'preparing' }]),
+        makeChain({ order_type: 'dine_in', payment_status: 'unpaid' }),
         makeChain(undefined, undefined, { success: true, changes: 1 }),
         makeChain(),
         makeChain()
@@ -154,6 +157,7 @@ describe('update-order', () => {
     it('allows valid transition: ready → served', async() => {
       const db = makeDB([
         makeChain(undefined, [{ id: 'ORD_1', status: 'ready' }]),
+        makeChain({ order_type: 'dine_in', payment_status: 'unpaid' }),
         makeChain(undefined, undefined, { success: true, changes: 1 }),
         makeChain(),
         makeChain()
@@ -232,6 +236,7 @@ describe('update-order', () => {
     it('allows customer to cancel their own pending order (200)', async() => {
       const db = makeDB([
         makeChain(undefined, [{ id: 'ORD_1', status: 'pending' }]),
+        makeChain({ order_type: 'dine_in', payment_status: 'unpaid' }),
         makeChain(undefined, undefined, { success: true, changes: 1 }),
         makeChain(),
         makeChain()
@@ -286,6 +291,7 @@ describe('update-order', () => {
     it('executes correct SQL sequence: SELECT then UPDATE with id param', async() => {
       const db = makeDB([
         makeChain(undefined, [{ id: 'ORD_1', status: 'pending' }]),
+        makeChain({ order_type: 'dine_in', payment_status: 'unpaid' }),
         makeChain(undefined, undefined, { success: true, changes: 1 }),
         makeChain(),
         makeChain()
@@ -302,7 +308,7 @@ describe('update-order', () => {
       const calls = db.prepare.mock.calls as unknown[][];
       expect(calls[0][0]).toContain('SELECT');
       expect(calls[0][0]).toContain('orders WHERE id = ?');
-      expect(calls[1][0]).toContain('UPDATE orders');
+      expect(calls.some((c) => String(c[0]).includes('UPDATE orders'))).toBe(true);
     });
 
     it('returns 500 on unhandled database error', async() => {

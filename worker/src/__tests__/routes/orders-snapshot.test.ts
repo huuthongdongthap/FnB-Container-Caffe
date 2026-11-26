@@ -82,6 +82,7 @@ describe('Phase 0: Response Shape Snapshot', () => {
     const order = body.data as Record<string, unknown>;
     const expectedKeys = [
       'id',            // string
+      'order_number',  // string (display order number)
       'status',        // 'pending'
       'payment_status',// 'unpaid'
       'items',         // array

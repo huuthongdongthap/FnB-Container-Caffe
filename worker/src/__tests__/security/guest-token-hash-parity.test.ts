@@ -474,8 +474,8 @@ describe('D1 primary session pinning and guest_token_hash verification', () => {
       env,
     );
     expect(webhookRes.status).toBe(200);
-    expect(doBroadcasts).toHaveLength(1);
-    expect(doBroadcasts[0]?.channel).toBe('branch-b:ORD_WEBHOOK_RT');
+    expect(doBroadcasts).toHaveLength(2);
+    expect(doBroadcasts.map((b) => b.channel)).toEqual(['branch-b:ORD_WEBHOOK_RT', 'branch-b:kitchen']);
     expect(doBroadcasts[0]?.payload).toMatchObject({
       orderId: 'ORD_WEBHOOK_RT',
       status: 'pending',
@@ -740,8 +740,8 @@ describe('D1 primary session pinning and guest_token_hash verification', () => {
       env,
     );
     expect(codPaidRes.status).toBe(200);
-    expect(doBroadcasts).toHaveLength(1);
-    expect(doBroadcasts[0]?.channel).toBe('branch-k:ORD_BARISTA_1');
+    expect(doBroadcasts).toHaveLength(2);
+    expect(doBroadcasts.map((b) => b.channel)).toEqual(['branch-k:ORD_BARISTA_1', 'branch-k:kitchen']);
     expect(doBroadcasts[0]?.payload).toMatchObject({
       orderId: 'ORD_BARISTA_1',
       status: 'served',

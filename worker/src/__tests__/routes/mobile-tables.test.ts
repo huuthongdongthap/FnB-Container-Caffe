@@ -265,7 +265,7 @@ describe('updateTableStatus', () => {
 
   it('returns 403 when kitchen staff tries to update table', async () => {
     const ctx: any = mockTablesContext({
-      role: 'staff',
+      role: 'kitchen',
       tableId: 'TBL_1',
       body: { status: 'occupied' },
     });

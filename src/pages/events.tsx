@@ -1,3 +1,4 @@
+import { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { HelmetHead } from '@/components/seo/HelmetHead';
@@ -37,12 +38,17 @@ const MONTHS_SHORT = [
 ] as const;
 
 function getDateLabel(iso: string): string {
+  if (!iso) return 'UPCOMING';
   const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso.toUpperCase();
   return `${MONTHS_SHORT[d.getMonth()]} ${d.getDate()}`;
 }
 
 function getMonthKey(iso: string): string {
-  return MONTHS_SHORT[new Date(iso).getMonth()]?.toLowerCase() ?? '';
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '';
+  return MONTHS_SHORT[d.getMonth()]?.toLowerCase() ?? '';
 }
 
 /* ── Adapter: EventItem[] -> EventsNew2PageData ── */
@@ -91,25 +97,21 @@ function buildEventsNew2PageData(
     heroImageUrl: featured?.image ?? '',
     heroImageAlt: featured?.title ?? '',
     navLinks: [
-      { key: 'menu', label: t('nav.menu'), href: '#', active: false },
-      { key: 'events', label: t('nav.events'), href: '#', active: true },
-      { key: 'reservations', label: t('nav.reservations'), href: '#', active: false },
-      { key: 'location', label: t('nav.spaces'), href: '#', active: false },
+      { key: 'menu', label: t('nav.menu', { defaultValue: 'Thực đơn' }), href: '/menu', active: false },
+      { key: 'events', label: t('nav.events', { defaultValue: 'Sự kiện' }), href: '/events', active: true },
+      { key: 'reservations', label: t('nav.reservations', { defaultValue: 'Đặt bàn' }), href: '/table-reservation', active: false },
+      { key: 'loyalty', label: t('nav.loyalty', { defaultValue: 'Tích điểm & Ví' }), href: '/loyalty', active: false },
     ],
     filterMonths:
       filterMonths.length > 0
-        ? filterMonths
-        : [
-            { key: 'oct', label: t('eventsNew2.monthOct') },
-            { key: 'nov', label: t('eventsNew2.monthNov') },
-            { key: 'dec', label: t('eventsNew2.monthDec') },
-          ],
+        ? [{ key: 'all', label: 'ALL' }, ...filterMonths]
+        : [],
     featuredEvents,
     pastArchives,
     footerLinks: [
-      { key: 'privacy', label: t('common.privacyPolicy'), href: '#' },
-      { key: 'terms', label: t('common.termsOfService'), href: '#' },
-      { key: 'contact', label: t('common.contactUs'), href: '#' },
+      { key: 'privacy', label: t('common.privacyPolicy', { defaultValue: 'Chính sách' }), href: '/privacy' },
+      { key: 'terms', label: t('common.termsOfService', { defaultValue: 'Điều khoản' }), href: '/terms' },
+      { key: 'contact', label: t('common.contactUs', { defaultValue: 'Liên hệ' }), href: '/contact' },
     ],
     copyright: t('eventsNew2.copyright', { year: new Date().getFullYear() }),
   };
@@ -137,18 +139,40 @@ export function EventsPage({
   const past = externalPast ?? hook.past ?? [];
   const onRetry = externalRetry ?? hook.refetch;
 
+  const [selectedTag, setSelectedTag] = useState<string>('all');
+  const availableTags = useMemo(() => {
+    const tags = Array.from(new Set(upcoming.map((e) => e.tag?.trim()).filter(Boolean))) as string[];
+    return ['all', ...tags];
+  }, [upcoming]);
+
+  const filteredUpcoming = useMemo(() => {
+    if (selectedTag === 'all') return upcoming;
+    return upcoming.filter((e) => (e.tag || '').toLowerCase() === selectedTag.toLowerCase());
+  }, [upcoming, selectedTag]);
+
   // Map loading/error booleans to combined LoadingState enum
   const loadingState =
     isLoading ? 'loading' as const : isError ? 'error' as const : 'idle' as const;
 
-  // Build data object from live API events; undefined triggers defaultData in StitchEventsNew2
+  // Always build live data when loaded (never fall back to fabricated OCT 14/21/28 demo events on empty API)
   const data =
-    !isLoading && !isError && upcoming.length > 0
-      ? buildEventsNew2PageData(upcoming, past, t)
+    !isLoading && !isError
+      ? buildEventsNew2PageData(filteredUpcoming, past, t)
       : undefined;
 
-  // Provide sensible defaults for new callbacks not available in legacy interface
+  // Provide sensible defaults for interactive callbacks
   const handleReserveSpot = onBookNow ?? (() => navigate('/table-reservation'));
+  const handleBookEvent = onBookTable ?? ((eventId: string) => navigate(`/table-reservation?event=${encodeURIComponent(eventId)}`));
+  const handleNavClick = (href: string) => {
+    if (href && href !== '#') {
+      navigate(href);
+    }
+  };
+  const handleCycleTypeFilter = () => {
+    if (availableTags.length <= 1) return;
+    const nextIdx = (availableTags.indexOf(selectedTag) + 1) % availableTags.length;
+    setSelectedTag(availableTags[nextIdx] ?? 'all');
+  };
 
   return (
     <>
@@ -160,10 +184,13 @@ export function EventsPage({
       <StitchEventsNew2
         data={data}
         loadingState={loadingState}
-        errorMessage={isError ? t('events.unableToLoad') : undefined}
+        errorMessage={isError ? t('events.unableToLoad', { defaultValue: 'Không thể tải lịch sự kiện lúc này.' }) : undefined}
         onRetry={onRetry}
-        onBookTable={onBookTable}
+        onBookTable={handleBookEvent}
         onReserveSpot={handleReserveSpot}
+        onViewDetails={handleReserveSpot}
+        onNavClick={handleNavClick}
+        onFilterByType={handleCycleTypeFilter}
       />
     </>
   );

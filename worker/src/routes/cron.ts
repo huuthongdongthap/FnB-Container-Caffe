@@ -14,6 +14,7 @@ export {
   processErpnextProductSync,
   checkOverdueOrders,
   expireUnpaidOnlineOrders,
+  checkInventoryAlerts,
   retryPendingRefundLoyaltyWork,
   sendCashbackExpiryWarnings,
   runCampaignTriggers,

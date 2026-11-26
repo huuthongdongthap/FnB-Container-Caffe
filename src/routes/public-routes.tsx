@@ -1,7 +1,7 @@
 import React from 'react';
 import { Route, Navigate } from 'react-router-dom';
 import { ErrorBoundary } from '@/components/shared/ErrorBoundary';
-import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
+import { ProtectedRoute, SAAS_ONBOARD_ROLES } from '@/components/auth/ProtectedRoute';
 
 /** Wraps a route element in ErrorBoundary so a crash in one route doesn't take down the whole SPA. */
 function guarded(element: React.ReactNode): React.ReactNode {
@@ -33,11 +33,14 @@ const CheckinNew = React.lazy(() => import('@/pages/stitch/checkin-new'));
 const ContactNew = React.lazy(() => import('@/pages/stitch/contact-new'));
 const TrackOrderNew = React.lazy(() => import('@/pages/stitch/track-order'));
 const ReservationNew = React.lazy(() => import('@/pages/stitch/reservation-new'));
-const SubscriptionsNew = React.lazy(() => import('@/pages/stitch/subscriptions-new'));
-const LoyaltyCalcNew = React.lazy(() => import('@/pages/stitch/loyalty-calc'));
+const SubscriptionsPage = React.lazy(() => import('@/pages/subscriptions'));
+const LoyaltyCalculatorPage = React.lazy(() => import('@/pages/loyalty-calculator'));
 const GalleryNew = React.lazy(() => import('@/pages/stitch/gallery-new'));
 const OurStory = React.lazy(() => import('@/pages/stitch/our-story'));
-const CustomerAccountDashboard = React.lazy(() => import('@/pages/stitch/customer-reviews'));
+const ReviewsPage = React.lazy(() => import('@/pages/ReviewsPage'));
+const RegisterPage = React.lazy(() => import('@/pages/register'));
+const VerifyEmailPage = React.lazy(() => import('@/pages/verify-email'));
+const ForgotPasswordPage = React.lazy(() => import('@/pages/forgot-password'));
 const StitchScreenGallery = React.lazy(() => import('@/pages/stitch-screen-gallery'));
 const SystemHubPage = React.lazy(() => import('@/pages/SystemHub'));
 const RecruitmentPage = React.lazy(() => import('@/pages/RecruitmentPage'));
@@ -64,9 +67,14 @@ export const publicRoutes = [
 
   // Tab 5: Cá nhân
   <Route key="/account" path="/account" element={guarded(<AccountPage />)} />,
+  <Route key="/register" path="/register" element={guarded(<RegisterPage />)} />,
+  <Route key="/verify-email" path="/verify-email" element={guarded(<VerifyEmailPage />)} />,
+  <Route key="/forgot-password" path="/forgot-password" element={guarded(<ForgotPasswordPage />)} />,
+  <Route key="/reset-password" path="/reset-password" element={guarded(<ForgotPasswordPage />)} />,
   <Route key="/loyalty" path="/loyalty" element={guarded(<LoyaltyPage />)} />,
+  <Route key="/dang-ky-thanh-vien" path="/dang-ky-thanh-vien" element={<Navigate to="/loyalty" replace />} />,
   <Route key="/referral" path="/referral" element={guarded(<ReferralPage />)} />,
-  <Route key="/subscriptions" path="/subscriptions" element={guarded(<SubscriptionsNew />)} />,
+  <Route key="/subscriptions" path="/subscriptions" element={guarded(<SubscriptionsPage />)} />,
 
   // Các trang chức năng không có tab (checkout, order, checkin...)
   <Route key="/checkout" path="/checkout" element={guarded(<CheckoutPage />)} />,
@@ -79,7 +87,7 @@ export const publicRoutes = [
   // Legacy / other pages
   <Route key="/table-checkin" path="/table-checkin" element={guarded(<TableCheckinPage />)} />,
   <Route key="/about" path="/about" element={guarded(<OurStory />)} />,
-  <Route key="/reviews" path="/reviews" element={guarded(<CustomerAccountDashboard />)} />,
+  <Route key="/reviews" path="/reviews" element={guarded(<ReviewsPage />)} />,
   <Route key="/contact" path="/contact" element={guarded(<ContactNew />)} />,
   <Route key="/tuyen-dung" path="/tuyen-dung" element={guarded(<RecruitmentPage />)} />,
   <Route key="/ung-tuyen" path="/ung-tuyen" element={guarded(<RecruitmentPage />)} />,
@@ -89,14 +97,14 @@ export const publicRoutes = [
   <Route key="/privacy" path="/privacy" element={<Navigate to="/about" replace />} />,
   <Route key="/terms" path="/terms" element={<Navigate to="/about" replace />} />,
   <Route key="/gallery" path="/gallery" element={guarded(<GalleryNew />)} />,
-  <Route key="/loyalty-calculator" path="/loyalty-calculator" element={guarded(<LoyaltyCalcNew />)} />,
+  <Route key="/loyalty-calculator" path="/loyalty-calculator" element={guarded(<LoyaltyCalculatorPage />)} />,
   <Route key="/pricing" path="/pricing" element={guarded(<PricingPage />)} />,
   <Route key="/:locale/pricing" path="/:locale/pricing" element={guarded(<PricingPage />)} />,
   <Route key="/saas" path="/saas" element={guarded(<PricingPage />)} />,
   <Route key="/signup" path="/signup" element={guarded(<SaasSignupPage />)} />,
   <Route key="/s/:slug" path="/s/:slug" element={guarded(<TenantStorefrontPage />)} />,
   <Route key="/s/:slug/*" path="/s/:slug/*" element={guarded(<TenantStorefrontPage />)} />,
-  <Route key="/saas-protected" element={<ProtectedRoute />}>
+  <Route key="/saas-protected" element={<ProtectedRoute allowedRoles={SAAS_ONBOARD_ROLES} loginPath="/signup" />}>
     <Route path="/saas/dashboard" element={guarded(<CustomerDashboard />)} />
     <Route path="/saas/onboard/tenant" element={guarded(<TenantCreate />)} />
     <Route path="/saas/onboard" element={guarded(<OnboardingWizard />)} />

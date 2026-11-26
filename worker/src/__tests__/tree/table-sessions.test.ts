@@ -195,7 +195,7 @@ describe('table-sessions routes', () => {
   it('GET /api/table-sessions/:id/orders lists orders for the session', async () => {
     db = makeScriptedDB([
       { match: (s) => /^SELECT id(?:, table_id)? FROM table_sessions WHERE id =/.test(s), rows: [{ id: 'SES-1' }], firstRow: { id: 'SES-1' } },
-      { match: (s) => s.includes('SELECT * FROM orders WHERE table_id'), rows: [{ id: 'ORD-1', total: 120000 }, { id: 'ORD-2', total: 80000 }], firstRow: undefined },
+      { match: (s) => s.includes('FROM orders'), rows: [{ id: 'ORD-1', total: 120000 }, { id: 'ORD-2', total: 80000 }], firstRow: undefined },
     ]);
     const { status, json } = await fetchHandler(db, 'GET', '/api/table-sessions/SES-1/orders');
     expect(status).toBe(200);

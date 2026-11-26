@@ -53,7 +53,7 @@ export function buildTemplateData(template_key: string, data: ZnsData): Record<s
       customer_name: data.name || '',
       member_id: data.member_id || '',
       balance: `${(data.balance || 0).toLocaleString('vi-VN')}đ`,
-      qr_url: data.qr_url || 'https://fnb-caffe-container.pages.dev/dang-ky-thanh-vien'
+      qr_url: data.qr_url || 'https://fnb-caffe-container.pages.dev/loyalty'
     };
   case 'cashback_earned':
     return {
@@ -74,6 +74,26 @@ export function buildTemplateData(template_key: string, data: ZnsData): Record<s
       customer_name: data.name || '',
       expiring_amount: `${(data.amount || 0).toLocaleString('vi-VN')}đ`,
       days_remaining: String(data.days || 7)
+    };
+  case 'birthday_promotion':
+    return {
+      customer_name: data.name || 'Quý khách',
+      promo_code: data.promo_code || 'BIRTHDAY',
+      discount: data.discount || '20%',
+      expires_at: data.expires_at || `${data.days || 7} ngày`
+    };
+  case 'winback_offer':
+    return {
+      customer_name: data.name || 'Quý khách',
+      promo_code: data.promo_code || 'WELCOMEBACK',
+      discount: data.discount || '15%',
+      days_inactive: String(data.days || 30)
+    };
+  case 'post_visit_review':
+    return {
+      customer_name: data.name || 'Quý khách',
+      order_id: data.order_id ? `AC${String(data.order_id).slice(0, 8).toUpperCase()}` : 'AURA',
+      review_url: data.qr_url || 'https://auraspace.cafe/reviews'
     };
   case 'general_promotion':
     return {

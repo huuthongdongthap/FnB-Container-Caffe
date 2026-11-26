@@ -174,6 +174,49 @@ export async function apiFetch<T = unknown>(
   return await res.json();
 }
 
+export async function apiFetchBlob(
+  path: string,
+  options: ApiFetchOptions = {},
+): Promise<Blob> {
+  const { silent = false, ...fetchOptions } = options;
+  const headers: Record<string, string> = {
+    ...(fetchOptions.headers as Record<string, string> | undefined),
+  };
+  try {
+    const token = typeof window !== 'undefined' ? localStorage.getItem('aura_auth_token') : null;
+    if (token && !headers['Authorization']) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+  } catch {
+    // restricted storage access
+  }
+
+  const url = path.startsWith('http://') || path.startsWith('https://') ? path : `${API_BASE}${path}`;
+  let res: Response;
+  try {
+    res = await fetch(url, {
+      ...fetchOptions,
+      headers,
+    });
+  } catch (networkErr) {
+    const msg = networkErr instanceof Error ? networkErr.message : 'Lỗi kết nối không xác định';
+    const apiError = new ApiClientError({ status: 0, message: msg });
+    reportError(apiError, path, fetchOptions.method ?? 'GET', silent);
+    throw apiError;
+  }
+
+  if (!res.ok || typeof res.blob !== 'function') {
+    const apiError = new ApiClientError({
+      status: res.status || 500,
+      message: `Lỗi tải tệp (${res.status})`,
+    });
+    reportError(apiError, path, fetchOptions.method ?? 'GET', silent);
+    throw apiError;
+  }
+
+  return await res.blob();
+}
+
 /* ── Catalog API methods ───────────────────────── */
 
 export const apiClient = {

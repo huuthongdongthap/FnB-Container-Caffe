@@ -50,13 +50,12 @@ describe('StitchAccountDashNew', () => {
     expect(screen.queryByText('Julian Vane')).toBeNull();
   });
 
-  it('renders nav items via i18n fallback defaults', () => {
-    renderWithProviders(<StitchAccountDashNew />);
-    // t() returns fallback default strings for nav labels
-    expect(screen.getByText('Reserve')).toBeTruthy();
-    expect(screen.getByText('Orders')).toBeTruthy();
-    expect(screen.getByText('Loyalty')).toBeTruthy();
-    expect(screen.getByText('Account')).toBeTruthy();
+  it('does not render duplicate mobile bottom nav and exposes direct CTA to /loyalty', () => {
+    const { container } = renderWithProviders(<StitchAccountDashNew />);
+    expect(container.querySelector('nav')).toBeNull();
+    const loyaltyLink = screen.getByTestId('dash-loyalty-cta');
+    expect(loyaltyLink).toBeTruthy();
+    expect(loyaltyLink.getAttribute('href')).toBe('/loyalty');
   });
 
   it('renders loyalty progress text', () => {

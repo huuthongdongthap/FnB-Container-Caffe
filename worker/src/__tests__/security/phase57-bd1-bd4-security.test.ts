@@ -333,6 +333,10 @@ describe('Phase 57 Security (BD1–BD4)', () => {
         },
       };
 
+      const hqAdminToken = await generateJWT(
+        { sub: 'hq-adm', role: 'admin', tenant_id: 'hq' },
+        JWT_SECRET
+      );
       const adminToken = await generateJWT(
         { sub: 'mgr-a', role: 'manager', tenant_id: 'store-a' },
         JWT_SECRET
@@ -343,16 +347,23 @@ describe('Phase 57 Security (BD1–BD4)', () => {
       };
 
       const app = new Hono<{ Bindings: Env }>();
-      app.use('*', async (c, next) => {
+      app.post('/invoices/:id/pay', async (c, next) => {
+        (c as unknown as { set: (k: string, v: unknown) => void }).set('user', {
+          id: 'hq-adm',
+          role: 'admin',
+          tenant_id: 'hq',
+          tenantId: 'hq',
+        });
+        await next();
+      }, payInvoice);
+      app.post('/invoices/generate', async (c, next) => {
         (c as unknown as { set: (k: string, v: unknown) => void }).set('user', {
           id: 'mgr-a',
           role: 'manager',
           tenant_id: 'store-a',
         });
         await next();
-      });
-      app.post('/invoices/:id/pay', payInvoice);
-      app.post('/invoices/generate', generateInvoices);
+      }, generateInvoices);
 
       const env = { AURA_DB: db, JWT_SECRET } as unknown as Env;
 
@@ -360,7 +371,11 @@ describe('Phase 57 Security (BD1–BD4)', () => {
         '/invoices/inv-a/pay',
         {
           method: 'POST',
-          headers: authHeaders,
+          headers: {
+            Authorization: `Bearer ${hqAdminToken}`,
+            'X-Tenant-ID': 'store-a',
+            'Content-Type': 'application/json',
+          },
           body: JSON.stringify({ payment_method: 'bank_transfer' }),
         },
         env

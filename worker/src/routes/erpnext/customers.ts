@@ -155,14 +155,21 @@ export function customerRoutes(app: import('hono').Hono<{ Bindings: Env }>): voi
 
       let effectiveTenant = tenantId === '*' ? 'default' : tenantId;
       let resolvedCustomerId: string | null = data.id || null;
+      let existingErpnextId: string | null = null;
       if (db && (data.id || data.name)) {
         try {
           if (data.id) {
             const existingRow = await db
-              .prepare('SELECT id, name, tenant_id FROM customers WHERE id = ? LIMIT 1')
+              .prepare('SELECT id, name, erpnext_id, tenant_id FROM customers WHERE id = ? LIMIT 1')
               .bind(data.id)
-              .first<{ id?: string; name?: string; tenant_id?: string | null }>()
-              .catch(() => null);
+              .first<{ id?: string; name?: string; erpnext_id?: string | null; tenant_id?: string | null }>()
+              .catch(() =>
+                db
+                  .prepare('SELECT id, name, tenant_id FROM customers WHERE id = ? LIMIT 1')
+                  .bind(data.id)
+                  .first<{ id?: string; name?: string; erpnext_id?: string | null; tenant_id?: string | null }>()
+                  .catch(() => null)
+              );
             if (existingRow) {
               if (tenantId !== '*' && !matchesTenantRow(existingRow as unknown as Record<string, unknown>, tenantId)) {
                 return c.json({ success: false, error: 'Customer not found' }, 404);
@@ -170,6 +177,9 @@ export function customerRoutes(app: import('hono').Hono<{ Bindings: Env }>): voi
               const rowTenant = typeof existingRow.tenant_id === 'string' ? existingRow.tenant_id.trim() : '';
               if (rowTenant && rowTenant !== '*' && rowTenant.toLowerCase() !== 'hq') {
                 effectiveTenant = rowTenant;
+              }
+              if (typeof existingRow.erpnext_id === 'string' && existingRow.erpnext_id.trim()) {
+                existingErpnextId = existingRow.erpnext_id.trim();
               }
             }
           } else if (data.name && tenantId === '*') {
@@ -214,10 +224,41 @@ export function customerRoutes(app: import('hono').Hono<{ Bindings: Env }>): voi
         return c.json({ success: false, error: 'ERPNext not configured' }, 503);
       }
 
-      const result = await client.create('Customer', { customer_name: data.name, mobile_no: data.phone || '', email_id: data.email || '', tax_id: data.tax_id || '' });
+      const customerPayload = {
+        customer_name: data.name,
+        mobile_no: data.phone || '',
+        email_id: data.email || '',
+        tax_id: data.tax_id || '',
+      };
+
+      let result: { data?: unknown };
+      if (existingErpnextId) {
+        result = await client.update('Customer', existingErpnextId, customerPayload);
+      } else {
+        try {
+          result = await client.create('Customer', customerPayload);
+        } catch (createErr) {
+          const msg = createErr instanceof Error ? createErr.message : String(createErr);
+          if (/duplicate|already exists|409/i.test(msg)) {
+            const listed = await client.list('Customer', {
+              fields: ['name'],
+              filters: [['customer_name', '=', data.name]],
+              limit: 1,
+            });
+            const foundName = Array.isArray(listed?.data)
+              ? (listed.data[0] as Record<string, string> | undefined)?.name
+              : undefined;
+            const targetErpName = foundName || data.name;
+            result = await client.update('Customer', targetErpName, customerPayload);
+            existingErpnextId = targetErpName;
+          } else {
+            throw createErr;
+          }
+        }
+      }
 
       if (db && (data.id || data.name)) {
-        const erpnextName = (result.data as Record<string, string>)?.name || null;
+        const erpnextName = (result?.data as Record<string, string> | undefined)?.name || existingErpnextId || null;
         const updatePromise = (async () => {
           let targetId = resolvedCustomerId;
           if (!targetId && data.name) {

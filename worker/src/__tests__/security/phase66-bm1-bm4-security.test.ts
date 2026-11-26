@@ -776,8 +776,8 @@ describe('Phase 66 Security & Multi-Tenant Suite (BM1..BM4)', () => {
         VALUES ('inv_a2', 'sub_a', 'cust_a', 199000, 199000, 'pending', 'tenant_a');
       `);
       const db = createSqliteD1(sqlite);
-      const adminTokenA = await signJWT(
-        { sub: 'adm_a', id: 'adm_a', role: 'admin', tenant_id: 'tenant_a', tenantId: 'tenant_a' },
+      const hqAdminToken = await signJWT(
+        { sub: 'adm_hq', id: 'adm_hq', role: 'admin', tenant_id: 'hq', tenantId: 'hq' },
         JWT_SECRET
       );
       const custTokenA = await signJWT(
@@ -786,15 +786,23 @@ describe('Phase 66 Security & Multi-Tenant Suite (BM1..BM4)', () => {
       );
 
       const app = new Hono<{ Bindings: Env }>();
-      app.post('/invoices/:id/pay', (c) => payInvoice(c as never));
+      app.post('/invoices/:id/pay', async (c, next) => {
+        (c as unknown as { set: (k: string, v: unknown) => void }).set('user', {
+          id: 'adm_hq',
+          role: 'admin',
+          tenant_id: 'hq',
+          tenantId: 'hq',
+        });
+        await next();
+      }, (c) => payInvoice(c as never));
       app.post('/subscriptions/:id/cancel', (c) => cancelSubscription(c as never));
 
       const payRes = await app.request(
         '/invoices/inv_a2/pay',
         {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${adminTokenA}` },
-          body: JSON.stringify({ payment_method: 'payos' }),
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${hqAdminToken}`, 'X-Tenant-ID': 'tenant_a' },
+          body: JSON.stringify({ payment_method: 'bank_transfer' }),
         },
         { AURA_DB: db, JWT_SECRET } as unknown as Env
       );

@@ -45,10 +45,14 @@ export async function submitContact(request: Request, env: Record<string, unknow
     const tenantId = resolvePilotStore(env as unknown as Env);
 
     const body = await request.json() as Record<string, unknown>;
+    const rawPhone = typeof body.phone === 'string' ? body.phone.trim() : body.phone;
+    const rawEmail = typeof body.email === 'string' ? body.email.trim() : body.email;
+    const phoneLooksLikeEmail = typeof rawPhone === 'string' && rawPhone.includes('@') && !rawEmail;
+
     const parsed = contactSchema.safeParse({
       name: body.name,
-      phone: body.phone,
-      email: body.email || undefined,
+      phone: phoneLooksLikeEmail ? '' : rawPhone,
+      email: phoneLooksLikeEmail ? rawPhone : (rawEmail || undefined),
       category: body.category || undefined,
       content: body.content
     });
@@ -66,7 +70,7 @@ export async function submitContact(request: Request, env: Record<string, unknow
     const db = env.AURA_DB as import('@cloudflare/workers-types').D1Database;
     const messages = await contactMessageRepository(db);
     const id = await messages.insert({ tenantId, classification: 'contact',
-      name: name.trim(), phone: phone.trim(), email: email?.trim(), category: category || 'other',
+      name: name.trim(), phone: (phone || '').trim(), email: email?.trim() || undefined, category: category || 'other',
       content: content.trim(), direction: 'customer' });
 
     return jsonResponse({

@@ -57,6 +57,8 @@ export function LandingFooter({ brandName = 'AURA CAFE' }: { brandName?: string 
           <FooterLink href="/menu" linkKey="landing.footerMenu" fallback="Thực đơn" t={t} />
           <FooterLink href="/table-reservation" linkKey="landing.footerReservation" fallback="Đặt bàn" t={t} />
           <FooterLink href="/promotions" linkKey="landing.footerPromotions" fallback="Ưu đãi" t={t} />
+          <FooterLink href="/loyalty" linkKey="landing.footerLoyalty" fallback="Tích điểm & Ví" t={t} />
+          <FooterLink href="/account" linkKey="landing.footerAccount" fallback="Tài khoản" t={t} />
           <FooterLink href="/pricing" linkKey="landing.footerPricing" fallback="Bảng giá SaaS" t={t} />
           <FooterLink href="/about" linkKey="landing.footerAbout" fallback="Câu chuyện AURA" t={t} />
           <FooterLink href="/gallery" linkKey="landing.footerGallery" fallback="Không gian" t={t} />

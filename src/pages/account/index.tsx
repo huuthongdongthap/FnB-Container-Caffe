@@ -9,6 +9,7 @@
 'use client';
 
 import { useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useAccount } from '@/hooks/use-account';
 import { useAuthStore } from '@/hooks/stores/use-auth-store';
@@ -44,7 +45,14 @@ export {
 export default function AccountPage() {
   const user = useAuthStore((s) => s.user);
   const { profile, orders, loading, error, ordersError, refetchProfile } = useAccount();
-  const { myVouchers, tierLadder, fetchLoyalty } = useLoyaltyStore();
+  const {
+    myVouchers,
+    tierLadder,
+    cashbackBalance: storeCashbackBalance,
+    cashbackRate,
+    cashbackExpiring7d,
+    fetchLoyalty,
+  } = useLoyaltyStore();
   const { t } = useTranslation('account');
 
   useEffect(() => {
@@ -60,7 +68,7 @@ export default function AccountPage() {
   /* ─── Profile loaded with data ──────────────────────────────────── */
   if (profile) {
     const points = Number(profile.loyalty_points ?? 0);
-    const cashbackBalance = Number(profile.cashback_balance ?? 0);
+    const cashbackBalance = Math.max(Number(profile.cashback_balance ?? 0), Number(storeCashbackBalance ?? 0));
     const lifetimePoints = Number(profile.lifetime_points ?? points);
     const customThresholds = tierLadder.length > 0
       ? Object.fromEntries(tierLadder.map((item) => [item.tier_name.toLowerCase(), item.min_points]))
@@ -104,22 +112,50 @@ export default function AccountPage() {
           loyalty={dashLoyalty}
           orders={dashOrders}
         />
-        <div className="max-w-md mx-auto px-4 pb-8 -mt-4 space-y-4">
+        <div className="max-w-[1280px] mx-auto px-5 pb-24 -mt-20 space-y-4">
           <div
             data-testid="account-wallet-summary"
-            className="rounded-2xl border border-[#C69C6D]/20 bg-[#1B1714]/80 p-4 flex items-center justify-between"
+            className="rounded-2xl border border-[#C69C6D]/20 bg-[#1B1714]/80 p-5 space-y-3"
           >
-            <div>
-              <p className="text-xs text-[#A89F91]">Điểm tích lũy</p>
-              <p className="text-lg font-bold text-[#F5EFE6]" data-testid="account-points-value">
-                {points.toLocaleString('vi-VN')} điểm
-              </p>
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <p className="text-xs text-[#A89F91]">Điểm tích lũy</p>
+                <p className="text-lg font-bold text-[#F5EFE6]" data-testid="account-points-value">
+                  {points.toLocaleString('vi-VN')} điểm
+                </p>
+              </div>
+              <div className="text-right">
+                <p className="text-xs text-[#A89F91]">Ví hoàn tiền (Hoàn {cashbackRate}%)</p>
+                <p className="text-lg font-bold text-[#C69C6D]" data-testid="account-cashback-value">
+                  {cashbackBalance.toLocaleString('vi-VN')}₫
+                </p>
+              </div>
             </div>
-            <div className="text-right">
-              <p className="text-xs text-[#A89F91]">Ví hoàn tiền (VND)</p>
-              <p className="text-lg font-bold text-[#C69C6D]" data-testid="account-cashback-value">
-                {cashbackBalance.toLocaleString('vi-VN')}₫
-              </p>
+
+            {cashbackExpiring7d > 0 && (
+              <div
+                role="alert"
+                data-testid="account-cashback-expiring-banner"
+                className="rounded-xl border border-amber-400/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-200"
+              >
+                Có {cashbackExpiring7d.toLocaleString('vi-VN')}₫ hoàn tiền sắp hết hạn trong 7 ngày tới.
+              </div>
+            )}
+
+            <div className="pt-2 border-t border-white/10 flex items-center justify-between">
+              <Link
+                to="/loyalty"
+                data-testid="account-view-loyalty-link"
+                className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#C69C6D] hover:underline"
+              >
+                Xem lịch sử điểm, hoàn tiền &amp; đổi quà →
+              </Link>
+              <Link
+                to="/loyalty-calculator"
+                className="text-xs text-[#A89F91] hover:text-[#F5EFE6]"
+              >
+                Tính nhẩm hoàn tiền
+              </Link>
             </div>
           </div>
 

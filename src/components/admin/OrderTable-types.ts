@@ -13,6 +13,7 @@ export interface OrderTableProps {
 
 export interface StatusActionsProps {
   currentStatus: string;
+  orderType?: string;
   isUpdating: boolean;
   onUpdate: (status: string) => void;
   t: (key: string) => string;

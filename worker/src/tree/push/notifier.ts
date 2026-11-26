@@ -14,7 +14,46 @@ export interface PushEnv {
   AURA_DB: import('@cloudflare/workers-types').D1Database;
 }
 
-const KITCHEN_EXTRA_ROLES = ['kitchen', 'barista', 'chef', 'staff', 'cashier'] as const;
+const KITCHEN_EXTRA_ROLES = ['kitchen', 'bep', 'barista', 'chef', 'staff', 'cashier'] as const;
+
+async function isStaffPreferenceEnabled(
+  env: PushEnv,
+  effectiveTenant: string,
+  staffId: string | null | undefined,
+  prefKey: 'orderAlertsEnabled' | 'shiftRemindersEnabled'
+): Promise<boolean> {
+  if (!env.AUTH_KV || !staffId || !String(staffId).trim()) return true;
+  const cleanId = String(staffId).trim();
+  try {
+    const scopedKey = `config:staff_notification_settings:${effectiveTenant}:${cleanId}`;
+    const raw =
+      (await env.AUTH_KV.get(scopedKey)) ??
+      (effectiveTenant === 'default' ? await env.AUTH_KV.get(`config:staff_notification_settings:${cleanId}`) : null);
+    if (!raw) return true;
+    const parsed = JSON.parse(raw) as Record<string, unknown>;
+    if (typeof parsed[prefKey] === 'boolean') {
+      return parsed[prefKey] as boolean;
+    }
+  } catch {
+    // Fail open on corrupt settings JSON
+  }
+  return true;
+}
+
+async function isSoundAlertsEnabled(env: PushEnv, effectiveTenant: string): Promise<boolean> {
+  if (!env.AUTH_KV) return false;
+  try {
+    const tenantKey = `config:notification_settings:${effectiveTenant}`;
+    const raw =
+      (await env.AUTH_KV.get(tenantKey)) ??
+      (effectiveTenant === 'default' ? await env.AUTH_KV.get('config:notification_settings') : null);
+    if (!raw) return false;
+    const parsed = JSON.parse(raw) as { soundAlerts?: unknown };
+    return Boolean(parsed.soundAlerts);
+  } catch {
+    return false;
+  }
+}
 
 async function isAutoNotifyNewOrderEnabled(env: PushEnv, effectiveTenant: string): Promise<boolean> {
   if (!env.AUTH_KV) return true;
@@ -253,6 +292,31 @@ export async function sendPushToStaff(
     subscriptions = subscriptions.filter(s => !s.customer_id || !excludeCustomerIds.includes(s.customer_id));
   }
 
+  const eventType = typeof payload.data?.type === 'string' ? payload.data.type : '';
+  const isOrderAlert = eventType === 'new_order' || role === STAFF_PUSH_ROLE;
+  const isShiftReminder = eventType === 'shift_reminder' || eventType === 'shift';
+
+  if (env.AUTH_KV && (isOrderAlert || isShiftReminder)) {
+    const prefKey = isShiftReminder ? 'shiftRemindersEnabled' : 'orderAlertsEnabled';
+    const filteredSubs: Subscription[] = [];
+    for (const sub of subscriptions) {
+      const allowed = await isStaffPreferenceEnabled(env, effectiveTenant, sub.customer_id, prefKey);
+      if (allowed) {
+        filteredSubs.push(sub);
+      }
+    }
+    subscriptions = filteredSubs;
+  }
+
+  const soundAlerts = await isSoundAlertsEnabled(env, effectiveTenant);
+  const enrichedPayload: PushPayload = {
+    ...payload,
+    data: {
+      ...(payload.data || {}),
+      soundAlerts,
+    },
+  };
+
   let sent = 0;
   let failed = 0;
 
@@ -266,7 +330,7 @@ export async function sendPushToStaff(
             p256dh: sub.p256dh_key
           }
         },
-        JSON.stringify(payload)
+        JSON.stringify(enrichedPayload)
       );
       sent++;
     } catch (err: unknown) {

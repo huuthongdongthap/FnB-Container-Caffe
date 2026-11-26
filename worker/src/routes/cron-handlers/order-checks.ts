@@ -9,11 +9,13 @@ import {
   verifyPayOSPaymentRequest,
 } from '../../../../packages/domain/payment/commands/payos-provider-verify';
 import { reconcilePayOSPayment } from '../../../../packages/domain/payment/commands/payos-reconcile';
+import { compensateVoidedOrder, publishOrderEvent } from '@aura/domain-order';
 import { isHeldOutOfKds } from '@aura/domain-kitchen';
 import type { Env } from '../../types/env';
 import type { D1Database, D1PreparedStatement, KVNamespace } from '@cloudflare/workers-types';
 
 const SLA_MINUTES_DEFAULT = 15;
+const OVERDUE_MAX_AGE_HOURS_DEFAULT = 24;
 const UNPAID_ONLINE_TTL_MINUTES_DEFAULT = 30;
 const log = createLogger({ route: 'cron' });
 
@@ -30,6 +32,7 @@ const OVERDUE_COLUMN_SETS = [
 
 async function fetchOverdueCandidates(
   db: import('@cloudflare/workers-types').D1Database,
+  minCreatedAt: string,
   cutoff: string,
   tenantId: string,
   scoped: boolean,
@@ -44,10 +47,14 @@ async function fetchOverdueCandidates(
           SELECT ${colList}
           FROM orders
           WHERE ${OVERDUE_STATUS_CLAUSE}
+            AND datetime(created_at) >= datetime(?)
             AND datetime(created_at) < datetime(?)${tenantWhere}
-            AND (notes IS NULL OR notes NOT LIKE '%[OVERDUE]%')
         `);
-        const res = await (filterTenant ? stmt.bind(cutoff, tenantId) : stmt.bind(cutoff)).all<Record<string, unknown>>();
+        const res = await (
+          filterTenant
+            ? stmt.bind(minCreatedAt, cutoff, tenantId)
+            : stmt.bind(minCreatedAt, cutoff)
+        ).all<Record<string, unknown>>();
         return (res.results || []).filter(
           (row) => matchesTenantRow(row, tenantId) && !isHeldOutOfKds(row),
         );
@@ -87,10 +94,16 @@ export async function checkOverdueOrders(env: Record<string, unknown>, tenantOve
 
   try {
     const db = env.AURA_DB as import('@cloudflare/workers-types').D1Database;
-    const cutoff = new Date(Date.now() - slaMinutes * 60 * 1000).toISOString();
+    const maxAgeHours =
+      Number.isFinite(Number(env.OVERDUE_MAX_AGE_HOURS)) && Number(env.OVERDUE_MAX_AGE_HOURS) > 0
+        ? Number(env.OVERDUE_MAX_AGE_HOURS)
+        : OVERDUE_MAX_AGE_HOURS_DEFAULT;
+    const nowMs = Date.now();
+    const minCreatedAt = new Date(nowMs - maxAgeHours * 3600 * 1000).toISOString();
+    const cutoff = new Date(nowMs - slaMinutes * 60 * 1000).toISOString();
     const scoped = Boolean(tenantId && tenantId !== '*');
 
-    const overdue = await fetchOverdueCandidates(db, cutoff, tenantId, scoped);
+    const overdue = await fetchOverdueCandidates(db, minCreatedAt, cutoff, tenantId, scoped);
 
     if (!overdue.length) {
       log.info('No overdue orders found.');
@@ -406,6 +419,28 @@ export async function expireUnpaidOnlineOrders(
       const orderUpdateResult = batchResults[batchResults.length - 1] as { meta?: { changes?: number } } | undefined;
       if (Number(orderUpdateResult?.meta?.changes ?? 0) > 0) {
         expiredCount += 1;
+        await compensateVoidedOrder({
+          db,
+          env,
+          kv: (env.AUTH_KV as KVNamespace | undefined) ?? null,
+          orderId: order.id,
+          tenantId: orderTenant,
+          now,
+          reason: 'order_expired',
+          preCancelStatus: 'pending',
+        }).catch((compErr) => {
+          log.warn('expireUnpaidOnlineOrders rollback warning', {
+            orderId: order.id,
+            message: compErr instanceof Error ? compErr.message : String(compErr),
+          });
+        });
+        if (env.AUTH_KV) {
+          await publishOrderEvent(env.AUTH_KV as KVNamespace, order.id, 'expired', {
+            previousStatus: 'pending',
+            tenantId: orderTenant,
+            paymentStatus: 'unpaid',
+          }).catch(() => {});
+        }
       }
     }
 

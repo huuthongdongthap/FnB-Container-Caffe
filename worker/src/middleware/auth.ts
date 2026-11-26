@@ -33,7 +33,7 @@ export function toUser(payload: { id: string; email: string; name: string; role:
     ...(isVerified !== undefined ? { emailVerified: isVerified, email_verified: rawVerified } : {}) };
 }
 const DEFAULT_AUTHENTICATED_ROLES = [
-  'customer', 'staff', 'waiter', 'manager', 'supervisor', 'owner', 'admin', 'cashier', 'kitchen', 'barista', 'chef', 'shipper',
+  'customer', 'user', 'staff', 'waiter', 'manager', 'supervisor', 'owner', 'admin', 'cashier', 'kitchen', 'barista', 'chef', 'bep', 'shipper', 'rider',
 ];
 export function requireAuth(allowedRoles: string[] = DEFAULT_AUTHENTICATED_ROLES): import('hono').MiddlewareHandler<{ Bindings: Env }> {
   return async (c, next) => {

@@ -1,7 +1,8 @@
 import { createLogger } from '../../middleware/logger';
 import { resolvePilotStore } from '../../middleware/tenant';
 import { syncOrderToERPNext } from '../../tree/erpnext/sync.js';
-import { createErpnextProductClient } from '../../clients/erpnext-product-client';
+import { ErpnextClient } from '../../clients/erpnext-client';
+import { createErpnextProductClient, ErpnextProductClient } from '../../clients/erpnext-product-client';
 
 const MAX_RETRIES = 3;
 const log = createLogger({ route: 'cron:erpnext' });
@@ -388,22 +389,129 @@ export async function processErpnextRetryQueue(
 }
 
 export async function processErpnextProductSync(
-  env: Record<string, unknown>
+  env: Record<string, unknown>,
+  tenantId?: string,
 ): Promise<{ synced: number; errors: number }> {
-  const client = createErpnextProductClient(env);
+  const db = env.AURA_DB as import('@cloudflare/workers-types').D1Database | undefined;
+  const kv = (env.AUTH_KV ?? env.AURA_KV) as {
+    get?: (key: string) => Promise<string | null>;
+    put?: (key: string, value: string, opts?: { expirationTtl?: number }) => Promise<void>;
+  } | undefined;
 
-  if (!client) {
-    log.info('ERPNext not configured, skipping product sync');
-    return { synced: 0, errors: 0 };
+  let activeTenant = tenantId && tenantId.trim() ? tenantId.trim() : '';
+  if (!activeTenant) {
+    try {
+      activeTenant = resolvePilotStore(env as unknown as Parameters<typeof resolvePilotStore>[0]);
+    } catch {
+      activeTenant = 'default';
+    }
+  }
+  if (activeTenant.toLowerCase() === 'hq') {
+    activeTenant = '*';
   }
 
-  try {
-    const result: { synced: number; errors: number } = { synced: 0, errors: 0 };
-    return result;
-  } catch (err) {
-    log.error('erpnext_product_sync_error', {
-      error: (err as Error)?.message
-    });
-    return { synced: 0, errors: 1 };
+  const candidateTenants = new Set<string>();
+  if (activeTenant !== '*') {
+    candidateTenants.add(activeTenant);
+  } else {
+    candidateTenants.add('default');
+    if (db && typeof db.prepare === 'function') {
+      try {
+        const tenantRes = await db
+          .prepare("SELECT DISTINCT id AS tenant_id FROM tenants WHERE COALESCE(status, 'active') = 'active' LIMIT 25")
+          .all<{ tenant_id?: string }>();
+        for (const row of tenantRes?.results || []) {
+          const t = typeof row.tenant_id === 'string' ? row.tenant_id.trim() : '';
+          if (t && t !== '*' && t.toLowerCase() !== 'hq') candidateTenants.add(t);
+        }
+      } catch {
+        // tenants table optional in minimal schemas
+      }
+      try {
+        const prodTenantRes = await db
+          .prepare("SELECT DISTINCT COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') AS tenant_id FROM products LIMIT 25")
+          .all<{ tenant_id?: string }>();
+        for (const row of prodTenantRes?.results || []) {
+          const t = typeof row.tenant_id === 'string' ? row.tenant_id.trim() : '';
+          if (t && t !== '*' && t.toLowerCase() !== 'hq') candidateTenants.add(t);
+        }
+      } catch {
+        // products table optional in minimal schemas
+      }
+    }
   }
+
+  let totalSynced = 0;
+  let totalErrors = 0;
+  const defaultSince = new Date(Date.now() - 24 * 3600_000).toISOString();
+
+  for (const targetTenant of candidateTenants) {
+    const creds = await resolveTenantErpnextCredentials(env, targetTenant);
+    let productClient: ErpnextProductClient | null = null;
+    if (creds) {
+      productClient = new ErpnextProductClient(
+        new ErpnextClient({ url: creds.url, apiKey: creds.key, apiSecret: creds.secret }),
+        {
+          AURA_DB: db as unknown as import('../../clients/erpnext-product-client').ProductEnv['AURA_DB'],
+          AURA_KV: kv as unknown as import('../../clients/erpnext-product-client').KVNamespace,
+          ERPNEXT_URL: creds.url,
+          ERPNEXT_API_KEY: creds.key,
+          ERPNEXT_API_SECRET: creds.secret,
+        }
+      );
+    } else if (targetTenant === 'default') {
+      productClient = createErpnextProductClient(env);
+    }
+
+    if (!productClient || !db) {
+      continue;
+    }
+
+    try {
+      const cursorKey =
+        targetTenant === 'default'
+          ? 'erpnext:product_sync:last_ts'
+          : `erpnext:product_sync:last_ts:${targetTenant}`;
+      let since = (kv && typeof kv.get === 'function' ? await kv.get(cursorKey).catch(() => null) : null) || '';
+      if (!since) {
+        try {
+          const lastRow = await db
+            .prepare(
+              "SELECT MAX(last_synced_at) AS last_ts FROM erpnext_product_sync WHERE COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
+            )
+            .bind(targetTenant)
+            .first<{ last_ts?: string | null }>();
+          if (lastRow?.last_ts) {
+            since = String(lastRow.last_ts);
+          }
+        } catch {
+          // erpnext_product_sync optional
+        }
+      }
+      const changed = await productClient.searchChangedProducts(since || defaultSince);
+      if (changed.length > 0) {
+        const syncRes = await productClient.syncProductsToLocal(
+          {
+            AURA_DB: db as unknown as import('../../clients/erpnext-product-client').ProductEnv['AURA_DB'],
+            AURA_KV: kv as unknown as import('../../clients/erpnext-product-client').KVNamespace,
+          },
+          changed,
+          targetTenant,
+        );
+        totalSynced += syncRes.updated;
+        totalErrors += syncRes.errors.length;
+      }
+      if (kv && typeof kv.put === 'function') {
+        await kv.put(cursorKey, new Date().toISOString()).catch(() => {});
+      }
+    } catch (err) {
+      totalErrors += 1;
+      log.error('erpnext_product_sync_error', {
+        tenantId: targetTenant,
+        error: (err as Error)?.message,
+      });
+    }
+  }
+
+  return { synced: totalSynced, errors: totalErrors };
 }

@@ -458,14 +458,17 @@ describe('PR-4: Shifts, Cash Reconciliation, Counter Cash & Delivery State Machi
 
   it('guards void transitions (failed/expired) on paid orders and persists delivery metadata when schema supports it', async () => {
     d1.exec(`
+      ALTER TABLE orders ADD COLUMN order_type TEXT DEFAULT 'dine_in';
       ALTER TABLE orders ADD COLUMN assigned_shipper_id TEXT;
       ALTER TABLE orders ADD COLUMN shipper_name TEXT;
       ALTER TABLE orders ADD COLUMN failure_reason TEXT;
-      INSERT INTO orders (id, tenant_id, payment_method, payment_status, status)
+      INSERT OR REPLACE INTO users (id, name, role, tenant_id, is_active)
+      VALUES ('shipper-1', 'Nguyen Van Shipper', 'rider', 'default', 1);
+      INSERT INTO orders (id, tenant_id, order_type, payment_method, payment_status, status)
       VALUES
-        ('ord-paid-deliv', 'default', 'payos', 'paid', 'delivering'),
-        ('ord-paid-pending', 'default', 'payos', 'paid', 'pending'),
-        ('ord-cod-deliv', 'default', 'cod', 'unpaid', 'ready');
+        ('ord-paid-deliv', 'default', 'delivery', 'payos', 'paid', 'delivering'),
+        ('ord-paid-pending', 'default', 'delivery', 'payos', 'paid', 'pending'),
+        ('ord-cod-deliv', 'default', 'delivery', 'cod', 'unpaid', 'ready');
     `);
 
     const blockedFail = await transitionOrderStatus(d1.db, 'ord-paid-deliv', 'failed', 'shipper', { tenantId: 'default' });
@@ -478,12 +481,14 @@ describe('PR-4: Shifts, Cash Reconciliation, Counter Cash & Delivery State Machi
 
     const dispatch = await executeKdsStatusTransition(d1.db, 'ord-cod-deliv', 'delivering', 'rider', {
       tenantId: 'default',
+      actorId: 'shipper-1',
       fields: { assigned_shipper_id: 'shipper-1', shipper_name: 'Nguyen Van Shipper' },
     });
     expect(dispatch.success).toBe(true);
 
     const failUnpaid = await executeKdsStatusTransition(d1.db, 'ord-cod-deliv', 'failed', 'rider', {
       tenantId: 'default',
+      actorId: 'shipper-1',
       fields: { failure_reason: 'Customer unreachable' },
     });
     expect(failUnpaid.success).toBe(true);

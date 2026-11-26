@@ -16,14 +16,19 @@ export interface EventItem {
 
 interface PretixEvent {
   slug?: string;
+  id?: string;
   name?: Record<string, string> | string;
+  description?: Record<string, string> | string;
   date_from?: string;
+  time?: string;
+  tag?: string;
+  image?: string;
   location?: { name?: string } | string;
   capacity?: number;
 }
 
 interface PretixEventsResponse {
-  success: boolean;
+  success?: boolean;
   data?: PretixEvent[] | { results?: PretixEvent[] };
   results?: PretixEvent[];
 }
@@ -36,6 +41,12 @@ function toEventItem(raw: PretixEvent, idx: number): EventItem {
   } else if (raw.name && typeof raw.name === 'object') {
     title = raw.name.vi || raw.name.en || Object.values(raw.name)[0] || '';
   }
+  let description = '';
+  if (typeof raw.description === 'string') {
+    description = raw.description;
+  } else if (raw.description && typeof raw.description === 'object') {
+    description = raw.description.vi || raw.description.en || Object.values(raw.description)[0] || '';
+  }
   let location = '';
   if (typeof raw.location === 'string') {
     location = raw.location;
@@ -44,15 +55,16 @@ function toEventItem(raw: PretixEvent, idx: number): EventItem {
   }
   const date = raw.date_from ? raw.date_from.slice(0, 10) : '';
   return {
-    id: raw.slug || `event-${idx}`,
+    id: raw.slug || raw.id || `event-${idx}`,
     title,
-    description: '',
+    description,
     date,
-    time: '',
+    time: raw.time || '',
     location,
-    tag: '',
+    tag: raw.tag || '',
     capacity: raw.capacity ?? 0,
     registered: 0,
+    image: raw.image,
   };
 }
 
@@ -60,23 +72,17 @@ export function useEvents() {
   return useQuery<EventItem[]>({
     queryKey: ['events'],
     queryFn: async () => {
-      try {
-        const res = await apiFetch<PretixEventsResponse>('/api/pretix/events', { silent: true });
-        const rawList = Array.isArray(res?.data)
-          ? res.data
-          : Array.isArray((res?.data as { results?: PretixEvent[] } | undefined)?.results)
-            ? (res?.data as { results: PretixEvent[] }).results
-            : Array.isArray(res?.results)
-              ? res.results
-              : [];
-        const items = rawList
-          .map((e, i) => toEventItem(e, i))
-          .filter((it) => it.title);
-        return items;
-      } catch {
-        // Pretix not configured or unreachable → render defaultData demo in page
-        return [];
-      }
+      const res = await apiFetch<PretixEventsResponse>('/api/pretix/events', { silent: true });
+      const rawList = Array.isArray(res?.data)
+        ? res.data
+        : Array.isArray((res?.data as { results?: PretixEvent[] } | undefined)?.results)
+          ? (res?.data as { results: PretixEvent[] }).results
+          : Array.isArray(res?.results)
+            ? res.results
+            : [];
+      return rawList
+        .map((e, i) => toEventItem(e, i))
+        .filter((it) => it.title);
     },
   });
 }

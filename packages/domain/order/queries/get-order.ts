@@ -5,6 +5,7 @@
 
 import { jsonResponse, errorResponse } from 'worker/src/middleware/cors';
 import { createLogger } from 'worker/src/middleware/logger';
+import { sanitizeOrderNotes } from '../model/helpers';
 
 const log = createLogger({ route: 'orders' });
 
@@ -26,8 +27,8 @@ export async function getOrder(
       : '';
     const binds = hasTenantScope ? [id, cleanTenant] : [id];
     const selectCols = cleanTenant
-      ? 'id, status, total, shipping_fee, discount, payment_status, customer_name, customer_phone, customer_address, items, tenant_id, created_at, updated_at, points_earned, cashback_earned'
-      : 'id, status, total, shipping_fee, discount, payment_status, customer_name, customer_phone, customer_address, items, created_at, updated_at, points_earned, cashback_earned';
+      ? 'id, order_number, status, total, shipping_fee, discount, payment_status, payment_method, order_type, table_id, notes, delivery_time, started_at, ready_at, served_at, cancelled_at, assigned_shipper_id, shipper_name, failure_reason, customer_name, customer_phone, customer_address, items, tenant_id, created_at, updated_at, points_earned, cashback_earned'
+      : 'id, order_number, status, total, shipping_fee, discount, payment_status, payment_method, order_type, table_id, notes, delivery_time, started_at, ready_at, served_at, cancelled_at, assigned_shipper_id, shipper_name, failure_reason, customer_name, customer_phone, customer_address, items, created_at, updated_at, points_earned, cashback_earned';
     let results: Record<string, unknown>[] = [];
     try {
       const res = await db.prepare(
@@ -79,6 +80,7 @@ export async function getOrder(
 
     const order: Record<string, unknown> = {
       ...results[0],
+      notes: sanitizeOrderNotes(results[0].notes),
       items: parsedItems,
       total: parseInt(String(results[0].total ?? results[0].total_amount ?? 0), 10) || 0,
       shipping_fee: parseInt(String(results[0].shipping_fee || 0), 10) || 0,

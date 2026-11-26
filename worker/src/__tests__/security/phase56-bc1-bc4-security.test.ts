@@ -504,11 +504,11 @@ describe('ERPNext/Pretix/Mixpost/Mautic Isolation, Admin/Pricing/Forecasting/WiF
                 ],
               };
             }
-            if (sql.includes('FROM inventory_transactions')) {
-              return { results: [{ item_id: 'ing-1', total_depleted: 700, tenant_id: 'store-a' }] };
-            }
             if (sql.includes('FROM stock_movements')) {
               return { results: [{ item_id: 'ing-2', total_depleted: 1400, tenant_id: 'store-a' }] };
+            }
+            if (sql.includes('FROM inventory_transactions')) {
+              return { results: [{ item_id: 'ing-1', total_depleted: 700, tenant_id: 'store-a' }] };
             }
             return { results: [] };
           },

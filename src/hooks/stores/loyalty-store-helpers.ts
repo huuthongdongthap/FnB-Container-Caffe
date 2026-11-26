@@ -8,6 +8,7 @@ import {
   type LoyaltyTierLadderItem,
   type NextTierInfo,
   type RedeemedVoucher,
+  type CashbackTransactionEntry,
 } from './loyalty-store-types';
 
 export function loadInitialLoyalty(): StoredLoyalty | null {
@@ -53,6 +54,9 @@ export function parseLoyaltySummary(data: Record<string, unknown>): {
   lifetimePoints: number;
   cashbackRate: number;
   cashbackBalance: number;
+  cashbackTotalEarned: number;
+  cashbackTotalSpent: number;
+  cashbackExpiring7d: number;
   nextTier: NextTierInfo | null;
 } {
   const tier = (data.tier as string) || 'bronze';
@@ -60,7 +64,11 @@ export function parseLoyaltySummary(data: Record<string, unknown>): {
   const lifetimePoints = Number(data.lifetime_points ?? data.total_points ?? data.points ?? 0);
   const tierConfig = data.tier_config as Record<string, unknown> | undefined;
   const wallet = data.wallet as Record<string, unknown> | undefined;
-  const cashbackBalance = Number(wallet?.balance ?? data.cashback_balance ?? data.balance ?? 0);
+  const cashbackBalance = Math.max(0, Number(wallet?.balance ?? data.cashback_balance ?? data.balance ?? 0));
+  const cashbackTotalEarned = Math.max(0, Number(wallet?.total_earned ?? data.total_earned ?? 0));
+  const cashbackTotalSpent = Math.max(0, Number(wallet?.total_spent ?? data.total_spent ?? 0));
+  const rawExpiring = Math.max(0, Number(wallet?.expiring_within_7d ?? data.expiring_within_7d ?? 0));
+  const cashbackExpiring7d = Math.max(0, Math.min(rawExpiring, cashbackBalance));
   const rawRate = Number(
     (data.cashbackRate as number) ??
     (tierConfig?.cashback_rate as number) ??
@@ -76,7 +84,30 @@ export function parseLoyaltySummary(data: Record<string, unknown>): {
         points_needed: Number(rawNext.points_needed ?? 0),
       }
     : null;
-  return { tier, points, lifetimePoints, cashbackRate, cashbackBalance, nextTier };
+  return {
+    tier,
+    points,
+    lifetimePoints,
+    cashbackRate,
+    cashbackBalance,
+    cashbackTotalEarned,
+    cashbackTotalSpent,
+    cashbackExpiring7d,
+    nextTier,
+  };
+}
+
+export function parseCashbackHistory(data: Record<string, unknown>[]): CashbackTransactionEntry[] {
+  return data.map((row) => ({
+    id: String(row.id || ''),
+    type: String(row.type || 'earn'),
+    amount: Number(row.amount ?? 0),
+    balanceAfter: Number(row.balance_after ?? row.balanceAfter ?? 0),
+    orderId: row.order_id ? String(row.order_id) : row.orderId ? String(row.orderId) : null,
+    expiresAt: row.expires_at ? String(row.expires_at) : row.expiresAt ? String(row.expiresAt) : null,
+    description: String(row.description || ''),
+    createdAt: String(row.created_at || row.createdAt || ''),
+  }));
 }
 
 export function parseMyRewards(data: Record<string, unknown>[]): RedeemedVoucher[] {

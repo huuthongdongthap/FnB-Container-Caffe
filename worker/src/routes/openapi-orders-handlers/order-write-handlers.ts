@@ -13,7 +13,7 @@ import { fetchOrderForRead } from './order-read-handlers';
 
 export { handleCancelOrder };
 
-const ORDER_STAFF_ROLES = ['owner', 'manager', 'supervisor', 'admin', 'cashier', 'waiter', 'staff', 'rider'];
+const ORDER_STAFF_ROLES = ['owner', 'manager', 'supervisor', 'admin', 'cashier', 'waiter', 'staff', 'shipper', 'rider'];
 
 function matchesOrderTenant(row: Record<string, unknown>, tenantId: string): boolean {
   return matchesTenantRow(row, tenantId);
@@ -23,17 +23,26 @@ export async function handleOpenApiCreateOrder(c: Context<{ Bindings: Env }>) {
   const body = ((c.req as any).valid ? (c.req as any).valid('json') : null) || (await c.req.json());
   let ctx: { waitUntil: (promise: Promise<unknown>) => void } | undefined;
   try { ctx = c.executionCtx; } catch { /* Unit callers may omit execution context. */ }
+  const resolvedChannel = body.channel || (body.tableId ? 'dine_in' : 'takeaway');
+  const rawCustomerName = typeof body.customer?.name === 'string' ? body.customer.name.trim() : '';
+  const rawCustomerPhone = typeof body.customer?.phone === 'string' ? body.customer.phone.trim() : '';
+  const fallbackCustomerName =
+    resolvedChannel === 'delivery'
+      ? ''
+      : resolvedChannel === 'takeaway'
+        ? 'Khách mang đi'
+        : 'Khách tại quán';
   const response = await createOrderFromAlias(c.req.raw, c.env, {
     items: body.items,
     total: body.total ?? body.totalAmount ?? 1000,
-    customer_name: body.customer?.name || 'Khách tại quán',
-    customer_phone: body.customer?.phone || '0000000000',
+    customer_name: rawCustomerName || fallbackCustomerName,
+    customer_phone: resolvedChannel === 'delivery' ? rawCustomerPhone : (rawCustomerPhone || ''),
     customer_email: body.customer?.email || '',
     customer_address: body.customer?.address || '',
     customer_id: body.customer?.id,
     payment_method: body.paymentMethod || 'cod',
     table_id: body.tableId,
-    order_type: body.channel || (body.tableId ? 'dine_in' : 'takeaway'),
+    order_type: resolvedChannel,
     notes: body.notes,
   }, ctx, c.get('user'));
   if (!response.ok) return response;
@@ -174,6 +183,16 @@ export async function handleOpenApiUpdateOrder(c: Context<{ Bindings: Env }>) {
     if (!Boolean(user?.role && ORDER_STAFF_ROLES.includes(user.role))) {
       return c.json({ success: false, error: 'Insufficient permissions to update order fields' }, 403);
     }
+    if (normalizedActorRole === 'shipper' || normalizedActorRole === 'rider') {
+      const hasCustomerPiiMutation =
+        customer_name !== undefined ||
+        customer_phone !== undefined ||
+        customer_email !== undefined ||
+        body.customer !== undefined;
+      if (hasCustomerPiiMutation) {
+        return c.json({ success: false, error: 'Shippers cannot modify customer details' }, 403);
+      }
+    }
   }
 
   if (body.status !== undefined) {
@@ -182,6 +201,11 @@ export async function handleOpenApiUpdateOrder(c: Context<{ Bindings: Env }>) {
       if (!structural.ok) return c.json({ success: false, error: structural.error }, 400);
       const authCheck = canActorTransition(toActorRole(user?.role), existing.status, body.status);
       if (!authCheck.ok) return c.json({ success: false, error: authCheck.error }, 403);
+
+      const deliveryFields: Record<string, unknown> = {};
+      if (typeof body.assigned_shipper_id === 'string') deliveryFields.assigned_shipper_id = body.assigned_shipper_id.trim() || null;
+      if (typeof body.shipper_name === 'string') deliveryFields.shipper_name = body.shipper_name.trim() || null;
+      if (typeof body.failure_reason === 'string') deliveryFields.failure_reason = body.failure_reason.trim() || null;
 
       if (isVoidStatus(body.status)) {
         const preCancelStatus = String(existing.status ?? '');
@@ -192,6 +216,8 @@ export async function handleOpenApiUpdateOrder(c: Context<{ Bindings: Env }>) {
           env: c.env as unknown as Record<string, unknown>,
           skipCancelSideEffects: true,
           allowPaidCompensation: canCompensatePaid,
+          actorId: user?.id,
+          ...(Object.keys(deliveryFields).length > 0 ? { fields: deliveryFields } : {}),
         });
         if (!transition.success) {
           return c.json({ success: false, error: transition.error }, (transition.statusCode || 400) as any);
@@ -204,14 +230,17 @@ export async function handleOpenApiUpdateOrder(c: Context<{ Bindings: Env }>) {
           existing: existing as unknown as Record<string, unknown>,
           cancelTenant: effectiveOrderTenant,
           now,
-          reason: body.reason || body.notes || 'order_cancelled',
+          reason: body.failure_reason || body.reason || body.notes || 'order_cancelled',
           preCancelStatus,
+          actorId: user?.id || null,
         });
       } else {
         const transition = await executeKdsStatusTransition(db, id, body.status, user?.role, {
           tenantId: effectiveOrderTenant,
           kv: c.env?.AUTH_KV,
           env: c.env as unknown as Record<string, unknown>,
+          actorId: user?.id,
+          ...(Object.keys(deliveryFields).length > 0 ? { fields: deliveryFields } : {}),
         });
         if (!transition.success) {
           return c.json({ success: false, error: transition.error }, (transition.statusCode || 400) as any);

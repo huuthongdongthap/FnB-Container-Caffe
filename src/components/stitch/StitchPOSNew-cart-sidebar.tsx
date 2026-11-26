@@ -48,6 +48,8 @@ interface CartSidebarProps {
   onClearCustomer?: () => void;
   useCashback?: boolean;
   onToggleCashback?: (enabled: boolean) => void;
+  cashTendered?: string;
+  onCashTenderedChange?: (value: string) => void;
 }
 
 export function CartSidebar({
@@ -76,6 +78,8 @@ export function CartSidebar({
   onClearCustomer,
   useCashback = false,
   onToggleCashback,
+  cashTendered = '',
+  onCashTenderedChange,
 }: CartSidebarProps) {
   const { t } = useTranslation();
   const resolvedOrderType: POSOrderType = orderType ?? (selectedTableId ? 'dine_in' : 'takeaway');
@@ -318,6 +322,37 @@ export function CartSidebar({
           <p className="text-[11px] text-amber-300/90 font-body" data-testid="pos-delivery-payos-note">
             Đơn giao hàng yêu cầu thanh toán trả trước qua PayOS.
           </p>
+        )}
+        {effectivePaymentMethod === 'cod' && onCashTenderedChange && payableTotal > 0 && (
+          <div className="mt-2 rounded-lg border border-white/15 bg-black/25 px-3 py-2 flex flex-col gap-1.5 font-body">
+            <div className="flex items-center justify-between gap-2">
+              <label htmlFor="pos-cash-tendered-input" className="text-[11px] text-[var(--aura-text-muted,#8A8E96)]">
+                Tiền khách đưa:
+              </label>
+              <input
+                id="pos-cash-tendered-input"
+                type="number"
+                min={0}
+                step={1000}
+                inputMode="numeric"
+                data-testid="pos-cash-tendered-input"
+                value={cashTendered}
+                onChange={(e) => onCashTenderedChange(e.target.value)}
+                placeholder={String(payableTotal)}
+                className="w-32 rounded border border-white/20 bg-black/40 px-2 py-1 text-right text-xs text-white outline-none focus:border-[#f2c08d]"
+              />
+            </div>
+            {cashTendered.trim() !== '' && Number.isFinite(Number(cashTendered)) && (
+              <div className="flex items-center justify-between text-xs" data-testid="pos-cash-change-due">
+                <span className="text-[var(--aura-text-muted,#8A8E96)]">Tiền thối:</span>
+                <span className={Number(cashTendered) >= payableTotal ? 'font-semibold text-emerald-300' : 'font-semibold text-red-300'}>
+                  {Number(cashTendered) >= payableTotal
+                    ? formatPosPrice(Number(cashTendered) - payableTotal)
+                    : 'Chưa đủ tiền'}
+                </span>
+              </div>
+            )}
+          </div>
         )}
         <button
           type="button"

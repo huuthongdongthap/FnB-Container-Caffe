@@ -528,6 +528,13 @@ export async function handleErpnextPosRequest(
             payloadStr, now
           ).run();
         }
+        await consumeErpnextWebhookEvent(db, (env.AUTH_KV ?? env.AURA_KV) as unknown as WebhookKvLike, {
+          doctype: String(body.doctype || ''),
+          docname: String(body.docname || ''),
+          action: String(body.action || ''),
+          payload: body,
+          tenantId: writeTenant,
+        }).catch(() => {});
       }
       return json({ success: true, message: 'Webhook received' });
     }
@@ -537,4 +544,171 @@ export async function handleErpnextPosRequest(
     const msg = e instanceof Error ? e.message : String(e);
     return json({ success: false, error: msg }, 500);
   }
+}
+
+interface WebhookKvLike {
+  get?: (key: string) => Promise<string | null>;
+  put?: (key: string, value: string) => Promise<unknown>;
+  delete?: (key: string) => Promise<unknown>;
+}
+
+export async function consumeErpnextWebhookEvent(
+  db: D1Database,
+  kv: WebhookKvLike | undefined,
+  event: {
+    doctype: string;
+    docname: string;
+    action: string;
+    payload?: Record<string, unknown> | null;
+    tenantId: string;
+  }
+): Promise<boolean> {
+  const doctype = event.doctype.trim();
+  const docname = event.docname.trim();
+  if (!doctype || !docname) return false;
+  const effectiveTenant =
+    event.tenantId && event.tenantId.trim() && event.tenantId.trim() !== '*'
+      ? event.tenantId.trim()
+      : 'default';
+  const now = new Date().toISOString();
+  const data = (event.payload?.data && typeof event.payload.data === 'object'
+    ? (event.payload.data as Record<string, unknown>)
+    : event.payload || {}) as Record<string, unknown>;
+
+  if (doctype === 'Item' || doctype === 'Bin') {
+    const itemCode = String(data.item_code || docname).trim();
+    const productKey = effectiveTenant !== 'default' ? `${effectiveTenant}::${itemCode}` : itemCode;
+    const stockVal = typeof data.actual_qty === 'number' ? Math.floor(data.actual_qty) : null;
+    const priceVal = typeof data.standard_rate === 'number' ? data.standard_rate : null;
+    try {
+      await db.prepare(
+        `INSERT INTO erpnext_product_sync
+          (product_id, erpnext_product_id, erpnext_item_code, cached_stock, cached_price, last_synced_at, erpnext_modified, tenant_id)
+         VALUES (?, 0, ?, ?, ?, ?, ?, ?)
+         ON CONFLICT(product_id) DO UPDATE SET
+          erpnext_item_code = excluded.erpnext_item_code,
+          cached_stock = COALESCE(excluded.cached_stock, erpnext_product_sync.cached_stock),
+          cached_price = COALESCE(excluded.cached_price, erpnext_product_sync.cached_price),
+          last_synced_at = excluded.last_synced_at,
+          erpnext_modified = excluded.erpnext_modified
+         WHERE COALESCE(NULLIF(TRIM(erpnext_product_sync.tenant_id), ''), 'default') = excluded.tenant_id`
+      ).bind(productKey, itemCode, stockVal, priceVal, now, String(data.modified || now), effectiveTenant).run();
+    } catch {
+      // Optional table in minimal schemas
+    }
+    if (kv && typeof kv.delete === 'function') {
+      const cacheKey =
+        effectiveTenant !== 'default'
+          ? `erpnext:product:availability:${effectiveTenant}:${itemCode}`
+          : `erpnext:product:availability:${itemCode}`;
+      await kv.delete(cacheKey).catch(() => {});
+    }
+    return true;
+  }
+
+  if (doctype === 'Customer') {
+    const phone = typeof data.mobile_no === 'string' ? data.mobile_no.trim() : '';
+    const email = typeof data.email_id === 'string' ? data.email_id.trim() : '';
+    if (phone || email || docname) {
+      await db.prepare(
+        `UPDATE customers
+         SET erpnext_id = ?, sync_status = 'synced'
+         WHERE (erpnext_id = ? OR (? != '' AND phone = ?) OR (? != '' AND email = ?))
+           AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?`
+      ).bind(docname, docname, phone, phone, email, email, effectiveTenant).run().catch(() => {});
+    }
+    return true;
+  }
+
+  if (doctype === 'Supplier') {
+    const supName = typeof data.supplier_name === 'string' ? data.supplier_name.trim() : docname;
+    await db.prepare(
+      `INSERT INTO erpnext_mappings (id, local_type, local_id, erpnext_id, erpnext_model, sync_status, last_synced_at, tenant_id)
+       VALUES (?, 'supplier', ?, ?, 'Supplier', 'synced', ?, ?)
+       ON CONFLICT(id) DO UPDATE SET erpnext_id = excluded.erpnext_id, sync_status = 'synced', last_synced_at = excluded.last_synced_at`
+    ).bind(`map_supplier_${effectiveTenant}_${supName}`, supName, docname, now, effectiveTenant).run().catch(() => {});
+    return true;
+  }
+
+  if (doctype === 'Sales Invoice' || doctype === 'POS Invoice' || doctype === 'Sales Order') {
+    const localOrderId = String(data.po_no || data.custom_aura_order_id || data.order_id || docname).trim();
+    await db.prepare(
+      `INSERT INTO erpnext_mappings (id, local_type, local_id, erpnext_id, erpnext_model, sync_status, last_synced_at, tenant_id)
+       VALUES (?, 'order', ?, ?, ?, 'synced', ?, ?)
+       ON CONFLICT(id) DO UPDATE SET erpnext_id = excluded.erpnext_id, sync_status = 'synced', last_synced_at = excluded.last_synced_at`
+    ).bind(`map_order_${effectiveTenant}_${localOrderId}`, localOrderId, docname, doctype, now, effectiveTenant).run().catch(() => {});
+    return true;
+  }
+
+  return false;
+}
+
+export async function processErpnextWebhookLog(
+  db: D1Database,
+  kv: WebhookKvLike | undefined,
+  tenantId: string,
+  limit = 50,
+): Promise<number> {
+  const effectiveTenant = tenantId && tenantId.trim() ? tenantId.trim() : 'default';
+  const cursorKey =
+    effectiveTenant === 'default'
+      ? 'erpnext:webhook_log:last_id'
+      : `erpnext:webhook_log:last_id:${effectiveTenant}`;
+  const rawLastId = kv && typeof kv.get === 'function' ? await kv.get(cursorKey).catch(() => null) : null;
+  const lastId = rawLastId ? Number(rawLastId) || 0 : 0;
+
+  let rows: Array<{
+    id: number;
+    doctype: string;
+    docname: string;
+    action: string;
+    payload?: string | null;
+    tenant_id?: string | null;
+  }> = [];
+  try {
+    const res = await db.prepare(
+      `SELECT id, doctype, docname, action, payload, tenant_id
+       FROM erpnext_webhook_log
+       WHERE id > ?
+         AND (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?)
+       ORDER BY id ASC
+       LIMIT ?`
+    ).bind(lastId, effectiveTenant, effectiveTenant, limit).all<typeof rows[number]>();
+    rows = res.results || [];
+  } catch {
+    return 0;
+  }
+
+  let processed = 0;
+  let maxSeenId = lastId;
+  for (const row of rows) {
+    let parsedPayload: Record<string, unknown> | null = null;
+    if (row.payload) {
+      try {
+        parsedPayload = JSON.parse(row.payload) as Record<string, unknown>;
+      } catch {
+        parsedPayload = null;
+      }
+    }
+    const rowTenant =
+      typeof row.tenant_id === 'string' && row.tenant_id.trim()
+        ? row.tenant_id.trim()
+        : effectiveTenant === '*'
+          ? 'default'
+          : effectiveTenant;
+    const handled = await consumeErpnextWebhookEvent(db, kv, {
+      doctype: row.doctype,
+      docname: row.docname,
+      action: row.action,
+      payload: parsedPayload,
+      tenantId: rowTenant,
+    }).catch(() => false);
+    if (handled) processed++;
+    if (row.id > maxSeenId) maxSeenId = row.id;
+  }
+
+  if (maxSeenId > lastId && kv && typeof kv.put === 'function') {
+    await kv.put(cursorKey, String(maxSeenId)).catch(() => {});
+  }
+  return processed;
 }

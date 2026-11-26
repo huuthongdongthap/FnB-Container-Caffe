@@ -148,7 +148,7 @@ export function registerFeatureRoutes(app: Hono<{ Bindings: Env }>): void {
   app.route('/api/promotions', promotionsRouter);
   app.route('/api/signage', signageRouter);
   app.route('/api/pretix', pretixRouter);
-  app.use('/api/shifts/:id/*', requireAuth(['owner', 'manager', 'supervisor', 'staff', 'admin', 'waiter', 'kitchen', 'barista', 'chef', 'cashier', 'shipper']));
+  app.use('/api/shifts/:id/*', requireAuth(['owner', 'manager', 'supervisor', 'staff', 'admin', 'waiter', 'kitchen', 'barista', 'chef', 'bep', 'cashier', 'shipper', 'rider']));
   reconciliationRoutes(app as any);
   app.route('/api/shifts', shiftsRouter);
   app.get('/api/subscriptions/invoices/:id/receipt', requireAuth(['owner', 'manager', 'supervisor', 'admin', 'staff', 'vendor', 'customer']), (c) => getInvoiceReceipt(c));
@@ -247,7 +247,7 @@ export function registerFeatureRoutes(app: Hono<{ Bindings: Env }>): void {
       (effectiveTenant === 'default' ? await c.env.AUTH_KV?.get('config:notification_settings') : null);
     const parsed = safeParseSettingsJson(raw);
     return c.json({
-      autoNotifyNewOrder: Boolean(parsed.autoNotifyNewOrder),
+      autoNotifyNewOrder: parsed.autoNotifyNewOrder !== false,
       soundAlerts: Boolean(parsed.soundAlerts),
     });
   });
@@ -262,7 +262,7 @@ export function registerFeatureRoutes(app: Hono<{ Bindings: Env }>): void {
       (effectiveTenant === 'default' ? await c.env.AUTH_KV?.get('config:notification_settings') : null);
     const prev = safeParseSettingsJson(raw);
     const next = {
-      autoNotifyNewOrder: typeof body.autoNotifyNewOrder === 'boolean' ? body.autoNotifyNewOrder : Boolean(prev.autoNotifyNewOrder),
+      autoNotifyNewOrder: typeof body.autoNotifyNewOrder === 'boolean' ? body.autoNotifyNewOrder : prev.autoNotifyNewOrder !== false,
       soundAlerts: typeof body.soundAlerts === 'boolean' ? body.soundAlerts : Boolean(prev.soundAlerts),
     };
     const serialized = JSON.stringify(next);
@@ -272,7 +272,7 @@ export function registerFeatureRoutes(app: Hono<{ Bindings: Env }>): void {
     }
     return c.json({ success: true, ...next });
   });
-  app.get('/api/staff/notification-settings', requireAuth(['owner', 'manager', 'supervisor', 'admin', 'staff', 'waiter', 'kitchen', 'barista', 'chef', 'cashier', 'shipper']), async (c) => {
+  app.get('/api/staff/notification-settings', requireAuth(['owner', 'manager', 'supervisor', 'admin', 'staff', 'waiter', 'kitchen', 'bep', 'barista', 'chef', 'cashier', 'shipper', 'rider']), async (c) => {
     const scope = resolveNotificationSettingsTenant(c, 'Forbidden: cross-tenant notification settings access denied');
     if (scope.errorResponse) return scope.errorResponse;
     const { effectiveTenant, user } = scope;
@@ -287,7 +287,7 @@ export function registerFeatureRoutes(app: Hono<{ Bindings: Env }>): void {
       shiftRemindersEnabled: Boolean(parsed.shiftRemindersEnabled ?? true),
     });
   });
-  app.patch('/api/staff/notification-settings', requireAuth(['owner', 'manager', 'supervisor', 'admin', 'staff', 'waiter', 'kitchen', 'barista', 'chef', 'cashier', 'shipper']), async (c) => {
+  app.patch('/api/staff/notification-settings', requireAuth(['owner', 'manager', 'supervisor', 'admin', 'staff', 'waiter', 'kitchen', 'bep', 'barista', 'chef', 'cashier', 'shipper', 'rider']), async (c) => {
     const scope = resolveNotificationSettingsTenant(c, 'Forbidden: cross-tenant notification settings update denied');
     if (scope.errorResponse) return scope.errorResponse;
     const { effectiveTenant, user } = scope;

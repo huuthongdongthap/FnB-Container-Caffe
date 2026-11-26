@@ -28,9 +28,15 @@ export function LoyaltyCalculatorPage() {
  <div className="flex flex-wrap justify-center gap-3 text-xs">
  <Link
  to="/loyalty"
- className="text-[color:var(--aura-chrome-bright)] underline-offset-2 hover:underline"
+ className="px-4 py-2 rounded-full bg-[color:var(--aura-chrome-bright)] text-black font-semibold hover:opacity-90 transition-opacity"
  >
- {t('loyaltyCalcPage.customerLoyalty')}
+ {t('loyaltyCalcPage.customerLoyalty', 'Tra cứu điểm & Ví hoàn tiền')}
+ </Link>
+ <Link
+ to="/account"
+ className="px-4 py-2 rounded-full border border-white/20 text-[color:var(--aura-chrome-bright)] hover:bg-white/5 transition-colors"
+ >
+ Đăng nhập hội viên
  </Link>
  </div>
  </div>
@@ -40,9 +46,11 @@ export function LoyaltyCalculatorPage() {
 
  {/* Footer note */}
  <footer className="mt-16 text-center text-xs text-[color:var(--aura-chrome-bright)]/40">
- <p>AURA CAFE Sa Dec &bull; He Thong Quan Ly Tai Chinh &amp; Van Hanh Tu Dong</p>
+ <p>AURA CAFE Sa Dec &bull; Chuong Trinh Khach Hang Than Thiet &amp; Vi Hoan Tien VND</p>
  </footer>
  </div>
  </>
  );
 }
+
+export default LoyaltyCalculatorPage;

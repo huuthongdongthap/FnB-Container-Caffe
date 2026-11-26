@@ -1,4 +1,5 @@
 import React from 'react';
+import { parseKdsTimestampMs } from '@/pages/kds-types';
 
 /* ── Static styles for OpsShell Mobile KDS (Dark Industrial Luxury) ── */
 
@@ -203,9 +204,27 @@ export function statusBadgeStyle(status: string): React.CSSProperties {
   };
 }
 
-export function cardBorder(status: string): React.CSSProperties {
+export function cardBorder(
+  status: string,
+  slaState?: 'overdue' | 'warning' | 'normal',
+): React.CSSProperties {
+  if (slaState === 'overdue' && status !== 'ready') {
+    return {
+      ...card,
+      border: '2px solid #EF4444',
+      boxShadow: '0 0 18px rgba(239, 68, 68, 0.25)',
+    };
+  }
+  if (slaState === 'warning' && status !== 'ready') {
+    return {
+      ...card,
+      border: '2px solid #F59E0B',
+      boxShadow: '0 0 14px rgba(245, 158, 11, 0.2)',
+    };
+  }
   const map: Record<string, string> = {
     pending: '#F59E0B',
+    confirmed: '#38BDF8',
     preparing: '#3B82F6',
     ready: '#10B981',
   };
@@ -215,9 +234,27 @@ export function cardBorder(status: string): React.CSSProperties {
   };
 }
 
-export function timeAgo(iso: string): string {
-  const sec = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
-  if (sec < 60) return `${sec}s`;
-  if (sec < 3600) return `${Math.floor(sec / 60)}m`;
-  return `${Math.floor(sec / 3600)}h`;
+export interface TimeAgoOptions {
+  freezeEndIso?: string | null;
+  lang?: string;
+  nowMs?: number;
+}
+
+export function timeAgo(iso: string, options?: TimeAgoOptions): string {
+  const startMs = parseKdsTimestampMs(iso);
+  if (!Number.isFinite(startMs)) return '0s';
+  const frozenEndMs = options?.freezeEndIso ? parseKdsTimestampMs(options.freezeEndIso) : NaN;
+  const refMs = Number.isFinite(frozenEndMs) ? frozenEndMs : (options?.nowMs ?? Date.now());
+  const sec = Math.max(0, Math.floor((refMs - startMs) / 1000));
+  const isVi = (options?.lang ?? '').toLowerCase().startsWith('vi');
+  if (sec < 60) return isVi ? `${sec}g` : `${sec}s`;
+  if (sec < 3600) return isVi ? `${Math.floor(sec / 60)}p` : `${Math.floor(sec / 60)}m`;
+  if (sec < 86400) {
+    const h = Math.floor(sec / 3600);
+    const m = Math.floor((sec % 3600) / 60);
+    return isVi ? `${h}g ${m}p` : `${h}h ${m}m`;
+  }
+  const d = Math.floor(sec / 86400);
+  const h = Math.floor((sec % 86400) / 3600);
+  return isVi ? `${d}ng ${h}g` : `${d}d ${h}h`;
 }

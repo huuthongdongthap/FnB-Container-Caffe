@@ -18,6 +18,7 @@ export function ManageMenuTabBar({ activeTab, onChange }: ManageMenuTabBarProps)
     { key: 'products', label: t('adminMenu.tabProducts') },
     { key: 'categories', label: t('adminMenu.tabCategories') },
     { key: 'modifiers', label: t('adminMenu.tabModifiers') },
+    { key: 'happy-hour', label: t('adminMenu.tabHappyHour', { defaultValue: 'Giờ vàng (Happy Hour)' }) },
   ];
 
   return (

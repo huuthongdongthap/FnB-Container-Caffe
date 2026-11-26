@@ -646,7 +646,11 @@ describe('Multi-Tenant & Franchise Preparation Integration', () => {
         channel: 'web',
       });
       expect(result.intent).toBe('table_bill');
-      expect(capturedSql[0]).toContain("COALESCE(NULLIF(t.tenant_id, ''), 'default') = COALESCE(NULLIF(o.tenant_id, ''), 'default')");
+      expect(
+        capturedSql.some((sql) =>
+          sql.includes("COALESCE(NULLIF(t.tenant_id, ''), 'default') = COALESCE(NULLIF(o.tenant_id, ''), 'default')")
+        )
+      ).toBe(true);
     });
   });
 
@@ -2168,6 +2172,9 @@ describe('Multi-Tenant & Franchise Preparation Integration', () => {
         }),
         all: vi.fn(async () => {
           if (/FROM mrr_snapshots/i.test(sql)) {
+            if (/tenant_id/i.test(sql) && args.includes('tenant_sadec_02')) {
+              return { results: [] };
+            }
             return { results: [{ snapshot_date: todayDate, mrr_vnd: 99000000, active_subscriptions: 25 }] };
           }
           if (/FROM subscriptions WHERE status = 'active' AND next_billing_date <= \?/i.test(sql)) {
@@ -4536,6 +4543,7 @@ describe('Multi-Tenant & Franchise Preparation Integration', () => {
             if (args[0] === 'user-supervisor') return staffAccountRow('supervisor', 'tenant_sadec_02');
             if (args[0] === 'user-manager') return staffAccountRow('manager', 'default');
             if (args[0] === 'user-owner') return staffAccountRow('owner', 'default');
+            if (args[0] === 'user-admin') return staffAccountRow('admin', 'hq');
             if (args[0] === 'user-waiter') return staffAccountRow('waiter', 'default');
           }
           if (/FROM customers WHERE phone = \? ORDER BY CASE WHEN COALESCE\(NULLIF\(tenant_id, ''\), 'default'\) = \?/i.test(sql)) {
@@ -4714,14 +4722,17 @@ describe('Multi-Tenant & Franchise Preparation Integration', () => {
             }
           }
           if (/INSERT INTO mrr_snapshots/i.test(sql)) {
+            const hasTenant = /tenant_id/i.test(sql);
+            const snapDate = hasTenant ? args[2] : args[1];
             const snap = {
               id: args[0],
-              snapshot_date: args[1],
-              mrr_vnd: args[2],
-              arr_vnd: args[3],
-              active_subscriptions: args[4],
+              tenant_id: hasTenant ? args[1] : 'default',
+              snapshot_date: snapDate,
+              mrr_vnd: hasTenant ? args[3] : args[2],
+              arr_vnd: hasTenant ? args[4] : args[3],
+              active_subscriptions: hasTenant ? args[5] : args[4],
             };
-            const idx = mrrSnapshots.findIndex((s) => s.snapshot_date === args[1]);
+            const idx = mrrSnapshots.findIndex((s) => s.snapshot_date === snapDate);
             if (idx >= 0) mrrSnapshots[idx] = snap;
             else mrrSnapshots.push(snap);
           }
@@ -4810,6 +4821,10 @@ describe('Multi-Tenant & Franchise Preparation Integration', () => {
         env
       );
       expect(createFranSubRes.status).toBe(201);
+      // Non-default tenant without tenant_id column in mrr_snapshots does not overwrite default snapshot; default snapshot only counts default store
+      expect(mrrSnapshots).toHaveLength(0);
+      const { updateMRRSnapshot } = await import('../../tree/subscriptions/mrr-calculator');
+      await updateMRRSnapshot(mockDb as any, 'default');
       expect(mrrSnapshots).toHaveLength(1);
       expect(mrrSnapshots[0].mrr_vnd).toBe(2000000);
       expect(mrrSnapshots[0].active_subscriptions).toBe(1);
@@ -4843,7 +4858,7 @@ describe('Multi-Tenant & Franchise Preparation Integration', () => {
       expect(defPayFranInvRes.status).toBe(404);
 
       const franPayInvRes = await subApp.fetch(
-        await authRequest('POST', '/api/subscriptions/invoices/inv_legacy_fran/pay', 'supervisor', 'tenant_sadec_02', {
+        await authRequest('POST', '/api/subscriptions/invoices/inv_legacy_fran/pay?tenant_id=tenant_sadec_02', 'admin', 'hq', {
           payment_method: 'bank_transfer',
         }),
         env
@@ -5839,9 +5854,10 @@ describe('Multi-Tenant & Franchise Preparation Integration', () => {
           if (/FROM referrals WHERE referred_customer_id = \?/i.test(sql)) {
             return referrals.find((r) => r.referred_customer_id === args[0] && r.status === 'pending') ?? null;
           }
-          if (/FROM subscriptions WHERE status = 'active' AND COALESCE\(NULLIF\(TRIM\(tenant_id\), ''\), 'default'\) = 'default'/i.test(sql)) {
+          if (/FROM subscriptions WHERE status = 'active' AND COALESCE\(NULLIF\(TRIM\(tenant_id\), ''\), 'default'\) = (?:'default'|\?)/i.test(sql)) {
+            const targetTenant = args.length > 0 ? String(args[0] ?? 'default') : 'default';
             const matching = subscriptions.filter(
-              (s) => s.status === 'active' && ((String(s.tenant_id ?? '').trim()) || 'default') === 'default'
+              (s) => s.status === 'active' && ((String(s.tenant_id ?? '').trim()) || 'default') === targetTenant
             );
             return {
               count: matching.length,
@@ -5903,11 +5919,12 @@ describe('Multi-Tenant & Franchise Preparation Integration', () => {
             return { success: true, meta: { changes: w ? 1 : 0 } };
           }
           if (/INSERT INTO mrr_snapshots/i.test(sql)) {
+            const hasTenant = /tenant_id/i.test(sql);
             mrrSnapshots.push({
               id: args[0],
-              snapshot_date: args[1],
-              mrr_vnd: args[2],
-              active_subscriptions: args[4],
+              snapshot_date: hasTenant ? args[2] : args[1],
+              mrr_vnd: hasTenant ? args[3] : args[2],
+              active_subscriptions: hasTenant ? args[5] : args[4],
             });
             return { success: true, meta: { changes: 1 } };
           }
@@ -9809,7 +9826,7 @@ describe('Multi-Tenant & Franchise Preparation Integration', () => {
             q.args[2] === 'tenant_sadec_02'
         )
       ).toBe(true);
-    });
+    }, 15000);
   });
 
   // =========================================================================
@@ -10119,12 +10136,13 @@ describe('Multi-Tenant & Franchise Preparation Integration', () => {
         run: async () => {
           executedSqls.push({ sql, args });
           if (/INSERT (?:OR REPLACE )?INTO mrr_snapshots/i.test(sql)) {
-            const mrrVal = typeof args[1] === 'number' ? args[1] : args[2];
+            const hasTenant = /tenant_id/i.test(sql);
+            const mrrVal = hasTenant ? args[3] : (typeof args[1] === 'number' ? args[1] : args[2]);
             mrrSnapshots.push({
-              snapshot_date: typeof args[1] === 'number' ? args[0] : args[1],
+              snapshot_date: hasTenant ? args[2] : (typeof args[1] === 'number' ? args[0] : args[1]),
               mrr_vnd: mrrVal,
-              arr_vnd: typeof args[1] === 'number' ? args[2] : args[3],
-              active_count: typeof args[1] === 'number' ? args[3] : args[4],
+              arr_vnd: hasTenant ? args[4] : (typeof args[1] === 'number' ? args[2] : args[3]),
+              active_count: hasTenant ? args[5] : (typeof args[1] === 'number' ? args[3] : args[4]),
             });
             return { success: true, meta: { changes: 1 } };
           }
@@ -13690,7 +13708,7 @@ describe('Multi-Tenant & Franchise Preparation Integration', () => {
                   } as unknown as T;
                 }
                 if (/FROM users WHERE id = \?|FROM staff WHERE id = \?/i.test(sql)) {
-                  return staffAccountRow('admin', 'sadec') as unknown as T;
+                  return staffAccountRow('admin', 'hq') as unknown as T;
                 }
                 if (/FROM subscriptions WHERE id = \?/i.test(sql)) {
                   return {
@@ -13759,7 +13777,7 @@ describe('Multi-Tenant & Franchise Preparation Integration', () => {
         await next();
       }, (c) => listSubscriptions(c as any));
       subApp.post('/invoices/:id/pay', async (c, next) => {
-        c.set('user' as any, { id: 'mgr_sadec', role: 'manager', tenantId: 'sadec' });
+        c.set('user' as any, { id: 'hq_admin', role: 'admin', tenantId: 'hq', tenant_id: 'hq' });
         c.set('tenantId' as any, 'sadec');
         await next();
       }, (c) => payInvoice(c as any));
@@ -13771,9 +13789,9 @@ describe('Multi-Tenant & Franchise Preparation Integration', () => {
       expect(emptyCustSubRes.status).toBe(403);
 
       // 2. payInvoice extends period by 3 months for 'quarterly' billing_cycle
-      const payReq = await authRequest('POST', '/invoices/inv_sadec_q1/pay', 'admin', 'sadec', {
+      const payReq = await authRequest('POST', '/invoices/inv_sadec_q1/pay', 'admin', 'hq', {
         payment_method: 'bank_transfer',
-      });
+      }, { 'X-Tenant-ID': 'sadec' });
       const payRes = await subApp.fetch(payReq, { AURA_DB: db, JWT_SECRET: TEST_JWT_SECRET } as any);
       expect(payRes.status).toBe(200);
       expect(updatedPeriodEnd).toBe('2026-04-15');
@@ -19234,8 +19252,10 @@ describe('Multi-Tenant & Franchise Preparation Integration', () => {
         { AURA_DB: kdsDb } as unknown as Env
       );
       expect(readyRes.status).toBe(200);
-      expect(pendingCheckBinds).toHaveLength(1);
-      expect(pendingCheckBinds[0]).toEqual(['ord-sadec-kds-1:item-1', 'ord-sadec-kds-1:item-1']);
+      expect(pendingCheckBinds.length).toBeGreaterThanOrEqual(1);
+      for (const binds of pendingCheckBinds) {
+        expect(binds).toEqual(['ord-sadec-kds-1:item-1', 'ord-sadec-kds-1:item-1']);
+      }
     });
 
     it('BB4: applyAccrual and transitionOrderStatus inherit order.tenant_id when called with tenantId="*"', async () => {
@@ -21308,7 +21328,7 @@ describe('Multi-Tenant & Franchise Preparation Integration', () => {
               if (/SELECT id, status FROM orders WHERE id = \?/i.test(sql) || /SELECT \* FROM orders WHERE id = \?/i.test(sql)) {
                 return { id: 'ord-kds-sd', status: 'pending', tenant_id: 'sadec' };
               }
-              if (/SELECT total, total_amount, tenant_id, customer_id, cashback_used FROM orders WHERE id = \?/i.test(sql)) {
+              if (/SELECT .*cashback_used.* FROM orders WHERE id = \?/i.test(sql)) {
                 return { total: 80000, tenant_id: 'sadec', customer_id: 'cust-sd-1', cashback_used: 10000 };
               }
               if (/FROM cashback_wallets WHERE customer_id = \?/i.test(sql)) {

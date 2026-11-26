@@ -70,7 +70,11 @@ export async function createCanonicalPurchaseOrder(
 
   const now = new Date().toISOString();
   const poId = `po_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
-  const poNumber = `PO-${Date.now().toString().slice(-6)}`;
+  const yyyymmdd = now.slice(0, 10).replace(/-/g, '');
+  const randBytes = new Uint8Array(4);
+  crypto.getRandomValues(randBytes);
+  const randHex = Array.from(randBytes, (b) => b.toString(16).padStart(2, '0')).join('').toUpperCase();
+  const poNumber = `PO-${yyyymmdd}-${randHex}`;
 
   let subtotal = 0;
   const processedItems = [];
@@ -169,7 +173,7 @@ export async function createCanonicalPurchaseOrder(
     }
   }
 
-  return { id: poId, poNumber, supplierId: input.supplierId, status: 'ordered', total: subtotal, items: processedItems };
+  return { id: poId, poNumber, po_number: poNumber, supplierId: input.supplierId, status: 'ordered', total: subtotal, items: processedItems };
 }
 
 export async function receivePurchaseOrder(

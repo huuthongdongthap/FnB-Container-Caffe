@@ -5,8 +5,17 @@ import type {
 } from '../model/reconciliation-types';
 
 import type { D1Database } from '@cloudflare/workers-types';
+import {
+  CASH_ASSIGN_ROLES,
+  CASH_DRAWER_ROLES,
+  NON_CASH_SHIFT_ROLES,
+  PAYOUT_ROLES,
+  RECONCILIATION_ROLES,
+} from '../../model/shift-types';
 import { ShiftContractError } from '../../commands/shift-access';
 import { assertCashSettlementWrite, assertReconciliationSnapshot } from '../../commands/cash-settlement';
+
+export { CASH_ASSIGN_ROLES, CASH_DRAWER_ROLES, NON_CASH_SHIFT_ROLES, PAYOUT_ROLES, RECONCILIATION_ROLES };
 
 interface Env {
   AURA_DB: D1Database;
@@ -126,18 +135,25 @@ async function getCashPaymentsForShift(
   const now = asOf || new Date().toISOString();
   const endTime = shift.clock_out || now;
   try {
-    const queryAttributionRows = (includeAttendanceState: boolean) =>
+    const queryAttributionRows = (includeAttendanceState: boolean, includeOrderGuard: boolean = true) =>
       db.prepare(`SELECT p.id, p.amount, a.shift_id,
           (SELECT COUNT(*) FROM staff_shifts s
            WHERE COALESCE(NULLIF(TRIM(s.tenant_id), ''), 'default') = ?
            AND s.clock_in IS NOT NULL
            ${includeAttendanceState ? "AND LOWER(COALESCE(s.attendance_state, 'active')) <> 'cancelled'" : ''}
-           AND LOWER(COALESCE(s.role, '')) NOT IN ('barista', 'kitchen', 'chef')
+           AND LOWER(COALESCE(s.role, '')) NOT IN ('barista', 'kitchen', 'chef', 'bep')
            AND julianday(COALESCE(p.updated_at, p.created_at)) >= julianday(s.clock_in)
            AND julianday(COALESCE(p.updated_at, p.created_at)) <= julianday(COALESCE(s.clock_out, ?))) AS candidates
         FROM payments p LEFT JOIN cash_payment_attributions a ON a.payment_id = p.id AND a.tenant_id = COALESCE(NULLIF(TRIM(p.tenant_id), ''), 'default')
         WHERE p.method IN ('cash', 'cod') AND p.status = 'completed'
         AND COALESCE(NULLIF(TRIM(p.tenant_id), ''), 'default') = ?
+        ${includeOrderGuard ? `AND NOT EXISTS (
+          SELECT 1 FROM orders o
+          WHERE o.id = p.order_id
+            AND COALESCE(NULLIF(TRIM(o.tenant_id), ''), 'default') = COALESCE(NULLIF(TRIM(p.tenant_id), ''), 'default')
+            AND (LOWER(COALESCE(o.status, '')) IN ('cancelled', 'canceled', 'failed', 'expired', 'rejected')
+              OR LOWER(COALESCE(o.payment_status, '')) = 'refunded')
+        )` : ''}
         AND (a.shift_id = ? OR (a.shift_id IS NULL
           AND julianday(COALESCE(p.updated_at, p.created_at)) >= julianday(?)
           AND julianday(COALESCE(p.updated_at, p.created_at)) <= julianday(?)))`)
@@ -146,10 +162,13 @@ async function getCashPaymentsForShift(
 
     let rows: { results?: Array<{ id: string; amount: number; shift_id: string | null; candidates: number }> };
     try {
-      rows = await queryAttributionRows(true);
+      rows = await queryAttributionRows(true, true);
     } catch (innerErr) {
-      if (/no such column:.*attendance_state/i.test(String(innerErr))) {
-        rows = await queryAttributionRows(false);
+      const innerMsg = String(innerErr);
+      if (/no such table:.*\borders\b/i.test(innerMsg)) {
+        rows = await queryAttributionRows(true, false);
+      } else if (/no such column:.*attendance_state/i.test(innerMsg)) {
+        rows = await queryAttributionRows(false, true).catch(() => queryAttributionRows(false, false));
       } else {
         throw innerErr;
       }
@@ -285,8 +304,8 @@ export async function reconcileShiftCash(
   const hasExplicitTenant = Boolean(rawTenant);
   const normTenant = hasExplicitTenant ? (rawTenant === 'hq' ? '*' : rawTenant) : 'default';
 
-  if (typeof input.opening_float !== 'number' || !Number.isFinite(input.opening_float) || input.opening_float < 0) {
-    throw new ShiftContractError('Invalid opening_float: must be a non-negative number', 400);
+  if (typeof input.opening_float !== 'number' || !Number.isInteger(input.opening_float) || input.opening_float < 0) {
+    throw new ShiftContractError('Invalid opening_float: must be a non-negative integer', 400);
   }
   const rawActualCounted =
     (input as unknown as Record<string, unknown>).actual_cash_counted ??
@@ -295,21 +314,30 @@ export async function reconcileShiftCash(
     (input.denominations as unknown as Record<string, unknown> | undefined)?.total_amount;
   if (
     rawActualCounted !== undefined &&
-    (typeof rawActualCounted !== 'number' || !Number.isFinite(rawActualCounted) || rawActualCounted < 0)
+    (typeof rawActualCounted !== 'number' || !Number.isInteger(rawActualCounted) || rawActualCounted < 0)
   ) {
-    throw new ShiftContractError('Invalid actual_cash_counted: must be a non-negative number', 400);
+    throw new ShiftContractError('Invalid actual_cash_counted: must be a non-negative integer', 400);
   }
   if (Array.isArray(input.denominations?.denominations)) {
     for (const d of input.denominations.denominations) {
       if (
         typeof d?.denomination !== 'number' ||
-        !Number.isFinite(d.denomination) ||
-        d.denomination < 0 ||
+        !Number.isInteger(d.denomination) ||
+        d.denomination <= 0 ||
         typeof d?.count !== 'number' ||
-        !Number.isFinite(d.count) ||
+        !Number.isInteger(d.count) ||
         d.count < 0
       ) {
-        throw new ShiftContractError('Invalid cash denomination or count: must be non-negative numbers', 400);
+        throw new ShiftContractError('Invalid cash denomination or count: must be non-negative integers', 400);
+      }
+      const isValidUnitOrBill =
+        d.denomination === 1 ||
+        (d.denomination >= 100 &&
+          d.denomination <= 500_000 &&
+          d.denomination % 100 === 0 &&
+          (d.denomination < 500 || d.denomination % 500 === 0));
+      if (!isValidUnitOrBill) {
+        throw new ShiftContractError('Invalid cash denomination or count: unsupported VND denomination', 400);
       }
     }
   }
@@ -350,7 +378,7 @@ export async function reconcileShiftCash(
     if (actorRole !== undefined && actor.role !== actorRole) {
       throw new ShiftContractError('Forbidden cross-tenant or inactive reconciliation actor', 403);
     }
-    if (!['staff', 'cashier', 'waiter', 'barista', 'chef', 'kitchen', 'shipper', 'supervisor', 'manager', 'owner', 'admin'].includes(effectiveActorRole) ||
+    if (!RECONCILIATION_ROLES.has(effectiveActorRole) ||
         (shiftWindow.staff_id !== staffId && !['supervisor', 'manager', 'owner', 'admin'].includes(effectiveActorRole))) {
       throw new ShiftContractError('Forbidden reconciliation actor', 403);
     }
@@ -363,7 +391,7 @@ export async function reconcileShiftCash(
     if (actor.is_active !== 1 || (actorRole !== undefined && actor.role !== actorRole)) {
       throw new ShiftContractError('Forbidden cross-tenant or inactive reconciliation actor', 403);
     }
-    if (!['staff', 'cashier', 'waiter', 'barista', 'chef', 'kitchen', 'shipper', 'supervisor', 'manager', 'owner', 'admin'].includes(actor.role)) {
+    if (!RECONCILIATION_ROLES.has(actor.role)) {
       throw new ShiftContractError('Forbidden reconciliation actor', 403);
     }
     const actorTenant = (actor.tenant_id?.trim() || 'default').toLowerCase();
@@ -421,11 +449,11 @@ export async function reconcileShiftCash(
   const hasRemitted = input.remitted_cash !== undefined;
   const hasClosing = input.closing_float !== undefined;
 
-  if (hasRemitted && (typeof input.remitted_cash !== 'number' || !Number.isFinite(input.remitted_cash))) {
-    throw new ShiftContractError('Invalid remitted_cash: must be a finite number', 400);
+  if (hasRemitted && (typeof input.remitted_cash !== 'number' || !Number.isInteger(input.remitted_cash))) {
+    throw new ShiftContractError('Invalid remitted_cash: must be a non-negative integer', 400);
   }
-  if (hasClosing && (typeof input.closing_float !== 'number' || !Number.isFinite(input.closing_float))) {
-    throw new ShiftContractError('Invalid closing_float: must be a finite number', 400);
+  if (hasClosing && (typeof input.closing_float !== 'number' || !Number.isInteger(input.closing_float))) {
+    throw new ShiftContractError('Invalid closing_float: must be a non-negative integer', 400);
   }
 
   let remittedCash: number;
@@ -486,11 +514,10 @@ export async function reconcileShiftCash(
             throw err;
           }
         }
-        const validStaffRoles = ['staff', 'cashier', 'waiter', 'barista', 'chef', 'kitchen', 'shipper', 'rider', 'supervisor', 'manager', 'owner', 'admin'];
         const recipientTenant = (recipient?.tenant_id?.trim() || 'default').toLowerCase();
         const isHqRecipient = Boolean(recipient && ['owner', 'admin'].includes(recipient.role) && (recipientTenant === 'hq' || recipientTenant === '*'));
         const sameTenantRecipient = Boolean(recipient && (recipient.tenant_id?.trim() || 'default') === effectiveReconTenant);
-        if (!recipient || recipient.is_active !== 1 || !validStaffRoles.includes(recipient.role) || (!isHqRecipient && !sameTenantRecipient)) {
+        if (!recipient || recipient.is_active !== 1 || !RECONCILIATION_ROLES.has(recipient.role) || (!isHqRecipient && !sameTenantRecipient)) {
           throw new ShiftContractError('Invalid handover recipient staff member', 400);
         }
       }
@@ -499,21 +526,104 @@ export async function reconcileShiftCash(
   }
 
   let onlineSalesTotal = 0;
+  const windowEnd = shiftWindow.clock_out || reconciliationTime;
   try {
-    const onlineRow = await db
-      .prepare(
-        `SELECT COALESCE(SUM(amount), 0) AS total FROM payments
-         WHERE method = 'payos' AND status = 'completed'
-           AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?
-           AND julianday(COALESCE(updated_at, created_at)) >= julianday(?)
-           AND julianday(COALESCE(updated_at, created_at)) <= julianday(?)`,
-      )
-      .bind(effectiveReconTenant, shiftWindow.clock_in, shiftWindow.clock_out || reconciliationTime)
-      .first<{ total: number }>();
+    const queryScopedOnline = async (withRefundAmount: boolean, withAttendanceState: boolean) => {
+      const amountExpr = withRefundAmount ? 'MAX(0, p.amount - COALESCE(p.refund_amount, 0))' : 'p.amount';
+      const tsExpr = withRefundAmount
+        ? 'CASE WHEN COALESCE(p.refund_amount, 0) > 0 THEN p.created_at ELSE COALESCE(p.updated_at, p.created_at) END'
+        : 'COALESCE(p.updated_at, p.created_at)';
+      if (shiftWindow.staff_id) {
+        return db
+          .prepare(
+            `SELECT COALESCE(SUM(${amountExpr}), 0) AS total
+             FROM payments p
+             WHERE p.method = 'payos'
+               AND p.status IN ('completed', 'paid', 'partially_refunded')
+               AND COALESCE(NULLIF(TRIM(p.tenant_id), ''), 'default') = ?
+               AND julianday(${tsExpr}) >= julianday(?)
+               AND julianday(${tsExpr}) <= julianday(?)
+               AND COALESCE(
+                 (SELECT CAST(s.id AS TEXT) FROM staff_shifts s
+                  WHERE COALESCE(NULLIF(TRIM(s.tenant_id), ''), 'default') = ?
+                    AND s.clock_in IS NOT NULL
+                    ${withAttendanceState ? "AND LOWER(COALESCE(s.attendance_state, 'active')) <> 'cancelled'" : ''}
+                    AND LOWER(COALESCE(s.role, '')) NOT IN ('barista', 'kitchen', 'chef', 'bep')
+                    AND julianday(${tsExpr}) >= julianday(s.clock_in)
+                    AND julianday(${tsExpr}) <= julianday(COALESCE(s.clock_out, ?))
+                  ORDER BY CASE WHEN LOWER(COALESCE(s.role, '')) IN ('owner', 'admin', 'manager', 'supervisor', 'cashier') THEN 0 ELSE 1 END,
+                           s.clock_in ASC, s.id ASC
+                  LIMIT 1),
+                 ?
+               ) = ?`,
+          )
+          .bind(
+            effectiveReconTenant,
+            shiftWindow.clock_in,
+            windowEnd,
+            effectiveReconTenant,
+            reconciliationTime,
+            String(input.shift_id),
+            String(input.shift_id),
+          )
+          .first<{ total: number }>();
+      }
+      return db
+        .prepare(
+          `SELECT COALESCE(SUM(${amountExpr}), 0) AS total
+           FROM payments p
+           WHERE p.method = 'payos'
+             AND p.status IN ('completed', 'paid', 'partially_refunded')
+             AND COALESCE(NULLIF(TRIM(p.tenant_id), ''), 'default') = ?
+             AND julianday(${tsExpr}) >= julianday(?)
+             AND julianday(${tsExpr}) <= julianday(?)`,
+        )
+        .bind(effectiveReconTenant, shiftWindow.clock_in, windowEnd)
+        .first<{ total: number }>();
+    };
+
+    let onlineRow: { total: number } | null = null;
+    try {
+      onlineRow = await queryScopedOnline(true, true);
+    } catch (onlineErr) {
+      const msg = String(onlineErr);
+      if (/no such column:.*refund_amount/i.test(msg)) {
+        try {
+          onlineRow = await queryScopedOnline(false, true);
+        } catch (attErr) {
+          if (/no such column:.*attendance_state/i.test(String(attErr))) {
+            onlineRow = await queryScopedOnline(false, false);
+          } else {
+            throw attErr;
+          }
+        }
+      } else if (/no such column:.*attendance_state/i.test(msg)) {
+        onlineRow = await queryScopedOnline(true, false);
+      } else {
+        onlineRow = await db
+          .prepare(
+            `SELECT COALESCE(SUM(amount), 0) AS total FROM payments
+             WHERE method = 'payos' AND status = 'completed'
+               AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?
+               AND julianday(COALESCE(updated_at, created_at)) >= julianday(?)
+               AND julianday(COALESCE(updated_at, created_at)) <= julianday(?)`,
+          )
+          .bind(effectiveReconTenant, shiftWindow.clock_in, windowEnd)
+          .first<{ total: number }>();
+      }
+    }
     onlineSalesTotal = onlineRow?.total || 0;
   } catch {
     onlineSalesTotal = 0;
   }
+
+  const shouldCloseShift = Boolean(input.close_shift) && !shiftWindow.clock_out;
+  const closeElapsedMs = shouldCloseShift
+    ? Math.max(0, new Date(reconciliationTime).getTime() - new Date(shiftWindow.clock_in).getTime())
+    : 0;
+  const closeHoursWorked = shouldCloseShift
+    ? Math.round((closeElapsedMs / 3_600_000) * 100) / 100
+    : null;
 
   const reconciliation: ShiftReconciliation = {
     id: `recon_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`,
@@ -531,6 +641,13 @@ export async function reconcileShiftCash(
     closing_float: closingFloat,
     handover_to_staff_id: handoverToStaffId,
     online_sales_total: onlineSalesTotal,
+    ...(shouldCloseShift
+      ? {
+          shift_closed: true,
+          clock_out: reconciliationTime,
+          hours_worked: closeHoursWorked,
+        }
+      : {}),
     notes: input.notes ?? null,
     created_at: reconciliationTime,
   };
@@ -543,28 +660,169 @@ export async function reconcileShiftCash(
     online_sales_total: onlineSalesTotal,
   });
 
-  try {
-    const insert = db.prepare(`INSERT INTO shift_reconciliations (
-        id, shift_id, staff_id, opening_float, expected_cash, actual_cash,
-        variance, variance_status, denominations, cash_payment_total,
-        cash_payout_total, notes, tenant_id, created_at,
-        reconciled_by, opening_cash, variance_amount, status, cash_sales
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+  const buildInsertStmt = (includeHandoverColumns: boolean) =>
+    includeHandoverColumns
+      ? db
+          .prepare(
+            `INSERT INTO shift_reconciliations (
+              id, shift_id, staff_id, opening_float, expected_cash, actual_cash,
+              variance, variance_status, denominations, cash_payment_total,
+              cash_payout_total, notes, tenant_id, created_at,
+              reconciled_by, opening_cash, variance_amount, status, cash_sales,
+              remitted_cash, closing_float, handover_to_staff_id, online_sales_total
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          )
+          .bind(
+            reconciliation.id,
+            input.shift_id,
+            reconciliation.staff_id,
+            authoritativeOpeningFloat,
+            expectedCash,
+            actualCash,
+            variance,
+            varianceStatus,
+            storedDenominationsJson,
+            cashPayments,
+            cashPayouts,
+            reconciliation.notes,
+            effectiveReconTenant,
+            reconciliation.created_at,
+            staffId,
+            authoritativeOpeningFloat,
+            variance,
+            varianceStatus,
+            cashPayments,
+            remittedCash,
+            closingFloat,
+            handoverToStaffId,
+            onlineSalesTotal,
+          )
+      : db
+          .prepare(
+            `INSERT INTO shift_reconciliations (
+              id, shift_id, staff_id, opening_float, expected_cash, actual_cash,
+              variance, variance_status, denominations, cash_payment_total,
+              cash_payout_total, notes, tenant_id, created_at,
+              reconciled_by, opening_cash, variance_amount, status, cash_sales
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          )
+          .bind(
+            reconciliation.id,
+            input.shift_id,
+            reconciliation.staff_id,
+            authoritativeOpeningFloat,
+            expectedCash,
+            actualCash,
+            variance,
+            varianceStatus,
+            storedDenominationsJson,
+            cashPayments,
+            cashPayouts,
+            reconciliation.notes,
+            effectiveReconTenant,
+            reconciliation.created_at,
+            staffId,
+            authoritativeOpeningFloat,
+            variance,
+            varianceStatus,
+            cashPayments,
+          );
+
+  const buildCloseShiftStmt = (includeStatusColumn: boolean) => {
+    const cleanNote = typeof input.notes === 'string' && input.notes.trim() ? input.notes.trim() : null;
+    const statusSetter = includeStatusColumn ? ", status = 'closed'" : '';
+    return db
+      .prepare(
+        `UPDATE staff_shifts
+         SET clock_out = ?,
+             hours_worked = ?,
+             attendance_state = 'completed'${statusSetter},
+             notes = CASE
+               WHEN ? IS NOT NULL THEN CASE WHEN notes IS NOT NULL AND TRIM(notes) <> '' THEN notes || '; ' || ? ELSE ? END
+               ELSE notes
+             END
+         WHERE CAST(id AS TEXT) = ?
+           AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?
+           AND clock_in = ?
+           AND clock_out IS NULL`,
+      )
       .bind(
-        reconciliation.id, input.shift_id, reconciliation.staff_id, authoritativeOpeningFloat,
-        expectedCash, actualCash, variance, varianceStatus, storedDenominationsJson,
-        cashPayments, cashPayouts, reconciliation.notes, effectiveReconTenant, reconciliation.created_at,
-        staffId, authoritativeOpeningFloat, variance, varianceStatus, cashPayments
+        reconciliationTime,
+        closeHoursWorked ?? 0,
+        cleanNote,
+        cleanNote,
+        cleanNote,
+        input.shift_id,
+        effectiveReconTenant,
+        shiftWindow.clock_in,
       );
+  };
+
+  let didCloseShiftInBatch = false;
+  const runCommit = async (includeHandoverColumns: boolean, includeStatusColumn: boolean) => {
+    const insert = buildInsertStmt(includeHandoverColumns);
     if (shiftWindow.staff_id) {
-      // Publish the cutoff only with the exact ledger snapshot it freezes. A later
-      // compensating delete alone leaves a window where clock-out can observe stale totals.
-      await db.batch([insert, assertCashSettlementWrite(db), assertReconciliationSnapshot(db, input.shift_id, effectiveReconTenant,
-        shiftWindow.clock_in, cashPayments, cashPayouts)]);
+      const batchStmts = [
+        insert,
+        assertCashSettlementWrite(db),
+        assertReconciliationSnapshot(
+          db,
+          input.shift_id,
+          effectiveReconTenant,
+          shiftWindow.clock_in,
+          cashPayments,
+          cashPayouts,
+        ),
+      ];
+      if (shouldCloseShift) {
+        batchStmts.push(buildCloseShiftStmt(includeStatusColumn), assertCashSettlementWrite(db));
+      }
+      await db.batch(batchStmts);
+      if (shouldCloseShift) didCloseShiftInBatch = true;
     } else {
       await insert.run();
+      if (shouldCloseShift) {
+        const closedRes = await buildCloseShiftStmt(includeStatusColumn).run();
+        if ((closedRes.meta?.changes ?? 0) === 0) {
+          throw new ShiftContractError('Shift already closed or changed concurrently', 409);
+        }
+        didCloseShiftInBatch = true;
+      }
+    }
+  };
+
+  try {
+    try {
+      await runCommit(true, true);
+    } catch (firstErr) {
+      const firstMsg = String(firstErr);
+      const missingHandoverCols =
+        /no such column:\s*(remitted_cash|closing_float|handover_to_staff_id|online_sales_total)|has no column named\s+(remitted_cash|closing_float|handover_to_staff_id|online_sales_total)/i.test(
+          firstMsg,
+        );
+      const missingStatusCol =
+        shouldCloseShift && /no such column:\s*status|has no column named\s+status/i.test(firstMsg);
+      if (missingHandoverCols || missingStatusCol) {
+        try {
+          await runCommit(!missingHandoverCols, !missingStatusCol);
+        } catch (secondErr) {
+          const secondMsg = String(secondErr);
+          if (
+            !missingStatusCol &&
+            shouldCloseShift &&
+            /no such column:\s*status|has no column named\s+status/i.test(secondMsg)
+          ) {
+            await runCommit(false, false);
+          } else {
+            throw secondErr;
+          }
+        }
+      } else {
+        throw firstErr;
+      }
     }
   } catch (err) {
+    if (err instanceof ShiftContractError) throw err;
     if (/integer overflow/i.test(String(err))) {
       throw new ShiftContractError('Shift cash ledger changed concurrently; refresh and retry reconciliation', 409);
     }
@@ -598,6 +856,23 @@ export async function reconcileShiftCash(
   }
 
   const deleteReconciliation = async () => {
+    if (didCloseShiftInBatch) {
+      await db
+        .prepare(
+          "UPDATE staff_shifts SET clock_out = NULL, hours_worked = NULL, attendance_state = 'active', status = 'open' WHERE CAST(id AS TEXT) = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?",
+        )
+        .bind(input.shift_id, effectiveReconTenant)
+        .run()
+        .catch(() =>
+          db
+            .prepare(
+              "UPDATE staff_shifts SET clock_out = NULL, hours_worked = NULL, attendance_state = 'active' WHERE CAST(id AS TEXT) = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?",
+            )
+            .bind(input.shift_id, effectiveReconTenant)
+            .run()
+            .catch(() => undefined),
+        );
+    }
     try {
       return await db
         .prepare('DELETE FROM shift_reconciliations WHERE id = ? AND tenant_id = ?')
@@ -742,15 +1017,38 @@ export async function getReconciliationForShift(
       : [],
   } as ShiftReconciliation['denominations'];
 
+  const colRemitted = typeof row.remitted_cash === 'number' && Number.isFinite(row.remitted_cash) ? row.remitted_cash : undefined;
+  const colClosing = typeof row.closing_float === 'number' && Number.isFinite(row.closing_float) ? row.closing_float : undefined;
+  const colOnline = typeof row.online_sales_total === 'number' && Number.isFinite(row.online_sales_total) ? row.online_sales_total : undefined;
+  const colHandover = typeof row.handover_to_staff_id === 'string' && row.handover_to_staff_id.trim()
+    ? row.handover_to_staff_id.trim()
+    : undefined;
+
+  const jsonRemitted = typeof parsedDenom?.remitted_cash === 'number' ? parsedDenom.remitted_cash : undefined;
+  const jsonClosing = typeof parsedDenom?.closing_float === 'number' ? parsedDenom.closing_float : undefined;
+  const jsonOnline = typeof parsedDenom?.online_sales_total === 'number' ? parsedDenom.online_sales_total : undefined;
+  const jsonHandover =
+    typeof parsedDenom?.handover_to_staff_id === 'string' || parsedDenom?.handover_to_staff_id === null
+      ? (parsedDenom.handover_to_staff_id as string | null)
+      : undefined;
+
+  const useJsonSplitFallback =
+    colRemitted === 0 &&
+    colClosing === 0 &&
+    ((jsonRemitted !== undefined && jsonRemitted !== 0) || (jsonClosing !== undefined && jsonClosing !== 0));
+
+  const resolvedRemitted = useJsonSplitFallback ? jsonRemitted : (colRemitted ?? jsonRemitted);
+  const resolvedClosing = useJsonSplitFallback ? jsonClosing : (colClosing ?? jsonClosing);
+  const resolvedOnline = colOnline === 0 && jsonOnline !== undefined && jsonOnline !== 0 ? jsonOnline : (colOnline ?? jsonOnline);
+  const resolvedHandover = colHandover ?? jsonHandover;
+
   return {
     ...(row as unknown as ShiftReconciliation),
     denominations: cleanDenominations,
-    ...(typeof parsedDenom?.remitted_cash === 'number' ? { remitted_cash: parsedDenom.remitted_cash } : {}),
-    ...(typeof parsedDenom?.closing_float === 'number' ? { closing_float: parsedDenom.closing_float } : {}),
-    ...(typeof parsedDenom?.handover_to_staff_id === 'string' || parsedDenom?.handover_to_staff_id === null
-      ? { handover_to_staff_id: parsedDenom.handover_to_staff_id as string | null }
-      : {}),
-    ...(typeof parsedDenom?.online_sales_total === 'number' ? { online_sales_total: parsedDenom.online_sales_total } : {}),
+    ...(resolvedRemitted !== undefined ? { remitted_cash: resolvedRemitted } : {}),
+    ...(resolvedClosing !== undefined ? { closing_float: resolvedClosing } : {}),
+    ...(resolvedHandover !== undefined ? { handover_to_staff_id: resolvedHandover } : {}),
+    ...(resolvedOnline !== undefined ? { online_sales_total: resolvedOnline } : {}),
   };
 }
 
@@ -765,8 +1063,6 @@ export interface ShiftCashPayout {
   created_at: string;
 }
 
-const CASH_ASSIGN_ROLES = new Set(['owner', 'manager', 'supervisor', 'admin', 'cashier']);
-const PAYOUT_ROLES = new Set(['owner', 'manager', 'supervisor', 'admin', 'cashier', 'staff', 'waiter']);
 const SHIFT_MANAGER_ROLES = new Set(['owner', 'manager', 'supervisor', 'admin']);
 const MAX_ASSIGN_PAYMENT_IDS = 100;
 const MAX_PAYOUT_AMOUNT_VND = 100_000_000;
@@ -893,16 +1189,28 @@ export async function assignCashPaymentsToShift(
   }
 
   const now = new Date().toISOString();
-  const validated: Array<{ id: string; settledAt: string }> = [];
+  const validated: Array<{ id: string; amount: number; prevShiftId: string | null; settledAt: string }> = [];
   for (const paymentId of cleanIds) {
     const payment = await db.prepare(
-      `SELECT id, updated_at, created_at FROM payments
+      `SELECT id, amount, updated_at, created_at FROM payments
        WHERE id = ? AND method IN ('cash', 'cod') AND status = 'completed'
          AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?
        LIMIT 1`
-    ).bind(paymentId, shift.tenant).first<{ id: string; updated_at?: string | null; created_at?: string | null }>();
+    ).bind(paymentId, shift.tenant).first<{ id: string; amount?: number | null; updated_at?: string | null; created_at?: string | null }>();
     if (!payment) {
       throw new ShiftContractError(`Completed cash payment ${paymentId} not found in tenant`, 404);
+    }
+
+    const globalAttr = await db
+      .prepare('SELECT tenant_id FROM cash_payment_attributions WHERE payment_id = ? LIMIT 1')
+      .bind(payment.id)
+      .first<{ tenant_id?: string | null }>()
+      .catch(() => null);
+    if (globalAttr) {
+      const globalTenant = (globalAttr.tenant_id?.trim() || 'default');
+      if (globalTenant !== shift.tenant) {
+        throw new ShiftContractError('Forbidden: payment attribution belongs to another tenant', 403);
+      }
     }
 
     const existingAttr = await db.prepare(
@@ -929,11 +1237,16 @@ export async function assignCashPaymentsToShift(
       }
     }
 
-    validated.push({ id: payment.id, settledAt: payment.updated_at || payment.created_at || now });
+    validated.push({
+      id: payment.id,
+      amount: Math.max(0, Number(payment.amount || 0)),
+      prevShiftId: existingAttr?.shift_id ? String(existingAttr.shift_id) : null,
+      settledAt: payment.updated_at || payment.created_at || now,
+    });
   }
 
   // Guard attribution writes atomically in SQL against concurrent reconciliation of either
-  // the target shift or any shift currently holding the payment.
+  // the target shift or any shift currently holding the payment, and enforce tenant_id match on conflict.
   const statements = validated.map((item) =>
     db.prepare(
       `INSERT INTO cash_payment_attributions (payment_id, tenant_id, shift_id, collected_by, settled_at)
@@ -953,7 +1266,8 @@ export async function assignCashPaymentsToShift(
        ON CONFLICT(payment_id) DO UPDATE SET
          shift_id = excluded.shift_id,
          collected_by = excluded.collected_by
-       WHERE NOT EXISTS (
+       WHERE COALESCE(NULLIF(TRIM(cash_payment_attributions.tenant_id), ''), 'default') = COALESCE(NULLIF(TRIM(excluded.tenant_id), ''), 'default')
+       AND NOT EXISTS (
          SELECT 1 FROM shift_reconciliations
          WHERE shift_id = cash_payment_attributions.shift_id
            AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = COALESCE(NULLIF(TRIM(cash_payment_attributions.tenant_id), ''), 'default')
@@ -990,6 +1304,37 @@ export async function assignCashPaymentsToShift(
         `Payment ${validated[i]?.id ?? ''} or shift ${shift.id} was reconciled concurrently; refresh and retry`,
         409
       );
+    }
+  }
+
+  // Sync staff_shifts.cash_sales, total_sales, and order_count on source and target shifts
+  for (const item of validated) {
+    if (item.prevShiftId === shift.id) continue;
+    try {
+      if (item.prevShiftId) {
+        await db
+          .prepare(
+            `UPDATE staff_shifts
+             SET cash_sales = MAX(0, COALESCE(cash_sales, 0) - ?),
+                 total_sales = MAX(0, COALESCE(total_sales, 0) - ?),
+                 order_count = MAX(0, COALESCE(order_count, 0) - 1)
+             WHERE CAST(id AS TEXT) = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?`,
+          )
+          .bind(item.amount, item.amount, item.prevShiftId, shift.tenant)
+          .run();
+      }
+      await db
+        .prepare(
+          `UPDATE staff_shifts
+           SET cash_sales = COALESCE(cash_sales, 0) + ?,
+               total_sales = COALESCE(total_sales, 0) + ?,
+               order_count = COALESCE(order_count, 0) + 1
+           WHERE CAST(id AS TEXT) = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?`,
+        )
+        .bind(item.amount, item.amount, shift.id, shift.tenant)
+        .run();
+    } catch {
+      // Best-effort sync when minimal test schemas omit cash_sales / total_sales / order_count
     }
   }
 
@@ -1061,10 +1406,18 @@ export async function createShiftCashPayout(
 
   const id = `payout_${crypto.randomUUID()}`;
   const createdAt = new Date().toISOString();
-  await db.prepare(
+  const payoutWrite = await db.prepare(
     `INSERT INTO cash_payouts (id, tenant_id, shift_id, amount, reason, status, created_by, created_at)
-     VALUES (?, ?, ?, ?, ?, 'completed', ?, ?)`
-  ).bind(id, shift.tenant, shift.id, input.amount, reason, actorId, createdAt).run();
+     SELECT ?, ?, ?, ?, ?, 'completed', ?, ?
+     WHERE NOT EXISTS (
+       SELECT 1 FROM shift_reconciliations sr
+       WHERE sr.shift_id = ?
+         AND COALESCE(NULLIF(TRIM(sr.tenant_id), ''), 'default') = ?
+     )`
+  ).bind(id, shift.tenant, shift.id, input.amount, reason, actorId, createdAt, shift.id, shift.tenant).run();
+  if ((payoutWrite.meta?.changes ?? 1) === 0) {
+    throw new ShiftContractError(`Shift ${shiftId} has already been reconciled`, 409);
+  }
 
   try {
     await db.prepare(
