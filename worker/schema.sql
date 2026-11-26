@@ -2114,6 +2114,7 @@ CREATE INDEX IF NOT EXISTS idx_otp_challenges_tenant_phone ON otp_challenges(ten
 CREATE INDEX IF NOT EXISTS idx_payments_tenant_order_status ON payments(tenant_id, order_id, status);
 CREATE INDEX IF NOT EXISTS idx_inv_tx_tenant_ref ON inventory_transactions(tenant_id, reference_type, reference_id);
 CREATE INDEX IF NOT EXISTS idx_stock_movements_tenant_ing ON stock_movements(tenant_id, ingredient_id, created_at);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_stock_movements_order_consumption_dedup ON stock_movements(COALESCE(NULLIF(TRIM(tenant_id), ''), 'default'), reference_id, ingredient_id) WHERE reference_type = 'order' AND type = 'consumption';
 CREATE INDEX IF NOT EXISTS idx_loyalty_tx_tenant_cust ON loyalty_transactions(tenant_id, customer_id, created_at);
 CREATE INDEX IF NOT EXISTS idx_loyalty_logs_tenant_cust ON loyalty_point_logs(tenant_id, customer_id, created_at);
 CREATE INDEX IF NOT EXISTS idx_consents_tenant_cust_channel ON consents(tenant_id, customer_id, purpose, channel);

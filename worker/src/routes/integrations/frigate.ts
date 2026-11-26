@@ -13,12 +13,11 @@
 import { Hono } from 'hono';
 import type { MiddlewareHandler } from 'hono';
 import type { Env } from '../../types/env';
-import { createFrigateClient } from '../../clients/frigate-client';
+import { createFrigateClient, FRIGATE_FETCH_TIMEOUT_MS, isFrigateTimeoutError } from '../../clients/frigate-client';
 import { syncFrigateEvents, getFrigateEvents } from '../../tree/integrations/frigate/sync';
 import { getOccupancyAnalytics } from '../../tree/integrations/frigate/occupancy';
 import { requireAuth } from '../../middleware/auth';
 import { getTenantId, isHQSuperAdmin } from '../../middleware/tenant';
-import { matchesTenantRow } from '../../lib/db';
 import { createLogger } from '../../middleware/logger';
 
 const log = createLogger({ route: 'frigate-gateway' });
@@ -52,6 +51,10 @@ function resolveFrigateTenant(c: Parameters<typeof getTenantId>[0]): string {
   return raw.toLowerCase() === 'hq' ? '*' : raw;
 }
 
+/**
+ * A concrete tenant may only snapshot a camera it has recorded events for.
+ * Fails closed: missing DB binding, query errors and unknown cameras all deny.
+ */
 async function verifyCameraTenant(
   env: Env,
   camera: string,
@@ -59,27 +62,24 @@ async function verifyCameraTenant(
 ): Promise<boolean> {
   if (tenantId === '*') return true;
   const db = (env.AURA_DB ?? (env as unknown as Record<string, unknown>).DB) as D1Database | undefined;
-  if (!db) return true;
-  try {
-    const res = await db
-      .prepare('SELECT tenant_id FROM frigate_events WHERE camera = ? LIMIT 50')
-      .bind(camera)
-      .all<Record<string, unknown>>();
-    const rows = res?.results || [];
-    if (rows.length > 0) {
-      return rows.some((r) => matchesTenantRow(r, tenantId));
-    }
-    const anyRes = await db
-      .prepare('SELECT COUNT(*) as cnt FROM frigate_events')
-      .first<{ cnt?: number }>()
-      .catch(() => null);
-    if (anyRes && Number(anyRes.cnt) > 0) {
-      return false;
-    }
-  } catch {
-    // frigate_events table or tenant_id column not present in mock mode
+  if (!db) {
+    log.error('frigate_camera_tenant_check_unavailable', { reason: 'db_binding_missing' });
+    return false;
   }
-  return true;
+  try {
+    const row = await db
+      .prepare(
+        `SELECT 1 AS owned FROM frigate_events
+         WHERE camera = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?
+         LIMIT 1`
+      )
+      .bind(camera, tenantId)
+      .first<{ owned?: number }>();
+    return Boolean(row);
+  } catch (err) {
+    log.error('frigate_camera_tenant_check_failed', { error: (err as Error).message });
+    return false;
+  }
 }
 
 export function createFrigateRoutes() {
@@ -195,7 +195,10 @@ export function createFrigateRoutes() {
         return c.json({ error: 'Snapshot URL unavailable', mock: false }, 503);
       }
 
-      const imgRes = await fetch(snapshotUrl, { headers: client.getHeaders() });
+      const imgRes = await fetch(snapshotUrl, {
+        headers: client.getHeaders(),
+        signal: AbortSignal.timeout(FRIGATE_FETCH_TIMEOUT_MS)
+      });
       if (!imgRes.ok) {
         return c.json({ error: `Frigate camera ${camera} responded ${imgRes.status}`, mock: false }, 502);
       }
@@ -205,6 +208,10 @@ export function createFrigateRoutes() {
         headers: { 'Content-Type': 'image/jpeg', 'Cache-Control': 'no-store' }
       });
     } catch (err) {
+      if (isFrigateTimeoutError(err)) {
+        log.error('frigate_snapshot_timeout', { timeoutMs: FRIGATE_FETCH_TIMEOUT_MS });
+        return c.json({ error: 'Frigate snapshot request timed out', mock: false }, 504);
+      }
       log.error('frigate_snapshot_error', { error: (err as Error).message });
       return c.json({ error: 'Failed to fetch snapshot', mock: false }, 500);
     }

@@ -419,15 +419,17 @@ describe('Deep audit orders & inventory regressions', () => {
     expect(afterReceive.cost_per_unit).toBe(150);
     expect(afterReceive.unit_cost).toBe(150);
 
-    // Second: simulate PO status CAS conflict (0 changes) -> rollback restores stock AND cost_per_unit/unit_cost
+    // Second: simulate a concurrent PO status transition -> atomic batch CAS rejects with 409 and rolls back stock + WAC + line receipt
     sqlite.exec(`
       INSERT INTO purchase_orders VALUES ('po-2', 'sup-1', 'ordered', 3000, 't1', '2026-11-26T00:00:00Z');
       INSERT INTO purchase_order_items VALUES ('poi-2', 'po-2', 'item-3', 10, 0, 300, 't1');
     `);
+    let racedPoStatus = false;
     const conflictDb = createMemoryD1(sqlite, {
-      beforeRun(query) {
-        if (query.includes("UPDATE purchase_orders SET status = ?") && query.includes("NOT IN ('received', 'cancelled')")) {
-          return { meta: { changes: 0 } };
+      afterFirst(query, args) {
+        if (!racedPoStatus && query.includes('FROM purchase_orders WHERE id = ?') && args[0] === 'po-2') {
+          racedPoStatus = true;
+          sqlite.prepare("UPDATE purchase_orders SET status = 'received' WHERE id = 'po-2'").run();
         }
       },
     });
@@ -450,5 +452,9 @@ describe('Deep audit orders & inventory regressions', () => {
     expect(afterRollback.current_stock).toBe(20);
     expect(afterRollback.cost_per_unit).toBe(150);
     expect(afterRollback.unit_cost).toBe(150);
+    const poItemAfterRollback = sqlite
+      .prepare('SELECT received_quantity FROM purchase_order_items WHERE id = ?')
+      .get('poi-2') as { received_quantity: number };
+    expect(poItemAfterRollback.received_quantity).toBe(0);
   });
 });

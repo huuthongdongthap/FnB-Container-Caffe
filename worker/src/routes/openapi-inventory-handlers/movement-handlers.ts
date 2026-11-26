@@ -4,6 +4,7 @@ import { InventoryRoutes } from '../../schemas/inventory';
 import { getDatabase } from '../../lib/db';
 import { authenticateRequest } from '../../middleware/auth';
 import { getTenantId, isHQSuperAdmin, matchesTenantRow } from '../../middleware/tenant';
+import { applyStockMovement } from './movement-stock-write';
 
 const INVENTORY_READ_ROLES = ['owner', 'manager', 'supervisor', 'admin', 'staff', 'kitchen', 'barista', 'chef', 'cashier', 'waiter'];
 const INVENTORY_MUTATION_ROLES = ['owner', 'manager', 'admin'];
@@ -525,271 +526,44 @@ export function registerMovementHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
     if (!hasAnyTenantScope && tenantId !== 'default' && tenantId !== '*') {
       return c.json({ success: false, error: 'Tenant-scoped ingredient schema required' }, 503);
     }
-
-    const casClauses: string[] = [];
-    const casParams: (string | number)[] = [];
-    if (expectedStock !== undefined || isTargetStocktake) {
-      casClauses.push('COALESCE(current_stock, 0) = ?');
-      casParams.push(expectedStock !== undefined ? Number(expectedStock) : previousStock);
-    }
-    if (
-      expectedUpdatedAt !== undefined &&
-      ingredient.updated_at !== undefined &&
-      ingredient.updated_at !== null
-    ) {
-      casClauses.push('updated_at = ?');
-      casParams.push(String(expectedUpdatedAt));
-    }
-    const hasCasPrecondition = casClauses.length > 0;
-    const casSql = hasCasPrecondition ? ` AND ${casClauses.join(' AND ')}` : '';
-
-    if (!usingCanonical) {
-      if (signedQty < 0) {
-        let upd: { meta?: { changes?: number } } | null = null;
-        if (effectiveTenant && hasIngredientTenantCol) {
-          try {
-            upd = await db.prepare(
-              `UPDATE ingredients SET current_stock = COALESCE(current_stock, 0) + ?, updated_at = ? WHERE id = ? AND (COALESCE(current_stock, 0) + ?) >= 0 AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?${casSql}`
-            ).bind(signedQty, now, body.ingredientId, signedQty, effectiveTenant, ...casParams).run();
-          } catch {
-            if (effectiveTenant !== 'default') {
-              return c.json({ success: false, error: 'Failed to update stock for tenant' }, 500);
-            }
-            upd = await db.prepare(
-              `UPDATE ingredients SET current_stock = COALESCE(current_stock, 0) + ?, updated_at = ? WHERE id = ? AND (COALESCE(current_stock, 0) + ?) >= 0${casSql}`
-            ).bind(signedQty, now, body.ingredientId, signedQty, ...casParams).run();
-          }
-        } else {
-          upd = await db.prepare(
-            `UPDATE ingredients SET current_stock = COALESCE(current_stock, 0) + ?, updated_at = ? WHERE id = ? AND (COALESCE(current_stock, 0) + ?) >= 0${casSql}`
-          ).bind(signedQty, now, body.ingredientId, signedQty, ...casParams).run();
-        }
-        if (upd && upd.meta && typeof upd.meta.changes === 'number' && upd.meta.changes === 0) {
-          if (hasCasPrecondition) {
-            return c.json(
-              { success: false, error: 'Stock changed concurrently. Please reload and recount.' },
-              409
-            );
-          }
-          return c.json({ success: false, error: 'Insufficient stock' }, 400);
-        }
-        if (effectiveTenant) {
-          await db.prepare(
-            "UPDATE inventory_items SET current_stock = COALESCE(current_stock, 0) + ?, updated_at = ? WHERE id = ? AND (COALESCE(current_stock, 0) + ?) >= 0 AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
-          ).bind(signedQty, now, body.ingredientId, signedQty, effectiveTenant).run().catch(() => {
-            if (effectiveTenant === 'default') {
-              return db.prepare(
-                'UPDATE inventory_items SET current_stock = COALESCE(current_stock, 0) + ?, updated_at = ? WHERE id = ? AND (COALESCE(current_stock, 0) + ?) >= 0'
-              ).bind(signedQty, now, body.ingredientId, signedQty).run().catch(() => {});
-            }
-            return null;
-          });
-        } else {
-          await db.prepare(
-            'UPDATE inventory_items SET current_stock = COALESCE(current_stock, 0) + ?, updated_at = ? WHERE id = ? AND (COALESCE(current_stock, 0) + ?) >= 0'
-          ).bind(signedQty, now, body.ingredientId, signedQty).run().catch(() => {});
-        }
-      } else {
-        let upd: { meta?: { changes?: number } } | null = null;
-        if (effectiveTenant && hasIngredientTenantCol) {
-          try {
-            upd = await db.prepare(`UPDATE ingredients SET current_stock = COALESCE(current_stock, 0) + ?, updated_at = ? WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?${casSql}`)
-              .bind(signedQty, now, body.ingredientId, effectiveTenant, ...casParams).run();
-          } catch {
-            if (effectiveTenant !== 'default') {
-              return c.json({ success: false, error: 'Failed to update stock for tenant' }, 500);
-            }
-            upd = await db.prepare(`UPDATE ingredients SET current_stock = COALESCE(current_stock, 0) + ?, updated_at = ? WHERE id = ?${casSql}`)
-              .bind(signedQty, now, body.ingredientId, ...casParams).run();
-          }
-        } else {
-          upd = await db.prepare(`UPDATE ingredients SET current_stock = COALESCE(current_stock, 0) + ?, updated_at = ? WHERE id = ?${casSql}`)
-            .bind(signedQty, now, body.ingredientId, ...casParams).run();
-        }
-        if (hasCasPrecondition && upd && upd.meta && typeof upd.meta.changes === 'number' && upd.meta.changes === 0) {
-          return c.json(
-            { success: false, error: 'Stock changed concurrently. Please reload and recount.' },
-            409
-          );
-        }
-        if (effectiveTenant) {
-          await db.prepare("UPDATE inventory_items SET current_stock = COALESCE(current_stock, 0) + ?, updated_at = ? WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?")
-            .bind(signedQty, now, body.ingredientId, effectiveTenant).run().catch(() => {
-              if (effectiveTenant === 'default') {
-                return db.prepare('UPDATE inventory_items SET current_stock = COALESCE(current_stock, 0) + ?, updated_at = ? WHERE id = ?')
-                  .bind(signedQty, now, body.ingredientId).run().catch(() => {});
-              }
-              return null;
-            });
-        } else {
-          await db.prepare('UPDATE inventory_items SET current_stock = COALESCE(current_stock, 0) + ?, updated_at = ? WHERE id = ?')
-            .bind(signedQty, now, body.ingredientId).run().catch(() => {});
-        }
-      }
-
-      try {
-        await db.prepare(
-          `INSERT INTO stock_movements (id, ingredient_id, type, quantity, reference_id, reference_type, notes, created_by, tenant_id, created_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-        ).bind(
-          id,
-          body.ingredientId,
-          body.type,
-          signedQty,
-          body.referenceId || null,
-          body.referenceType || null,
-          body.notes || null,
-          user.id,
-          writeTenant,
-          now
-        ).run();
-      } catch (err) {
-        const msg = String((err as Error)?.message || err || '');
-        if ((tenantId !== 'default' || writeTenant !== 'default') && (!hasAnyTenantScope || !msg.includes('tenant_id'))) {
-          throw err;
-        }
-        await db.prepare(
-          `INSERT INTO stock_movements (id, ingredient_id, type, quantity, reference_id, reference_type, notes, created_by, created_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
-        ).bind(
-          id,
-          body.ingredientId,
-          body.type,
-          signedQty,
-          body.referenceId || null,
-          body.referenceType || null,
-          body.notes || null,
-          user.id,
-          now
-        ).run();
-      }
-
-      await db.prepare(
-        `INSERT OR IGNORE INTO inventory_transactions (
-          id, item_id, type, quantity, reference_type, reference_id, notes, tenant_id, created_at
-        )
-        SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?
-        WHERE EXISTS (SELECT 1 FROM inventory_items WHERE id = ?)`
-      ).bind(
-        id,
-        body.ingredientId,
-        canonicalTxType,
-        signedQty,
+    const writeResult = await applyStockMovement(db, {
+      usingCanonical,
+      ingredientId: body.ingredientId,
+      movementId: id,
+      now,
+      tenant: writeTenant,
+      ingredientHasTenantCol: hasIngredientTenantCol,
+      signedQty,
+      previousStock,
+      targetStock: isTargetStocktake ? Number(targetStock) : undefined,
+      expectedStock: expectedStock !== undefined ? Number(expectedStock) : undefined,
+      expectedUpdatedAt:
+        expectedUpdatedAt !== undefined && ingredient.updated_at !== undefined && ingredient.updated_at !== null
+          ? String(expectedUpdatedAt)
+          : undefined,
+      ledger: {
+        type: body.type,
+        canonicalType: canonicalTxType,
         canonicalRefType,
-        body.referenceId || null,
-        body.notes || body.type || null,
-        writeTenant,
-        now,
-        body.ingredientId
-      ).run().catch(() => {
-        if (tenantId !== 'default' || writeTenant !== 'default') return null;
-        return db.prepare(
-          `INSERT OR IGNORE INTO inventory_transactions (
-            id, item_id, type, quantity, reference_type, reference_id, notes, created_at
-          )
-          SELECT ?, ?, ?, ?, ?, ?, ?, ?
-          WHERE EXISTS (SELECT 1 FROM inventory_items WHERE id = ?)`
-        ).bind(
-          id,
-          body.ingredientId,
-          canonicalTxType,
-          signedQty,
-          canonicalRefType,
-          body.referenceId || null,
-          body.notes || body.type || null,
-          now,
-          body.ingredientId
-        ).run().catch(() => {});
-      });
-    } else {
-      if (signedQty < 0) {
-        let upd: { meta?: { changes?: number } } | null = null;
-        if (effectiveTenant) {
-          try {
-            upd = await db.prepare(
-              `UPDATE inventory_items SET current_stock = COALESCE(current_stock, 0) + ?, updated_at = ? WHERE id = ? AND (COALESCE(current_stock, 0) + ?) >= 0 AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?${casSql}`
-            ).bind(signedQty, now, body.ingredientId, signedQty, effectiveTenant, ...casParams).run();
-          } catch {
-            if (effectiveTenant !== 'default') {
-              return c.json({ success: false, error: 'Failed to update stock for tenant' }, 500);
-            }
-            upd = await db.prepare(
-              `UPDATE inventory_items SET current_stock = COALESCE(current_stock, 0) + ?, updated_at = ? WHERE id = ? AND (COALESCE(current_stock, 0) + ?) >= 0${casSql}`
-            ).bind(signedQty, now, body.ingredientId, signedQty, ...casParams).run();
-          }
-        } else {
-          upd = await db.prepare(
-            `UPDATE inventory_items SET current_stock = COALESCE(current_stock, 0) + ?, updated_at = ? WHERE id = ? AND (COALESCE(current_stock, 0) + ?) >= 0${casSql}`
-          ).bind(signedQty, now, body.ingredientId, signedQty, ...casParams).run();
-        }
-        if (upd && upd.meta && typeof upd.meta.changes === 'number' && upd.meta.changes === 0) {
-          if (hasCasPrecondition) {
-            return c.json(
-              { success: false, error: 'Stock changed concurrently. Please reload and recount.' },
-              409
-            );
-          }
+        referenceId: body.referenceId || null,
+        referenceType: body.referenceType || null,
+        notes: body.notes || null,
+        createdBy: user.id,
+      },
+    });
+    if (!writeResult.ok) {
+      switch (writeResult.reason) {
+        case 'insufficient':
           return c.json({ success: false, error: 'Insufficient stock' }, 400);
-        }
-      } else {
-        let upd: { meta?: { changes?: number } } | null = null;
-        if (effectiveTenant) {
-          try {
-            upd = await db.prepare(`UPDATE inventory_items SET current_stock = COALESCE(current_stock, 0) + ?, updated_at = ? WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?${casSql}`)
-              .bind(signedQty, now, body.ingredientId, effectiveTenant, ...casParams).run();
-          } catch {
-            if (effectiveTenant !== 'default') {
-              return c.json({ success: false, error: 'Failed to update stock for tenant' }, 500);
-            }
-            upd = await db.prepare(`UPDATE inventory_items SET current_stock = COALESCE(current_stock, 0) + ?, updated_at = ? WHERE id = ?${casSql}`)
-              .bind(signedQty, now, body.ingredientId, ...casParams).run();
-          }
-        } else {
-          upd = await db.prepare(`UPDATE inventory_items SET current_stock = COALESCE(current_stock, 0) + ?, updated_at = ? WHERE id = ?${casSql}`)
-            .bind(signedQty, now, body.ingredientId, ...casParams).run();
-        }
-        if (hasCasPrecondition && upd && upd.meta && typeof upd.meta.changes === 'number' && upd.meta.changes === 0) {
+        case 'tenant_write_failed':
+          return c.json({ success: false, error: 'Failed to update stock for tenant' }, 500);
+        case 'not_found':
+          return c.json({ success: false, error: 'Ingredient not found' }, 404);
+        default:
           return c.json(
             { success: false, error: 'Stock changed concurrently. Please reload and recount.' },
             409
           );
-        }
-      }
-
-      try {
-        await db.prepare(
-          `INSERT INTO inventory_transactions (
-            id, item_id, type, quantity, reference_type, reference_id, notes, tenant_id, created_at
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
-        ).bind(
-          id,
-          body.ingredientId,
-          canonicalTxType,
-          signedQty,
-          canonicalRefType,
-          body.referenceId || null,
-          body.notes || body.type || null,
-          writeTenant,
-          now
-        ).run();
-      } catch (err) {
-        if (tenantId !== 'default' || writeTenant !== 'default') {
-          throw err;
-        }
-        await db.prepare(
-          `INSERT INTO inventory_transactions (
-            id, item_id, type, quantity, reference_type, reference_id, notes, created_at
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
-        ).bind(
-          id,
-          body.ingredientId,
-          canonicalTxType,
-          signedQty,
-          canonicalRefType,
-          body.referenceId || null,
-          body.notes || body.type || null,
-          now
-        ).run();
       }
     }
 

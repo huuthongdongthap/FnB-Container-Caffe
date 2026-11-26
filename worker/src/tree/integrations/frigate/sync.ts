@@ -225,8 +225,19 @@ export async function getFrigateEvents(
       tenantBinds.push(cleanTenant, cleanTenant, limitBind);
     }
     rows = await db.prepare(tenantSql).bind(...tenantBinds).all<FrigateEventRow>();
-  } catch {
-    rows = await db.prepare(sql).bind(...binds).all<FrigateEventRow>();
+  } catch (err) {
+    const message = (err as Error).message;
+    log.warn('frigate_events_tenant_query_failed', { error: message });
+    const scopedToConcreteTenant = Boolean(cleanTenant) && cleanTenant !== '*';
+    if (scopedToConcreteTenant && cleanTenant !== 'default') {
+      // Unscoped rows cannot be attributed to a non-default tenant; never expose them.
+      rows = { results: [] };
+    } else if (/no such column.*tenant_id/i.test(message)) {
+      // Legacy schema without tenant_id: every row belongs to the default tenant.
+      rows = await db.prepare(sql).bind(...binds).all<FrigateEventRow>();
+    } else {
+      throw err;
+    }
   }
   const rawEvents = rows.results ?? [];
   const filtered = rawEvents.filter((r) =>

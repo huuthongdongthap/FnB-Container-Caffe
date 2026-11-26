@@ -821,32 +821,72 @@ export async function deductInventoryForOrder(
           ),
         ];
 
-        if (hasIngTenantCol) {
+        // Two order lines can resolve to the same ingredient. The unique index on order consumption
+        // allows one ledger row per (tenant, order, ingredient), so the later line is folded into the
+        // existing row instead of being rolled back and lost.
+        const foldIntoExistingConsumption = async () => {
+          const stockOp = hasIngTenantCol
+            ? env.AURA_DB.prepare(
+                "UPDATE ingredients SET current_stock = MAX(0, COALESCE(current_stock, 0) - ?), updated_at = ? WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
+              ).bind(deductQty, now, ingredient.id, effectiveTenant)
+            : env.AURA_DB.prepare(
+                'UPDATE ingredients SET current_stock = MAX(0, COALESCE(current_stock, 0) - ?), updated_at = ? WHERE id = ?'
+              ).bind(deductQty, now, ingredient.id);
+          const ledgerMatch =
+            "reference_id = ? AND reference_type = 'order' AND type = 'consumption' AND ingredient_id = ?";
           try {
             await env.AURA_DB.batch([
+              stockOp,
               env.AURA_DB.prepare(
-                "UPDATE ingredients SET current_stock = MAX(0, COALESCE(current_stock, 0) - ?), updated_at = ? WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
-              ).bind(deductQty, now, ingredient.id, effectiveTenant),
-              env.AURA_DB.prepare(
-                'INSERT INTO stock_movements (id, ingredient_id, type, quantity, reference_id, reference_type, notes, created_at, tenant_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'
-              ).bind(
-                movId,
-                ingredient.id,
-                'consumption',
-                -deductQty,
+                `UPDATE stock_movements SET quantity = quantity - ? WHERE ${ledgerMatch} AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?`
+              ).bind(deductQty, orderId, ingredient.id, effectiveTenant),
+            ]);
+          } catch {
+            // Legacy schemas without stock_movements.tenant_id
+            await env.AURA_DB.batch([
+              stockOp,
+              env.AURA_DB.prepare(`UPDATE stock_movements SET quantity = quantity - ? WHERE ${ledgerMatch}`).bind(
+                deductQty,
                 orderId,
-                'order',
-                `Auto-deduct from order ${orderId}`,
-                now,
-                effectiveTenant
+                ingredient.id
               ),
             ]);
-          } catch (batchErr) {
-            if (effectiveTenant !== 'default') throw batchErr;
+          }
+        };
+        const isDuplicateConsumption = (e: unknown) => /UNIQUE constraint failed/i.test(String((e as Error)?.message ?? e));
+
+        try {
+          if (hasIngTenantCol) {
+            try {
+              await env.AURA_DB.batch([
+                env.AURA_DB.prepare(
+                  "UPDATE ingredients SET current_stock = MAX(0, COALESCE(current_stock, 0) - ?), updated_at = ? WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
+                ).bind(deductQty, now, ingredient.id, effectiveTenant),
+                env.AURA_DB.prepare(
+                  'INSERT INTO stock_movements (id, ingredient_id, type, quantity, reference_id, reference_type, notes, created_at, tenant_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'
+                ).bind(
+                  movId,
+                  ingredient.id,
+                  'consumption',
+                  -deductQty,
+                  orderId,
+                  'order',
+                  `Auto-deduct from order ${orderId}`,
+                  now,
+                  effectiveTenant
+                ),
+              ]);
+            } catch (batchErr) {
+              if (isDuplicateConsumption(batchErr)) throw batchErr;
+              if (effectiveTenant !== 'default') throw batchErr;
+              await env.AURA_DB.batch(fallbackIngBatch);
+            }
+          } else {
             await env.AURA_DB.batch(fallbackIngBatch);
           }
-        } else {
-          await env.AURA_DB.batch(fallbackIngBatch);
+        } catch (dupErr) {
+          if (!isDuplicateConsumption(dupErr)) throw dupErr;
+          await foldIntoExistingConsumption();
         }
 
         await env.AURA_DB.prepare('UPDATE stock_movements SET tenant_id = ? WHERE id = ?')

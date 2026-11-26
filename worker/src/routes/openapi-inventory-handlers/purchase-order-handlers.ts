@@ -369,6 +369,415 @@ async function writePoAuditLog(
   }
 }
 
+// SQLite integer overflow aborts the entire D1 batch when the preceding statement
+// changed 0 rows, ensuring concurrent receives or stale state fail atomically.
+const RECEIVE_GUARD_SQL =
+  'SELECT CASE WHEN changes() = 1 THEN 1 ELSE abs(-9223372036854775808) END AS receive_guard';
+const RECEIVE_CONFLICT_ERROR = /integer overflow|Concurrent receive conflict/i;
+const TENANT_MATCH = "COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?";
+
+interface ReceiveTableShape {
+  known: boolean;
+  columns: Set<string>;
+}
+
+async function detectTableShape(db: any, table: string): Promise<ReceiveTableShape> {
+  try {
+    const res = await db.prepare(`PRAGMA table_info(${table})`).all();
+    const rows = Array.isArray(res?.results) ? (res.results as Array<{ name?: unknown }>) : [];
+    const cols = new Set<string>();
+    for (const r of rows) {
+      if (typeof r?.name === 'string' && r.name.trim()) {
+        cols.add(r.name.trim());
+      }
+    }
+    return { known: cols.size > 0, columns: cols };
+  } catch {
+    return { known: false, columns: new Set<string>() };
+  }
+}
+
+interface ReceiveLineSpec {
+  ingredientId: string;
+  receiveQty: number;
+  unitCost: number | null;
+  orderedItem?: Record<string, unknown>;
+  ingredient: any;
+  usingCanonical: boolean;
+}
+
+interface BuildReceiveStatementsInput {
+  db: any;
+  poId: string;
+  po: Record<string, unknown>;
+  tenant: string;
+  nextPoStatus: string;
+  now: string;
+  userId: string;
+  poItems: Array<Record<string, unknown>>;
+  lines: ReceiveLineSpec[];
+}
+
+function buildMirrorUpdateStatement(
+  db: any,
+  opts: {
+    ingredientId: string;
+    receiveQty: number;
+    effectiveUnitCost: number | null;
+    now: string;
+    tenant: string;
+    scopeTenant: boolean;
+    invHasCost: boolean;
+    invHasUnitCost: boolean;
+    invHasLastRestocked: boolean;
+    invHasUpdatedAt: boolean;
+  }
+) {
+  const setParts: string[] = [];
+  const bindVals: unknown[] = [];
+  if (opts.effectiveUnitCost !== null && (opts.invHasCost || opts.invHasUnitCost)) {
+    const existingCostExpr =
+      opts.invHasCost && opts.invHasUnitCost
+        ? 'COALESCE(cost_per_unit, unit_cost, 0)'
+        : opts.invHasCost
+          ? 'COALESCE(cost_per_unit, 0)'
+          : 'COALESCE(unit_cost, 0)';
+    const wacExpr = `CASE
+               WHEN (MAX(0, COALESCE(current_stock, 0)) + ?) > 0
+               THEN ((MAX(0, COALESCE(current_stock, 0)) * ${existingCostExpr}) + (? * ?)) / (MAX(0, COALESCE(current_stock, 0)) + ?)
+               ELSE ?
+             END`;
+    if (opts.invHasCost) {
+      setParts.push(`cost_per_unit = ${wacExpr}`);
+      bindVals.push(opts.receiveQty, opts.receiveQty, opts.effectiveUnitCost, opts.receiveQty, opts.effectiveUnitCost);
+    }
+    if (opts.invHasUnitCost) {
+      setParts.push(`unit_cost = ${wacExpr}`);
+      bindVals.push(opts.receiveQty, opts.receiveQty, opts.effectiveUnitCost, opts.receiveQty, opts.effectiveUnitCost);
+    }
+  }
+  setParts.push('current_stock = COALESCE(current_stock, 0) + ?');
+  bindVals.push(opts.receiveQty);
+  if (opts.invHasLastRestocked) {
+    setParts.push('last_restocked_at = ?');
+    bindVals.push(opts.now);
+  }
+  if (opts.invHasUpdatedAt) {
+    setParts.push('updated_at = ?');
+    bindVals.push(opts.now);
+  }
+  const whereClause = opts.scopeTenant ? `id = ? AND ${TENANT_MATCH}` : 'id = ?';
+  const whereBinds = opts.scopeTenant ? [opts.ingredientId, opts.tenant] : [opts.ingredientId];
+  return db.prepare(`UPDATE inventory_items SET ${setParts.join(', ')} WHERE ${whereClause}`).bind(...bindVals, ...whereBinds);
+}
+
+/**
+ * Builds one atomic D1 batch for a purchase order receipt.
+ *
+ * Concurrency & atomicity design:
+ * 1. Pre-batch capability detection (`PRAGMA table_info`) determines table/column presence
+ *    (legacy no-tenant_id fallbacks are only permitted for tenant `'default'`).
+ * 2. Every optimistic CAS statement (`purchase_order_items.received_quantity` per line,
+ *    followed by `purchase_orders.status NOT IN ('received','cancelled')`) runs FIRST and
+ *    is immediately followed by `SELECT CASE WHEN changes() = 1 THEN 1 ELSE abs(-9223372036854775808) END`.
+ *    When receiving multiple lines on a known schema, a single preflight assertion checks all
+ *    line capacities together before line 1 is mutated.
+ * 3. Under concurrent double-receive on the same line or PO, the losing batch's CAS updates
+ *    0 rows and the guard triggers SQLite `integer overflow`, aborting the D1 batch transaction
+ *    with zero partial writes; the handler inspects the error via `RECEIVE_CONFLICT_ERROR` and
+ *    returns HTTP 409.
+ * 4. All dependent writes (`ingredients` WAC + stock, `inventory_items` mirror, `stock_movements`,
+ *    `inventory_transactions`) run in the same batch without `.catch(() => {})` swallowing, so
+ *    any failure rolls back every earlier item, stock update, ledger entry, and PO status change.
+ */
+async function buildReceiveStatements(input: BuildReceiveStatementsInput): Promise<any[]> {
+  const { db, poId, po, tenant, nextPoStatus, now, userId, lines } = input;
+  const [poShape, poiShape, ingShape, invShape, movShape, txShape] = await Promise.all([
+    detectTableShape(db, 'purchase_orders'),
+    detectTableShape(db, 'purchase_order_items'),
+    detectTableShape(db, 'ingredients'),
+    detectTableShape(db, 'inventory_items'),
+    detectTableShape(db, 'stock_movements'),
+    detectTableShape(db, 'inventory_transactions'),
+  ]);
+  const pragmaSupported =
+    poShape.known || poiShape.known || ingShape.known || invShape.known || movShape.known || txShape.known;
+
+  const isConcreteTenant = Boolean(tenant && tenant !== '*');
+  const isDefaultTenant = !tenant || tenant === 'default';
+  const hasColumn = (shape: ReceiveTableShape, col: string, rowHint?: Record<string, unknown>): boolean => {
+    if (shape.known) return shape.columns.has(col);
+    if (rowHint && typeof rowHint === 'object' && col in rowHint) return true;
+    return true;
+  };
+  const requireTenantColumn = (shape: ReceiveTableShape, tableName: string, rowHint?: Record<string, unknown>): boolean => {
+    const present = hasColumn(shape, 'tenant_id', rowHint);
+    if (!present && !isDefaultTenant) {
+      throw new Error(`Multi-tenant isolation requires ${tableName}.tenant_id for tenant ${tenant}`);
+    }
+    return present;
+  };
+
+  const poHasTenant = requireTenantColumn(poShape, 'purchase_orders', po);
+  const poiPresent = !pragmaSupported || poiShape.known;
+  const poiHasPurchaseOrderId = hasColumn(poiShape, 'purchase_order_id');
+  const poiHasQuantity = hasColumn(poiShape, 'quantity');
+  // Ledger rows are addressed by primary key and linked to a tenant-verified PO + ingredient,
+  // matching movement-stock-write.ts when a legacy ledger schema omits tenant_id.
+  const movHasTenant = hasColumn(movShape, 'tenant_id');
+  const txTableExists = !pragmaSupported || txShape.known;
+  const txHasTenant = hasColumn(txShape, 'tenant_id');
+  const invTableExists = !pragmaSupported || invShape.known;
+  const invHasTenant = hasColumn(invShape, 'tenant_id');
+  const invHasCost = hasColumn(invShape, 'cost_per_unit');
+  const invHasUnitCost = invShape.known ? invShape.columns.has('unit_cost') : false;
+  const invHasLastRestocked = hasColumn(invShape, 'last_restocked_at');
+  const invHasUpdatedAt = hasColumn(invShape, 'updated_at');
+
+  const guard = () => db.prepare(RECEIVE_GUARD_SQL);
+  const statements: any[] = [];
+
+  // Step 1: Per-line received_quantity CAS gates (before any stock/cost/ledger mutation).
+  const lineCasOps: Array<{ updateStmt: any; checkClause: string; checkArgs: unknown[] }> = [];
+  for (const line of lines) {
+    if (!line.orderedItem || !poiPresent) continue;
+    const poItemId = line.orderedItem.id !== undefined && line.orderedItem.id !== null ? String(line.orderedItem.id) : '';
+    if (poItemId) {
+      if (poiHasPurchaseOrderId && poiHasQuantity) {
+        lineCasOps.push({
+          updateStmt: db
+            .prepare(
+              'UPDATE purchase_order_items SET received_quantity = COALESCE(received_quantity, 0) + ? WHERE id = ? AND purchase_order_id = ? AND (quantity IS NULL OR COALESCE(received_quantity, 0) + ? <= quantity)'
+            )
+            .bind(line.receiveQty, poItemId, poId, line.receiveQty),
+          checkClause: '(id = ? AND purchase_order_id = ? AND (quantity IS NULL OR COALESCE(received_quantity, 0) + ? <= quantity))',
+          checkArgs: [poItemId, poId, line.receiveQty],
+        });
+      } else if (poiHasQuantity) {
+        lineCasOps.push({
+          updateStmt: db
+            .prepare(
+              'UPDATE purchase_order_items SET received_quantity = COALESCE(received_quantity, 0) + ? WHERE id = ? AND (quantity IS NULL OR COALESCE(received_quantity, 0) + ? <= quantity)'
+            )
+            .bind(line.receiveQty, poItemId, line.receiveQty),
+          checkClause: '(id = ? AND (quantity IS NULL OR COALESCE(received_quantity, 0) + ? <= quantity))',
+          checkArgs: [poItemId, line.receiveQty],
+        });
+      } else {
+        lineCasOps.push({
+          updateStmt: db
+            .prepare('UPDATE purchase_order_items SET received_quantity = COALESCE(received_quantity, 0) + ? WHERE id = ?')
+            .bind(line.receiveQty, poItemId),
+          checkClause: '(id = ?)',
+          checkArgs: [poItemId],
+        });
+      }
+    } else if (poiHasPurchaseOrderId) {
+      lineCasOps.push({
+        updateStmt: db
+          .prepare(
+            'UPDATE purchase_order_items SET received_quantity = COALESCE(received_quantity, 0) + ? WHERE purchase_order_id = ? AND ingredient_id = ? AND (quantity IS NULL OR COALESCE(received_quantity, 0) + ? <= quantity)'
+          )
+          .bind(line.receiveQty, poId, line.ingredientId, line.receiveQty),
+        checkClause:
+          '(purchase_order_id = ? AND ingredient_id = ? AND (quantity IS NULL OR COALESCE(received_quantity, 0) + ? <= quantity))',
+        checkArgs: [poId, line.ingredientId, line.receiveQty],
+      });
+    }
+  }
+
+  if (lineCasOps.length > 1 && poiShape.known) {
+    const preflightClauses = lineCasOps.map((op) => op.checkClause).join(' OR ');
+    const preflightArgs = lineCasOps.flatMap((op) => op.checkArgs);
+    statements.push(
+      db
+        .prepare(
+          `SELECT CASE WHEN (SELECT COUNT(*) FROM purchase_order_items WHERE ${preflightClauses}) = ? THEN 1 ELSE abs(-9223372036854775808) END AS receive_preflight_guard`
+        )
+        .bind(...preflightArgs, lineCasOps.length)
+    );
+  }
+  for (const op of lineCasOps) {
+    statements.push(op.updateStmt);
+    statements.push(guard());
+  }
+
+  // Step 2: Purchase-order status CAS gate (derived inside the transaction after line updates
+  // so two concurrent partial receives that together complete all lines land on 'received').
+  const poWhere =
+    isConcreteTenant && poHasTenant
+      ? `id = ? AND status NOT IN ('received', 'cancelled') AND ${TENANT_MATCH}`
+      : "id = ? AND status NOT IN ('received', 'cancelled')";
+  if (poiShape.known && poiHasPurchaseOrderId && poiHasQuantity && input.poItems.length > 0) {
+    const statusExpr =
+      "CASE WHEN NOT EXISTS (SELECT 1 FROM purchase_order_items WHERE purchase_order_id = ? AND quantity IS NOT NULL AND quantity > 0 AND COALESCE(received_quantity, 0) < quantity) THEN 'received' ELSE 'partially_received' END";
+    const poBinds = isConcreteTenant && poHasTenant ? [poId, now, poId, tenant] : [poId, now, poId];
+    statements.push(
+      db.prepare(`UPDATE purchase_orders SET status = ${statusExpr}, updated_at = ? WHERE ${poWhere}`).bind(...poBinds)
+    );
+  } else {
+    const poBinds = isConcreteTenant && poHasTenant ? [nextPoStatus, now, poId, tenant] : [nextPoStatus, now, poId];
+    statements.push(db.prepare(`UPDATE purchase_orders SET status = ?, updated_at = ? WHERE ${poWhere}`).bind(...poBinds));
+  }
+  statements.push(guard());
+
+  // Step 3: Dependent ingredient WAC/stock, inventory_items mirror, and ledger inserts.
+  for (const line of lines) {
+    const movId = `mov_${Date.now()}_${crypto.randomUUID().replace(/-/g, '').slice(0, 12)}`;
+    const { ingredientId, receiveQty, unitCost: effectiveUnitCost, ingredient, usingCanonical } = line;
+
+    if (!usingCanonical) {
+      const ingHasTenant = requireTenantColumn(ingShape, 'ingredients', ingredient);
+      const ingScopeTenant = isConcreteTenant && ingHasTenant;
+      const ingWhere = ingScopeTenant ? `id = ? AND ${TENANT_MATCH}` : 'id = ?';
+      const ingWhereBinds = ingScopeTenant ? [ingredientId, tenant] : [ingredientId];
+      if (effectiveUnitCost !== null) {
+        statements.push(
+          db
+            .prepare(
+              `UPDATE ingredients SET current_stock = COALESCE(current_stock, 0) + ?,
+                   cost_per_unit = CASE
+                     WHEN (MAX(0, COALESCE(current_stock, 0)) + ?) > 0
+                     THEN ((MAX(0, COALESCE(current_stock, 0)) * COALESCE(cost_per_unit, 0)) + (? * ?)) / (MAX(0, COALESCE(current_stock, 0)) + ?)
+                     ELSE ?
+                   END,
+                   updated_at = ?
+               WHERE ${ingWhere}`
+            )
+            .bind(receiveQty, receiveQty, receiveQty, effectiveUnitCost, receiveQty, effectiveUnitCost, now, ...ingWhereBinds)
+        );
+      } else {
+        statements.push(
+          db
+            .prepare(`UPDATE ingredients SET current_stock = COALESCE(current_stock, 0) + ?, updated_at = ? WHERE ${ingWhere}`)
+            .bind(receiveQty, now, ...ingWhereBinds)
+        );
+      }
+      statements.push(guard());
+
+      if (movHasTenant) {
+        statements.push(
+          db
+            .prepare(
+              `INSERT INTO stock_movements (id, ingredient_id, type, quantity, reference_id, reference_type, notes, created_by, tenant_id, created_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+            )
+            .bind(movId, ingredientId, 'purchase_receipt', receiveQty, poId, 'purchase_order', `Received from PO ${poId}`, userId, tenant || 'default', now)
+        );
+        if (isConcreteTenant) {
+          statements.push(db.prepare('UPDATE stock_movements SET tenant_id = ? WHERE id = ?').bind(tenant, movId));
+        }
+      } else {
+        statements.push(
+          db
+            .prepare(
+              `INSERT INTO stock_movements (id, ingredient_id, type, quantity, reference_id, reference_type, notes, created_by, created_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+            )
+            .bind(movId, ingredientId, 'purchase_receipt', receiveQty, poId, 'purchase_order', `Received from PO ${poId}`, userId, now)
+        );
+      }
+
+      if (invTableExists) {
+        if (!invHasTenant && !isDefaultTenant) {
+          throw new Error(`Multi-tenant isolation requires inventory_items.tenant_id for tenant ${tenant}`);
+        }
+        statements.push(
+          buildMirrorUpdateStatement(db, {
+            ingredientId,
+            receiveQty,
+            effectiveUnitCost,
+            now,
+            tenant,
+            scopeTenant: isConcreteTenant && invHasTenant,
+            invHasCost,
+            invHasUnitCost,
+            invHasLastRestocked,
+            invHasUpdatedAt,
+          })
+        );
+      }
+
+      if (txTableExists && invTableExists) {
+        if (txHasTenant) {
+          statements.push(
+            db
+              .prepare(
+                `INSERT OR IGNORE INTO inventory_transactions (
+                  id, item_id, type, quantity, reference_type, reference_id, notes, tenant_id, created_at
+                )
+                SELECT ?, ?, 'in', ?, 'purchase', ?, ?, ?, ?
+                WHERE EXISTS (SELECT 1 FROM inventory_items WHERE id = ?)`
+              )
+              .bind(movId, ingredientId, receiveQty, poId, `Received from PO ${poId}`, tenant || 'default', now, ingredientId)
+          );
+          if (isConcreteTenant) {
+            statements.push(db.prepare('UPDATE inventory_transactions SET tenant_id = ? WHERE id = ?').bind(tenant, movId));
+          }
+        } else {
+          statements.push(
+            db
+              .prepare(
+                `INSERT OR IGNORE INTO inventory_transactions (
+                  id, item_id, type, quantity, reference_type, reference_id, notes, created_at
+                )
+                SELECT ?, ?, 'in', ?, 'purchase', ?, ?, ?
+                WHERE EXISTS (SELECT 1 FROM inventory_items WHERE id = ?)`
+              )
+              .bind(movId, ingredientId, receiveQty, poId, `Received from PO ${poId}`, now, ingredientId)
+          );
+        }
+      }
+    } else {
+      const canInvHasTenant = requireTenantColumn(invShape, 'inventory_items', ingredient);
+      statements.push(
+        buildMirrorUpdateStatement(db, {
+          ingredientId,
+          receiveQty,
+          effectiveUnitCost,
+          now,
+          tenant,
+          scopeTenant: isConcreteTenant && canInvHasTenant,
+          invHasCost,
+          invHasUnitCost,
+          invHasLastRestocked,
+          invHasUpdatedAt,
+        })
+      );
+      statements.push(guard());
+
+      if (txTableExists) {
+        if (txHasTenant) {
+          statements.push(
+            db
+              .prepare(
+                `INSERT INTO inventory_transactions (
+                  id, item_id, type, quantity, reference_type, reference_id, notes, tenant_id, created_at
+                ) VALUES (?, ?, 'in', ?, 'purchase', ?, ?, ?, ?)`
+              )
+              .bind(movId, ingredientId, receiveQty, poId, `Received from PO ${poId}`, tenant || 'default', now)
+          );
+          if (isConcreteTenant) {
+            statements.push(db.prepare('UPDATE inventory_transactions SET tenant_id = ? WHERE id = ?').bind(tenant, movId));
+          }
+        } else {
+          statements.push(
+            db
+              .prepare(
+                `INSERT INTO inventory_transactions (
+                  id, item_id, type, quantity, reference_type, reference_id, notes, created_at
+                ) VALUES (?, ?, 'in', ?, 'purchase', ?, ?, ?)`
+              )
+              .bind(movId, ingredientId, receiveQty, poId, `Received from PO ${poId}`, now)
+          );
+        }
+      }
+    }
+  }
+
+  return statements;
+}
+
 export function registerPurchaseOrderHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
   // GET /api/inventory/purchase-orders - List purchase orders
   app.openapi(InventoryRoutes.purchaseOrders.list as any, async (c: any) => {
@@ -1315,510 +1724,46 @@ export function registerPurchaseOrderHandlers(app: OpenAPIHono<{ Bindings: Env }
           })
         : true;
     const nextPoStatus = allItemsFullyReceived ? 'received' : 'partially_received';
-    const appliedUpdates: Array<{
-      poItemId?: string;
-      ingredientId: string;
-      receiveQty: number;
-      movId: string;
-      usingCanonical: boolean;
-      previousCostPerUnit: number | null;
-    }> = [];
 
-    const rollbackAppliedUpdates = async () => {
-      for (const applied of [...appliedUpdates].reverse()) {
-        if (applied.poItemId) {
-          await db
-            .prepare('UPDATE purchase_order_items SET received_quantity = MAX(0, COALESCE(received_quantity, 0) - ?) WHERE id = ?')
-            .bind(applied.receiveQty, applied.poItemId)
-            .run()
-            .catch(() => null);
-        } else {
-          await db
-            .prepare('UPDATE purchase_order_items SET received_quantity = MAX(0, COALESCE(received_quantity, 0) - ?) WHERE purchase_order_id = ? AND ingredient_id = ?')
-            .bind(applied.receiveQty, id, applied.ingredientId)
-            .run()
-            .catch(() => null);
-        }
-        if (!applied.usingCanonical) {
-          const restoreIngCostSql = applied.previousCostPerUnit !== null ? ', cost_per_unit = ?' : '';
-          const restoreIngCostParams = applied.previousCostPerUnit !== null ? [applied.previousCostPerUnit] : [];
-          if (effectiveTenant && effectiveTenant !== '*') {
-            await db
-              .prepare(`UPDATE ingredients SET current_stock = MAX(0, COALESCE(current_stock, 0) - ?)${restoreIngCostSql}, updated_at = ? WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?`)
-              .bind(applied.receiveQty, ...restoreIngCostParams, now, applied.ingredientId, effectiveTenant)
-              .run()
-              .catch(() => {
-                if (effectiveTenant !== 'default') return null;
-                return db
-                  .prepare(`UPDATE ingredients SET current_stock = MAX(0, COALESCE(current_stock, 0) - ?)${restoreIngCostSql}, updated_at = ? WHERE id = ?`)
-                  .bind(applied.receiveQty, ...restoreIngCostParams, now, applied.ingredientId)
-                  .run()
-                  .catch(() => null);
-              });
-          } else {
-            await db
-              .prepare(`UPDATE ingredients SET current_stock = MAX(0, COALESCE(current_stock, 0) - ?)${restoreIngCostSql}, updated_at = ? WHERE id = ?`)
-              .bind(applied.receiveQty, ...restoreIngCostParams, now, applied.ingredientId)
-              .run()
-              .catch(() => null);
-          }
-          await db.prepare('DELETE FROM stock_movements WHERE id = ?').bind(applied.movId).run().catch(() => null);
-        }
-        const restoreCanonCostSql = applied.previousCostPerUnit !== null ? ', cost_per_unit = ?, unit_cost = ?' : '';
-        const restoreCanonCostParams = applied.previousCostPerUnit !== null ? [applied.previousCostPerUnit, applied.previousCostPerUnit] : [];
-        if (effectiveTenant && effectiveTenant !== '*') {
-          await db
-            .prepare(`UPDATE inventory_items SET current_stock = MAX(0, COALESCE(current_stock, 0) - ?)${restoreCanonCostSql}, updated_at = ? WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?`)
-            .bind(applied.receiveQty, ...restoreCanonCostParams, now, applied.ingredientId, effectiveTenant)
-            .run()
-            .catch(() => {
-              if (applied.previousCostPerUnit !== null) {
-                return db
-                  .prepare("UPDATE inventory_items SET current_stock = MAX(0, COALESCE(current_stock, 0) - ?), cost_per_unit = ?, updated_at = ? WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?")
-                  .bind(applied.receiveQty, applied.previousCostPerUnit, now, applied.ingredientId, effectiveTenant)
-                  .run()
-                  .catch(() => {
-                    if (effectiveTenant !== 'default') return null;
-                    return db
-                      .prepare(`UPDATE inventory_items SET current_stock = MAX(0, COALESCE(current_stock, 0) - ?)${restoreCanonCostSql}, updated_at = ? WHERE id = ?`)
-                      .bind(applied.receiveQty, ...restoreCanonCostParams, now, applied.ingredientId)
-                      .run()
-                      .catch(() => null);
-                  });
-              }
-              if (effectiveTenant !== 'default') return null;
-              return db
-                .prepare('UPDATE inventory_items SET current_stock = MAX(0, COALESCE(current_stock, 0) - ?), updated_at = ? WHERE id = ?')
-                .bind(applied.receiveQty, now, applied.ingredientId)
-                .run()
-                .catch(() => null);
-            });
-        } else {
-          await db
-            .prepare(`UPDATE inventory_items SET current_stock = MAX(0, COALESCE(current_stock, 0) - ?)${restoreCanonCostSql}, updated_at = ? WHERE id = ?`)
-            .bind(applied.receiveQty, ...restoreCanonCostParams, now, applied.ingredientId)
-            .run()
-            .catch(() => {
-              if (applied.previousCostPerUnit === null) return null;
-              return db
-                .prepare('UPDATE inventory_items SET current_stock = MAX(0, COALESCE(current_stock, 0) - ?), cost_per_unit = ?, updated_at = ? WHERE id = ?')
-                .bind(applied.receiveQty, applied.previousCostPerUnit, now, applied.ingredientId)
-                .run()
-                .catch(() => null);
-            });
-        }
-        await db.prepare('DELETE FROM inventory_transactions WHERE id = ?').bind(applied.movId).run().catch(() => null);
-      }
-    };
-
-    for (const { item, orderedItem, receiveQty, ingredient, usingCanonical } of resolvedItems) {
-      if (receiveQty <= 0) continue;
-      const movId = `mov_${Date.now()}_${crypto.randomUUID().replace(/-/g, '').slice(0, 12)}`;
-      const hasIngTenantCol = Boolean(ingredient && typeof ingredient === 'object' && 'tenant_id' in ingredient);
-      const poItemId = orderedItem?.id ? String(orderedItem.id) : undefined;
-      let itemUpdate: any = null;
-      if (poItemId) {
-        itemUpdate = await db
-          .prepare('UPDATE purchase_order_items SET received_quantity = COALESCE(received_quantity, 0) + ? WHERE id = ? AND purchase_order_id = ? AND (quantity IS NULL OR COALESCE(received_quantity, 0) + ? <= quantity)')
-          .bind(receiveQty, poItemId, id, receiveQty)
-          .run()
-          .catch((err: unknown) => {
-            if (effectiveTenant !== 'default') throw err;
-            return db
-              .prepare('UPDATE purchase_order_items SET received_quantity = COALESCE(received_quantity, 0) + ? WHERE id = ? AND (quantity IS NULL OR COALESCE(received_quantity, 0) + ? <= quantity)')
-              .bind(receiveQty, poItemId, receiveQty)
-              .run()
-              .catch(() =>
-                db
-                  .prepare('UPDATE purchase_order_items SET received_quantity = COALESCE(received_quantity, 0) + ? WHERE purchase_order_id = ? AND ingredient_id = ? AND COALESCE(received_quantity, 0) + ? <= quantity')
-                  .bind(receiveQty, id, item.ingredientId, receiveQty)
-                  .run()
-                  .catch(() => null)
-              );
-          });
-      } else {
-        itemUpdate = await db
-          .prepare('UPDATE purchase_order_items SET received_quantity = COALESCE(received_quantity, 0) + ? WHERE purchase_order_id = ? AND ingredient_id = ? AND (quantity IS NULL OR COALESCE(received_quantity, 0) + ? <= quantity)')
-          .bind(receiveQty, id, item.ingredientId, receiveQty)
-          .run()
-          .catch((err: unknown) => {
-            if (effectiveTenant !== 'default') throw err;
-            return db
-              .prepare('UPDATE purchase_order_items SET received_quantity = COALESCE(received_quantity, 0) + ? WHERE purchase_order_id = ? AND ingredient_id = ? AND COALESCE(received_quantity, 0) + ? <= quantity')
-              .bind(receiveQty, id, item.ingredientId, receiveQty)
-              .run()
-              .catch(() => null);
-          });
-      }
-      if (itemUpdate?.meta && typeof itemUpdate.meta.changes === 'number' && itemUpdate.meta.changes === 0) {
-        await rollbackAppliedUpdates();
-        return c.json({ success: false, error: `Concurrent receive conflict or over-receive for ingredient ${item.ingredientId}` }, 409);
-      }
-
-      const rawUnitCost = item.unitCost ?? item.unit_cost ?? orderedItem?.unit_cost ?? orderedItem?.unit_price;
-      const effectiveUnitCost =
-        rawUnitCost !== undefined && rawUnitCost !== null && Number.isFinite(Number(rawUnitCost)) && Number(rawUnitCost) >= 0
-          ? Number(rawUnitCost)
-          : null;
-
-      if (!usingCanonical) {
-        if (effectiveUnitCost !== null) {
-          if (effectiveTenant && effectiveTenant !== '*') {
-            try {
-              await db.prepare(
-                `UPDATE ingredients SET current_stock = COALESCE(current_stock, 0) + ?,
-                     cost_per_unit = CASE
-                       WHEN (MAX(0, COALESCE(current_stock, 0)) + ?) > 0
-                       THEN ((MAX(0, COALESCE(current_stock, 0)) * COALESCE(cost_per_unit, 0)) + (? * ?)) / (MAX(0, COALESCE(current_stock, 0)) + ?)
-                       ELSE ?
-                     END,
-                     updated_at = ?
-                 WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?`
-              ).bind(receiveQty, receiveQty, receiveQty, effectiveUnitCost, receiveQty, effectiveUnitCost, now, item.ingredientId, effectiveTenant).run();
-            } catch (err) {
-              if (effectiveTenant !== 'default' || hasIngTenantCol) throw err;
-              await db.prepare(
-                `UPDATE ingredients SET current_stock = COALESCE(current_stock, 0) + ?,
-                     cost_per_unit = CASE
-                       WHEN (MAX(0, COALESCE(current_stock, 0)) + ?) > 0
-                       THEN ((MAX(0, COALESCE(current_stock, 0)) * COALESCE(cost_per_unit, 0)) + (? * ?)) / (MAX(0, COALESCE(current_stock, 0)) + ?)
-                       ELSE ?
-                     END,
-                     updated_at = ?
-                 WHERE id = ?`
-              ).bind(receiveQty, receiveQty, receiveQty, effectiveUnitCost, receiveQty, effectiveUnitCost, now, item.ingredientId).run();
-            }
-          } else {
-            await db.prepare(
-              `UPDATE ingredients SET current_stock = COALESCE(current_stock, 0) + ?,
-                   cost_per_unit = CASE
-                     WHEN (MAX(0, COALESCE(current_stock, 0)) + ?) > 0
-                     THEN ((MAX(0, COALESCE(current_stock, 0)) * COALESCE(cost_per_unit, 0)) + (? * ?)) / (MAX(0, COALESCE(current_stock, 0)) + ?)
-                     ELSE ?
-                   END,
-                   updated_at = ?
-               WHERE id = ?`
-            ).bind(receiveQty, receiveQty, receiveQty, effectiveUnitCost, receiveQty, effectiveUnitCost, now, item.ingredientId).run();
-          }
-        } else if (effectiveTenant && effectiveTenant !== '*') {
-          try {
-            await db.prepare(
-              "UPDATE ingredients SET current_stock = COALESCE(current_stock, 0) + ?, updated_at = ? WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
-            ).bind(receiveQty, now, item.ingredientId, effectiveTenant).run();
-          } catch (err) {
-            if (effectiveTenant !== 'default' || hasIngTenantCol) throw err;
-            await db.prepare('UPDATE ingredients SET current_stock = COALESCE(current_stock, 0) + ?, updated_at = ? WHERE id = ?')
-              .bind(receiveQty, now, item.ingredientId).run();
-          }
-        } else {
-          await db.prepare('UPDATE ingredients SET current_stock = COALESCE(current_stock, 0) + ?, updated_at = ? WHERE id = ?')
-            .bind(receiveQty, now, item.ingredientId).run();
-        }
-
-        try {
-          await db.prepare(
-            `INSERT INTO stock_movements (id, ingredient_id, type, quantity, reference_id, reference_type, notes, created_by, tenant_id, created_at)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-          ).bind(
-            movId,
-            item.ingredientId,
-            'purchase_receipt',
-            receiveQty,
-            id,
-            'purchase_order',
-            `Received from PO ${id}`,
-            user.id,
-            effectiveTenant || 'default',
-            now
-          ).run();
-        } catch (err) {
-          const msg = String((err as Error)?.message || err || '');
-          if (effectiveTenant !== 'default' && !msg.includes('tenant_id')) throw err;
-          await db.prepare(
-            `INSERT INTO stock_movements (id, ingredient_id, type, quantity, reference_id, reference_type, notes, created_by, created_at)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
-          ).bind(
-            movId,
-            item.ingredientId,
-            'purchase_receipt',
-            receiveQty,
-            id,
-            'purchase_order',
-            `Received from PO ${id}`,
-            user.id,
-            now
-          ).run();
-        }
-        if (effectiveTenant && effectiveTenant !== '*') {
-          await db.prepare('UPDATE stock_movements SET tenant_id = ? WHERE id = ?').bind(effectiveTenant, movId).run().catch(() => {});
-        }
-
-        if (effectiveUnitCost !== null) {
-          const wacExpr = `CASE
-                     WHEN (MAX(0, COALESCE(current_stock, 0)) + ?) > 0
-                     THEN ((MAX(0, COALESCE(current_stock, 0)) * COALESCE(cost_per_unit, unit_cost, 0)) + (? * ?)) / (MAX(0, COALESCE(current_stock, 0)) + ?)
-                     ELSE ?
-                   END`;
-          if (effectiveTenant && effectiveTenant !== '*') {
-            await db.prepare(
-              `UPDATE inventory_items
-               SET cost_per_unit = ${wacExpr},
-                   unit_cost = ${wacExpr},
-                   current_stock = COALESCE(current_stock, 0) + ?,
-                   last_restocked_at = ?,
-                   updated_at = ?
-               WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?`
-            ).bind(
-              receiveQty, receiveQty, effectiveUnitCost, receiveQty, effectiveUnitCost,
-              receiveQty, receiveQty, effectiveUnitCost, receiveQty, effectiveUnitCost,
-              receiveQty, now, now, item.ingredientId, effectiveTenant
-            ).run().catch(() => {
-              return db.prepare(
-                `UPDATE inventory_items
-                 SET cost_per_unit = CASE
-                       WHEN (MAX(0, COALESCE(current_stock, 0)) + ?) > 0
-                       THEN ((MAX(0, COALESCE(current_stock, 0)) * COALESCE(cost_per_unit, 0)) + (? * ?)) / (MAX(0, COALESCE(current_stock, 0)) + ?)
-                       ELSE ?
-                     END,
-                     current_stock = COALESCE(current_stock, 0) + ?,
-                     last_restocked_at = ?,
-                     updated_at = ?
-                 WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?`
-              ).bind(receiveQty, receiveQty, effectiveUnitCost, receiveQty, effectiveUnitCost, receiveQty, now, now, item.ingredientId, effectiveTenant).run().catch(() => {
-                if (effectiveTenant !== 'default') return null;
-                return db.prepare('UPDATE inventory_items SET current_stock = COALESCE(current_stock, 0) + ?, last_restocked_at = ?, updated_at = ? WHERE id = ?')
-                  .bind(receiveQty, now, now, item.ingredientId).run().catch(() => {});
-              });
-            });
-          } else {
-            await db.prepare(
-              `UPDATE inventory_items
-               SET cost_per_unit = ${wacExpr},
-                   unit_cost = ${wacExpr},
-                   current_stock = COALESCE(current_stock, 0) + ?,
-                   last_restocked_at = ?,
-                   updated_at = ?
-               WHERE id = ?`
-            ).bind(
-              receiveQty, receiveQty, effectiveUnitCost, receiveQty, effectiveUnitCost,
-              receiveQty, receiveQty, effectiveUnitCost, receiveQty, effectiveUnitCost,
-              receiveQty, now, now, item.ingredientId
-            ).run().catch(() => {
-              return db.prepare(
-                `UPDATE inventory_items
-                 SET cost_per_unit = CASE
-                       WHEN (MAX(0, COALESCE(current_stock, 0)) + ?) > 0
-                       THEN ((MAX(0, COALESCE(current_stock, 0)) * COALESCE(cost_per_unit, 0)) + (? * ?)) / (MAX(0, COALESCE(current_stock, 0)) + ?)
-                       ELSE ?
-                     END,
-                     current_stock = COALESCE(current_stock, 0) + ?,
-                     last_restocked_at = ?,
-                     updated_at = ?
-                 WHERE id = ?`
-              ).bind(receiveQty, receiveQty, effectiveUnitCost, receiveQty, effectiveUnitCost, receiveQty, now, now, item.ingredientId).run().catch(() => {});
-            });
-          }
-        } else if (effectiveTenant && effectiveTenant !== '*') {
-          await db.prepare(
-            "UPDATE inventory_items SET current_stock = COALESCE(current_stock, 0) + ?, last_restocked_at = ?, updated_at = ? WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
-          ).bind(receiveQty, now, now, item.ingredientId, effectiveTenant).run().catch(() => {
-            if (effectiveTenant !== 'default') return null;
-            return db.prepare('UPDATE inventory_items SET current_stock = COALESCE(current_stock, 0) + ?, last_restocked_at = ?, updated_at = ? WHERE id = ?')
-              .bind(receiveQty, now, now, item.ingredientId).run().catch(() => {});
-          });
-        } else {
-          await db.prepare('UPDATE inventory_items SET current_stock = COALESCE(current_stock, 0) + ?, last_restocked_at = ?, updated_at = ? WHERE id = ?')
-            .bind(receiveQty, now, now, item.ingredientId).run().catch(() => {});
-        }
-
-        await db.prepare(
-          `INSERT OR IGNORE INTO inventory_transactions (
-            id, item_id, type, quantity, reference_type, reference_id, notes, tenant_id, created_at
-          )
-          SELECT ?, ?, 'in', ?, 'purchase', ?, ?, ?, ?
-          WHERE EXISTS (SELECT 1 FROM inventory_items WHERE id = ?)`
-        ).bind(
-          movId,
-          item.ingredientId,
-          receiveQty,
-          id,
-          `Received from PO ${id}`,
-          effectiveTenant || 'default',
-          now,
-          item.ingredientId
-        ).run().catch(() => {
-          if (effectiveTenant !== 'default') return null;
-          return db.prepare(
-            `INSERT OR IGNORE INTO inventory_transactions (
-              id, item_id, type, quantity, reference_type, reference_id, notes, created_at
-            )
-            SELECT ?, ?, 'in', ?, 'purchase', ?, ?, ?
-            WHERE EXISTS (SELECT 1 FROM inventory_items WHERE id = ?)`
-          ).bind(
-            movId,
-            item.ingredientId,
-            receiveQty,
-            id,
-            `Received from PO ${id}`,
-            now,
-            item.ingredientId
-          ).run().catch(() => {});
-        });
-        if (effectiveTenant && effectiveTenant !== '*') {
-          await db.prepare('UPDATE inventory_transactions SET tenant_id = ? WHERE id = ?').bind(effectiveTenant, movId).run().catch(() => {});
-        }
-      } else {
-        if (effectiveUnitCost !== null) {
-          const wacExpr = `CASE
-                     WHEN (MAX(0, COALESCE(current_stock, 0)) + ?) > 0
-                     THEN ((MAX(0, COALESCE(current_stock, 0)) * COALESCE(cost_per_unit, unit_cost, 0)) + (? * ?)) / (MAX(0, COALESCE(current_stock, 0)) + ?)
-                     ELSE ?
-                   END`;
-          if (effectiveTenant && effectiveTenant !== '*') {
-            try {
-              await db.prepare(
-                `UPDATE inventory_items
-                 SET cost_per_unit = ${wacExpr},
-                     unit_cost = ${wacExpr},
-                     current_stock = COALESCE(current_stock, 0) + ?,
-                     last_restocked_at = ?,
-                     updated_at = ?
-                 WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?`
-              ).bind(
-                receiveQty, receiveQty, effectiveUnitCost, receiveQty, effectiveUnitCost,
-                receiveQty, receiveQty, effectiveUnitCost, receiveQty, effectiveUnitCost,
-                receiveQty, now, now, item.ingredientId, effectiveTenant
-              ).run();
-            } catch (err) {
-              if (effectiveTenant !== 'default') {
-                await db.prepare(
-                  `UPDATE inventory_items
-                   SET cost_per_unit = CASE
-                         WHEN (MAX(0, COALESCE(current_stock, 0)) + ?) > 0
-                         THEN ((MAX(0, COALESCE(current_stock, 0)) * COALESCE(cost_per_unit, 0)) + (? * ?)) / (MAX(0, COALESCE(current_stock, 0)) + ?)
-                         ELSE ?
-                       END,
-                       current_stock = COALESCE(current_stock, 0) + ?,
-                       last_restocked_at = ?,
-                       updated_at = ?
-                   WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?`
-                ).bind(receiveQty, receiveQty, effectiveUnitCost, receiveQty, effectiveUnitCost, receiveQty, now, now, item.ingredientId, effectiveTenant).run();
-              } else {
-                await db.prepare(
-                  `UPDATE inventory_items
-                   SET cost_per_unit = ${wacExpr},
-                       unit_cost = ${wacExpr},
-                       current_stock = COALESCE(current_stock, 0) + ?,
-                       last_restocked_at = ?,
-                       updated_at = ?
-                   WHERE id = ?`
-                ).bind(
-                  receiveQty, receiveQty, effectiveUnitCost, receiveQty, effectiveUnitCost,
-                  receiveQty, receiveQty, effectiveUnitCost, receiveQty, effectiveUnitCost,
-                  receiveQty, now, now, item.ingredientId
-                ).run().catch(() => {
-                  throw err;
-                });
-              }
-            }
-          } else {
-            await db.prepare(
-              `UPDATE inventory_items
-               SET cost_per_unit = ${wacExpr},
-                   unit_cost = ${wacExpr},
-                   current_stock = COALESCE(current_stock, 0) + ?,
-                   last_restocked_at = ?,
-                   updated_at = ?
-               WHERE id = ?`
-            ).bind(
-              receiveQty, receiveQty, effectiveUnitCost, receiveQty, effectiveUnitCost,
-              receiveQty, receiveQty, effectiveUnitCost, receiveQty, effectiveUnitCost,
-              receiveQty, now, now, item.ingredientId
-            ).run();
-          }
-        } else if (effectiveTenant && effectiveTenant !== '*') {
-          try {
-            await db.prepare(
-              "UPDATE inventory_items SET current_stock = COALESCE(current_stock, 0) + ?, last_restocked_at = ?, updated_at = ? WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
-            ).bind(receiveQty, now, now, item.ingredientId, effectiveTenant).run();
-          } catch (err) {
-            if (effectiveTenant !== 'default') throw err;
-            await db.prepare('UPDATE inventory_items SET current_stock = COALESCE(current_stock, 0) + ?, last_restocked_at = ?, updated_at = ? WHERE id = ?')
-              .bind(receiveQty, now, now, item.ingredientId).run();
-          }
-        } else {
-          await db.prepare('UPDATE inventory_items SET current_stock = COALESCE(current_stock, 0) + ?, last_restocked_at = ?, updated_at = ? WHERE id = ?')
-            .bind(receiveQty, now, now, item.ingredientId).run();
-        }
-
-        try {
-          await db.prepare(
-            `INSERT INTO inventory_transactions (
-              id, item_id, type, quantity, reference_type, reference_id, notes, tenant_id, created_at
-            ) VALUES (?, ?, 'in', ?, 'purchase', ?, ?, ?, ?)`
-          ).bind(
-            movId,
-            item.ingredientId,
-            receiveQty,
-            id,
-            `Received from PO ${id}`,
-            effectiveTenant || 'default',
-            now
-          ).run();
-        } catch (err) {
-          if (effectiveTenant !== 'default') throw err;
-          await db.prepare(
-            `INSERT INTO inventory_transactions (
-              id, item_id, type, quantity, reference_type, reference_id, notes, created_at
-            ) VALUES (?, ?, 'in', ?, 'purchase', ?, ?, ?)`
-          ).bind(
-            movId,
-            item.ingredientId,
-            receiveQty,
-            id,
-            `Received from PO ${id}`,
-            now
-          ).run();
-        }
-      }
-
-      appliedUpdates.push({
-        poItemId,
-        ingredientId: String(item.ingredientId),
-        receiveQty,
-        movId,
-        usingCanonical,
-        previousCostPerUnit:
-          effectiveUnitCost !== null
-            ? Number(
-                (ingredient as { cost_per_unit?: unknown; unit_cost?: unknown } | null)?.cost_per_unit ??
-                (ingredient as { unit_cost?: unknown } | null)?.unit_cost ??
-                0
-              )
-            : null,
-      });
+    if (typeof (db as { batch?: unknown }).batch !== 'function') {
+      throw new Error('Purchase order receipt requires atomic D1 batch support');
     }
-
-    let casRes: any;
-    if (effectiveTenant && effectiveTenant !== '*') {
-      try {
-        casRes = await db.prepare(
-          "UPDATE purchase_orders SET status = ?, updated_at = ? WHERE id = ? AND status NOT IN ('received', 'cancelled') AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
-        ).bind(nextPoStatus, now, id, effectiveTenant).run();
-      } catch (err) {
-        if (effectiveTenant !== 'default') throw err;
-        casRes = await db.prepare(
-          "UPDATE purchase_orders SET status = ?, updated_at = ? WHERE id = ? AND status NOT IN ('received', 'cancelled')"
-        ).bind(nextPoStatus, now, id).run();
+    const statements = await buildReceiveStatements({
+      db,
+      poId: id,
+      po: existing,
+      tenant: effectiveTenant,
+      nextPoStatus,
+      now,
+      userId: user.id,
+      poItems,
+      lines: resolvedItems
+        .filter((r) => r.receiveQty > 0)
+        .map(({ item, orderedItem, receiveQty, ingredient, usingCanonical }) => {
+          const rawUnitCost = item.unitCost ?? item.unit_cost ?? orderedItem?.unit_cost ?? orderedItem?.unit_price;
+          return {
+            ingredientId: String(item.ingredientId),
+            receiveQty,
+            unitCost:
+              rawUnitCost !== undefined && rawUnitCost !== null && Number.isFinite(Number(rawUnitCost)) && Number(rawUnitCost) >= 0
+                ? Number(rawUnitCost)
+                : null,
+            orderedItem,
+            ingredient,
+            usingCanonical,
+          };
+        }),
+    });
+    try {
+      await db.batch(statements);
+    } catch (err) {
+      if (RECEIVE_CONFLICT_ERROR.test(String((err as Error)?.message ?? err))) {
+        return c.json(
+          { success: false, error: 'Concurrent receive conflict: purchase order changed since it was read, reload and retry' },
+          409
+        );
       }
-    } else {
-      casRes = await db.prepare(
-        "UPDATE purchase_orders SET status = ?, updated_at = ? WHERE id = ? AND status NOT IN ('received', 'cancelled')"
-      ).bind(nextPoStatus, now, id).run();
-    }
-    if (casRes && casRes.meta && typeof casRes.meta.changes === 'number' && casRes.meta.changes === 0) {
-      await rollbackAppliedUpdates();
-      return c.json({ success: false, error: 'Purchase order already received' }, 409);
+      throw err;
     }
 
     await writePoAuditLog(db, user.id, 'purchase_order_receive', id, JSON.stringify({ ...body, tenant_id: effectiveTenant }), now, effectiveTenant);
