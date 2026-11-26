@@ -13,6 +13,15 @@ import { createLogger } from '../middleware/logger';
 
 const log = createLogger({ route: 'frigate-client' });
 
+/** Upper bound for every outbound Frigate request (headers and body). */
+export const FRIGATE_FETCH_TIMEOUT_MS = 10_000;
+
+/** True when `err` was raised by an AbortSignal timeout/abort rather than a Frigate response. */
+export function isFrigateTimeoutError(err: unknown): boolean {
+  const name = (err as { name?: string } | null)?.name;
+  return name === 'TimeoutError' || name === 'AbortError';
+}
+
 export interface FrigateEnv {
   FRIGATE_URL?: string;
   FRIGATE_API_KEY?: string;
@@ -72,7 +81,8 @@ export class FrigateClient {
       }
 
       const res = await fetch(`${this.baseUrl}/api/events?${qs.toString()}`, {
-        headers: this.getHeaders()
+        headers: this.getHeaders(),
+        signal: AbortSignal.timeout(FRIGATE_FETCH_TIMEOUT_MS)
       });
       if (!res.ok) {
         throw new Error(`HTTP ${res.status}`);
@@ -92,7 +102,8 @@ export class FrigateClient {
 
     try {
       const res = await fetch(`${this.baseUrl}/api/events/${encodeURIComponent(eventId)}`, {
-        headers: this.getHeaders()
+        headers: this.getHeaders(),
+        signal: AbortSignal.timeout(FRIGATE_FETCH_TIMEOUT_MS)
       });
       if (!res.ok) {
         throw new Error(`HTTP ${res.status}`);
@@ -101,6 +112,9 @@ export class FrigateClient {
       return { event: data };
     } catch (err) {
       log.warn('frigate_getEvent_failed', { eventId, error: (err as Error).message });
+      if (isFrigateTimeoutError(err)) {
+        throw err;
+      }
       return { event: { id: eventId, camera: '', label: '', start_time: 0 } };
     }
   }
@@ -115,7 +129,8 @@ export class FrigateClient {
       // HEAD only to verify accessibility; the caller fetches the blob
       const res = await fetch(snapshotUrl, {
         method: 'HEAD',
-        headers: this.getHeaders()
+        headers: this.getHeaders(),
+        signal: AbortSignal.timeout(FRIGATE_FETCH_TIMEOUT_MS)
       });
       if (!res.ok) {
         throw new Error(`HTTP ${res.status}`);
@@ -123,6 +138,9 @@ export class FrigateClient {
       return { snapshotUrl };
     } catch (err) {
       log.warn('frigate_getCameraSnap_failed', { camera, error: (err as Error).message });
+      if (isFrigateTimeoutError(err)) {
+        throw err;
+      }
       return { snapshotUrl: '' };
     }
   }

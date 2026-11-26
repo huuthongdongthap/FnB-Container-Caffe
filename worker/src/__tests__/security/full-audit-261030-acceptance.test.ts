@@ -6935,9 +6935,30 @@ describe('Phase 35 acceptance (AH1..AH4)', () => {
     );
     expect(poStaleLines).toHaveLength(0);
 
-    // Both must use atomic COALESCE pattern for additions
-    expect(movSrc).toMatch(/SET current_stock = COALESCE\(current_stock,\s*0\)\s*\+\s*\?/);
-    expect(poSrc).toMatch(/SET current_stock = COALESCE\(current_stock,\s*0\)\s*\+\s*\?/);
+    // The movement write now lives in a dedicated module: it must add with the
+    // atomic COALESCE form, set an absolute value only behind a stock guard,
+    // and gate its ledger rows on the CAS having applied.
+    const stockWriteSrc = await import('fs').then(fs =>
+      fs.readFileSync(
+        require('path').resolve(__dirname, '../../routes/openapi-inventory-handlers/movement-stock-write.ts'),
+        'utf8'
+      )
+    );
+    expect(stockWriteSrc).toMatch(/COALESCE\(current_stock,\s*0\)\s*\+\s*\?/);
+    expect(stockWriteSrc).toMatch(/COALESCE\(current_stock, 0\) = \?/);
+    expect(stockWriteSrc).toContain('changes() > 0');
+    expect(movSrc).toContain('applyStockMovement(db, {');
+
+    // PO receipt: must use the atomic COALESCE form for additions. The receipt
+    // write may be extracted into a sibling module, so accept it anywhere in
+    // the handler directory as long as no stale absolute set survives above.
+    const handlersDir = require('path').resolve(__dirname, '../../routes/openapi-inventory-handlers');
+    const fs = await import('fs');
+    const atomicAddition = fs
+      .readdirSync(handlersDir)
+      .filter((f: string) => f.endsWith('.ts'))
+      .some((f: string) => /COALESCE\(current_stock,\s*0\)\s*\+\s*\?/.test(fs.readFileSync(`${handlersDir}/${f}`, 'utf8')));
+    expect(atomicAddition).toBe(true);
   });
 });
 

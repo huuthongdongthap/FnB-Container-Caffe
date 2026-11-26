@@ -326,6 +326,95 @@ export async function calculateOrderConsumption(
   return { depletions, coveredProductIds, totalCost, realizedRevenue, grossMargin, grossMarginPercent };
 }
 
+function changesOf(res: unknown): number | null {
+  const changes = (res as { meta?: { changes?: unknown } } | null | undefined)?.meta?.changes;
+  return typeof changes === 'number' ? changes : null;
+}
+
+async function hasOrderConsumption(
+  db: D1Database,
+  orderId: string,
+  ingredientId: string,
+  tenantId: string
+): Promise<boolean> {
+  const base =
+    "SELECT 1 AS found FROM stock_movements WHERE reference_id = ? AND reference_type = 'order' AND type IN ('order_consumption', 'consumption', 'sale', 'out') AND ingredient_id = ?";
+  let row: { found?: number } | null = null;
+  try {
+    row = await db
+      .prepare(`${base} AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ? LIMIT 1`)
+      .bind(orderId, ingredientId, tenantId)
+      .first<{ found?: number }>();
+  } catch {
+    if (tenantId === 'default') {
+      row = await db
+        .prepare(`${base} LIMIT 1`)
+        .bind(orderId, ingredientId)
+        .first<{ found?: number }>()
+        .catch(() => null);
+    }
+  }
+  return Boolean(row?.found);
+}
+
+/**
+ * Ledger insert and stock update for one ingredient of one order. The update only applies when this
+ * call's own ledger row exists, so the pair is idempotent per (tenant, order, ingredient) once the
+ * partial unique index on order consumption is present. ON CONFLICT DO NOTHING absorbs only the
+ * duplicate-key case; NOT NULL and CHECK violations still abort the batch. With enforceStock the
+ * ledger row is also refused when the ingredient cannot cover the quantity, which keeps ledger and
+ * stock consistent. tenantId null targets schemas that predate the tenant_id columns.
+ */
+function buildConsumptionStatements(
+  db: D1Database,
+  p: {
+    movId: string;
+    ingredientId: string;
+    quantity: number;
+    orderId: string;
+    now: string;
+    enforceStock: boolean;
+    tenantId: string | null;
+  }
+): [ReturnType<D1Database['prepare']>, ReturnType<D1Database['prepare']>] {
+  const notes = `BOM deduction for order ${p.orderId}`;
+  const stockClause = p.enforceStock ? ' AND current_stock >= ?' : '';
+  const stockBinds = p.enforceStock ? [p.quantity] : [];
+  if (p.tenantId === null) {
+    return [
+      db
+        .prepare(
+          `INSERT INTO stock_movements (id, ingredient_id, type, quantity, reference_id, reference_type, notes, created_at)
+           SELECT ?, ?, 'consumption', ?, ?, 'order', ?, ?
+           WHERE EXISTS (SELECT 1 FROM ingredients WHERE id = ?${stockClause})
+           ON CONFLICT DO NOTHING`
+        )
+        .bind(p.movId, p.ingredientId, -p.quantity, p.orderId, notes, p.now, p.ingredientId, ...stockBinds),
+      db
+        .prepare(
+          `UPDATE ingredients SET current_stock = current_stock - ?, updated_at = ? WHERE id = ? AND EXISTS (SELECT 1 FROM stock_movements WHERE id = ? AND ingredient_id = ? AND reference_id = ? AND reference_type = 'order' AND type = 'consumption')`
+        )
+        .bind(p.quantity, p.now, p.ingredientId, p.movId, p.ingredientId, p.orderId),
+    ];
+  }
+  const tenantMatch = "COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?";
+  return [
+    db
+      .prepare(
+        `INSERT INTO stock_movements (id, ingredient_id, type, quantity, reference_id, reference_type, notes, created_at, tenant_id)
+         SELECT ?, ?, 'consumption', ?, ?, 'order', ?, ?, ?
+         WHERE EXISTS (SELECT 1 FROM ingredients WHERE id = ?${stockClause} AND ${tenantMatch})
+         ON CONFLICT DO NOTHING`
+      )
+      .bind(p.movId, p.ingredientId, -p.quantity, p.orderId, notes, p.now, p.tenantId, p.ingredientId, ...stockBinds, p.tenantId),
+    db
+      .prepare(
+        `UPDATE ingredients SET current_stock = current_stock - ?, updated_at = ? WHERE id = ? AND ${tenantMatch} AND EXISTS (SELECT 1 FROM stock_movements WHERE id = ? AND ingredient_id = ? AND reference_id = ? AND reference_type = 'order' AND type = 'consumption')`
+      )
+      .bind(p.quantity, p.now, p.ingredientId, p.tenantId, p.movId, p.ingredientId, p.orderId),
+  ];
+}
+
 export async function deductOrderStock(
   db: D1Database,
   orderId: string,
@@ -435,13 +524,13 @@ export async function deductOrderStock(
   }
 
   // 4. Atomic Deductions & Stock Movement Logging
+  // The ledger row is written first and gates the stock UPDATE through its own id. A unique index
+  // on (tenant, order, ingredient) for order consumption turns a concurrent retry into a no-op:
+  // the loser's INSERT conflicts, its movement id never exists, so its UPDATE touches nothing.
   const now = new Date().toISOString();
-  const batchOps: ReturnType<D1Database['prepare']>[] = [];
-  const fallbackBatchOps: ReturnType<D1Database['prepare']>[] = [];
-  const sequentialEntries: Array<{ ingredientId: string; quantity: number; movId: string }> = [];
-
+  const enforceStock = !options?.allowNegative;
+  const entries: Array<{ ingredientId: string; quantity: number; movId: string }> = [];
   for (const d of depletions) {
-    const movId = `mov_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
     let ingRow: any = null;
     try {
       ingRow = await db.prepare('SELECT id, tenant_id FROM ingredients WHERE id = ?').bind(d.ingredientId).first<any>();
@@ -454,28 +543,19 @@ export async function deductOrderStock(
         continue;
       }
     }
-    sequentialEntries.push({ ingredientId: d.ingredientId, quantity: d.quantity, movId });
-    batchOps.push(
-      db.prepare(
-        "UPDATE ingredients SET current_stock = current_stock - ?, updated_at = ? WHERE id = ? AND (COALESCE(NULLIF(tenant_id, ''), 'default') = ? OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?4)"
-      ).bind(d.quantity, now, d.ingredientId, effectiveTenant),
-      db.prepare(
-        `INSERT INTO stock_movements (id, ingredient_id, type, quantity, reference_id, reference_type, notes, created_at, tenant_id)
-         VALUES (?, ?, 'consumption', ?, ?, 'order', ?, ?, ?)`
-      ).bind(movId, d.ingredientId, -d.quantity, orderId, `BOM deduction for order ${orderId}`, now, effectiveTenant),
-    );
-    fallbackBatchOps.push(
-      db.prepare(
-        'UPDATE ingredients SET current_stock = current_stock - ?, updated_at = ? WHERE id = ?'
-      ).bind(d.quantity, now, d.ingredientId),
-      db.prepare(
-        `INSERT INTO stock_movements (id, ingredient_id, type, quantity, reference_id, reference_type, notes, created_at)
-         VALUES (?, ?, 'consumption', ?, ?, 'order', ?, ?)`
-      ).bind(movId, d.ingredientId, -d.quantity, orderId, `BOM deduction for order ${orderId}`, now),
-    );
+    entries.push({
+      ingredientId: d.ingredientId,
+      quantity: d.quantity,
+      movId: `mov_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+    });
   }
 
-  if (batchOps.length > 0) {
+  const buildOps = (tenantId: string | null) =>
+    entries.flatMap((e) => buildConsumptionStatements(db, { ...e, orderId, now, enforceStock, tenantId }));
+  // null until the write path reports per-statement row counts; mocks without counts stay null
+  let appliedIngredientIds: Set<string> | null = null;
+
+  if (entries.length > 0) {
     if (typeof (db as { batch?: unknown }).batch === 'function') {
       let anyRunInvoked = false;
       const trackRuns = (ops: ReturnType<D1Database['prepare']>[]) =>
@@ -497,18 +577,16 @@ export async function deductOrderStock(
           }
           return op;
         });
-      let usedFallbackOps = false;
+      let opsToRun = trackRuns(buildOps(effectiveTenant));
       let batchRes: unknown;
-      const trackedPrimary = trackRuns(batchOps);
       try {
-        batchRes = await db.batch(trackedPrimary);
+        batchRes = await db.batch(opsToRun);
       } catch (batchErr) {
         if (effectiveTenant !== 'default') throw batchErr;
-        usedFallbackOps = true;
         anyRunInvoked = false;
-        batchRes = await db.batch(trackRuns(fallbackBatchOps));
+        opsToRun = trackRuns(buildOps(null));
+        batchRes = await db.batch(opsToRun);
       }
-      const opsToRun = usedFallbackOps ? fallbackBatchOps : trackedPrimary;
       const isUnranSqlMockStmt = opsToRun.every(
         (op) =>
           op &&
@@ -521,36 +599,83 @@ export async function deductOrderStock(
         for (const op of opsToRun) {
           await (op as { run: () => Promise<unknown> }).run();
         }
+      } else if (Array.isArray(batchRes) && batchRes.length === opsToRun.length) {
+        // Statements are [ledger insert, stock update] pairs. Zero rows on the insert means the ledger
+        // row was refused (duplicate consumption or insufficient stock) and nothing was deducted.
+        const applied = new Set<string>();
+        let countsAvailable = true;
+        entries.forEach((e, i) => {
+          const changes = changesOf(batchRes[i * 2]);
+          if (changes === null) countsAvailable = false;
+          else if (changes > 0) applied.add(e.ingredientId);
+        });
+        if (countsAvailable) appliedIngredientIds = applied;
       }
     } else {
-      for (const entry of sequentialEntries) {
+      const applied = new Set<string>();
+      let tenantId: string | null = effectiveTenant;
+      for (const e of entries) {
+        const params = { ...e, orderId, now, enforceStock };
+        let stmts = buildConsumptionStatements(db, { ...params, tenantId });
+        let insRes: unknown;
         try {
-          await db.prepare(
-            "UPDATE ingredients SET current_stock = current_stock - ?, updated_at = ? WHERE id = ? AND (COALESCE(NULLIF(tenant_id, ''), 'default') = ? OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?4)"
-          ).bind(entry.quantity, now, entry.ingredientId, effectiveTenant).run();
-        } catch (updErr) {
-          if (effectiveTenant !== 'default') throw updErr;
-          await db.prepare(
-            'UPDATE ingredients SET current_stock = current_stock - ?, updated_at = ? WHERE id = ?'
-          ).bind(entry.quantity, now, entry.ingredientId).run();
-        }
-        try {
-          await db.prepare(
-            `INSERT INTO stock_movements (id, ingredient_id, type, quantity, reference_id, reference_type, notes, created_at, tenant_id)
-             VALUES (?, ?, 'consumption', ?, ?, 'order', ?, ?, ?)`
-          ).bind(entry.movId, entry.ingredientId, -entry.quantity, orderId, `BOM deduction for order ${orderId}`, now, effectiveTenant).run();
+          insRes = await stmts[0].run();
         } catch (insErr) {
-          if (effectiveTenant !== 'default') throw insErr;
-          await db.prepare(
-            `INSERT INTO stock_movements (id, ingredient_id, type, quantity, reference_id, reference_type, notes, created_at)
-             VALUES (?, ?, 'consumption', ?, ?, 'order', ?, ?)`
-          ).bind(entry.movId, entry.ingredientId, -entry.quantity, orderId, `BOM deduction for order ${orderId}`, now).run();
+          if (tenantId === null || effectiveTenant !== 'default') throw insErr;
+          tenantId = null;
+          stmts = buildConsumptionStatements(db, { ...params, tenantId });
+          insRes = await stmts[0].run();
         }
+        if (changesOf(insRes) === 0) continue;
+        try {
+          await stmts[1].run();
+        } catch (updErr) {
+          // No transaction here: the ledger row must not outlive a failed stock update,
+          // otherwise a retry would treat the ingredient as already deducted.
+          await db.prepare('DELETE FROM stock_movements WHERE id = ?').bind(e.movId).run().catch(() => {});
+          throw updErr;
+        }
+        applied.add(e.ingredientId);
       }
+      appliedIngredientIds = applied;
     }
   }
 
-  return { ok: true, alreadyDeducted: false, depletions, coveredProductIds };
+  if (appliedIngredientIds === null) {
+    return { ok: true, alreadyDeducted: false, depletions, coveredProductIds };
+  }
+  const appliedIds = appliedIngredientIds;
+  const appliedDepletions = depletions.filter((d) => appliedIds.has(d.ingredientId));
+  if (enforceStock) {
+    const insufficient: Array<{ ingredientId: string; needed: number; available: number }> = [];
+    for (const e of entries) {
+      if (appliedIds.has(e.ingredientId)) continue;
+      // A refused insert is either a concurrent duplicate (benign) or a stock shortfall
+      if (await hasOrderConsumption(db, orderId, e.ingredientId, effectiveTenant)) continue;
+      const row = await db
+        .prepare('SELECT current_stock FROM ingredients WHERE id = ?')
+        .bind(e.ingredientId)
+        .first<{ current_stock?: number }>()
+        .catch(() => null);
+      insufficient.push({ ingredientId: e.ingredientId, needed: e.quantity, available: Number(row?.current_stock ?? 0) });
+    }
+    if (insufficient.length > 0) {
+      return {
+        ok: false,
+        alreadyDeducted: false,
+        depletions: appliedDepletions,
+        coveredProductIds,
+        error: 'insufficient_stock',
+        insufficientIngredients: insufficient,
+      };
+    }
+  }
+  return {
+    ok: true,
+    alreadyDeducted: appliedDepletions.length === 0,
+    depletions: appliedDepletions,
+    coveredProductIds,
+  };
 }
 
 export function calculateProductMargin(sellingPrice: number, recipeCost: number) {

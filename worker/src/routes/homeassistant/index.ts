@@ -270,7 +270,11 @@ export function createHARouter() {
       const webhookTenant = configuredWebhookTenant
         || (secret ? (rawWebhookTenant || undefined) : resolvePilotStore(c.env));
       const result = await handleHAWebhook(c.env as Record<string, unknown>, body, webhookTenant);
-      return c.json({ ...result, success: true });
+      if (result.success) {
+        return c.json(result);
+      }
+      // Ownership conflict is a client error; an unverifiable ownership lookup is retryable.
+      return c.json(result, result.action_taken.startsWith('cross_tenant_blocked:') ? 409 : 503);
     } catch (err) {
       log.error('ha_webhook_error', { error: (err as Error).message });
       return c.json({ success: false, error: 'Failed to process Home Assistant webhook' }, 500);
