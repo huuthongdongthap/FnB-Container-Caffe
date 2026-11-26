@@ -35,9 +35,9 @@ export async function triggerAutomation(
       ? (payload as Record<string, unknown>).trigger_entity as string | undefined
       : undefined;
 
-    const result = mockMode
-      ? 'mocked execution success'
-      : 'dispatched to HA webhook';
+    const haUrl = typeof env.HA_URL === 'string' ? env.HA_URL.trim().replace(/\/$/, '') : '';
+    const haToken = typeof env.HA_TOKEN === 'string' ? env.HA_TOKEN.trim() : '';
+    const liveDispatch = !mockMode && Boolean(haUrl);
 
     const now = new Date().toISOString();
     const rawTenant = tenantId ? tenantId.trim() : '';
@@ -58,6 +58,46 @@ export async function triggerAutomation(
       }
     }
 
+    let result = mockMode
+      ? 'mocked execution success'
+      : 'simulated local execution';
+    let dispatchFailed = false;
+    let failureReason = '';
+
+    if (liveDispatch) {
+      if (!/^(?:automation\.)?[a-zA-Z0-9_-]{1,128}$/.test(automationId)) {
+        return errorResponse('Invalid automation_id format', 400);
+      }
+      const entityId = automationId.startsWith('automation.') ? automationId : `automation.${automationId}`;
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (haToken) {
+        headers.Authorization = `Bearer ${haToken}`;
+      }
+      const serviceBody: Record<string, unknown> = {
+        entity_id: entityId
+      };
+
+      try {
+        const haRes = await fetch(`${haUrl}/api/services/automation/trigger`, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify(serviceBody),
+          signal: AbortSignal.timeout(10_000)
+        });
+        if (!haRes.ok) {
+          dispatchFailed = true;
+          failureReason = `HTTP ${haRes.status}`;
+          result = `failed: ${failureReason}`;
+        } else {
+          result = 'dispatched to HA';
+        }
+      } catch (fetchErr) {
+        dispatchFailed = true;
+        failureReason = (fetchErr as Error).message || 'network error';
+        result = `failed: ${failureReason}`;
+      }
+    }
+
     try {
       await db
         .prepare(
@@ -74,11 +114,16 @@ export async function triggerAutomation(
         .run();
     }
 
+    if (dispatchFailed) {
+      log.error('ha_automation_dispatch_failed', { automation_id: automationId, trigger_entity: triggerEntity, reason: failureReason });
+      return errorResponse(`Home Assistant automation dispatch failed (${failureReason})`, 502);
+    }
+
     log.info('automation_triggered', { automation_id: automationId, trigger_entity: triggerEntity });
 
     return jsonResponse({
       success: true,
-      mock: mockMode || undefined,
+      mock: !liveDispatch ? true : undefined,
       automation_id: automationId,
       trigger_entity: triggerEntity ?? undefined,
       result,

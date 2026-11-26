@@ -7566,7 +7566,7 @@ describe('Phase 39 acceptance (AL1..AL4)', () => {
     expect(invCrudSrc).toContain('matchesInventoryTenant');
     expect(bomPolicySrc).toContain('coveredProductIds');
     expect(orderDeductionSrc).toContain('coveredProductIds');
-    expect(movementHandlersSrc).toContain('-Math.abs(body.quantity)');
+    expect(movementHandlersSrc).toContain('-Math.abs(rawQty)');
     expect(poHandlersSrc).toContain("existing.status === 'cancelled'");
     expect(poHandlersSrc).toContain('received_quantity');
   });
@@ -8969,7 +8969,7 @@ describe('Phase 50 (AW1..AW4) — Reservations/QR/Tables, Staff/Inventory/Foreca
     expect(demandForecastSrc).toContain("strftime('%H', datetime(created_at, '+7 hours')) as hour");
     expect(invForecastSrc).toContain('Date.now() + 7 * 3600_000');
     expect(purchasingPolicySrc).toContain('cost_per_unit');
-    expect(recipePolicySrc).toContain("SELECT id FROM stock_movements WHERE reference_id = ? AND reference_type = 'order'");
+    expect(recipePolicySrc).toContain("SELECT DISTINCT ingredient_id FROM stock_movements WHERE reference_id = ? AND reference_type = 'order'");
   });
 
   it('AW3: CRM accrual/events/referrals/account reject terminal/refunded orders & isolate tenants, subscription middleware/handlers verify live staff accounts, normalize quarterly/annual MRR & filter cross-tenant invoices, and realtime orders/digest scope channels & metrics per tenant', async () => {

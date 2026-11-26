@@ -140,6 +140,44 @@ export async function toggleDevice(
       return errorResponse('Device not found', 404);
     }
 
+    const haUrl = typeof env.HA_URL === 'string' ? env.HA_URL.trim().replace(/\/$/, '') : '';
+    const haToken = typeof env.HA_TOKEN === 'string' ? env.HA_TOKEN.trim() : '';
+
+    if (haUrl) {
+      const domain = entityId.includes('.') ? entityId.split('.')[0] : 'homeassistant';
+      const service = on ? 'turn_on' : 'turn_off';
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (haToken) {
+        headers.Authorization = `Bearer ${haToken}`;
+      }
+
+      let haRes: Response;
+      try {
+        haRes = await fetch(`${haUrl}/api/services/${encodeURIComponent(domain)}/${service}`, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({ entity_id: entityId }),
+          signal: AbortSignal.timeout(10_000)
+        });
+      } catch (fetchErr) {
+        log.error('ha_toggle_dispatch_failed', {
+          entityId,
+          on,
+          message: (fetchErr as Error).message
+        });
+        return errorResponse('Home Assistant service call failed', 502);
+      }
+
+      if (!haRes.ok) {
+        log.error('ha_toggle_dispatch_failed', {
+          entityId,
+          on,
+          status: haRes.status
+        });
+        return errorResponse(`Home Assistant service call failed (${haRes.status})`, 502);
+      }
+    }
+
     const rawTenant = tenantId ? tenantId.trim() : '';
     const cleanTenant = rawTenant.toLowerCase() === 'hq' ? '*' : rawTenant;
     const entityTenant = typeof existing.tenant_id === 'string' && existing.tenant_id.trim()
@@ -164,7 +202,7 @@ export async function toggleDevice(
       attributes: existing.attributes ? safeParseJsonObject(existing.attributes) : null
     };
 
-    return jsonResponse({ result });
+    return jsonResponse(haUrl ? { result, dispatched: true } : { result, mock: true, simulated: true });
   } catch (err) {
     log.error('toggleDevice error', { message: (err as Error).message, entityId, on });
     return errorResponse('Failed to toggle device', 500);

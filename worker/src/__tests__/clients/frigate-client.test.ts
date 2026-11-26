@@ -94,18 +94,16 @@ describe('getRecentEvents', () => {
     expect(url).toContain('camera=front_door');
   });
 
-  it('falls back to mock events on HTTP error', async() => {
+  it('throws on HTTP error in live mode instead of fabricating mock events', async() => {
     const c = new FrigateClient({ url: 'https://f.local', apiKey: 'k', isMock: false });
     mockFetchOk({ error: 'fail' }, false, 500);
-    const result = await c.getRecentEvents();
-    expect(result.mock).toBe(true);
+    await expect(c.getRecentEvents()).rejects.toThrow('HTTP 500');
   });
 
-  it('falls back to mock events on network error', async() => {
+  it('throws on network error in live mode instead of fabricating mock events', async() => {
     const c = new FrigateClient({ url: 'https://f.local', apiKey: 'k', isMock: false });
     fetchStub.mockRejectedValue(new TypeError('fetch failed'));
-    const result = await c.getRecentEvents();
-    expect(result.mock).toBe(true);
+    await expect(c.getRecentEvents()).rejects.toThrow('fetch failed');
   });
 
   it('handles non-array response by returning empty list', async() => {

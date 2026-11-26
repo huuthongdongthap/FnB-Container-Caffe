@@ -43,6 +43,12 @@ describe('Inventory / Recipe Contract', () => {
               });
               return { results: joined } as any;
             }
+            if (sql.includes('stock_movements WHERE reference_id')) {
+              const matched = stock_movements.filter(
+                m => m.reference_id === binds[0] && m.reference_type === 'order'
+              );
+              return { results: matched } as any;
+            }
             return { results: [] } as any;
           },
           run: async () => {

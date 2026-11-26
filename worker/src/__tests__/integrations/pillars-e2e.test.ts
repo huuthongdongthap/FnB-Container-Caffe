@@ -234,9 +234,10 @@ function createInMemoryD1() {
             if (item) item.state = binds[0];
             return { success: true, meta: { changes: 1 } };
           }
-          if (lower.includes('insert or ignore into frigate_events')) {
+          if (lower.includes('into frigate_events')) {
             const list = store.get('frigate_events')!;
-            list.push({
+            const existingIdx = list.findIndex((e: Record<string, unknown>) => e.id === binds[0]);
+            const record = {
               id: binds[0],
               camera: binds[1],
               label: binds[2],
@@ -245,7 +246,12 @@ function createInMemoryD1() {
               score: binds[5],
               payload: binds[6],
               received_at: new Date().toISOString()
-            });
+            };
+            if (existingIdx >= 0) {
+              list[existingIdx] = record;
+            } else {
+              list.push(record);
+            }
             return { success: true, meta: { changes: 1 } };
           }
           if (lower.includes('insert into erpnext_mappings')) {

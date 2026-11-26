@@ -358,32 +358,45 @@ export async function deductOrderStock(
       // Optional orders lookup in minimal test mocks
     }
   }
-  // 1. Idempotency Guard
-  let existing: { id: string } | null = null;
-  try {
-    existing = await db.prepare(
-      "SELECT id FROM stock_movements WHERE reference_id = ? AND reference_type = 'order' AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ? LIMIT 1"
-    ).bind(orderId, effectiveTenant).first<{ id: string }>();
-  } catch {
-    if (effectiveTenant === 'default') {
-      existing = await db.prepare(
-        `SELECT id FROM stock_movements WHERE reference_id = ? AND reference_type = 'order' LIMIT 1`
-      ).bind(orderId).first<{ id: string }>();
-    }
-  }
-
-  if (existing) {
-    return { ok: true, alreadyDeducted: true, depletions: [], coveredProductIds: [] };
-  }
-
-  // 2. Calculate Server-Side BOM Consumption
-  const { depletions, coveredProductIds = [] } = await calculateOrderConsumption(
+  // 1. Calculate Server-Side BOM Consumption first so idempotency is per-ingredient (resumable after partial failure)
+  const { depletions: allDepletions, coveredProductIds = [] } = await calculateOrderConsumption(
     db,
     orderItems,
     effectiveTenant
   );
-  if (depletions.length === 0) {
+  if (allDepletions.length === 0) {
     return { ok: true, alreadyDeducted: false, depletions: [], coveredProductIds };
+  }
+
+  // 2. Per-ingredient Idempotency Guard
+  const alreadyDeductedIds = new Set<string>();
+  try {
+    let existingRows: Array<{ ingredient_id?: string }> = [];
+    try {
+      const res = await db.prepare(
+        "SELECT DISTINCT ingredient_id FROM stock_movements WHERE reference_id = ? AND reference_type = 'order' AND type IN ('order_consumption', 'consumption', 'sale', 'out') AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
+      ).bind(orderId, effectiveTenant).all<{ ingredient_id?: string }>();
+      existingRows = res?.results || [];
+    } catch {
+      if (effectiveTenant === 'default') {
+        const res = await db.prepare(
+          "SELECT DISTINCT ingredient_id FROM stock_movements WHERE reference_id = ? AND reference_type = 'order' AND type IN ('order_consumption', 'consumption', 'sale', 'out')"
+        ).bind(orderId).all<{ ingredient_id?: string }>();
+        existingRows = res?.results || [];
+      }
+    }
+    for (const row of existingRows) {
+      if (row?.ingredient_id) {
+        alreadyDeductedIds.add(String(row.ingredient_id));
+      }
+    }
+  } catch {
+    // Optional stock_movements lookup in minimal test mocks
+  }
+
+  const depletions = allDepletions.filter((d) => !alreadyDeductedIds.has(d.ingredientId));
+  if (depletions.length === 0) {
+    return { ok: true, alreadyDeducted: true, depletions: [], coveredProductIds };
   }
 
   // 3. Stock Level Verification
