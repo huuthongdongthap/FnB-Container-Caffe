@@ -525,28 +525,52 @@ export function registerMovementHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
     if (!hasAnyTenantScope && tenantId !== 'default' && tenantId !== '*') {
       return c.json({ success: false, error: 'Tenant-scoped ingredient schema required' }, 503);
     }
+
+    const casClauses: string[] = [];
+    const casParams: (string | number)[] = [];
+    if (expectedStock !== undefined || isTargetStocktake) {
+      casClauses.push('COALESCE(current_stock, 0) = ?');
+      casParams.push(expectedStock !== undefined ? Number(expectedStock) : previousStock);
+    }
+    if (
+      expectedUpdatedAt !== undefined &&
+      ingredient.updated_at !== undefined &&
+      ingredient.updated_at !== null
+    ) {
+      casClauses.push('updated_at = ?');
+      casParams.push(String(expectedUpdatedAt));
+    }
+    const hasCasPrecondition = casClauses.length > 0;
+    const casSql = hasCasPrecondition ? ` AND ${casClauses.join(' AND ')}` : '';
+
     if (!usingCanonical) {
       if (signedQty < 0) {
-        let upd: any;
+        let upd: { meta?: { changes?: number } } | null = null;
         if (effectiveTenant && hasIngredientTenantCol) {
           try {
             upd = await db.prepare(
-              "UPDATE ingredients SET current_stock = COALESCE(current_stock, 0) + ?, updated_at = ? WHERE id = ? AND (COALESCE(current_stock, 0) + ?) >= 0 AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
-            ).bind(signedQty, now, body.ingredientId, signedQty, effectiveTenant).run();
+              `UPDATE ingredients SET current_stock = COALESCE(current_stock, 0) + ?, updated_at = ? WHERE id = ? AND (COALESCE(current_stock, 0) + ?) >= 0 AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?${casSql}`
+            ).bind(signedQty, now, body.ingredientId, signedQty, effectiveTenant, ...casParams).run();
           } catch {
             if (effectiveTenant !== 'default') {
               return c.json({ success: false, error: 'Failed to update stock for tenant' }, 500);
             }
             upd = await db.prepare(
-              'UPDATE ingredients SET current_stock = COALESCE(current_stock, 0) + ?, updated_at = ? WHERE id = ? AND (COALESCE(current_stock, 0) + ?) >= 0'
-            ).bind(signedQty, now, body.ingredientId, signedQty).run();
+              `UPDATE ingredients SET current_stock = COALESCE(current_stock, 0) + ?, updated_at = ? WHERE id = ? AND (COALESCE(current_stock, 0) + ?) >= 0${casSql}`
+            ).bind(signedQty, now, body.ingredientId, signedQty, ...casParams).run();
           }
         } else {
           upd = await db.prepare(
-            'UPDATE ingredients SET current_stock = COALESCE(current_stock, 0) + ?, updated_at = ? WHERE id = ? AND (COALESCE(current_stock, 0) + ?) >= 0'
-          ).bind(signedQty, now, body.ingredientId, signedQty).run();
+            `UPDATE ingredients SET current_stock = COALESCE(current_stock, 0) + ?, updated_at = ? WHERE id = ? AND (COALESCE(current_stock, 0) + ?) >= 0${casSql}`
+          ).bind(signedQty, now, body.ingredientId, signedQty, ...casParams).run();
         }
         if (upd && upd.meta && typeof upd.meta.changes === 'number' && upd.meta.changes === 0) {
+          if (hasCasPrecondition) {
+            return c.json(
+              { success: false, error: 'Stock changed concurrently. Please reload and recount.' },
+              409
+            );
+          }
           return c.json({ success: false, error: 'Insufficient stock' }, 400);
         }
         if (effectiveTenant) {
@@ -566,20 +590,27 @@ export function registerMovementHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
           ).bind(signedQty, now, body.ingredientId, signedQty).run().catch(() => {});
         }
       } else {
+        let upd: { meta?: { changes?: number } } | null = null;
         if (effectiveTenant && hasIngredientTenantCol) {
           try {
-            await db.prepare("UPDATE ingredients SET current_stock = COALESCE(current_stock, 0) + ?, updated_at = ? WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?")
-              .bind(signedQty, now, body.ingredientId, effectiveTenant).run();
+            upd = await db.prepare(`UPDATE ingredients SET current_stock = COALESCE(current_stock, 0) + ?, updated_at = ? WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?${casSql}`)
+              .bind(signedQty, now, body.ingredientId, effectiveTenant, ...casParams).run();
           } catch {
             if (effectiveTenant !== 'default') {
               return c.json({ success: false, error: 'Failed to update stock for tenant' }, 500);
             }
-            await db.prepare('UPDATE ingredients SET current_stock = COALESCE(current_stock, 0) + ?, updated_at = ? WHERE id = ?')
-              .bind(signedQty, now, body.ingredientId).run();
+            upd = await db.prepare(`UPDATE ingredients SET current_stock = COALESCE(current_stock, 0) + ?, updated_at = ? WHERE id = ?${casSql}`)
+              .bind(signedQty, now, body.ingredientId, ...casParams).run();
           }
         } else {
-          await db.prepare('UPDATE ingredients SET current_stock = COALESCE(current_stock, 0) + ?, updated_at = ? WHERE id = ?')
-            .bind(signedQty, now, body.ingredientId).run();
+          upd = await db.prepare(`UPDATE ingredients SET current_stock = COALESCE(current_stock, 0) + ?, updated_at = ? WHERE id = ?${casSql}`)
+            .bind(signedQty, now, body.ingredientId, ...casParams).run();
+        }
+        if (hasCasPrecondition && upd && upd.meta && typeof upd.meta.changes === 'number' && upd.meta.changes === 0) {
+          return c.json(
+            { success: false, error: 'Stock changed concurrently. Please reload and recount.' },
+            409
+          );
         }
         if (effectiveTenant) {
           await db.prepare("UPDATE inventory_items SET current_stock = COALESCE(current_stock, 0) + ?, updated_at = ? WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?")
@@ -672,43 +703,56 @@ export function registerMovementHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
       });
     } else {
       if (signedQty < 0) {
-        let upd: any;
+        let upd: { meta?: { changes?: number } } | null = null;
         if (effectiveTenant) {
           try {
             upd = await db.prepare(
-              "UPDATE inventory_items SET current_stock = COALESCE(current_stock, 0) + ?, updated_at = ? WHERE id = ? AND (COALESCE(current_stock, 0) + ?) >= 0 AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
-            ).bind(signedQty, now, body.ingredientId, signedQty, effectiveTenant).run();
+              `UPDATE inventory_items SET current_stock = COALESCE(current_stock, 0) + ?, updated_at = ? WHERE id = ? AND (COALESCE(current_stock, 0) + ?) >= 0 AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?${casSql}`
+            ).bind(signedQty, now, body.ingredientId, signedQty, effectiveTenant, ...casParams).run();
           } catch {
             if (effectiveTenant !== 'default') {
               return c.json({ success: false, error: 'Failed to update stock for tenant' }, 500);
             }
             upd = await db.prepare(
-              'UPDATE inventory_items SET current_stock = COALESCE(current_stock, 0) + ?, updated_at = ? WHERE id = ? AND (COALESCE(current_stock, 0) + ?) >= 0'
-            ).bind(signedQty, now, body.ingredientId, signedQty).run();
+              `UPDATE inventory_items SET current_stock = COALESCE(current_stock, 0) + ?, updated_at = ? WHERE id = ? AND (COALESCE(current_stock, 0) + ?) >= 0${casSql}`
+            ).bind(signedQty, now, body.ingredientId, signedQty, ...casParams).run();
           }
         } else {
           upd = await db.prepare(
-            'UPDATE inventory_items SET current_stock = COALESCE(current_stock, 0) + ?, updated_at = ? WHERE id = ? AND (COALESCE(current_stock, 0) + ?) >= 0'
-          ).bind(signedQty, now, body.ingredientId, signedQty).run();
+            `UPDATE inventory_items SET current_stock = COALESCE(current_stock, 0) + ?, updated_at = ? WHERE id = ? AND (COALESCE(current_stock, 0) + ?) >= 0${casSql}`
+          ).bind(signedQty, now, body.ingredientId, signedQty, ...casParams).run();
         }
         if (upd && upd.meta && typeof upd.meta.changes === 'number' && upd.meta.changes === 0) {
+          if (hasCasPrecondition) {
+            return c.json(
+              { success: false, error: 'Stock changed concurrently. Please reload and recount.' },
+              409
+            );
+          }
           return c.json({ success: false, error: 'Insufficient stock' }, 400);
         }
       } else {
+        let upd: { meta?: { changes?: number } } | null = null;
         if (effectiveTenant) {
           try {
-            await db.prepare("UPDATE inventory_items SET current_stock = COALESCE(current_stock, 0) + ?, updated_at = ? WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?")
-              .bind(signedQty, now, body.ingredientId, effectiveTenant).run();
+            upd = await db.prepare(`UPDATE inventory_items SET current_stock = COALESCE(current_stock, 0) + ?, updated_at = ? WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?${casSql}`)
+              .bind(signedQty, now, body.ingredientId, effectiveTenant, ...casParams).run();
           } catch {
             if (effectiveTenant !== 'default') {
               return c.json({ success: false, error: 'Failed to update stock for tenant' }, 500);
             }
-            await db.prepare('UPDATE inventory_items SET current_stock = COALESCE(current_stock, 0) + ?, updated_at = ? WHERE id = ?')
-              .bind(signedQty, now, body.ingredientId).run();
+            upd = await db.prepare(`UPDATE inventory_items SET current_stock = COALESCE(current_stock, 0) + ?, updated_at = ? WHERE id = ?${casSql}`)
+              .bind(signedQty, now, body.ingredientId, ...casParams).run();
           }
         } else {
-          await db.prepare('UPDATE inventory_items SET current_stock = COALESCE(current_stock, 0) + ?, updated_at = ? WHERE id = ?')
-            .bind(signedQty, now, body.ingredientId).run();
+          upd = await db.prepare(`UPDATE inventory_items SET current_stock = COALESCE(current_stock, 0) + ?, updated_at = ? WHERE id = ?${casSql}`)
+            .bind(signedQty, now, body.ingredientId, ...casParams).run();
+        }
+        if (hasCasPrecondition && upd && upd.meta && typeof upd.meta.changes === 'number' && upd.meta.changes === 0) {
+          return c.json(
+            { success: false, error: 'Stock changed concurrently. Please reload and recount.' },
+            409
+          );
         }
       }
 

@@ -142,7 +142,7 @@ export const handleLatestOrderTimestamp = (c: import('hono').Context<{ Bindings:
 export const handleUpdateOrder = (c: import('hono').Context<{ Bindings: Env }>) => {
   const user = c.get('user');
   const orderId = c.req.param('id')!;
-  return updateOrder(c.req.raw, c.env, orderId, user?.role, getTenantId(c));
+  return updateOrder(c.req.raw, c.env, orderId, user?.role, getTenantId(c), user?.id);
 };
 
 ordersCoreRouter.post('/', orderRateLimit, handleCreateOrder);

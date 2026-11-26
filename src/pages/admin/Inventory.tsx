@@ -34,7 +34,7 @@ export default function InventoryPage() {
   const tenantScope = useAuthStore((s) => s.user?.tenantId) || 'default';
   const sessionVersion = useAuthStore((s) => s.sessionVersion);
   const [activeTab, setActiveTab] = useState<InventoryTab>('overview');
-  const [selectedIngredient, setSelectedIngredient] = useState<IngredientItem | null>(null);
+  const [selectedIngredientId, setSelectedIngredientId] = useState<string | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
   const ingredientsQ = useQuery<{ success: boolean; data: IngredientItem[]; summary?: InventoryStats }>({
@@ -62,6 +62,10 @@ export default function InventoryPage() {
   });
 
   const ingredients = useMemo(() => ingredientsQ.data?.data || [], [ingredientsQ.data]);
+  const selectedIngredient = useMemo(
+    () => ingredients.find((i) => i.id === selectedIngredientId) ?? null,
+    [ingredients, selectedIngredientId],
+  );
   const movements = useMemo(() => movementsQ.data?.data || [], [movementsQ.data]);
   const suppliers = useMemo(() => suppliersQ.data?.data || [], [suppliersQ.data]);
   const purchaseOrders = useMemo(() => purchaseOrdersQ.data?.data || [], [purchaseOrdersQ.data]);
@@ -91,22 +95,27 @@ export default function InventoryPage() {
     notes?: string;
   }) => {
     const normalizedType = payload.type === 'adjust' ? 'adjustment' : payload.type;
-    const res = await apiFetch<{ success?: boolean; ok?: boolean; error?: string }>('/api/inventory/movements', {
-      method: 'POST',
-      body: JSON.stringify({
-        ...payload,
-        type: normalizedType,
-        movementType: normalizedType,
-      }),
-    });
-    if (res && (res.success === false || res.ok === false)) {
-      throw new Error(res.error || 'Failed to record stock movement');
+    try {
+      const res = await apiFetch<{ success?: boolean; ok?: boolean; error?: string }>('/api/inventory/movements', {
+        method: 'POST',
+        body: JSON.stringify({
+          ...payload,
+          type: normalizedType,
+          movementType: normalizedType,
+        }),
+      });
+      if (res && (res.success === false || res.ok === false)) {
+        throw new Error(res.error || 'Failed to record stock movement');
+      }
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['admin-inventory-ingredients', tenantScope] }),
+        queryClient.invalidateQueries({ queryKey: ['admin-inventory-movements', tenantScope] }),
+        queryClient.invalidateQueries({ queryKey: ['admin-inventory-forecast', tenantScope] }),
+      ]);
+    } catch (err) {
+      void queryClient.invalidateQueries({ queryKey: ['admin-inventory-ingredients', tenantScope] });
+      throw err;
     }
-    await Promise.all([
-      queryClient.invalidateQueries({ queryKey: ['admin-inventory-ingredients', tenantScope] }),
-      queryClient.invalidateQueries({ queryKey: ['admin-inventory-movements', tenantScope] }),
-      queryClient.invalidateQueries({ queryKey: ['admin-inventory-forecast', tenantScope] }),
-    ]);
   };
 
   return (
@@ -205,7 +214,7 @@ export default function InventoryPage() {
             <InventoryIngredientsTab
               ingredients={ingredients}
               loading={ingredientsQ.isLoading}
-              onOpenMovement={(item) => { setSelectedIngredient(item); setIsModalOpen(true); }}
+              onOpenMovement={(item) => { setSelectedIngredientId(item.id); setIsModalOpen(true); }}
             />
           )}
           {activeTab === 'movements' && (

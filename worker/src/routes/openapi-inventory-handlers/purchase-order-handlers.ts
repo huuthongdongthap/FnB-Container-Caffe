@@ -1321,6 +1321,7 @@ export function registerPurchaseOrderHandlers(app: OpenAPIHono<{ Bindings: Env }
       receiveQty: number;
       movId: string;
       usingCanonical: boolean;
+      previousCostPerUnit: number | null;
     }> = [];
 
     const rollbackAppliedUpdates = async () => {
@@ -1339,34 +1340,52 @@ export function registerPurchaseOrderHandlers(app: OpenAPIHono<{ Bindings: Env }
             .catch(() => null);
         }
         if (!applied.usingCanonical) {
+          const restoreIngCostSql = applied.previousCostPerUnit !== null ? ', cost_per_unit = ?' : '';
+          const restoreIngCostParams = applied.previousCostPerUnit !== null ? [applied.previousCostPerUnit] : [];
           if (effectiveTenant && effectiveTenant !== '*') {
             await db
-              .prepare("UPDATE ingredients SET current_stock = MAX(0, COALESCE(current_stock, 0) - ?), updated_at = ? WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?")
-              .bind(applied.receiveQty, now, applied.ingredientId, effectiveTenant)
+              .prepare(`UPDATE ingredients SET current_stock = MAX(0, COALESCE(current_stock, 0) - ?)${restoreIngCostSql}, updated_at = ? WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?`)
+              .bind(applied.receiveQty, ...restoreIngCostParams, now, applied.ingredientId, effectiveTenant)
               .run()
               .catch(() => {
                 if (effectiveTenant !== 'default') return null;
                 return db
-                  .prepare('UPDATE ingredients SET current_stock = MAX(0, COALESCE(current_stock, 0) - ?), updated_at = ? WHERE id = ?')
-                  .bind(applied.receiveQty, now, applied.ingredientId)
+                  .prepare(`UPDATE ingredients SET current_stock = MAX(0, COALESCE(current_stock, 0) - ?)${restoreIngCostSql}, updated_at = ? WHERE id = ?`)
+                  .bind(applied.receiveQty, ...restoreIngCostParams, now, applied.ingredientId)
                   .run()
                   .catch(() => null);
               });
           } else {
             await db
-              .prepare('UPDATE ingredients SET current_stock = MAX(0, COALESCE(current_stock, 0) - ?), updated_at = ? WHERE id = ?')
-              .bind(applied.receiveQty, now, applied.ingredientId)
+              .prepare(`UPDATE ingredients SET current_stock = MAX(0, COALESCE(current_stock, 0) - ?)${restoreIngCostSql}, updated_at = ? WHERE id = ?`)
+              .bind(applied.receiveQty, ...restoreIngCostParams, now, applied.ingredientId)
               .run()
               .catch(() => null);
           }
           await db.prepare('DELETE FROM stock_movements WHERE id = ?').bind(applied.movId).run().catch(() => null);
         }
+        const restoreCanonCostSql = applied.previousCostPerUnit !== null ? ', cost_per_unit = ?, unit_cost = ?' : '';
+        const restoreCanonCostParams = applied.previousCostPerUnit !== null ? [applied.previousCostPerUnit, applied.previousCostPerUnit] : [];
         if (effectiveTenant && effectiveTenant !== '*') {
           await db
-            .prepare("UPDATE inventory_items SET current_stock = MAX(0, COALESCE(current_stock, 0) - ?), updated_at = ? WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?")
-            .bind(applied.receiveQty, now, applied.ingredientId, effectiveTenant)
+            .prepare(`UPDATE inventory_items SET current_stock = MAX(0, COALESCE(current_stock, 0) - ?)${restoreCanonCostSql}, updated_at = ? WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?`)
+            .bind(applied.receiveQty, ...restoreCanonCostParams, now, applied.ingredientId, effectiveTenant)
             .run()
             .catch(() => {
+              if (applied.previousCostPerUnit !== null) {
+                return db
+                  .prepare("UPDATE inventory_items SET current_stock = MAX(0, COALESCE(current_stock, 0) - ?), cost_per_unit = ?, updated_at = ? WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?")
+                  .bind(applied.receiveQty, applied.previousCostPerUnit, now, applied.ingredientId, effectiveTenant)
+                  .run()
+                  .catch(() => {
+                    if (effectiveTenant !== 'default') return null;
+                    return db
+                      .prepare(`UPDATE inventory_items SET current_stock = MAX(0, COALESCE(current_stock, 0) - ?)${restoreCanonCostSql}, updated_at = ? WHERE id = ?`)
+                      .bind(applied.receiveQty, ...restoreCanonCostParams, now, applied.ingredientId)
+                      .run()
+                      .catch(() => null);
+                  });
+              }
               if (effectiveTenant !== 'default') return null;
               return db
                 .prepare('UPDATE inventory_items SET current_stock = MAX(0, COALESCE(current_stock, 0) - ?), updated_at = ? WHERE id = ?')
@@ -1376,10 +1395,17 @@ export function registerPurchaseOrderHandlers(app: OpenAPIHono<{ Bindings: Env }
             });
         } else {
           await db
-            .prepare('UPDATE inventory_items SET current_stock = MAX(0, COALESCE(current_stock, 0) - ?), updated_at = ? WHERE id = ?')
-            .bind(applied.receiveQty, now, applied.ingredientId)
+            .prepare(`UPDATE inventory_items SET current_stock = MAX(0, COALESCE(current_stock, 0) - ?)${restoreCanonCostSql}, updated_at = ? WHERE id = ?`)
+            .bind(applied.receiveQty, ...restoreCanonCostParams, now, applied.ingredientId)
             .run()
-            .catch(() => null);
+            .catch(() => {
+              if (applied.previousCostPerUnit === null) return null;
+              return db
+                .prepare('UPDATE inventory_items SET current_stock = MAX(0, COALESCE(current_stock, 0) - ?), cost_per_unit = ?, updated_at = ? WHERE id = ?')
+                .bind(applied.receiveQty, applied.previousCostPerUnit, now, applied.ingredientId)
+                .run()
+                .catch(() => null);
+            });
         }
         await db.prepare('DELETE FROM inventory_transactions WHERE id = ?').bind(applied.movId).run().catch(() => null);
       }
@@ -1528,36 +1554,69 @@ export function registerPurchaseOrderHandlers(app: OpenAPIHono<{ Bindings: Env }
         }
 
         if (effectiveUnitCost !== null) {
+          const wacExpr = `CASE
+                     WHEN (MAX(0, COALESCE(current_stock, 0)) + ?) > 0
+                     THEN ((MAX(0, COALESCE(current_stock, 0)) * COALESCE(cost_per_unit, unit_cost, 0)) + (? * ?)) / (MAX(0, COALESCE(current_stock, 0)) + ?)
+                     ELSE ?
+                   END`;
           if (effectiveTenant && effectiveTenant !== '*') {
             await db.prepare(
               `UPDATE inventory_items
-               SET cost_per_unit = CASE
-                     WHEN (MAX(0, COALESCE(current_stock, 0)) + ?) > 0
-                     THEN ((MAX(0, COALESCE(current_stock, 0)) * COALESCE(cost_per_unit, 0)) + (? * ?)) / (MAX(0, COALESCE(current_stock, 0)) + ?)
-                     ELSE ?
-                   END,
+               SET cost_per_unit = ${wacExpr},
+                   unit_cost = ${wacExpr},
                    current_stock = COALESCE(current_stock, 0) + ?,
                    last_restocked_at = ?,
                    updated_at = ?
                WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?`
-            ).bind(receiveQty, receiveQty, effectiveUnitCost, receiveQty, effectiveUnitCost, receiveQty, now, now, item.ingredientId, effectiveTenant).run().catch(() => {
-              if (effectiveTenant !== 'default') return null;
-              return db.prepare('UPDATE inventory_items SET current_stock = COALESCE(current_stock, 0) + ?, last_restocked_at = ?, updated_at = ? WHERE id = ?')
-                .bind(receiveQty, now, now, item.ingredientId).run().catch(() => {});
+            ).bind(
+              receiveQty, receiveQty, effectiveUnitCost, receiveQty, effectiveUnitCost,
+              receiveQty, receiveQty, effectiveUnitCost, receiveQty, effectiveUnitCost,
+              receiveQty, now, now, item.ingredientId, effectiveTenant
+            ).run().catch(() => {
+              return db.prepare(
+                `UPDATE inventory_items
+                 SET cost_per_unit = CASE
+                       WHEN (MAX(0, COALESCE(current_stock, 0)) + ?) > 0
+                       THEN ((MAX(0, COALESCE(current_stock, 0)) * COALESCE(cost_per_unit, 0)) + (? * ?)) / (MAX(0, COALESCE(current_stock, 0)) + ?)
+                       ELSE ?
+                     END,
+                     current_stock = COALESCE(current_stock, 0) + ?,
+                     last_restocked_at = ?,
+                     updated_at = ?
+                 WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?`
+              ).bind(receiveQty, receiveQty, effectiveUnitCost, receiveQty, effectiveUnitCost, receiveQty, now, now, item.ingredientId, effectiveTenant).run().catch(() => {
+                if (effectiveTenant !== 'default') return null;
+                return db.prepare('UPDATE inventory_items SET current_stock = COALESCE(current_stock, 0) + ?, last_restocked_at = ?, updated_at = ? WHERE id = ?')
+                  .bind(receiveQty, now, now, item.ingredientId).run().catch(() => {});
+              });
             });
           } else {
             await db.prepare(
               `UPDATE inventory_items
-               SET cost_per_unit = CASE
-                     WHEN (MAX(0, COALESCE(current_stock, 0)) + ?) > 0
-                     THEN ((MAX(0, COALESCE(current_stock, 0)) * COALESCE(cost_per_unit, 0)) + (? * ?)) / (MAX(0, COALESCE(current_stock, 0)) + ?)
-                     ELSE ?
-                   END,
+               SET cost_per_unit = ${wacExpr},
+                   unit_cost = ${wacExpr},
                    current_stock = COALESCE(current_stock, 0) + ?,
                    last_restocked_at = ?,
                    updated_at = ?
                WHERE id = ?`
-            ).bind(receiveQty, receiveQty, effectiveUnitCost, receiveQty, effectiveUnitCost, receiveQty, now, now, item.ingredientId).run().catch(() => {});
+            ).bind(
+              receiveQty, receiveQty, effectiveUnitCost, receiveQty, effectiveUnitCost,
+              receiveQty, receiveQty, effectiveUnitCost, receiveQty, effectiveUnitCost,
+              receiveQty, now, now, item.ingredientId
+            ).run().catch(() => {
+              return db.prepare(
+                `UPDATE inventory_items
+                 SET cost_per_unit = CASE
+                       WHEN (MAX(0, COALESCE(current_stock, 0)) + ?) > 0
+                       THEN ((MAX(0, COALESCE(current_stock, 0)) * COALESCE(cost_per_unit, 0)) + (? * ?)) / (MAX(0, COALESCE(current_stock, 0)) + ?)
+                       ELSE ?
+                     END,
+                     current_stock = COALESCE(current_stock, 0) + ?,
+                     last_restocked_at = ?,
+                     updated_at = ?
+                 WHERE id = ?`
+              ).bind(receiveQty, receiveQty, effectiveUnitCost, receiveQty, effectiveUnitCost, receiveQty, now, now, item.ingredientId).run().catch(() => {});
+            });
           }
         } else if (effectiveTenant && effectiveTenant !== '*') {
           await db.prepare(
@@ -1609,7 +1668,75 @@ export function registerPurchaseOrderHandlers(app: OpenAPIHono<{ Bindings: Env }
           await db.prepare('UPDATE inventory_transactions SET tenant_id = ? WHERE id = ?').bind(effectiveTenant, movId).run().catch(() => {});
         }
       } else {
-        if (effectiveTenant && effectiveTenant !== '*') {
+        if (effectiveUnitCost !== null) {
+          const wacExpr = `CASE
+                     WHEN (MAX(0, COALESCE(current_stock, 0)) + ?) > 0
+                     THEN ((MAX(0, COALESCE(current_stock, 0)) * COALESCE(cost_per_unit, unit_cost, 0)) + (? * ?)) / (MAX(0, COALESCE(current_stock, 0)) + ?)
+                     ELSE ?
+                   END`;
+          if (effectiveTenant && effectiveTenant !== '*') {
+            try {
+              await db.prepare(
+                `UPDATE inventory_items
+                 SET cost_per_unit = ${wacExpr},
+                     unit_cost = ${wacExpr},
+                     current_stock = COALESCE(current_stock, 0) + ?,
+                     last_restocked_at = ?,
+                     updated_at = ?
+                 WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?`
+              ).bind(
+                receiveQty, receiveQty, effectiveUnitCost, receiveQty, effectiveUnitCost,
+                receiveQty, receiveQty, effectiveUnitCost, receiveQty, effectiveUnitCost,
+                receiveQty, now, now, item.ingredientId, effectiveTenant
+              ).run();
+            } catch (err) {
+              if (effectiveTenant !== 'default') {
+                await db.prepare(
+                  `UPDATE inventory_items
+                   SET cost_per_unit = CASE
+                         WHEN (MAX(0, COALESCE(current_stock, 0)) + ?) > 0
+                         THEN ((MAX(0, COALESCE(current_stock, 0)) * COALESCE(cost_per_unit, 0)) + (? * ?)) / (MAX(0, COALESCE(current_stock, 0)) + ?)
+                         ELSE ?
+                       END,
+                       current_stock = COALESCE(current_stock, 0) + ?,
+                       last_restocked_at = ?,
+                       updated_at = ?
+                   WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?`
+                ).bind(receiveQty, receiveQty, effectiveUnitCost, receiveQty, effectiveUnitCost, receiveQty, now, now, item.ingredientId, effectiveTenant).run();
+              } else {
+                await db.prepare(
+                  `UPDATE inventory_items
+                   SET cost_per_unit = ${wacExpr},
+                       unit_cost = ${wacExpr},
+                       current_stock = COALESCE(current_stock, 0) + ?,
+                       last_restocked_at = ?,
+                       updated_at = ?
+                   WHERE id = ?`
+                ).bind(
+                  receiveQty, receiveQty, effectiveUnitCost, receiveQty, effectiveUnitCost,
+                  receiveQty, receiveQty, effectiveUnitCost, receiveQty, effectiveUnitCost,
+                  receiveQty, now, now, item.ingredientId
+                ).run().catch(() => {
+                  throw err;
+                });
+              }
+            }
+          } else {
+            await db.prepare(
+              `UPDATE inventory_items
+               SET cost_per_unit = ${wacExpr},
+                   unit_cost = ${wacExpr},
+                   current_stock = COALESCE(current_stock, 0) + ?,
+                   last_restocked_at = ?,
+                   updated_at = ?
+               WHERE id = ?`
+            ).bind(
+              receiveQty, receiveQty, effectiveUnitCost, receiveQty, effectiveUnitCost,
+              receiveQty, receiveQty, effectiveUnitCost, receiveQty, effectiveUnitCost,
+              receiveQty, now, now, item.ingredientId
+            ).run();
+          }
+        } else if (effectiveTenant && effectiveTenant !== '*') {
           try {
             await db.prepare(
               "UPDATE inventory_items SET current_stock = COALESCE(current_stock, 0) + ?, last_restocked_at = ?, updated_at = ? WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
@@ -1661,6 +1788,14 @@ export function registerPurchaseOrderHandlers(app: OpenAPIHono<{ Bindings: Env }
         receiveQty,
         movId,
         usingCanonical,
+        previousCostPerUnit:
+          effectiveUnitCost !== null
+            ? Number(
+                (ingredient as { cost_per_unit?: unknown; unit_cost?: unknown } | null)?.cost_per_unit ??
+                (ingredient as { unit_cost?: unknown } | null)?.unit_cost ??
+                0
+              )
+            : null,
       });
     }
 

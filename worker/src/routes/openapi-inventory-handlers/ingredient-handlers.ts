@@ -826,20 +826,25 @@ export function registerIngredientHandlers(app: OpenAPIHono<{ Bindings: Env }>) 
     params.push(now, id);
 
     const casClauses: string[] = [];
+    const canonicalCasClauses: string[] = [];
     const casParams: (string | number)[] = [];
     if (body.expectedCurrentStock !== undefined) {
       casClauses.push('COALESCE(current_stock, 0) = ?');
+      canonicalCasClauses.push('COALESCE(current_stock, 0) = ?');
       casParams.push(Number(body.expectedCurrentStock));
     }
     if (body.expectedCostPerUnit !== undefined) {
       casClauses.push('COALESCE(cost_per_unit, 0) = ?');
+      canonicalCasClauses.push('COALESCE(cost_per_unit, unit_cost, 0) = ?');
       casParams.push(Number(body.expectedCostPerUnit));
     }
     if (body.expectedUpdatedAt !== undefined && existing.updated_at !== undefined && existing.updated_at !== null) {
       casClauses.push('updated_at = ?');
+      canonicalCasClauses.push('updated_at = ?');
       casParams.push(String(body.expectedUpdatedAt));
     }
     const casSql = casClauses.length > 0 ? ` AND ${casClauses.join(' AND ')}` : '';
+    const canonicalCasSql = canonicalCasClauses.length > 0 ? ` AND ${canonicalCasClauses.join(' AND ')}` : '';
 
     if (!usingCanonical) {
       try {
@@ -877,13 +882,56 @@ export function registerIngredientHandlers(app: OpenAPIHono<{ Bindings: Env }>) 
     if (canonicalUpdates.length > 0) {
       canonicalUpdates.push('updated_at = ?');
       canonicalParams.push(now, id);
-      try {
-        await db.prepare(
-          `UPDATE inventory_items SET ${canonicalUpdates.join(', ')} WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?`
-        ).bind(...canonicalParams, effectiveRowTenant).run();
-      } catch {
-        if (isLegacyUnscopedRow && hasVerifiedTenantOwnership) {
-          await db.prepare(`UPDATE inventory_items SET ${canonicalUpdates.join(', ')} WHERE id = ?`).bind(...canonicalParams).run().catch(() => {});
+      if (usingCanonical) {
+        try {
+          const upd = await db.prepare(
+            `UPDATE inventory_items SET ${canonicalUpdates.join(', ')} WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?${canonicalCasSql}`
+          ).bind(...canonicalParams, effectiveRowTenant, ...casParams).run();
+          if (upd?.meta && typeof upd.meta.changes === 'number' && upd.meta.changes === 0) {
+            if (hasPrecondition) {
+              return c.json(
+                { success: false, error: 'Ingredient was modified concurrently. Please reload and try again.' },
+                409
+              );
+            }
+            if (isLegacyUnscopedRow && hasVerifiedTenantOwnership) {
+              const fallbackUpd = await db.prepare(
+                `UPDATE inventory_items SET ${canonicalUpdates.join(', ')} WHERE id = ?${canonicalCasSql}`
+              ).bind(...canonicalParams, ...casParams).run();
+              if (fallbackUpd?.meta && typeof fallbackUpd.meta.changes === 'number' && fallbackUpd.meta.changes === 0) {
+                return c.json({ success: false, error: 'Ingredient not found' }, 404);
+              }
+            } else {
+              return c.json({ success: false, error: 'Ingredient not found' }, 404);
+            }
+          }
+        } catch {
+          if (isLegacyUnscopedRow && hasVerifiedTenantOwnership) {
+            const fallbackUpd = await db.prepare(
+              `UPDATE inventory_items SET ${canonicalUpdates.join(', ')} WHERE id = ?${canonicalCasSql}`
+            ).bind(...canonicalParams, ...casParams).run();
+            if (fallbackUpd?.meta && typeof fallbackUpd.meta.changes === 'number' && fallbackUpd.meta.changes === 0) {
+              if (hasPrecondition) {
+                return c.json(
+                  { success: false, error: 'Ingredient was modified concurrently. Please reload and try again.' },
+                  409
+                );
+              }
+              return c.json({ success: false, error: 'Ingredient not found' }, 404);
+            }
+          } else {
+            return c.json({ success: false, error: 'Ingredient not found' }, 404);
+          }
+        }
+      } else {
+        try {
+          await db.prepare(
+            `UPDATE inventory_items SET ${canonicalUpdates.join(', ')} WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?`
+          ).bind(...canonicalParams, effectiveRowTenant).run();
+        } catch {
+          if (isLegacyUnscopedRow && hasVerifiedTenantOwnership) {
+            await db.prepare(`UPDATE inventory_items SET ${canonicalUpdates.join(', ')} WHERE id = ?`).bind(...canonicalParams).run().catch(() => {});
+          }
         }
       }
     }
