@@ -112,7 +112,16 @@ export async function resetPassword(request: Request, env: Record<string, unknow
         resolvedCustomerTenant = pilotTenant;
       }
       token = await generateJWT(
-        { email, name: user.name, id: user.id, role: 'customer', tenantId: resolvedCustomerTenant, authVersion: user.auth_version },
+        {
+          email,
+          name: user.name,
+          id: user.id,
+          role: 'customer',
+          tenantId: resolvedCustomerTenant,
+          authVersion: user.auth_version,
+          ...(typeof env.JWT_AUDIENCE === 'string' && env.JWT_AUDIENCE ? { aud: env.JWT_AUDIENCE } : {}),
+          ...(typeof env.JWT_ISSUER === 'string' && env.JWT_ISSUER ? { iss: env.JWT_ISSUER } : {}),
+        },
         env.JWT_SECRET as string,
         env.JWT_EXPIRY_SECONDS as string
       );

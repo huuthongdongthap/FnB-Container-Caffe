@@ -82,13 +82,17 @@ export async function registerWithVerification(request: Request, env: Record<str
           ? env.PILOT_TENANT_ID.trim()
           : 'default');
 
+    if (email.endsWith('@loyalty.aura')) {
+      return errorResponse('Email không hợp lệ', 400);
+    }
+
     if (db?.prepare) {
       try {
         let existingCustomer: { id: string; email?: string | null; phone?: string | null; tenant_id?: string | null } | null = null;
         try {
           existingCustomer = await db.prepare(
             `SELECT id, email, phone, tenant_id FROM customers
-             WHERE (lower(email) = lower(?) OR (? != '' AND phone = ? AND (email IS NULL OR TRIM(email) = '')))
+             WHERE (lower(email) = lower(?) OR (? != '' AND phone = ?))
                AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?
              LIMIT 1`
           ).bind(email, phone || '', phone || '', rawPilotTenant).first<{ id: string; email?: string | null; phone?: string | null; tenant_id?: string | null }>();
@@ -96,63 +100,46 @@ export async function registerWithVerification(request: Request, env: Record<str
           if (rawPilotTenant === 'default') {
             existingCustomer = await db.prepare(
               `SELECT id, email, phone FROM customers
-               WHERE lower(email) = lower(?) OR (? != '' AND phone = ? AND (email IS NULL OR TRIM(email) = ''))
+               WHERE lower(email) = lower(?) OR (? != '' AND phone = ?)
                LIMIT 1`
             ).bind(email, phone || '', phone || '').first<{ id: string; email?: string | null; phone?: string | null }>().catch(() => null);
           }
         }
 
-        const existingTenant = String(existingCustomer?.tenant_id || '').trim() || rawPilotTenant;
-        const existingEmail = String(existingCustomer?.email || '').trim().toLowerCase();
-        const canAdoptCustomer = Boolean(
-          existingCustomer?.id &&
-          existingTenant === rawPilotTenant &&
-          (!existingEmail || existingEmail === email)
-        );
+        if (existingCustomer?.id) {
+          return jsonResponse(
+            {
+              success: false,
+              error: 'Tài khoản hoặc số điện thoại đã tồn tại. Vui lòng xác thực OTP để liên kết tài khoản.',
+              code: 'ACCOUNT_ALREADY_EXISTS',
+            },
+            409
+          );
+        }
 
         const normalizedCustomerPhone = String(phone || '').trim() || null;
 
-        if (canAdoptCustomer && existingCustomer) {
-          userId = existingCustomer.id;
-          try {
-            await db.prepare(
-              `UPDATE customers
-               SET email = COALESCE(NULLIF(email, ''), ?),
-                   name = COALESCE(NULLIF(name, ''), ?),
-                   phone = COALESCE(NULLIF(phone, ''), ?),
-                   updated_at = ?
-               WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?`
-            ).bind(email, name || 'Thành viên', normalizedCustomerPhone, now, userId, rawPilotTenant).run();
-          } catch {
-            if (rawPilotTenant === 'default') {
-              await db.prepare(
-                'UPDATE customers SET email = COALESCE(NULLIF(email, \'\'), ?), name = COALESCE(NULLIF(name, \'\'), ?), phone = COALESCE(NULLIF(phone, \'\'), ?), updated_at = ? WHERE id = ?'
-              ).bind(email, name || 'Thành viên', normalizedCustomerPhone, now, userId).run().catch(() => {});
-            }
-          }
-        } else {
-          try {
-            await db.prepare(
-              'INSERT INTO customers (id, email, name, phone, loyalty_points, lifetime_points, loyalty_tier, tenant_id, created_at, updated_at) VALUES (?, ?, ?, ?, 0, 0, ?, ?, ?, ?)'
-            ).bind(userId, email, name || 'Thành viên', normalizedCustomerPhone, 'bronze', rawPilotTenant, now, now).run();
-          } catch {
-            if (rawPilotTenant === 'default') {
-              await db.prepare(
-                'INSERT INTO customers (id, email, name, phone, loyalty_points, loyalty_tier, created_at) VALUES (?, ?, ?, ?, 0, ?, ?)'
-              ).bind(userId, email, name || 'Thành viên', normalizedCustomerPhone, 'bronze', now).run().catch(() => {});
-            }
-          }
-          const walletId = generateId('wal_');
+        try {
           await db.prepare(
-            'INSERT INTO cashback_wallets (id, customer_id, balance, total_earned, total_spent, tenant_id, created_at, updated_at) VALUES (?, ?, 0, 0, 0, ?, ?, ?)'
-          ).bind(walletId, userId, rawPilotTenant, now, now).run().catch(async () => {
-            if (rawPilotTenant === 'default') {
-              await db.prepare(
-                'INSERT INTO cashback_wallets (id, customer_id, balance, total_earned, total_spent, created_at, updated_at) VALUES (?, ?, 0, 0, 0, ?, ?)'
-              ).bind(walletId, userId, now, now).run().catch(() => {});
-            }
-          });
+            'INSERT INTO customers (id, email, name, phone, loyalty_points, lifetime_points, loyalty_tier, tenant_id, created_at, updated_at) VALUES (?, ?, ?, ?, 0, 0, ?, ?, ?, ?)'
+          ).bind(userId, email, name || 'Thành viên', normalizedCustomerPhone, 'bronze', rawPilotTenant, now, now).run();
+        } catch {
+          if (rawPilotTenant === 'default') {
+            await db.prepare(
+              'INSERT INTO customers (id, email, name, phone, loyalty_points, loyalty_tier, created_at) VALUES (?, ?, ?, ?, 0, ?, ?)'
+            ).bind(userId, email, name || 'Thành viên', normalizedCustomerPhone, 'bronze', now).run().catch(() => {});
+          }
         }
+        const walletId = generateId('wal_');
+        await db.prepare(
+          'INSERT INTO cashback_wallets (id, customer_id, balance, total_earned, total_spent, tenant_id, created_at, updated_at) VALUES (?, ?, 0, 0, 0, ?, ?, ?)'
+        ).bind(walletId, userId, rawPilotTenant, now, now).run().catch(async () => {
+          if (rawPilotTenant === 'default') {
+            await db.prepare(
+              'INSERT INTO cashback_wallets (id, customer_id, balance, total_earned, total_spent, created_at, updated_at) VALUES (?, ?, 0, 0, 0, ?, ?)'
+            ).bind(walletId, userId, now, now).run().catch(() => {});
+          }
+        });
       } catch {
         // Optional D1 customer provisioning on registration
       }

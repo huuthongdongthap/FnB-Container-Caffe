@@ -684,29 +684,40 @@ describe('Loyalty, Referrals, Inventory PO, Customer Events & Audit Cutover (202
       env
     );
     expect(loyaltyAdminAccountsRes.status).toBe(200);
+    const calSecret = env.CAL_WEBHOOK_SECRET || 'test-cal-secret';
+    const calPayload = JSON.stringify({
+      triggerEvent: 'BOOKING_CREATED',
+      createdAt: '2026-10-30T10:00:00Z',
+      payload: {
+        uid: 'cal-replica-uid-1',
+        title: 'Replica Booking',
+        startTime: '2026-10-30T19:00:00Z',
+        endTime: '2026-10-30T20:00:00Z',
+        attendees: [{ name: 'Khach Replica', email: 'replica@auraspace.vn', timeZone: 'Asia/Ho_Chi_Minh' }],
+        organizer: { name: 'AURA SPACE', email: 'booking@auraspace.vn' },
+        location: 'Sa Dec',
+      },
+    });
+    const calHmacKey = await crypto.subtle.importKey(
+      'raw',
+      new TextEncoder().encode(calSecret),
+      { name: 'HMAC', hash: 'SHA-256' },
+      false,
+      ['sign']
+    );
+    const calSigBuf = await crypto.subtle.sign('HMAC', calHmacKey, new TextEncoder().encode(calPayload));
+    const calSigHex = Array.from(new Uint8Array(calSigBuf)).map((b) => b.toString(16).padStart(2, '0')).join('');
     const calWebhookRes = await app.request(
       '/api/cal-booking-webhook',
       {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'x-cal-webhook-secret': env.CAL_WEBHOOK_SECRET || 'test-cal-secret',
+          'x-cal-signature-256': calSigHex,
         },
-        body: JSON.stringify({
-          triggerEvent: 'BOOKING_CREATED',
-          createdAt: '2026-10-30T10:00:00Z',
-          payload: {
-            uid: 'cal-replica-uid-1',
-            title: 'Replica Booking',
-            startTime: '2026-10-30T19:00:00Z',
-            endTime: '2026-10-30T20:00:00Z',
-            attendees: [{ name: 'Khach Replica', email: 'replica@auraspace.vn', timeZone: 'Asia/Ho_Chi_Minh' }],
-            organizer: { name: 'AURA SPACE', email: 'booking@auraspace.vn' },
-            location: 'Sa Dec',
-          },
-        }),
+        body: calPayload,
       },
-      { ...env, CAL_WEBHOOK_SECRET: env.CAL_WEBHOOK_SECRET || 'test-cal-secret' }
+      { ...env, CAL_WEBHOOK_SECRET: calSecret }
     );
     expect(calWebhookRes.status).toBe(200);
 

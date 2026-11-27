@@ -35,6 +35,49 @@ interface PosEnv {
   NODE_ENV?: string;
 }
 
+const WEBHOOK_TIMESTAMP_TOLERANCE_SECONDS = 300;
+const WEBHOOK_REPLAY_TTL_SECONDS = 600;
+
+function isFreshErpnextWebhookTimestamp(rawTs: string | undefined | null): boolean {
+  if (!rawTs || !rawTs.trim()) return true;
+  const trimmed = rawTs.trim();
+  let tsSeconds = NaN;
+  if (/^\d+(\.\d+)?$/.test(trimmed)) {
+    const num = Number(trimmed);
+    if (!Number.isFinite(num) || num <= 0) return false;
+    tsSeconds = num > 1e11 ? Math.floor(num / 1000) : Math.floor(num);
+  } else if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$/.test(trimmed)) {
+    const parsedMs = Date.parse(trimmed);
+    if (!Number.isFinite(parsedMs) || parsedMs <= 0) return false;
+    tsSeconds = Math.floor(parsedMs / 1000);
+  } else {
+    return false;
+  }
+  const nowSeconds = Math.floor(Date.now() / 1000);
+  return Math.abs(nowSeconds - tsSeconds) <= WEBHOOK_TIMESTAMP_TOLERANCE_SECONDS;
+}
+
+async function isDuplicateErpnextWebhookReplay(
+  env: PosEnv,
+  rawBody: string,
+): Promise<boolean> {
+  const kv = env.AUTH_KV ?? env.AURA_KV;
+  if (!kv || typeof kv.get !== 'function') return false;
+  // Derive replay key strictly from HMAC-authenticated body bytes; unsigned timestamp headers cannot salt a bypass.
+  const input = new TextEncoder().encode(rawBody);
+  const digest = await crypto.subtle.digest('SHA-256', input);
+  const hex = Array.from(new Uint8Array(digest))
+    .map((b) => b.toString(16).padStart(2, '0'))
+    .join('');
+  const replayKey = `webhook:replay:erpnext:${hex}`;
+  const existing = await kv.get(replayKey).catch(() => null);
+  if (existing) return true;
+  if (typeof kv.put === 'function') {
+    await kv.put(replayKey, '1', { expirationTtl: WEBHOOK_REPLAY_TTL_SECONDS }).catch(() => {});
+  }
+  return false;
+}
+
 async function computeWebhookHmacSha256(body: string, secret: string): Promise<{ hex: string; base64: string }> {
   const enc = new TextEncoder();
   const key = await crypto.subtle.importKey(
@@ -135,13 +178,6 @@ async function extractRequestRole(
     token = authHeader.slice(7).trim();
   } else {
     token = getAuthToken(request) || '';
-    if (!token) {
-      const cookieHeader = request.headers.get('Cookie') || request.headers.get('cookie') || '';
-      const match = cookieHeader.match(/(?:^|;\s*)(?:aura_staff_token|aura_access_token|access_token|token)=([^;]+)/);
-      if (match?.[1]) {
-        token = decodeURIComponent(match[1].trim());
-      }
-    }
   }
   if (!token) {
     return {
@@ -454,11 +490,7 @@ export async function handleErpnextPosRequest(
         (envName === 'development' || envName === 'test') &&
         (String(env.ALLOW_UNSIGNED_WEBHOOKS || '').trim().toLowerCase() === 'true' ||
           String(env.ALLOW_UNSIGNED_ERPNEXT_WEBHOOK || '').trim().toLowerCase() === 'true');
-      const isLegacyMockWithoutEnv =
-        !envName &&
-        (String(env.ERPNEXT_MOCK || '').trim().toLowerCase() === 'true' ||
-          (!env.JWT_SECRET && Boolean(env.ERPNEXT_URL && env.ERPNEXT_API_KEY && env.ERPNEXT_API_SECRET)));
-      if (!webhookSecret && !allowUnsignedDev && !isLegacyMockWithoutEnv) {
+      if (!webhookSecret && !allowUnsignedDev) {
         return json({ success: false, error: 'ERPNext webhook secret not configured' }, 503);
       }
 
@@ -477,14 +509,22 @@ export async function handleErpnextPosRequest(
         } else if (secretHeader) {
           const normalizedSecretHeader = secretHeader.replace(/^sha256=/i, '').trim();
           signatureValid =
-            Boolean(secretHeader) &&
+            Boolean(normalizedSecretHeader) &&
             (constantTimeEqual(normalizedSecretHeader.toLowerCase(), expectedHex) ||
-              constantTimeEqual(normalizedSecretHeader, expectedBase64) ||
-              constantTimeEqual(secretHeader, webhookSecret));
+              constantTimeEqual(normalizedSecretHeader, expectedBase64));
         }
         if (!signatureValid) {
           return json({ success: false, error: 'Invalid webhook secret' }, 401);
         }
+      }
+
+      const rawTimestamp =
+        request.headers.get('x-frappe-webhook-timestamp') ||
+        request.headers.get('x-erpnext-webhook-timestamp') ||
+        request.headers.get('x-webhook-timestamp') ||
+        request.headers.get('x-timestamp');
+      if (!isFreshErpnextWebhookTimestamp(rawTimestamp)) {
+        return json({ success: false, error: 'Stale or invalid webhook timestamp' }, 401);
       }
 
       let body: Record<string, unknown>;
@@ -493,9 +533,15 @@ export async function handleErpnextPosRequest(
       } catch {
         return json({ success: false, error: 'Invalid JSON payload' }, 400);
       }
+      if (!body || typeof body !== 'object' || Array.isArray(body)) {
+        return json({ success: false, error: 'Invalid JSON payload' }, 400);
+      }
       const parsed = erpnextPosWebhookSchema.safeParse(body);
       if (!parsed.success) {
         return json({ success: false, error: parsed.error.issues[0].message }, 400);
+      }
+      if (await isDuplicateErpnextWebhookReplay(env, rawBody)) {
+        return json({ success: false, error: 'Duplicate webhook replay detected' }, 409);
       }
       const configuredWebhookTenantRaw = (
         (typeof env.ERPNEXT_WEBHOOK_TENANT === 'string' ? env.ERPNEXT_WEBHOOK_TENANT.trim() : '') ||

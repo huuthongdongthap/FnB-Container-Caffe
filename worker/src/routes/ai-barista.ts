@@ -196,17 +196,32 @@ aiBaristaRouter.post('/recommend', async (c) => {
   const clientIp = (
     c.req.header('cf-connecting-ip') ||
     c.req.header('CF-Connecting-IP') ||
-    c.req.header('x-forwarded-for')?.split(',')[0]?.trim() ||
-    c.req.header('X-Forwarded-For')?.split(',')[0]?.trim() ||
     'anonymous'
   ).slice(0, 64);
   const now = Date.now();
+  const bucketKey = `${tenantId === '*' ? 'default' : tenantId}:${clientIp}`;
+
+  if (c.env?.AUTH_KV && typeof c.env.AUTH_KV.get === 'function') {
+    try {
+      const kvKey = `rl:barista:${bucketKey}:${Math.floor(now / BARISTA_RATE_LIMIT_WINDOW_MS)}`;
+      const rawCount = await c.env.AUTH_KV.get(kvKey);
+      const kvCount = rawCount ? parseInt(rawCount, 10) : 0;
+      if (Number.isFinite(kvCount) && kvCount >= BARISTA_RATE_LIMIT_MAX_REQUESTS) {
+        return c.json({ success: false, error: 'Too many recommendation requests. Please try again later.' }, 429);
+      }
+      if (typeof c.env.AUTH_KV.put === 'function') {
+        await c.env.AUTH_KV.put(kvKey, String(kvCount + 1), { expirationTtl: 60 });
+      }
+    } catch {
+      // Fall through to in-memory bucket
+    }
+  }
+
   if (baristaRateLimitBuckets.size > 1000) {
     for (const [k, v] of baristaRateLimitBuckets.entries()) {
       if (now >= v.resetAt) baristaRateLimitBuckets.delete(k);
     }
   }
-  const bucketKey = `${tenantId === '*' ? 'default' : tenantId}:${clientIp}`;
   const existingBucket = baristaRateLimitBuckets.get(bucketKey);
   if (!existingBucket || now >= existingBucket.resetAt) {
     baristaRateLimitBuckets.set(bucketKey, { count: 1, resetAt: now + BARISTA_RATE_LIMIT_WINDOW_MS });

@@ -21,40 +21,35 @@ const ALLOWED_ORIGIN_PATTERNS: RegExp[] = [
   /^https:\/\/(www\.)?auraspace\.cafe$/,
   /^https:\/\/[a-z0-9-]+\.auraspace\.cafe$/,
   /^https:\/\/(www\.)?auracafe\.vn$/,
-  /^https:\/\/[a-z0-9-]+\.auracafe\.vn$/,
+  /^https:\/\/[a-z0-9-]+\.auracafe\.vn$/
+];
+
+const DEV_LOCALHOST_ORIGIN_PATTERNS: RegExp[] = [
   /^https?:\/\/localhost(:\d+)?$/,
   /^https?:\/\/127\.0\.0\.1(:\d+)?$/
 ];
 
-/** Exact origins kept for readability and for the legacy auracafe/auraspace entries. */
+/** Exact production origins kept for readability and for the legacy auracafe/auraspace entries. */
 const ALLOWED_ORIGINS = [
-  'http://localhost:5173',
-  'http://localhost:3000',
-  'http://localhost:8787',
   'https://auracafe.vn',
   'https://staging.auracafe.vn',
   'https://auraspace.cafe',
   'https://www.auraspace.cafe',
 ];
 
-function isAllowedOrigin(origin: string): boolean {
+function isAllowedOrigin(origin: string, environment?: string): boolean {
   if (!origin) return false;
   if (ALLOWED_ORIGINS.includes(origin)) return true;
-  return ALLOWED_ORIGIN_PATTERNS.some((rx) => rx.test(origin));
+  if (ALLOWED_ORIGIN_PATTERNS.some((rx) => rx.test(origin))) return true;
+  const envName = String(environment || '').toLowerCase();
+  if ((envName === 'development' || envName === 'test') && DEV_LOCALHOST_ORIGIN_PATTERNS.some((rx) => rx.test(origin))) {
+    return true;
+  }
+  return false;
 }
 
-/**
- * Resolves the origin to echo back, or `false` when the caller must not be granted
- * cross-origin reads.
- *
- * An unmatched origin never falls back to a fixed default. Emitting
- * `Access-Control-Allow-Origin: http://localhost:5173` for a request from anywhere else
- * is a lie the browser enforces anyway, it hides which origin was rejected, and it leaks
- * a dev URL in production responses. Returning `false` means "emit no ACAO", so the
- * browser blocks the read — the same outcome the app-level middleware produces.
- */
-export function getCorsOrigin(originHeader?: string | null): string | false {
-  if (originHeader && isAllowedOrigin(originHeader)) {
+export function getCorsOrigin(originHeader?: string | null, environment?: string): string | false {
+  if (originHeader && isAllowedOrigin(originHeader, environment)) {
     return originHeader;
   }
   return false;
@@ -96,11 +91,11 @@ export function corsHeaders(origin: string | false, withCredentials = false): Re
  * default, so it resolves to `false` (no ACAO). An explicit origin string is checked
  * against the allowlist.
  */
-function resolveCorsOrigin(corsOrigin: string | false | undefined): string | false {
+function resolveCorsOrigin(corsOrigin: string | false | undefined, environment?: string): string | false {
   if (typeof corsOrigin !== 'string' || corsOrigin === '' || corsOrigin === '*') {
     return false;
   }
-  return getCorsOrigin(corsOrigin);
+  return getCorsOrigin(corsOrigin, environment);
 }
 
 export function jsonResponse(
@@ -108,9 +103,10 @@ export function jsonResponse(
   status = 200,
   headers: Record<string, string> = {},
   corsOrigin: string | false = '*',
-  withCredentials = false
+  withCredentials = false,
+  environment?: string
 ): Response {
-  const resolved = resolveCorsOrigin(corsOrigin);
+  const resolved = resolveCorsOrigin(corsOrigin, environment);
   return new Response(JSON.stringify(data), {
     status,
     headers: {
@@ -129,13 +125,15 @@ export function errorResponse(
   message: string,
   status = 400,
   headers: Record<string, string> = {},
-  corsOrigin: string | false = '*'
+  corsOrigin: string | false = '*',
+  environment?: string
 ): Response {
   return jsonResponse(
     { success: false, error: message },
     status,
     headers,
-    resolveCorsOrigin(corsOrigin),
-    true
+    resolveCorsOrigin(corsOrigin, environment),
+    true,
+    environment
   );
 }

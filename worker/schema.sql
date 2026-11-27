@@ -2444,3 +2444,30 @@ CREATE TABLE IF NOT EXISTS leads (
 CREATE INDEX IF NOT EXISTS idx_leads_tenant_created_at
   ON leads(tenant_id, created_at DESC);
 
+-- Append-only immutability triggers for audit_logs and saas_audit_logs (SOC2 CC7.2 / ISO 27001 A.8.15)
+DROP TRIGGER IF EXISTS trg_audit_logs_sync;
+
+CREATE TRIGGER IF NOT EXISTS trg_audit_logs_no_update
+BEFORE UPDATE ON audit_logs
+BEGIN
+  SELECT RAISE(ABORT, 'audit_logs is append-only and cannot be updated');
+END;
+
+CREATE TRIGGER IF NOT EXISTS trg_audit_logs_no_delete
+BEFORE DELETE ON audit_logs
+BEGIN
+  SELECT RAISE(ABORT, 'audit_logs is append-only and cannot be deleted');
+END;
+
+CREATE TRIGGER IF NOT EXISTS trg_saas_audit_logs_no_update
+BEFORE UPDATE ON saas_audit_logs
+BEGIN
+  SELECT RAISE(ABORT, 'saas_audit_logs is append-only and cannot be updated');
+END;
+
+CREATE TRIGGER IF NOT EXISTS trg_saas_audit_logs_no_delete
+BEFORE DELETE ON saas_audit_logs
+BEGIN
+  SELECT RAISE(ABORT, 'saas_audit_logs is append-only and cannot be deleted');
+END;
+

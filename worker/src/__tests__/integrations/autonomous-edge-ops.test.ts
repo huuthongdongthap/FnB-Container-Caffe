@@ -9,6 +9,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { createHmac } from 'node:crypto';
 import { createMockEnv, isStaffAccountLookup, TEST_JWT_SECRET } from '../test-utils';
 import { generateJWT } from '../../lib/jwt';
 import app from '../../index';
@@ -261,7 +262,7 @@ describe('Autonomous Edge Operations Integration (Phase 5)', () => {
       });
 
       const payload = { query: 'Kiểm tra giúp đơn ord_12345' };
-      const req = await authRequest('POST', '/api/chat/assistant', undefined, 'default', payload);
+      const req = await authRequest('POST', '/api/chat/assistant', 'staff', 'default', payload);
       const res = await app.fetch(req, mockEnv);
       expect(res.status).toBe(200);
       const json = await res.json() as any;
@@ -285,7 +286,7 @@ describe('Autonomous Edge Operations Integration (Phase 5)', () => {
       });
 
       const payload = { query: 'Bàn 2 tính tiền bao nhiêu vậy?' };
-      const req = await authRequest('POST', '/api/chat/assistant', undefined, 'default', payload);
+      const req = await authRequest('POST', '/api/chat/assistant', 'staff', 'default', payload);
       const res = await app.fetch(req, mockEnv);
       expect(res.status).toBe(200);
       const json = await res.json() as any;
@@ -309,7 +310,7 @@ describe('Autonomous Edge Operations Integration (Phase 5)', () => {
       });
 
       const payload = { query: 'Kiểm tra điểm tích lũy', phone: '0901234567' };
-      const req = await authRequest('POST', '/api/chat/assistant', undefined, 'default', payload);
+      const req = await authRequest('POST', '/api/chat/assistant', 'staff', 'default', payload);
       const res = await app.fetch(req, mockEnv);
       expect(res.status).toBe(200);
       const json = await res.json() as any;
@@ -351,7 +352,7 @@ describe('Autonomous Edge Operations Integration (Phase 5)', () => {
       expect(unsignedRes.status).toBe(503);
 
       const req = await authRequest('POST', '/api/webhooks/zalo', undefined, 'default', zaloPayload);
-      const res = await app.fetch(req, { ...mockEnv, ENVIRONMENT: 'test' });
+      const res = await app.fetch(req, { ...mockEnv, ENVIRONMENT: 'test', ALLOW_UNSIGNED_ZALO_WEBHOOK: 'true' });
       expect(res.status).toBe(200);
       const json = await res.json() as any;
       expect(json.success).toBe(true);
@@ -365,7 +366,7 @@ describe('Autonomous Edge Operations Integration (Phase 5)', () => {
       const unauthDefaultRes = await app.fetch(unauthDefaultReq, mockEnv);
       expect(unauthDefaultRes.status).toBe(401);
 
-      const req = await authRequest('POST', '/api/webhooks/zalo/simulate', undefined, 'default', simPayload);
+      const req = await authRequest('POST', '/api/webhooks/zalo/simulate', 'manager', 'default', simPayload);
       const res = await app.fetch(req, { ...mockEnv, ENVIRONMENT: 'development' });
       expect(res.status).toBe(200);
       const json = await res.json() as any;
@@ -374,21 +375,17 @@ describe('Autonomous Edge Operations Integration (Phase 5)', () => {
       expect(json.data.reply).toContain('Cà phê muối Sa Đéc');
     });
 
-    it('enforces staff/manager/owner auth on /api/webhooks/zalo/simulate in production', async () => {
+    it('disables /api/webhooks/zalo/simulate in production with 404', async () => {
       const prodEnv = { ...mockEnv, ENVIRONMENT: 'production' };
       const simPayload = { text: 'Menu có món gì đặc sản?' };
 
       const unauthReq = await authRequest('POST', '/api/webhooks/zalo/simulate', undefined, 'default', simPayload);
       const unauthRes = await app.fetch(unauthReq, prodEnv);
-      expect(unauthRes.status).toBe(401);
-
-      const customerReq = await authRequest('POST', '/api/webhooks/zalo/simulate', 'customer', 'default', simPayload);
-      const customerRes = await app.fetch(customerReq, prodEnv);
-      expect(customerRes.status).toBe(403);
+      expect(unauthRes.status).toBe(404);
 
       const managerReq = await authRequest('POST', '/api/webhooks/zalo/simulate', 'manager', 'default', simPayload);
       const managerRes = await app.fetch(managerReq, prodEnv);
-      expect(managerRes.status).toBe(200);
+      expect(managerRes.status).toBe(404);
     });
 
     it('routes /api/webhooks/cal-booking properly, guards /bookings RBAC, and sanitizes 500 errors', async () => {
@@ -409,25 +406,26 @@ describe('Autonomous Edge Operations Integration (Phase 5)', () => {
           })
       });
 
+      const webhookBody = JSON.stringify({
+        triggerEvent: 'BOOKING_CREATED',
+        createdAt: '2026-10-14T09:00:00Z',
+        payload: {
+          uid: 'cal_uid_123',
+          title: 'Table Booking',
+          startTime: '2026-10-14T10:00:00Z',
+          endTime: '2026-10-14T11:00:00Z',
+          attendees: [{ name: 'Test Guest', email: 'guest@test.aura', timeZone: 'Asia/Ho_Chi_Minh' }],
+          organizer: { name: 'AURA Cafe', email: 'host@test.aura' },
+          location: 'Sa Dec'
+        }
+      });
       const webhookReq = new Request('https://test.aura/api/webhooks/cal-booking', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'x-cal-webhook-secret': 'cal_sec_test'
+          'x-cal-signature-256': createHmac('sha256', 'cal_sec_test').update(webhookBody).digest('hex')
         },
-        body: JSON.stringify({
-          triggerEvent: 'BOOKING_CREATED',
-          createdAt: '2026-10-14T09:00:00Z',
-          payload: {
-            uid: 'cal_uid_123',
-            title: 'Table Booking',
-            startTime: '2026-10-14T10:00:00Z',
-            endTime: '2026-10-14T11:00:00Z',
-            attendees: [{ name: 'Test Guest', email: 'guest@test.aura', timeZone: 'Asia/Ho_Chi_Minh' }],
-            organizer: { name: 'AURA Cafe', email: 'host@test.aura' },
-            location: 'Sa Dec'
-          }
-        })
+        body: webhookBody
       });
       const webhookRes = await app.fetch(webhookReq, mockEnv);
       expect(webhookRes.status).toBe(500);
@@ -455,7 +453,7 @@ describe('Autonomous Edge Operations Integration (Phase 5)', () => {
         network_ping_ms: 18
       };
 
-      const req = await authRequest('POST', '/api/edge/telemetry/heartbeat', undefined, 'default', heartbeat);
+      const req = await authRequest('POST', '/api/edge/telemetry/heartbeat', 'manager', 'default', heartbeat);
       const res = await app.fetch(req, mockEnv);
       expect(res.status).toBe(200);
       const json = await res.json() as any;
@@ -482,7 +480,7 @@ describe('Autonomous Edge Operations Integration (Phase 5)', () => {
         kds_online: true
       };
 
-      const req = await authRequest('POST', '/api/edge/telemetry/heartbeat', undefined, 'default', heartbeat);
+      const req = await authRequest('POST', '/api/edge/telemetry/heartbeat', 'manager', 'default', heartbeat);
       const res = await app.fetch(req, mockEnv);
       expect(res.status).toBe(200);
       const json = await res.json() as any;
@@ -508,7 +506,7 @@ describe('Autonomous Edge Operations Integration (Phase 5)', () => {
         kds_online: true
       };
 
-      const req = await authRequest('POST', '/api/edge/telemetry/heartbeat', undefined, 'default', heartbeat);
+      const req = await authRequest('POST', '/api/edge/telemetry/heartbeat', 'manager', 'default', heartbeat);
       const res = await app.fetch(req, mockEnv);
       expect(res.status).toBe(200);
       const json = await res.json() as any;

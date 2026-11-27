@@ -1,5 +1,6 @@
 // @vitest-environment node
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { createHmac } from 'node:crypto';
 import { DatabaseSync } from 'node:sqlite';
 import { Hono } from 'hono';
 import type { D1Database } from '@cloudflare/workers-types';
@@ -322,10 +323,12 @@ describe('Home Assistant webhook tenant isolation', () => {
   }
 
   function webhook(app: Hono<{ Bindings: Env }>, body: Record<string, unknown>, headers: Record<string, string> = {}) {
+    const rawBody = JSON.stringify(body);
+    const sig = createHmac('sha256', HA_SECRET).update(rawBody).digest('hex');
     return app.request('http://localhost/api/ha/webhook', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-ha-token': HA_SECRET, ...headers },
-      body: JSON.stringify(body)
+      headers: { 'Content-Type': 'application/json', 'x-ha-signature': `sha256=${sig}`, ...headers },
+      body: rawBody
     });
   }
 

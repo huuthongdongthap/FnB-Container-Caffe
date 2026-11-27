@@ -229,22 +229,20 @@ describe('Phase 45 Slice AR1: Telemetry, WiFi Portal, Inventory & Demand Forecas
       expect(bodyFranchise.success).toBe(true);
       expect(bodyFranchise.customer_id).not.toBe(bodyDefault.customer_id);
 
-      const defaultCustomer = sqlite
-        .prepare('SELECT email, tenant_id FROM customers WHERE id = ?')
-        .get(bodyDefault.customer_id) as { email: string; tenant_id: string };
-      const franchiseCustomer = sqlite
-        .prepare('SELECT email, tenant_id FROM customers WHERE id = ?')
-        .get(bodyFranchise.customer_id) as { email: string; tenant_id: string };
+      expect(bodyDefault.customer_id).toMatch(/^CUS_WIFI_/);
+      expect(bodyFranchise.customer_id).toMatch(/^CUS_WIFI_/);
 
-      expect(defaultCustomer.email).toBe('0901234567@wifi.aura');
-      expect(defaultCustomer.tenant_id).toBe('default');
-      expect(franchiseCustomer.email).toBe('0901234567+tenant_sadec_02@wifi.aura');
-      expect(franchiseCustomer.tenant_id).toBe('tenant_sadec_02');
+      const defaultSession = sqlite
+        .prepare('SELECT tenant_id, customer_id FROM wifi_sessions WHERE id = ?')
+        .get(bodyDefault.session_id) as { tenant_id: string; customer_id: string };
+      expect(defaultSession.tenant_id).toBe('default');
+      expect(defaultSession.customer_id).toBe(bodyDefault.customer_id);
 
       const franchiseSession = sqlite
-        .prepare('SELECT tenant_id FROM wifi_sessions WHERE id = ?')
-        .get(bodyFranchise.session_id) as { tenant_id: string };
+        .prepare('SELECT tenant_id, customer_id FROM wifi_sessions WHERE id = ?')
+        .get(bodyFranchise.session_id) as { tenant_id: string; customer_id: string };
       expect(franchiseSession.tenant_id).toBe('tenant_sadec_02');
+      expect(franchiseSession.customer_id).toBe(bodyFranchise.customer_id);
     });
 
     it('rejects staff role on POST /authorize while allowing supervisor and manager', async () => {

@@ -48,7 +48,7 @@ describe('Client Errors Route (/api/client-error)', () => {
     expect(body.success).toBe(true);
     expect(body.id).toMatch(/^CE-/);
 
-    expect(bindSpy).toHaveBeenCalledTimes(1);
+    expect(bindSpy).toHaveBeenCalledTimes(2);
     const [, route, message, stack, href, userAgent, ts] = bindSpy.mock.calls[0];
     expect(route).toBe('/checkout');
     expect(message).toBe('Cannot read properties of undefined (reading "price")');
@@ -62,7 +62,8 @@ describe('Client Errors Route (/api/client-error)', () => {
     expect(href).not.toContain('0986470981');
     expect(href).not.toContain('#payment');
     expect(userAgent).toBe('VitestBrowser/1.0');
-    expect(ts).toBe('2026-10-14T12:00:00.000Z');
+    expect(ts).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/);
+    expect(ts).not.toBe('2026-10-14T12:00:00.000Z');
   });
 
   it('normalizes api-client payload (path, message, url, timestamp)', async () => {
@@ -98,7 +99,8 @@ describe('Client Errors Route (/api/client-error)', () => {
     expect(route).toBe('/api/orders');
     expect(message).toBe('Bad Gateway');
     expect(href).toBe('https://auraspace.cafe/menu');
-    expect(ts).toBe('2026-10-14T12:05:00.000Z');
+    expect(ts).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/);
+    expect(ts).not.toBe('2026-10-14T12:05:00.000Z');
   });
 
   it('returns sanitized 500 response when D1 insert fails without leaking SQLite details', async () => {

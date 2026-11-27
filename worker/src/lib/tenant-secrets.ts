@@ -106,6 +106,23 @@ export async function decryptTenantSecret(
   return new TextDecoder().decode(plainBuffer);
 }
 
+export function isEncryptedTenantSecret(value: string | null | undefined): boolean {
+  if (typeof value !== 'string') return false;
+  const parts = value.split(':');
+  return parts.length === 3 && /^v\d+a?$/.test(parts[0]);
+}
+
+export async function decryptTenantSecretOrPlaintext(
+  value: string,
+  masterKey: string | undefined,
+  aad?: string
+): Promise<string> {
+  if (!isEncryptedTenantSecret(value)) {
+    return value;
+  }
+  return decryptTenantSecret(value, masterKey, aad);
+}
+
 export function maskSecretValue(value: string | null | undefined): string {
   const clean = String(value || '').trim();
   if (!clean) return '';

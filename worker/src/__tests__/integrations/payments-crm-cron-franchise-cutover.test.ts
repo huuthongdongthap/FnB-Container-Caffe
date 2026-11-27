@@ -840,7 +840,7 @@ describe('Payments, CRM, Reviews, Franchise & Cron Cutover (20261029_03..07)', (
       'http://localhost/api/reviews',
       {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${ownerToken}` },
         body: JSON.stringify({
           order_id: 'ORD_PAY_01',
           rating: 5,

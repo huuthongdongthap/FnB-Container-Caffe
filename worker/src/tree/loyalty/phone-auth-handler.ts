@@ -20,6 +20,59 @@ const OTP_VERIFY_FAIL_MAX = 5;
 const OTP_VERIFY_FAIL_TTL_SECONDS = 300;
 const campaignBonusLocks = new Map<string, Promise<void>>();
 
+function isErasedCustomerRecord(
+  row: { name?: unknown; phone?: unknown; anonymized_at?: unknown; is_active?: unknown } | null | undefined,
+): boolean {
+  if (!row) return false;
+  if (row.is_active === 0 || row.is_active === false) return true;
+  if (typeof row.anonymized_at === 'string' ? row.anonymized_at.trim() !== '' : Boolean(row.anonymized_at)) {
+    return true;
+  }
+  const name = typeof row.name === 'string' ? row.name.trim() : '';
+  if (name === '[ERASED]') return true;
+  const phone = typeof row.phone === 'string' ? row.phone.trim().toLowerCase() : '';
+  if (phone.startsWith('erased_')) return true;
+  return false;
+}
+
+async function isCustomerErasedInDb(
+  db: Env['AURA_DB'] | undefined,
+  customerId: string,
+  row?: { name?: unknown; phone?: unknown; anonymized_at?: unknown } | null,
+): Promise<boolean> {
+  if (isErasedCustomerRecord(row)) return true;
+  if (!db?.prepare || !customerId) return false;
+
+  const custRow = await db
+    .prepare('SELECT id, name, phone, anonymized_at FROM customers WHERE id = ? LIMIT 1')
+    .bind(customerId)
+    .first<{ id?: string | null; name?: string | null; phone?: string | null; anonymized_at?: string | null }>()
+    .catch(() => null);
+  if (custRow && (!custRow.id || String(custRow.id) === customerId) && isErasedCustomerRecord(custRow)) {
+    return true;
+  }
+
+  const userRow = await db
+    .prepare('SELECT id, is_active, name, phone FROM users WHERE id = ? LIMIT 1')
+    .bind(customerId)
+    .first<{ id?: string | null; is_active?: number | boolean | null; name?: string | null; phone?: string | null }>()
+    .catch(() => null);
+  if (userRow && (!userRow.id || String(userRow.id) === customerId) && isErasedCustomerRecord(userRow)) {
+    return true;
+  }
+
+  const eraseEvent = await db
+    .prepare("SELECT event_type FROM customer_events WHERE customer_id = ? AND event_type = 'CustomerDataErased' LIMIT 1")
+    .bind(customerId)
+    .first<{ event_type?: string | null }>()
+    .catch(() => null);
+  if (eraseEvent?.event_type === 'CustomerDataErased') {
+    return true;
+  }
+
+  return false;
+}
+
 async function withCampaignBonusLock<T>(key: string, fn: () => Promise<T>): Promise<T> {
   const prev = campaignBonusLocks.get(key) ?? Promise.resolve();
   let release!: () => void;
@@ -131,6 +184,9 @@ export async function handlePhoneAuth(c: Context<{ Bindings: Env }>) {
     }
     const validated = parsed.data;
     const phone = validated.phone.replace(/\s+/g, '');
+    if (phone.toLowerCase().startsWith('erased_')) {
+      return c.json({ success: false, code: 'SESSION_REVOKED', error: 'Tài khoản đã bị xóa hoặc vô hiệu hóa' }, 401);
+    }
     const dob = validated.dob || null;
     const zalo = (validated.zalo || '').replace(/\s+/g, '') || null;
     const source = validated.source || 'unknown';
@@ -230,10 +286,10 @@ export async function handlePhoneAuth(c: Context<{ Bindings: Env }>) {
               meta = null;
               hadCrossTenantCustomer = true;
             } else {
-              return c.json({ success: false, error: 'Tài khoản thuộc cửa hàng khác' }, 403);
+              return c.json({ success: false, error: 'Cần xác thực OTP để tiếp tục', requiresOtp: true }, 401);
             }
           } else if (resolvedTenant !== tenantId) {
-            return c.json({ success: false, error: 'Tài khoản thuộc cửa hàng khác' }, 403);
+            return c.json({ success: false, error: 'Cần xác thực OTP để tiếp tục', requiresOtp: true }, 401);
           } else {
             customer = tenantCustomer;
             meta = { tenant_id: tenantId, verified_at: tenantCustomer.verified_at ?? null };
@@ -244,6 +300,9 @@ export async function handlePhoneAuth(c: Context<{ Bindings: Env }>) {
 
     let customerVerifiedNow = false;
     if (customer) {
+      if (await isCustomerErasedInDb(db, customer.id, customer)) {
+        return c.json({ success: false, code: 'SESSION_REVOKED', error: 'Tài khoản đã bị xóa hoặc vô hiệu hóa' }, 401);
+      }
       const authHeader = c.req.header?.('Authorization');
       const bearerToken = authHeader?.startsWith('Bearer ') ? authHeader.slice(7).trim() : null;
       const requiresProof =
@@ -289,23 +348,32 @@ export async function handlePhoneAuth(c: Context<{ Bindings: Env }>) {
             ((verifiedPayload.tenantId && String(verifiedPayload.tenantId).trim()) || 'default') === tenantId
           ) {
             let versionValid = true;
+            let storedVersion = 1;
+            let hasVersionRecord = false;
+            const lookupEmail = verifiedPayload.email || customer.email;
+            const lookupId = verifiedPayload.id || customer.id;
             if (c.env.AUTH_KV?.get) {
-              let storedVersion = 1;
-              let hasVersionRecord = false;
-              const lookupEmail = verifiedPayload.email || customer.email;
               if (lookupEmail) {
                 const rawUser = await c.env.AUTH_KV.get(`user:${lookupEmail}`).catch(() => null);
                 if (rawUser) {
                   hasVersionRecord = true;
                   try {
-                    const parsed = JSON.parse(rawUser) as { auth_version?: number };
+                    const parsed = JSON.parse(rawUser) as {
+                      auth_version?: number;
+                      is_active?: number | boolean;
+                      anonymized_at?: string | null;
+                      name?: string | null;
+                      phone?: string | null;
+                    };
+                    if (isErasedCustomerRecord(parsed)) {
+                      versionValid = false;
+                    }
                     storedVersion = Math.max(storedVersion, Number(parsed.auth_version || 1));
                   } catch {
                     // Ignore malformed KV record
                   }
                 }
               }
-              const lookupId = verifiedPayload.id || customer.id;
               if (lookupId) {
                 const rawVer = await c.env.AUTH_KV.get(`cust_auth_ver:${lookupId}`).catch(() => null);
                 if (rawVer) {
@@ -315,21 +383,38 @@ export async function handlePhoneAuth(c: Context<{ Bindings: Env }>) {
                     storedVersion = Math.max(storedVersion, parsedVer);
                   }
                 }
-                if (db && typeof db.prepare === 'function') {
-                  const dbCustVer = await db
-                    .prepare('SELECT auth_version FROM customers WHERE id = ? LIMIT 1')
-                    .bind(lookupId)
-                    .first<{ auth_version?: number | null }>()
-                    .catch(() => null);
-                  if (dbCustVer && Number.isFinite(Number(dbCustVer.auth_version)) && Number(dbCustVer.auth_version) > 0) {
-                    hasVersionRecord = true;
-                    storedVersion = Math.max(storedVersion, Number(dbCustVer.auth_version));
-                  }
-                }
               }
-              if (hasVersionRecord && storedVersion !== Number(verifiedPayload.authVersion || 1)) {
+            }
+            if (lookupId && db && typeof db.prepare === 'function') {
+              if (await isCustomerErasedInDb(db, lookupId)) {
                 versionValid = false;
               }
+              const dbCustVer = await db
+                .prepare('SELECT auth_version FROM customers WHERE id = ? LIMIT 1')
+                .bind(lookupId)
+                .first<{ auth_version?: number | null }>()
+                .catch(() => null);
+              if (dbCustVer && Number.isFinite(Number(dbCustVer.auth_version)) && Number(dbCustVer.auth_version) > 0) {
+                hasVersionRecord = true;
+                storedVersion = Math.max(storedVersion, Number(dbCustVer.auth_version));
+              }
+              const dbUserVer = await db
+                .prepare('SELECT id, auth_version, is_active, name, phone FROM users WHERE id = ? LIMIT 1')
+                .bind(lookupId)
+                .first<{ id?: string | null; auth_version?: number | null; is_active?: number | boolean | null; name?: string | null; phone?: string | null }>()
+                .catch(() => null);
+              if (dbUserVer && (!dbUserVer.id || String(dbUserVer.id) === String(lookupId))) {
+                if (isErasedCustomerRecord(dbUserVer)) {
+                  versionValid = false;
+                }
+                if (Number.isFinite(Number(dbUserVer.auth_version)) && Number(dbUserVer.auth_version) > 0) {
+                  hasVersionRecord = true;
+                  storedVersion = Math.max(storedVersion, Number(dbUserVer.auth_version));
+                }
+              }
+            }
+            if (hasVersionRecord && storedVersion !== Number(verifiedPayload.authVersion || 1)) {
+              versionValid = false;
             }
             if (versionValid && verifiedPayload.id === customer.id) {
               proofVerified = true;
@@ -344,8 +429,14 @@ export async function handlePhoneAuth(c: Context<{ Bindings: Env }>) {
               const rawEmailAccount = await c.env.AUTH_KV.get(`user:${customer.email}`).catch(() => null);
               if (rawEmailAccount) {
                 try {
-                  const parsedEmailAccount = JSON.parse(rawEmailAccount) as { email_verified?: boolean };
-                  if (parsedEmailAccount.email_verified === true) {
+                  const parsedEmailAccount = JSON.parse(rawEmailAccount) as {
+                    email_verified?: boolean;
+                    is_active?: number | boolean;
+                    anonymized_at?: string | null;
+                    name?: string | null;
+                    phone?: string | null;
+                  };
+                  if (parsedEmailAccount.email_verified === true && !isErasedCustomerRecord(parsedEmailAccount)) {
                     proofVerified = true;
                   }
                 } catch {
@@ -811,6 +902,8 @@ export async function handlePhoneAuth(c: Context<{ Bindings: Env }>) {
         tenantId,
         authVersion: customerAuthVersion,
         phoneVerified: isPhoneVerified,
+        ...(c.env.JWT_AUDIENCE ? { aud: c.env.JWT_AUDIENCE } : {}),
+        ...(c.env.JWT_ISSUER ? { iss: c.env.JWT_ISSUER } : {}),
       },
       c.env.JWT_SECRET,
       c.env.JWT_EXPIRY_SECONDS

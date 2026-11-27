@@ -1,5 +1,6 @@
 // @vitest-environment node
 import { describe, it, expect } from 'vitest';
+import { createHmac } from 'node:crypto';
 import { DatabaseSync } from 'node:sqlite';
 import { Hono } from 'hono';
 import { OpenAPIHono } from '@hono/zod-openapi';
@@ -899,29 +900,30 @@ describe('Phase 50 Slice AW1 — Reservations, QR Codes, Table Sessions, OpenAPI
       registerWebhookHandler(app);
 
       // Cross-tenant cancellation attempt from store-b -> 404
+      const crossCancelBody = JSON.stringify({
+        triggerEvent: 'BOOKING_CANCELLED',
+        createdAt: '2027-07-01T12:00:00Z',
+        payload: {
+          uid: 'cal-store-a-uid',
+          title: 'Dinner Table',
+          startTime: '2027-07-02T19:00:00Z',
+          endTime: '2027-07-02T20:00:00Z',
+          organizer: { name: 'Aura Caffe', email: 'host@auracaffe.vn' },
+          location: 'Aura Caffe Store A',
+          cancellationReason: 'Cross-tenant spoof',
+          metadata: { tenant_id: 'store-b' },
+        },
+      });
       const crossCancelRes = await app.request(
         'http://localhost/',
         {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'x-cal-webhook-secret': 'cal-secret-123',
+            'x-cal-signature-256': createHmac('sha256', 'cal-secret-123').update(crossCancelBody).digest('hex'),
             'X-Tenant-ID': 'store-b',
           },
-          body: JSON.stringify({
-            triggerEvent: 'BOOKING_CANCELLED',
-            createdAt: '2027-07-01T12:00:00Z',
-            payload: {
-              uid: 'cal-store-a-uid',
-              title: 'Dinner Table',
-              startTime: '2027-07-02T19:00:00Z',
-              endTime: '2027-07-02T20:00:00Z',
-              organizer: { name: 'Aura Caffe', email: 'host@auracaffe.vn' },
-              location: 'Aura Caffe Store A',
-              cancellationReason: 'Cross-tenant spoof',
-              metadata: { tenant_id: 'store-b' },
-            },
-          }),
+          body: crossCancelBody,
         },
         { AURA_DB: db, CAL_WEBHOOK_SECRET: 'cal-secret-123' } as unknown as Env
       );
@@ -934,29 +936,30 @@ describe('Phase 50 Slice AW1 — Reservations, QR Codes, Table Sessions, OpenAPI
       expect(rowAfterCrossCancel.status).toBe('confirmed');
 
       // Same-tenant cancellation from store-a -> 200
+      const validCancelBody = JSON.stringify({
+        triggerEvent: 'BOOKING_CANCELLED',
+        createdAt: '2027-07-01T12:00:00Z',
+        payload: {
+          uid: 'cal-store-a-uid',
+          title: 'Dinner Table',
+          startTime: '2027-07-02T19:00:00Z',
+          endTime: '2027-07-02T20:00:00Z',
+          organizer: { name: 'Aura Caffe', email: 'host@auracaffe.vn' },
+          location: 'Aura Caffe Store A',
+          cancellationReason: 'Customer cancelled',
+          metadata: { tenant_id: 'store-a' },
+        },
+      });
       const validCancelRes = await app.request(
         'http://localhost/',
         {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'x-cal-webhook-secret': 'cal-secret-123',
+            'x-cal-signature-256': createHmac('sha256', 'cal-secret-123').update(validCancelBody).digest('hex'),
             'X-Tenant-ID': 'store-a',
           },
-          body: JSON.stringify({
-            triggerEvent: 'BOOKING_CANCELLED',
-            createdAt: '2027-07-01T12:00:00Z',
-            payload: {
-              uid: 'cal-store-a-uid',
-              title: 'Dinner Table',
-              startTime: '2027-07-02T19:00:00Z',
-              endTime: '2027-07-02T20:00:00Z',
-              organizer: { name: 'Aura Caffe', email: 'host@auracaffe.vn' },
-              location: 'Aura Caffe Store A',
-              cancellationReason: 'Customer cancelled',
-              metadata: { tenant_id: 'store-a' },
-            },
-          }),
+          body: validCancelBody,
         },
         { AURA_DB: db, CAL_WEBHOOK_SECRET: 'cal-secret-123' } as unknown as Env
       );

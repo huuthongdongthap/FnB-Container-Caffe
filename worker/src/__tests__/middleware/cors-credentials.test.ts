@@ -8,10 +8,11 @@ describe('CORS — Credential Reflection & Error Handling', () => {
       expect(getCorsOrigin('https://staging.auracafe.vn')).toBe('https://staging.auracafe.vn');
     });
 
-    it('reflects localhost ports for local development', () => {
-      expect(getCorsOrigin('http://localhost:5173')).toBe('http://localhost:5173');
-      expect(getCorsOrigin('http://localhost:3000')).toBe('http://localhost:3000');
-      expect(getCorsOrigin('http://localhost:8787')).toBe('http://localhost:8787');
+    it('reflects localhost ports for local development and rejects in production', () => {
+      expect(getCorsOrigin('http://localhost:5173', 'development')).toBe('http://localhost:5173');
+      expect(getCorsOrigin('http://localhost:3000', 'development')).toBe('http://localhost:3000');
+      expect(getCorsOrigin('http://localhost:8787', 'development')).toBe('http://localhost:8787');
+      expect(getCorsOrigin('http://localhost:5173', 'production')).toBe(false);
     });
 
     it('reflects subdomains of auracafe.vn', () => {

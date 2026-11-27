@@ -55,7 +55,7 @@ describe('Merchant payment-config direct webhook URL', () => {
         }, { email: `${role}@example.test`, sessionType: 'staff-web' });
         const headers = { Authorization: `Bearer ${token}` };
         const config = await app.fetch(new Request('https://auraspace.cafe/api/saas/payment-config', { headers }), env, dummyCtx);
-        expect(config.status).toBe(role === 'staff' ? 403 : 200);
+        expect(config.status).toBe(role === 'staff' || role === 'manager' ? 403 : 200);
         const hq = await app.fetch(new Request('https://auraspace.cafe/api/hq/saas/overview', { headers }), env, dummyCtx);
         expect(hq.status).toBe(403);
       }

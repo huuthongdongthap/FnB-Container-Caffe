@@ -19,6 +19,50 @@ const log = createLogger({ route: 'loyalty-otp' });
 const OTP_TTL_SECONDS = 300;
 const STAFF_ROLES = new Set(['owner', 'admin', 'manager', 'supervisor', 'staff', 'cashier']);
 
+function isErasedCustomerRecord(
+  row: { name?: unknown; phone?: unknown; anonymized_at?: unknown; is_active?: unknown } | null | undefined,
+): boolean {
+  if (!row) return false;
+  if (row.is_active === 0 || row.is_active === false) return true;
+  if (typeof row.anonymized_at === 'string' ? row.anonymized_at.trim() !== '' : Boolean(row.anonymized_at)) {
+    return true;
+  }
+  const name = typeof row.name === 'string' ? row.name.trim() : '';
+  if (name === '[ERASED]') return true;
+  const phone = typeof row.phone === 'string' ? row.phone.trim().toLowerCase() : '';
+  if (phone.startsWith('erased_')) return true;
+  return false;
+}
+
+async function isCustomerErasedInDb(
+  db: Env['AURA_DB'] | undefined,
+  customerId: string,
+  row?: { name?: unknown; phone?: unknown; anonymized_at?: unknown } | null,
+): Promise<boolean> {
+  if (isErasedCustomerRecord(row)) return true;
+  if (!db?.prepare || !customerId) return false;
+
+  const userRow = await db
+    .prepare('SELECT id, is_active, name, phone FROM users WHERE id = ? LIMIT 1')
+    .bind(customerId)
+    .first<{ id?: string | null; is_active?: number | boolean | null; name?: string | null; phone?: string | null }>()
+    .catch(() => null);
+  if (userRow && (!userRow.id || String(userRow.id) === customerId) && isErasedCustomerRecord(userRow)) {
+    return true;
+  }
+
+  const eraseEvent = await db
+    .prepare("SELECT event_type FROM customer_events WHERE customer_id = ? AND event_type = 'CustomerDataErased' LIMIT 1")
+    .bind(customerId)
+    .first<{ event_type?: string | null }>()
+    .catch(() => null);
+  if (eraseEvent?.event_type === 'CustomerDataErased') {
+    return true;
+  }
+
+  return false;
+}
+
 function generateSixDigitOtp(): string {
   const buf = new Uint32Array(1);
   crypto.getRandomValues(buf);
@@ -47,6 +91,9 @@ export async function handlePhoneOtpRequest(c: Context<{ Bindings: Env }>) {
     }
 
     const phone = parsed.data.phone.replace(/\s+/g, '');
+    if (phone.toLowerCase().startsWith('erased_')) {
+      return c.json({ success: false, error: 'Tài khoản đã bị xóa hoặc vô hiệu hóa' }, 403);
+    }
 
     let tenantId = 'default';
     try {
@@ -107,20 +154,28 @@ export async function handlePhoneOtpRequest(c: Context<{ Bindings: Env }>) {
       return c.json({ success: false, error: 'Số điện thoại này đã yêu cầu quá nhiều mã OTP. Vui lòng đợi 5 phút.' }, 429);
     }
 
-    let customer: { id: string; name: string; phone: string; tenant_id?: string | null } | null = null;
+    let customer: { id: string; name: string; phone: string; tenant_id?: string | null; anonymized_at?: string | null } | null = null;
     try {
       customer = await c.env.AURA_DB.prepare(
-        "SELECT id, name, phone, tenant_id FROM customers WHERE phone = ? ORDER BY CASE WHEN COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ? THEN 0 ELSE 1 END LIMIT 1"
-      ).bind(phone, tenantId).first<{ id: string; name: string; phone: string; tenant_id?: string | null }>();
+        "SELECT id, name, phone, tenant_id, anonymized_at FROM customers WHERE phone = ? ORDER BY CASE WHEN COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ? THEN 0 ELSE 1 END LIMIT 1"
+      ).bind(phone, tenantId).first<{ id: string; name: string; phone: string; tenant_id?: string | null; anonymized_at?: string | null }>();
     } catch {
       try {
         customer = await c.env.AURA_DB.prepare(
-          'SELECT id, name, phone, tenant_id FROM customers WHERE phone = ?'
-        ).bind(phone).first<{ id: string; name: string; phone: string; tenant_id?: string | null }>();
+          "SELECT id, name, phone, tenant_id FROM customers WHERE phone = ? ORDER BY CASE WHEN COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ? THEN 0 ELSE 1 END LIMIT 1"
+        ).bind(phone, tenantId).first<{ id: string; name: string; phone: string; tenant_id?: string | null }>();
       } catch {
-        customer = await c.env.AURA_DB.prepare(
-          'SELECT id, name, phone FROM customers WHERE phone = ?'
-        ).bind(phone).first<{ id: string; name: string; phone: string }>();
+        if (tenantId === 'default') {
+          try {
+            customer = await c.env.AURA_DB.prepare(
+              'SELECT id, name, phone, tenant_id FROM customers WHERE phone = ?'
+            ).bind(phone).first<{ id: string; name: string; phone: string; tenant_id?: string | null }>();
+          } catch {
+            customer = await c.env.AURA_DB.prepare(
+              'SELECT id, name, phone FROM customers WHERE phone = ?'
+            ).bind(phone).first<{ id: string; name: string; phone: string }>();
+          }
+        }
       }
     }
 
@@ -143,6 +198,10 @@ export async function handlePhoneOtpRequest(c: Context<{ Bindings: Env }>) {
       if (custTenant !== tenantId) {
         return c.json({ success: false, error: 'Tài khoản thuộc cửa hàng khác' }, 403);
       }
+    }
+
+    if (customer && await isCustomerErasedInDb(c.env.AURA_DB, customer.id, customer)) {
+      return c.json({ success: false, error: 'Tài khoản đã bị xóa hoặc vô hiệu hóa' }, 403);
     }
 
     const otp = generateSixDigitOtp();

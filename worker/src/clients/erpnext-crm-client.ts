@@ -82,8 +82,8 @@ export class ErpnextCrmClient {
       throw new Error('Customer data is required to create lead');
     }
 
-    const hasConsent = customerData.consent_marketing !== false &&
-                       customerData.consent_erpnext_sync !== false;
+    const hasConsent = customerData.consent_marketing === true &&
+                       customerData.consent_erpnext_sync === true;
     if (!hasConsent) {
       return null;
     }

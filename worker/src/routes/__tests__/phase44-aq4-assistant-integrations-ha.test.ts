@@ -1,5 +1,6 @@
 // @vitest-environment node
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { createHmac } from 'node:crypto';
 import { Hono } from 'hono';
 import { DatabaseSync } from 'node:sqlite';
 import { customerAssistantRouter, processCustomerQuery } from '../customer-assistant';
@@ -474,21 +475,23 @@ describe('AI Customer Assistant, TastyIgniter, Frigate & HomeAssistant Hardening
       app.route('/api/ha', createHARouter());
 
       // 1. Inbound webhook spoofing X-Tenant-ID: * and body.tenant_id: '*' falls back to default store and is blocked from mutating tenant_sadec_02 device
+      const haBody = JSON.stringify({
+        entity_id: 'light.sadec_garden',
+        state: 'on',
+        tenant_id: '*',
+      });
+      const haSig = createHmac('sha256', 'ha-secret-token').update(haBody).digest('hex');
       const webhookRes = await app.fetch(
         new Request('https://test.local/api/ha/webhook', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'X-HA-Token': 'ha-secret-token',
+            'X-HA-Signature': `sha256=${haSig}`,
             'X-Tenant-ID': '*',
           },
-          body: JSON.stringify({
-            entity_id: 'light.sadec_garden',
-            state: 'on',
-            tenant_id: '*',
-          }),
+          body: haBody,
         }),
-        { AURA_DB: d1, HA_TOKEN: 'ha-secret-token' }
+        { AURA_DB: d1, HA_WEBHOOK_SECRET: 'ha-secret-token' }
       );
       expect(webhookRes.status).toBe(409);
       const webhookBody = (await webhookRes.json()) as { success: boolean; action_taken: string };

@@ -5,6 +5,7 @@ import { requireStaffAccount } from '../../lib/staff-session';
 import { changeStaffPassword } from '../../lib/staff-password';
 import { findLoginUser } from '../../lib/staff-login-identity';
 import { getAuthToken } from '../../lib/jwt';
+import { getClientIdentifier } from '../../middleware/rate-limit';
 import { resolvePublicTenantId } from '../../middleware/tenant';
 import { AuthRoutes } from '../../schemas/auth';
 import { hashPassword, verifyPassword, writeAuthAuditLog } from './helpers';
@@ -21,6 +22,50 @@ function constantTimeEqualCode(a: string, b: string): boolean {
     diff |= (bufA[i] ?? 0) ^ (bufB[i] ?? 0);
   }
   return diff === 0;
+}
+
+function isErasedOrInactiveRecord(record: Record<string, unknown> | null | undefined): boolean {
+  if (!record || typeof record !== 'object') return false;
+  if (record.is_active === 0 || record.is_active === false) return true;
+  if (record.anonymized_at) return true;
+  if (record.name === '[ERASED]') return true;
+  if (typeof record.phone === 'string' && record.phone.startsWith('erased_')) return true;
+  return false;
+}
+
+async function isUserErasedOrInactive(db: any, userId: string): Promise<boolean> {
+  if (!db?.prepare || !userId) return false;
+  const userState = await db
+    .prepare('SELECT id, is_active, name, phone FROM users WHERE id = ? LIMIT 1')
+    .bind(userId)
+    .first()
+    .catch(() => null);
+  if (userState && String((userState as { id?: unknown }).id || userId) === userId && isErasedOrInactiveRecord(userState as Record<string, unknown>)) {
+    return true;
+  }
+  const custState = await db
+    .prepare('SELECT id, name, phone, anonymized_at FROM customers WHERE id = ? LIMIT 1')
+    .bind(userId)
+    .first()
+    .catch(() =>
+      db
+        .prepare('SELECT id, name, phone FROM customers WHERE id = ? LIMIT 1')
+        .bind(userId)
+        .first()
+        .catch(() => null)
+    );
+  if (custState && String((custState as { id?: unknown }).id || userId) === userId && isErasedOrInactiveRecord(custState as Record<string, unknown>)) {
+    return true;
+  }
+  const eraseEvent = await db
+    .prepare("SELECT event_type FROM customer_events WHERE customer_id = ? AND event_type = 'CustomerDataErased' LIMIT 1")
+    .bind(userId)
+    .first()
+    .catch(() => null);
+  if (eraseEvent && (eraseEvent as { event_type?: unknown }).event_type === 'CustomerDataErased') {
+    return true;
+  }
+  return false;
 }
 
 async function resolveResetTargetUser(
@@ -90,12 +135,15 @@ async function resolveResetTargetUser(
   }
   if (!user && env) {
     const kvOrStaffUser = await findLoginUser(env, normalizedEmail).catch(() => null);
-    if (kvOrStaffUser?.id) {
+    if (kvOrStaffUser?.id && !isErasedOrInactiveRecord(kvOrStaffUser as Record<string, unknown>)) {
       const kvTenant = String((kvOrStaffUser as { tenant_id?: string; tenantId?: string }).tenant_id || (kvOrStaffUser as { tenantId?: string }).tenantId || 'default').trim() || 'default';
       if (!cleanTenant || kvTenant === cleanTenant) {
         user = { id: kvOrStaffUser.id, role: kvOrStaffUser.role, tenant_id: (kvOrStaffUser as { tenant_id?: string }).tenant_id };
       }
     }
+  }
+  if (user && (isErasedOrInactiveRecord(user as unknown as Record<string, unknown>) || (await isUserErasedOrInactive(db, user.id)))) {
+    return null;
   }
   return user;
 }
@@ -184,11 +232,8 @@ export function registerForgotPasswordHandler(app: OpenAPIHono<{ Bindings: Env }
     const db = c.env.AURA_DB;
     const data = (await c.req.json().catch(() => ({}))) as { email?: string };
     const normalizedEmail = String(data.email || '').trim().toLowerCase();
-    const clientIp =
-      c.req.header('CF-Connecting-IP') ||
-      c.req.header('X-Forwarded-For') ||
-      normalizedEmail ||
-      'ip';
+    const rawClientIp = getClientIdentifier(c);
+    const clientIp = rawClientIp !== 'unknown' ? rawClientIp : normalizedEmail || 'ip';
 
     if (c.env?.AUTH_KV) {
       const rlKey = `rate:forgot-password:${clientIp}`;
@@ -214,7 +259,7 @@ export function registerForgotPasswordHandler(app: OpenAPIHono<{ Bindings: Env }
       return c.json({ success: true, data: { success: true } });
     }
 
-    await invalidatePriorPasswordResetCodes(db, normalizedEmail);
+    await invalidatePriorPasswordResetCodes(db, normalizedEmail, user.id);
 
     const randomBuf = new Uint32Array(1);
     crypto.getRandomValues(randomBuf);
@@ -251,14 +296,17 @@ export function registerPasswordHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
     const normalizedEmail = String(rawBody.email || body.email || '').trim().toLowerCase();
     const submittedCode = String(rawBody.code || rawBody.otp || '').trim();
     const submittedNewPassword = String(rawBody.newPassword || rawBody.new_password || rawBody.password || '');
-    const clientIp =
-      c.req.header('CF-Connecting-IP') ||
-      c.req.header('X-Forwarded-For') ||
-      normalizedEmail ||
-      'ip';
+    const rawClientIp = getClientIdentifier(c);
+    const clientIp = rawClientIp !== 'unknown' ? rawClientIp : normalizedEmail || 'ip';
 
     const requestedResetTenant = String(resolvePublicTenantId(c) || '').trim();
     if (submittedCode && submittedNewPassword) {
+      if (submittedNewPassword.length < 8 || submittedNewPassword.length > 128) {
+        return c.json(
+          { success: false, error: 'Mật khẩu mới phải có từ 8 đến 128 ký tự' },
+          400
+        );
+      }
       const targetUser = await resolveResetTargetUser(db, c.env, normalizedEmail, requestedResetTenant);
       const resetTenant = String(targetUser?.tenant_id || requestedResetTenant || 'default').trim() || 'default';
       const attemptKey = `rate:reset-password:attempts:${normalizedEmail || clientIp}`;
@@ -474,7 +522,7 @@ export function registerPasswordHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
       return c.json({ success: true, data: { success: true } });
     }
 
-    await invalidatePriorPasswordResetCodes(db, normalizedEmail);
+    await invalidatePriorPasswordResetCodes(db, normalizedEmail, user.id);
 
     const randomBuf = new Uint32Array(1);
     crypto.getRandomValues(randomBuf);
@@ -501,6 +549,10 @@ export function registerPasswordHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
     const body = c.req.valid('json');
     const user = c.get('user');
     const now = new Date().toISOString();
+
+    if (user?.id && (await isUserErasedOrInactive(db, user.id))) {
+      return c.json({ success: false, error: 'Account is inactive or erased' }, 403);
+    }
 
     let userRecord = await db
       .prepare('SELECT password_hash, tenant_id, auth_version FROM users WHERE id = ?')

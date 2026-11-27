@@ -10,7 +10,65 @@ import { resolvePilotStore, matchesTenantRow } from '../../middleware/tenant';
 import { toMauticContact } from './contact-mapper';
 import { syncSegments } from './segment-sync';
 
-export async function syncMauticContacts(env: Record<string, unknown>, tenantOverride?: string): Promise<{ synced: number; skipped?: boolean }> {
+const SCOPED_MARKETING_CONSENT_SQL = `AND c.anonymized_at IS NULL
+           AND (
+             EXISTS (
+               SELECT 1 FROM consents co
+               WHERE co.customer_id = c.id
+                 AND co.purpose = 'marketing'
+                 AND co.granted = 1
+                 AND co.revoked_at IS NULL
+                 AND COALESCE(NULLIF(TRIM(co.tenant_id), ''), 'default') = ?2
+             )
+             OR (
+               (COALESCE(c.consent_marketing, 0) = 1 OR COALESCE(c.marketing_consent, 0) = 1)
+               AND NOT EXISTS (
+                 SELECT 1 FROM consents co_rev
+                 WHERE co_rev.customer_id = c.id
+                   AND co_rev.purpose = 'marketing'
+                   AND (co_rev.granted = 0 OR co_rev.revoked_at IS NOT NULL)
+                   AND COALESCE(NULLIF(TRIM(co_rev.tenant_id), ''), 'default') = ?2
+               )
+             )
+           )`;
+
+const WILDCARD_MARKETING_CONSENT_SQL = `AND c.anonymized_at IS NULL
+           AND (
+             EXISTS (
+               SELECT 1 FROM consents co
+               WHERE co.customer_id = c.id
+                 AND co.purpose = 'marketing'
+                 AND co.granted = 1
+                 AND co.revoked_at IS NULL
+                 AND COALESCE(NULLIF(TRIM(co.tenant_id), ''), 'default') = COALESCE(NULLIF(TRIM(c.tenant_id), ''), 'default')
+             )
+             OR (
+               (COALESCE(c.consent_marketing, 0) = 1 OR COALESCE(c.marketing_consent, 0) = 1)
+               AND NOT EXISTS (
+                 SELECT 1 FROM consents co_rev
+                 WHERE co_rev.customer_id = c.id
+                   AND co_rev.purpose = 'marketing'
+                   AND (co_rev.granted = 0 OR co_rev.revoked_at IS NOT NULL)
+                   AND COALESCE(NULLIF(TRIM(co_rev.tenant_id), ''), 'default') = COALESCE(NULLIF(TRIM(c.tenant_id), ''), 'default')
+               )
+             )
+           )`;
+
+const LEGACY_DEFAULT_MARKETING_CONSENT_SQL = `AND c.anonymized_at IS NULL
+           AND EXISTS (
+             SELECT 1 FROM consents co
+             WHERE co.customer_id = c.id
+               AND co.purpose = 'marketing'
+               AND co.granted = 1
+               AND co.revoked_at IS NULL
+           )`;
+
+function isConsentSchemaFailure(err: unknown): boolean {
+  const msg = String((err as Error)?.message || err || '');
+  return /no such table:\s*consents|no such column:\s*(?:c\.)?anonymized_at|no such column:\s*(?:co|co_rev)\.(?:purpose|granted|revoked_at|customer_id)/i.test(msg);
+}
+
+export async function syncMauticContacts(env: Record<string, unknown>, tenantOverride?: string): Promise<{ synced: number; errors?: number; skipped?: boolean }> {
   const client = createMauticClient({
     MAUTIC_BASE_URL: env.MAUTIC_BASE_URL as string,
     MAUTIC_CLIENT_ID: env.MAUTIC_CLIENT_ID as string,
@@ -47,6 +105,7 @@ export async function syncMauticContacts(env: Record<string, unknown>, tenantOve
           c.updated_at
          FROM customers c
          WHERE c.updated_at > ?1
+           ${SCOPED_MARKETING_CONSENT_SQL}
            AND COALESCE(NULLIF(TRIM(c.tenant_id), ''), 'default') = ?2
          ORDER BY c.updated_at ASC
          LIMIT 500`
@@ -54,7 +113,10 @@ export async function syncMauticContacts(env: Record<string, unknown>, tenantOve
       results = ((res.results || []) as Array<Record<string, unknown>>).filter(
         (row) => !('tenant_id' in row) || matchesTenantRow(row, effectiveTenant)
       );
-    } catch {
+    } catch (primaryErr) {
+      if (isConsentSchemaFailure(primaryErr)) {
+        return { synced: 0, errors: 0 };
+      }
       try {
         const res = await db.prepare(
           `SELECT c.phone, c.name, c.email, c.loyalty_tier, NULL as birthday, c.tenant_id,
@@ -63,6 +125,7 @@ export async function syncMauticContacts(env: Record<string, unknown>, tenantOve
             c.updated_at
            FROM customers c
            WHERE c.updated_at > ?1
+             ${SCOPED_MARKETING_CONSENT_SQL}
              AND COALESCE(NULLIF(TRIM(c.tenant_id), ''), 'default') = ?2
            ORDER BY c.updated_at ASC
            LIMIT 500`
@@ -70,7 +133,10 @@ export async function syncMauticContacts(env: Record<string, unknown>, tenantOve
         results = ((res.results || []) as Array<Record<string, unknown>>).filter(
           (row) => !('tenant_id' in row) || matchesTenantRow(row, effectiveTenant)
         );
-      } catch {
+      } catch (secondErr) {
+        if (isConsentSchemaFailure(secondErr)) {
+          return { synced: 0, errors: 0 };
+        }
         try {
           const res = await db.prepare(
             `SELECT c.phone, c.name, c.email, c.tier as loyalty_tier, NULL as birthday, c.tenant_id,
@@ -79,6 +145,7 @@ export async function syncMauticContacts(env: Record<string, unknown>, tenantOve
               c.created_at as updated_at
              FROM customers c
              WHERE c.created_at > ?1
+               ${SCOPED_MARKETING_CONSENT_SQL}
                AND COALESCE(NULLIF(TRIM(c.tenant_id), ''), 'default') = ?2
              ORDER BY c.created_at ASC
              LIMIT 500`
@@ -87,26 +154,34 @@ export async function syncMauticContacts(env: Record<string, unknown>, tenantOve
             (row) => !('tenant_id' in row) || matchesTenantRow(row, effectiveTenant)
           );
         } catch (err) {
+          if (isConsentSchemaFailure(err)) {
+            return { synced: 0, errors: 0 };
+          }
           const msg = String((err as Error)?.message || '');
           if (msg.includes('column')) {
             if (isScopedTenant) {
-              return { synced: 0, errors: 0 } as { synced: number; errors?: number; skipped?: boolean };
+              return { synced: 0, errors: 0 };
             }
-            const res = await db.prepare(
-              `SELECT c.phone, c.name, c.email, c.tier as loyalty_tier, NULL as birthday,
-                (SELECT MAX(o.created_at) FROM orders o WHERE o.customer_id = c.id) as last_order_date,
-                (SELECT COUNT(*) FROM orders o2 WHERE o2.customer_id = c.id) as total_orders,
-                c.created_at as updated_at
-               FROM customers c
-               WHERE c.created_at > ?
-               ORDER BY c.created_at ASC
-               LIMIT 500`
-            ).bind(since).all();
-            results = ((res.results || []) as Array<Record<string, unknown>>).filter(
-              (row) => !('tenant_id' in row) || matchesTenantRow(row, effectiveTenant)
-            );
+            try {
+              const res = await db.prepare(
+                `SELECT c.phone, c.name, c.email, c.tier as loyalty_tier, NULL as birthday,
+                  (SELECT MAX(o.created_at) FROM orders o WHERE o.customer_id = c.id) as last_order_date,
+                  (SELECT COUNT(*) FROM orders o2 WHERE o2.customer_id = c.id) as total_orders,
+                  c.created_at as updated_at
+                 FROM customers c
+                 WHERE c.created_at > ?
+                   ${LEGACY_DEFAULT_MARKETING_CONSENT_SQL}
+                 ORDER BY c.created_at ASC
+                 LIMIT 500`
+              ).bind(since).all();
+              results = ((res.results || []) as Array<Record<string, unknown>>).filter(
+                (row) => !('tenant_id' in row) || matchesTenantRow(row, effectiveTenant)
+              );
+            } catch {
+              return { synced: 0, errors: 0 };
+            }
           } else {
-            throw err;
+            return { synced: 0, errors: 0 };
           }
         }
       }
@@ -120,6 +195,7 @@ export async function syncMauticContacts(env: Record<string, unknown>, tenantOve
           c.updated_at
          FROM customers c
          WHERE c.updated_at > ?
+           ${WILDCARD_MARKETING_CONSENT_SQL}
          ORDER BY c.updated_at ASC
          LIMIT 500`
       ).bind(since).all();
@@ -127,6 +203,9 @@ export async function syncMauticContacts(env: Record<string, unknown>, tenantOve
         (row) => !('tenant_id' in row) || matchesTenantRow(row, tenantId)
       );
     } catch (err) {
+      if (isConsentSchemaFailure(err)) {
+        return { synced: 0, errors: 0 };
+      }
       const msg = String((err as Error)?.message || '');
       if (msg.includes('column')) {
         try {
@@ -137,29 +216,38 @@ export async function syncMauticContacts(env: Record<string, unknown>, tenantOve
               c.created_at as updated_at
              FROM customers c
              WHERE c.created_at > ?
+               ${WILDCARD_MARKETING_CONSENT_SQL}
              ORDER BY c.created_at ASC
              LIMIT 500`
           ).bind(since).all();
           results = ((res.results || []) as Array<Record<string, unknown>>).filter(
             (row) => !('tenant_id' in row) || matchesTenantRow(row, tenantId)
           );
-        } catch {
-          const res = await db.prepare(
-            `SELECT c.phone, c.name, c.email, c.tier as loyalty_tier, NULL as birthday,
-              (SELECT MAX(o.created_at) FROM orders o WHERE o.customer_id = c.id) as last_order_date,
-              (SELECT COUNT(*) FROM orders o2 WHERE o2.customer_id = c.id) as total_orders,
-              c.created_at as updated_at
-             FROM customers c
-             WHERE c.created_at > ?
-             ORDER BY c.created_at ASC
-             LIMIT 500`
-          ).bind(since).all();
-          results = ((res.results || []) as Array<Record<string, unknown>>).filter(
-            (row) => !('tenant_id' in row) || matchesTenantRow(row, tenantId)
-          );
+        } catch (secondWildErr) {
+          if (isConsentSchemaFailure(secondWildErr)) {
+            return { synced: 0, errors: 0 };
+          }
+          try {
+            const res = await db.prepare(
+              `SELECT c.phone, c.name, c.email, c.tier as loyalty_tier, NULL as birthday,
+                (SELECT MAX(o.created_at) FROM orders o WHERE o.customer_id = c.id) as last_order_date,
+                (SELECT COUNT(*) FROM orders o2 WHERE o2.customer_id = c.id) as total_orders,
+                c.created_at as updated_at
+               FROM customers c
+               WHERE c.created_at > ?
+                 ${LEGACY_DEFAULT_MARKETING_CONSENT_SQL}
+               ORDER BY c.created_at ASC
+               LIMIT 500`
+            ).bind(since).all();
+            results = ((res.results || []) as Array<Record<string, unknown>>).filter(
+              (row) => !('tenant_id' in row) || matchesTenantRow(row, tenantId)
+            );
+          } catch {
+            return { synced: 0, errors: 0 };
+          }
         }
       } else {
-        throw err;
+        return { synced: 0, errors: 0 };
       }
     }
   }

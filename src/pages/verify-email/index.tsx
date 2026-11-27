@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { apiFetch } from '@/lib/api-client';
 import { saveClientSession, type ClientSessionUser } from '@/lib/client-session';
+import { sanitizeInternalRedirect } from '@/lib/safe-redirect';
 import { useAuthStore, type AuthUser } from '@/hooks/stores/use-auth-store';
 
 const VerifyEmailPage: React.FC = () => {
@@ -61,8 +62,7 @@ const VerifyEmailPage: React.FC = () => {
       setSuccess(data.message || 'Xác thực email thành công!');
 
       const params = new URLSearchParams(window.location.search);
-      const nextPath = params.get('next');
-      const safeNext = nextPath && nextPath.startsWith('/') && !nextPath.startsWith('//') ? nextPath : '/account';
+      const safeNext = sanitizeInternalRedirect(params.get('next'), '/account');
 
       setTimeout(() => {
         window.location.href = safeNext;

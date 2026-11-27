@@ -49,7 +49,7 @@ function validSignature(data: Record<string, unknown>): string {
 }
 
 describe('POST /payos', () => {
-  test('acknowledges empty payload (health probe)', async () => {
+  test('rejects unsigned empty payload with 401', async () => {
     env = {
       AURA_DB: createMockD1(),
       PAYOS_CHECKSUM_KEY: 'test-checksum-key',
@@ -62,13 +62,12 @@ describe('POST /payos', () => {
       body: JSON.stringify({}),
     }, env, { waitUntil: vi.fn() });
 
-    expect(res.status).toBe(200);
+    expect(res.status).toBe(401);
     const body = await res.json();
-    expect(body.error).toBe(0);
-    expect(body.message).toMatch(/alive/i);
+    expect(body.error).toBe(1);
   });
 
-  test('returns 500 when PAYOS_CHECKSUM_KEY not configured', async () => {
+  test('returns 401 when PAYOS_CHECKSUM_KEY not configured', async () => {
     env = { AURA_DB: createMockD1() };
     await mountRouter();
 
@@ -81,7 +80,7 @@ describe('POST /payos', () => {
       }),
     }, env, { waitUntil: vi.fn() });
 
-    expect(res.status).toBe(500);
+    expect(res.status).toBe(401);
     const body = await res.json();
     expect(body.error).toBe(1);
   });

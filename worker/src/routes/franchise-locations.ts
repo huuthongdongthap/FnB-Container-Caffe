@@ -189,13 +189,13 @@ franchiseRouter.get('/locations/:id', async (c) => {
       (targetTenant !== 'default' && targetTenant !== '*' && !('tenant_id' in rawRec)) ||
       !matchesTenantRow(rawRec, targetTenant)
     ) {
-      return c.json({ success: false, error: 'Access denied to this franchise location' }, 403);
+      return c.json({ success: false, error: 'Location not found' }, 404);
     }
     location = rawLocation;
   }
 
   if (!matchesTenantRow(location as unknown as Record<string, unknown>, targetTenant)) {
-    return c.json({ success: false, error: 'Access denied to this franchise location' }, 403);
+    return c.json({ success: false, error: 'Location not found' }, 404);
   }
 
   return c.json({ success: true, data: location });
@@ -238,13 +238,13 @@ franchiseRouter.get('/locations/:id/metrics', requireAuth(['owner', 'admin', 'ma
       (targetTenant !== 'default' && targetTenant !== '*' && !('tenant_id' in rawRec)) ||
       !matchesTenantRow(rawRec, targetTenant)
     ) {
-      return c.json({ success: false, error: 'Access denied to this franchise location' }, 403);
+      return c.json({ success: false, error: 'Location not found' }, 404);
     }
     location = rawLocation;
   }
 
   if (!matchesTenantRow(location as unknown as Record<string, unknown>, targetTenant)) {
-    return c.json({ success: false, error: 'Access denied to this franchise location' }, 403);
+    return c.json({ success: false, error: 'Location not found' }, 404);
   }
 
   const rawLocTenant = (typeof location.tenant_id === 'string' && location.tenant_id.trim()) || 'default';

@@ -183,6 +183,7 @@ describe('POST /products/sync', () => {
 
 describe('POST /webhook', () => {
   test('receives and stores ERPNext webhook', async () => {
+    const { createHmac } = await import('node:crypto');
     const db = {
       prepare: vi.fn(() => ({
         bind: vi.fn(() => ({ run: vi.fn(async () => ({ success: true })) })),
@@ -190,16 +191,22 @@ describe('POST /webhook', () => {
     };
     await mountHandler();
 
+    const secret = 'test-erpnext-webhook-secret';
+    const rawBody = JSON.stringify({
+      doctype: 'Sales Order',
+      docname: 'SAL-001',
+      action: 'submit',
+    });
+    const sig = createHmac('sha256', secret).update(rawBody).digest('base64');
     const req = new Request('https://test/api/erpnext-pos/webhook', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        doctype: 'Sales Order',
-        docname: 'SAL-001',
-        action: 'submit',
-      }),
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Frappe-Webhook-Signature': sig,
+      },
+      body: rawBody,
     });
-    const res = await handleErpnextPosRequest(req, { ...configuredEnv, AURA_DB: db });
+    const res = await handleErpnextPosRequest(req, { ...configuredEnv, ERPNEXT_WEBHOOK_SECRET: secret, AURA_DB: db });
 
     expect(res.status).toBe(200);
     const body = await res.json();
@@ -209,13 +216,20 @@ describe('POST /webhook', () => {
   });
 
   test('returns 400 for invalid webhook payload', async () => {
+    const { createHmac } = await import('node:crypto');
     await mountHandler();
+    const secret = 'test-erpnext-webhook-secret';
+    const rawBody = JSON.stringify({ doctype: 123 }); // number where string expected
+    const sig = createHmac('sha256', secret).update(rawBody).digest('base64');
     const req = new Request('https://test/api/erpnext-pos/webhook', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ doctype: 123 }), // number where string expected
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Frappe-Webhook-Signature': sig,
+      },
+      body: rawBody,
     });
-    const res = await handleErpnextPosRequest(req, configuredEnv);
+    const res = await handleErpnextPosRequest(req, { ...configuredEnv, ERPNEXT_WEBHOOK_SECRET: secret });
     expect(res.status).toBe(400);
   });
 });

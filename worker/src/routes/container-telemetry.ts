@@ -61,7 +61,6 @@ containerTelemetryRouter.post(
   '/telemetry/heartbeat',
   async (c, next) => {
     const envRec = (c.env ?? {}) as Record<string, unknown>;
-    const isProd = c.env?.ENVIRONMENT === 'production' || envRec.NODE_ENV === 'production';
     const providedSecret =
       c.req.header('x-edge-telemetry-secret') ||
       c.req.header('x-edge-secret') ||
@@ -73,34 +72,7 @@ containerTelemetryRouter.post(
       c.set('edgeSecretVerified' as never, true as never);
       return next();
     }
-    const requestedTenant = (
-      c.req.query('tenant_id') ||
-      c.req.query('tenantId') ||
-      c.req.query('store_id') ||
-      c.req.query('storeId') ||
-      c.req.header('X-Tenant-ID') ||
-      c.req.header('x-tenant-id') ||
-      c.req.header('X-Store-ID') ||
-      c.req.header('x-store-id') ||
-      ''
-    ).trim();
-    const hasStaffJwtSecret = typeof envRec.STAFF_JWT_SECRET === 'string' && envRec.STAFF_JWT_SECRET.length >= 16;
-    const hasCustomJwtSecret =
-      typeof c.env?.JWT_SECRET === 'string' &&
-      c.env.JWT_SECRET.length >= 16 &&
-      (c.env.JWT_SECRET !== 'test-jwt-secret-at-least-16-chars' || !envRec.RESET_KEY);
-    const isLegacyUnitMockHarness =
-      !isProd &&
-      !expectedSecret &&
-      !hasStaffJwtSecret &&
-      !hasCustomJwtSecret &&
-      !c.req.header('Authorization') &&
-      !providedSecret &&
-      !requestedTenant;
-    if (!isLegacyUnitMockHarness) {
-      return requireAuth(['owner', 'admin', 'manager', 'supervisor'])(c, next);
-    }
-    return next();
+    return requireAuth(['owner', 'admin', 'manager', 'supervisor'])(c, next);
   },
   async (c) => {
     const body = await c.req.json().catch(() => ({}));

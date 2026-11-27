@@ -55,7 +55,9 @@ describe('createLead', () => {
     const result = await (client as unknown as { createLead: (d: unknown) => Promise<unknown> }).createLead({
       name: 'Nguyen Van A',
       email: 'a@test.com',
-      phone: '0909'
+      phone: '0909',
+      consent_marketing: true,
+      consent_erpnext_sync: true,
     });
     expect(result).toEqual({ leadId: 'LEAD-1' });
     expect(createSpy).toHaveBeenCalledWith('Lead', expect.objectContaining({
@@ -69,7 +71,7 @@ describe('createLead', () => {
     const createSpy = vi.fn().mockResolvedValue({ data: { name: 'L' } });
     const client = buildCrm(makeErpnext({ create: createSpy }));
     const longName = 'A'.repeat(200);
-    await (client as unknown as { createLead: (d: unknown) => Promise<unknown> }).createLead({ name: longName });
+    await (client as unknown as { createLead: (d: unknown) => Promise<unknown> }).createLead({ name: longName, consent_marketing: true, consent_erpnext_sync: true });
     const mockCalls = (createSpy as unknown as { mock: { calls: [unknown, unknown][] } }).mock.calls as [unknown, unknown][];
     const [, payload] = mockCalls[0];
     expect((payload as Record<string, unknown>).first_name).toBe('A'.repeat(140));
@@ -78,7 +80,7 @@ describe('createLead', () => {
   it('throws when create returns no name', async() => {
     const client = buildCrm(makeErpnext({ create: vi.fn().mockResolvedValue({ data: {} }) }));
     await expect(
-      (client as unknown as { createLead: (d: unknown) => Promise<unknown> }).createLead({ name: 'X' })
+      (client as unknown as { createLead: (d: unknown) => Promise<unknown> }).createLead({ name: 'X', consent_marketing: true, consent_erpnext_sync: true })
     ).rejects.toThrow('no name');
   });
 });

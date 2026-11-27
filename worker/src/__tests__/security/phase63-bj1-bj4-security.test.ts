@@ -1,5 +1,6 @@
 // @vitest-environment node
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { createHmac } from 'node:crypto';
 import { DatabaseSync } from 'node:sqlite';
 import { Hono } from 'hono';
 import { OpenAPIHono } from '@hono/zod-openapi';
@@ -471,25 +472,26 @@ describe('Phase 63 Security Regression Suite (BJ1-BJ4)', () => {
       });
       calApp.route('/webhooks/cal', calBookingWebhookRouter);
 
+      const calReviveBody = JSON.stringify({
+        triggerEvent: 'BOOKING_RESCHEDULED',
+        createdAt: '2026-11-05T10:00:00Z',
+        payload: {
+          uid: 'uid_cancelled',
+          title: 'Table Reservation',
+          startTime: '2026-12-02T18:00:00Z',
+          endTime: '2026-12-02T19:00:00Z',
+          organizer: { name: 'AURA Cafe', email: 'host@aura.vn' },
+          location: 'Main Hall',
+          attendees: [{ name: 'Cancelled Guest', email: 'guest@test.vn', timeZone: 'Asia/Ho_Chi_Minh' }],
+        },
+      });
       const calReviveRes = await calApp.request('/webhooks/cal', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'x-cal-webhook-secret': 'cal-secret-2026',
+          'x-cal-signature-256': createHmac('sha256', 'cal-secret-2026').update(calReviveBody).digest('hex'),
         },
-        body: JSON.stringify({
-          triggerEvent: 'BOOKING_RESCHEDULED',
-          createdAt: '2026-11-05T10:00:00Z',
-          payload: {
-            uid: 'uid_cancelled',
-            title: 'Table Reservation',
-            startTime: '2026-12-02T18:00:00Z',
-            endTime: '2026-12-02T19:00:00Z',
-            organizer: { name: 'AURA Cafe', email: 'host@aura.vn' },
-            location: 'Main Hall',
-            attendees: [{ name: 'Cancelled Guest', email: 'guest@test.vn', timeZone: 'Asia/Ho_Chi_Minh' }],
-          },
-        }),
+        body: calReviveBody,
       });
       expect(calReviveRes.status).toBe(409);
     });
@@ -878,6 +880,7 @@ describe('Phase 63 Security Regression Suite (BJ1-BJ4)', () => {
           JWT_SECRET,
           ENVIRONMENT: 'test',
           PILOT_TENANT_ID: 'store-a',
+          ALLOW_UNSIGNED_ZALO_WEBHOOK: 'true',
         } as unknown as Env;
         await next();
       });

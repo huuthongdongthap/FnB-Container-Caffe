@@ -1,4 +1,5 @@
 // @vitest-environment node
+import { createHmac } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
@@ -912,28 +913,29 @@ describe('Floor Plan, Cal.com Bookings, ERPNext & OpenAPI v1 Cutover (20261029_0
     expect(table2?.capacity).toBe(6);
 
     // 2. Verify Cal.com Booking Webhook (BOOKING_CREATED -> BOOKING_RESCHEDULED -> BOOKING_CANCELLED) & Bookings list on unified reservations
+    const calCreateBody = JSON.stringify({
+      triggerEvent: 'BOOKING_CREATED',
+      createdAt: '2026-10-29T10:00:00Z',
+      payload: {
+        uid: 'cal_uid_sadec_01',
+        title: 'Đặt bàn VIP Container',
+        startTime: '2026-10-30T19:00:00+07:00',
+        endTime: '2026-10-30T20:30:00+07:00',
+        attendees: [{ name: 'Lê Minh Tuấn', email: 'tuan@example.com', timeZone: 'Asia/Ho_Chi_Minh' }],
+        organizer: { name: 'AURA Space', email: 'booking@auraspace.vn' },
+        location: 'Sa Đéc Flagship',
+        metadata: { guest_count: 5, zone: 'Indoor' },
+      },
+    });
     const calCreateRes = await app.request(
       'http://localhost/api/cal-booking-webhook',
       {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'x-cal-webhook-secret': calSecret,
+          'x-cal-signature-256': createHmac('sha256', calSecret).update(calCreateBody).digest('hex'),
         },
-        body: JSON.stringify({
-          triggerEvent: 'BOOKING_CREATED',
-          createdAt: '2026-10-29T10:00:00Z',
-          payload: {
-            uid: 'cal_uid_sadec_01',
-            title: 'Đặt bàn VIP Container',
-            startTime: '2026-10-30T19:00:00+07:00',
-            endTime: '2026-10-30T20:30:00+07:00',
-            attendees: [{ name: 'Lê Minh Tuấn', email: 'tuan@example.com', timeZone: 'Asia/Ho_Chi_Minh' }],
-            organizer: { name: 'AURA Space', email: 'booking@auraspace.vn' },
-            location: 'Sa Đéc Flagship',
-            metadata: { guest_count: 5, zone: 'Indoor' },
-          },
-        }),
+        body: calCreateBody,
       },
       env,
     );
@@ -952,52 +954,54 @@ describe('Floor Plan, Cal.com Bookings, ERPNext & OpenAPI v1 Cutover (20261029_0
     expect(calListBody.success).toBe(true);
     expect(calListBody.data.some((b) => b.cal_uid === 'cal_uid_sadec_01' && b.attendee_email === 'tuan@example.com')).toBe(true);
 
+    const calRescheduleBody = JSON.stringify({
+      triggerEvent: 'BOOKING_RESCHEDULED',
+      createdAt: '2026-10-29T10:05:00Z',
+      payload: {
+        uid: 'cal_uid_sadec_01',
+        title: 'Đặt bàn VIP Container',
+        startTime: '2026-10-30T20:00:00+07:00',
+        endTime: '2026-10-30T21:30:00+07:00',
+        organizer: { name: 'AURA Space', email: 'booking@auraspace.vn' },
+        location: 'Sa Đéc Flagship',
+      },
+    });
     const calRescheduleRes = await app.request(
       'http://localhost/api/cal-booking-webhook',
       {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'x-cal-webhook-secret': calSecret,
+          'x-cal-signature-256': createHmac('sha256', calSecret).update(calRescheduleBody).digest('hex'),
         },
-        body: JSON.stringify({
-          triggerEvent: 'BOOKING_RESCHEDULED',
-          createdAt: '2026-10-29T10:05:00Z',
-          payload: {
-            uid: 'cal_uid_sadec_01',
-            title: 'Đặt bàn VIP Container',
-            startTime: '2026-10-30T20:00:00+07:00',
-            endTime: '2026-10-30T21:30:00+07:00',
-            organizer: { name: 'AURA Space', email: 'booking@auraspace.vn' },
-            location: 'Sa Đéc Flagship',
-          },
-        }),
+        body: calRescheduleBody,
       },
       env,
     );
     expect(calRescheduleRes.status).toBe(200);
 
+    const calCancelBody = JSON.stringify({
+      triggerEvent: 'BOOKING_CANCELLED',
+      createdAt: '2026-10-29T10:10:00Z',
+      payload: {
+        uid: 'cal_uid_sadec_01',
+        title: 'Đặt bàn VIP Container',
+        startTime: '2026-10-30T20:00:00+07:00',
+        endTime: '2026-10-30T21:30:00+07:00',
+        organizer: { name: 'AURA Space', email: 'booking@auraspace.vn' },
+        location: 'Sa Đéc Flagship',
+        cancellationReason: 'Customer requested change',
+      },
+    });
     const calCancelRes = await app.request(
       'http://localhost/api/cal-booking-webhook',
       {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'x-cal-webhook-secret': calSecret,
+          'x-cal-signature-256': createHmac('sha256', calSecret).update(calCancelBody).digest('hex'),
         },
-        body: JSON.stringify({
-          triggerEvent: 'BOOKING_CANCELLED',
-          createdAt: '2026-10-29T10:10:00Z',
-          payload: {
-            uid: 'cal_uid_sadec_01',
-            title: 'Đặt bàn VIP Container',
-            startTime: '2026-10-30T20:00:00+07:00',
-            endTime: '2026-10-30T21:30:00+07:00',
-            organizer: { name: 'AURA Space', email: 'booking@auraspace.vn' },
-            location: 'Sa Đéc Flagship',
-            cancellationReason: 'Customer requested change',
-          },
-        }),
+        body: calCancelBody,
       },
       env,
     );
@@ -1036,18 +1040,23 @@ describe('Floor Plan, Cal.com Bookings, ERPNext & OpenAPI v1 Cutover (20261029_0
     expect(erpVendorBody.success).toBe(true);
     expect(erpVendorBody.data.length).toBeGreaterThanOrEqual(2);
 
+    const erpWhSecret = 'erp-pos-cutover-secret';
+    const erpWhBody = JSON.stringify({
+      doctype: 'POS Invoice',
+      docname: 'ACC-PSINV-2026-00001',
+      action: 'on_submit',
+    });
     const erpWebhookRes = await app.request(
       'http://localhost/api/erpnext-pos/webhook',
       {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          doctype: 'POS Invoice',
-          docname: 'ACC-PSINV-2026-00001',
-          action: 'on_submit',
-        }),
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Frappe-Webhook-Signature': createHmac('sha256', erpWhSecret).update(erpWhBody).digest('hex'),
+        },
+        body: erpWhBody,
       },
-      env,
+      { ...env, ERPNEXT_WEBHOOK_SECRET: erpWhSecret },
     );
     expect(erpWebhookRes.status).toBe(200);
     const webhookLogRow = sqlite

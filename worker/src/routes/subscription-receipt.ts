@@ -157,7 +157,7 @@ export async function getInvoiceReceipt(c: Context<{ Bindings: Env }>) {
         String(inv.customer_email).trim().toLowerCase() === String(user.email).trim().toLowerCase()
       );
       if (!matchesId && !matchesEmail) {
-        return errorResponse('Forbidden', 403);
+        return errorResponse('Invoice not found', 404);
       }
     }
 

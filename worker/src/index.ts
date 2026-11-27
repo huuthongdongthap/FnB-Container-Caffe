@@ -55,15 +55,25 @@ const ALLOWED_ORIGIN_PATTERNS = [
   /^https:\/\/(www\.)?auraspace\.cafe$/,
   /^https:\/\/[a-z0-9-]+\.auraspace\.cafe$/,
   /^https:\/\/(www\.)?auracafe\.vn$/,
-  /^https:\/\/[a-z0-9-]+\.auracafe\.vn$/,
+  /^https:\/\/[a-z0-9-]+\.auracafe\.vn$/
+];
+
+const DEV_LOCALHOST_ORIGIN_PATTERNS = [
   /^https?:\/\/localhost(:\d+)?$/,
   /^https?:\/\/127\.0\.0\.1(:\d+)?$/
 ];
 
 app.use('/*', cors({
-  origin: (origin: string) => {
+  origin: (origin: string, c) => {
     if (!origin) return false;
-    return ALLOWED_ORIGIN_PATTERNS.some((rx) => rx.test(origin)) ? origin : false;
+    if (ALLOWED_ORIGIN_PATTERNS.some((rx) => rx.test(origin))) {
+      return origin;
+    }
+    const envName = String((c.env as Record<string, unknown> | undefined)?.ENVIRONMENT || '').toLowerCase();
+    if ((envName === 'development' || envName === 'test') && DEV_LOCALHOST_ORIGIN_PATTERNS.some((rx) => rx.test(origin))) {
+      return origin;
+    }
+    return false;
   },
   allowMethods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowHeaders: [
@@ -110,6 +120,7 @@ app.use('/api/orders/*', orderBodyLimit());
 app.use('/api/orders', orderBodyLimit());
 app.use('/api/kds/orders/*', orderBodyLimit());
 app.use('/api/auth/*', authBodyLimit());
+app.use('/mobile/*', authBodyLimit());
 app.onError(errorHandler);
 
 // ── Menu & Unified Orders Router (Single Runtime Owner) ──

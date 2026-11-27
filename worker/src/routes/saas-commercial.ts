@@ -625,7 +625,7 @@ export function createSaasCommercialRoutes() {
   function requireOwnerOrAdmin(c: Context<SaasRouterEnv>): Response | null {
     const user = c.get('user');
     const role = String(user?.role || '').toLowerCase();
-    if (!['owner', 'admin', 'manager'].includes(role) && !isHQSuperAdmin(user)) {
+    if (!['owner', 'admin'].includes(role) && !isHQSuperAdmin(user)) {
       return c.json({ success: false, error: 'Chỉ chủ quán hoặc quản trị viên mới có quyền truy cập.' }, 403);
     }
     return null;
@@ -638,6 +638,37 @@ export function createSaasCommercialRoutes() {
       return c.json({ success: false, error: 'Chỉ chủ quán hoặc quản trị viên mới có quyền truy cập.' }, 403);
     }
     return null;
+  }
+
+  async function writeSaasAuditLog(
+    db: D1Database,
+    c: Context<SaasRouterEnv>,
+    tenantId: string,
+    action: string,
+    afterPayload: Record<string, unknown>,
+    reason: string
+  ): Promise<void> {
+    const user = c.get('user');
+    const auditId = `saud_${crypto.randomUUID().replace(/-/g, '').slice(0, 16)}`;
+    const nowIso = new Date().toISOString();
+    await db
+      .prepare(
+        `INSERT INTO saas_audit_logs (
+           id, tenant_id, actor_user_id, actor_role, action, after_json, reason, created_at
+         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+      )
+      .bind(
+        auditId,
+        tenantId,
+        String(user?.id || 'unknown'),
+        String(user?.role || 'unknown'),
+        action,
+        JSON.stringify(afterPayload),
+        reason,
+        nowIso
+      )
+      .run()
+      .catch(() => undefined);
   }
 
   router.get('/me', async (c) => {
@@ -782,6 +813,15 @@ export function createSaasCommercialRoutes() {
       .prepare('UPDATE saas_tenants SET name = ?, updated_at = ? WHERE id = ?')
       .bind(displayName, nowIso, tenantId)
       .run();
+
+    await writeSaasAuditLog(
+      db,
+      c,
+      tenantId,
+      'branding_updated',
+      { displayName, tagline, logoUrl, primaryColor, accentColor, address, phone, receiptFooter },
+      'Tenant branding updated'
+    );
 
     return c.json({ success: true, data: { tenantId, displayName, tagline, logoUrl, primaryColor, accentColor, address, phone, receiptFooter } });
   });
@@ -973,6 +1013,19 @@ export function createSaasCommercialRoutes() {
       )
       .run();
 
+    await writeSaasAuditLog(
+      c.env.AURA_DB,
+      c,
+      tenantId,
+      'payment_config_updated',
+      {
+        provider,
+        payosSaved: Boolean(clientIdEnc),
+        vietqrSaved: Boolean(bankBin && bankAccountNo),
+      },
+      'Tenant payment configuration updated'
+    );
+
     return c.json({
       success: true,
       data: {
@@ -1090,6 +1143,15 @@ export function createSaasCommercialRoutes() {
       .bind(id, tenantId, domain, token, nowIso, nowIso)
       .run();
 
+    await writeSaasAuditLog(
+      c.env.AURA_DB,
+      c,
+      tenantId,
+      'domain_created',
+      { id, domain },
+      'Custom domain added'
+    );
+
     return c.json(
       {
         success: true,
@@ -1137,11 +1199,28 @@ export function createSaasCommercialRoutes() {
         .prepare("UPDATE tenant_domains SET status = 'verified', verified_at = ?, updated_at = ? WHERE id = ?")
         .bind(nowIso, nowIso, row.id)
         .run();
+      await writeSaasAuditLog(
+        db,
+        c,
+        tenantId,
+        'domain_verified',
+        { id: row.id, domain: row.domain, status: 'verified', verifiedAt: nowIso },
+        'Custom domain DNS TXT verified'
+      );
       return c.json({
         success: true,
         data: { id: row.id, domain: row.domain, status: 'verified', verifiedAt: nowIso },
       });
     }
+
+    await writeSaasAuditLog(
+      db,
+      c,
+      tenantId,
+      'domain_verify_failed',
+      { id: row.id, domain: row.domain, recordsFound: dnsResult.records },
+      'Custom domain DNS TXT verification failed'
+    );
 
     return c.json(
       {
@@ -1163,6 +1242,14 @@ export function createSaasCommercialRoutes() {
       .prepare('DELETE FROM tenant_domains WHERE id = ? AND tenant_id = ?')
       .bind(id, tenantId)
       .run();
+    await writeSaasAuditLog(
+      c.env.AURA_DB,
+      c,
+      tenantId,
+      'domain_deleted',
+      { id },
+      'Custom domain deleted'
+    );
     return c.json({ success: true });
   });
 
@@ -1317,6 +1404,15 @@ export function createSaasCommercialRoutes() {
       .bind(checkoutUrl, new Date().toISOString(), invoiceId)
       .run();
 
+    await writeSaasAuditLog(
+      c.env.AURA_DB,
+      c,
+      tenantId,
+      'billing_checkout_created',
+      { invoiceId, planId, billingCycle: cycle, amountVnd },
+      'SaaS billing checkout created'
+    );
+
     return c.json(
       {
         success: true,
@@ -1352,6 +1448,18 @@ export function createSaasCommercialRoutes() {
       db.prepare('SELECT id, order_number, table_number, status, total, payment_method, payment_status, created_at FROM orders WHERE tenant_id = ? ORDER BY created_at DESC LIMIT 1000').bind(tenantId).all(),
       db.prepare('SELECT id, name, phone, email, loyalty_points, tier, created_at FROM customers WHERE tenant_id = ? LIMIT 1000').bind(tenantId).all(),
     ]);
+
+    await writeSaasAuditLog(
+      db,
+      c,
+      tenantId,
+      'tenant_data_exported',
+      {
+        ordersCount: (orders.results || []).length,
+        customersCount: (customers.results || []).length,
+      },
+      'Tenant bulk PII/data export'
+    );
 
     return c.json({
       success: true,

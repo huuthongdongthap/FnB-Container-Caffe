@@ -219,7 +219,16 @@ export async function checkRateLimit(
     envRecord?.ENVIRONMENT === 'test'
   );
   const origin = c.req.header('origin') || c.req.header('referer') || '';
-  if (allowTestHarness && (origin.includes('localhost') || origin.includes('127.0.0.1'))) {
+  let isLocalOrigin = false;
+  if (origin) {
+    try {
+      const parsedOrigin = new URL(origin);
+      isLocalOrigin = parsedOrigin.hostname === 'localhost' || parsedOrigin.hostname === '127.0.0.1';
+    } catch {
+      isLocalOrigin = false;
+    }
+  }
+  if (allowTestHarness && isLocalOrigin) {
     return true;
   }
   const isTestBypass = allowTestHarness && c.req.header('x-playwright-test') === 'true';

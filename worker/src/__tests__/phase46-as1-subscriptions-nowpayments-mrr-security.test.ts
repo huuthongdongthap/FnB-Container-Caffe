@@ -561,7 +561,7 @@ describe('Phase 46 Slice AS1 — Subscriptions, NowPayments IPN, MRR/ARR, Plan C
       const otherCustomerRes = await getInvoiceReceipt(
         makeContext({ id: 'cust_other_2', role: 'customer' }, 'tenant_1', db)
       );
-      expect(otherCustomerRes.status).toBe(403);
+      expect(otherCustomerRes.status).toBe(404);
     });
 
     it('fails closed with 404 for non-default tenant when tenant columns cannot be verified', async () => {

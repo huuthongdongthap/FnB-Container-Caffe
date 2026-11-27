@@ -42,6 +42,11 @@ export const VerifyEmailSchema = z.object({
 
 export const ResetPasswordSchema = z.object({
   email: z.string().email(),
+  code: z.string().optional(),
+  otp: z.string().optional(),
+  newPassword: z.string().min(8).max(128).optional(),
+  new_password: z.string().min(8).max(128).optional(),
+  password: z.string().min(8).max(128).optional(),
   idempotencyKey: IdempotencyKeySchema.optional(),
 }).openapi('ResetPassword');
 

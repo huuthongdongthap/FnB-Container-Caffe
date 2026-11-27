@@ -1,59 +1,31 @@
 import type { OpenAPIHono } from '@hono/zod-openapi';
+import type { Context } from 'hono';
 import type { Env } from '../../types/env';
-import { getAuthToken, verifyJWT } from '../../lib/jwt';
-import { toUser } from '../../middleware/auth';
+import { getAuthToken } from '../../lib/jwt';
+import { authenticateRequest } from '../../lib/staff-session-auth';
+import { toUser, type AuthUser } from '../../middleware/auth';
 import { getTenantId, isHQSuperAdmin, resolvePublicTenantId } from '../../middleware/tenant';
 import { AuthRoutes } from '../../schemas/auth';
 import { writeAuthAuditLog } from './helpers';
 import { registerPasswordHandlers } from './password-handlers';
 
-async function resolveDeviceUser(c: any): Promise<any> {
+async function resolveDeviceUser(c: Context<{ Bindings: Env }>): Promise<AuthUser | undefined> {
   const existing = c.get('user');
   if (existing) return existing;
-  const token = getAuthToken(c.req?.raw);
-  if (token && c.env?.JWT_SECRET) {
-    if (c.env?.AUTH_KV && typeof c.env.AUTH_KV.get === 'function') {
-      const isRevoked = await c.env.AUTH_KV.get(`revoked:${token}`).catch(() => '__KV_ERR__');
-      if (isRevoked) return undefined;
-    }
-    const payload = await verifyJWT(token, c.env.JWT_SECRET).catch(() => null);
-    if (payload) {
-      const tokenVer = Number((payload as { authVersion?: number }).authVersion || 1);
-      const db = c.env?.AURA_DB;
-      if (db && typeof db.prepare === 'function' && payload.id) {
-        const userRow = await db
-          .prepare('SELECT is_active, auth_version FROM users WHERE id = ? LIMIT 1')
-          .bind(payload.id)
-          .first()
-          .catch(() => null);
-        if (userRow) {
-          if ((userRow as { is_active?: number }).is_active === 0) return undefined;
-          if (Number((userRow as { auth_version?: number }).auth_version || 1) !== tokenVer) return undefined;
-        } else if (payload.role === 'customer') {
-          const custRow = await db
-            .prepare('SELECT auth_version FROM customers WHERE id = ? LIMIT 1')
-            .bind(payload.id)
-            .first()
-            .catch(() => null);
-          if (custRow && Number((custRow as { auth_version?: number }).auth_version || 1) !== tokenVer) {
-            return undefined;
-          }
-        }
-      }
-      if (c.env?.AUTH_KV && typeof c.env.AUTH_KV.get === 'function' && payload.id && payload.role === 'customer') {
-        const kvVer = await c.env.AUTH_KV.get(`cust_auth_ver:${payload.id}`).catch(() => null);
-        if (kvVer && Number(kvVer) !== tokenVer) return undefined;
-      }
-      const resolved = toUser(payload as any);
-      c.set('user', resolved);
-      return resolved;
-    }
+  if (!c.req?.raw || !c.env?.JWT_SECRET) return undefined;
+  try {
+    const session = await authenticateRequest(c.req.raw, c.env);
+    if (!session || 'blocked' in session) return undefined;
+    const resolved = toUser(session.payload);
+    c.set('user', resolved);
+    return resolved;
+  } catch {
+    return undefined;
   }
-  return undefined;
 }
 
 function verifyDeviceCallerTenant(c: any, user: any): { ok: true; tenantId: string } | { ok: false } {
-  const userTenant = String(user?.tenantId || user?.tenant_id || '').trim();
+  const userTenant = String(user?.tenantId || '').trim();
   const resolvedTenant = String(getTenantId(c) || userTenant || 'default').trim() || 'default';
   const headerOverride = String(
     c.req?.query?.('tenant_id') ||
@@ -246,7 +218,7 @@ export function registerDeviceHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
         }
       }
       if (staffDevice) {
-        const deviceTenant = tenantId || String(user?.tenantId || user?.tenant_id || resolvePublicTenantId(c) || 'default').trim() || 'default';
+        const deviceTenant = tenantId || String(user?.tenantId || resolvePublicTenantId(c) || 'default').trim() || 'default';
         try {
           await db.batch([
             db
@@ -299,7 +271,7 @@ export function registerDeviceHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
       // Sessions table may be absent when using KV-backed tokens
     }
     if (user.role === 'customer') {
-      let dbNextVer = Number(user.authVersion ?? user.auth_version ?? 1) + 1;
+      let dbNextVer = Number(user.authVersion ?? user.authVersion ?? 1) + 1;
       try {
         const currentRow = (await db.prepare('SELECT auth_version FROM users WHERE id = ?').bind(user.id).first().catch(() => null)) as { auth_version?: number } | null;
         if (currentRow && Number.isFinite(Number(currentRow.auth_version))) {
@@ -351,7 +323,7 @@ export function registerDeviceHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
       }
     }
 
-    const revokeTenant = String((device as any)?.tenant_id || tenantId || user?.tenantId || user?.tenant_id || resolvePublicTenantId(c) || 'default').trim() || 'default';
+    const revokeTenant = String((device as any)?.tenant_id || tenantId || user?.tenantId || resolvePublicTenantId(c) || 'default').trim() || 'default';
     await writeAuthAuditLog(db, user.id, 'revoke_device', 'trusted_device', id, JSON.stringify({ name: device.name }), now, revokeTenant);
 
     return c.json({ success: true, data: { success: true } });
@@ -470,7 +442,7 @@ export function registerDeviceHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
       }
     }
 
-    const rawRevokeAllTenant = String(tenantId || user?.tenantId || user?.tenant_id || resolvePublicTenantId(c) || 'default').trim();
+    const rawRevokeAllTenant = String(tenantId || user?.tenantId || resolvePublicTenantId(c) || 'default').trim();
     const revokeAllTenant = !rawRevokeAllTenant || rawRevokeAllTenant === '*' || rawRevokeAllTenant.toLowerCase() === 'hq' ? 'default' : rawRevokeAllTenant;
     await writeAuthAuditLog(db, user.id, 'revoke_all_devices', 'trusted_device', user.id, JSON.stringify({}), now, revokeAllTenant);
 

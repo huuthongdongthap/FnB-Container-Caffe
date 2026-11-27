@@ -254,7 +254,7 @@ describe('Phase 54 Slice BA2: Subscriptions, Billing Cycles, Invoices & MRR Secu
         { method: 'GET' },
         { ...TEST_ENV, AURA_DB: db } as unknown as Env
       );
-      expect(res.status).toBe(403);
+      expect(res.status).toBe(404);
     });
   });
 });

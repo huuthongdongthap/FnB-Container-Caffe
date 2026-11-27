@@ -42,7 +42,11 @@ function redactStringValue(value: string): string {
   if (/^(?:\+?84|0)\d{9,10}$/.test(trimmed)) {
     return REDACTED;
   }
-  return value.replace(/([?&](?:token|order_token|access_token)=)[^&\s]+/gi, `$1${REDACTED}`);
+  return value
+    .replace(/([?&](?:token|order_token|access_token)=)[^&\s]+/gi, `$1${REDACTED}`)
+    .replace(/\bBearer\s+[A-Za-z0-9._~+/=-]+/gi, `Bearer ${REDACTED}`)
+    .replace(/\beyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\b/g, REDACTED)
+    .replace(/\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b/g, REDACTED);
 }
 
 /**

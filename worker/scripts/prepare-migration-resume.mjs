@@ -1,18 +1,22 @@
 import { createHash } from 'node:crypto';
-import { readFileSync, writeFileSync } from 'node:fs';
+import { readFileSync, realpathSync, writeFileSync } from 'node:fs';
 import { basename } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
+import { fileURLToPath } from 'node:url';
 
 const approved = new Map([
   ['20261115_01_tenant_unique_constraints_and_indexes.sql', 'd516b03f7f9bee8717839ac8ac5bbb1d95f925fdad5d6dcfb54a81980c70e244'],
   ['20261118_01_orders_loyalty_points_redeemed.sql', '88c78d8c1b33b5d3b1e141b4365c34ea4ea915ffd10f92c27a6aa7a1105e0244'],
+  ['20261127_02_audit_logs_immutability_triggers.sql', '5a57ab114d2068157a4ee35b226aa07f6c2227d1bec45121ae464d86fcdf5775'],
 ]);
+
+const STATEMENT_PATTERN = /^(?:CREATE\s+(?:TEMP(?:ORARY)?\s+)?TRIGGER\b[\s\S]*?\bEND;|DROP\s+TRIGGER\s+IF\s+EXISTS\s+\w+;|(?:CREATE|ALTER) [^;]+;)/gm;
 
 function requireMatch(condition, message) {
   if (!condition) throw new Error(message);
 }
 
-function load(file) {
+export function load(file) {
   const name = basename(file);
   requireMatch(approved.has(name), `Unsupported migration for --resume-existing: ${name}`);
   const bytes = readFileSync(file);
@@ -20,8 +24,16 @@ function load(file) {
     `Unapproved SQL checksum: ${name}`);
   const source = bytes.toString('utf8');
   // Only the pinned files reach this matcher; their DDL starts at the beginning of a line.
-  const statements = [...source.matchAll(/^(?:CREATE|ALTER) [^;]+;/gm)].map(match => {
+  const statements = [...source.matchAll(STATEMENT_PATTERN)].map(match => {
     const sql = match[0];
+    const dropTrigger = /^DROP\s+TRIGGER\s+IF\s+EXISTS\s+(\w+);$/i.exec(sql);
+    if (dropTrigger) {
+      return { sql, type: 'drop_trigger', name: dropTrigger[1].toLowerCase() };
+    }
+    const createTrigger = /^CREATE\s+(?:TEMP(?:ORARY)?\s+)?TRIGGER\s+IF\s+NOT\s+EXISTS\s+(\w+)\s+(?:BEFORE|AFTER|INSTEAD\s+OF)\s+(?:(?!\bBEGIN\b)[\s\S])*?\bON\s+(\w+)/i.exec(sql);
+    if (createTrigger) {
+      return { sql, type: 'trigger', name: createTrigger[1].toLowerCase(), table: createTrigger[2].toLowerCase() };
+    }
     const create = /^(CREATE) (TABLE|(?:UNIQUE )?INDEX) IF NOT EXISTS (\w+)(?: ON (\w+))?/.exec(sql);
     if (create) return { sql, type: create[2].endsWith('INDEX') ? 'index' : 'table', name: create[3], table: create[4] };
     const add = /^ALTER TABLE (\w+) ADD COLUMN ((\w+) .+);$/.exec(sql);
@@ -30,15 +42,15 @@ function load(file) {
   });
   const createdTables = new Set(statements.filter(s => s.type === 'table').map(s => s.name));
   const bases = [...new Set(statements.map(s => s.table).filter(t => t && !createdTables.has(t)))];
-  const names = [...bases, ...statements.filter(s => s.type !== 'column').map(s => s.name)];
+  const names = [...new Set([...bases, ...statements.filter(s => s.type !== 'column').map(s => s.name)])];
   return { source, statements, bases, names };
 }
 
-function query(names) {
+export function query(names) {
   // One row for every requested name, including absent objects, so a truncated result cannot look like missing DDL.
   return `WITH requested(target) AS (VALUES ${names.map(name => `('${name}')`).join(', ')})
 SELECT target, s.type, s.name, s.tbl_name, s.sql FROM requested
-LEFT JOIN main.sqlite_schema s ON s.name = target COLLATE NOCASE AND s.type <> 'trigger'`;
+LEFT JOIN main.sqlite_schema s ON s.name = target COLLATE NOCASE`;
 }
 
 function readSnapshot(file, names) {
@@ -50,8 +62,8 @@ function readSnapshot(file, names) {
   for (const row of rows) {
     requireMatch(row && names.includes(row.target) && !objects.has(row.target), 'Unexpected or duplicate D1 schema row');
     const absent = row.type === null && row.name === null && row.tbl_name === null && row.sql === null;
-    requireMatch(absent || (['table', 'view', 'index'].includes(row.type) &&
-      typeof row.name === 'string' && row.name.toLowerCase() === row.target &&
+    requireMatch(absent || (['table', 'view', 'index', 'trigger'].includes(row.type) &&
+      typeof row.name === 'string' && row.name.toLowerCase() === row.target.toLowerCase() &&
       typeof row.tbl_name === 'string' && typeof row.sql === 'string' && row.sql.length > 0),
     `Incomplete D1 schema row: ${row.target}`);
     objects.set(row.target, absent ? null : row);
@@ -90,12 +102,12 @@ function columnTerm(ddl, name) {
   }
 }
 
-function prepare(migration, snapshot, destination) {
+export function prepare(migration, snapshot, destination) {
   const { source, statements, bases, names } = migration;
   const objects = readSnapshot(snapshot, names);
   const local = new DatabaseSync(':memory:');
   const completed = new Set();
-  const storedSql = local.prepare('SELECT sql FROM main.sqlite_schema WHERE name = ?');
+  const storedSql = local.prepare('SELECT sql FROM main.sqlite_schema WHERE name = ? COLLATE NOCASE');
   try {
     for (const table of bases) {
       const row = objects.get(table);
@@ -128,31 +140,51 @@ function prepare(migration, snapshot, destination) {
         } finally {
           local.exec('ROLLBACK TO verify_column; RELEASE verify_column');
         }
+      } else if (type === 'drop_trigger') {
+        const actual = objects.get(name);
+        if (!actual) {
+          completed.add(sql);
+          continue;
+        }
+        requireMatch(actual.type === 'trigger', `Schema drift: trigger ${name}`);
+        local.exec(sql);
+        continue;
       } else {
         local.exec(sql);
         const actual = objects.get(name);
         if (!actual) continue;
         const expected = storedSql.get(name)?.sql;
-        requireMatch(actual.type === type && actual.tbl_name.toLowerCase() === (table ?? name) &&
+        requireMatch(actual.type === type && actual.tbl_name.toLowerCase() === (table ?? name).toLowerCase() &&
           expected && sameTokens(tokens(actual.sql), tokens(expected)), `Schema drift: ${type} ${name}`);
       }
       completed.add(sql);
     }
     const residual = completed.size === statements.length ? '' :
-      source.replace(/^(?:CREATE|ALTER) [^;]+;/gm, sql => completed.has(sql) ? '' : sql);
+      source.replace(STATEMENT_PATTERN, sql => completed.has(sql) ? '' : sql);
     writeFileSync(destination, residual, { mode: 0o600, flag: 'wx' });
   } finally {
     local.close();
   }
 }
 
-try {
-  const [action, ...args] = process.argv.slice(2);
-  if (action === '--check') args.forEach(load);
-  else if (action === '--query') console.log(query(load(args[0]).names));
-  else if (action === '--prepare') prepare(load(args[0]), args[1], args[2]);
-  else throw new Error('Expected --check, --query, or --prepare');
-} catch (error) {
-  console.error(`ERROR: ${error.message}`);
-  process.exitCode = 1;
+function isMainModule() {
+  if (!process.argv[1]) return false;
+  try {
+    return realpathSync(process.argv[1]) === realpathSync(fileURLToPath(import.meta.url));
+  } catch {
+    return false;
+  }
+}
+
+if (isMainModule()) {
+  try {
+    const [action, ...args] = process.argv.slice(2);
+    if (action === '--check') args.forEach(load);
+    else if (action === '--query') console.log(query(load(args[0]).names));
+    else if (action === '--prepare') prepare(load(args[0]), args[1], args[2]);
+    else throw new Error('Expected --check, --query, or --prepare');
+  } catch (error) {
+    console.error(`ERROR: ${error.message}`);
+    process.exitCode = 1;
+  }
 }

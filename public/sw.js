@@ -233,7 +233,20 @@ self.addEventListener('push', (event) => {
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
 
-  const targetUrl = event.notification.data?.url || '/?tab=orders';
+  const rawTarget = event.notification.data?.url || '/?tab=orders';
+  let targetUrl = '/?tab=orders';
+  try {
+    const parsed = new URL(String(rawTarget), self.location.origin);
+    if (
+      parsed.origin === self.location.origin &&
+      !parsed.pathname.startsWith('//') &&
+      !parsed.pathname.startsWith('/\\')
+    ) {
+      targetUrl = `${parsed.pathname}${parsed.search}${parsed.hash}`;
+    }
+  } catch {
+    targetUrl = '/?tab=orders';
+  }
 
   if (event.action === 'view' || !event.action) {
     event.waitUntil(clients.openWindow(targetUrl));

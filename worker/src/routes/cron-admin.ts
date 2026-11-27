@@ -27,7 +27,7 @@ async function checkCronSecret(c: {
   if (!c.env.CRON_SECRET) {
     return false;
   } // not configured — fail-closed
-  const secret = c.req.header('X-Cron-Secret') || c.req.query('secret');
+  const secret = c.req.header('X-Cron-Secret');
   if (!secret) {
     return false;
   }
@@ -91,7 +91,6 @@ function hasCrossTenantOverride(c: {
   if (userTenant === '*' || userTenant.toLowerCase() === 'hq') return true;
   if (!headerOrQueryTenant) return false;
   if (headerOrQueryTenant === '*' || headerOrQueryTenant.toLowerCase() === 'hq') return true;
-  if (isOwnerOrAdmin && !userTenant) return false;
   const boundTenant = userTenant || 'default';
   return headerOrQueryTenant !== boundTenant;
 }

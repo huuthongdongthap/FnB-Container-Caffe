@@ -71,11 +71,11 @@ describe('hashPassword / verifyPassword', () => {
     await expect(verifyPassword('wrongpass', hash)).resolves.toBe(false);
   });
 
-  it('supports legacy SHA-256 fallback', async() => {
+  it('rejects legacy unsalted SHA-256 hashes', async() => {
     const enc = new TextEncoder();
     const hashBuffer = await crypto.subtle.digest('SHA-256', enc.encode('legacypass'));
     const hexHash = Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('');
-    await expect(verifyPassword('legacypass', hexHash)).resolves.toBe(true);
+    await expect(verifyPassword('legacypass', hexHash)).resolves.toBe(false);
     await expect(verifyPassword('wrong', hexHash)).resolves.toBe(false);
   });
 });

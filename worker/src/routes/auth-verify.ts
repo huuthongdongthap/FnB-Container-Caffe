@@ -9,6 +9,37 @@ import { lookupVerifyCode, deleteVerifyCode, isExpired } from '../tree/auth/emai
 
 const log = createLogger({ route: 'auth-verify' });
 
+function isErasedAccountRecord(
+  row: { name?: unknown; phone?: unknown; anonymized_at?: unknown; is_active?: unknown } | null | undefined,
+): boolean {
+  if (!row) return false;
+  if (row.is_active === 0 || row.is_active === false) return true;
+  if (typeof row.anonymized_at === 'string' ? row.anonymized_at.trim() !== '' : Boolean(row.anonymized_at)) {
+    return true;
+  }
+  const name = typeof row.name === 'string' ? row.name.trim() : '';
+  if (name === '[ERASED]') return true;
+  const phone = typeof row.phone === 'string' ? row.phone.trim().toLowerCase() : '';
+  if (phone.startsWith('erased_')) return true;
+  return false;
+}
+
+async function hasErasureEvent(
+  db: { prepare(_sql: string): { bind(..._a: unknown[]): { first<T = Record<string, unknown>>(): Promise<T | null> } } } | undefined,
+  customerId: string | undefined | null,
+): Promise<boolean> {
+  if (!db?.prepare || !customerId) return false;
+  try {
+    const eraseEvent = await db
+      .prepare("SELECT event_type FROM customer_events WHERE customer_id = ? AND event_type = 'CustomerDataErased' LIMIT 1")
+      .bind(customerId)
+      .first<{ event_type?: string | null }>();
+    return eraseEvent?.event_type === 'CustomerDataErased';
+  } catch {
+    return false;
+  }
+}
+
 export async function verifyEmail(request: Request, env: Record<string, unknown>) {
   try {
     const body = (await request.json().catch(() => ({}))) as Record<string, unknown>;
@@ -63,6 +94,9 @@ const db = env.AURA_DB as unknown as { prepare(_sql: string): { bind(..._a: unkn
     }
 
     const user = JSON.parse(userStr);
+    if ((!user.role || user.role === 'customer') && isErasedAccountRecord(user)) {
+      return errorResponse('Tài khoản không khả dụng', 401);
+    }
     const now = new Date().toISOString();
     const defaultTenant = typeof env.PILOT_TENANT_ID === 'string' && env.PILOT_TENANT_ID.trim() && env.PILOT_TENANT_ID.trim() !== '*'
       ? env.PILOT_TENANT_ID.trim()
@@ -74,20 +108,48 @@ const db = env.AURA_DB as unknown as { prepare(_sql: string): { bind(..._a: unkn
 
     if ((!user.role || user.role === 'customer') && db?.prepare) {
       try {
-        let existingCustomer: { id: string; email?: string | null; tenant_id?: string | null } | null = null;
+        if (user.id) {
+          const d1UserRow = await db
+            .prepare('SELECT id, is_active, name, phone FROM users WHERE id = ? LIMIT 1')
+            .bind(user.id)
+            .first<{ id?: string | null; is_active?: number | boolean | null; name?: string | null; phone?: string | null }>()
+            .catch(() => null);
+          if (d1UserRow && (!d1UserRow.id || String(d1UserRow.id) === String(user.id)) && isErasedAccountRecord(d1UserRow)) {
+            return errorResponse('Tài khoản không khả dụng', 401);
+          }
+          if (await hasErasureEvent(db, user.id)) {
+            return errorResponse('Tài khoản không khả dụng', 401);
+          }
+        }
+        let existingCustomer: { id: string; email?: string | null; name?: string | null; phone?: string | null; tenant_id?: string | null; anonymized_at?: string | null } | null = null;
+        let canProvisionCustomer = true;
         try {
           existingCustomer = await db.prepare(
-            `SELECT id, email, tenant_id FROM customers
+            `SELECT id, email, name, phone, tenant_id, anonymized_at FROM customers
              WHERE (id = ? OR lower(email) = lower(?))
                AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?
              LIMIT 1`
-          ).bind(user.id, email, tenantId).first<{ id: string; email?: string | null; tenant_id?: string | null }>();
+          ).bind(user.id, email, tenantId).first<{ id: string; email?: string | null; name?: string | null; phone?: string | null; tenant_id?: string | null; anonymized_at?: string | null }>();
         } catch {
-          if (tenantId === 'default') {
+          try {
             existingCustomer = await db.prepare(
-              'SELECT id, email FROM customers WHERE id = ? OR lower(email) = lower(?) LIMIT 1'
-            ).bind(user.id, email).first<{ id: string; email?: string | null }>().catch(() => null);
+              `SELECT id, email, tenant_id FROM customers
+               WHERE (id = ? OR lower(email) = lower(?))
+                 AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?
+               LIMIT 1`
+            ).bind(user.id, email, tenantId).first<{ id: string; email?: string | null; tenant_id?: string | null }>();
+          } catch {
+            if (tenantId === 'default') {
+              existingCustomer = await db.prepare(
+                'SELECT id, email FROM customers WHERE id = ? OR lower(email) = lower(?) LIMIT 1'
+              ).bind(user.id, email).first<{ id: string; email?: string | null }>().catch(() => null);
+            } else {
+              canProvisionCustomer = false;
+            }
           }
+        }
+        if (isErasedAccountRecord(existingCustomer) || (existingCustomer?.id && await hasErasureEvent(db, existingCustomer.id))) {
+          return errorResponse('Tài khoản không khả dụng', 401);
         }
         const existingTenant = String(existingCustomer?.tenant_id || '').trim() || tenantId;
         const existingEmail = String(existingCustomer?.email || '').trim().toLowerCase();
@@ -113,7 +175,7 @@ const db = env.AURA_DB as unknown as { prepare(_sql: string): { bind(..._a: unkn
               ).bind(email, now, now, user.id).run().catch(() => {});
             }
           }
-        } else {
+        } else if (canProvisionCustomer) {
           const normalizedCustomerPhone = String(user.phone || '').trim() || null;
           try {
             await db.prepare(
@@ -152,7 +214,19 @@ const db = env.AURA_DB as unknown as { prepare(_sql: string): { bind(..._a: unkn
     const token = user.role && user.role !== 'customer'
       ? (await issueStaffSession(env as unknown as Env, await requireStaffAccount((env as unknown as Env).AURA_DB, user.id), { email: user.email, sessionType: 'staff-web' })).token
       : await generateJWT(
-      { email: user.email, name: user.name, id: user.id, role: user.role || 'customer', tenantId, tier: 'BASIC', emailVerified: true, email_verified: true, authVersion: Number(user.auth_version || 1) } as unknown as Parameters<typeof generateJWT>[0],
+      {
+        email: user.email,
+        name: user.name,
+        id: user.id,
+        role: user.role || 'customer',
+        tenantId,
+        tier: 'BASIC',
+        emailVerified: true,
+        email_verified: true,
+        authVersion: Number(user.auth_version || 1),
+        ...(typeof env.JWT_AUDIENCE === 'string' && env.JWT_AUDIENCE ? { aud: env.JWT_AUDIENCE } : {}),
+        ...(typeof env.JWT_ISSUER === 'string' && env.JWT_ISSUER ? { iss: env.JWT_ISSUER } : {}),
+      } as unknown as Parameters<typeof generateJWT>[0],
       env.JWT_SECRET as string,
       env.JWT_EXPIRY_SECONDS as string
     );

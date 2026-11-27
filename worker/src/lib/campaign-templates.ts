@@ -8,8 +8,18 @@ export interface CampaignTemplate {
   sms: string;
 }
 
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 export function winbackTemplate(name?: string, locale: 'vi' | 'en' = 'vi'): CampaignTemplate {
   const safeName = name || (locale === 'en' ? 'you' : 'bạn');
+  const htmlName = escapeHtml(safeName);
 
   if (locale === 'en') {
     const subject = `AURA CAFE — We miss you, ${safeName}!`;
@@ -19,7 +29,7 @@ export function winbackTemplate(name?: string, locale: 'vi' | 'en' = 'vi'): Camp
 <head><meta charset="UTF-8"></head>
 <body style="font-family:'Space Grotesk',Arial,Helvetica,sans-serif;max-width:600px;margin:0 auto;padding:20px;color:#333;">
   <h1 style="color:#8B4513;">AURA CAFE</h1>
-  <p>Hi ${safeName},</p>
+  <p>Hi ${htmlName},</p>
   <p>It's been a while since your last visit! We miss you and want to offer you a special deal.</p>
   <p>Come to AURA CAFE and enjoy your favorite coffee!</p>
   <p>— AURA CAFE Team</p>
@@ -38,7 +48,7 @@ export function winbackTemplate(name?: string, locale: 'vi' | 'en' = 'vi'): Camp
 <head><meta charset="UTF-8"></head>
 <body style="font-family:'Space Grotesk',Arial,Helvetica,sans-serif;max-width:600px;margin:0 auto;padding:20px;color:#333;">
   <h1 style="color:#8B4513;">AURA CAFE</h1>
-  <p>Chào ${safeName},</p>
+  <p>Chào ${htmlName},</p>
   <p>Đã lâu rồi bạn không ghé quán! Chúng tôi nhớ bạn và muốn dành tặng bạn một ưu đãi đặc biệt.</p>
   <p>Hãy đến AURA CAFE để thưởng thức ly cà phê yêu thích nhé!</p>
   <p>— Đội ngũ AURA CAFE</p>
@@ -52,7 +62,8 @@ export function winbackTemplate(name?: string, locale: 'vi' | 'en' = 'vi'): Camp
 
 export function birthdayTemplate(name?: string, tier?: string, discountPct?: number, locale: 'vi' | 'en' = 'vi'): CampaignTemplate {
   const safeName = name || (locale === 'en' ? 'you' : 'bạn');
-  const pct = discountPct || 15;
+  const htmlName = escapeHtml(safeName);
+  const pct = typeof discountPct === 'number' && Number.isFinite(discountPct) && discountPct > 0 ? discountPct : 15;
 
   if (locale === 'en') {
     const subject = `🎂 Happy Birthday, ${safeName}!`;
@@ -62,7 +73,7 @@ export function birthdayTemplate(name?: string, tier?: string, discountPct?: num
 <head><meta charset="UTF-8"></head>
 <body style="font-family:'Space Grotesk',Arial,Helvetica,sans-serif;max-width:600px;margin:0 auto;padding:20px;color:#333;">
   <h1 style="color:#8B4513;">AURA CAFE</h1>
-  <p>🎂 Happy Birthday ${safeName}!</p>
+  <p>🎂 Happy Birthday ${htmlName}!</p>
   <p>On your special day, AURA CAFE gives you <strong>${pct}% off</strong> on all beverages.</p>
   <p>Bring your friends to AURA CAFE and celebrate your birthday with us!</p>
   <p>— AURA CAFE Team</p>
@@ -81,7 +92,7 @@ export function birthdayTemplate(name?: string, tier?: string, discountPct?: num
 <head><meta charset="UTF-8"></head>
 <body style="font-family:'Space Grotesk',Arial,Helvetica,sans-serif;max-width:600px;margin:0 auto;padding:20px;color:#333;">
   <h1 style="color:#8B4513;">AURA CAFE</h1>
-  <p>🎂 Chúc mừng sinh nhật ${safeName}!</p>
+  <p>🎂 Chúc mừng sinh nhật ${htmlName}!</p>
   <p>Nhân dịp sinh nhật của bạn, AURA CAFE dành tặng bạn <strong>${pct}% giảm giá</strong> cho tất cả các loại đồ uống.</p>
   <p>Hãy mang theo bạn bè đến AURA CAFE để tổ chức sinh nhật thật vui vẻ nhé!</p>
   <p>— Đội ngũ AURA CAFE</p>
@@ -97,19 +108,22 @@ export function promoTemplate(name?: string, promoTitle?: string, promoDesc?: st
   const safeName = name || (locale === 'en' ? 'you' : 'bạn');
   const title = promoTitle || (locale === 'en' ? 'Special Promotion' : 'Khuyến mãi đặc biệt');
   const desc = promoDesc || '';
+  const htmlName = escapeHtml(safeName);
+  const htmlTitle = escapeHtml(title);
+  const htmlDesc = desc ? escapeHtml(desc) : '';
 
   if (locale === 'en') {
     const subject = `AURA CAFE — ${title}`;
 
-    const descHtml = desc ? `<p>${desc}</p>` : '';
+    const descHtml = htmlDesc ? `<p>${htmlDesc}</p>` : '';
 
     const html = `<!DOCTYPE html>
 <html lang="en">
 <head><meta charset="UTF-8"></head>
 <body style="font-family:'Space Grotesk',Arial,Helvetica,sans-serif;max-width:600px;margin:0 auto;padding:20px;color:#333;">
   <h1 style="color:#8B4513;">AURA CAFE</h1>
-  <p>Hi ${safeName},</p>
-  <p><strong>${title}</strong></p>
+  <p>Hi ${htmlName},</p>
+  <p><strong>${htmlTitle}</strong></p>
   ${descHtml}
   <p>Don't miss out! Visit AURA CAFE today.</p>
   <p>— AURA CAFE Team</p>
@@ -123,15 +137,15 @@ export function promoTemplate(name?: string, promoTitle?: string, promoDesc?: st
 
   const subject = `AURA CAFE — ${title}`;
 
-  const descHtml = desc ? `<p>${desc}</p>` : '';
+  const descHtml = htmlDesc ? `<p>${htmlDesc}</p>` : '';
 
   const html = `<!DOCTYPE html>
 <html lang="vi">
 <head><meta charset="UTF-8"></head>
 <body style="font-family:'Space Grotesk',Arial,Helvetica,sans-serif;max-width:600px;margin:0 auto;padding:20px;color:#333;">
   <h1 style="color:#8B4513;">AURA CAFE</h1>
-  <p>Chào ${safeName},</p>
-  <p><strong>${title}</strong></p>
+  <p>Chào ${htmlName},</p>
+  <p><strong>${htmlTitle}</strong></p>
   ${descHtml}
   <p>Đừng bỏ lỡ cơ hội này! Ghé AURA CAFE ngay hôm nay.</p>
   <p>— Đội ngũ AURA CAFE</p>

@@ -12,7 +12,7 @@ import { listStaff } from '../../tree/auth/list-staff';
 import { listStaffDevices, revokeStaffDevice } from '../../../../packages/domain/staff/commands/staff-auth';
 import { franchiseRouter } from '../../routes/franchise-locations';
 import { issueStaffSession } from '../../lib/staff-session';
-import { generateJWT } from '../../lib/jwt';
+import { generateJWT, hashPassword } from '../../lib/jwt';
 
 const TEST_JWT_SECRET = 'phase51_ax1_test_jwt_secret_minimum_32_bytes_long!';
 
@@ -274,18 +274,34 @@ describe('Phase 51 Slice AX1 — Auth, Staff Device, Customer Takeover & Franchi
         }),
       });
       const regRes = await registerWithVerification(regReq, env);
-      expect(regRes.status).toBe(201);
-      const regBody = (await regRes.json()) as {
-        success: boolean;
-        user: { id: string; email: string; phone: string };
-      };
-      expect(regBody.success).toBe(true);
-      expect(regBody.user.id).not.toBe('cust_victim_default');
-      expect(regBody.user.id).not.toBe('cust_victim_tenant_b');
+      expect(regRes.status).toBe(409);
       expect(customers.get('cust_victim_default')?.email).toBe('victim@example.com');
       expect(wallets.get('cust_victim_default')?.balance).toBe(50000);
+      expect(verifyCodes.get('attacker@example.com')).toBeUndefined();
 
-      // Verify email flow must also keep attacker isolated from victim's customer ID
+      // Seed an unverified KV user whose phone collides with the victim to verify downstream email verification and login isolation
+      const attackerId = 'USR_attacker_isolated';
+      const hashedPassword = await hashPassword('Password123!');
+      await kv.put(
+        'user:attacker@example.com',
+        JSON.stringify({
+          id: attackerId,
+          email: 'attacker@example.com',
+          name: 'Attacker',
+          phone: '0901234567',
+          password: hashedPassword,
+          role: 'customer',
+          tenant_id: 'default',
+          email_verified: false,
+        })
+      );
+      verifyCodes.set('attacker@example.com', {
+        id: 'ev_attacker_1',
+        email: 'attacker@example.com',
+        code: '654321',
+        expires_at: new Date(Date.now() + 5 * 60_000).toISOString(),
+      });
+
       const verifyRecord = verifyCodes.get('attacker@example.com');
       expect(verifyRecord).toBeDefined();
       const verifyReq = new Request('https://example.com/api/auth/verify-email', {
@@ -299,10 +315,9 @@ describe('Phase 51 Slice AX1 — Auth, Staff Device, Customer Takeover & Franchi
       const verifyRes = await verifyEmail(verifyReq, env);
       expect(verifyRes.status).toBe(200);
       const verifyBody = (await verifyRes.json()) as { user: { id: string } };
-      expect(verifyBody.user.id).toBe(regBody.user.id);
+      expect(verifyBody.user.id).toBe(attackerId);
       expect(verifyBody.user.id).not.toBe('cust_victim_default');
 
-      // Login flow must also keep attacker isolated from victim's customer ID and wallet
       const loginReq = new Request('https://example.com/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -314,10 +329,11 @@ describe('Phase 51 Slice AX1 — Auth, Staff Device, Customer Takeover & Franchi
       const loginRes = await loginUser(loginReq, env);
       expect(loginRes.status).toBe(200);
       const loginBody = (await loginRes.json()) as { user: { id: string; tenantId: string } };
-      expect(loginBody.user.id).toBe(regBody.user.id);
+      expect(loginBody.user.id).toBe(attackerId);
       expect(loginBody.user.id).not.toBe('cust_victim_default');
       expect(loginBody.user.id).not.toBe('cust_victim_tenant_b');
       expect(wallets.get(loginBody.user.id)?.balance ?? 0).toBe(0);
+      expect(wallets.get('cust_victim_default')?.balance).toBe(50000);
     });
   });
 

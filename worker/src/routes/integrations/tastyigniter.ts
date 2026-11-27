@@ -28,6 +28,51 @@ import { createLogger } from '../../middleware/logger';
 
 const log = createLogger({ route: 'ti-gateway' });
 
+const WEBHOOK_TIMESTAMP_TOLERANCE_SECONDS = 300;
+const WEBHOOK_REPLAY_TTL_SECONDS = 600;
+
+function isFreshTiWebhookTimestamp(rawTs: string | undefined | null): boolean {
+  if (!rawTs || !rawTs.trim()) return true;
+  const trimmed = rawTs.trim();
+  let tsSeconds = NaN;
+  if (/^\d+(\.\d+)?$/.test(trimmed)) {
+    const num = Number(trimmed);
+    if (!Number.isFinite(num) || num <= 0) return false;
+    tsSeconds = num > 1e11 ? Math.floor(num / 1000) : Math.floor(num);
+  } else if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$/.test(trimmed)) {
+    const parsedMs = Date.parse(trimmed);
+    if (!Number.isFinite(parsedMs) || parsedMs <= 0) return false;
+    tsSeconds = Math.floor(parsedMs / 1000);
+  } else {
+    return false;
+  }
+  const nowSeconds = Math.floor(Date.now() / 1000);
+  return Math.abs(nowSeconds - tsSeconds) <= WEBHOOK_TIMESTAMP_TOLERANCE_SECONDS;
+}
+
+async function isDuplicateTiWebhookReplay(
+  env: Env | undefined,
+  rawBody: string,
+): Promise<boolean> {
+  const kv = (env?.AUTH_KV ?? (env as unknown as Record<string, unknown>)?.AURA_KV) as
+    | import('@cloudflare/workers-types').KVNamespace
+    | undefined;
+  if (!kv || typeof kv.get !== 'function') return false;
+  // Derive replay key strictly from HMAC-authenticated body bytes; unsigned timestamp headers cannot salt a bypass.
+  const input = new TextEncoder().encode(rawBody);
+  const digest = await crypto.subtle.digest('SHA-256', input);
+  const hex = Array.from(new Uint8Array(digest))
+    .map((b) => b.toString(16).padStart(2, '0'))
+    .join('');
+  const replayKey = `webhook:replay:tastyigniter:${hex}`;
+  const existing = await kv.get(replayKey).catch(() => null);
+  if (existing) return true;
+  if (typeof kv.put === 'function') {
+    await kv.put(replayKey, '1', { expirationTtl: WEBHOOK_REPLAY_TTL_SECONDS }).catch(() => {});
+  }
+  return false;
+}
+
 export function hasCrossTenantOverride(c: {
   get: (_k: string) => unknown;
   req: { query: (_k: string) => string | undefined; header: (_k: string) => string | undefined };
@@ -248,10 +293,7 @@ export function createTIRoutes() {
   app.post('/webhook', async(c) => {
     try {
       const isProd = c.env?.ENVIRONMENT === 'production' || c.env?.NODE_ENV === 'production';
-      const allowUnsignedDev = !isProd && (
-        c.env?.ENVIRONMENT === 'development' ||
-        c.env?.ENVIRONMENT === 'test'
-      );
+      const allowUnsignedDev = !isProd && (c.env as Record<string, unknown>)?.ALLOW_UNSIGNED_TASTYIGNITER_WEBHOOK === 'true';
       const secret = (c.env.TASTYIGNITER_WEBHOOK_SECRET ?? '') as string;
       if (!secret && !allowUnsignedDev) {
         return c.json({ error: 'TastyIgniter webhook secret not configured' }, 503);
@@ -267,16 +309,21 @@ export function createTIRoutes() {
         if (!sig) {
           return c.json({ error: 'Unauthorized webhook signature' }, 401);
         }
-        const directMatch = await timingSafeEqual(sig, secret);
-        let hmacMatch = false;
-        if (!directMatch) {
-          const hmacHex = await computeHmacSha256(rawBody, secret);
-          const normalizedSig = sig.replace(/^sha256=/i, '').trim().toLowerCase();
-          hmacMatch = await timingSafeEqual(normalizedSig, hmacHex.toLowerCase());
-        }
-        if (!directMatch && !hmacMatch) {
+        const hmacHex = await computeHmacSha256(rawBody, secret);
+        const normalizedSig = sig.replace(/^sha256=/i, '').trim().toLowerCase();
+        const hmacMatch = await timingSafeEqual(normalizedSig, hmacHex.toLowerCase());
+        if (!hmacMatch) {
           return c.json({ error: 'Unauthorized webhook signature' }, 401);
         }
+      }
+
+      const rawTimestamp =
+        c.req.header('x-tastyigniter-timestamp') ??
+        c.req.header('X-TastyIgniter-Timestamp') ??
+        c.req.header('x-webhook-timestamp') ??
+        c.req.header('x-timestamp');
+      if (!isFreshTiWebhookTimestamp(rawTimestamp)) {
+        return c.json({ error: 'Stale or invalid webhook timestamp' }, 401);
       }
 
       let body: TIWebhookPayload | null = null;
@@ -285,7 +332,7 @@ export function createTIRoutes() {
       } catch {
         return c.json({ error: 'Invalid JSON payload' }, 400);
       }
-      if (!body || typeof body !== 'object') {
+      if (!body || typeof body !== 'object' || Array.isArray(body)) {
         return c.json({ error: 'Invalid JSON payload' }, 400);
       }
 
@@ -336,6 +383,9 @@ export function createTIRoutes() {
       const requestedTenant = rawWebhookTenant || payloadTenant;
       if (requestedTenant && requestedTenant !== configuredWebhookTenant) {
         return c.json({ error: 'Cross-tenant webhook target denied' }, 403);
+      }
+      if (await isDuplicateTiWebhookReplay(c.env, rawBody)) {
+        return c.json({ success: false, error: 'Duplicate webhook replay detected' }, 409);
       }
       const explicitTenant = configuredWebhookTenant;
       const result = await processTIWebhook(c.env as Record<string, unknown>, body, explicitTenant);

@@ -132,9 +132,9 @@ describe.each(aliases)('PayOS settlement alias %s', (path) => {
     expect(sqlite.prepare("SELECT COUNT(*) count FROM _metrics WHERE name = 'payment_success'").get()?.count).toBe(1);
   });
 
-  it('acknowledges a signed unknown code and empty verification probe', async () => {
+  it('acknowledges a signed unknown code and rejects unsigned empty probe', async () => {
     const { env } = fixture();
     expect((await app.fetch(request(path, { orderCode: 999999 }), env, context)).status).toBe(200);
-    if (path === '/api/webhook/payos') expect((await app.fetch(new Request(`https://test.aura${path}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' }), env, context)).status).toBe(200);
+    if (path === '/api/webhook/payos') expect((await app.fetch(new Request(`https://test.aura${path}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' }), env, context)).status).toBe(401);
   });
 });

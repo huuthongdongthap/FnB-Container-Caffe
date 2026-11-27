@@ -718,6 +718,20 @@ async function handleFloorPlanTableStatusPatch(c: any) {
   if (!rawStatus) {
     return c.json({ success: false, error: 'status is required' }, 400);
   }
+  const ALLOWED_FLOOR_PLAN_STATUSES = new Set([
+    'available',
+    'free',
+    'occupied',
+    'reserved',
+    'cleaning',
+    'dirty',
+    'maintenance',
+    'inactive',
+  ]);
+  const lowerTarget = rawStatus.toLowerCase();
+  if (!ALLOWED_FLOOR_PLAN_STATUSES.has(lowerTarget)) {
+    return c.json({ success: false, error: 'Invalid table status' }, 400);
+  }
   let table: Record<string, unknown> | null = null;
   let useLegacyTable = false;
   try {
@@ -735,25 +749,38 @@ async function handleFloorPlanTableStatusPatch(c: any) {
       : tenantId === '*'
         ? 'default'
         : tenantId;
-  const lowerTarget = rawStatus.toLowerCase();
-  const isAvailableTarget = lowerTarget === 'available' || lowerTarget === 'free';
-  const isCleaningTarget = lowerTarget === 'cleaning';
-  if (isAvailableTarget && (await hasUnpaidActiveOrdersForTable(db, id, effectiveTableTenant))) {
+  const isNonOccupiedTarget = lowerTarget !== 'occupied';
+  if (isNonOccupiedTarget && (await hasUnpaidActiveOrdersForTable(db, id, effectiveTableTenant))) {
     return c.json({ success: false, error: 'Cannot release table with unpaid active orders' }, 409);
   }
   const now = new Date().toISOString();
   const tblName = useLegacyTable ? 'tables' : 'cafe_tables';
-  if (isAvailableTarget || isCleaningTarget) {
+  if (isNonOccupiedTarget) {
     await db
-      .prepare(`UPDATE ${tblName} SET status = ?, current_order_id = NULL WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?`)
+      .prepare(`UPDATE ${tblName} SET status = ?, current_order_id = NULL, current_session_id = NULL WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?`)
       .bind(rawStatus, id, effectiveTableTenant)
       .run()
+      .catch(() =>
+        db
+          .prepare(`UPDATE ${tblName} SET status = ?, current_order_id = NULL WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?`)
+          .bind(rawStatus, id, effectiveTableTenant)
+          .run()
+      )
       .catch(() =>
         db.prepare(`UPDATE ${tblName} SET status = ? WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?`).bind(rawStatus, id, effectiveTableTenant).run()
       )
       .catch(() =>
         effectiveTableTenant === 'default'
-          ? db.prepare(`UPDATE ${tblName} SET status = ? WHERE id = ?`).bind(rawStatus, id).run()
+          ? db
+              .prepare(`UPDATE ${tblName} SET status = ?, current_order_id = NULL, current_session_id = NULL WHERE id = ?`)
+              .bind(rawStatus, id)
+              .run()
+              .catch(() =>
+                db.prepare(`UPDATE ${tblName} SET status = ?, current_order_id = NULL WHERE id = ?`).bind(rawStatus, id).run()
+              )
+              .catch(() =>
+                db.prepare(`UPDATE ${tblName} SET status = ? WHERE id = ?`).bind(rawStatus, id).run()
+              )
           : undefined
       );
     await db
@@ -769,7 +796,25 @@ async function handleFloorPlanTableStatusPatch(c: any) {
           )
           .bind(now, id, effectiveTableTenant, effectiveTableTenant)
           .run()
-          .catch(() => undefined)
+      )
+      .catch(() =>
+        effectiveTableTenant === 'default'
+          ? db
+              .prepare(
+                "UPDATE table_sessions SET status = 'closed', closed_at = ?, updated_at = ? WHERE table_id = ? AND status IN ('active', 'occupied', 'seated', 'ordering', 'paying', 'paid')"
+              )
+              .bind(now, now, id)
+              .run()
+              .catch(() =>
+                db
+                  .prepare(
+                    "UPDATE table_sessions SET status = 'completed', ended_at = ? WHERE table_id = ? AND status IN ('active', 'occupied', 'seated', 'ordering', 'paying', 'paid')"
+                  )
+                  .bind(now, id)
+                  .run()
+                  .catch(() => undefined)
+              )
+          : undefined
       );
   } else {
     await db

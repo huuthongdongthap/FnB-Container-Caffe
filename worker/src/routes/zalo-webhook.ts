@@ -118,11 +118,7 @@ zaloWebhookRouter.post('/', async (c) => {
   const envRecord = (c.env || {}) as unknown as Record<string, unknown>;
   const zaloSecret = (envRecord.ZALO_OA_SECRET || envRecord.ZALO_APP_SECRET) as string | undefined;
   const isProd = c.env?.ENVIRONMENT === 'production' || c.env?.NODE_ENV === 'production';
-  const allowUnsignedDev = !isProd && (
-    envRecord.ALLOW_UNSIGNED_ZALO_WEBHOOK === 'true' ||
-    c.env?.ENVIRONMENT === 'development' ||
-    c.env?.ENVIRONMENT === 'test'
-  );
+  const allowUnsignedDev = !isProd && envRecord.ALLOW_UNSIGNED_ZALO_WEBHOOK === 'true';
   const signatureHeader = c.req.header('X-ZaloOA-Signature') || c.req.header('x-zalooa-signature');
 
   const timestampRaw = body.timestamp !== undefined ? String(body.timestamp).trim() : '';
@@ -333,16 +329,15 @@ zaloWebhookRouter.post('/', async (c) => {
   });
 });
 
-// POST /api/webhooks/zalo/simulate — Dev/Test simulation (requires staff auth outside explicit dev/test)
+// POST /api/webhooks/zalo/simulate — Dev/Test simulation (disabled in production, always requires staff auth)
 zaloWebhookRouter.post(
   '/simulate',
   async (c, next) => {
     const isProd = c.env?.ENVIRONMENT === 'production' || c.env?.NODE_ENV === 'production';
-    const isExplicitDev = !isProd && (c.env?.ENVIRONMENT === 'development' || c.env?.ENVIRONMENT === 'test');
-    if (!isExplicitDev || c.req.header('Authorization')) {
-      return requireAuth(['owner', 'manager', 'supervisor', 'staff', 'admin'])(c, next);
+    if (isProd) {
+      return c.json({ success: false, error: 'Not found' }, 404);
     }
-    return next();
+    return requireAuth(['owner', 'manager', 'supervisor', 'staff', 'admin'])(c, next);
   },
   async (c) => {
     const rawBody = await c.req.json().catch(() => ({}));

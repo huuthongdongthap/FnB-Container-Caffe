@@ -3,6 +3,7 @@ import { Card, CardBody } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { apiFetch } from '@/lib/api-client';
+import { isAllowedPaymentUrl } from '@/lib/safe-redirect';
 import { formatVND, StatusBadge } from './dashboard-utils';
 import type { Invoice } from '@/hooks/use-subscriptions';
 import ReceiptDownloadButton from './receipt-download';
@@ -46,7 +47,11 @@ export default function InvoiceTableCard({ invoices, isLoading }: Props) {
         res?.data?.payment_url ??
         res?.data?.checkout_url;
       if (paymentUrl) {
-        window.location.href = paymentUrl;
+        if (isAllowedPaymentUrl(String(paymentUrl))) {
+          window.location.href = paymentUrl;
+        } else {
+          setPaymentError('Liên kết thanh toán không hợp lệ');
+        }
       } else {
         setPaymentError('Không nhận được liên kết thanh toán từ cổng thanh toán');
       }

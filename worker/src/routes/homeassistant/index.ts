@@ -60,6 +60,51 @@ function resolveHaTenant(c: Parameters<typeof getTenantId>[0]): string {
 
 const log = createLogger({ route: 'ha' });
 
+const WEBHOOK_TIMESTAMP_TOLERANCE_SECONDS = 300;
+const WEBHOOK_REPLAY_TTL_SECONDS = 600;
+
+function isFreshHaWebhookTimestamp(rawTs: string | undefined | null): boolean {
+  if (!rawTs || !rawTs.trim()) return true;
+  const trimmed = rawTs.trim();
+  let tsSeconds = NaN;
+  if (/^\d+(\.\d+)?$/.test(trimmed)) {
+    const num = Number(trimmed);
+    if (!Number.isFinite(num) || num <= 0) return false;
+    tsSeconds = num > 1e11 ? Math.floor(num / 1000) : Math.floor(num);
+  } else if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$/.test(trimmed)) {
+    const parsedMs = Date.parse(trimmed);
+    if (!Number.isFinite(parsedMs) || parsedMs <= 0) return false;
+    tsSeconds = Math.floor(parsedMs / 1000);
+  } else {
+    return false;
+  }
+  const nowSeconds = Math.floor(Date.now() / 1000);
+  return Math.abs(nowSeconds - tsSeconds) <= WEBHOOK_TIMESTAMP_TOLERANCE_SECONDS;
+}
+
+async function isDuplicateHaWebhookReplay(
+  env: Env | undefined,
+  rawBody: string,
+): Promise<boolean> {
+  const kv = (env?.AUTH_KV ?? (env as unknown as Record<string, unknown>)?.AURA_KV) as
+    | import('@cloudflare/workers-types').KVNamespace
+    | undefined;
+  if (!kv || typeof kv.get !== 'function') return false;
+  // Derive replay key strictly from HMAC-authenticated body bytes; unsigned timestamp headers cannot salt a bypass.
+  const input = new TextEncoder().encode(rawBody);
+  const digest = await crypto.subtle.digest('SHA-256', input);
+  const hex = Array.from(new Uint8Array(digest))
+    .map((b) => b.toString(16).padStart(2, '0'))
+    .join('');
+  const replayKey = `webhook:replay:ha:${hex}`;
+  const existing = await kv.get(replayKey).catch(() => null);
+  if (existing) return true;
+  if (typeof kv.put === 'function') {
+    await kv.put(replayKey, '1', { expirationTtl: WEBHOOK_REPLAY_TTL_SECONDS }).catch(() => {});
+  }
+  return false;
+}
+
 const ToggleDeviceSchema = z.object({
   action: z.enum(['on', 'off'])
 });
@@ -223,36 +268,62 @@ export function createHARouter() {
   app.post('/webhook', async(c) => {
     try {
       const isProd = c.env?.ENVIRONMENT === 'production' || c.env?.NODE_ENV === 'production';
-      const allowUnsignedDev = !isProd && (
-        c.env?.ENVIRONMENT === 'development' ||
-        c.env?.ENVIRONMENT === 'test' ||
-        (c.env as Record<string, unknown>)?.HA_MOCK === 'true'
-      );
-      const secret = (c.env.HA_WEBHOOK_SECRET ?? c.env.HA_TOKEN ?? '') as string;
+      const allowUnsignedDev = !isProd && (c.env as Record<string, unknown>)?.ALLOW_UNSIGNED_HA_WEBHOOK === 'true';
+      const secret = (c.env.HA_WEBHOOK_SECRET ?? '') as string;
       if (!secret && !allowUnsignedDev) {
         return c.json({ error: 'HA webhook secret not configured' }, 503);
       }
+      const rawBody = await c.req.text().catch(() => '');
       if (secret) {
         if (c.req.query('token')) {
-          return c.json({ error: 'Query token is not supported; pass X-HA-Token or Authorization header' }, 401);
+          return c.json({ error: 'Query token is not supported; pass X-HA-Signature header' }, 401);
         }
-        const token =
-          c.req.header('x-ha-token') ??
-          c.req.header('authorization')?.replace(/^Bearer\s+/i, '');
+        const sig =
+          c.req.header('x-ha-signature') ??
+          c.req.header('x-webhook-signature') ??
+          '';
+        if (!sig) {
+          return c.json({ error: 'Unauthorized HA webhook signature' }, 401);
+        }
         const enc = new TextEncoder();
-        const aBytes = enc.encode(token ?? '');
-        const bBytes = enc.encode(secret);
+        const key = await crypto.subtle.importKey(
+          'raw',
+          enc.encode(secret),
+          { name: 'HMAC', hash: 'SHA-256' },
+          false,
+          ['sign']
+        );
+        const macBuf = await crypto.subtle.sign('HMAC', key, enc.encode(rawBody));
+        const expectedHex = Array.from(new Uint8Array(macBuf))
+          .map((b) => b.toString(16).padStart(2, '0'))
+          .join('');
+        const normalizedSig = sig.replace(/^sha256=/i, '').trim().toLowerCase();
+        const aBytes = enc.encode(normalizedSig);
+        const bBytes = enc.encode(expectedHex);
         let diff = aBytes.length === bBytes.length ? 0 : 1;
         if (diff === 0) {
           for (let i = 0; i < aBytes.length; i++) diff |= aBytes[i] ^ bBytes[i];
         }
-        if (!token || diff !== 0) {
-          return c.json({ error: 'Unauthorized HA token' }, 401);
+        if (diff !== 0) {
+          return c.json({ error: 'Unauthorized HA webhook signature' }, 401);
         }
       }
 
-      const body = await c.req.json<Record<string, unknown>>();
-      if (!body || typeof body !== 'object') {
+      const rawTimestamp =
+        c.req.header('x-ha-timestamp') ??
+        c.req.header('x-webhook-timestamp') ??
+        c.req.header('x-timestamp');
+      if (!isFreshHaWebhookTimestamp(rawTimestamp)) {
+        return c.json({ error: 'Stale or invalid webhook timestamp' }, 401);
+      }
+
+      let body: Record<string, unknown>;
+      try {
+        body = JSON.parse(rawBody) as Record<string, unknown>;
+      } catch {
+        return c.json({ error: 'Invalid JSON payload' }, 400);
+      }
+      if (!body || typeof body !== 'object' || Array.isArray(body)) {
         return c.json({ error: 'Invalid JSON payload' }, 400);
       }
 
@@ -266,6 +337,9 @@ export function createHARouter() {
         : '';
       if (configuredWebhookTenant && rawWebhookTenant && rawWebhookTenant !== configuredWebhookTenant) {
         return c.json({ error: 'Cross-tenant webhook target denied' }, 403);
+      }
+      if (await isDuplicateHaWebhookReplay(c.env, rawBody)) {
+        return c.json({ success: false, error: 'Duplicate webhook replay detected' }, 409);
       }
       const webhookTenant = configuredWebhookTenant
         || (secret ? (rawWebhookTenant || undefined) : resolvePilotStore(c.env));

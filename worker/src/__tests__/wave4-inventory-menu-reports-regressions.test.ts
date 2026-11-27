@@ -1,5 +1,6 @@
 // @vitest-environment node
 import { describe, it, expect, vi, afterEach } from 'vitest';
+import { createHmac } from 'node:crypto';
 import { DatabaseSync } from 'node:sqlite';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
@@ -807,7 +808,10 @@ describe('Wave 4 Regressions (#228, #229, #230, #231)', () => {
       const whRes = await handleErpnextPosRequest(
         new Request('http://localhost/api/erpnext-pos/webhook', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'X-ERPNext-Webhook-Secret': 'wh-sec' },
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Frappe-Webhook-Signature': createHmac('sha256', 'wh-sec').update(whPayload).digest('hex'),
+          },
           body: whPayload,
         }),
         { AURA_DB: db, AUTH_KV: kv, ERPNEXT_WEBHOOK_SECRET: 'wh-sec', ERPNEXT_WEBHOOK_TENANT: 'store-a' },

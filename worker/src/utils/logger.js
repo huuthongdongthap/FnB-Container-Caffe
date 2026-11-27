@@ -16,8 +16,21 @@
  */
 
 const LEVELS = ['debug', 'info', 'warn', 'error'];
-const REDACTED_KEYS = /^(signature|checksum|token|secret|password|authorization|api_key|apikey|payment_payload|customer_phone|customer_email|phone|email|to|recipient)$/i;
+const REDACTED_KEYS = /^(signature|checksum|token|order_token|device_token|raw_device_token|otp_code|verification_code|secret|password|authorization|api_key|apikey|payment_payload|customer_name|customer_phone|customer_email|delivery_address|shipping_address|address|phone|email|to|recipient)$/i;
 const REDACTED = '[REDACTED]';
+
+function redactStringValue(value) {
+  const trimmed = value.trim();
+  if (/^(?:\+?84|0)\d{9,10}$/.test(trimmed)) {
+    return REDACTED;
+  }
+  return value
+    .replace(/([?&](?:token|order_token|access_token)=)[^&\s]+/gi, `$1${REDACTED}`)
+    .replace(/\bBearer\s+[A-Za-z0-9._~+/=-]+/gi, `Bearer ${REDACTED}`)
+    .replace(/\beyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\b/g, REDACTED)
+    .replace(/\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b/g, REDACTED)
+    .replace(/(^|[^\w+])(?:\+84|84|0)(?:3|5|7|8|9)\d{8}\b/g, `$1${REDACTED}`);
+}
 
 export function redact(value, depth = 0) {
   if (depth > 4) {
@@ -33,8 +46,8 @@ export function redact(value, depth = 0) {
     }
     return out;
   }
-  if (typeof value === 'string' && /^0\d{9}$/.test(value)) {
-    return REDACTED;
+  if (typeof value === 'string') {
+    return redactStringValue(value);
   }
   return value;
 }
@@ -48,7 +61,7 @@ function emit(level, base, msg, extra) {
     level,
     ts: nowIso(),
     ...redact(base),
-    msg: typeof msg === 'string' && /^0\d{9}$/.test(msg) ? REDACTED : msg,
+    msg: typeof msg === 'string' ? redactStringValue(msg) : msg,
     ...(extra && typeof extra === 'object' ? redact(extra) : {}),
   };
   // Keep error objects short — Workers logs truncate at ~4KB

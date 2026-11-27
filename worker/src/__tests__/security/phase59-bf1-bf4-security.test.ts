@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { createHmac } from 'node:crypto';
 import { Hono } from 'hono';
 import { issueStaffSession } from '../../lib/staff-session';
 import { dindinRouter } from '../../routes/dindin-handlers/routes';
@@ -337,42 +338,44 @@ describe('Phase 59 Security Suite — DinDin, Mixpost, Campaigns, Cal Booking, A
         } as unknown as D1Database,
       } as Env;
 
+      const conflictBody = JSON.stringify({
+        triggerEvent: 'BOOKING_CREATED',
+        payload: {
+          uid: 'uid-conflict-1',
+          startTime: '2026-11-04T10:00:00Z',
+          endTime: '2026-11-04T11:00:00Z',
+          metadata: { tenant_id: 'store-a' },
+        },
+      });
       const conflictReq = new Request('http://localhost/api/cal-booking-webhook', {
         method: 'POST',
         headers: {
-          'x-cal-webhook-secret': secret,
+          'x-cal-signature-256': createHmac('sha256', secret).update(conflictBody).digest('hex'),
           'X-Tenant-ID': 'store-b',
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          triggerEvent: 'BOOKING_CREATED',
-          payload: {
-            uid: 'uid-conflict-1',
-            startTime: '2026-11-04T10:00:00Z',
-            endTime: '2026-11-04T11:00:00Z',
-            metadata: { tenant_id: 'store-a' },
-          },
-        }),
+        body: conflictBody,
       });
       const conflictRes = await handleCalBookingWebhook(conflictReq, env);
       expect(conflictRes.status).toBe(400);
 
+      const collisionBody = JSON.stringify({
+        triggerEvent: 'BOOKING_CREATED',
+        payload: {
+          uid: 'uid-owned-by-store-a',
+          startTime: '2026-11-04T10:00:00Z',
+          endTime: '2026-11-04T11:00:00Z',
+          metadata: { tenant_id: 'store-b' },
+        },
+      });
       const collisionReq = new Request('http://localhost/api/cal-booking-webhook', {
         method: 'POST',
         headers: {
-          'x-cal-webhook-secret': secret,
+          'x-cal-signature-256': createHmac('sha256', secret).update(collisionBody).digest('hex'),
           'X-Tenant-ID': 'store-b',
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          triggerEvent: 'BOOKING_CREATED',
-          payload: {
-            uid: 'uid-owned-by-store-a',
-            startTime: '2026-11-04T10:00:00Z',
-            endTime: '2026-11-04T11:00:00Z',
-            metadata: { tenant_id: 'store-b' },
-          },
-        }),
+        body: collisionBody,
       });
       const collisionRes = await handleCalBookingWebhook(collisionReq, env);
       expect(collisionRes.status).toBe(409);
