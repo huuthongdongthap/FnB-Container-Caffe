@@ -1,3 +1,4 @@
+import type { Context } from 'hono';
 import type { OpenAPIHono } from '@hono/zod-openapi';
 import type { Env } from '../../types/env';
 import { PromotionRoutes } from '../../schemas/promotions';
@@ -519,7 +520,7 @@ export function registerUsageHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
   });
 
   // GET /api/promotions/{id}/usage - List promotion usage
-  app.openapi(PromotionRoutes.usage.list, (async (c) => {
+  app.openapi(PromotionRoutes.usage.list, (async (c: Context<{ Bindings: Env }>) => {
     const db = getDatabase(c);
     const tenantId = getTenantId(c).trim() || 'default';
     const user = c.get('user');
