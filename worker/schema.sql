@@ -263,6 +263,7 @@ ON payments(transaction_id) WHERE transaction_id != '';
 CREATE TABLE reservations (
     id TEXT PRIMARY KEY,
     table_id TEXT NOT NULL,
+    customer_id TEXT,
     customer_name TEXT NOT NULL,
     customer_phone TEXT NOT NULL,
     guest_count INTEGER NOT NULL DEFAULT 2,
@@ -279,6 +280,23 @@ CREATE TABLE reservations (
 CREATE INDEX idx_reservations_date ON reservations(date);
 CREATE INDEX idx_reservations_table ON reservations(table_id);
 CREATE INDEX idx_reservations_status ON reservations(status);
+CREATE INDEX IF NOT EXISTS idx_reservations_customer_id ON reservations(customer_id);
+
+CREATE TABLE IF NOT EXISTS waitlist (
+  id TEXT PRIMARY KEY,
+  tenant_id TEXT NOT NULL DEFAULT 'default',
+  customer_name TEXT NOT NULL,
+  customer_phone TEXT NOT NULL,
+  party_size INTEGER NOT NULL DEFAULT 2,
+  zone TEXT DEFAULT 'indoor',
+  notes TEXT,
+  status TEXT NOT NULL DEFAULT 'waiting',
+  notified_at TEXT,
+  seated_at TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_waitlist_tenant_status ON waitlist(tenant_id, status, created_at);
 
 CREATE TRIGGER update_reservations_timestamp
 AFTER UPDATE ON reservations
