@@ -1,6 +1,7 @@
 import { z } from '@hono/zod-openapi';
 import {
   PaginationQuerySchema,
+  QueryBooleanSchema,
   PaginationMetaSchema,
   SuccessResponseSchema,
   ErrorResponseSchema,
@@ -63,7 +64,7 @@ export const supplierRoutes = {
     summary: 'List suppliers',
     tags: ['Inventory'],
     security: [{ BearerAuth: [] }],
-    request: { query: PaginationQuerySchema.extend({ isActive: z.coerce.boolean().optional() }) },
+    request: { query: PaginationQuerySchema.extend({ isActive: QueryBooleanSchema.optional() }) },
     responses: {
       200: { description: 'Supplier list', content: { 'application/json': { schema: SuccessResponseSchema(SupplierListResponseSchema) } } },
     },

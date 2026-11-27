@@ -95,14 +95,25 @@ async function queryTenantDepletions(
     });
 
   const queryStockMovementDepletions = async () => {
+    const netSumExpr = `MAX(0, SUM(CASE
+      WHEN sm.type IN ('release', 'restore', 'reversal', 'cancel_restore', 'return')
+        OR (sm.type = 'adjustment' AND sm.quantity > 0 AND sm.reference_type = 'order')
+      THEN -ABS(sm.quantity)
+      ELSE ABS(sm.quantity)
+    END))`;
+    const typeFilterExpr = `(
+      sm.type IN ('out', 'consumption', 'sale', 'usage', 'deduction', 'order_deduction', 'order_consumption', 'reserve', 'release', 'restore', 'reversal', 'cancel_restore', 'return')
+      OR (sm.type = 'waste' AND COALESCE(sm.reference_type, '') != 'order')
+      OR (sm.type = 'adjustment' AND (sm.quantity < 0 OR (sm.quantity > 0 AND sm.reference_type = 'order')))
+    )`;
     try {
       const res = await db.prepare(`
         SELECT sm.ingredient_id as item_id,
-               MAX(0, SUM(CASE WHEN sm.type IN ('release', 'restore', 'reversal', 'cancel_restore') THEN -ABS(sm.quantity) ELSE ABS(sm.quantity) END)) as total_depleted,
+               ${netSumExpr} as total_depleted,
                sm.tenant_id
         FROM stock_movements sm
         WHERE replace(substr(sm.created_at, 1, 19), 'T', ' ') >= ?
-          AND (sm.type IN ('out', 'consumption', 'sale', 'waste', 'usage', 'deduction', 'order_deduction', 'order_consumption', 'reserve', 'release', 'restore', 'reversal', 'cancel_restore') OR (sm.type = 'adjustment' AND sm.quantity < 0))
+          AND ${typeFilterExpr}
           AND (? = '*' OR COALESCE(NULLIF(TRIM(sm.tenant_id), ''), 'default') = ?)
           AND NOT (
             sm.reference_type IS NOT NULL
@@ -121,26 +132,26 @@ async function queryTenantDepletions(
     } catch {
       try {
         const res = await db.prepare(`
-          SELECT ingredient_id as item_id,
-                 MAX(0, SUM(CASE WHEN type IN ('release', 'restore', 'reversal', 'cancel_restore') THEN -ABS(quantity) ELSE ABS(quantity) END)) as total_depleted,
-                 tenant_id
-          FROM stock_movements
-          WHERE replace(substr(created_at, 1, 19), 'T', ' ') >= ?
-            AND (type IN ('out', 'consumption', 'sale', 'waste', 'usage', 'deduction', 'order_deduction', 'order_consumption', 'reserve', 'release', 'restore', 'reversal', 'cancel_restore') OR (type = 'adjustment' AND quantity < 0))
-            AND (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?)
-          GROUP BY ingredient_id, tenant_id
+          SELECT sm.ingredient_id as item_id,
+                 ${netSumExpr} as total_depleted,
+                 sm.tenant_id
+          FROM stock_movements sm
+          WHERE replace(substr(sm.created_at, 1, 19), 'T', ' ') >= ?
+            AND ${typeFilterExpr}
+            AND (? = '*' OR COALESCE(NULLIF(TRIM(sm.tenant_id), ''), 'default') = ?)
+          GROUP BY sm.ingredient_id, sm.tenant_id
         `).bind(normalizedStart, tenantId, tenantId).all<{ item_id: string; total_depleted: number; tenant_id?: string | null }>();
         return filterRows(res.results || []);
       } catch {
         try {
           const res = await db.prepare(`
-            SELECT ingredient_id as item_id,
-                   MAX(0, SUM(CASE WHEN type IN ('release', 'restore', 'reversal', 'cancel_restore') THEN -ABS(quantity) ELSE ABS(quantity) END)) as total_depleted,
-                   tenant_id
-            FROM stock_movements
-            WHERE replace(substr(created_at, 1, 19), 'T', ' ') >= ?
-              AND (type IN ('out', 'consumption', 'sale', 'waste', 'usage', 'deduction', 'order_deduction', 'order_consumption', 'reserve', 'release', 'restore', 'reversal', 'cancel_restore') OR (type = 'adjustment' AND quantity < 0))
-            GROUP BY ingredient_id, tenant_id
+            SELECT sm.ingredient_id as item_id,
+                   ${netSumExpr} as total_depleted,
+                   sm.tenant_id
+            FROM stock_movements sm
+            WHERE replace(substr(sm.created_at, 1, 19), 'T', ' ') >= ?
+              AND ${typeFilterExpr}
+            GROUP BY sm.ingredient_id, sm.tenant_id
           `).bind(normalizedStart).all<{ item_id: string; total_depleted: number; tenant_id?: string | null }>();
           return filterRows(res.results || []);
         } catch {
@@ -149,12 +160,12 @@ async function queryTenantDepletions(
           }
           try {
             const res = await db.prepare(`
-              SELECT ingredient_id as item_id,
-                     MAX(0, SUM(CASE WHEN type IN ('release', 'restore', 'reversal', 'cancel_restore') THEN -ABS(quantity) ELSE ABS(quantity) END)) as total_depleted
-              FROM stock_movements
-              WHERE replace(substr(created_at, 1, 19), 'T', ' ') >= ?
-                AND (type IN ('out', 'consumption', 'sale', 'waste', 'usage', 'deduction', 'order_deduction', 'order_consumption', 'reserve', 'release', 'restore', 'reversal', 'cancel_restore') OR (type = 'adjustment' AND quantity < 0))
-              GROUP BY ingredient_id
+              SELECT sm.ingredient_id as item_id,
+                     ${netSumExpr} as total_depleted
+              FROM stock_movements sm
+              WHERE replace(substr(sm.created_at, 1, 19), 'T', ' ') >= ?
+                AND ${typeFilterExpr}
+              GROUP BY sm.ingredient_id
             `).bind(normalizedStart).all<{ item_id: string; total_depleted: number; tenant_id?: string | null }>();
             return filterRows(res.results || []);
           } catch {

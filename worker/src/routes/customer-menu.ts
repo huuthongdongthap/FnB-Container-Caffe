@@ -39,6 +39,7 @@ function toLegacyMenuDto(item: CustomerMenuItem) {
     imageUrl: item.imageUrl ?? '',
     available: item.available,
     tags: item.tags,
+    modifierChoices: item.modifierChoices ?? [],
   };
 }
 
@@ -47,8 +48,8 @@ customerMenuRouter.get('/', async (c) => {
   const category = c.req.query('category');
   const availableParam = c.req.query('available') ?? null;
   const availabilityFilter = parseAvailabilityFilter(availableParam);
-  const includeUnavailable =
-    c.req.query('include_unavailable') === 'true' || availabilityFilter === 0;
+  // Public customer menu must never expose unavailable/hidden products
+  const includeUnavailable = false;
   const locale = c.req.query('locale') || 'vi-VN';
   const channel = c.req.query('channel');
   const normalizedSearch = normalizeSearchText(c.req.query('search') ?? '');

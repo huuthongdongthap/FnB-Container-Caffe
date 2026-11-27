@@ -386,17 +386,25 @@ productsRouter.get('/', async (c) => {
 });
 
 async function isCrossTenantCategory(db: Env['AURA_DB'], categoryId: string | undefined, tenantId: string): Promise<boolean> {
-  if (!categoryId || tenantId === '*') return false;
-  const row = await db.prepare('SELECT * FROM categories WHERE id = ?').bind(categoryId).first<Record<string, unknown>>().catch(() => null);
-  if (row) {
-    return !matchesTenantRow(row, tenantId);
+  if (!categoryId) return false;
+  try {
+    const row = await db.prepare('SELECT * FROM categories WHERE id = ?').bind(categoryId).first<Record<string, unknown>>();
+    if (row) {
+      if (tenantId === '*') return false;
+      return !matchesTenantRow(row, tenantId);
+    }
+    const allRes = await db.prepare('SELECT * FROM categories WHERE id = ?').bind(categoryId).all<Record<string, unknown>>().catch(() => null);
+    const matchedById = (allRes?.results || []).find((r: Record<string, unknown>) => String(r.id ?? '') === categoryId);
+    if (matchedById) {
+      if (tenantId === '*') return false;
+      return !matchesTenantRow(matchedById, tenantId);
+    }
+    // Category ID does not exist in categories table -> reject cleanly with 404 instead of FK 503
+    return true;
+  } catch {
+    // Table absent in partial test mocks
+    return false;
   }
-  const allRes = await db.prepare('SELECT * FROM categories WHERE id = ?').bind(categoryId).all<Record<string, unknown>>().catch(() => null);
-  const matchedById = (allRes?.results || []).find((r: Record<string, unknown>) => String(r.id ?? '') === categoryId);
-  if (matchedById) {
-    return !matchesTenantRow(matchedById, tenantId);
-  }
-  return false;
 }
 
 productsRouter.post('/', productCreateAuth, audit('product_create'), async (c) => {
@@ -697,6 +705,11 @@ productsRouter.delete('/:id', productMutationAuth, audit('product_delete'), asyn
     }
     await syncProductAvailabilityProjection(db, id, 0, targetTenant);
   } else {
+    try {
+      await db.prepare('DELETE FROM product_modifier_groups WHERE product_id = ?').bind(id).run();
+    } catch {
+      // Optional table in partial test mocks
+    }
     try {
       await db.prepare(
         "DELETE FROM products WHERE id = ? AND (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?)"

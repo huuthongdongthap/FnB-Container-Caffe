@@ -348,6 +348,7 @@ async function restoreInventoryForOrderInternal(
       const absQty = Math.abs(mov.quantity);
       const restoreMovId = crypto.randomUUID();
       const movType = spoiled ? 'waste' : 'adjustment';
+      const movQty = spoiled ? -absQty : absQty;
       const movNote = spoiled
         ? `Spoiled after preparation started, cancelled order ${orderId}`
         : `Restore from cancelled order ${orderId}`;
@@ -373,16 +374,16 @@ async function restoreInventoryForOrderInternal(
         hasIngTenantCol
           ? env.AURA_DB.prepare(
               'INSERT INTO stock_movements (id, ingredient_id, type, quantity, reference_id, reference_type, notes, created_at, tenant_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'
-            ).bind(restoreMovId, mov.ingredient_id, movType, absQty, orderId, 'order', movNote, now, effectiveTenant)
+            ).bind(restoreMovId, mov.ingredient_id, movType, movQty, orderId, 'order', movNote, now, effectiveTenant)
           : env.AURA_DB.prepare(
               'INSERT INTO stock_movements (id, ingredient_id, type, quantity, reference_id, reference_type, notes, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
-            ).bind(restoreMovId, mov.ingredient_id, movType, absQty, orderId, 'order', movNote, now)
+            ).bind(restoreMovId, mov.ingredient_id, movType, movQty, orderId, 'order', movNote, now)
       );
 
       fallbackOps.push(
         env.AURA_DB.prepare(
           'INSERT INTO stock_movements (id, ingredient_id, type, quantity, reference_id, reference_type, notes, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
-        ).bind(restoreMovId, mov.ingredient_id, movType, absQty, orderId, 'order', movNote, now)
+        ).bind(restoreMovId, mov.ingredient_id, movType, movQty, orderId, 'order', movNote, now)
       );
 
       if (spoiled) {

@@ -1,6 +1,7 @@
 import { z } from '@hono/zod-openapi';
 import {
   PaginationQuerySchema,
+  QueryBooleanSchema,
   PaginationMetaSchema,
   SuccessResponseSchema,
   ErrorResponseSchema,
@@ -157,7 +158,7 @@ export const StaffRoutes = {
     request: {
       query: PaginationQuerySchema.extend({
         role: StaffRoleEnum.optional(),
-        isActive: z.coerce.boolean().optional(),
+        isActive: QueryBooleanSchema.optional(),
         locationId: z.string().min(1).optional(),
       }),
     },
