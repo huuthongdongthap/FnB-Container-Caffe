@@ -230,18 +230,19 @@ export async function eraseCustomerPii(
     await db.prepare('DELETE FROM push_subscriptions WHERE customer_id = ?').bind(input.customerId).run();
   } catch { /* optional table */ }
 
-  // 3b. Scrub/purge PII across all auxiliary D1 tables (GDPR Art. 17 / VN ND 13) — tenant-scoped
+  // 3b. Scrub/purge PII across all auxiliary D1 tables (GDPR Art. 17 / VN ND 13) — scoped to concrete target tenant
+  const effectiveTargetTenant = resolvedRowTenant || (tenantId === '*' ? 'default' : tenantId);
   const cleanPhone = priorPhone && !priorPhone.startsWith('erased_') ? priorPhone : null;
   const cleanEmail = priorEmail ? priorEmail.toLowerCase() : null;
-  const tenantPred = "AND (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?)";
+  const tenantPred = "AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?";
   const runScoped = async (sqlBase: string, binds: unknown[]) => {
     try {
       await db
         .prepare(`${sqlBase} ${tenantPred}`)
-        .bind(...binds, tenantId, tenantId)
+        .bind(...binds, effectiveTargetTenant)
         .run();
     } catch (err) {
-      if (/no such column:\s*tenant_id/i.test(String(err)) && (tenantId === 'default' || tenantId === '*')) {
+      if (/no such column:\s*tenant_id/i.test(String(err)) && effectiveTargetTenant === 'default') {
         await db.prepare(sqlBase).bind(...binds).run().catch(() => {});
       }
     }
@@ -341,8 +342,6 @@ export async function eraseCustomerPii(
     'DELETE FROM leads WHERE ((? IS NOT NULL AND LOWER(email) = ?) OR (? IS NOT NULL AND phone = ?))',
     [cleanEmail, cleanEmail, cleanPhone, cleanPhone],
   );
-
-  const effectiveTargetTenant = resolvedRowTenant || (tenantId === '*' ? 'default' : tenantId);
 
   // 4. Append erasure audit events
   const eventId = `cev_erase_${crypto.randomUUID()}`;

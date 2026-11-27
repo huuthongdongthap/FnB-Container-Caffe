@@ -119,8 +119,9 @@ async function sendMessage(c: Context<{ Bindings: Env }>) {
           return errorResponse('Không được phép gửi tin nhắn dưới số điện thoại của khách hàng khác', 403);
         }
       } else if (callerPayload && callerPayload.role !== 'customer') {
-        const accountTenant = (session && 'account' in session ? session.account?.tenant_id : undefined)?.trim() || 'default';
-        if (accountTenant !== tenantId || hasDisallowedStoreOverride(c, tenantId)) {
+        const account = session && 'account' in session ? session.account : null;
+        const accountTenant = (account?.tenant_id || '').trim() || 'default';
+        if (!account || !roles.includes(account.role) || accountTenant !== tenantId || hasDisallowedStoreOverride(c, tenantId)) {
           return errorResponse('Không đủ quyền truy cập cửa hàng', 403);
         }
       } else if (!callerPayload && c.env.AURA_DB) {
