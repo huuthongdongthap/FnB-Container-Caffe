@@ -89,7 +89,8 @@ ordersUnifiedRouter.post(
     const hasOrderToken = Boolean(
       (c.req.header('X-Order-Token') || c.req.header('x-order-token') || c.req.query('order_token') || '').trim()
     );
-    if (hasOrderToken) {
+    const hasAuthHeader = Boolean((c.req.header('Authorization') || c.req.header('authorization') || '').trim());
+    if (hasOrderToken && !hasAuthHeader) {
       return optionalAuth()(c, async () => {
         const user = c.get('user') as { role?: string } | undefined;
         if (user?.role && !ORDER_CANCEL_ROLES.includes(String(user.role).toLowerCase())) {
