@@ -281,33 +281,35 @@ export function registerSendHandler(router: Hono<{ Bindings: Env }>): void {
             throw channelColErr;
           }
         }
-        consentFilterActive = true;
-        for (const row of consentRows) {
-          const cid = String(row.customer_id);
-          const rawCh = row.channel && String(row.channel).trim() !== ''
-            ? String(row.channel).trim().toLowerCase()
-            : 'all';
-          const chKey = rawCh === 'zalo' ? 'zns' : rawCh;
-          let perCh = customerChannelMap.get(cid);
-          if (!perCh) {
-            perCh = new Map<string, boolean>();
-            customerChannelMap.set(cid, perCh);
+        if (consentRows.length > 0) {
+          consentFilterActive = true;
+          for (const row of consentRows) {
+            const cid = String(row.customer_id);
+            const rawCh = row.channel && String(row.channel).trim() !== ''
+              ? String(row.channel).trim().toLowerCase()
+              : 'all';
+            const chKey = rawCh === 'zalo' ? 'zns' : rawCh;
+            let perCh = customerChannelMap.get(cid);
+            if (!perCh) {
+              perCh = new Map<string, boolean>();
+              customerChannelMap.set(cid, perCh);
+            }
+            const isActiveGrant = Number(row.granted) === 1 && !row.revoked_at;
+            if (chKey === 'all' && !isActiveGrant) {
+              perCh.clear();
+              perCh.set('all', false);
+            } else {
+              perCh.set(chKey, isActiveGrant);
+            }
           }
-          const isActiveGrant = Number(row.granted) === 1 && !row.revoked_at;
-          if (chKey === 'all' && !isActiveGrant) {
-            perCh.clear();
-            perCh.set('all', false);
-          } else {
-            perCh.set(chKey, isActiveGrant);
-          }
+          customers = customers.filter((cust) => {
+            const perCh = customerChannelMap.get(String(cust.id));
+            if (!perCh) return false;
+            return activeChannels.some((ch) =>
+              perCh.has(ch) ? Boolean(perCh.get(ch)) : Boolean(perCh.get('all'))
+            );
+          });
         }
-        customers = customers.filter((cust) => {
-          const perCh = customerChannelMap.get(String(cust.id));
-          if (!perCh) return false;
-          return activeChannels.some((ch) =>
-            perCh.has(ch) ? Boolean(perCh.get(ch)) : Boolean(perCh.get('all'))
-          );
-        });
       } catch (consentErr) {
         if (!/no such table:\s*consents/i.test(String(consentErr))) {
           return c.json({ success: false, error: 'Consent verification unavailable', retryable: true }, 503);

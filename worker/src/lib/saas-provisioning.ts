@@ -450,6 +450,17 @@ export async function provisionSelfServeTenant(
   });
 
   // 9. Seed Cafe Tables + initial Table QR codes atomically in the same batch
+  let hasTableQrTenantId = true;
+  try {
+    const qrCols = await db.prepare('PRAGMA table_info(table_qr_codes)').all<{ name?: string }>();
+    const rows = qrCols.results ?? [];
+    if (rows.length > 0) {
+      hasTableQrTenantId = rows.some((col) => col.name === 'tenant_id');
+    }
+  } catch {
+    // Keep default true if PRAGMA is unavailable
+  }
+
   template.tables.forEach((tbl, idx) => {
     const tblId = `tbl_${slug}_${tbl.code.toLowerCase()}`;
     const uniqueTableNumber = `${slug}-${tbl.code}`;
@@ -463,15 +474,27 @@ export async function provisionSelfServeTenant(
         )
         .bind(tblId, uniqueTableNumber, tbl.code, tbl.name, tbl.capacity, tbl.zone, idx + 1, tenantId, nowIso, nowIso)
     );
-    statements.push(
-      db
-        .prepare(
-          `INSERT INTO table_qr_codes (
-            table_id, slug, tenant_id, created_at, updated_at
-          ) VALUES (?, ?, ?, ?, ?)`
-        )
-        .bind(tblId, qrSlug, tenantId, nowIso, nowIso)
-    );
+    if (hasTableQrTenantId) {
+      statements.push(
+        db
+          .prepare(
+            `INSERT INTO table_qr_codes (
+              table_id, slug, tenant_id, created_at, updated_at
+            ) VALUES (?, ?, ?, ?, ?)`
+          )
+          .bind(tblId, qrSlug, tenantId, nowIso, nowIso)
+      );
+    } else {
+      statements.push(
+        db
+          .prepare(
+            `INSERT INTO table_qr_codes (
+              table_id, slug, created_at, updated_at
+            ) VALUES (?, ?, ?, ?)`
+          )
+          .bind(tblId, qrSlug, nowIso, nowIso)
+      );
+    }
   });
 
   // 10. Seed Default Shifts

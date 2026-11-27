@@ -91,6 +91,14 @@ export async function changePassword(request: Request, env: Record<string, unkno
         if (dbRow && Number.isFinite(Number(dbRow.auth_version))) {
           nextVersion = Math.max(nextVersion, Number(dbRow.auth_version) + 1);
         }
+        const custDbRow = (await db
+          .prepare('SELECT auth_version FROM customers WHERE id = ? OR email = ?')
+          .bind(custId || null, payload.email || null)
+          .first<{ auth_version?: number }>()
+          .catch(() => null));
+        if (custDbRow && Number.isFinite(Number(custDbRow.auth_version))) {
+          nextVersion = Math.max(nextVersion, Number(custDbRow.auth_version) + 1);
+        }
       }
       try {
         if (custId && authKV) {
@@ -148,6 +156,21 @@ export async function changePassword(request: Request, env: Record<string, unkno
             if (customerTenant === 'default') {
               await db
                 .prepare("UPDATE users SET password_hash = ?, auth_version = COALESCE(auth_version, 1) + 1, updated_at = datetime('now') WHERE id = ? OR email = ?")
+                .bind(user.password, custId || null, payload.email || null)
+                .run()
+                .catch(() => {});
+            }
+          });
+        await db
+          .prepare(
+            "UPDATE customers SET password_hash = ?, auth_version = MAX(COALESCE(auth_version, 1) + 1, ?), updated_at = datetime('now') WHERE (id = ? OR email = ?) AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
+          )
+          .bind(user.password, nextVersion, custId || null, payload.email || null, customerTenant)
+          .run()
+          .catch(async () => {
+            if (customerTenant === 'default') {
+              await db
+                .prepare("UPDATE customers SET password_hash = ?, auth_version = COALESCE(auth_version, 1) + 1, updated_at = datetime('now') WHERE id = ? OR email = ?")
                 .bind(user.password, custId || null, payload.email || null)
                 .run()
                 .catch(() => {});

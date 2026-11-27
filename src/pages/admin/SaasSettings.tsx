@@ -503,8 +503,11 @@ export default function AdminSaasSettingsPage(): ReactNode {
           <h1 className="text-2xl font-bold text-white">Gói dịch vụ, Thanh toán & Thương hiệu</h1>
           <p className="text-sm text-slate-400">
             Cửa hàng: <strong className="text-white">{me?.tenant.name}</strong> • Link QR:{' '}
-            <a href={`/s/${me?.tenant.slug}`} className="font-mono text-amber-400 hover:underline">
-              /s/{me?.tenant.slug}
+            <a
+              href={me?.tenant.slug && me.tenant.slug !== 'default' ? `/s/${me.tenant.slug}` : '/'}
+              className="font-mono text-amber-400 hover:underline"
+            >
+              {me?.tenant.slug && me.tenant.slug !== 'default' ? `/s/${me.tenant.slug}` : '/'}
             </a>
           </p>
         </div>

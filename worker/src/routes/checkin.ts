@@ -640,6 +640,45 @@ const handleApproveCheckin = async(c: import('hono').Context<{ Bindings: Env }>)
     }
   }
 
+  // Keep cashback_wallets.lifetime_earned in sync when the column exists
+  if (Number(checkin.reward_amount || 0) > 0 && checkin.customer_id) {
+    await db
+      .prepare(
+        "UPDATE cashback_wallets SET lifetime_earned = COALESCE(lifetime_earned, 0) + ? WHERE customer_id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
+      )
+      .bind(checkin.reward_amount, checkin.customer_id, effectiveTenant)
+      .run()
+      .catch(() => {});
+  }
+
+  // Credit check-in loyalty points to customers + loyalty_accounts if present
+  const pointsEarned = Number((checkin as unknown as { points_earned?: number }).points_earned || 0);
+  if (pointsEarned > 0 && checkin.customer_id) {
+    const nowPts = new Date().toISOString();
+    await db
+      .prepare(
+        "UPDATE customers SET loyalty_points = COALESCE(loyalty_points, 0) + ?, lifetime_points = COALESCE(lifetime_points, 0) + ?, updated_at = ? WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
+      )
+      .bind(pointsEarned, pointsEarned, nowPts, checkin.customer_id, effectiveTenant)
+      .run()
+      .catch(async () => {
+        if (effectiveTenant === 'default') {
+          await db
+            .prepare('UPDATE customers SET loyalty_points = COALESCE(loyalty_points, 0) + ?, lifetime_points = COALESCE(lifetime_points, 0) + ?, updated_at = ? WHERE id = ?')
+            .bind(pointsEarned, pointsEarned, nowPts, checkin.customer_id)
+            .run()
+            .catch(() => {});
+        }
+      });
+    await db
+      .prepare(
+        "UPDATE loyalty_accounts SET current_points = COALESCE(current_points, 0) + ?, lifetime_points = COALESCE(lifetime_points, 0) + ?, updated_at = ? WHERE customer_id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
+      )
+      .bind(pointsEarned, pointsEarned, nowPts, checkin.customer_id, effectiveTenant)
+      .run()
+      .catch(() => {});
+  }
+
   const row = await db.prepare('SELECT * FROM checkins WHERE id = ?').bind(id).first<CheckinRecord>();
   return c.json({ success: true, data: row });
 };
