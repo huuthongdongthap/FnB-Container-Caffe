@@ -170,8 +170,8 @@ export function registerStaffHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
       params.push(isActive ? 1 : 0);
     }
     if (search) {
-      whereClause += ' AND (name LIKE ? OR email LIKE ? OR phone LIKE ?)';
-      params.push(`%${search}%`, `%${search}%`, `%${search}%`);
+      whereClause += ' AND (name LIKE ? OR email LIKE ? OR phone LIKE ? OR id IN (SELECT staff_id FROM staff_login_identities WHERE email LIKE ?))';
+      params.push(`%${search}%`, `%${search}%`, `%${search}%`, `%${search}%`);
     }
 
     const offset = (page - 1) * limit;
@@ -553,6 +553,27 @@ export function registerStaffHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
       return c.json({ success: false, error: 'Email already exists' }, 409);
     }
     await db.prepare('UPDATE users SET email = ? WHERE id = ?').bind(normalizedEmail, id).run().catch(() => {});
+    const extraSets: string[] = [];
+    const extraParams: (string | number | null)[] = [];
+    if (body.locale !== undefined) {
+      extraSets.push('locale = ?');
+      extraParams.push(body.locale);
+    }
+    if (body.hourlyRate !== undefined) {
+      extraSets.push('hourly_rate = ?');
+      extraParams.push(body.hourlyRate);
+    }
+    if (body.hireDate !== undefined) {
+      extraSets.push('hire_date = ?');
+      extraParams.push(body.hireDate);
+    }
+    if (extraSets.length > 0) {
+      await db
+        .prepare(`UPDATE users SET ${extraSets.join(', ')} WHERE id = ?`)
+        .bind(...extraParams, id)
+        .run()
+        .catch(() => {});
+    }
     if (c.env.AUTH_KV) {
       const credential = JSON.stringify({ id, name: body.name, email: normalizedEmail, role: body.role,
         phone: body.phone || '', password: passwordHash, tenant_id: staffTenant, active: body.isActive !== false, auth_version: 1 });
@@ -752,6 +773,7 @@ export function registerStaffHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
       canonicalParams.push(body.isActive ? 1 : 0);
     }
     if (body.avatarUrl !== undefined) { updates.push('avatar_url = ?'); params.push(body.avatarUrl); }
+    if (body.hourlyRate !== undefined) { updates.push('hourly_rate = ?'); params.push(body.hourlyRate); }
     if (body.hireDate !== undefined) { updates.push('hire_date = ?'); params.push(body.hireDate); }
 
     const invalidatesSession = body.role !== undefined || body.isActive !== undefined || body.email !== undefined;

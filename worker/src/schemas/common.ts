@@ -4,6 +4,17 @@ import { z } from '@hono/zod-openapi';
  * Common OpenAPI schemas for all routes
  */
 
+// Strict boolean query parameter parser (avoids Boolean("false") === true from z.coerce.boolean())
+export const QueryBooleanSchema = z.preprocess((val) => {
+  if (typeof val === 'boolean') return val;
+  if (typeof val === 'string') {
+    const normalized = val.trim().toLowerCase();
+    if (normalized === 'true' || normalized === '1') return true;
+    if (normalized === 'false' || normalized === '0') return false;
+  }
+  return val;
+}, z.boolean());
+
 // Pagination
 export const PaginationQuerySchema = z.object({
   page: z.coerce.number().int().positive().default(1).openapi({

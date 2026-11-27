@@ -373,6 +373,31 @@ export function inventoryCRUD(app: Hono<AppContext>) {
         .run();
     }
 
+    // Best-effort mirror to canonical `ingredients` table to avoid split-brain with /admin/inventory & BOM
+    try {
+      await db
+        .prepare(
+          `INSERT OR IGNORE INTO ingredients
+           (id, sku, name, category, unit, current_stock, min_stock, max_stock, cost_per_unit, is_active, tenant_id, created_at, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, datetime('now'), datetime('now'))`
+        )
+        .bind(
+          id,
+          input.sku,
+          input.name,
+          input.category,
+          input.unit,
+          input.current_stock,
+          input.min_stock,
+          input.max_stock,
+          input.cost_per_unit,
+          tenantId
+        )
+        .run();
+    } catch {
+      // Optional table/columns in partial test mocks
+    }
+
     return c.json({ success: true, data: { id, ...input } }, 201);
   });
 
@@ -487,7 +512,7 @@ export function inventoryCRUD(app: Hono<AppContext>) {
       .first<Record<string, unknown>>()
       .catch(() => null);
     if (!existing || !matchesInventoryTenant(existing, tenantId)) {
-      return c.json({ success: false });
+      return c.json({ success: false, error: 'Inventory item not found' }, 404);
     }
     const effectiveRowTenant =
       existing.tenant_id &&

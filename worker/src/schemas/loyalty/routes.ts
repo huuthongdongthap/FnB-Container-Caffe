@@ -1,6 +1,7 @@
 import { z } from '@hono/zod-openapi';
 import {
   PaginationQuerySchema,
+  QueryBooleanSchema,
   SuccessResponseSchema,
   ErrorResponseSchema,
   IdParamsSchema,
@@ -103,7 +104,7 @@ export const LoyaltyRoutes = {
       summary: 'List available rewards',
       tags: ['Loyalty'],
       security: [{ BearerAuth: [] }],
-      request: { query: PaginationQuerySchema.extend({ isActive: z.coerce.boolean().optional(), type: LoyaltyRewardTypeEnum.optional() }) },
+      request: { query: PaginationQuerySchema.extend({ isActive: QueryBooleanSchema.optional(), type: LoyaltyRewardTypeEnum.optional() }) },
       responses: {
         200: { description: 'Rewards list', content: { 'application/json': { schema: SuccessResponseSchema(LoyaltyRewardListResponseSchema) } } },
       },

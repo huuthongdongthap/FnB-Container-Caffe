@@ -9,6 +9,24 @@ interface InventoryIngredientsTabProps {
   onOpenMovement: (item: IngredientItem) => void;
 }
 
+const CATEGORY_LABELS: Record<string, string> = {
+  raw_materials: 'Nguyên liệu thô',
+  packaging: 'Bao bì',
+  dairy: 'Sữa & Kem',
+  coffee: 'Cà phê',
+  tea: 'Trà',
+  syrup: 'Syrup & Sốt',
+  consumables: 'Vật tư tiêu hao',
+  beverage: 'Đồ uống',
+  pastry: 'Bánh ngọt',
+};
+
+function formatCategoryLabel(cat: string): string {
+  const key = cat.trim().toLowerCase();
+  if (CATEGORY_LABELS[key]) return CATEGORY_LABELS[key];
+  return cat.replace(/_/g, ' ');
+}
+
 export function InventoryIngredientsTab({
   ingredients,
   loading,
@@ -74,7 +92,7 @@ export function InventoryIngredientsTab({
                   : 'bg-white/5 text-[var(--aura-text-muted)] hover:bg-white/10'
               }`}
             >
-              {cat}
+              {formatCategoryLabel(cat)}
             </button>
           ))}
         </div>
@@ -124,7 +142,7 @@ export function InventoryIngredientsTab({
                       </td>
                       <td className="py-3 px-4 font-medium">{item.name}</td>
                       <td className="py-3 px-4 capitalize text-[var(--aura-text-muted)]">
-                        {item.category || 'Mặc định'}
+                        {item.category ? formatCategoryLabel(item.category) : 'Mặc định'}
                       </td>
                       <td className="py-3 px-4 text-right font-bold font-mono">
                         {item.current_stock.toLocaleString()} {item.unit}

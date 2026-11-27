@@ -27,6 +27,7 @@ export const WAITER_ORDER_CREATE_ROLES = new Set([
   'supervisor',
   'waiter',
   'cashier',
+  'staff',
 ]);
 
 const WAITER_SERVE_ROLES = new Set([

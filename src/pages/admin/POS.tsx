@@ -456,7 +456,7 @@ export default function AdminPOSPage() {
           setCheckoutError('Vui lòng chọn bàn phục vụ trước khi tạo đơn.');
           return false;
         }
-        const effectiveMethod: PaymentMethod = effectiveOrderType === 'delivery' ? 'payos' : paymentMethod;
+        const effectiveMethod: PaymentMethod = paymentMethod;
         const totalQty = cart.reduce((sum, ci) => sum + ci.quantity, 0);
         const computedShippingFee = effectiveOrderType === 'delivery' && totalQty > 0 && totalQty < 2 ? 15_000 : 0;
         const subtotal = cart.reduce((acc, ci) => acc + ci.price * ci.quantity, 0);
@@ -852,9 +852,6 @@ export default function AdminPOSPage() {
         orderType={orderType}
         onOrderTypeChange={(nextType) => {
           setOrderType(nextType);
-          if (nextType === 'delivery') {
-            setPaymentMethod('payos');
-          }
           if (nextType !== 'dine_in') {
             setSelectedTableId(undefined);
           }

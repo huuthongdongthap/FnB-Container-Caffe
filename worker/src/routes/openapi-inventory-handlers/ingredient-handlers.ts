@@ -234,6 +234,12 @@ export function registerIngredientHandlers(app: OpenAPIHono<{ Bindings: Env }>) 
       params.push(query.isActive ? 1 : 0);
     }
 
+    if (query.lowStock === true) {
+      whereClause += whereClause ? 'AND current_stock <= min_stock ' : 'WHERE current_stock <= min_stock ';
+    } else if (query.lowStock === false) {
+      whereClause += whereClause ? 'AND current_stock > min_stock ' : 'WHERE current_stock > min_stock ';
+    }
+
     const tenantId = resolveOpenApiIngredientTenant(c);
     const fetchLimit = tenantId === '*' ? limit : Math.max(limit * 10, 500);
     const fetchOffset = tenantId === '*' ? offset : 0;
