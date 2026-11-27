@@ -157,77 +157,9 @@ export async function executeKdsStatusTransition(
       actorId: options?.actorId ?? null,
       skipInventoryRestore: true,
       skipTableRelease: true,
-      // The legacy loyalty block below already reverses accrual and decrements
-      // `customers.total_spent`; letting the policy do it as well double-counts
-      // the reversal for every paid order that earned points/cashback.
-      skipAccrualReversal: true,
     }).catch(() => {});
+    const cancelTotalVnd = Number(ordRow?.total ?? ordRow?.total_amount ?? 0);
     try {
-      let earnRow = await rawDb
-        .prepare("SELECT customer_id FROM cashback_transactions WHERE order_id = ? AND type = 'earn' AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ? LIMIT 1")
-        .bind(orderId, effectiveCancelTenant)
-        .first<{ customer_id?: string }>()
-        .catch(() => null);
-      if (!earnRow && effectiveCancelTenant === 'default') {
-        const fallbackEarn = await rawDb
-          .prepare("SELECT customer_id FROM cashback_transactions WHERE order_id = ? AND type = 'earn' LIMIT 1")
-          .bind(orderId)
-          .first<{ customer_id?: string; tenant_id?: string | null }>()
-          .catch(() => null);
-        if (
-          fallbackEarn &&
-          (!('tenant_id' in fallbackEarn) ||
-            fallbackEarn.tenant_id === undefined ||
-            (String(fallbackEarn.tenant_id ?? '').trim() || 'default') === effectiveCancelTenant)
-        ) {
-          earnRow = fallbackEarn;
-        }
-      }
-      if (earnRow?.customer_id) {
-        const { loadPolicy, reverseAccrual } = await import('@aura/domain-crm');
-        const totalVnd = Number(ordRow?.total ?? ordRow?.total_amount ?? 0);
-        const ordTenant = effectiveCancelTenant;
-        const policy = await loadPolicy(rawDb, options?.kv as any, new Date(), ordTenant).catch(() => null);
-        if (policy) {
-          await reverseAccrual(rawDb, policy, {
-            orderId,
-            customerId: earnRow.customer_id,
-            refundAmountVnd: totalVnd,
-            reason: 'order_cancelled',
-            tenantId: ordTenant,
-          }).catch(() => {});
-        }
-      }
-      const cancelPaymentStatus = String(
-        ordRow?.payment_status ?? (order as Record<string, unknown>).payment_status ?? '',
-      )
-        .trim()
-        .toLowerCase();
-      const cancelCustomerId =
-        (ordRow?.customer_id ? String(ordRow.customer_id).trim() : '') ||
-        (earnRow?.customer_id ? String(earnRow.customer_id).trim() : '');
-      const cancelTotalVnd = Number(ordRow?.total ?? ordRow?.total_amount ?? 0);
-      if (
-        cancelCustomerId &&
-        cancelTotalVnd > 0 &&
-        (cancelPaymentStatus === 'paid' || cancelPaymentStatus === 'completed' || Boolean(earnRow?.customer_id))
-      ) {
-        await rawDb
-          .prepare(
-            "UPDATE customers SET total_spent = MAX(0, COALESCE(total_spent, 0) - ?) WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?",
-          )
-          .bind(cancelTotalVnd, cancelCustomerId, effectiveCancelTenant)
-          .run()
-          .catch(() => {
-            if (effectiveCancelTenant === 'default') {
-              return rawDb
-                .prepare('UPDATE customers SET total_spent = MAX(0, COALESCE(total_spent, 0) - ?) WHERE id = ?')
-                .bind(cancelTotalVnd, cancelCustomerId)
-                .run()
-                .catch(() => {});
-            }
-          });
-      }
       const existingRefund = await rawDb
         .prepare("SELECT id FROM cashback_transactions WHERE order_id = ? AND type = 'refund' AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ? LIMIT 1")
         .bind(orderId, effectiveCancelTenant)

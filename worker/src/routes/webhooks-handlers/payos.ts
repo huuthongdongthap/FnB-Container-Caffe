@@ -215,6 +215,28 @@ export async function handlePayosWebhook(
       safeWaitUntil(c, metrics.recordMetric(success ? 'payment_success' : 'payment_failed', Number(payment.amount), { provider: 'payos', order_id: payment.order_id, tenant_id: settledOrderTenant }));
       if (success && !isInitialTerminalOrder) {
         safeWaitUntil(c, metrics.recordMetric('revenue', Number(payment.amount), { provider: 'payos', tenant_id: settledOrderTenant }));
+        safeWaitUntil(
+          c,
+          db
+            .prepare(
+              `UPDATE staff_shifts
+               SET online_sales = COALESCE(online_sales, 0) + ?,
+                   total_sales = COALESCE(total_sales, 0) + ?,
+                   order_count = COALESCE(order_count, 0) + 1
+               WHERE id = (
+                 SELECT id FROM staff_shifts
+                 WHERE clock_in IS NOT NULL AND clock_out IS NULL
+                   AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?
+                   AND LOWER(COALESCE(role, '')) NOT IN ('barista', 'kitchen', 'chef', 'bep')
+                 ORDER BY CASE WHEN LOWER(COALESCE(role, '')) IN ('cashier', 'owner', 'admin', 'manager', 'supervisor') THEN 0 ELSE 1 END,
+                          clock_in DESC, id DESC
+                 LIMIT 1
+               )`
+            )
+            .bind(Number(payment.amount), Number(payment.amount), settledOrderTenant)
+            .run()
+            .catch(() => {})
+        );
       }
     }
     if (success && (settled.orderChanged || settled.paymentChanged)) {

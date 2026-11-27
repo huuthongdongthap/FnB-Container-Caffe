@@ -208,13 +208,13 @@ export function registerAnalyticsHandlers(app: Hono<{ Bindings: Env }>) {
        GROUP BY DATE(datetime(created_at, '+7 hours')) ORDER BY date`
     ).bind(from, to, ...tf.binds).all<{ date: string; count: number }>();
 
-    // Orders by day (ICT UTC+7) — net of partial refunds
+    // Orders by day (ICT UTC+7) — net of partial refunds, grouped by settlement date when available
     let orders: { date: string; count: number; revenue: number }[] = [];
     try {
       const ordRes = await db.prepare(
-        `SELECT DATE(datetime(created_at, '+7 hours')) as date, COUNT(*) as count, COALESCE(SUM(${NET_ORDER_TOTAL_SQL}), 0) as revenue
-         FROM orders WHERE DATE(datetime(created_at, '+7 hours')) BETWEEN ? AND ? AND ${VALID_REVENUE_ORDER_SQL}${tf.and}
-         GROUP BY DATE(datetime(created_at, '+7 hours')) ORDER BY date`
+        `SELECT DATE(datetime(COALESCE(cod_paid_at, created_at), '+7 hours')) as date, COUNT(*) as count, COALESCE(SUM(${NET_ORDER_TOTAL_SQL}), 0) as revenue
+         FROM orders WHERE DATE(datetime(COALESCE(cod_paid_at, created_at), '+7 hours')) BETWEEN ? AND ? AND ${VALID_REVENUE_ORDER_SQL}${tf.and}
+         GROUP BY DATE(datetime(COALESCE(cod_paid_at, created_at), '+7 hours')) ORDER BY date`
       ).bind(from, to, ...tf.binds).all<{ date: string; count: number; revenue: number }>();
       orders = ordRes.results || [];
     } catch {
@@ -611,7 +611,7 @@ export function registerAnalyticsHandlers(app: Hono<{ Bindings: Env }>) {
       const res = await db.prepare(
         `SELECT CAST(strftime('%H', datetime(created_at, '+7 hours')) AS INTEGER) as hour,
                 COUNT(*) as order_count,
-                COALESCE(SUM(total), 0) as revenue
+                COALESCE(SUM(${NET_ORDER_TOTAL_SQL}), 0) as revenue
          FROM orders
          WHERE DATE(datetime(created_at, '+7 hours')) BETWEEN ? AND ? AND ${VALID_REVENUE_ORDER_SQL}${tf.and}
          GROUP BY hour ORDER BY hour`
@@ -673,7 +673,11 @@ export function registerAnalyticsHandlers(app: Hono<{ Bindings: Env }>) {
         `SELECT COUNT(*) as count FROM (SELECT customer_id FROM orders WHERE customer_id IS NOT NULL AND TRIM(COALESCE(customer_id, '')) NOT IN ('', 'guest', 'walk-in', 'pos') AND ${VALID_REVENUE_ORDER_SQL}${tf.and} GROUP BY customer_id, COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') HAVING COUNT(*) > 1)`
       ),
       runFirst<{ total: number }>(
-        `SELECT COALESCE(SUM(total), 0) as total FROM orders WHERE ${VALID_REVENUE_ORDER_SQL}${tf.and}`
+        `SELECT COALESCE(SUM(${NET_ORDER_TOTAL_SQL}), 0) as total FROM orders WHERE ${VALID_REVENUE_ORDER_SQL}${tf.and}`
+      ).catch(() =>
+        runFirst<{ total: number }>(
+          `SELECT COALESCE(SUM(total), 0) as total FROM orders WHERE ${VALID_REVENUE_ORDER_SQL}${tf.and}`
+        )
       ),
       runFirst<{ count: number }>(
         `SELECT COUNT(*) as count FROM orders WHERE ${VALID_REVENUE_ORDER_SQL}${tf.and}`

@@ -214,7 +214,30 @@ export async function runPostOrderSideEffects(params: PostOrderParams): Promise<
     })());
   }
 
-  if (ctx?.waitUntil) {
+  const isInitiallyPaid = ['paid', 'completed'].includes(String(params.initialPaymentStatus || '').trim().toLowerCase());
+  if (isInitiallyPaid && snapshot.total > 0) {
+    const revMetricPromise = db.prepare(
+      `INSERT INTO _metrics (name, value, labels, timestamp) VALUES (?, ?, ?, ?)`
+    ).bind(
+      'revenue',
+      snapshot.total,
+      JSON.stringify({ provider: validatedMethod || 'cash', order_id: orderId, tenant_id: effectiveTenant }),
+      Math.floor(Date.now() / 1000)
+    ).run().catch(() => {});
+    if (ctx?.waitUntil) ctx.waitUntil(revMetricPromise);
+    else await revMetricPromise;
+  }
+
+  if (ctx?.waitUntil && isInitiallyPaid) {
+    const mappedErpItems = snapshot.items.map((it) => ({
+      item_code: it.menuItemId,
+      product_id: it.menuItemId,
+      quantity: it.quantity,
+      unit_price: it.unitPriceCents,
+      rate: it.unitPriceCents,
+      subtotal: it.subtotalCents,
+      amount: it.subtotalCents,
+    }));
     ctx.waitUntil(Promise.resolve(syncOrderToERPNext(
       {
         ERPNEXT_URL: (env as Record<string, string>).ERPNEXT_URL!,
@@ -225,7 +248,7 @@ export async function runPostOrderSideEffects(params: PostOrderParams): Promise<
       {
         customer_name: data.customer_name, customer_phone: data.customer_phone,
         customer_id: undefined, table_id: resolvedTableId,
-        items: snapshot.items as unknown as Record<string, unknown>[],
+        items: mappedErpItems,
         total: snapshot.total, payment_method: validatedMethod, notes: data.notes ?? undefined
       }
     )));
