@@ -216,9 +216,9 @@ export function registerRewardHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
         const activeParams = query.isActive !== undefined ? [query.isActive ? 1 : 0] : [];
         const fallbackRewards = (await db.prepare(
           `SELECT * FROM rewards ${activeFilter}`
-        ).bind(...activeParams).all()) as { results: any[] };
-        const existingIds = new Set(rewardResults.map((r: any) => String(r.id)));
-        const mergedFallback: any[] = [];
+        ).bind(...activeParams).all<Record<string, unknown>>()) as { results?: Record<string, unknown>[] };
+        const existingIds = new Set(rewardResults.map((r: Record<string, unknown>) => String(r.id)));
+        const mergedFallback: Record<string, unknown>[] = [];
         for (const r of fallbackRewards.results || []) {
           if (!existingIds.has(String(r.id)) && (await checkRewardTenant(db, r, tenantId))) {
             mergedFallback.push(r);
@@ -226,7 +226,8 @@ export function registerRewardHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
         }
         if (mergedFallback.length > 0) {
           const combined = [...rewardResults, ...mergedFallback].sort(
-            (a: any, b: any) => resolveEffectivePointsCost(a) - resolveEffectivePointsCost(b)
+            (a: Record<string, unknown>, b: Record<string, unknown>) =>
+              resolveEffectivePointsCost(a) - resolveEffectivePointsCost(b)
           );
           total = Math.max(total + mergedFallback.length, combined.length);
           rewardResults = combined.slice(0, limit);

@@ -519,7 +519,7 @@ export function registerUsageHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
   });
 
   // GET /api/promotions/{id}/usage - List promotion usage
-  app.openapi(PromotionRoutes.usage.list as any, async (c: any) => {
+  app.openapi(PromotionRoutes.usage.list, (async (c) => {
     const db = getDatabase(c);
     const tenantId = getTenantId(c).trim() || 'default';
     const user = c.get('user');
@@ -576,5 +576,5 @@ export function registerUsageHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
         },
       },
     });
-  });
+  }) as never);
 }

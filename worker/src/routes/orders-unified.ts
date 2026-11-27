@@ -91,13 +91,13 @@ ordersUnifiedRouter.post(
     );
     const hasAuthHeader = Boolean((c.req.header('Authorization') || c.req.header('authorization') || '').trim());
     if (hasOrderToken && !hasAuthHeader) {
-      return optionalAuth()(c, async () => {
-        const user = c.get('user') as { role?: string } | undefined;
-        if (user?.role && !ORDER_CANCEL_ROLES.includes(String(user.role).toLowerCase())) {
-          return c.json({ success: false, error: 'Insufficient permissions to cancel order' }, 403);
-        }
-        await next();
-      });
+      await optionalAuth()(c, async () => {});
+      const user = c.get('user') as { role?: string } | undefined;
+      if (user?.role && !ORDER_CANCEL_ROLES.includes(String(user.role).toLowerCase())) {
+        return c.json({ success: false, error: 'Insufficient permissions to cancel order' }, 403);
+      }
+      await next();
+      return;
     }
     return requireAuth(ORDER_CANCEL_ROLES)(c, next);
   },

@@ -2154,7 +2154,7 @@ waitlistRouter.get('/', optionalAuth() as any, requireReservationStaff() as any,
   return c.json({ success: true, data: rows });
 });
 
-waitlistRouter.post('/', optionalAuth() as any, requireReservationStaff() as any, async (c) => {
+waitlistRouter.post('/', optionalAuth() as never, requireReservationStaff() as never, async (c) => {
   const db = c.env.AURA_DB;
   const tenantId = resolveRequestTenantId(c);
   const effectiveTenant = tenantId === '*' ? 'default' : tenantId;
@@ -2194,7 +2194,7 @@ waitlistRouter.post('/', optionalAuth() as any, requireReservationStaff() as any
   );
 });
 
-waitlistRouter.patch('/:id', optionalAuth() as any, requireReservationStaff() as any, async (c) => {
+waitlistRouter.patch('/:id', optionalAuth() as never, requireReservationStaff() as never, async (c) => {
   const db = c.env.AURA_DB;
   const tenantId = resolveRequestTenantId(c);
   const id = c.req.param('id');
@@ -2243,7 +2243,7 @@ waitlistRouter.patch('/:id', optionalAuth() as any, requireReservationStaff() as
   return c.json({ success: true, data: updated });
 });
 
-waitlistRouter.delete('/:id', optionalAuth() as any, requireReservationStaff() as any, async (c) => {
+waitlistRouter.delete('/:id', optionalAuth() as never, requireReservationStaff() as never, async (c) => {
   const db = c.env.AURA_DB;
   const tenantId = resolveRequestTenantId(c);
   const id = c.req.param('id');
