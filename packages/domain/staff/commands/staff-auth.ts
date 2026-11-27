@@ -213,16 +213,13 @@ async function upsertDevice(env: { AURA_DB: import('@cloudflare/workers-types').
      WHERE staff_devices.staff_id = excluded.staff_id`,
   ).bind(devId, data.staff_id, data.device_name ?? null, data.device_token, data.pin_hash, data.role, now, now,
     account.id, account.auth_version, account.role, targetTenant);
-  const updateVerStmt = env.AURA_DB.prepare(`UPDATE users SET auth_version = auth_version + 1, updated_at = ? WHERE id = ? AND auth_version = ?
-        AND EXISTS (SELECT 1 FROM staff_devices WHERE device_token = ? AND staff_id = ? AND pin_hash = ?)`)
-        .bind(now, account.id, account.auth_version, data.device_token, data.staff_id, data.pin_hash);
-  let results;
+  let result;
   try {
-    results = await env.AURA_DB.batch([statementWithTenant, updateVerStmt]);
+    result = await statementWithTenant.run();
   } catch (err) {
     if (String((err as Error)?.message || '').toLowerCase().includes('tenant_id')) {
       try {
-        results = await env.AURA_DB.batch([statementFallback, updateVerStmt]);
+        result = await statementFallback.run();
       } catch {
         throw new SessionUnavailableError();
       }
@@ -230,7 +227,7 @@ async function upsertDevice(env: { AURA_DB: import('@cloudflare/workers-types').
       throw new SessionUnavailableError();
     }
   }
-  if (!results[0]?.meta.changes || !results[1]?.meta.changes) throw new StaffSessionError('SESSION_REVOKED');
+  if (!result?.meta.changes) throw new StaffSessionError('SESSION_REVOKED');
 
 }
 

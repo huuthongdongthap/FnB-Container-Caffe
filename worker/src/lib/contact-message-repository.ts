@@ -64,15 +64,19 @@ export async function contactMessageRepository(db: D1Database) {
         ORDER BY cm.created_at DESC, cm.rowid DESC`)
         .bind(tenantId, tenantId, tenantId, tenantId).all()).results;
     },
-    async history(tenantId: string, phone: string) {
+    async history(tenantId: string, phone: string, options?: { markAsRead?: boolean }) {
       // No mutation of the unrelated chat_messages table: ownership there is not established.
-      const updates = [];
-      if (columns.has('read_at')) updates.push('read_at = ?');
-      if (columns.has('status')) updates.push("status = 'read'");
-      const params = columns.has('read_at') ? [new Date().toISOString(), phone, tenantId] : [phone, tenantId];
-      await db.prepare(`UPDATE contact_messages AS cm SET ${updates.join(', ')} WHERE cm.phone = ? AND ${allowed('cm')}
-        AND ${unread('cm')}`)
-        .bind(...params).run();
+      if (options?.markAsRead !== false) {
+        const updates = [];
+        if (columns.has('read_at')) updates.push('read_at = ?');
+        if (columns.has('status')) updates.push("status = 'read'");
+        if (updates.length > 0) {
+          const params = columns.has('read_at') ? [new Date().toISOString(), phone, tenantId] : [phone, tenantId];
+          await db.prepare(`UPDATE contact_messages AS cm SET ${updates.join(', ')} WHERE cm.phone = ? AND ${allowed('cm')}
+            AND ${unread('cm')}`)
+            .bind(...params).run();
+        }
+      }
       return (await db.prepare(`SELECT cm.id, cm.name, cm.phone, ${text} AS message,
         ${direction('cm')} AS direction, cm.created_at, ${readAt('cm')} AS read_at
         FROM contact_messages cm WHERE cm.phone = ? AND ${allowed('cm')} ORDER BY cm.created_at ASC, cm.rowid ASC`)

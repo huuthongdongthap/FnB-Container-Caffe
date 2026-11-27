@@ -331,8 +331,11 @@ async function applyAccrualAttempt(db: D1Database, policy: LoyaltyPolicy, input:
   const accountingTenantColumns = new Set<string>();
   let hasAccountMirror = false;
   let hasTextAuditId = false;
+  let hasCustomerTotalSpent = false;
+  let hasCustomerTotalOrders = false;
+  let hasCustomerTierCol = false;
   try {
-    for (const table of ['cashback_transactions', 'loyalty_point_logs', 'loyalty_audit_log', 'loyalty_accounts']) {
+    for (const table of ['cashback_transactions', 'loyalty_point_logs', 'loyalty_audit_log', 'loyalty_accounts', 'customers']) {
       const schema = await db.prepare(`PRAGMA table_info(${table})`).all<{ name: string; type: string }>();
       if (!schema.success || !Array.isArray(schema.results)) throw new Error(`unreadable ${table} schema`);
       const hasTenantColumn = schema.results.some(column => column.name === 'tenant_id');
@@ -341,7 +344,12 @@ async function applyAccrualAttempt(db: D1Database, policy: LoyaltyPolicy, input:
       if (table === 'loyalty_audit_log') {
         hasTextAuditId = schema.results.some(column => column.name === 'id' && /^TEXT$/i.test(column.type));
       }
-      if (writeTenant !== 'default' && schema.results.length > 0 && !hasTenantColumn) {
+      if (table === 'customers') {
+        hasCustomerTotalSpent = schema.results.some(column => column.name === 'total_spent');
+        hasCustomerTotalOrders = schema.results.some(column => column.name === 'total_orders');
+        hasCustomerTierCol = schema.results.some(column => column.name === 'tier');
+      }
+      if (table !== 'customers' && writeTenant !== 'default' && schema.results.length > 0 && !hasTenantColumn) {
         throw new Error(`tenant scope unavailable for ${table}`);
       }
     }
@@ -562,12 +570,30 @@ async function applyAccrualAttempt(db: D1Database, policy: LoyaltyPolicy, input:
 
   // The tier and ledger balances are calculated from the same customer snapshot.
   // Do not overwrite a tier or publish a stale balance after another mutation.
+  const extraCustomerSet: string[] = [];
+  const extraCustomerBind: unknown[] = [];
+  if (tierUpgraded) {
+    extraCustomerSet.push('loyalty_tier = ?');
+    extraCustomerBind.push(finalTier);
+    if (hasCustomerTierCol) {
+      extraCustomerSet.push('tier = ?');
+      extraCustomerBind.push(finalTier);
+    }
+  }
+  if (hasCustomerTotalSpent) {
+    extraCustomerSet.push('total_spent = COALESCE(total_spent, 0) + ?');
+    extraCustomerBind.push(total);
+  }
+  if (hasCustomerTotalOrders) {
+    extraCustomerSet.push('total_orders = COALESCE(total_orders, 0) + 1');
+  }
+  const extraSetSql = extraCustomerSet.length > 0 ? `, ${extraCustomerSet.join(', ')}` : '';
   const customerUpdateStmt = db.prepare(`UPDATE customers
     SET loyalty_points = COALESCE(loyalty_points, 0) + ?, lifetime_points = COALESCE(lifetime_points, 0) + ?,
-      updated_at = ?${tierUpgraded ? ', loyalty_tier = ?' : ''}
+      updated_at = ?${extraSetSql}
     WHERE id = ?${customerScope}
       AND COALESCE(loyalty_points, 0) = ? AND COALESCE(lifetime_points, 0) = ? AND loyalty_tier IS ?`)
-    .bind(points, points, now, ...(tierUpgraded ? [finalTier] : []), ...customerArgs,
+    .bind(points, points, now, ...extraCustomerBind, ...customerArgs,
       customer.loyalty_points ?? 0, customer.lifetime_points ?? 0, customer.loyalty_tier ?? null);
 
   const orderUpdateStmt = effectiveTenant && order.tenant_id !== undefined

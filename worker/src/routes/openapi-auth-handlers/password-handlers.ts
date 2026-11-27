@@ -123,8 +123,33 @@ export function registerForgotPasswordHandler(app: OpenAPIHono<{ Bindings: Env }
 
     await db.prepare(
       `INSERT INTO email_verifications (id, email, code, type, expires_at, used, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`
-    ).bind(resetId, normalizedEmail, code, 'password_reset', expiresAt, 0, now).run();
+       VALUES (?, ?, ?, ?, ?, ?, ?)
+       ON CONFLICT(email) DO UPDATE SET
+         id = excluded.id,
+         code = excluded.code,
+         type = excluded.type,
+         expires_at = excluded.expires_at,
+         used = 0,
+         attempts = 0,
+         created_at = excluded.created_at`
+    ).bind(resetId, normalizedEmail, code, 'password_reset', expiresAt, 0, now).run().catch(async (err: unknown) => {
+      const msg = err instanceof Error ? err.message : String(err);
+      if (msg.toLowerCase().includes('attempts')) {
+        await db.prepare(
+          `INSERT INTO email_verifications (id, email, code, type, expires_at, used, created_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?)
+           ON CONFLICT(email) DO UPDATE SET
+             id = excluded.id,
+             code = excluded.code,
+             type = excluded.type,
+             expires_at = excluded.expires_at,
+             used = 0,
+             created_at = excluded.created_at`
+        ).bind(resetId, normalizedEmail, code, 'password_reset', expiresAt, 0, now).run();
+        return;
+      }
+      throw err;
+    });
 
     await db.prepare(
       `INSERT INTO otp_codes (id, email, code, purpose, expires_at, used, created_at)

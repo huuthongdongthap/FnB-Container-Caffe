@@ -25,13 +25,32 @@ const TIER_RANK: Record<string, number> = {
   vip: 4,
 };
 
+function resolveEffectivePointsCost(r: Record<string, unknown>): number {
+  const pc = r.points_cost !== undefined && r.points_cost !== null ? Number(r.points_cost) : null;
+  const legacyPc = r.point_cost !== undefined && r.point_cost !== null ? Number(r.point_cost) : null;
+  if (legacyPc !== null && Number.isFinite(legacyPc) && (pc === null || (pc === 100 && legacyPc !== 100))) {
+    return legacyPc;
+  }
+  return pc !== null && Number.isFinite(pc) ? pc : 100;
+}
+
+function resolveEffectiveRewardType(r: Record<string, unknown>): string {
+  const t = typeof r.type === 'string' && r.type.trim() ? r.type.trim() : null;
+  const rt = typeof r.reward_type === 'string' && r.reward_type.trim() ? r.reward_type.trim() : null;
+  const dt = typeof r.discount_type === 'string' && r.discount_type.trim() ? r.discount_type.trim() : null;
+  if (dt && (!t || (t === 'fixed' && dt !== 'fixed'))) {
+    return dt;
+  }
+  return t ?? rt ?? dt ?? 'voucher';
+}
+
 function mapRewardRow(r: any) {
   return {
     ...r,
     name: r.name ?? r.title,
-    type: r.type ?? r.reward_type ?? r.discount_type ?? 'voucher',
+    type: resolveEffectiveRewardType(r),
     value: r.value ?? r.reward_value ?? r.discount_value ?? 0,
-    pointsCost: r.points_cost ?? r.point_cost ?? 100,
+    pointsCost: resolveEffectivePointsCost(r),
     maxRedemptions: r.max_redemptions ?? (r.stock !== undefined && r.stock > 0 ? r.stock : null),
     currentRedemptions: r.current_redemptions ?? r.redeemed_count ?? 0,
     validFrom: r.valid_from ?? null,
@@ -191,24 +210,27 @@ export function registerRewardHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
       }
     }
 
-    if (rewardResults.length === 0 && !query.type) {
+    if ((rewardResults.length === 0 || tenantId === 'default') && !query.type) {
       try {
         const activeFilter = query.isActive !== undefined ? 'WHERE is_active = ?' : '';
         const activeParams = query.isActive !== undefined ? [query.isActive ? 1 : 0] : [];
         const fallbackRewards = (await db.prepare(
           `SELECT * FROM rewards ${activeFilter}`
         ).bind(...activeParams).all()) as { results: any[] };
-        const sortedFallback = (fallbackRewards.results || []).sort(
-          (a: any, b: any) => Number(a.points_cost ?? a.point_cost ?? 100) - Number(b.points_cost ?? b.point_cost ?? 100)
-        );
-        const scopedFallback: any[] = [];
-        for (const r of sortedFallback) {
-          if (await checkRewardTenant(db, r, tenantId)) {
-            scopedFallback.push(r);
+        const existingIds = new Set(rewardResults.map((r: any) => String(r.id)));
+        const mergedFallback: any[] = [];
+        for (const r of fallbackRewards.results || []) {
+          if (!existingIds.has(String(r.id)) && (await checkRewardTenant(db, r, tenantId))) {
+            mergedFallback.push(r);
           }
         }
-        total = scopedFallback.length;
-        rewardResults = scopedFallback.slice(offset, offset + limit);
+        if (mergedFallback.length > 0) {
+          const combined = [...rewardResults, ...mergedFallback].sort(
+            (a: any, b: any) => resolveEffectivePointsCost(a) - resolveEffectivePointsCost(b)
+          );
+          total = Math.max(total + mergedFallback.length, combined.length);
+          rewardResults = combined.slice(0, limit);
+        }
       } catch {
         // Ignore when rewards table is absent
       }
@@ -529,7 +551,11 @@ export function registerRewardHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
       return c.json({ success: false, error: 'Reward is not active' }, 400);
     }
 
-    const customerLookupId = String(user.customerId || user.customer_id || user.id);
+    const isStaffRedeem = ['owner', 'admin', 'manager', 'supervisor', 'staff', 'cashier'].includes(String(user.role || '').toLowerCase());
+    const customerLookupId =
+      isStaffRedeem && body.customerId && String(body.customerId).trim()
+        ? String(body.customerId).trim()
+        : String(user.customerId || user.customer_id || user.id);
     let verifiedOrderTenant: string | null = null;
     if (body.orderId) {
       let orderRow: Record<string, unknown> | null = null;
