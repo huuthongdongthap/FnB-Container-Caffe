@@ -90,7 +90,13 @@ ordersUnifiedRouter.post(
       (c.req.header('X-Order-Token') || c.req.header('x-order-token') || c.req.query('order_token') || '').trim()
     );
     if (hasOrderToken) {
-      return optionalAuth()(c, next);
+      return optionalAuth()(c, async () => {
+        const user = c.get('user') as { role?: string } | undefined;
+        if (user?.role && !ORDER_CANCEL_ROLES.includes(String(user.role).toLowerCase())) {
+          return c.json({ success: false, error: 'Insufficient permissions to cancel order' }, 403);
+        }
+        await next();
+      });
     }
     return requireAuth(ORDER_CANCEL_ROLES)(c, next);
   },
