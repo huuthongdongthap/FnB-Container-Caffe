@@ -118,11 +118,22 @@ async function sendMessage(c: Context<{ Bindings: Env }>) {
         if (!callerPhone || callerPhone !== phone) {
           return errorResponse('Không được phép gửi tin nhắn dưới số điện thoại của khách hàng khác', 403);
         }
+      } else if (callerPayload && callerPayload.role !== 'customer') {
+        const accountTenant = (session && 'account' in session ? session.account?.tenant_id : undefined)?.trim() || 'default';
+        if (accountTenant !== tenantId || hasDisallowedStoreOverride(c, tenantId)) {
+          return errorResponse('Không đủ quyền truy cập cửa hàng', 403);
+        }
       } else if (!callerPayload && c.env.AURA_DB) {
-        // Anonymous caller cannot spoof a registered customer's phone
+        // Anonymous caller cannot spoof a registered customer's phone (check 0..., 84..., +84... variants)
+        const digits = phone.replace(/[^\d]/g, '');
+        const localPhone = digits.startsWith('84') && digits.length >= 10 ? `0${digits.slice(2)}` : digits;
+        const intlPhone = localPhone.startsWith('0') ? `84${localPhone.slice(1)}` : localPhone;
+        const plusIntlPhone = `+${intlPhone}`;
         const existingOwner = await c.env.AURA_DB
-          .prepare("SELECT id FROM customers WHERE phone = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ? LIMIT 1")
-          .bind(phone, tenantId)
+          .prepare(
+            "SELECT id FROM customers WHERE phone IN (?, ?, ?, ?) AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ? LIMIT 1",
+          )
+          .bind(phone, localPhone, intlPhone, plusIntlPhone, tenantId)
           .first<{ id?: string }>()
           .catch(() => null);
         if (existingOwner?.id) {

@@ -230,159 +230,117 @@ export async function eraseCustomerPii(
     await db.prepare('DELETE FROM push_subscriptions WHERE customer_id = ?').bind(input.customerId).run();
   } catch { /* optional table */ }
 
-  // 3b. Scrub/purge PII across all auxiliary D1 tables (GDPR Art. 17 / VN ND 13)
+  // 3b. Scrub/purge PII across all auxiliary D1 tables (GDPR Art. 17 / VN ND 13) — tenant-scoped
   const cleanPhone = priorPhone && !priorPhone.startsWith('erased_') ? priorPhone : null;
   const cleanEmail = priorEmail ? priorEmail.toLowerCase() : null;
-
-  try {
-    await db
-      .prepare(
-        `UPDATE subscriptions
-            SET customer_name = '[ERASED]', customer_email = ?, customer_phone = ?
-          WHERE customer_id = ? OR (? IS NOT NULL AND LOWER(customer_email) = ?) OR (? IS NOT NULL AND customer_phone = ?)`,
-      )
-      .bind(`${erasedToken}@erased.invalid`, erasedToken, input.customerId, cleanEmail, cleanEmail, cleanPhone, cleanPhone)
-      .run();
-  } catch { /* optional table */ }
-
-  try {
-    await db
-      .prepare(
-        `UPDATE reservations
-            SET customer_name = '[ERASED]', customer_phone = ?, notes = NULL
-          WHERE customer_id = ? OR (? IS NOT NULL AND customer_phone = ?)`,
-      )
-      .bind(erasedToken, input.customerId, cleanPhone, cleanPhone)
-      .run();
-  } catch { /* optional table */ }
-
-  try {
-    await db
-      .prepare("UPDATE checkins SET customer_name = '[ERASED]' WHERE customer_id = ?")
-      .bind(input.customerId)
-      .run();
-  } catch { /* optional table */ }
-
-  try {
-    await db
-      .prepare(
-        `UPDATE contact_messages
-            SET name = '[ERASED]', phone = NULL, email = NULL, content = '[ERASED]'
-          WHERE (? IS NOT NULL AND LOWER(email) = ?) OR (? IS NOT NULL AND phone = ?)`,
-      )
-      .bind(cleanEmail, cleanEmail, cleanPhone, cleanPhone)
-      .run();
-  } catch { /* optional table */ }
-
-  try {
-    await db
-      .prepare("UPDATE reviews SET customer_name = '[ERASED]' WHERE customer_id = ?")
-      .bind(input.customerId)
-      .run();
-  } catch { /* optional table */ }
-
-  try {
-    await db
-      .prepare(
-        `UPDATE table_sessions
-            SET customer_name = '[ERASED]', customer_phone = NULL, notes = NULL
-          WHERE customer_id = ? OR (? IS NOT NULL AND customer_phone = ?)`,
-      )
-      .bind(input.customerId, cleanPhone, cleanPhone)
-      .run();
-  } catch { /* optional table */ }
-
-  try {
-    await db
-      .prepare(
-        `UPDATE wifi_sessions
-            SET phone = NULL, ip_address = NULL
-          WHERE customer_id = ? OR (? IS NOT NULL AND phone = ?)`,
-      )
-      .bind(input.customerId, cleanPhone, cleanPhone)
-      .run();
-  } catch { /* optional table */ }
-
-  try {
-    await db
-      .prepare(
-        `UPDATE ai_barista_interactions
-            SET customer_phone = NULL, query_prompt = '[ERASED]', preferences_json = NULL
-          WHERE customer_id = ? OR (? IS NOT NULL AND customer_phone = ?)`,
-      )
-      .bind(input.customerId, cleanPhone, cleanPhone)
-      .run();
-  } catch { /* optional table */ }
-
-  try {
-    if (cleanPhone) {
+  const tenantPred = "AND (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?)";
+  const runScoped = async (sqlBase: string, binds: unknown[]) => {
+    try {
       await db
-        .prepare(
-          `UPDATE customer_support_interactions
-              SET customer_phone = NULL, user_query = '[ERASED]'
-            WHERE customer_phone = ?`,
-        )
-        .bind(cleanPhone)
+        .prepare(`${sqlBase} ${tenantPred}`)
+        .bind(...binds, tenantId, tenantId)
         .run();
+    } catch (err) {
+      if (/no such column:\s*tenant_id/i.test(String(err)) && (tenantId === 'default' || tenantId === '*')) {
+        await db.prepare(sqlBase).bind(...binds).run().catch(() => {});
+      }
     }
-  } catch { /* optional table */ }
+  };
 
-  try {
-    if (cleanPhone) {
-      await db.prepare('DELETE FROM otp_challenges WHERE phone = ?').bind(cleanPhone).run();
-    }
-  } catch { /* optional table */ }
+  await runScoped(
+    `UPDATE subscriptions
+        SET customer_name = '[ERASED]', customer_email = ?, customer_phone = ?
+      WHERE (customer_id = ? OR (? IS NOT NULL AND LOWER(customer_email) = ?) OR (? IS NOT NULL AND customer_phone = ?))`,
+    [`${erasedToken}@erased.invalid`, erasedToken, input.customerId, cleanEmail, cleanEmail, cleanPhone, cleanPhone],
+  );
 
-  try {
-    await db
-      .prepare('DELETE FROM email_verifications WHERE user_id = ? OR (? IS NOT NULL AND LOWER(email) = ?)')
-      .bind(input.customerId, cleanEmail, cleanEmail)
-      .run();
-  } catch { /* optional table */ }
+  await runScoped(
+    `UPDATE reservations
+        SET customer_name = '[ERASED]', customer_phone = ?, notes = NULL
+      WHERE (customer_id = ? OR (? IS NOT NULL AND customer_phone = ?))`,
+    [erasedToken, input.customerId, cleanPhone, cleanPhone],
+  );
 
-  try {
-    await db
-      .prepare(
-        `UPDATE promotion_redemptions
-            SET customer_phone = NULL
-          WHERE customer_id = ? OR (? IS NOT NULL AND customer_phone = ?)`,
-      )
-      .bind(input.customerId, cleanPhone, cleanPhone)
-      .run();
-  } catch { /* optional table */ }
+  await runScoped(
+    "UPDATE checkins SET customer_name = '[ERASED]' WHERE customer_id = ?",
+    [input.customerId],
+  );
 
-  try {
-    await db
-      .prepare(
-        `UPDATE signup_bonus_log
-            SET phone = NULL, ip_hint = NULL
-          WHERE customer_id = ? OR (? IS NOT NULL AND phone = ?)`,
-      )
-      .bind(input.customerId, cleanPhone, cleanPhone)
-      .run();
-  } catch { /* optional table */ }
+  await runScoped(
+    `UPDATE contact_messages
+        SET name = '[ERASED]', phone = NULL, email = NULL, content = '[ERASED]'
+      WHERE ((? IS NOT NULL AND LOWER(email) = ?) OR (? IS NOT NULL AND phone = ?))`,
+    [cleanEmail, cleanEmail, cleanPhone, cleanPhone],
+  );
 
-  try {
-    await db
-      .prepare(
-        `UPDATE notification_audit_log
-            SET recipient = NULL, phone = NULL, payload = NULL, data = NULL
-          WHERE customer_id = ?
-             OR (? IS NOT NULL AND (LOWER(recipient) = ? OR recipient = ?))
-             OR (? IS NOT NULL AND (phone = ? OR recipient = ?))`,
-      )
-      .bind(input.customerId, cleanEmail, cleanEmail, priorEmail, cleanPhone, cleanPhone, cleanPhone)
-      .run();
-  } catch { /* optional table */ }
+  await runScoped(
+    "UPDATE reviews SET customer_name = '[ERASED]' WHERE customer_id = ?",
+    [input.customerId],
+  );
 
-  try {
-    await db
-      .prepare(
-        'DELETE FROM leads WHERE (? IS NOT NULL AND LOWER(email) = ?) OR (? IS NOT NULL AND phone = ?)',
-      )
-      .bind(cleanEmail, cleanEmail, cleanPhone, cleanPhone)
-      .run();
-  } catch { /* optional table */ }
+  await runScoped(
+    `UPDATE table_sessions
+        SET customer_name = '[ERASED]', customer_phone = NULL, notes = NULL
+      WHERE (customer_id = ? OR (? IS NOT NULL AND customer_phone = ?))`,
+    [input.customerId, cleanPhone, cleanPhone],
+  );
+
+  await runScoped(
+    `UPDATE wifi_sessions
+        SET phone = NULL, ip_address = NULL
+      WHERE (customer_id = ? OR (? IS NOT NULL AND phone = ?))`,
+    [input.customerId, cleanPhone, cleanPhone],
+  );
+
+  await runScoped(
+    `UPDATE ai_barista_interactions
+        SET customer_phone = NULL, query_prompt = '[ERASED]', preferences_json = NULL
+      WHERE (customer_id = ? OR (? IS NOT NULL AND customer_phone = ?))`,
+    [input.customerId, cleanPhone, cleanPhone],
+  );
+
+  if (cleanPhone) {
+    await runScoped(
+      `UPDATE customer_support_interactions
+          SET customer_phone = NULL, user_query = '[ERASED]'
+        WHERE customer_phone = ?`,
+      [cleanPhone],
+    );
+    await runScoped('DELETE FROM otp_challenges WHERE phone = ?', [cleanPhone]);
+  }
+
+  await runScoped(
+    'DELETE FROM email_verifications WHERE (user_id = ? OR (? IS NOT NULL AND LOWER(email) = ?))',
+    [input.customerId, cleanEmail, cleanEmail],
+  );
+
+  await runScoped(
+    `UPDATE promotion_redemptions
+        SET customer_phone = NULL
+      WHERE (customer_id = ? OR (? IS NOT NULL AND customer_phone = ?))`,
+    [input.customerId, cleanPhone, cleanPhone],
+  );
+
+  await runScoped(
+    `UPDATE signup_bonus_log
+        SET phone = NULL, ip_hint = NULL
+      WHERE (customer_id = ? OR (? IS NOT NULL AND phone = ?))`,
+    [input.customerId, cleanPhone, cleanPhone],
+  );
+
+  await runScoped(
+    `UPDATE notification_audit_log
+        SET recipient = NULL, phone = NULL, payload = NULL, data = NULL
+      WHERE (customer_id = ?
+         OR (? IS NOT NULL AND (LOWER(recipient) = ? OR recipient = ?))
+         OR (? IS NOT NULL AND (phone = ? OR recipient = ?)))`,
+    [input.customerId, cleanEmail, cleanEmail, priorEmail, cleanPhone, cleanPhone, cleanPhone],
+  );
+
+  await runScoped(
+    'DELETE FROM leads WHERE ((? IS NOT NULL AND LOWER(email) = ?) OR (? IS NOT NULL AND phone = ?))',
+    [cleanEmail, cleanEmail, cleanPhone, cleanPhone],
+  );
 
   const effectiveTargetTenant = resolvedRowTenant || (tenantId === '*' ? 'default' : tenantId);
 
