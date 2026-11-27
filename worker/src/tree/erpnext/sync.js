@@ -82,22 +82,31 @@ export async function syncOrderToERPNext(env, orderId, orderData) {
 
       if (!soRespFixed.ok) {
         salesOrderFailed = true;
-        console.error(
-          '[erpnext-sync] Sales Order failed:',
-          soRespFixed.status,
-          soJson,
-        );
+        log.error('erpnext_sales_order_failed', {
+          orderId,
+          status: soRespFixed.status,
+          exc_type: typeof soJson?.exc_type === 'string' ? soJson.exc_type : undefined,
+        });
       }
     }
   } catch (err) {
     salesOrderFailed = true;
-    log.error('erpnext_sales_order_exception', { error: err?.message || err });
+    log.error('erpnext_sales_order_exception', { orderId, error: err?.message || String(err) });
   }
 
-  // ── 2) Lead for new walk-in customers (no linked customer_id) ─────────────
+  // ── 2) Lead for walk-in customers only with explicit marketing/CRM opt-in ──
   try {
     const isWalkIn = !orderData?.customer_id;
-    if (isWalkIn && orderData?.customer_name && orderData?.customer_phone) {
+    const hasExplicitOptIn =
+      (orderData?.consent_marketing === true ||
+        orderData?.marketing_consent === true ||
+        orderData?.consent_crm === true ||
+        orderData?.consent_erpnext_sync === true) &&
+      orderData?.consent_marketing !== false &&
+      orderData?.marketing_consent !== false &&
+      orderData?.consent_crm !== false &&
+      orderData?.consent_erpnext_sync !== false;
+    if (isWalkIn && hasExplicitOptIn && orderData?.customer_name && orderData?.customer_phone) {
       const leadBody = {
         doctype: 'Lead',
         lead_name: orderData.customer_name,
@@ -119,15 +128,15 @@ export async function syncOrderToERPNext(env, orderId, orderData) {
       results.lead = leadJson.data ?? leadJson;
 
       if (!leadResp.ok) {
-        console.error(
-          '[erpnext-sync] Lead failed:',
-          leadResp.status,
-          leadJson,
-        );
+        log.error('erpnext_lead_failed', {
+          orderId,
+          status: leadResp.status,
+          exc_type: typeof leadJson?.exc_type === 'string' ? leadJson.exc_type : undefined,
+        });
       }
     }
   } catch (err) {
-    log.error('erpnext_lead_exception', { error: err?.message || err });
+    log.error('erpnext_lead_exception', { orderId, error: err?.message || String(err) });
   }
 
   return { ok: !salesOrderFailed, orderId, results };

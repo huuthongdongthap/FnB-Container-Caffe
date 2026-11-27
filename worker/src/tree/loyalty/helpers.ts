@@ -20,7 +20,7 @@ export async function throttle(
   }
   const cfIp = c.req.header('CF-Connecting-IP')?.trim();
   const xffRaw = c.req.header('X-Forwarded-For');
-  const xffIp = xffRaw ? xffRaw.split(',')[0].trim() : '';
+  const xffIp = c.env.ENVIRONMENT === 'production' ? '' : (xffRaw ? xffRaw.split(',')[0].trim() : '');
   const ip = cfIp || xffIp || 'unknown';
   const isLoopback = (val?: string) => val === '127.0.0.1' || val === 'localhost' || val === '::1';
   if (c.env.ENVIRONMENT !== 'production' && cfIp && isLoopback(cfIp)) {

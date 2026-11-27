@@ -17,6 +17,7 @@ export const ALLOWED_ORIGIN_PATTERNS: RegExp[] = [
   /^https:\/\/fnb-caffe-container\.pages\.dev$/,
   /^https:\/\/[a-z0-9-]+\.fnb-caffe-container\.pages\.dev$/,
   /^https:\/\/(www\.)?auraspace\.cafe$/,
+  /^https:\/\/[a-z0-9-]+\.auraspace\.cafe$/,
   /^https:\/\/(www\.)?auracafe\.vn$/,
   /^https:\/\/[a-z0-9-]+\.auracafe\.vn$/
 ];

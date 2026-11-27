@@ -54,6 +54,7 @@ async function expireStalePending(
 }
 
 const inFlightAuditIds = new Set<string>();
+const LIFECYCLE_NOTIFY_LOCK_PREFIX = 'saas_lifecycle_notify_lock:';
 
 async function claimAndNotify(
   db: D1Database,
@@ -64,6 +65,9 @@ async function claimAndNotify(
   if (!env.TELEGRAM_BOT_TOKEN || !env.TELEGRAM_CHAT_ID) return false;
   if (inFlightAuditIds.has(evt.auditId)) return false;
   inFlightAuditIds.add(evt.auditId);
+  const kv = env.AUTH_KV;
+  const lockKey = `${LIFECYCLE_NOTIFY_LOCK_PREFIX}${evt.auditId}`;
+  let kvLocked = false;
   try {
     const existing = await db
       .prepare('SELECT id FROM saas_audit_logs WHERE id = ? LIMIT 1')
@@ -71,19 +75,44 @@ async function claimAndNotify(
       .first<{ id: string }>();
     if (existing) return false;
 
-    const sent = await sendTelegramMessage(env.TELEGRAM_BOT_TOKEN, env.TELEGRAM_CHAT_ID, evt.text);
+    if (kv && typeof kv.get === 'function' && typeof kv.put === 'function') {
+      const existingLock = await kv.get(lockKey);
+      if (existingLock) return false;
+      await kv.put(lockKey, evt.nowIso, { expirationTtl: 300 });
+      kvLocked = true;
+    }
+
+    let sent = false;
+    try {
+      sent = await sendTelegramMessage(env.TELEGRAM_BOT_TOKEN, env.TELEGRAM_CHAT_ID, evt.text);
+    } catch (err) {
+      if (kvLocked && kv && typeof kv.delete === 'function') {
+        await kv.delete(lockKey).catch(() => undefined);
+      }
+      throw err;
+    }
     if (!sent) {
+      if (kvLocked && kv && typeof kv.delete === 'function') {
+        await kv.delete(lockKey).catch(() => undefined);
+      }
       return false;
     }
 
-    const res = await db
-      .prepare(
-        `INSERT OR IGNORE INTO saas_audit_logs (id, tenant_id, actor_user_id, actor_role, action, after_json, reason, created_at)
-         VALUES (?, ?, 'system_cron', 'system', ?, ?, ?, ?)`
-      )
-      .bind(evt.auditId, evt.tenantId, evt.action, JSON.stringify(evt.details), evt.reason, evt.nowIso)
-      .run();
-    if (Number(res.meta?.changes ?? 0) !== 1) return false;
+    try {
+      const res = await db
+        .prepare(
+          `INSERT OR IGNORE INTO saas_audit_logs (id, tenant_id, actor_user_id, actor_role, action, after_json, reason, created_at)
+           VALUES (?, ?, 'system_cron', 'system', ?, ?, ?, ?)`
+        )
+        .bind(evt.auditId, evt.tenantId, evt.action, JSON.stringify(evt.details), evt.reason, evt.nowIso)
+        .run();
+      if (Number(res.meta?.changes ?? 0) !== 1) return false;
+    } catch {
+      if (kv && typeof kv.put === 'function') {
+        await kv.put(lockKey, evt.nowIso, { expirationTtl: 86400 }).catch(() => undefined);
+      }
+      return false;
+    }
 
     summary.telegramDispatched++;
     return true;

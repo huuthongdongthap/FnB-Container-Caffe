@@ -10,6 +10,8 @@ import { checkRateLimit } from '../middleware/rate-limit';
 import { customerAssistantRouter, processCustomerQuery } from '../routes/customer-assistant';
 import { aiBaristaRouter, resetBaristaRateLimitForTests } from '../routes/ai-barista';
 import { registerVitalsRoute } from '../routes/vitals';
+import { chatRouter } from '../routes/chat';
+import { clientErrorsRouter } from '../routes/client-errors';
 import { generateJWT } from '../lib/jwt';
 
 const JWT_SECRET = 'k9X2mP7qR4vW8zB3nL6jF1hD5cT0yA9sE2uG4iO8';
@@ -386,5 +388,124 @@ describe('Issue #270: AI/LLM Assistant, Rate-Limit Bypass & D1 Flooding Regressi
     );
     expect(bRes.status).toBe(200);
     expect(Array.from(kv.store.keys()).some((k) => k.startsWith('rl:barista:'))).toBe(true);
+  });
+
+  it('rejects unauthenticated order lookups on customer assistant regardless of request host or order id', async () => {
+    const db = makeD1Mock({ first: () => null, all: () => ({ results: [] }) });
+    const env = {
+      ENVIRONMENT: 'production',
+      JWT_SECRET,
+      AURA_DB: db,
+    } as unknown as Env;
+
+    const res = await customerAssistantRouter.fetch(
+      new Request('https://test.local/?tenant_id=tenant_sadec_02', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query: 'Kiểm tra đơn #ord-sad-88', order_id: 'ord-sad-88' }),
+      }),
+      env
+    );
+    expect(res.status).toBe(401);
+  });
+
+  it('hardens chat route against invalid Bearer tokens, D1 outages, and unverified JWT phone claims', async () => {
+    const kv = makeKvMock();
+    const envWithDbError = {
+      ENVIRONMENT: 'production',
+      JWT_SECRET,
+      PILOT_TENANT_ID: 'default',
+      AUTH_KV: kv as unknown as KVNamespace,
+      AURA_DB: {
+        prepare: () => ({
+          bind: () => ({
+            first: async () => {
+              throw new Error('D1 connection failed');
+            },
+          }),
+        }),
+      },
+    } as unknown as Env;
+
+    const badBearerRes = await chatRouter.fetch(
+      new Request('https://auraspace.cafe/messages', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: 'Bearer invalid.jwt.token',
+        },
+        body: JSON.stringify({ name: 'Guest', phone: '0901234567', message: 'Hello' }),
+      }),
+      envWithDbError
+    );
+    expect(badBearerRes.status).toBe(401);
+
+    const dbOutageRes = await chatRouter.fetch(
+      new Request('https://auraspace.cafe/messages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: 'Guest', phone: '0901234567', message: 'Hello' }),
+      }),
+      envWithDbError
+    );
+    expect(dbOutageRes.status).toBe(503);
+
+    const customerToken = await generateJWT(
+      { id: 'cust-no-db-phone', sub: 'cust-no-db-phone', role: 'customer', phone: '0909998888', tenantId: 'default' } as any,
+      JWT_SECRET,
+      3600
+    );
+    const dbMissingPhone = makeD1Mock({
+      first: () => null,
+      all: () => ({ results: [] }),
+    });
+    const historyEnv = {
+      ENVIRONMENT: 'production',
+      JWT_SECRET,
+      PILOT_TENANT_ID: 'default',
+      AUTH_KV: kv as unknown as KVNamespace,
+      AURA_DB: dbMissingPhone,
+    } as unknown as Env;
+
+    const historyRes = await chatRouter.fetch(
+      new Request('https://auraspace.cafe/messages/0909998888', {
+        method: 'GET',
+        headers: { Authorization: `Bearer ${customerToken}` },
+      }),
+      historyEnv
+    );
+    expect(historyRes.status).toBe(403);
+  });
+
+  it('ignores attacker-supplied future timestamps in client-errors and stores server timestamp', async () => {
+    const insertedParams: unknown[][] = [];
+    const db = makeD1Mock({
+      run: (_sql, params) => {
+        insertedParams.push(params);
+        return { success: true, meta: { changes: 1 } };
+      },
+    });
+    const env = {
+      ENVIRONMENT: 'production',
+      AURA_DB: db,
+    } as unknown as Env;
+
+    const res = await clientErrorsRouter.fetch(
+      new Request('https://auraspace.cafe/', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          message: 'Test error',
+          ts: '9999-12-31T23:59:59Z',
+          timestamp: '9999-12-31T23:59:59Z',
+        }),
+      }),
+      env
+    );
+    expect(res.status).toBe(201);
+    expect(insertedParams.length).toBeGreaterThanOrEqual(1);
+    const storedTs = String(insertedParams[0][6]);
+    expect(storedTs).not.toBe('9999-12-31T23:59:59Z');
+    expect(new Date(storedTs).getUTCFullYear()).toBeLessThan(2100);
   });
 });

@@ -8,6 +8,7 @@ import { useOrderStore, useOrderStoreWithOfflineFlush } from '@/hooks/stores/use
 import { usePaymentStore } from '@/hooks/stores/use-payment-store';
 import { useAuthStore } from '@/hooks/stores/use-auth-store';
 import { API_BASE } from '@/lib/api-client';
+import { isAllowedPaymentUrl } from '@/lib/safe-redirect';
 import { clearCheckoutIntent, resolveCheckoutOrder } from './checkout-intent';
 
 function checkoutIdentity(): string {
@@ -224,6 +225,10 @@ export function CheckoutPage() {
         setPayosRetrying(false);
         if (checkoutIdentity() !== identity) throw new Error('Phiên đăng nhập đã thay đổi. Vui lòng thử lại.');
         if (url) {
+          if (!isAllowedPaymentUrl(url)) {
+            submittingRef.current = false;
+            throw new Error(t('invalidPaymentUrl', 'Liên kết thanh toán không hợp lệ.'));
+          }
           window.location.href = url;
           return;
         }

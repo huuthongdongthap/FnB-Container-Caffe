@@ -41,8 +41,30 @@ export async function handlePayosWebhook(
   const ack = (message: string) => openApi
     ? c.json({ success: true, data: { received: true } })
     : c.json({ error: 0, message, data: null });
+  let payload: Record<string, unknown>;
   try {
-    const payload = await c.req.json() as Record<string, unknown>;
+    const raw = await c.req.json();
+    if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
+      return c.json({ error: 1, message: 'Invalid JSON payload' }, 400);
+    }
+    payload = raw as Record<string, unknown>;
+  } catch {
+    return c.json({ error: 1, message: 'Invalid JSON payload' }, 400);
+  }
+  try {
+    // Authenticate signature before schema validation so unauthenticated probes
+    // receive an identical 401 regardless of tenant existence or payload shape.
+    const signature = (payload.signature as string) || c.req.header('x-payos-signature');
+    if (!signature) return c.json({ error: 1, message: 'Invalid signature' }, 401);
+    if (
+      !payload.data ||
+      typeof payload.data !== 'object' ||
+      Array.isArray(payload.data) ||
+      !Object.keys(payload.data).length
+    ) {
+      return c.json({ error: 1, message: 'Invalid signature' }, 401);
+    }
+
     let targetTenantId = 'default';
     if (explicitTenantSlugOrId) {
       const tenantRow = await db
@@ -64,13 +86,6 @@ export async function handlePayosWebhook(
       return c.json({ error: 1, message: 'Invalid signature' }, 401);
     }
 
-    const signature = (payload.signature as string) || c.req.header('x-payos-signature');
-    if (!signature) return c.json({ error: 1, message: 'Invalid signature' }, 401);
-    if (!payload.data || typeof payload.data !== 'object' || !Object.keys(payload.data).length) {
-      return c.json({ error: 1, message: 'Invalid PayOS webhook payload' }, 400);
-    }
-    const parsed = payosWebhookSchema.safeParse(payload);
-    if (!parsed.success) return c.json({ error: 1, message: 'Invalid PayOS webhook payload' }, 400);
     const data = payload.data as Record<string, unknown>;
     if (!await verifySignature(data, signature, checksumKey)) {
       await writePaymentReviewMarker(c.env.AUTH_KV, {
@@ -82,6 +97,8 @@ export async function handlePayosWebhook(
       });
       return c.json({ error: 1, message: 'Invalid signature' }, 401);
     }
+    const parsed = payosWebhookSchema.safeParse(payload);
+    if (!parsed.success) return c.json({ error: 1, message: 'Invalid PayOS webhook payload' }, 400);
     // Signed registration probe: acknowledged without touching any business table.
     if (Number(data.orderCode) === PAYOS_PROBE_ORDER_CODE) {
       return openApi

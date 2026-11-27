@@ -92,6 +92,15 @@ export function inspectMigrationReversibility(forwardSql, downSql) {
     if (/DROP\s+INDEX\b/i.test(line) && !/DROP\s+INDEX\s+IF\s+EXISTS\b/i.test(line)) {
       hazards.add('unsafe_down_ddl_missing_if_exists');
     }
+    if (
+      /CREATE\s+(?:TEMP(?:ORARY)?\s+)?TRIGGER\b/i.test(line) &&
+      !/CREATE\s+(?:TEMP(?:ORARY)?\s+)?TRIGGER\s+IF\s+NOT\s+EXISTS\b/i.test(line)
+    ) {
+      hazards.add('unsafe_down_ddl_missing_if_exists');
+    }
+    if (/DROP\s+TRIGGER\b/i.test(line) && !/DROP\s+TRIGGER\s+IF\s+EXISTS\b/i.test(line)) {
+      hazards.add('unsafe_down_ddl_missing_if_exists');
+    }
   }
 
   const forwardCreatedTables = [];
@@ -130,6 +139,16 @@ export function inspectMigrationReversibility(forwardSql, downSql) {
     });
   }
 
+  const forwardCreatedTriggers = [];
+  for (const m of cleanForward.matchAll(
+    /CREATE\s+(?:TEMP(?:ORARY)?\s+)?TRIGGER\s+(?:IF\s+NOT\s+EXISTS\s+)?(["'`[]?[a-zA-Z0-9_]+["'`\]]?)(?:\s+(?:BEFORE|AFTER|INSTEAD\s+OF)\s+(?:(?!\bBEGIN\b)[\s\S])*?\bON\s+(["'`[]?[a-zA-Z0-9_]+["'`\]]?))?/gi
+  )) {
+    forwardCreatedTriggers.push({
+      trigger: normalizeIdentifier(m[1]),
+      table: m[2] ? normalizeIdentifier(m[2]) : '',
+    });
+  }
+
   const downDroppedTables = [];
   for (const m of cleanDown.matchAll(
     /DROP\s+TABLE\s+(?:IF\s+EXISTS\s+)?(["'`[]?[a-zA-Z0-9_]+["'`\]]?)/gi
@@ -153,6 +172,13 @@ export function inspectMigrationReversibility(forwardSql, downSql) {
     /DROP\s+INDEX\s+(?:IF\s+EXISTS\s+)?(["'`[]?[a-zA-Z0-9_]+["'`\]]?)/gi
   )) {
     downDroppedIndexes.push(normalizeIdentifier(m[1]));
+  }
+
+  const downDroppedTriggers = [];
+  for (const m of cleanDown.matchAll(
+    /DROP\s+TRIGGER\s+(?:IF\s+EXISTS\s+)?(["'`[]?[a-zA-Z0-9_]+["'`\]]?)/gi
+  )) {
+    downDroppedTriggers.push(normalizeIdentifier(m[1]));
   }
 
   for (const m of cleanDown.matchAll(
@@ -193,6 +219,12 @@ export function inspectMigrationReversibility(forwardSql, downSql) {
   for (const { index, table } of forwardCreatedIndexes) {
     if (!downDroppedIndexes.includes(index) && !downDroppedTables.includes(table)) {
       hazards.add('incomplete_down_missing_index_reversal');
+    }
+  }
+
+  for (const { trigger, table } of forwardCreatedTriggers) {
+    if (!downDroppedTriggers.includes(trigger) && (!table || !downDroppedTables.includes(table))) {
+      hazards.add('incomplete_down_missing_trigger_reversal');
     }
   }
 
@@ -324,6 +356,19 @@ export function lintMigrationsDirectory(migrationsDir, options = {}) {
 
       if (/DROP\s+TABLE/i.test(line) && !/DROP\s+TABLE\s+IF\s+EXISTS/i.test(line)) {
         errors.push(`${file}:${i + 1}: Unsafe DROP TABLE without IF EXISTS guard`);
+      }
+
+      if (
+        /CREATE\s+(?:TEMP(?:ORARY)?\s+)?TRIGGER\b/i.test(line) &&
+        !/CREATE\s+(?:TEMP(?:ORARY)?\s+)?TRIGGER\s+IF\s+NOT\s+EXISTS\b/i.test(line)
+      ) {
+        errors.push(
+          `${file}:${i + 1}: CREATE TRIGGER statement missing IF NOT EXISTS guard`
+        );
+      }
+
+      if (/DROP\s+TRIGGER\b/i.test(line) && !/DROP\s+TRIGGER\s+IF\s+EXISTS\b/i.test(line)) {
+        errors.push(`${file}:${i + 1}: Unsafe DROP TRIGGER without IF EXISTS guard`);
       }
 
       if (/^\s*TRUNCATE\b/i.test(line)) {

@@ -4,7 +4,7 @@ import path from 'node:path';
 import { eraseCustomerPii } from '../../../packages/domain/crm/commands/erase-customer-pii';
 import { ErpnextCrmClient } from '../clients/erpnext-crm-client';
 import { redact } from '../middleware/logger';
-import { getCorsOrigin } from '../middleware/cors';
+import { getCorsOrigin, jsonResponse } from '../middleware/cors';
 import { isAllowedOrigin } from '../../../packages/domain/security/src/policies/security-headers';
 import { sanitizeInternalRedirect, isAllowedPaymentUrl } from '../../../src/lib/safe-redirect';
 
@@ -206,5 +206,40 @@ describe('Issue #272 — Production CORS, Open Redirect, stitch-designs removal,
 
     const referral = fs.readFileSync(path.join(REPO_ROOT, 'src/pages/referral.tsx'), 'utf8');
     expect(referral).toContain("'noopener,noreferrer'");
+  });
+
+  it('rejects dot-segment protocol-relative bypasses in sanitizeInternalRedirect and sw.js, and enforces safe-redirect helpers across checkout and verify-email', () => {
+    expect(sanitizeInternalRedirect('/..//evil.com', '/account', 'https://auraspace.cafe')).toBe('/account');
+    expect(sanitizeInternalRedirect('/a/..//evil.com', '/account', 'https://auraspace.cafe')).toBe('/account');
+    expect(sanitizeInternalRedirect('/./a/..//evil.com', '/account', 'https://auraspace.cafe')).toBe('/account');
+
+    expect(isAllowedPaymentUrl('http://localhost:5173/payment-return', 'http://localhost:5173')).toBe(true);
+    expect(isAllowedPaymentUrl('http://localhost:5173/payment-return', 'https://auraspace.cafe')).toBe(false);
+
+    const swJs = fs.readFileSync(path.join(REPO_ROOT, 'public/sw.js'), 'utf8');
+    expect(swJs).toContain("!parsed.pathname.startsWith('//')");
+    expect(swJs).toContain("!parsed.pathname.startsWith('/\\\\')");
+
+    const verifyEmail = fs.readFileSync(path.join(REPO_ROOT, 'src/pages/verify-email/index.tsx'), 'utf8');
+    expect(verifyEmail).toContain('sanitizeInternalRedirect');
+
+    const checkout = fs.readFileSync(path.join(REPO_ROOT, 'src/pages/checkout.tsx'), 'utf8');
+    expect(checkout).toContain('isAllowedPaymentUrl');
+
+    const tableHooks = fs.readFileSync(path.join(REPO_ROOT, 'src/pages/TableOrder-hooks.ts'), 'utf8');
+    expect(tableHooks).toContain('isAllowedPaymentUrl');
+
+    const invoiceCard = fs.readFileSync(path.join(REPO_ROOT, 'src/pages/saas/dashboard/invoice-table-card.tsx'), 'utf8');
+    expect(invoiceCard).toContain('isAllowedPaymentUrl');
+  });
+
+  it('allows subdomain auraspace.cafe origins in security-headers policy and forwards environment in cors jsonResponse', () => {
+    expect(isAllowedOrigin('https://store1.auraspace.cafe', 'production')).toBe(true);
+
+    const devRes = jsonResponse({ ok: true }, 200, {}, 'http://localhost:5173', true, 'development');
+    expect(devRes.headers.get('Access-Control-Allow-Origin')).toBe('http://localhost:5173');
+
+    const prodRes = jsonResponse({ ok: true }, 200, {}, 'http://localhost:5173', true, 'production');
+    expect(prodRes.headers.get('Access-Control-Allow-Origin')).toBeNull();
   });
 });

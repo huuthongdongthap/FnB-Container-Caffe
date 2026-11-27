@@ -3140,14 +3140,23 @@ describe('Multi-Tenant & Franchise Preparation Integration', () => {
       const sadCustChatRes = await customerAssistantRouter.fetch(sadCustChatReq, env);
       expect(sadCustChatRes.status).toBe(403);
 
+      // Unauthenticated caller cannot query order status even with explicit ?tenant_id=tenant_sadec_02
       const pubSadChatReq = new Request('https://test.local/?tenant_id=tenant_sadec_02', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ query: 'Kiểm tra đơn #ord-sad-88', order_id: 'ord-sad-88' }),
       });
       const pubSadChatRes = await customerAssistantRouter.fetch(pubSadChatReq, env);
-      expect(pubSadChatRes.status).toBe(200);
-      expect(((await pubSadChatRes.json()) as any).data.reply).toContain('#ord-sad-88');
+      expect(pubSadChatRes.status).toBe(401);
+
+      // Authenticated SaDec supervisor can look up SaDec order #ord-sad-88
+      const sadSupChatReq = await authRequest('POST', '/?tenant_id=tenant_sadec_02', 'supervisor', 'tenant_sadec_02', {
+        query: 'Kiểm tra đơn #ord-sad-88',
+        order_id: 'ord-sad-88',
+      });
+      const sadSupChatRes = await customerAssistantRouter.fetch(sadSupChatReq, env);
+      expect(sadSupChatRes.status).toBe(200);
+      expect(((await sadSupChatRes.json()) as any).data.reply).toContain('#ord-sad-88');
 
       // 3. Zalo Webhook /simulate allows supervisor role and scopes order lookup to supervisor's tenant
       const supSimReq = await authRequest('POST', '/simulate', 'supervisor', 'tenant_sadec_02', {

@@ -10,6 +10,55 @@ import { toMauticContact } from './contact-mapper';
 import { trackEnrollment } from './enrollment-tracker';
 import type { MauticBridgeEnv } from './types';
 
+const UNSCOPED_MARKETING_CONSENT_SQL = `AND c.anonymized_at IS NULL
+     AND (
+       EXISTS (
+         SELECT 1 FROM consents co
+         WHERE co.customer_id = c.id
+           AND co.purpose = 'marketing'
+           AND co.granted = 1
+           AND co.revoked_at IS NULL
+           AND COALESCE(NULLIF(TRIM(co.tenant_id), ''), 'default') = COALESCE(NULLIF(TRIM(c.tenant_id), ''), 'default')
+       )
+       OR (
+         (COALESCE(c.consent_marketing, 0) = 1 OR COALESCE(c.marketing_consent, 0) = 1)
+         AND NOT EXISTS (
+           SELECT 1 FROM consents co_rev
+           WHERE co_rev.customer_id = c.id
+             AND co_rev.purpose = 'marketing'
+             AND (co_rev.granted = 0 OR co_rev.revoked_at IS NOT NULL)
+             AND COALESCE(NULLIF(TRIM(co_rev.tenant_id), ''), 'default') = COALESCE(NULLIF(TRIM(c.tenant_id), ''), 'default')
+         )
+       )
+     )`;
+
+const SCOPED_MARKETING_CONSENT_SQL = `AND c.anonymized_at IS NULL
+       AND (
+         EXISTS (
+           SELECT 1 FROM consents co
+           WHERE co.customer_id = c.id
+             AND co.purpose = 'marketing'
+             AND co.granted = 1
+             AND co.revoked_at IS NULL
+             AND COALESCE(NULLIF(TRIM(co.tenant_id), ''), 'default') = ?
+         )
+         OR (
+           (COALESCE(c.consent_marketing, 0) = 1 OR COALESCE(c.marketing_consent, 0) = 1)
+           AND NOT EXISTS (
+             SELECT 1 FROM consents co_rev
+             WHERE co_rev.customer_id = c.id
+               AND co_rev.purpose = 'marketing'
+               AND (co_rev.granted = 0 OR co_rev.revoked_at IS NOT NULL)
+               AND COALESCE(NULLIF(TRIM(co_rev.tenant_id), ''), 'default') = ?
+           )
+         )
+       )`;
+
+function isConsentSchemaFailure(err: unknown): boolean {
+  const msg = String((err as Error)?.message || err || '');
+  return /no such table:\s*consents|no such column:\s*(?:c\.)?anonymized_at|no such column:\s*(?:co|co_rev)\.(?:purpose|granted|revoked_at|customer_id)/i.test(msg);
+}
+
 async function detectAndEnroll(
   env: Record<string, unknown>,
   campaignEnvVar: string,
@@ -42,6 +91,9 @@ async function detectAndEnroll(
     const { results } = await db.prepare(query).bind(...queryParams).all();
     customers = (results || []) as Array<Record<string, unknown>>;
   } catch (err) {
+    if (isConsentSchemaFailure(err)) {
+      return { detected: 0, enrolled: 0 };
+    }
     const msg = String((err as Error)?.message || '');
     const baseQuery = (allowUnscopedFallback && fallbackUnscopedQuery) ? fallbackUnscopedQuery : query;
     const baseParams = (allowUnscopedFallback && fallbackUnscopedParams) ? fallbackUnscopedParams : queryParams;
@@ -52,7 +104,10 @@ async function detectAndEnroll(
           .replace(/c\.date_of_birth/g, 'c.birthday');
         const { results } = await db.prepare(fallbackQuery).bind(...baseParams).all();
         customers = (results || []) as Array<Record<string, unknown>>;
-      } catch {
+      } catch (err2) {
+        if (isConsentSchemaFailure(err2)) {
+          return { detected: 0, enrolled: 0 };
+        }
         try {
           const canonicalQuery = baseQuery
             .replace('c.loyalty_tier', 'c.tier as loyalty_tier')
@@ -109,8 +164,7 @@ export async function detectWinbackCandidates(
       (SELECT MAX(o.created_at) FROM orders o WHERE o.customer_id = c.id AND COALESCE(o.status, '') NOT IN ('cancelled', 'rejected', 'failed', 'expired')) as last_order_date
      FROM customers c
      WHERE c.phone IS NOT NULL AND c.phone != ''
-       AND c.anonymized_at IS NULL
-       AND (COALESCE(c.consent_marketing, 0) = 1 OR COALESCE(c.marketing_consent, 0) = 1 OR EXISTS (SELECT 1 FROM consents co WHERE co.customer_id = c.id AND co.granted = 1 AND co.revoked_at IS NULL))
+       ${UNSCOPED_MARKETING_CONSENT_SQL}
        AND c.id NOT IN (
          SELECT customer_id FROM campaign_enrollments WHERE campaign_type = 'winback'
            AND created_at > ?
@@ -129,8 +183,7 @@ export async function detectWinbackCandidates(
         (SELECT MAX(o.created_at) FROM orders o WHERE o.customer_id = c.id AND COALESCE(o.status, '') NOT IN ('cancelled', 'rejected', 'failed', 'expired') AND COALESCE(NULLIF(TRIM(o.tenant_id), ''), 'default') = ?) as last_order_date
        FROM customers c
        WHERE c.phone IS NOT NULL AND c.phone != ''
-         AND c.anonymized_at IS NULL
-         AND (COALESCE(c.consent_marketing, 0) = 1 OR COALESCE(c.marketing_consent, 0) = 1 OR EXISTS (SELECT 1 FROM consents co WHERE co.customer_id = c.id AND co.granted = 1 AND co.revoked_at IS NULL))
+         ${SCOPED_MARKETING_CONSENT_SQL}
          AND COALESCE(NULLIF(TRIM(c.tenant_id), ''), 'default') = ?
          AND c.id NOT IN (
            SELECT customer_id FROM campaign_enrollments WHERE campaign_type = 'winback'
@@ -150,7 +203,7 @@ export async function detectWinbackCandidates(
       (env.MAUTIC_CAMPAIGN_WINBACK as string) || '10',
       'winback',
       scopedQuery,
-      [tenantId, tenantId, thirtyOneDaysAgo, tenantId, tenantId, tenantId, thirtyOneDaysAgo],
+      [tenantId, tenantId, tenantId, tenantId, thirtyOneDaysAgo, tenantId, tenantId, tenantId, thirtyOneDaysAgo],
       tenantId,
       unscopedQuery,
       unscopedParams
@@ -180,6 +233,7 @@ export async function detectBirthdayCandidates(
      WHERE c.date_of_birth IS NOT NULL
        AND substr(c.date_of_birth, 6, 2) = ?
        AND c.phone IS NOT NULL AND c.phone != ''
+       ${UNSCOPED_MARKETING_CONSENT_SQL}
        AND c.id NOT IN (
          SELECT customer_id FROM campaign_enrollments WHERE campaign_type = 'birthday'
            AND created_at > ?
@@ -193,6 +247,7 @@ export async function detectBirthdayCandidates(
        WHERE c.date_of_birth IS NOT NULL
          AND substr(c.date_of_birth, 6, 2) = ?
          AND c.phone IS NOT NULL AND c.phone != ''
+         ${SCOPED_MARKETING_CONSENT_SQL}
          AND COALESCE(NULLIF(TRIM(c.tenant_id), ''), 'default') = ?
          AND c.id NOT IN (
            SELECT customer_id FROM campaign_enrollments WHERE campaign_type = 'birthday'
@@ -206,7 +261,7 @@ export async function detectBirthdayCandidates(
       (env.MAUTIC_CAMPAIGN_BIRTHDAY as string) || '20',
       'birthday',
       scopedQuery,
-      [currentMonth, tenantId, monthStart, tenantId],
+      [currentMonth, tenantId, tenantId, tenantId, monthStart, tenantId],
       tenantId,
       unscopedQuery,
       unscopedParams

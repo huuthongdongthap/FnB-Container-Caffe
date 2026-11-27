@@ -69,7 +69,16 @@ export async function registerUser(request: Request, env: Record<string, unknown
 const trialEnds = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString();
 
     const token = await generateJWT(
-      { email, name: user.name, id: user.id, role: user.role, tenantId, tier: 'BASIC' },
+      {
+        email,
+        name: user.name,
+        id: user.id,
+        role: user.role,
+        tenantId,
+        tier: 'BASIC',
+        ...(typeof env.JWT_AUDIENCE === 'string' && env.JWT_AUDIENCE ? { aud: env.JWT_AUDIENCE } : {}),
+        ...(typeof env.JWT_ISSUER === 'string' && env.JWT_ISSUER ? { iss: env.JWT_ISSUER } : {}),
+      },
       env.JWT_SECRET as string,
       env.JWT_EXPIRY_SECONDS as string
     );

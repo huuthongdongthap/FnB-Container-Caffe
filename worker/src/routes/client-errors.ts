@@ -83,7 +83,8 @@ clientErrorsRouter.post('/', rateLimitMiddleware(CLIENT_ERROR_RATE_LIMIT), async
   ].filter(Boolean);
   const stack = stackParts.length > 0 ? stackParts.join('\n--- Component Stack ---\n').slice(0, 4000) : null;
   const href = sanitizeClientHref(rawHref);
-  const ts = String(body.ts || body.timestamp || new Date().toISOString()).slice(0, 64);
+  // Always use server-generated timestamp so client-supplied future dates cannot bypass 14-day retention pruning
+  const serverTs = new Date().toISOString();
 
   const randBytes = new Uint8Array(3);
   crypto.getRandomValues(randBytes);
@@ -93,15 +94,28 @@ clientErrorsRouter.post('/', rateLimitMiddleware(CLIENT_ERROR_RATE_LIMIT), async
     await db.prepare(
       `INSERT INTO client_errors (id, route, message, stack, href, user_agent, ts)
        VALUES (?, ?, ?, ?, ?, ?, ?)`
-    ).bind(id, route, message, stack, href, c.req.header('User-Agent') || null, ts).run();
+    ).bind(id, route, message, stack, href, c.req.header('User-Agent') || null, serverTs).run();
 
     // Best-effort retention pruning (14 days) to prevent unbounded D1 growth
     const retentionCutoff = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString();
-    await db
+    const prunePromise = db
       .prepare('DELETE FROM client_errors WHERE ts < ?')
       .bind(retentionCutoff)
       .run()
       .catch(() => undefined);
+
+    let scheduled = false;
+    try {
+      if (c.executionCtx && typeof c.executionCtx.waitUntil === 'function') {
+        c.executionCtx.waitUntil(prunePromise);
+        scheduled = true;
+      }
+    } catch {
+      scheduled = false;
+    }
+    if (!scheduled) {
+      await prunePromise;
+    }
 
     return c.json({ success: true, id }, 201);
   } catch (error) {

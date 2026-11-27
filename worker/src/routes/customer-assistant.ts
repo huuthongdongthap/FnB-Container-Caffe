@@ -514,19 +514,8 @@ customerAssistantRouter.post('/', rateLimitMiddleware(CHAT_ASSISTANT_RATE_LIMIT)
     Boolean(parsed.data.table_number || qLower.includes('bàn') || qLower.includes('tính tiền') || qLower.includes('hóa đơn'));
 
   const pilotStore = resolvePilotStore(c.env) || 'default';
-  const isLegacyAcceptanceMaskingProbe =
-    c.env?.JWT_SECRET === 'test-only-secret-key-20261030-acceptance' &&
-    !requestedTenant;
-  const isLegacyPubSadMock =
-    c.req.url.startsWith('https://test.local/') &&
-    requestedTenant === 'tenant_sadec_02' &&
-    parsed.data.order_id === 'ord-sad-88';
-  const isLegacyTestAuraProbe =
-    c.req.url.startsWith('https://test.aura/api/chat/assistant') &&
-    c.env?.JWT_SECRET === 'test-jwt-secret-at-least-16-chars' &&
-    !requestedTenant;
 
-  if (!user && !isLegacyAcceptanceMaskingProbe && !isLegacyPubSadMock && !isLegacyTestAuraProbe) {
+  if (!user) {
     if (requestedTenant && requestedTenant !== pilotStore && (isTableBillQuery || Boolean(parsed.data.phone) || isOrderStatusQuery)) {
       return c.json({ success: false, error: 'Authentication required for cross-tenant order or table lookup' }, 401);
     }

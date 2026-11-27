@@ -13,6 +13,34 @@ import { parseJSON } from './helpers';
 
 const log = createLogger({ route: 'auth' });
 
+function isErasedAccountRecord(
+  row: { name?: unknown; phone?: unknown; anonymized_at?: unknown; is_active?: unknown } | null | undefined,
+): boolean {
+  if (!row) return false;
+  if (row.is_active === 0 || row.is_active === false) return true;
+  if (typeof row.anonymized_at === 'string' ? row.anonymized_at.trim() !== '' : Boolean(row.anonymized_at)) {
+    return true;
+  }
+  const name = typeof row.name === 'string' ? row.name.trim() : '';
+  if (name === '[ERASED]') return true;
+  const phone = typeof row.phone === 'string' ? row.phone.trim().toLowerCase() : '';
+  if (phone.startsWith('erased_')) return true;
+  return false;
+}
+
+async function hasErasureEvent(
+  db: Env['AURA_DB'] | undefined,
+  customerId: string | undefined | null,
+): Promise<boolean> {
+  if (!db?.prepare || !customerId) return false;
+  const eraseEvent = await db
+    .prepare("SELECT event_type FROM customer_events WHERE customer_id = ? AND event_type = 'CustomerDataErased' LIMIT 1")
+    .bind(customerId)
+    .first<{ event_type?: string | null }>()
+    .catch(() => null);
+  return eraseEvent?.event_type === 'CustomerDataErased';
+}
+
 export async function loginUser(request: Request, env: Record<string, unknown>, ctx?: { waitUntil?: (p: Promise<unknown>) => void }) {
   try {
     const body = await parseJSON(request);
@@ -96,6 +124,7 @@ export async function loginUser(request: Request, env: Record<string, unknown>, 
       user.name = state.account.name || state.account.id;
       user.tenant_id = state.account.tenant_id;
     } else {
+      if (isErasedAccountRecord(user)) return errorResponse('Invalid credentials', 401);
       if (!await verifyPassword(password, user.password)) return failedPassword();
       if (user.email_verified === false) {
         return jsonResponse(
@@ -115,9 +144,29 @@ export async function loginUser(request: Request, env: Record<string, unknown>, 
       let tier: string | undefined;
       try {
         const db = (env as unknown as Env).AURA_DB;
-        const row = await db.prepare('SELECT tenant_id FROM users WHERE id = ?').bind(user.id).first<{ tenant_id: string | null }>().catch(() => null);
-        tenantId = row?.tenant_id || undefined;
-        if (!tenantId) {
+        if (db?.prepare && user.id) {
+          const userStateRow = await db
+            .prepare('SELECT id, tenant_id, is_active, name, phone FROM users WHERE id = ?')
+            .bind(user.id)
+            .first<{ id?: string | null; tenant_id?: string | null; is_active?: number | boolean | null; name?: string | null; phone?: string | null }>()
+            .catch(() =>
+              db
+                .prepare('SELECT tenant_id FROM users WHERE id = ?')
+                .bind(user.id)
+                .first<{ id?: string | null; tenant_id?: string | null; is_active?: number | boolean | null; name?: string | null; phone?: string | null }>()
+                .catch(() => null),
+            );
+          if (userStateRow && (!userStateRow.id || String(userStateRow.id) === String(user.id))) {
+            if (isErasedAccountRecord(userStateRow)) {
+              return errorResponse('Invalid credentials', 401);
+            }
+            tenantId = userStateRow.tenant_id || undefined;
+          }
+          if (await hasErasureEvent(db, user.id)) {
+            return errorResponse('Invalid credentials', 401);
+          }
+        }
+        if (!tenantId && db?.prepare) {
           const tenant = await db.prepare('SELECT id, tier FROM saas_tenants WHERE owner_user_id = ?').bind(user.id).first<{ id: string; tier: string }>().catch(() => null);
           tenantId = tenant?.id; tier = tenant?.tier;
         }
@@ -130,26 +179,47 @@ export async function loginUser(request: Request, env: Record<string, unknown>, 
         }
         const effectiveTenant = tenantId || defaultPilotTenant;
         if (db?.prepare) {
-          let existingCust: { id: string; email?: string | null; tenant_id?: string | null; anonymized_at?: string | null } | null = null;
+          let existingCust: { id: string; email?: string | null; name?: string | null; phone?: string | null; tenant_id?: string | null; anonymized_at?: string | null } | null = null;
+          let canProvisionCustomer = true;
           try {
             existingCust = await db.prepare(
-              `SELECT id, email, tenant_id, anonymized_at FROM customers
+              `SELECT id, email, name, phone, tenant_id, anonymized_at FROM customers
                WHERE (id = ? OR lower(email) = lower(?))
                  AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?
                LIMIT 1`
-            ).bind(user.id, email, effectiveTenant).first<{ id: string; email?: string | null; tenant_id?: string | null; anonymized_at?: string | null }>();
+            ).bind(user.id, email, effectiveTenant).first<{ id: string; email?: string | null; name?: string | null; phone?: string | null; tenant_id?: string | null; anonymized_at?: string | null }>();
           } catch {
-            if (effectiveTenant === 'default') {
+            try {
               existingCust = await db.prepare(
-                'SELECT id, email, anonymized_at FROM customers WHERE id = ? OR lower(email) = lower(?) LIMIT 1'
-              ).bind(user.id, email).first<{ id: string; email?: string | null; tenant_id?: string | null; anonymized_at?: string | null }>().catch(() =>
-                db.prepare(
-                  'SELECT id, email FROM customers WHERE id = ? OR lower(email) = lower(?) LIMIT 1'
-                ).bind(user.id, email).first<{ id: string; email?: string | null; tenant_id?: string | null; anonymized_at?: string | null }>().catch(() => null),
-              );
+                `SELECT id, email, name, phone, tenant_id FROM customers
+                 WHERE (id = ? OR lower(email) = lower(?))
+                   AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?
+                 LIMIT 1`
+              ).bind(user.id, email, effectiveTenant).first<{ id: string; email?: string | null; name?: string | null; phone?: string | null; tenant_id?: string | null; anonymized_at?: string | null }>();
+            } catch {
+              try {
+                existingCust = await db.prepare(
+                  `SELECT id, email, tenant_id FROM customers
+                   WHERE (id = ? OR lower(email) = lower(?))
+                     AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?
+                   LIMIT 1`
+                ).bind(user.id, email, effectiveTenant).first<{ id: string; email?: string | null; tenant_id?: string | null; anonymized_at?: string | null }>();
+              } catch {
+                if (effectiveTenant === 'default') {
+                  existingCust = await db.prepare(
+                    'SELECT id, email, anonymized_at FROM customers WHERE id = ? OR lower(email) = lower(?) LIMIT 1'
+                  ).bind(user.id, email).first<{ id: string; email?: string | null; tenant_id?: string | null; anonymized_at?: string | null }>().catch(() =>
+                    db.prepare(
+                      'SELECT id, email FROM customers WHERE id = ? OR lower(email) = lower(?) LIMIT 1'
+                    ).bind(user.id, email).first<{ id: string; email?: string | null; tenant_id?: string | null; anonymized_at?: string | null }>().catch(() => null),
+                  );
+                } else {
+                  canProvisionCustomer = false;
+                }
+              }
             }
           }
-          if (existingCust?.anonymized_at) {
+          if (isErasedAccountRecord(existingCust) || (existingCust?.id && await hasErasureEvent(db, existingCust.id))) {
             return errorResponse('Invalid credentials', 401);
           }
           const custTenant = String(existingCust?.tenant_id || '').trim() || effectiveTenant;
@@ -162,7 +232,7 @@ export async function loginUser(request: Request, env: Record<string, unknown>, 
           if (canBindCust && existingCust) {
             user.id = existingCust.id;
             tenantId = custTenant;
-          } else {
+          } else if (canProvisionCustomer) {
             const nowIso = new Date().toISOString();
             const customerPhone = String(user.phone || '').trim() || null;
             try {
@@ -213,7 +283,23 @@ export async function loginUser(request: Request, env: Record<string, unknown>, 
       }
       const authVersion = Math.max(Number(user.auth_version || 1), d1AuthVer, kvAuthVer);
       user.auth_version = authVersion;
-      token = await generateJWT({ email, name: user.name, id: user.id, role: 'customer', tenantId, tier, sessionId: crypto.randomUUID(), authVersion, emailVerified: Boolean(user.email_verified) }, env.JWT_SECRET as string, env.JWT_EXPIRY_SECONDS as string);
+      token = await generateJWT(
+        {
+          email,
+          name: user.name,
+          id: user.id,
+          role: 'customer',
+          tenantId,
+          tier,
+          sessionId: crypto.randomUUID(),
+          authVersion,
+          emailVerified: Boolean(user.email_verified),
+          ...(typeof env.JWT_AUDIENCE === 'string' && env.JWT_AUDIENCE ? { aud: env.JWT_AUDIENCE } : {}),
+          ...(typeof env.JWT_ISSUER === 'string' && env.JWT_ISSUER ? { iss: env.JWT_ISSUER } : {}),
+        },
+        env.JWT_SECRET as string,
+        env.JWT_EXPIRY_SECONDS as string
+      );
       sessionUser = { id: user.id, email: user.email, name: user.name, phone: user.phone, role: 'customer', tenantId };
     }
 

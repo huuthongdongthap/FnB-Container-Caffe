@@ -4,6 +4,7 @@ import type { Context } from 'hono';
 import { z } from 'zod';
 import { jsonResponse, errorResponse } from '../middleware/cors';
 import { requireAuth } from '../middleware/auth';
+import { getClientIdentifier } from '../middleware/rate-limit';
 import { authenticateRequest } from '../lib/staff-session-auth';
 import { staffSessionErrorResponse } from '../lib/staff-session';
 import { contactMessageRepository, ContactSchemaUnavailable } from '../lib/contact-message-repository';
@@ -77,8 +78,8 @@ async function sendMessage(c: Context<{ Bindings: Env }>) {
     }
     const { name, phone: rawPhone, message } = parsed.data;
     const phone = normalizeChatPhone(rawPhone);
-    const ip = c.req.header('CF-Connecting-IP') || c.req.header('X-Forwarded-For')?.split(',')[0]?.trim();
-    if ((ip && !(await checkRateLimit(c.env, `ip:${ip}`, 20)))
+    const ip = getClientIdentifier(c);
+    if ((ip !== 'unknown' && !(await checkRateLimit(c.env, `ip:${ip}`, 20)))
       || !(await checkRateLimit(c.env, `msg:${phone}`, 10)))
       return errorResponse('Qua nhieu tin nhan, vui long thu lai sau', 429);
     const tenantId = resolvePilotStore(c.env);
@@ -98,8 +99,10 @@ async function sendMessage(c: Context<{ Bindings: Env }>) {
         return errorResponse('Không đủ quyền truy cập cửa hàng', 403);
       direction = 'admin';
     } else {
-      // Prevent spoofing another customer's phone in support chat
-      const session = await authenticateRequest(c.req.raw, c.env, { optional: true }).catch(() => null);
+      // Prevent spoofing another customer's phone in support chat.
+      // Reject explicit invalid/revoked credentials or KV outages instead of downgrading to anonymous.
+      const hasAuthHeader = Boolean(c.req.header('Authorization')?.trim());
+      const session = await authenticateRequest(c.req.raw, c.env, { optional: !hasAuthHeader });
       if (session && 'blocked' in session) return errorResponse(session.blocked, 403);
       const callerPayload = session && 'payload' in session ? session.payload : null;
       if (callerPayload && callerPayload.role === 'customer') {
@@ -125,18 +128,38 @@ async function sendMessage(c: Context<{ Bindings: Env }>) {
           return errorResponse('Không đủ quyền truy cập cửa hàng', 403);
         }
       } else if (!callerPayload && c.env.AURA_DB) {
-        // Anonymous caller cannot spoof a registered customer's phone (check 0..., 84..., +84... variants)
+        // Anonymous caller cannot spoof a registered customer's phone (check 0..., 84..., +84... and formatted variants)
         const digits = phone.replace(/[^\d]/g, '');
         const localPhone = digits.startsWith('84') && digits.length >= 10 ? `0${digits.slice(2)}` : digits;
         const intlPhone = localPhone.startsWith('0') ? `84${localPhone.slice(1)}` : localPhone;
         const plusIntlPhone = `+${intlPhone}`;
-        const existingOwner = await c.env.AURA_DB
-          .prepare(
-            "SELECT id FROM customers WHERE phone IN (?, ?, ?, ?) AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ? LIMIT 1",
-          )
-          .bind(phone, localPhone, intlPhone, plusIntlPhone, tenantId)
-          .first<{ id?: string }>()
-          .catch(() => null);
+        let existingOwner: { id?: string } | null = null;
+        try {
+          existingOwner = await c.env.AURA_DB
+            .prepare(
+              "SELECT id FROM customers WHERE REPLACE(REPLACE(REPLACE(phone, ' ', ''), '-', ''), '.', '') IN (?, ?, ?, ?) AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ? LIMIT 1",
+            )
+            .bind(phone, localPhone, intlPhone, plusIntlPhone, tenantId)
+            .first<{ id?: string }>();
+        } catch (err) {
+          const errMsg = String(err instanceof Error ? err.message : err);
+          if (/no such table:\s*customers/i.test(errMsg)) {
+            existingOwner = null;
+          } else if (tenantId === 'default' && /no such column:\s*tenant_id/i.test(errMsg)) {
+            try {
+              existingOwner = await c.env.AURA_DB
+                .prepare(
+                  "SELECT id FROM customers WHERE REPLACE(REPLACE(REPLACE(phone, ' ', ''), '-', ''), '.', '') IN (?, ?, ?, ?) LIMIT 1",
+                )
+                .bind(phone, localPhone, intlPhone, plusIntlPhone)
+                .first<{ id?: string }>();
+            } catch {
+              return errorResponse('Chat unavailable', 503);
+            }
+          } else {
+            return errorResponse('Chat unavailable', 503);
+          }
+        }
         if (existingOwner?.id) {
           return errorResponse('Vui lòng đăng nhập để gửi tin nhắn bằng số điện thoại đã đăng ký', 401);
         }
@@ -179,9 +202,6 @@ async function getMessageHistory(c: Context<{ Bindings: Env }>) {
         if (custRow?.phone) {
           verifiedCustomerPhone = normalizeChatPhone(String(custRow.phone));
         }
-      }
-      if (!verifiedCustomerPhone && caller.phone) {
-        verifiedCustomerPhone = normalizeChatPhone(String(caller.phone));
       }
       if (!verifiedCustomerPhone || verifiedCustomerPhone !== requestedNorm) {
         return errorResponse('Không đủ quyền truy cập cuộc trò chuyện này', 403);

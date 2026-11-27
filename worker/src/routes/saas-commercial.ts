@@ -814,6 +814,15 @@ export function createSaasCommercialRoutes() {
       .bind(displayName, nowIso, tenantId)
       .run();
 
+    await writeSaasAuditLog(
+      db,
+      c,
+      tenantId,
+      'branding_updated',
+      { displayName, tagline, logoUrl, primaryColor, accentColor, address, phone, receiptFooter },
+      'Tenant branding updated'
+    );
+
     return c.json({ success: true, data: { tenantId, displayName, tagline, logoUrl, primaryColor, accentColor, address, phone, receiptFooter } });
   });
 
@@ -1190,11 +1199,28 @@ export function createSaasCommercialRoutes() {
         .prepare("UPDATE tenant_domains SET status = 'verified', verified_at = ?, updated_at = ? WHERE id = ?")
         .bind(nowIso, nowIso, row.id)
         .run();
+      await writeSaasAuditLog(
+        db,
+        c,
+        tenantId,
+        'domain_verified',
+        { id: row.id, domain: row.domain, status: 'verified', verifiedAt: nowIso },
+        'Custom domain DNS TXT verified'
+      );
       return c.json({
         success: true,
         data: { id: row.id, domain: row.domain, status: 'verified', verifiedAt: nowIso },
       });
     }
+
+    await writeSaasAuditLog(
+      db,
+      c,
+      tenantId,
+      'domain_verify_failed',
+      { id: row.id, domain: row.domain, recordsFound: dnsResult.records },
+      'Custom domain DNS TXT verification failed'
+    );
 
     return c.json(
       {

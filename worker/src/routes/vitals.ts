@@ -7,12 +7,14 @@
 
 import { Hono } from 'hono';
 import { z } from 'zod';
+import { getClientIdentifier } from '../middleware/rate-limit';
 import type { Env } from '../types/env';
 
 // ─── Rate Limiting ──────────────────────────────────────────────────────────
 
 const VITALS_RATE_LIMIT_MAX = 60;
 const VITALS_RATE_LIMIT_WINDOW_MS = 60_000;
+const VITALS_RATE_BUCKET_MAX_KEYS = 1000;
 const vitalsRateBuckets = new Map<string, number[]>();
 
 const VALID_TENANT_RE = /^[a-zA-Z0-9_-]{1,64}$/;
@@ -46,17 +48,6 @@ function resolveVitalsTenantId(
   return 'default';
 }
 
-function resolveClientIp(c: { req: { header: (k: string) => string | undefined } }): string {
-  const raw =
-    c.req.header('cf-connecting-ip') ||
-    c.req.header('CF-Connecting-IP') ||
-    c.req.header('x-forwarded-for')?.split(',')[0] ||
-    c.req.header('X-Forwarded-For')?.split(',')[0] ||
-    c.req.header('x-real-ip') ||
-    'unknown';
-  return raw.trim() || 'unknown';
-}
-
 async function isVitalsRateLimited(
   env: Env | undefined,
   clientIp: string
@@ -88,6 +79,22 @@ async function isVitalsRateLimited(
   }
   existing.push(now);
   vitalsRateBuckets.set(key, existing);
+
+  if (vitalsRateBuckets.size > VITALS_RATE_BUCKET_MAX_KEYS) {
+    for (const [bucketKey, timestamps] of vitalsRateBuckets) {
+      const active = timestamps.filter((ts) => ts > cutoff);
+      if (active.length === 0) {
+        vitalsRateBuckets.delete(bucketKey);
+      } else {
+        vitalsRateBuckets.set(bucketKey, active);
+      }
+    }
+    while (vitalsRateBuckets.size > VITALS_RATE_BUCKET_MAX_KEYS) {
+      const oldestKey = vitalsRateBuckets.keys().next().value;
+      if (oldestKey === undefined) break;
+      vitalsRateBuckets.delete(oldestKey);
+    }
+  }
   return false;
 }
 
@@ -108,7 +115,7 @@ const vitalsSchema = z.object({
 const vitalsRouter = new Hono<{ Bindings: Env }>();
 
 vitalsRouter.post('/', async(c) => {
-  const clientIp = resolveClientIp(c);
+  const clientIp = getClientIdentifier(c);
   if (await isVitalsRateLimited(c.env, clientIp)) {
     return c.json({ error: 'Too many requests' }, 429);
   }

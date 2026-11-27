@@ -24,9 +24,13 @@ const EXEMPT_PREFIXES = [
   '/api/auth/login',
   '/api/auth/logout',
   '/api/auth/refresh',
+  '/api/auth/forgot-password',
+  '/api/auth/reset-password',
   '/api/v1/auth/login',
   '/api/v1/auth/logout',
   '/api/v1/auth/refresh',
+  '/api/v1/auth/forgot-password',
+  '/api/v1/auth/reset-password',
   '/api/saas/signup',
   '/api/saas/check-slug',
   '/api/saas/billing',
@@ -38,40 +42,43 @@ const EXEMPT_PREFIXES = [
   '/api/health',
 ];
 
+function isControlTenantId(tenantId: string): boolean {
+  const clean = tenantId.trim();
+  return !clean || clean === 'default' || clean.toLowerCase() === 'hq' || clean === '*';
+}
+
 export function isSaasWriteExemptPath(pathname: string): boolean {
   return EXEMPT_PREFIXES.some((prefix) => pathname.startsWith(prefix));
 }
 
-async function resolveGuestCandidateTenant(c: Context<{ Bindings: Env }>): Promise<string> {
+async function resolveGuestCandidateTenants(c: Context<{ Bindings: Env }>): Promise<string[]> {
+  const candidates = new Set<string>();
+  const addCandidate = (value: unknown) => {
+    const clean = String(value ?? '').trim();
+    if (!isControlTenantId(clean)) {
+      candidates.add(clean);
+    }
+  };
+
   const ctxGetter = (c as unknown as { get?: (k: string) => unknown }).get;
-  const fromCtx = String(ctxGetter?.('tenantId') || ctxGetter?.('hostTenantId') || '').trim();
-  if (fromCtx && fromCtx !== 'default') return fromCtx;
+  addCandidate(ctxGetter?.('tenantId'));
+  addCandidate(ctxGetter?.('hostTenantId'));
+
   const readHeader = (name: string): string =>
     typeof c.req.header === 'function'
       ? c.req.header(name) || ''
       : c.req.raw?.headers.get(name) || '';
-  const fromHeader = (
-    readHeader('X-Tenant-ID') ||
-    readHeader('x-tenant-id') ||
-    readHeader('X-Store-ID') ||
-    readHeader('x-store-id') ||
-    ''
-  ).trim();
-  if (fromHeader) return fromHeader;
+  addCandidate(readHeader('X-Tenant-ID') || readHeader('x-tenant-id'));
+  addCandidate(readHeader('X-Store-ID') || readHeader('x-store-id'));
+
   const rawUrl = c.req.url || c.req.raw?.url || 'http://localhost';
   const searchParams = new URL(rawUrl, 'http://localhost').searchParams;
   const readQuery = (name: string): string =>
     typeof c.req.query === 'function'
       ? c.req.query(name) || ''
       : searchParams.get(name) || '';
-  const fromQuery = (
-    readQuery('tenant_id') ||
-    readQuery('tenantId') ||
-    readQuery('store_id') ||
-    readQuery('storeId') ||
-    ''
-  ).trim();
-  if (fromQuery) return fromQuery;
+  addCandidate(readQuery('tenant_id') || readQuery('tenantId'));
+  addCandidate(readQuery('store_id') || readQuery('storeId'));
 
   // Inspect JSON body for tenant_id / store_id on public guest write routes
   const contentType = (readHeader('content-type') || readHeader('Content-Type') || '').toLowerCase();
@@ -79,17 +86,15 @@ async function resolveGuestCandidateTenant(c: Context<{ Bindings: Env }>): Promi
     try {
       const parsed = (await c.req.raw.clone().json()) as Record<string, unknown> | null;
       if (parsed && typeof parsed === 'object') {
-        const fromBody = String(
-          parsed.tenant_id ?? parsed.tenantId ?? parsed.store_id ?? parsed.storeId ?? ''
-        ).trim();
-        if (fromBody) return fromBody;
+        addCandidate(parsed.tenant_id ?? parsed.tenantId);
+        addCandidate(parsed.store_id ?? parsed.storeId);
       }
     } catch {
       // Ignore invalid JSON; downstream route validation will handle it
     }
   }
 
-  return fromCtx;
+  return Array.from(candidates);
 }
 
 /**
@@ -137,8 +142,8 @@ export async function enforceSaasWriteGuard(
             tenantId: session.payload.tenantId,
           };
         } else if (session && 'blocked' in session) {
-          const guestTenant = await resolveGuestCandidateTenant(c);
-          if (!guestTenant || guestTenant === 'default' || guestTenant === 'hq' || guestTenant === '*') {
+          const guestTenants = await resolveGuestCandidateTenants(c);
+          if (guestTenants.length === 0) {
             return null;
           }
         }
@@ -155,29 +160,30 @@ export async function enforceSaasWriteGuard(
   const userTenant = resolvedUser
     ? String(resolvedUser.tenantId || resolvedUser.tenant_id || '').trim()
     : '';
-  const candidateTenant = await resolveGuestCandidateTenant(c);
-  const resolvedTenant =
-    userTenant && userTenant !== 'default'
-      ? userTenant
-      : candidateTenant || userTenant;
+  const candidateTenants = await resolveGuestCandidateTenants(c);
+  const targetTenants = Array.from(
+    new Set([userTenant, ...candidateTenants].filter((tid) => !isControlTenantId(tid)))
+  );
 
-  if (!resolvedTenant || resolvedTenant === 'default' || resolvedTenant === 'hq' || resolvedTenant === '*') {
+  if (targetTenants.length === 0) {
     return null;
   }
 
-  const check = await assertTenantWritable(db, resolvedTenant);
-  if (!check.allowed) {
-    return c.json(
-      {
-        ok: false,
-        success: false,
-        code: check.code || 'subscription_expired_readonly',
-        error: check.code || 'subscription_expired_readonly',
-        message: check.message,
-        lifecycleState: check.entitlement.lifecycleState,
-      },
-      402
-    );
+  for (const resolvedTenant of targetTenants) {
+    const check = await assertTenantWritable(db, resolvedTenant);
+    if (!check.allowed) {
+      return c.json(
+        {
+          ok: false,
+          success: false,
+          code: check.code || 'subscription_expired_readonly',
+          error: check.code || 'subscription_expired_readonly',
+          message: check.message,
+          lifecycleState: check.entitlement.lifecycleState,
+        },
+        402
+      );
+    }
   }
 
   return null;

@@ -10,6 +10,53 @@ import { matchesTenantRow, resolvePilotStore } from '../../middleware/tenant';
 
 const log = createLogger({ route: 'cal-booking-webhook' });
 
+const WEBHOOK_TIMESTAMP_TOLERANCE_SECONDS = 300;
+const WEBHOOK_REPLAY_TTL_SECONDS = 600;
+
+function isFreshCalWebhookTimestamp(rawTs: string | undefined | null): boolean {
+  if (!rawTs || !rawTs.trim()) return true;
+  const trimmed = rawTs.trim();
+  let tsSeconds = NaN;
+  if (/^\d+(\.\d+)?$/.test(trimmed)) {
+    const num = Number(trimmed);
+    if (!Number.isFinite(num) || num <= 0) return false;
+    tsSeconds = num > 1e11 ? Math.floor(num / 1000) : Math.floor(num);
+  } else if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$/.test(trimmed)) {
+    const parsedMs = Date.parse(trimmed);
+    if (!Number.isFinite(parsedMs) || parsedMs <= 0) return false;
+    tsSeconds = Math.floor(parsedMs / 1000);
+  } else {
+    return false;
+  }
+  const nowSeconds = Math.floor(Date.now() / 1000);
+  return Math.abs(nowSeconds - tsSeconds) <= WEBHOOK_TIMESTAMP_TOLERANCE_SECONDS;
+}
+
+async function computeCalReplayKey(rawBody: string): Promise<string> {
+  // Derive replay key strictly from HMAC-authenticated body bytes; unsigned timestamp headers cannot salt a bypass.
+  const input = new TextEncoder().encode(rawBody);
+  const digest = await crypto.subtle.digest('SHA-256', input);
+  const hex = Array.from(new Uint8Array(digest))
+    .map((b) => b.toString(16).padStart(2, '0'))
+    .join('');
+  return `webhook:replay:cal:${hex}`;
+}
+
+async function isDuplicateCalWebhookReplay(
+  env: Env | undefined,
+  rawBody: string,
+): Promise<boolean> {
+  const kv = env?.AUTH_KV;
+  if (!kv || typeof kv.get !== 'function') return false;
+  const replayKey = await computeCalReplayKey(rawBody);
+  const existing = await kv.get(replayKey).catch(() => null);
+  if (existing) return true;
+  if (typeof kv.put === 'function') {
+    await kv.put(replayKey, '1', { expirationTtl: WEBHOOK_REPLAY_TTL_SECONDS }).catch(() => {});
+  }
+  return false;
+}
+
 async function verifyCalWebhookSignature(
   sig: string | undefined | null,
   secret: string | undefined,
@@ -281,6 +328,13 @@ export function registerWebhookHandler(router: Hono<{ Bindings: Env }>): void {
     if (!isValid) {
       return c.json({ success: false, error: 'Unauthorized' }, 401);
     }
+    const rawTimestamp =
+      c.req.header('x-cal-timestamp') ||
+      c.req.header('x-webhook-timestamp') ||
+      c.req.header('x-timestamp');
+    if (!isFreshCalWebhookTimestamp(rawTimestamp)) {
+      return c.json({ success: false, error: 'Stale or invalid webhook timestamp' }, 401);
+    }
     const db = c.env.AURA_DB;
 
     let raw: unknown;
@@ -309,6 +363,9 @@ export function registerWebhookHandler(router: Hono<{ Bindings: Env }>): void {
     }
     if (hasConfiguredCalTenantMismatch(payload, rawHeaderTenant, c.env)) {
       return c.json({ success: false, error: 'Cross-tenant webhook target denied' }, 403);
+    }
+    if (await isDuplicateCalWebhookReplay(c.env, rawBody)) {
+      return c.json({ success: false, error: 'Duplicate webhook replay detected' }, 409);
     }
     const activeTenant = resolveWebhookTenant(
       payload,
@@ -507,8 +564,16 @@ export async function handleCalBookingWebhook(request: Request, env: Env): Promi
   if (!sig || !env.CAL_WEBHOOK_SECRET) {
     return json({ success: false, error: 'Unauthorized' }, 401);
   }
+  const rawTimestamp =
+    request.headers.get('x-cal-timestamp') ||
+    request.headers.get('x-webhook-timestamp') ||
+    request.headers.get('x-timestamp');
+  if (!isFreshCalWebhookTimestamp(rawTimestamp)) {
+    return json({ success: false, error: 'Stale or invalid webhook timestamp' }, 401);
+  }
 
   let body: CalBookingPayloadInput;
+  let rawBodyForReplay = '';
   if (typeof request.text === 'function') {
     const rawBody = await request.text().catch(() => '');
     const isValid = await verifyCalWebhookSignature(sig, env.CAL_WEBHOOK_SECRET, rawBody);
@@ -520,24 +585,28 @@ export async function handleCalBookingWebhook(request: Request, env: Env): Promi
     } catch {
       return json({ success: false, error: 'Invalid JSON' }, 400);
     }
+    rawBodyForReplay = rawBody;
   } else {
     try {
       body = await request.json() as CalBookingPayloadInput;
     } catch {
-      const directMatch = await timingSafeEqual(sig, env.CAL_WEBHOOK_SECRET);
-      if (!directMatch) {
-        return json({ success: false, error: 'Unauthorized' }, 401);
-      }
-      return json({ success: false, error: 'Invalid JSON' }, 400);
+      return json({ success: false, error: 'Unauthorized' }, 401);
     }
-    const rawBody = JSON.stringify(body ?? {});
+    if (!body || typeof body !== 'object' || Array.isArray(body)) {
+      return json({ success: false, error: 'Unauthorized' }, 401);
+    }
+    const rawBody = JSON.stringify(body);
     const isValid = await verifyCalWebhookSignature(sig, env.CAL_WEBHOOK_SECRET, rawBody);
     if (!isValid) {
       return json({ success: false, error: 'Unauthorized' }, 401);
     }
+    rawBodyForReplay = rawBody;
   }
 
-  const { triggerEvent, payload } = body || {};
+  if (!body || typeof body !== 'object' || Array.isArray(body)) {
+    return json({ success: false, error: 'Invalid webhook payload' }, 400);
+  }
+  const { triggerEvent, payload } = body;
   if (!triggerEvent || !payload?.uid) {
     return json({ success: false, error: 'Invalid webhook payload' }, 400);
   }
@@ -549,6 +618,9 @@ export async function handleCalBookingWebhook(request: Request, env: Env): Promi
   }
   if (hasConfiguredCalTenantMismatch(payload, rawHeaderTenant, env)) {
     return json({ success: false, error: 'Cross-tenant webhook target denied' }, 403);
+  }
+  if (await isDuplicateCalWebhookReplay(env, rawBodyForReplay)) {
+    return json({ success: false, error: 'Duplicate webhook replay detected' }, 409);
   }
   const activeTenant = resolveWebhookTenant(
     payload,

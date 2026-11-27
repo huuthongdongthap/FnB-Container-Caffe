@@ -91,11 +91,11 @@ export function corsHeaders(origin: string | false, withCredentials = false): Re
  * default, so it resolves to `false` (no ACAO). An explicit origin string is checked
  * against the allowlist.
  */
-function resolveCorsOrigin(corsOrigin: string | false | undefined): string | false {
+function resolveCorsOrigin(corsOrigin: string | false | undefined, environment?: string): string | false {
   if (typeof corsOrigin !== 'string' || corsOrigin === '' || corsOrigin === '*') {
     return false;
   }
-  return getCorsOrigin(corsOrigin);
+  return getCorsOrigin(corsOrigin, environment);
 }
 
 export function jsonResponse(
@@ -103,9 +103,10 @@ export function jsonResponse(
   status = 200,
   headers: Record<string, string> = {},
   corsOrigin: string | false = '*',
-  withCredentials = false
+  withCredentials = false,
+  environment?: string
 ): Response {
-  const resolved = resolveCorsOrigin(corsOrigin);
+  const resolved = resolveCorsOrigin(corsOrigin, environment);
   return new Response(JSON.stringify(data), {
     status,
     headers: {
@@ -124,13 +125,15 @@ export function errorResponse(
   message: string,
   status = 400,
   headers: Record<string, string> = {},
-  corsOrigin: string | false = '*'
+  corsOrigin: string | false = '*',
+  environment?: string
 ): Response {
   return jsonResponse(
     { success: false, error: message },
     status,
     headers,
-    resolveCorsOrigin(corsOrigin),
-    true
+    resolveCorsOrigin(corsOrigin, environment),
+    true,
+    environment
   );
 }

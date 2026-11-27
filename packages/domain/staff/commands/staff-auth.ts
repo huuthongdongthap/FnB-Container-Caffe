@@ -20,7 +20,7 @@ const log = createLogger({ route: 'staff-auth' });
 
 // ── PIN hashing (PBKDF2, 100k iterations, 8-byte random salt) ──────
 
-async function hashPin(pin: string): Promise<string> {
+export async function hashPin(pin: string): Promise<string> {
   const salt = crypto.getRandomValues(new Uint8Array(8));
   const keyMaterial = await crypto.subtle.importKey(
     'raw', new TextEncoder().encode(pin), 'PBKDF2', false, ['deriveBits']
@@ -45,17 +45,26 @@ function constantTimeStringEqual(a: string, b: string): boolean {
   return diff === 0;
 }
 
-async function verifyPin(pin: string, stored: string): Promise<boolean> {
+export async function verifyPin(pin: string, stored: string): Promise<boolean> {
+  if (typeof pin !== 'string' || typeof stored !== 'string') return false;
   const parts = stored.split('$');
-  if (parts.length !== 5 || parts[0] !== 'pin') return false;
-  const [, , , saltB64, expectedB64] = parts;
+  if (parts.length !== 5 || parts[0] !== 'pin' || parts[1] !== 'pbkdf2') return false;
+  const [, , iterStr, saltB64, expectedB64] = parts;
+  if (!iterStr || !/^\d+$/.test(iterStr) || !saltB64 || !expectedB64) return false;
+  const iterations = Number(iterStr);
+  if (!Number.isSafeInteger(iterations) || iterations < 1000 || iterations > 1_000_000) {
+    return false;
+  }
   try {
     const salt = Uint8Array.from(atob(saltB64), c => c.charCodeAt(0));
+    if (salt.length < 8 || salt.length > 64) return false;
+    const expectedBytes = Uint8Array.from(atob(expectedB64), c => c.charCodeAt(0));
+    if (expectedBytes.length !== 32) return false;
     const keyMaterial = await crypto.subtle.importKey(
       'raw', new TextEncoder().encode(pin), 'PBKDF2', false, ['deriveBits']
     );
     const bits = await crypto.subtle.deriveBits(
-      { name: 'PBKDF2', salt, iterations: 100_000, hash: 'SHA-256' },
+      { name: 'PBKDF2', salt, iterations, hash: 'SHA-256' },
       keyMaterial, 256
     );
     const actualB64 = btoa(String.fromCharCode(...new Uint8Array(bits)));
@@ -304,9 +313,21 @@ export async function staffTokenRefresh(c: Context<{ Bindings: Env }>) {
     if (!session || 'blocked' in session) throw new StaffSessionError('SESSION_EXPIRED');
     const claims = session.payload as StaffSession;
     if (!session.account || claims.sessionType !== 'staff-mobile') throw new StaffSessionError('SESSION_REVOKED');
-    const body = await c.req.json<Record<string, unknown>>();
-    const deviceToken = String(body.device_token ?? '');
+    let body: Record<string, unknown>;
+    try {
+      const raw = await c.req.json();
+      if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
+        return errorResponse('Thiếu device_token', 400);
+      }
+      body = raw as Record<string, unknown>;
+    } catch {
+      return errorResponse('Thiếu device_token', 400);
+    }
+    const deviceToken = typeof body.device_token === 'string' ? body.device_token.trim() : '';
     if (!deviceToken) return errorResponse('Thiếu device_token', 400);
+    if (deviceToken.length < 8 || deviceToken.length > 128) {
+      return errorResponse('device_token không hợp lệ', 400);
+    }
     if (!c.env.AUTH_KV) throw new SessionUnavailableError();
     let lockoutCount = 0;
     try {

@@ -108,6 +108,19 @@ export async function verifyJWT(
     if (!headerBase64 || !payloadBase64 || !signatureBase64) {
       return null;
     }
+
+    const parsedHeader = JSON.parse(base64UrlDecode(headerBase64));
+    if (!parsedHeader || typeof parsedHeader !== 'object' || Array.isArray(parsedHeader)) {
+      return null;
+    }
+    const header = parsedHeader as { alg?: unknown; typ?: unknown };
+    if (header.alg !== 'HS256') {
+      return null;
+    }
+    if (header.typ !== undefined && header.typ !== 'JWT') {
+      return null;
+    }
+
     const signatureInput = `${headerBase64}.${payloadBase64}`;
 
     const key = await crypto.subtle.importKey(
@@ -125,7 +138,11 @@ export async function verifyJWT(
       return null;
     }
 
-    const payload = JSON.parse(base64UrlDecode(payloadBase64)) as JwtPayload;
+    const parsedPayload = JSON.parse(base64UrlDecode(payloadBase64));
+    if (!parsedPayload || typeof parsedPayload !== 'object' || Array.isArray(parsedPayload)) {
+      return null;
+    }
+    const payload = parsedPayload as JwtPayload;
 
     const now = Date.now() / 1000;
 
@@ -184,12 +201,24 @@ function getExplicitToken(request: Request): string | null {
   return null;
 }
 
-/** Token the browser sent implicitly, from any login session cookie. */
+const COOKIE_TOKEN_PRECEDENCE = [
+  'aura_staff_token',
+  'aura_access_token',
+  'access_token',
+  'token',
+] as const;
+
+/** Token the browser sent implicitly, from any login session cookie in strict precedence order. */
 function getCookieToken(request: Request): string | null {
   const cookie = request.headers.get('Cookie');
   if (!cookie) return null;
-  const match = cookie.match(/(?:^|;\s*)(?:aura_staff_token|aura_access_token|access_token|token)=([^\s;]+)/);
-  return match && match[1] ? match[1] : null;
+  for (const cookieName of COOKIE_TOKEN_PRECEDENCE) {
+    const match = cookie.match(new RegExp(`(?:^|;\\s*)${cookieName}=([^\\s;]+)`));
+    if (match && match[1]) {
+      return match[1];
+    }
+  }
+  return null;
 }
 
 /** True when the only credential on the request is the session cookie. */
@@ -253,22 +282,45 @@ export async function hashPassword(password: string): Promise<string> {
 }
 
 export async function verifyPassword(password: string, stored: string): Promise<boolean> {
-  if (typeof stored !== 'string') {
+  if (typeof password !== 'string' || typeof stored !== 'string') {
     return false;
   }
-  if (stored.startsWith('pbkdf2$')) {
-    const parts = stored.split('$');
-    const iterStr = parts[1];
-    const saltHex = parts[2];
-    const hashHex = parts[3];
-    if (!iterStr || !saltHex || !hashHex) {
-      return false;
-    }
-    const iter = parseInt(iterStr, 10);
-    const saltMatch = saltHex.match(/.{2}/g);
-    if (!saltMatch) {
-      return false;
-    }
+  if (!stored.startsWith('pbkdf2$')) {
+    return false;
+  }
+  const parts = stored.split('$');
+  if (parts.length !== 4 || parts[0] !== 'pbkdf2') {
+    return false;
+  }
+  const iterStr = parts[1];
+  const saltHex = parts[2];
+  const hashHex = parts[3];
+  if (!iterStr || !saltHex || !hashHex) {
+    return false;
+  }
+  if (!/^\d+$/.test(iterStr)) {
+    return false;
+  }
+  const iter = Number(iterStr);
+  if (!Number.isSafeInteger(iter) || iter < 1000 || iter > 1_000_000) {
+    return false;
+  }
+  if (
+    saltHex.length < 16 ||
+    saltHex.length > 128 ||
+    saltHex.length % 2 !== 0 ||
+    !/^[0-9a-fA-F]+$/.test(saltHex)
+  ) {
+    return false;
+  }
+  if (!/^[0-9a-fA-F]{64}$/.test(hashHex)) {
+    return false;
+  }
+  const saltMatch = saltHex.match(/.{2}/g);
+  if (!saltMatch) {
+    return false;
+  }
+  try {
     const salt = new Uint8Array(saltMatch.map(h => parseInt(h, 16)));
     const enc = new TextEncoder();
     const keyMat = await crypto.subtle.importKey(
@@ -279,7 +331,8 @@ export async function verifyPassword(password: string, stored: string): Promise<
     );
     const computed = Array.from(new Uint8Array(bits))
       .map(b => b.toString(16).padStart(2, '0')).join('');
-    return timingSafeEqualString(computed, hashHex);
+    return timingSafeEqualString(computed, hashHex.toLowerCase());
+  } catch {
+    return false;
   }
-  return false;
 }

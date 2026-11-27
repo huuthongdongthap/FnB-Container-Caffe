@@ -237,7 +237,11 @@ self.addEventListener('notificationclick', (event) => {
   let targetUrl = '/?tab=orders';
   try {
     const parsed = new URL(String(rawTarget), self.location.origin);
-    if (parsed.origin === self.location.origin) {
+    if (
+      parsed.origin === self.location.origin &&
+      !parsed.pathname.startsWith('//') &&
+      !parsed.pathname.startsWith('/\\')
+    ) {
       targetUrl = `${parsed.pathname}${parsed.search}${parsed.hash}`;
     }
   } catch {

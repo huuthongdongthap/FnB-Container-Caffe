@@ -262,7 +262,7 @@ describe('Autonomous Edge Operations Integration (Phase 5)', () => {
       });
 
       const payload = { query: 'Kiểm tra giúp đơn ord_12345' };
-      const req = await authRequest('POST', '/api/chat/assistant', undefined, 'default', payload);
+      const req = await authRequest('POST', '/api/chat/assistant', 'staff', 'default', payload);
       const res = await app.fetch(req, mockEnv);
       expect(res.status).toBe(200);
       const json = await res.json() as any;
@@ -286,7 +286,7 @@ describe('Autonomous Edge Operations Integration (Phase 5)', () => {
       });
 
       const payload = { query: 'Bàn 2 tính tiền bao nhiêu vậy?' };
-      const req = await authRequest('POST', '/api/chat/assistant', undefined, 'default', payload);
+      const req = await authRequest('POST', '/api/chat/assistant', 'staff', 'default', payload);
       const res = await app.fetch(req, mockEnv);
       expect(res.status).toBe(200);
       const json = await res.json() as any;
@@ -310,7 +310,7 @@ describe('Autonomous Edge Operations Integration (Phase 5)', () => {
       });
 
       const payload = { query: 'Kiểm tra điểm tích lũy', phone: '0901234567' };
-      const req = await authRequest('POST', '/api/chat/assistant', undefined, 'default', payload);
+      const req = await authRequest('POST', '/api/chat/assistant', 'staff', 'default', payload);
       const res = await app.fetch(req, mockEnv);
       expect(res.status).toBe(200);
       const json = await res.json() as any;

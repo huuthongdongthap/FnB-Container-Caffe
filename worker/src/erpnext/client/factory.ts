@@ -4,6 +4,7 @@
  */
 
 import { ErpnextClient, type ErpnextEnv } from './core';
+import { decryptTenantSecretOrPlaintext } from '../../lib/tenant-secrets';
 
 export function createErpnextClient(env: ErpnextEnv): ErpnextClient | null {
   if (!env.ERPNEXT_URL || !env.ERPNEXT_API_KEY || !env.ERPNEXT_API_SECRET) {
@@ -18,7 +19,11 @@ export function createErpnextClient(env: ErpnextEnv): ErpnextClient | null {
 }
 
 export async function createErpnextClientWithKv(
-  env: ErpnextEnv & { AUTH_KV?: import('@cloudflare/workers-types').KVNamespace },
+  env: ErpnextEnv & {
+    AUTH_KV?: import('@cloudflare/workers-types').KVNamespace;
+    TENANT_SECRETS_KEY?: string;
+    JWT_SECRET?: string;
+  },
   tenantId?: string,
 ): Promise<ErpnextClient | null> {
   const effectiveTenant = tenantId && tenantId.trim() && tenantId.trim() !== '*' ? tenantId.trim() : 'default';
@@ -27,23 +32,40 @@ export async function createErpnextClientWithKv(
   let apiSecret = env.ERPNEXT_API_SECRET;
 
   if (env.AUTH_KV) {
+    let kvUrl: string | null = null;
+    let kvKey: string | null = null;
+    let kvSecret: string | null = null;
+    let kvReadFailed = false;
     try {
       const prefix = effectiveTenant === 'default' ? 'erpnext' : `erpnext:${effectiveTenant}`;
-      const kvUrl = await env.AUTH_KV.get(`${prefix}:api_url`);
-      const kvKey = await env.AUTH_KV.get(`${prefix}:api_key`);
-      const kvSecret = await env.AUTH_KV.get(`${prefix}:api_secret`);
-      if (kvUrl && kvKey && kvSecret) {
-        url = kvUrl;
-        apiKey = kvKey;
-        apiSecret = kvSecret;
-      } else if (effectiveTenant !== 'default') {
+      kvUrl = await env.AUTH_KV.get(`${prefix}:api_url`);
+      kvKey = await env.AUTH_KV.get(`${prefix}:api_key`);
+      kvSecret = await env.AUTH_KV.get(`${prefix}:api_secret`);
+      if (!(kvUrl && kvKey && kvSecret) && effectiveTenant !== 'default') {
         const defaultKvUrl = await env.AUTH_KV.get('erpnext:api_url');
         if (defaultKvUrl) {
           return null;
         }
       }
     } catch {
+      kvReadFailed = true;
       // KV unavailable — fallback to env
+    }
+
+    if (!kvReadFailed && kvUrl && kvKey && kvSecret) {
+      const masterKey = env.TENANT_SECRETS_KEY || env.JWT_SECRET;
+      try {
+        const [plainKey, plainSecret] = await Promise.all([
+          decryptTenantSecretOrPlaintext(kvKey, masterKey, effectiveTenant),
+          decryptTenantSecretOrPlaintext(kvSecret, masterKey, effectiveTenant),
+        ]);
+        url = kvUrl;
+        apiKey = plainKey;
+        apiSecret = plainSecret;
+      } catch {
+        // Fail closed when stored KV credentials cannot be decrypted.
+        return null;
+      }
     }
   }
 

@@ -3,6 +3,7 @@ import { resolvePilotStore } from '../../middleware/tenant';
 import { syncOrderToERPNext } from '../../tree/erpnext/sync.js';
 import { ErpnextClient } from '../../clients/erpnext-client';
 import { createErpnextProductClient, ErpnextProductClient } from '../../clients/erpnext-product-client';
+import { decryptTenantSecretOrPlaintext } from '../../lib/tenant-secrets';
 
 const MAX_RETRIES = 3;
 const log = createLogger({ route: 'cron:erpnext' });
@@ -53,12 +54,23 @@ function matchesQueueTenant(row: Record<string, unknown>, activeTenant: string):
 async function resolveTenantErpnextCredentials(
   env: Record<string, unknown>,
   targetTenant: string,
-): Promise<{ url: string; key: string; secret: string } | null> {
-  const erpEnv = env as { ERPNEXT_URL?: string; ERPNEXT_API_KEY?: string; ERPNEXT_API_SECRET?: string };
+): Promise<{ url: string; key: string; secret: string; decryptFailed?: false } | { url?: undefined; key?: undefined; secret?: undefined; decryptFailed: true } | null> {
+  const erpEnv = env as {
+    ERPNEXT_URL?: string;
+    ERPNEXT_API_KEY?: string;
+    ERPNEXT_API_SECRET?: string;
+    TENANT_SECRETS_KEY?: string;
+    JWT_SECRET?: string;
+  };
   const kv = env.AUTH_KV as { get?: (_key: string) => Promise<string | null> } | undefined;
   const normalizedTenant = !targetTenant || targetTenant === '*' ? 'default' : targetTenant.trim();
+  const masterKey = erpEnv.TENANT_SECRETS_KEY || erpEnv.JWT_SECRET;
 
   if (kv && typeof kv.get === 'function') {
+    let foundUrl: string | null = null;
+    let foundKey: string | null = null;
+    let foundSecret: string | null = null;
+    let kvReadFailed = false;
     try {
       const [kvUrl, kvKey, kvSecret] = await Promise.all([
         kv.get(`erpnext:${normalizedTenant}:api_url`),
@@ -66,20 +78,37 @@ async function resolveTenantErpnextCredentials(
         kv.get(`erpnext:${normalizedTenant}:api_secret`),
       ]);
       if (kvUrl && kvKey && kvSecret) {
-        return { url: kvUrl, key: kvKey, secret: kvSecret };
-      }
-      if (normalizedTenant === 'default') {
+        foundUrl = kvUrl;
+        foundKey = kvKey;
+        foundSecret = kvSecret;
+      } else if (normalizedTenant === 'default') {
         const [defUrl, defKey, defSecret] = await Promise.all([
           kv.get('erpnext:api_url'),
           kv.get('erpnext:api_key'),
           kv.get('erpnext:api_secret'),
         ]);
         if (defUrl && defKey && defSecret) {
-          return { url: defUrl, key: defKey, secret: defSecret };
+          foundUrl = defUrl;
+          foundKey = defKey;
+          foundSecret = defSecret;
         }
       }
     } catch {
-      // Fall through to env credentials check
+      kvReadFailed = true;
+      // Fall through to env credentials check when KV read itself is unavailable
+    }
+
+    if (!kvReadFailed && foundUrl && foundKey && foundSecret) {
+      try {
+        const [plainKey, plainSecret] = await Promise.all([
+          decryptTenantSecretOrPlaintext(foundKey, masterKey, normalizedTenant),
+          decryptTenantSecretOrPlaintext(foundSecret, masterKey, normalizedTenant),
+        ]);
+        return { url: foundUrl, key: plainKey, secret: plainSecret };
+      } catch {
+        // Fail closed when stored KV credentials cannot be decrypted.
+        return { decryptFailed: true };
+      }
     }
   }
 
@@ -88,7 +117,15 @@ async function resolveTenantErpnextCredentials(
     const key = erpEnv.ERPNEXT_API_KEY || '';
     const secret = erpEnv.ERPNEXT_API_SECRET || '';
     if (url && key && secret) {
-      return { url, key, secret };
+      try {
+        const [plainKey, plainSecret] = await Promise.all([
+          decryptTenantSecretOrPlaintext(key, masterKey, normalizedTenant),
+          decryptTenantSecretOrPlaintext(secret, masterKey, normalizedTenant),
+        ]);
+        return { url, key: plainKey, secret: plainSecret };
+      } catch {
+        return { decryptFailed: true };
+      }
     }
   }
 
@@ -115,9 +152,10 @@ export async function processErpnextRetryQueue(
   }
 
   const kv = env.AUTH_KV as { get?: (key: string) => Promise<string | null> } | undefined;
-  const baseCreds = activeTenant !== '*'
+  const baseCredsResult = activeTenant !== '*'
     ? await resolveTenantErpnextCredentials(env, activeTenant)
     : await resolveTenantErpnextCredentials(env, 'default');
+  const baseCreds = baseCredsResult && !baseCredsResult.decryptFailed ? baseCredsResult : null;
 
   if (activeTenant !== '*' && !baseCreds) {
     log.info('ERPNext not configured, skipping retry queue');
@@ -237,9 +275,10 @@ export async function processErpnextRetryQueue(
     const rowTenant = resolveQueueRowTenant(row, activeTenant);
 
     try {
-      const rowCreds = activeTenant === '*'
+      const rowCredsResult = activeTenant === '*'
         ? await resolveTenantErpnextCredentials(env, rowTenant)
         : baseCreds;
+      const rowCreds = rowCredsResult && !rowCredsResult.decryptFailed ? rowCredsResult : null;
       if (!rowCreds) {
         throw new Error(`ERPNext credentials not configured for tenant ${rowTenant}`);
       }
@@ -446,20 +485,20 @@ export async function processErpnextProductSync(
   const defaultSince = new Date(Date.now() - 24 * 3600_000).toISOString();
 
   for (const targetTenant of candidateTenants) {
-    const creds = await resolveTenantErpnextCredentials(env, targetTenant);
+    const credsResult = await resolveTenantErpnextCredentials(env, targetTenant);
     let productClient: ErpnextProductClient | null = null;
-    if (creds) {
+    if (credsResult && !credsResult.decryptFailed) {
       productClient = new ErpnextProductClient(
-        new ErpnextClient({ url: creds.url, apiKey: creds.key, apiSecret: creds.secret }),
+        new ErpnextClient({ url: credsResult.url, apiKey: credsResult.key, apiSecret: credsResult.secret }),
         {
           AURA_DB: db as unknown as import('../../clients/erpnext-product-client').ProductEnv['AURA_DB'],
           AURA_KV: kv as unknown as import('../../clients/erpnext-product-client').KVNamespace,
-          ERPNEXT_URL: creds.url,
-          ERPNEXT_API_KEY: creds.key,
-          ERPNEXT_API_SECRET: creds.secret,
+          ERPNEXT_URL: credsResult.url,
+          ERPNEXT_API_KEY: credsResult.key,
+          ERPNEXT_API_SECRET: credsResult.secret,
         }
       );
-    } else if (targetTenant === 'default') {
+    } else if (!credsResult?.decryptFailed && targetTenant === 'default') {
       productClient = createErpnextProductClient(env);
     }
 

@@ -30,7 +30,11 @@ export function sanitizeInternalRedirect(
     (typeof window !== 'undefined' && window.location?.origin ? window.location.origin : 'https://auraspace.cafe');
   try {
     const parsed = new URL(trimmed, baseOrigin);
-    if (parsed.origin !== baseOrigin) {
+    if (
+      parsed.origin !== baseOrigin ||
+      parsed.pathname.startsWith('//') ||
+      parsed.pathname.startsWith('/\\')
+    ) {
       return fallback;
     }
     return `${parsed.pathname}${parsed.search}${parsed.hash}`;
@@ -52,14 +56,18 @@ export function isAllowedPaymentUrl(
   }
   try {
     const parsed = new URL(url.trim());
-    if (parsed.protocol !== 'https:') {
-      return false;
-    }
     const baseOrigin =
       originOverride ||
       (typeof window !== 'undefined' && window.location?.origin ? window.location.origin : '');
-    if (baseOrigin && parsed.origin === baseOrigin) {
+    if (
+      baseOrigin &&
+      parsed.origin === baseOrigin &&
+      (parsed.protocol === 'https:' || parsed.protocol === 'http:')
+    ) {
       return true;
+    }
+    if (parsed.protocol !== 'https:') {
+      return false;
     }
     return ALLOWED_PAYMENT_HOST_PATTERNS.some((rx) => rx.test(parsed.hostname));
   } catch {

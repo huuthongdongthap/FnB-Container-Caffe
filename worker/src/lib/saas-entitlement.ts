@@ -75,7 +75,7 @@ export function resolveTenantLifecycle(
   const tenantId = sub?.tenant_id || 'default';
 
   // Flagship tenant ('default') is never locked out by SaaS subscription expiry.
-  if (tenantId === 'default' || tenantId === 'hq' || tenantId === '*') {
+  if (tenantId === 'default' || tenantId.toLowerCase() === 'hq' || tenantId === '*') {
     const chain = SAAS_PLANS.chain;
     return {
       tenantId,
@@ -242,41 +242,104 @@ export function resolveTenantLifecycle(
   };
 }
 
+const AUTHORITATIVE_LOCK_STATUSES = new Set(['suspended', 'readonly', 'expired', 'cancelled']);
+
+function isMissingSchemaError(err: unknown): boolean {
+  const msg = err instanceof Error ? err.message : String(err ?? '');
+  return /no such table|no such column/i.test(msg);
+}
+
 export async function getTenantEntitlement(
   db: D1Database,
   tenantId: string,
   now: Date = new Date()
 ): Promise<TenantEntitlement> {
   const cleanId = String(tenantId || 'default').trim();
-  if (!cleanId || cleanId === 'default' || cleanId === 'hq' || cleanId === '*') {
+  if (!cleanId || cleanId === 'default' || cleanId.toLowerCase() === 'hq' || cleanId === '*') {
     return resolveTenantLifecycle({ tenant_id: cleanId || 'default', tier: 'chain', status: 'active' }, now);
   }
 
-  const subRow = await db
-    .prepare(
-      `SELECT id, tenant_id, tier, billing_cycle, status, trial_ends_at, grace_ends_at, current_period_start, current_period_end, price_vnd
-       FROM tenant_subscriptions
-       WHERE tenant_id = ?
-       LIMIT 1`
-    )
-    .bind(cleanId)
-    .first<SubscriptionRow>()
-    .catch(() => null);
+  let dbFailed = false;
+  let subRow: SubscriptionRow | null = null;
+  try {
+    subRow = await db
+      .prepare(
+        `SELECT id, tenant_id, tier, billing_cycle, status, trial_ends_at, grace_ends_at, current_period_start, current_period_end, price_vnd
+         FROM tenant_subscriptions
+         WHERE tenant_id = ?
+         LIMIT 1`
+      )
+      .bind(cleanId)
+      .first<SubscriptionRow>();
+  } catch (err) {
+    if (!isMissingSchemaError(err)) {
+      dbFailed = true;
+    }
+  }
+
+  let tenantRow: SubscriptionRow | null = null;
+  try {
+    tenantRow = await db
+      .prepare(
+        `SELECT id AS tenant_id, tier, status, trial_ends_at, current_period_end
+         FROM saas_tenants
+         WHERE id = ? OR slug = ?
+         LIMIT 1`
+      )
+      .bind(cleanId, cleanId)
+      .first<SubscriptionRow>();
+  } catch (err) {
+    if (!isMissingSchemaError(err)) {
+      dbFailed = true;
+    }
+  }
+
+  if (!subRow && tenantRow?.tenant_id && tenantRow.tenant_id !== cleanId) {
+    try {
+      subRow = await db
+        .prepare(
+          `SELECT id, tenant_id, tier, billing_cycle, status, trial_ends_at, grace_ends_at, current_period_start, current_period_end, price_vnd
+           FROM tenant_subscriptions
+           WHERE tenant_id = ?
+           LIMIT 1`
+        )
+        .bind(tenantRow.tenant_id)
+        .first<SubscriptionRow>();
+    } catch (err) {
+      if (!isMissingSchemaError(err)) {
+        dbFailed = true;
+      }
+    }
+  }
+
+  const tenantStatus = String(tenantRow?.status || '').trim().toLowerCase();
+  if (tenantRow && AUTHORITATIVE_LOCK_STATUSES.has(tenantStatus)) {
+    return resolveTenantLifecycle(
+      {
+        ...(subRow ?? {}),
+        ...tenantRow,
+        tenant_id: tenantRow.tenant_id || subRow?.tenant_id || cleanId,
+        tier: subRow?.tier || tenantRow.tier,
+        status: tenantRow.status,
+      },
+      now
+    );
+  }
+
+  if (dbFailed) {
+    return resolveTenantLifecycle(
+      {
+        tenant_id: cleanId,
+        tier: subRow?.tier || tenantRow?.tier || 'starter',
+        status: 'readonly',
+      },
+      now
+    );
+  }
 
   if (subRow) {
     return resolveTenantLifecycle(subRow, now);
   }
-
-  const tenantRow = await db
-    .prepare(
-      `SELECT id AS tenant_id, tier, status, trial_ends_at, current_period_end
-       FROM saas_tenants
-       WHERE id = ? OR slug = ?
-       LIMIT 1`
-    )
-    .bind(cleanId, cleanId)
-    .first<SubscriptionRow>()
-    .catch(() => null);
 
   if (tenantRow) {
     return resolveTenantLifecycle(tenantRow, now);

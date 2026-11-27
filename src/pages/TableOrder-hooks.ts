@@ -7,6 +7,7 @@ import {
   useOrderStoreWithOfflineFlush,
 } from '@/hooks/stores/use-order-store';
 import { usePaymentStore } from '@/hooks/stores/use-payment-store';
+import { isAllowedPaymentUrl } from '@/lib/safe-redirect';
 import { normalizePhone } from './TableOrder-utils';
 
 interface UseHandleViewCartArgs {
@@ -102,24 +103,14 @@ export function useHandleViewCart({
                   }),
               );
             }
-            let parsedUrl: URL;
-            try {
-              parsedUrl = new URL(checkoutUrl);
-            } catch {
+            if (!isAllowedPaymentUrl(checkoutUrl)) {
               throw new Error(
                 t('invalidPaymentUrl', {
                   defaultValue: 'Liên kết thanh toán không hợp lệ.',
                 }),
               );
             }
-            if (parsedUrl.protocol !== 'https:' && parsedUrl.protocol !== 'http:') {
-              throw new Error(
-                t('invalidPaymentUrl', {
-                  defaultValue: 'Liên kết thanh toán không hợp lệ.',
-                }),
-              );
-            }
-            window.location.href = parsedUrl.toString();
+            window.location.href = checkoutUrl;
             return;
           }
           navigate(

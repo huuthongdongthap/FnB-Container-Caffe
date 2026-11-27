@@ -294,10 +294,28 @@ describe('Full Security Audit Acceptance — KDS Surfaces & Collection Guards', 
           VALUES('mgr-a','Manager A','manager','default',1,1,'2026-10-30T00:00:00Z');
       `);
 
-      const chatOrderRes = await app.fetch(
+      // Unauthenticated sensitive assistant lookups must be rejected (401)
+      const unauthOrderRes = await app.fetch(
         new Request('http://localhost/api/chat/assistant', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ query: 'Kiểm tra đơn ord-foreign-99', order_id: 'ord-foreign-99' }),
+        }),
+        env
+      );
+      expect(unauthOrderRes.status).toBe(401);
+
+      const mgrARow: any = sql.prepare("SELECT * FROM users WHERE id = 'mgr-a'").get();
+      const { token: mgrAToken } = await issueStaffSession(env, mgrARow, { sessionType: 'staff-web' });
+      const mgrAHeaders = {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${mgrAToken}`,
+      };
+
+      const chatOrderRes = await app.fetch(
+        new Request('http://localhost/api/chat/assistant', {
+          method: 'POST',
+          headers: mgrAHeaders,
           body: JSON.stringify({ query: 'Kiểm tra đơn ord-foreign-99', order_id: 'ord-foreign-99' }),
         }),
         env
@@ -308,7 +326,7 @@ describe('Full Security Audit Acceptance — KDS Surfaces & Collection Guards', 
       const chatBillRes = await app.fetch(
         new Request('http://localhost/api/chat/assistant', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: mgrAHeaders,
           body: JSON.stringify({ query: 'Bàn 9 tính tiền', table_number: '9' }),
         }),
         env
@@ -319,7 +337,7 @@ describe('Full Security Audit Acceptance — KDS Surfaces & Collection Guards', 
       const chatPointsRes = await app.fetch(
         new Request('http://localhost/api/chat/assistant', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: mgrAHeaders,
           body: JSON.stringify({ query: 'Kiểm tra điểm tích lũy', phone: '0908888777' }),
         }),
         env
@@ -2332,11 +2350,31 @@ describe('Full Security Audit Acceptance — KDS Surfaces & Collection Guards', 
       expect(mgrSyncStatusBody.logs[0].request_body).toBeUndefined();
       expect(mgrSyncStatusBody.logs[0].response_body).toBeUndefined();
 
-      // U3: POST /api/chat/assistant masks customer full name on loyalty lookup and order ID on phone-only order lookup
-      const loyaltyChatRes = await app.fetch(
+      // U3: POST /api/chat/assistant rejects unauthenticated sensitive queries (401) and masks customer full name & order ID for authenticated customers
+      const unauthLoyaltyChatRes = await app.fetch(
         new Request('http://localhost/api/chat/assistant', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ query: 'Kiểm tra điểm tích lũy', phone: '0912345678' }),
+        }),
+        multiTenantEnv
+      );
+      expect(unauthLoyaltyChatRes.status).toBe(401);
+
+      const u22CustomerToken = await generateJWT(
+        { id: 'cust_u22_def', role: 'customer', tenantId: 'default', phone: '0912345678' },
+        multiTenantEnv.JWT_SECRET,
+        3600
+      );
+      const u22CustomerHeaders = {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${u22CustomerToken}`,
+      };
+
+      const loyaltyChatRes = await app.fetch(
+        new Request('http://localhost/api/chat/assistant', {
+          method: 'POST',
+          headers: u22CustomerHeaders,
           body: JSON.stringify({ query: 'Kiểm tra điểm tích lũy', phone: '0912345678' }),
         }),
         multiTenantEnv
@@ -2349,7 +2387,7 @@ describe('Full Security Audit Acceptance — KDS Surfaces & Collection Guards', 
       const orderPhoneChatRes = await app.fetch(
         new Request('http://localhost/api/chat/assistant', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: u22CustomerHeaders,
           body: JSON.stringify({ query: 'Kiểm tra đơn hàng của tôi', phone: '0912345678' }),
         }),
         multiTenantEnv
@@ -6675,14 +6713,38 @@ describe('Full Security Audit Acceptance — KDS Surfaces & Collection Guards', 
       `);
       sql.prepare("INSERT INTO cafe_tables (id, table_number, tenant_id) VALUES ('T99', '99', 'default')").run();
       sql.prepare(
+        `INSERT INTO customers (id, name, phone, email, tenant_id)
+         VALUES ('cust-ak-99', 'Secret Guest', '0908889999', 'secret-ak@example.test', 'default')`
+      ).run();
+      sql.prepare(
         `INSERT INTO orders (id, order_number, customer_phone, customer_name, tenant_id, total, status, payment_status, payment_method, order_type, table_id, items, created_at, updated_at)
          VALUES ('ord-ak-secret999', 'ORD-AK9', '0908889999', 'Secret Guest', 'default', 95000, 'preparing', 'unpaid', 'cash', 'dine_in', 'T99', '[]', ?, ?)`
       ).run(nowIso, nowIso);
 
-      const spoofZaloRes = await customerAssistantRouter.fetch(
+      const unauthSpoofZaloRes = await customerAssistantRouter.fetch(
         new Request('http://localhost/', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ query: 'Kiểm tra đơn hàng của tôi', phone: '0908889999', channel: 'zalo' }),
+        }),
+        env
+      );
+      expect(unauthSpoofZaloRes.status).toBe(401);
+
+      const akCustomerToken = await generateJWT(
+        { id: 'cust-ak-99', role: 'customer', tenantId: 'default', phone: '0908889999' },
+        env.JWT_SECRET,
+        3600
+      );
+      const akCustomerHeaders = {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${akCustomerToken}`,
+      };
+
+      const spoofZaloRes = await customerAssistantRouter.fetch(
+        new Request('http://localhost/', {
+          method: 'POST',
+          headers: akCustomerHeaders,
           body: JSON.stringify({ query: 'Kiểm tra đơn hàng của tôi', phone: '0908889999', channel: 'zalo' }),
         }),
         env
@@ -6695,7 +6757,7 @@ describe('Full Security Audit Acceptance — KDS Surfaces & Collection Guards', 
       const tableBillRes = await customerAssistantRouter.fetch(
         new Request('http://localhost/', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: akCustomerHeaders,
           body: JSON.stringify({ query: 'Tính tiền bàn 99', table_number: '99' }),
         }),
         env
