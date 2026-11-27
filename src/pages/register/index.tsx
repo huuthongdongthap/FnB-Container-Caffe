@@ -12,9 +12,12 @@ interface RegisterApiResponse {
   success?: boolean;
   token?: string;
   user?: { id: string; name: string; email: string; phone?: string; role?: string };
+  message?: string;
   data?: {
     user?: { id: string; name: string; email: string; phone?: string; role?: string };
     tokens?: { accessToken?: string };
+    message?: string;
+    verification_required?: boolean;
   };
 }
 
@@ -29,6 +32,7 @@ const RegisterPage: React.FC<Props> = ({ onRegistered }) => {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState('');
+  const [hasSession, setHasSession] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -59,6 +63,7 @@ const RegisterPage: React.FC<Props> = ({ onRegistered }) => {
 
       const token = res?.token || res?.data?.tokens?.accessToken;
       const createdUser = res?.user || res?.data?.user;
+      const authenticated = Boolean(token && createdUser);
       if (token && createdUser) {
         saveClientSession(token, {
           id: createdUser.id,
@@ -69,7 +74,14 @@ const RegisterPage: React.FC<Props> = ({ onRegistered }) => {
         });
       }
 
-      setSuccess('Đăng ký hội viên thành công! Bạn đã sẵn sàng tích điểm & nhận hoàn tiền.');
+      setHasSession(authenticated);
+      setSuccess(
+        authenticated
+          ? 'Đăng ký hội viên thành công! Bạn đã sẵn sàng tích điểm & nhận hoàn tiền.'
+          : res?.message ||
+            res?.data?.message ||
+            'Đăng ký thành công! Vui lòng kiểm tra hộp thư để xác thực email trước khi đăng nhập.',
+      );
       setEmail('');
       setPassword('');
       setName('');
@@ -107,18 +119,29 @@ const RegisterPage: React.FC<Props> = ({ onRegistered }) => {
           <div role="status" className="rounded-xl border border-emerald-400/30 bg-emerald-500/15 p-4 text-sm text-emerald-200 space-y-3">
             <p>{success}</p>
             <div className="flex gap-3 pt-1">
-              <Link
-                to="/loyalty"
-                className="px-4 py-2 rounded-lg bg-[var(--aura-chrome-bright,#C69C6D)] text-[#0A1A2E] text-xs font-bold"
-              >
-                Xem Ví &amp; Điểm
-              </Link>
-              <Link
-                to="/account"
-                className="px-4 py-2 rounded-lg border border-white/20 text-white text-xs font-semibold"
-              >
-                Vào Tài khoản
-              </Link>
+              {hasSession ? (
+                <>
+                  <Link
+                    to="/loyalty"
+                    className="px-4 py-2 rounded-lg bg-[var(--aura-chrome-bright,#C69C6D)] text-[#0A1A2E] text-xs font-bold"
+                  >
+                    Xem Ví &amp; Điểm
+                  </Link>
+                  <Link
+                    to="/account"
+                    className="px-4 py-2 rounded-lg border border-white/20 text-white text-xs font-semibold"
+                  >
+                    Vào Tài khoản
+                  </Link>
+                </>
+              ) : (
+                <Link
+                  to="/login"
+                  className="px-4 py-2 rounded-lg bg-[var(--aura-chrome-bright,#C69C6D)] text-[#0A1A2E] text-xs font-bold"
+                >
+                  Đăng nhập sau khi xác thực
+                </Link>
+              )}
             </div>
           </div>
         ) : (

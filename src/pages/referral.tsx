@@ -49,7 +49,7 @@ export function ReferralPage() {
   const [searchParams] = useSearchParams();
   const store = useReferralStore();
   const user = useAuthStore((s) => s.user);
-  const isAuthenticated = !!user;
+  const isAuthenticated = Boolean(user && (!user.role || user.role === 'customer'));
 
   useEffect(() => {
     const incomingRef = searchParams.get('ref')?.trim();

@@ -8,7 +8,7 @@
  */
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Coffee } from 'lucide-react';
 
@@ -33,10 +33,33 @@ export function StitchMobileOrderNew({
   onViewCart,
 }: Readonly<StitchMobileOrderNewProps>) {
   const { t } = useTranslation();
+  const storageKey = `aura_table_order_cart:${tableId || 'default'}`;
   const [activeCategory, setActiveCategory] = useState('all');
-  const [cart, setCart] = useState<CartItem[]>([]);
+  const [cart, setCart] = useState<CartItem[]>(() => {
+    if (typeof window === 'undefined') return [];
+    try {
+      const raw = window.localStorage.getItem(storageKey);
+      if (!raw) return [];
+      const parsed = JSON.parse(raw);
+      return Array.isArray(parsed) ? (parsed as CartItem[]) : [];
+    } catch {
+      return [];
+    }
+  });
   const [searchQuery, setSearchQuery] = useState('');
   const [showSearch, setShowSearch] = useState(false);
+
+  useEffect(() => {
+    try {
+      if (cart.length === 0) {
+        window.localStorage.removeItem(storageKey);
+      } else {
+        window.localStorage.setItem(storageKey, JSON.stringify(cart));
+      }
+    } catch {
+      /* ignore storage errors */
+    }
+  }, [cart, storageKey]);
 
   const derivedCategories = useMemo(() => {
     const knownKeys = new Set<string>(CATEGORIES.map((c) => c.key));

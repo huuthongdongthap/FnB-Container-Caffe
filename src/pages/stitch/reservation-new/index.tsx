@@ -89,14 +89,20 @@ export function parseDateToISO(dateInput: string, nowMs = Date.now()): string {
 }
 
 export default function ReservationNew() {
-  const todayStr = useMemo(() => {
+  const { defaultDateStr, defaultTimeStr } = useMemo(() => {
     const vnNow = new Date(Date.now() + 7 * 3600_000);
-    return vnNow.toISOString().slice(0, 10);
+    const vnHour = vnNow.getUTCHours();
+    const vnMin = vnNow.getUTCMinutes();
+    if (vnHour > 19 || (vnHour === 19 && vnMin >= 0)) {
+      const tomorrow = new Date(vnNow.getTime() + 24 * 3600_000);
+      return { defaultDateStr: tomorrow.toISOString().slice(0, 10), defaultTimeStr: '19:30' };
+    }
+    return { defaultDateStr: vnNow.toISOString().slice(0, 10), defaultTimeStr: '19:30' };
   }, []);
 
   const [selectedParty, setSelectedParty] = useState('2 khách');
-  const [selectedDate, setSelectedDate] = useState(todayStr);
-  const [selectedTime, setSelectedTime] = useState('19:30');
+  const [selectedDate, setSelectedDate] = useState(defaultDateStr);
+  const [selectedTime, setSelectedTime] = useState(defaultTimeStr);
   const [selectedZone, setSelectedZone] = useState(2);
   const [fullName, setFullName] = useState('');
   const [phone, setPhone] = useState('');
@@ -119,6 +125,12 @@ export default function ReservationNew() {
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!fullName.trim() || !phone.trim() || isCreating || isLoadingTables) return;
+
+    const normalizedPhone = phone.replace(/[\s.-]/g, '');
+    if (!/^0\d{9,10}$/.test(normalizedPhone)) {
+      setSubmissionError('Số điện thoại không hợp lệ. Vui lòng nhập 10 chữ số bắt đầu bằng 0 (VD: 0901234567).');
+      return;
+    }
 
     // Availability or submission failures must fail closed: never present an unlinked demo booking.
     if (availabilityError) {

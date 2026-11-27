@@ -34,7 +34,7 @@ export function LoyaltyPage({
   const { t } = useTranslation();
   const store = useLoyaltyStore();
   const user = useAuthStore((s) => s.user);
-  const isAuthenticated = !!user;
+  const isAuthenticated = Boolean(user && (!user.role || user.role === 'customer'));
 
   const [checkinError, setCheckinError] = useState<string | null>(null);
   const [checkedInToday, setCheckedInToday] = useState(false);
@@ -190,8 +190,17 @@ export function LoyaltyPage({
     is_current: item.tier_name.toLowerCase() === normalizedTier,
   }));
 
+  const DAY_LABELS_FALLBACK: Record<string, string> = {
+    MON: 'T2',
+    TUE: 'T3',
+    WED: 'T4',
+    THU: 'T5',
+    FRI: 'T6',
+    SAT: 'T7',
+    SUN: 'CN',
+  };
   const streakDays: LoyaltyStreakDay[] = WEEK_DAYS.map((day) => ({
-    label: t(`loyalty.days.${day}`),
+    label: t(`loyalty.days.${day}`, { defaultValue: DAY_LABELS_FALLBACK[day] ?? day }),
     checked: checkinDays[day] ?? false,
   }));
 

@@ -73,7 +73,7 @@ export function registerEventHandlers(router: Hono): void {
     const env = c.env as unknown as PretixEnv;
     const client = getPretixClient(env);
     if (!client) {
-      return c.json({ success: false, error: 'pretix not configured' }, 503);
+      return c.json({ success: true, data: [], results: [], configured: false });
     }
 
     const orgRes = resolveTenantOrganizer(c, env);

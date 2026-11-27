@@ -177,6 +177,7 @@ reviewsRouter.post('/', optionalAuth(), async(c) => {
   // If order_id provided, verify order exists, belongs to tenant, and caller is authorized
   let resolvedOrderTenant: string | undefined;
   if (data.order_id) {
+    const cleanOrderId = data.order_id.trim().replace(/^#/, '');
     let orderRow: {
       id: string;
       customer_id?: string | null;
@@ -186,8 +187,8 @@ reviewsRouter.post('/', optionalAuth(), async(c) => {
     } | null = null;
     try {
       orderRow = await db
-        .prepare('SELECT id, customer_id, customer_phone, status, tenant_id FROM orders WHERE id = ?')
-        .bind(data.order_id)
+        .prepare('SELECT id, customer_id, customer_phone, status, tenant_id FROM orders WHERE id = ?1 OR UPPER(order_number) = UPPER(?1)')
+        .bind(cleanOrderId)
         .first<{
           id: string;
           customer_id?: string | null;
@@ -199,20 +200,23 @@ reviewsRouter.post('/', optionalAuth(), async(c) => {
       if (!orderRow) {
         orderRow = await db
           .prepare('SELECT id, customer_id, tenant_id FROM orders WHERE id = ?')
-          .bind(data.order_id)
+          .bind(cleanOrderId)
           .first<{ id: string; customer_id?: string | null; tenant_id?: string | null }>()
           .catch(() =>
             db
               .prepare('SELECT id, customer_id FROM orders WHERE id = ?')
-              .bind(data.order_id)
+              .bind(cleanOrderId)
               .first<{ id: string; customer_id?: string | null; tenant_id?: string | null }>()
               .catch(() =>
                 db
                   .prepare('SELECT id, tenant_id FROM orders WHERE id = ?')
-                  .bind(data.order_id)
+                  .bind(cleanOrderId)
                   .first<{ id: string; customer_id?: string | null; tenant_id?: string | null }>()
               )
           );
+      }
+      if (orderRow?.id) {
+        data.order_id = orderRow.id;
       }
     } catch {
       orderRow = null;

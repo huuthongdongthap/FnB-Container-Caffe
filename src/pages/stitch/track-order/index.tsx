@@ -14,6 +14,8 @@ import { TrackOrderEmptyCard } from '@/components/tracking/track-order-empty-car
 import { TrackOrderLoadingCard } from '@/components/tracking/track-order-loading-card';
 import { TrackOrderErrorCard } from '@/components/tracking/track-order-error-card';
 import { useOrderObservation } from '@/hooks/use-order-observation';
+import { apiFetch } from '@/lib/api-client';
+import { getGuestOrderToken } from '@/lib/guest-order-token';
 
 const POLL_TIMEOUT_MS = 10 * 60 * 1000; // 10 min
 
@@ -113,6 +115,31 @@ export default function TrackOrderPage() {
     [navigate]
   );
 
+  const [cancelling, setCancelling] = useState(false);
+  const [cancelError, setCancelError] = useState<string | null>(null);
+
+  const handleCancelOrder = useCallback(async () => {
+    if (!matchedOrder || cancelling) return;
+    setCancelling(true);
+    setCancelError(null);
+    try {
+      const guestToken =
+        searchParams.get('order_token')?.trim() ||
+        getGuestOrderToken(matchedOrder.id) ||
+        undefined;
+      await apiFetch(`/api/orders/${encodeURIComponent(matchedOrder.id)}/cancel`, {
+        method: 'POST',
+        headers: guestToken ? { 'X-Order-Token': guestToken } : undefined,
+        body: JSON.stringify({ reason: 'Khách hàng tự huỷ đơn' }),
+      });
+      refresh();
+    } catch (err) {
+      setCancelError(err instanceof Error ? err.message : 'Không thể huỷ đơn hàng lúc này');
+    } finally {
+      setCancelling(false);
+    }
+  }, [matchedOrder, cancelling, searchParams, refresh]);
+
   if (!orderId) {
     return (
       <div className="min-h-screen bg-[var(--aura-bg-page,var(--aura-bg-surface))] font-body text-[var(--aura-text-primary,#e2e2e2)]">
@@ -161,16 +188,36 @@ export default function TrackOrderPage() {
     : (matchedOrder.estimatedMinutes ?? 8);
 
   return (
-    <StitchTrackOrderNew
-      orderId={matchedOrder.orderNumber || matchedOrder.id}
-      estimatedMinutes={estimatedMinutes}
-      items={trackOrderItems}
-      total={matchedOrder.totalAmount}
-      status={matchedOrder.status}
-      orderType={matchedOrder.channel}
-      onSearchAnother={handleSearchAnother}
-      onBack={handleBack}
-      onNavigate={handleNavigate}
-    />
+    <>
+      <StitchTrackOrderNew
+        orderId={matchedOrder.orderNumber || matchedOrder.id}
+        estimatedMinutes={estimatedMinutes}
+        items={trackOrderItems}
+        total={matchedOrder.totalAmount}
+        status={matchedOrder.status}
+        orderType={matchedOrder.channel}
+        onSearchAnother={handleSearchAnother}
+        onBack={handleBack}
+        onNavigate={handleNavigate}
+      />
+      {normalizedStatus === 'pending' && (
+        <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-40 w-[calc(100%-2rem)] max-w-md rounded-2xl border border-rose-500/30 bg-[#0d1117]/95 backdrop-blur-md p-3 shadow-2xl flex flex-col gap-2">
+          {cancelError && (
+            <p className="text-xs text-rose-400 text-center" role="alert">
+              {cancelError}
+            </p>
+          )}
+          <button
+            type="button"
+            onClick={handleCancelOrder}
+            disabled={cancelling}
+            data-testid="track-order-cancel-btn"
+            className="w-full py-2.5 rounded-xl bg-rose-500/20 hover:bg-rose-500/30 border border-rose-500/40 text-rose-200 text-xs font-semibold uppercase tracking-wider transition-colors disabled:opacity-50"
+          >
+            {cancelling ? 'Đang huỷ đơn...' : 'Huỷ đơn hàng'}
+          </button>
+        </div>
+      )}
+    </>
   );
 }
