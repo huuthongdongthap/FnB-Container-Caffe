@@ -31,9 +31,13 @@ describe('Chat privacy with actual SQLite queries', () => {
     expect(f.sqlite.prepare("SELECT status FROM contact_messages WHERE id='visible'").get()?.status).toBe('read');
     expect((await (await f.request('/api/chat/conversations', 'owner')).json()).data[0].unread_count).toBe(0);
   });
-  it('public writes set ownership/classification server side even with a foreign JWT and spoofed body', async () => {
+  it('rejects foreign staff JWT on public writes and sets ownership/classification server side for anonymous writes', async () => {
     const f = fixture();
-    const response = await f.request('/api/chat/messages', 'other', 'POST',
+    const foreignRes = await f.request('/api/chat/messages', 'other', 'POST',
+      { ...message, tenant_id: 'cafe-b', category: 'recruitment', classification: 'recruitment' }, { 'X-Tenant-Id': 'cafe-b' });
+    expect(foreignRes.status).toBe(403);
+
+    const response = await f.request('/api/chat/messages', undefined, 'POST',
       { ...message, tenant_id: 'cafe-b', category: 'recruitment', classification: 'recruitment' }, { 'X-Tenant-Id': 'cafe-b' });
     expect(response.status).toBe(201);
     const { id } = await response.json();
