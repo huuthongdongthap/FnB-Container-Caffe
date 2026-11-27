@@ -1456,6 +1456,7 @@
       "memberSince": "MEMBER SINCE {{year}}",
       "statusPreparing": "Preparing",
       "statusDelivered": "Delivered",
+      "statusCancelled": "Cancelled",
       "reorder": "Reorder",
       "reorderConfirm": "This will replace your current cart items. Continue?",
       "navReserve": "Reserve",
@@ -1856,8 +1857,8 @@
       "cta": "Sign in now",
       "title": "Not signed in"
     },
-    "todayWithTime": "Today at {time}",
-    "yesterdayWithTime": "Yesterday at {time}"
+    "todayWithTime": "Today at {{time}}",
+    "yesterdayWithTime": "Yesterday at {{time}}"
   },
   "promotions": {
     "title": "Promotions & Offers",
@@ -1914,8 +1915,8 @@
   "account.notLoggedIn.body": "Sign in to view your account details",
   "account.notLoggedIn.cta": "Sign in now",
   "account.notLoggedIn.title": "Not signed in",
-  "account.todayWithTime": "Today at {time}",
-  "account.yesterdayWithTime": "Yesterday at {time}",
+  "account.todayWithTime": "Today at {{time}}",
+  "account.yesterdayWithTime": "Yesterday at {{time}}",
   "events.common.contactUs": "Contact Us",
   "events.common.privacyPolicy": "Privacy Policy",
   "events.common.termsOfService": "Terms of Service",

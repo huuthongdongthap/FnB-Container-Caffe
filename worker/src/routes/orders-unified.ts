@@ -82,7 +82,20 @@ ordersUnifiedRouter.patch('/:id/status', requireAuth(['owner', 'manager', 'super
 ordersUnifiedRouter.patch('/:id/mark-cod-paid', requireAuth(COD_COLLECTION_ROLES), audit('order_cod_paid'), handleMarkCodPaid);
 ordersUnifiedRouter.post('/:id/recall', requireAuth(KDS_PREP_ROLES), audit('order_status_change'), handleRecallKdsOrder);
 
-ordersUnifiedRouter.post('/:id/cancel', requireAuth(['owner', 'manager', 'supervisor', 'staff', 'waiter', 'cashier', 'admin', 'shipper', 'rider', 'customer']), handleCancelOrder);
+const ORDER_CANCEL_ROLES = ['owner', 'manager', 'supervisor', 'staff', 'waiter', 'cashier', 'admin', 'shipper', 'rider', 'customer'];
+ordersUnifiedRouter.post(
+  '/:id/cancel',
+  async (c, next) => {
+    const hasOrderToken = Boolean(
+      (c.req.header('X-Order-Token') || c.req.header('x-order-token') || c.req.query('order_token') || '').trim()
+    );
+    if (hasOrderToken) {
+      return optionalAuth()(c, next);
+    }
+    return requireAuth(ORDER_CANCEL_ROLES)(c, next);
+  },
+  handleCancelOrder,
+);
 ordersUnifiedRouter.post('/:id/claim', requireAuth(['owner', 'manager', 'supervisor', 'staff', 'waiter', 'cashier', 'admin', 'customer']), handleClaimOrder);
 
 // ── 3. Parameterized Base Record Handlers (/:id) ──

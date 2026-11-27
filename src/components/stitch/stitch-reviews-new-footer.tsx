@@ -34,7 +34,7 @@ export function ReviewsFooter() {
             fontFamily: "var(--aura-font-display)",
             lineHeight: '1.3',
             fontWeight: 500,
-            color: 'var(--aura-noir-void)',
+            color: 'var(--aura-chrome-bright, #E8EEF3)',
           }}
         >
           Aura Cafe
@@ -42,15 +42,15 @@ export function ReviewsFooter() {
 
         <div className="mb-4 flex flex-wrap justify-center gap-8 md:mb-0">
           {[
-            { key: 'footerPrivacy', default: 'Privacy Policy' },
-            { key: 'footerTerms', default: 'Terms of Service' },
-            { key: 'footerContact', default: 'Contact Us' },
-            { key: 'footerPressKit', default: 'Press Kit' },
-          ].map(({ key, default: label }) => (
+            { key: 'footerPrivacy', default: 'Privacy Policy', href: '/privacy' },
+            { key: 'footerTerms', default: 'Terms of Service', href: '/terms' },
+            { key: 'footerContact', default: 'Contact Us', href: '/contact' },
+            { key: 'footerPressKit', default: 'Story', href: '/story' },
+          ].map(({ key, default: label, href }) => (
             <a
               key={key}
               className="transition-all hover:underline"
-              href="#"
+              href={href}
               style={FOOTER_LINK_STYLE}
               onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--aura-chrome-bright, #E8EEF3)'; }}
               onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--aura-chrome-soft)'; }}
@@ -61,7 +61,7 @@ export function ReviewsFooter() {
         </div>
 
         <span
-          className="uppercase tracking-widest opacity-60"
+          className="uppercase tracking-widest opacity-80"
           style={{
             fontFamily: "var(--aura-font-body)",
             fontSize: '12px',
@@ -71,7 +71,7 @@ export function ReviewsFooter() {
             color: 'var(--aura-chrome-soft)',
           }}
         >
-          {t('stitch.footerCopyright', { defaultValue: '© 2024 Aura Cafe. Precision. Darkness. Luxury.' })}
+          {t('stitch.footerCopyright', { defaultValue: '© 2026 Aura Cafe. Precision. Darkness. Luxury.' })}
         </span>
       </div>
     </footer>

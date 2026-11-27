@@ -36,6 +36,7 @@ export interface CheckoutNewFormData {
   discount?: number;
   useCashback?: boolean;
   cashbackAmount?: number;
+  redeemPoints?: number;
 }
 
 export interface StitchCheckoutNewProps {

@@ -147,13 +147,14 @@ export async function fetchOrderForRead(
   id: string,
   tenantId: string,
 ): Promise<Record<string, any> | null> {
+  const cleanId = id.trim().replace(/^#/, '');
   const rawTenant = (tenantId || '').trim() || 'default';
   const cleanTenant = rawTenant.toLowerCase() === 'hq' ? '*' : rawTenant;
   const scoped = cleanTenant !== '*';
   const joinTenantClause = !scoped
     ? ''
     : cleanTenant === 'default'
-      ? " AND (o.tenant_id = ? OR o.tenant_id IS NULL OR o.tenant_id = '' OR TRIM(o.tenant_id) = '')"
+      ? " AND (o.tenant_id = ?2 OR o.tenant_id IS NULL OR o.tenant_id = '' OR TRIM(o.tenant_id) = '')"
       : ' AND (o.tenant_id = ?2 OR TRIM(o.tenant_id) = ?2)';
   const tableJoinTenantClause = !scoped
     ? " AND COALESCE(NULLIF(TRIM(t.tenant_id), ''), 'default') = COALESCE(NULLIF(TRIM(o.tenant_id), ''), 'default')"
@@ -163,21 +164,26 @@ export async function fetchOrderForRead(
   const bareTenantClause = !scoped
     ? ''
     : cleanTenant === 'default'
-      ? " AND (tenant_id = ? OR tenant_id IS NULL OR tenant_id = '' OR TRIM(tenant_id) = '')"
+      ? " AND (tenant_id = ?2 OR tenant_id IS NULL OR tenant_id = '' OR TRIM(tenant_id) = '')"
       : ' AND (tenant_id = ?2 OR TRIM(tenant_id) = ?2)';
-  const idPlaceholder = scoped && cleanTenant !== 'default' ? '?1' : '?';
+  const bindArgs = scoped ? [cleanId, cleanTenant] : [cleanId];
   try {
     return (await db.prepare(
-      `SELECT o.*, COALESCE(t.table_number, t.id) as table_name FROM orders o LEFT JOIN cafe_tables t ON o.table_id = t.id${tableJoinTenantClause} WHERE o.id = ${idPlaceholder}${joinTenantClause}`
-    ).bind(...(scoped ? [id, cleanTenant] : [id])).first()) as Record<string, any> | null;
+      `SELECT o.*, COALESCE(t.table_number, t.id) as table_name FROM orders o LEFT JOIN cafe_tables t ON o.table_id = t.id${tableJoinTenantClause} WHERE (o.id = ?1 OR UPPER(o.order_number) = UPPER(?1))${joinTenantClause}`
+    ).bind(...bindArgs).first()) as Record<string, unknown> | null;
   } catch {
     try {
       return (await db.prepare(
-        `SELECT o.*, COALESCE(t.table_number, t.id) as table_name FROM orders o LEFT JOIN cafe_tables t ON o.table_id = t.id WHERE o.id = ${idPlaceholder}${joinTenantClause}`
-      ).bind(...(scoped ? [id, cleanTenant] : [id])).first()) as Record<string, any> | null;
+        `SELECT o.*, COALESCE(t.table_number, t.id) as table_name FROM orders o LEFT JOIN cafe_tables t ON o.table_id = t.id WHERE (o.id = ?1 OR UPPER(o.order_number) = UPPER(?1))${joinTenantClause}`
+      ).bind(...bindArgs).first()) as Record<string, unknown> | null;
     } catch {
-      return (await db.prepare(`SELECT * FROM orders WHERE id = ${idPlaceholder}${bareTenantClause}`)
-        .bind(...(scoped ? [id, cleanTenant] : [id])).first()) as Record<string, any> | null;
+      try {
+        return (await db.prepare(`SELECT * FROM orders WHERE (id = ?1 OR UPPER(order_number) = UPPER(?1))${bareTenantClause}`)
+          .bind(...bindArgs).first()) as Record<string, unknown> | null;
+      } catch {
+        return (await db.prepare(`SELECT * FROM orders WHERE id = ?1${bareTenantClause}`)
+          .bind(...bindArgs).first()) as Record<string, unknown> | null;
+      }
     }
   }
 }

@@ -75,8 +75,12 @@ export interface Invoice {
 
 export function useMyInvoices() {
   const session = useClientSessionScope();
+  const isSignedIn = Boolean(
+    session.userScope && session.userScope !== 'guest' && session.userScope !== 'anon',
+  );
   return useQuery<Invoice[]>({
     queryKey: ['my-invoices', session.tenantId, session.userScope],
+    enabled: isSignedIn,
     queryFn: async () => {
       try {
         const res = await apiFetch<ApiListResponse<Invoice>>('/api/subscriptions/invoices/list');
@@ -119,8 +123,12 @@ export function usePlans() {
 
 export function useMySubscriptions() {
   const session = useClientSessionScope();
+  const isSignedIn = Boolean(
+    session.userScope && session.userScope !== 'guest' && session.userScope !== 'anon',
+  );
   return useQuery<Subscription[]>({
     queryKey: ['my-subscriptions', session.tenantId, session.userScope],
+    enabled: isSignedIn,
     queryFn: async () => {
       const res = await apiFetch<ApiListResponse<Subscription>>('/api/subscriptions');
       return res.data;

@@ -1457,6 +1457,7 @@
       "memberSince": "THÀNH VIÊN TỪ {{year}}",
       "statusPreparing": "Đang chế biến",
       "statusDelivered": "Đã giao",
+      "statusCancelled": "Đã hủy",
       "reorder": "Đặt lại",
       "reorderConfirm": "Việc này sẽ thay thế giỏ hàng hiện tại của bạn. Tiếp tục?",
       "navReserve": "Đặt bàn",
@@ -1856,8 +1857,8 @@
       "cta": "Đăng nhập ngay",
       "title": "Chưa đăng nhập"
     },
-    "todayWithTime": "Hôm nay lúc {time}",
-    "yesterdayWithTime": "Hôm qua lúc {time}"
+    "todayWithTime": "Hôm nay lúc {{time}}",
+    "yesterdayWithTime": "Hôm qua lúc {{time}}"
   },
   "promotions": {
     "title": "Khuyến Mãi & Ưu Đãi",
@@ -1914,8 +1915,8 @@
   "account.notLoggedIn.body": "Đăng nhập để xem thông tin tài khoản",
   "account.notLoggedIn.cta": "Đăng nhập ngay",
   "account.notLoggedIn.title": "Chưa đăng nhập",
-  "account.todayWithTime": "Hôm nay lúc {time}",
-  "account.yesterdayWithTime": "Hôm qua lúc {time}",
+  "account.todayWithTime": "Hôm nay lúc {{time}}",
+  "account.yesterdayWithTime": "Hôm qua lúc {{time}}",
   "events.common.contactUs": "Liên Hệ Chúng Tôi",
   "events.common.privacyPolicy": "Chính Sách Bảo Mật",
   "events.common.termsOfService": "Điều Khoản Dịch Vụ",

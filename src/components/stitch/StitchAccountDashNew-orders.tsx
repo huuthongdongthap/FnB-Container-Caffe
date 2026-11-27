@@ -2,6 +2,7 @@
  * DashOrdersSection — Recent Transactions + OrderDashStatusBadge for StitchAccountDashNew
  */
 import type React from 'react';
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { clsx } from 'clsx';
@@ -106,8 +107,9 @@ interface DashOrdersSectionProps {
 
 export function DashOrdersSection({ orders, setGlassCardRef }: DashOrdersSectionProps) {
   const { t } = useTranslation();
-  const navigate = useNavigate();
   const handleReorder = useReorder();
+  const [showAll, setShowAll] = useState(false);
+  const visibleOrders = showAll ? orders : orders.slice(0, 5);
 
   return (
     <section className="space-y-4" aria-label={t('stitch.accountDashboard.recentTransactions', 'Recent Transactions')}>
@@ -118,15 +120,18 @@ export function DashOrdersSection({ orders, setGlassCardRef }: DashOrdersSection
         >
           {t('stitch.accountDashboard.recentTransactions', 'Recent Transactions')}
         </h3>
-        <button
-          type="button"
-          onClick={() => navigate('/track-order')}
-          className="min-h-[44px] min-w-[44px] flex items-center justify-center text-[11px] font-bold uppercase tracking-widest text-[var(--aura-chrome-bright)] border-b border-[var(--aura-chrome-bright)]/30"
-          style={{ fontFamily: BODY_FONT, lineHeight: '1' }}
-          aria-label={t('stitch.accountDashboard.viewAll', 'View All')}
-        >
-          {t('stitch.accountDashboard.viewAll', 'View All')}
-        </button>
+        {orders.length > 0 && (
+          <button
+            type="button"
+            onClick={() => setShowAll((prev) => !prev)}
+            data-testid="account-orders-toggle-all"
+            className="min-h-[44px] min-w-[44px] flex items-center justify-center text-[11px] font-bold uppercase tracking-widest text-[var(--aura-chrome-bright)] border-b border-[var(--aura-chrome-bright)]/30"
+            style={{ fontFamily: BODY_FONT, lineHeight: '1' }}
+            aria-label={showAll ? t('stitch.accountDashboard.showLess', 'Thu gọn') : t('stitch.accountDashboard.viewAll', 'View All')}
+          >
+            {showAll ? t('stitch.accountDashboard.showLess', 'Thu gọn') : t('stitch.accountDashboard.viewAll', 'View All')}
+          </button>
+        )}
       </div>
 
       {orders.length === 0 ? (
@@ -141,7 +146,7 @@ export function DashOrdersSection({ orders, setGlassCardRef }: DashOrdersSection
         </div>
       ) : (
         <div className="space-y-2">
-          {orders.map((order, idx) => (
+          {visibleOrders.map((order, idx) => (
             <div
               key={order.id}
               ref={setGlassCardRef}

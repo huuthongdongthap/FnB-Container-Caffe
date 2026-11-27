@@ -62,9 +62,9 @@ export function GuestInfoForm({
 
   return (
     <div
-      className="fixed left-0 right-0 z-40 px-5 pt-3 pb-3"
+      data-testid="table-order-guest-form"
+      className="sticky top-[4.5rem] z-30 w-full px-5 pt-3 pb-3"
       style={{
-        top: '4.5rem',
         background: 'color-mix(in srgb, var(--aura-noir-deep) 85%, transparent)',
         backdropFilter: 'blur(24px)',
         WebkitBackdropFilter: 'blur(24px)',

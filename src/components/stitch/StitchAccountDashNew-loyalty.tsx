@@ -52,7 +52,10 @@ export function DashLoyaltySection({ loyalty, tier, setGlassCardRef }: DashLoyal
             className="text-base text-[var(--aura-chrome-bright)]"
             style={{ fontFamily: BODY_FONT, fontWeight: 400, lineHeight: '1.6' }}
           >
-            {loyalty.pointsToNext.toLocaleString()} {t('stitch.accountDashboard.pts', 'pts')} {t('stitch.accountDashboard.pointsToGo', 'to go')}
+            {t('stitch.accountDashboard.pointsToGo', {
+              count: loyalty.pointsToNext,
+              defaultValue: `${loyalty.pointsToNext.toLocaleString()} pts to go`,
+            })}
           </p>
         </div>
       </div>
