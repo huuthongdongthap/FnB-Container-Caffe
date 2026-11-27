@@ -275,7 +275,7 @@ export function createSaasCommercialRoutes() {
     const slug = String(c.req.param('slug') || '').trim().toLowerCase();
     const db = c.env.AURA_DB;
 
-    const tenant = await db
+    let tenant = await db
       .prepare(
         `SELECT id, slug, name, tier, status, template_id, subdomain, trial_ends_at, current_period_end
          FROM saas_tenants
@@ -284,6 +284,20 @@ export function createSaasCommercialRoutes() {
       )
       .bind(slug, slug)
       .first<Record<string, unknown>>();
+
+    if (!tenant && slug === 'default') {
+      tenant = {
+        id: 'default',
+        slug: 'default',
+        name: 'AURA Container Cafe',
+        tier: 'pro',
+        status: 'active',
+        template_id: 'cafe',
+        subdomain: null,
+        trial_ends_at: null,
+        current_period_end: null,
+      };
+    }
 
     if (!tenant) {
       return c.json({ success: false, code: 'store_not_found', error: 'Không tìm thấy cửa hàng.' }, 404);
@@ -617,7 +631,18 @@ export function createSaasCommercialRoutes() {
     return null;
   }
 
+  function requireStrictOwnerOrAdmin(c: Context<SaasRouterEnv>): Response | null {
+    const user = c.get('user');
+    const role = String(user?.role || '').toLowerCase();
+    if (!['owner', 'admin'].includes(role) && !isHQSuperAdmin(user)) {
+      return c.json({ success: false, error: 'Chỉ chủ quán hoặc quản trị viên mới có quyền truy cập.' }, 403);
+    }
+    return null;
+  }
+
   router.get('/me', async (c) => {
+    const denied = requireOwnerOrAdmin(c);
+    if (denied) return denied;
     const db = c.env.AURA_DB;
     const tenantId = resolveScopedTenant(c);
 
@@ -862,7 +887,7 @@ export function createSaasCommercialRoutes() {
   });
 
   router.put('/payment-config', async (c) => {
-    const denied = requireOwnerOrAdmin(c);
+    const denied = requireStrictOwnerOrAdmin(c);
     if (denied) return denied;
     const db = c.env.AURA_DB;
     const tenantId = resolveScopedTenant(c);
@@ -1017,7 +1042,7 @@ export function createSaasCommercialRoutes() {
   });
 
   router.post('/domains', async (c) => {
-    const denied = requireOwnerOrAdmin(c);
+    const denied = requireStrictOwnerOrAdmin(c);
     if (denied) return denied;
     const db = c.env.AURA_DB;
     const tenantId = resolveScopedTenant(c);
@@ -1085,7 +1110,7 @@ export function createSaasCommercialRoutes() {
   });
 
   router.post('/domains/:id/verify', async (c) => {
-    const denied = requireOwnerOrAdmin(c);
+    const denied = requireStrictOwnerOrAdmin(c);
     if (denied) return denied;
     const db = c.env.AURA_DB;
     const tenantId = resolveScopedTenant(c);
@@ -1130,7 +1155,7 @@ export function createSaasCommercialRoutes() {
   });
 
   router.delete('/domains/:id', async (c) => {
-    const denied = requireOwnerOrAdmin(c);
+    const denied = requireStrictOwnerOrAdmin(c);
     if (denied) return denied;
     const tenantId = resolveScopedTenant(c);
     const id = c.req.param('id');
@@ -1170,7 +1195,7 @@ export function createSaasCommercialRoutes() {
   });
 
   router.post('/billing/checkout', async (c) => {
-    const denied = requireOwnerOrAdmin(c);
+    const denied = requireStrictOwnerOrAdmin(c);
     if (denied) return denied;
     const db = c.env.AURA_DB;
     const tenantId = resolveScopedTenant(c);
@@ -1315,7 +1340,7 @@ export function createSaasCommercialRoutes() {
   // =====================================================
 
   router.get('/export', async (c) => {
-    const denied = requireOwnerOrAdmin(c);
+    const denied = requireStrictOwnerOrAdmin(c);
     if (denied) return denied;
     const db = c.env.AURA_DB;
     const tenantId = resolveScopedTenant(c);

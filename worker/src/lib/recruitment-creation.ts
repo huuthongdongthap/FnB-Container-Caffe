@@ -8,8 +8,24 @@ import { prepareResourceCreation, creationInsertGuard, commitResourceCreation } 
 
 const applySchema = z.object({
   fullName: z.string().trim().min(1, 'Họ và tên không được để trống').max(100),
-  phone: z.string().trim().min(8, 'Số điện thoại không hợp lệ').max(20),
-  birthYear: z.string().trim().max(10).default(''),
+  phone: z
+    .string()
+    .trim()
+    .min(8, 'Số điện thoại không hợp lệ')
+    .max(20)
+    .refine((v) => /^\+?\d{8,15}$/.test(v.replace(/[\s\-().]/g, '')), 'Số điện thoại không hợp lệ'),
+  birthYear: z
+    .string()
+    .trim()
+    .max(10)
+    .default('')
+    .refine((v) => {
+      if (!v) return true;
+      if (!/^\d{4}$/.test(v)) return false;
+      const year = Number(v);
+      const maxYear = new Date().getFullYear() - 14;
+      return year >= 1940 && year <= maxYear;
+    }, 'Năm sinh không hợp lệ'),
   position: z.enum(['barista', 'service', 'other']).default('barista'),
   shifts: z.array(z.string().max(50)).max(20).default([]),
   experience: z.string().max(50).default('none'),

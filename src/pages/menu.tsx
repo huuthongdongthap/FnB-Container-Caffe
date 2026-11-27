@@ -1,5 +1,5 @@
-import { useState, useMemo, useEffect } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useState, useMemo, useEffect, useRef } from 'react';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { HelmetHead } from '@/components/seo/HelmetHead';
 import { useCustomerMenu, type CustomerMenu, type CustomerMenuItem } from '@/hooks/useCustomerMenu';
@@ -42,8 +42,10 @@ function flattenMenu(menu: CustomerMenu): CustomerMenuItem[] {
 export function MenuPage() {
   const { t, i18n } = useTranslation();
   const navigate = useNavigate();
+  const { id: routeItemId } = useParams<{ id?: string }>();
   const [searchParams] = useSearchParams();
   const { showToast } = useToast();
+  const autoOpenedItemRef = useRef<string | null>(null);
 
   const rawTable = searchParams.get('table') || searchParams.get('ban');
   const tableNumber = rawTable?.trim();
@@ -129,6 +131,16 @@ export function MenuPage() {
   const isCatalogUnavailable = Boolean(error) || stitchItems.length === 0;
 
   const [customizingItem, setCustomizingItem] = useState<MenuItemData | null>(null);
+
+  useEffect(() => {
+    const cleanId = routeItemId?.trim().toLowerCase();
+    if (!cleanId || autoOpenedItemRef.current === cleanId || stitchItems.length === 0) return;
+    const match = stitchItems.find((item) => item.id.toLowerCase() === cleanId);
+    if (match) {
+      autoOpenedItemRef.current = cleanId;
+      setCustomizingItem(match);
+    }
+  }, [routeItemId, stitchItems]);
 
   const handleAddToCart = (stitchItem: MenuItemData) => {
     // Packaged / Ready-to-serve items (bottled water, canned drinks, yogurt cups, etc.)

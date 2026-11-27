@@ -315,7 +315,7 @@ loyaltyRouter.get('/rewards', async(c, next) => {
     c.req.query('limit') !== undefined ||
     c.req.query('page') !== undefined ||
     c.req.query('includeInactive') !== undefined;
-  if (!cust && hasAdminPaging) {
+  if (!cust && (hasAdminPaging || (await shouldDelegateRewardsListToOpenApi(c)))) {
     await next();
     return;
   }
@@ -355,8 +355,18 @@ loyaltyRouter.get('/rewards', async(c, next) => {
     if (headerTenant && headerTenant !== storeTenant) {
       return c.json({ success: false, error: 'Cross-tenant access denied' }, 403);
     }
+    if (
+      rawCustTenant &&
+      rawCustTenant !== '*' &&
+      rawCustTenant.toLowerCase() !== 'hq' &&
+      rawCustTenant !== storeTenant
+    ) {
+      return c.json({ success: false, error: 'Cross-tenant access denied' }, 403);
+    }
   } else if (rawCustTenant && rawCustTenant !== '*' && rawCustTenant.toLowerCase() !== 'hq') {
     storeTenant = rawCustTenant;
+  } else if (headerTenant) {
+    storeTenant = headerTenant;
   } else {
     storeTenant = resolvePublicTenantId(c);
   }

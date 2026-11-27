@@ -146,9 +146,11 @@ export async function collectCodPayment(
         error: 'Order must be in delivering or delivered status before shipper COD collection',
       };
     }
-    const assignedShipper = typeof order.assigned_shipper_id === 'string' ? order.assigned_shipper_id.trim() : '';
-    if (assignedShipper && staff && assignedShipper !== staff) {
-      return { success: false, statusCode: 403, error: 'Forbidden: order is assigned to another shipper' };
+    const assignedShipper = String(
+      (order as Record<string, unknown>).assigned_shipper_id ?? (order as Record<string, unknown>).shipper_id ?? ''
+    ).trim();
+    if (!assignedShipper || !staff || assignedShipper !== staff) {
+      return { success: false, statusCode: 403, error: 'Forbidden: order is not assigned to this shipper' };
     }
   }
 
@@ -374,6 +376,26 @@ export async function collectCodPayment(
     }
   }
   if (!results || results.some(result => !result.success)) throw new Error('COD settlement transaction failed');
+  if (amount > 0) {
+    const metricTags = JSON.stringify({ provider: 'cod', order_id: id, tenant_id: effectiveOrderTenant });
+    await db
+      .prepare('INSERT INTO _metrics (name, value, tags, created_at, tenant_id) VALUES (?, ?, ?, ?, ?)')
+      .bind('revenue', amount, metricTags, now, effectiveOrderTenant)
+      .run()
+      .catch(() =>
+        db
+          .prepare('INSERT INTO _metrics (name, value, tags, created_at) VALUES (?, ?, ?, ?)')
+          .bind('revenue', amount, metricTags, now)
+          .run()
+          .catch(() =>
+            db
+              .prepare('INSERT INTO _metrics (name, value, labels, timestamp) VALUES (?, ?, ?, ?)')
+              .bind('revenue', amount, metricTags, Math.floor(Date.now() / 1000))
+              .run()
+              .catch(() => {}),
+          ),
+      );
+  }
   return { success: true, status: order.status };
 }
 

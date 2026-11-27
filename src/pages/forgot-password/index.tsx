@@ -166,7 +166,7 @@ const ForgotPasswordPage: React.FC = () => {
               >
                 Đã có mã xác thực?
               </button>
-              <a href="/admin/login" className="underline hover:text-foreground">
+              <a href="/login" className="underline hover:text-foreground">
                 Quay lại đăng nhập
               </a>
             </div>
@@ -248,7 +248,7 @@ const ForgotPasswordPage: React.FC = () => {
               >
                 Gửi lại mã mới
               </button>
-              <a href="/admin/login" className="underline hover:text-foreground">
+              <a href="/login" className="underline hover:text-foreground">
                 Quay lại đăng nhập
               </a>
             </div>

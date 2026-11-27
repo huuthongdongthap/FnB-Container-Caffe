@@ -557,7 +557,12 @@ export async function createSubscription(c: Context<{ Bindings: Env }>) {
     }
   }
 
-  const isSelfServiceCaller = callerRole === 'customer' || callerRole === 'vendor';
+  const normalizedCallerRole = String(callerRole || '').toLowerCase();
+  const isSubAdmin = ['owner', 'admin', 'manager'].includes(normalizedCallerRole);
+  const isSelfServiceCaller = normalizedCallerRole === 'customer' || normalizedCallerRole === 'vendor';
+  if (!isSubAdmin && !isSelfServiceCaller) {
+    return c.json({ success: false, error: 'Forbidden: insufficient role to create subscription' }, 403);
+  }
   const explicitCustomerId = body.customer_id as string | undefined;
   const rawCycle = String(body.billing_cycle || '').trim().toLowerCase();
   const cycleMonths = rawCycle === 'quarterly' ? 3 : (rawCycle === 'yearly' || rawCycle === 'annual') ? 12 : 1;
@@ -611,16 +616,16 @@ export async function createSubscription(c: Context<{ Bindings: Env }>) {
     if (!customer || !matchesTenantRow(customer, rawTenantId)) {
       return c.json({ success: false, error: 'Customer not found' }, 400);
     }
-  } else if (callerUserId) {
+  } else if (isSelfServiceCaller && callerUserId) {
     customerId = callerUserId;
   }
 
   const id = generateId('sub_');
   const periodStart = today();
   const periodEnd = addMonths(periodStart, cycleMonths);
-  const amount = isSelfServiceCaller ? cyclePlanAmount : ((body.amount_vnd as number) || cyclePlanAmount);
-  const depositPaidFlag = isSelfServiceCaller ? 0 : (body.deposit_paid ? 1 : 0);
-  const depositAmount = isSelfServiceCaller ? plan.deposit_vnd : (body.deposit_vnd || plan.deposit_vnd);
+  const amount = cyclePlanAmount;
+  const depositPaidFlag = isSubAdmin ? (body.deposit_paid ? 1 : 0) : 0;
+  const depositAmount = Number(plan.deposit_vnd ?? 0);
 
   try {
     await db.prepare(

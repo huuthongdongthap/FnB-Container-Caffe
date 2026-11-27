@@ -8,9 +8,10 @@
  */
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Coffee } from 'lucide-react';
+import { useOrderStore } from '@/hooks/stores/use-order-store';
 
 import type { MenuItem, CartItem, StitchMobileOrderNewProps } from './StitchMobileOrderNew-types';
 import { DEFAULT_ITEMS, CATEGORIES } from './StitchMobileOrderNew-default-data';
@@ -21,6 +22,18 @@ import { CategoryFilter } from './StitchMobileOrderNew-category-filter';
 import { OrderHeader } from './StitchMobileOrderNew-header';
 
 export type { MenuItem, CartItem, StitchMobileOrderNewProps };
+
+function readTableCart(storageKey: string): CartItem[] {
+  if (typeof window === 'undefined') return [];
+  try {
+    const raw = window.localStorage.getItem(storageKey);
+    if (!raw) return [];
+    const parsed: unknown = JSON.parse(raw);
+    return Array.isArray(parsed) ? (parsed as CartItem[]) : [];
+  } catch {
+    return [];
+  }
+}
 
 export function StitchMobileOrderNew({
   items = DEFAULT_ITEMS,
@@ -33,10 +46,54 @@ export function StitchMobileOrderNew({
   onViewCart,
 }: Readonly<StitchMobileOrderNewProps>) {
   const { t } = useTranslation();
+  const storageKey = `aura_table_order_cart:${tableId || 'default'}`;
+  const prevStorageKeyRef = useRef(storageKey);
+  const currentOrderId = useOrderStore((s) => s.currentOrder?.id ?? null);
+  const initialOrderIdRef = useRef<string | null>(currentOrderId);
+  const submittedOrderRef = useRef(false);
   const [activeCategory, setActiveCategory] = useState('all');
-  const [cart, setCart] = useState<CartItem[]>([]);
+  const [cart, setCart] = useState<CartItem[]>(() => readTableCart(storageKey));
   const [searchQuery, setSearchQuery] = useState('');
   const [showSearch, setShowSearch] = useState(false);
+
+  useEffect(() => {
+    if (
+      submittedOrderRef.current &&
+      currentOrderId &&
+      currentOrderId !== initialOrderIdRef.current
+    ) {
+      initialOrderIdRef.current = currentOrderId;
+      submittedOrderRef.current = false;
+      setCart([]);
+      try {
+        window.localStorage.removeItem(storageKey);
+      } catch {
+        /* ignore storage errors */
+      }
+    }
+  }, [currentOrderId, storageKey]);
+
+  const handleViewCart = (currentCart: CartItem[]) => {
+    submittedOrderRef.current = true;
+    onViewCart?.(currentCart);
+  };
+
+  useEffect(() => {
+    if (prevStorageKeyRef.current !== storageKey) {
+      prevStorageKeyRef.current = storageKey;
+      setCart(readTableCart(storageKey));
+      return;
+    }
+    try {
+      if (cart.length === 0) {
+        window.localStorage.removeItem(storageKey);
+      } else {
+        window.localStorage.setItem(storageKey, JSON.stringify(cart));
+      }
+    } catch {
+      /* ignore storage errors */
+    }
+  }, [cart, storageKey]);
 
   const derivedCategories = useMemo(() => {
     const knownKeys = new Set<string>(CATEGORIES.map((c) => c.key));
@@ -188,7 +245,7 @@ export function StitchMobileOrderNew({
           totalItems={totalItems}
           totalPrice={totalPrice}
           cart={cart}
-          onViewCart={onViewCart}
+          onViewCart={handleViewCart}
         />
       )}
 

@@ -54,8 +54,10 @@ export const ordersUnifiedRouter = new Hono<{ Bindings: Env }>();
 ordersUnifiedRouter.post('/guest-checkin', rateLimitMiddleware(ORDER_RATE_LIMIT), handleGuestCheckin);
 ordersUnifiedRouter.post('/guest-checkout', rateLimitMiddleware(ORDER_RATE_LIMIT), handleGuestCheckout);
 
+const SPLIT_ORDER_ROLES = ['owner', 'admin', 'manager', 'supervisor', 'staff', 'waiter', 'cashier'];
+
 ordersUnifiedRouter.post('/sync', orderRateLimit, handleSyncOrders);
-ordersUnifiedRouter.post('/split', orderRateLimit, handleSplitOrders);
+ordersUnifiedRouter.post('/split', orderRateLimit, requireAuth(SPLIT_ORDER_ROLES), handleSplitOrders);
 ordersUnifiedRouter.get('/latest', handleLatestOrderTimestamp);
 
 ordersUnifiedRouter.get('/kds/recent', requireAuth(KDS_ROLES), handleGetKdsRecentOrders);
@@ -80,7 +82,33 @@ ordersUnifiedRouter.patch('/:id/status', requireAuth(['owner', 'manager', 'super
 ordersUnifiedRouter.patch('/:id/mark-cod-paid', requireAuth(COD_COLLECTION_ROLES), audit('order_cod_paid'), handleMarkCodPaid);
 ordersUnifiedRouter.post('/:id/recall', requireAuth(KDS_PREP_ROLES), audit('order_status_change'), handleRecallKdsOrder);
 
-ordersUnifiedRouter.post('/:id/cancel', requireAuth(['owner', 'manager', 'supervisor', 'staff', 'waiter', 'cashier', 'admin', 'shipper', 'rider', 'customer']), handleCancelOrder);
+const ORDER_CANCEL_ROLES = ['owner', 'manager', 'supervisor', 'staff', 'waiter', 'cashier', 'admin', 'shipper', 'rider', 'customer'];
+ordersUnifiedRouter.post(
+  '/:id/cancel',
+  async (c, next) => {
+    const hasOrderToken = Boolean(
+      (c.req.header('X-Order-Token') || c.req.header('x-order-token') || c.req.query('order_token') || '').trim()
+    );
+    const hasAuthHeader = Boolean((c.req.header('Authorization') || c.req.header('authorization') || '').trim());
+    if (hasOrderToken && !hasAuthHeader) {
+      let authPassed = false;
+      const authResult = await optionalAuth()(c, async () => {
+        authPassed = true;
+      });
+      if (!authPassed) {
+        return authResult;
+      }
+      const user = c.get('user') as { role?: string } | undefined;
+      if (user?.role && !ORDER_CANCEL_ROLES.includes(String(user.role).toLowerCase())) {
+        return c.json({ success: false, error: 'Insufficient permissions to cancel order' }, 403);
+      }
+      await next();
+      return;
+    }
+    return requireAuth(ORDER_CANCEL_ROLES)(c, next);
+  },
+  handleCancelOrder,
+);
 ordersUnifiedRouter.post('/:id/claim', requireAuth(['owner', 'manager', 'supervisor', 'staff', 'waiter', 'cashier', 'admin', 'customer']), handleClaimOrder);
 
 // ── 3. Parameterized Base Record Handlers (/:id) ──

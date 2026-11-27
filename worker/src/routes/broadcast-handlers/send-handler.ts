@@ -243,6 +243,7 @@ export function registerSendHandler(router: Hono<{ Bindings: Env }>): void {
       : [channel];
 
     const customerChannelMap = new Map<string, Map<string, boolean>>();
+    const preConsentCustomerCount = customers.length;
     let consentFilterActive = false;
     if (customers.length > 0) {
       try {
@@ -324,7 +325,16 @@ export function registerSendHandler(router: Hono<{ Bindings: Env }>): void {
     };
 
     if (customers.length === 0) {
-      return c.json({ success: false, error: 'Không có khách hàng nào trong phân khúc này' }, 400);
+      return c.json(
+        {
+          success: false,
+          error:
+            consentFilterActive && preConsentCustomerCount > 0
+              ? 'Không có khách hàng nào đã đồng ý nhận tin tiếp thị trong phân khúc này'
+              : 'Không có khách hàng nào trong phân khúc này',
+        },
+        400,
+      );
     }
 
     // Skip channels where env or required template is not configured

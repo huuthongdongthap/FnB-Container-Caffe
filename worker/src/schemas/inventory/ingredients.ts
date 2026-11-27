@@ -1,6 +1,7 @@
 import { z } from '@hono/zod-openapi';
 import {
   PaginationQuerySchema,
+  QueryBooleanSchema,
   PaginationMetaSchema,
   SuccessResponseSchema,
   ErrorResponseSchema,
@@ -93,8 +94,8 @@ export const ingredientRoutes = {
       query: PaginationQuerySchema.extend({
         locationId: z.string().min(1).optional(),
         category: z.string().optional(),
-        isActive: z.coerce.boolean().optional(),
-        lowStock: z.coerce.boolean().optional(),
+        isActive: QueryBooleanSchema.optional(),
+        lowStock: QueryBooleanSchema.optional(),
         search: z.string().optional(),
       }),
     },

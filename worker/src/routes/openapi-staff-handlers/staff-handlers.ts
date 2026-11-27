@@ -153,6 +153,10 @@ export function registerStaffHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
     const { tenantId } = tenantCheck;
     const query = c.req.valid('query');
     const { page = 1, limit = 20, sort = 'name', order = 'asc', role, isActive, search } = query;
+    const caller = c.get('user');
+    const canViewUnmaskedPii = Boolean(
+      caller?.role && ['owner', 'admin', 'manager'].includes(String(caller.role).toLowerCase())
+    );
 
     let whereClause = "WHERE role != 'customer'";
     const params: (string | number)[] = [];
@@ -170,8 +174,13 @@ export function registerStaffHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
       params.push(isActive ? 1 : 0);
     }
     if (search) {
-      whereClause += ' AND (name LIKE ? OR email LIKE ? OR phone LIKE ?)';
-      params.push(`%${search}%`, `%${search}%`, `%${search}%`);
+      if (canViewUnmaskedPii) {
+        whereClause += ' AND (name LIKE ? OR email LIKE ? OR phone LIKE ? OR id IN (SELECT staff_id FROM staff_login_identities WHERE email LIKE ?))';
+        params.push(`%${search}%`, `%${search}%`, `%${search}%`, `%${search}%`);
+      } else {
+        whereClause += ' AND name LIKE ?';
+        params.push(`%${search}%`);
+      }
     }
 
     const offset = (page - 1) * limit;
@@ -197,11 +206,18 @@ export function registerStaffHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
       total = countResult?.total || 0;
 
       const rows = (await db.prepare(
-        `SELECT id, name, email, phone, role, locale, is_active, avatar_url, hire_date, created_at, updated_at
+        `SELECT id, name, email, phone, role, locale, is_active, avatar_url, hire_date, hourly_rate, created_at, updated_at
          FROM users ${whereClause}
          ORDER BY ${orderClause}
          LIMIT ? OFFSET ?`
-      ).bind(...params, limit, offset).all()) as { results: any[] };
+      ).bind(...params, limit, offset).all().catch(() =>
+        db.prepare(
+          `SELECT id, name, email, phone, role, locale, is_active, avatar_url, hire_date, created_at, updated_at
+           FROM users ${whereClause}
+           ORDER BY ${orderClause}
+           LIMIT ? OFFSET ?`
+        ).bind(...params, limit, offset).all()
+      )) as { results: any[] };
       rawRows = rows.results || [];
     } catch {
       let canonicalWhere = "WHERE role != 'customer'";
@@ -219,8 +235,13 @@ export function registerStaffHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
         canonicalParams.push(isActive ? 1 : 0);
       }
       if (search) {
-        canonicalWhere += ' AND (name LIKE ? OR phone LIKE ?)';
-        canonicalParams.push(`%${search}%`, `%${search}%`);
+        if (canViewUnmaskedPii) {
+          canonicalWhere += ' AND (name LIKE ? OR phone LIKE ?)';
+          canonicalParams.push(`%${search}%`, `%${search}%`);
+        } else {
+          canonicalWhere += ' AND name LIKE ?';
+          canonicalParams.push(`%${search}%`);
+        }
       }
       const canonicalSort = ['name', 'role', 'created_at'].includes(sortCol) ? sortCol : 'name';
       const countResult = (await db.prepare(
@@ -229,11 +250,18 @@ export function registerStaffHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
       total = countResult?.total || 0;
 
       const rows = (await db.prepare(
-        `SELECT id, phone, name, role, is_active, created_at, updated_at
+        `SELECT id, phone, name, role, is_active, hourly_rate, created_at, updated_at
          FROM users ${canonicalWhere}
          ORDER BY ${canonicalSort} ${sortDir}
          LIMIT ? OFFSET ?`
-      ).bind(...canonicalParams, limit, offset).all()) as { results: any[] };
+      ).bind(...canonicalParams, limit, offset).all().catch(() =>
+        db.prepare(
+          `SELECT id, phone, name, role, is_active, created_at, updated_at
+           FROM users ${canonicalWhere}
+           ORDER BY ${canonicalSort} ${sortDir}
+           LIMIT ? OFFSET ?`
+        ).bind(...canonicalParams, limit, offset).all()
+      )) as { results: any[] };
       rawRows = rows.results || [];
     }
 
@@ -266,10 +294,6 @@ export function registerStaffHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
       }
     }
 
-    const caller = c.get('user');
-    const canViewUnmaskedPii = Boolean(
-      caller?.role && ['owner', 'admin', 'manager'].includes(String(caller.role).toLowerCase())
-    );
     const staff = rawRows.map((s: any) => ({
       ...s,
       email: canViewUnmaskedPii || s.id === caller?.id ? (s.email ?? null) : null,
@@ -277,6 +301,8 @@ export function registerStaffHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
       role: s.role,
       locale: s.locale ?? 'vi',
       isActive: s.is_active === 1,
+      hourlyRate: canViewUnmaskedPii || s.id === caller?.id ? (s.hourly_rate ?? null) : null,
+      hourly_rate: canViewUnmaskedPii || s.id === caller?.id ? (s.hourly_rate ?? null) : null,
       hireDate: s.hire_date ?? null,
       createdAt: s.created_at,
       updatedAt: s.updated_at,
@@ -301,17 +327,41 @@ export function registerStaffHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
     if (!account.ok || (tenantId !== '*' && ((account.account.tenant_id || '').trim() || 'default') !== tenantId)) return c.json({ success: false, error: 'Staff not found' }, 404);
 
 
-    let staff: { id: string; name: string; email?: string | null; phone?: string | null; role: string; locale?: string; is_active: number; avatar_url?: string | null; hire_date?: string | null; created_at: string; updated_at: string } | null = null;
+    type StaffProfileRow = {
+      id: string;
+      name: string;
+      email?: string | null;
+      phone?: string | null;
+      role: string;
+      locale?: string;
+      is_active: number;
+      avatar_url?: string | null;
+      hire_date?: string | null;
+      hourly_rate?: number | null;
+      created_at: string;
+      updated_at: string;
+    };
+    let staff: StaffProfileRow | null = null;
     try {
       staff = await db.prepare(
-        `SELECT id, name, email, phone, role, locale, is_active, avatar_url, hire_date, created_at, updated_at
+        `SELECT id, name, email, phone, role, locale, is_active, avatar_url, hire_date, hourly_rate, created_at, updated_at
          FROM users WHERE id = ? AND role != 'customer'`
-      ).bind(id).first();
+      ).bind(id).first<StaffProfileRow>().catch(() =>
+        db.prepare(
+          `SELECT id, name, email, phone, role, locale, is_active, avatar_url, hire_date, created_at, updated_at
+           FROM users WHERE id = ? AND role != 'customer'`
+        ).bind(id).first<StaffProfileRow>()
+      );
     } catch {
       staff = await db.prepare(
-        `SELECT id, phone, name, role, is_active, created_at, updated_at
+        `SELECT id, phone, name, role, is_active, hourly_rate, created_at, updated_at
          FROM users WHERE id = ? AND role != 'customer'`
-      ).bind(id).first();
+      ).bind(id).first<StaffProfileRow>().catch(() =>
+        db.prepare(
+          `SELECT id, phone, name, role, is_active, created_at, updated_at
+           FROM users WHERE id = ? AND role != 'customer'`
+        ).bind(id).first<StaffProfileRow>()
+      );
     }
 
     if (!staff) {
@@ -365,6 +415,8 @@ export function registerStaffHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
         role: staff.role,
         locale: staff.locale ?? 'vi',
         isActive: staff.is_active === 1,
+        hourlyRate: canViewUnmaskedPii || staff.id === caller?.id ? (staff.hourly_rate ?? null) : null,
+        hourly_rate: canViewUnmaskedPii || staff.id === caller?.id ? (staff.hourly_rate ?? null) : null,
         hireDate: staff.hire_date ?? null,
         createdAt: staff.created_at,
         updatedAt: staff.updated_at,
@@ -553,6 +605,37 @@ export function registerStaffHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
       return c.json({ success: false, error: 'Email already exists' }, 409);
     }
     await db.prepare('UPDATE users SET email = ? WHERE id = ?').bind(normalizedEmail, id).run().catch(() => {});
+    const extraSets: string[] = [];
+    const extraParams: (string | number | null)[] = [];
+    if (body.locale !== undefined) {
+      extraSets.push('locale = ?');
+      extraParams.push(body.locale);
+    }
+    if (body.hourlyRate !== undefined) {
+      extraSets.push('hourly_rate = ?');
+      extraParams.push(body.hourlyRate);
+    }
+    if (body.hireDate !== undefined) {
+      extraSets.push('hire_date = ?');
+      extraParams.push(body.hireDate);
+    }
+    if (extraSets.length > 0) {
+      await db
+        .prepare(`UPDATE users SET ${extraSets.join(', ')} WHERE id = ?`)
+        .bind(...extraParams, id)
+        .run()
+        .catch(async () => {
+          if (body.hourlyRate !== undefined) {
+            await db.prepare('UPDATE users SET hourly_rate = ? WHERE id = ?').bind(body.hourlyRate, id).run().catch(() => {});
+          }
+          if (body.locale !== undefined) {
+            await db.prepare('UPDATE users SET locale = ? WHERE id = ?').bind(body.locale, id).run().catch(() => {});
+          }
+          if (body.hireDate !== undefined) {
+            await db.prepare('UPDATE users SET hire_date = ? WHERE id = ?').bind(body.hireDate, id).run().catch(() => {});
+          }
+        });
+    }
     if (c.env.AUTH_KV) {
       const credential = JSON.stringify({ id, name: body.name, email: normalizedEmail, role: body.role,
         phone: body.phone || '', password: passwordHash, tenant_id: staffTenant, active: body.isActive !== false, auth_version: 1 });
@@ -567,14 +650,24 @@ export function registerStaffHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
     let created: any = null;
     try {
       created = await db.prepare(
-        `SELECT id, name, email, phone, role, locale, is_active, avatar_url, hire_date, created_at, updated_at
+        `SELECT id, name, email, phone, role, locale, is_active, avatar_url, hire_date, hourly_rate, created_at, updated_at
          FROM users WHERE id = ?`
-      ).bind(id).first();
+      ).bind(id).first().catch(() =>
+        db.prepare(
+          `SELECT id, name, email, phone, role, locale, is_active, avatar_url, hire_date, created_at, updated_at
+           FROM users WHERE id = ?`
+        ).bind(id).first()
+      );
     } catch {
       created = await db.prepare(
-        `SELECT id, phone, name, role, is_active, created_at, updated_at
+        `SELECT id, phone, name, role, is_active, hourly_rate, created_at, updated_at
          FROM users WHERE id = ?`
-      ).bind(id).first();
+      ).bind(id).first().catch(() =>
+        db.prepare(
+          `SELECT id, phone, name, role, is_active, created_at, updated_at
+           FROM users WHERE id = ?`
+        ).bind(id).first()
+      );
     }
 
     return c.json({
@@ -589,6 +682,7 @@ export function registerStaffHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
         tenant_id: staffTenant,
         locale: created?.locale ?? body.locale ?? 'vi',
         isActive: created ? (created.is_active === 1 || created.isActive === true) : true,
+        hourlyRate: created?.hourly_rate ?? body.hourlyRate ?? null,
         hireDate: created?.hire_date ?? body.hireDate ?? now.slice(0, 10),
         createdAt: created?.created_at ?? now,
         updatedAt: created?.updated_at ?? now,
@@ -752,6 +846,7 @@ export function registerStaffHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
       canonicalParams.push(body.isActive ? 1 : 0);
     }
     if (body.avatarUrl !== undefined) { updates.push('avatar_url = ?'); params.push(body.avatarUrl); }
+    if (body.hourlyRate !== undefined) { updates.push('hourly_rate = ?'); params.push(body.hourlyRate); }
     if (body.hireDate !== undefined) { updates.push('hire_date = ?'); params.push(body.hireDate); }
 
     const invalidatesSession = body.role !== undefined || body.isActive !== undefined || body.email !== undefined;
@@ -784,6 +879,9 @@ export function registerStaffHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
       }
       try {
         saved = await saveAccount(`UPDATE users SET ${canonicalUpdates.join(', ')} WHERE ${guard.sql}`, canonicalParams);
+        if (saved.meta.changes && body.hourlyRate !== undefined) {
+          await db.prepare('UPDATE users SET hourly_rate = ? WHERE id = ?').bind(body.hourlyRate, id).run().catch(() => {});
+        }
       } catch (innerErr) {
         if (/UNIQUE constraint failed/i.test(String((innerErr as Error)?.message || innerErr))) {
           return c.json({ success: false, error: 'Phone or email already exists' }, 409);
@@ -893,14 +991,24 @@ export function registerStaffHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
     let updated: any = null;
     try {
       updated = await db.prepare(
-        `SELECT id, name, email, phone, role, locale, is_active, avatar_url, hire_date, created_at, updated_at
+        `SELECT id, name, email, phone, role, locale, is_active, avatar_url, hire_date, hourly_rate, created_at, updated_at
          FROM users WHERE id = ?`
-      ).bind(id).first();
+      ).bind(id).first().catch(() =>
+        db.prepare(
+          `SELECT id, name, email, phone, role, locale, is_active, avatar_url, hire_date, created_at, updated_at
+           FROM users WHERE id = ?`
+        ).bind(id).first()
+      );
     } catch {
       updated = await db.prepare(
-        `SELECT id, phone, name, role, is_active, created_at, updated_at
+        `SELECT id, phone, name, role, is_active, hourly_rate, created_at, updated_at
          FROM users WHERE id = ?`
-      ).bind(id).first();
+      ).bind(id).first().catch(() =>
+        db.prepare(
+          `SELECT id, phone, name, role, is_active, created_at, updated_at
+           FROM users WHERE id = ?`
+        ).bind(id).first()
+      );
     }
 
     return c.json({
@@ -910,6 +1018,7 @@ export function registerStaffHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
         role: updated!.role,
         locale: updated?.locale ?? 'vi',
         isActive: updated!.is_active === 1,
+        hourlyRate: updated?.hourly_rate ?? (body.hourlyRate !== undefined ? body.hourlyRate : (existing?.hourly_rate ?? null)),
         hireDate: updated?.hire_date ?? null,
         createdAt: updated!.created_at,
         updatedAt: updated!.updated_at,

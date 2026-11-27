@@ -6310,6 +6310,7 @@ describe('Full Security Audit Acceptance — KDS Surfaces & Collection Guards', 
           ingredient_id TEXT,
           type TEXT,
           quantity REAL,
+          reference_type TEXT,
           tenant_id TEXT DEFAULT 'default',
           created_at TEXT
         );
@@ -6799,11 +6800,7 @@ describe('Full Security Audit Acceptance — KDS Surfaces & Collection Guards', 
         new Request('http://localhost/check?customer_id=cust-ak-inelig'),
         env
       );
-      expect(unauthCheckRes.status).toBe(200);
-      const unauthCheckJson = (await unauthCheckRes.json()) as { data: Record<string, unknown> };
-      expect(unauthCheckJson.data.eligible).toBe(false);
-      expect(unauthCheckJson.data.birthday).toBeUndefined();
-      expect(unauthCheckJson.data.customer_name).toBeUndefined();
+      expect(unauthCheckRes.status).toBe(401);
 
       // AK4.3: Subscription create rejects cross-tenant subscription_plans with 404
       sql.prepare(
@@ -9702,7 +9699,7 @@ describe('Phase 53 (AZ1..AZ4) — Tenant Boundary Core, Payment Settlement Integ
     expect(staffAuthSrc).toContain('pin_lockout');
     expect(ordersMobileSrc).toContain('maskMobileOrderPii');
     expect(ordersMobileSrc).toContain('customer_address:');
-    expect(ordersMobileSrc).toContain("const PII_UNMASKED_ROLES: string[] = ['owner', 'manager', 'admin', 'shipper'];");
+    expect(ordersMobileSrc).toContain("const PII_UNMASKED_ROLES: string[] = ['owner', 'manager', 'admin'];");
   });
 
   it('AZ4: handleClaimOrder parses verification body & rejects unverified claims on orders with table_id/order_token, canMutateOrder blocks customers from mutating unclaimed guest orders, PATCH /api/orders/:id runs full cancellation rollback parity, table-sessions order attachment blocks rejected/refunded orders & bounds orders to session window, and table-zones blocks deleting zones with tables', async () => {

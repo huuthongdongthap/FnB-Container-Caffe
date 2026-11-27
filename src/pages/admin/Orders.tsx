@@ -465,7 +465,7 @@ export default function AdminOrdersPage() {
   useEffect(() => {
     let active = true;
     const normRole = (actorRole || '').trim().toLowerCase();
-    if (!['owner', 'admin', 'super_admin', 'manager', 'supervisor', 'staff', 'cashier', 'waiter', 'shipper', 'rider'].includes(normRole)) {
+    if (!['owner', 'admin', 'super_admin', 'manager', 'supervisor'].includes(normRole)) {
       return;
     }
     void apiFetch<{
@@ -849,12 +849,27 @@ export default function AdminOrdersPage() {
           ((order.status === 'delivering' && ['admin', 'manager', 'staff', 'rider'].includes(canonicalActor)) ||
             (order.status === 'delivered' && !isPaidStatus(payStatus) && ['admin', 'manager', 'rider'].includes(canonicalActor)) ||
             (order.status === 'served' && !isPaidStatus(payStatus) && ['admin', 'manager'].includes(canonicalActor)));
-        const hasMetaBadges = Boolean(order.shipperName || (order.status === 'failed' && order.failureReason));
+        const needsPendingRefund =
+          (order.status === 'cancelled' || order.status === 'failed' || order.status === 'expired') &&
+          (payStatus === 'paid' ||
+            payStatus === 'partially_refunded' ||
+            String(order.notes ?? '').includes('[PAID_ORDER_VOIDED_REFUND_REQUIRED]'));
+        const hasMetaBadges = Boolean(
+          order.shipperName || (order.status === 'failed' && order.failureReason) || needsPendingRefund
+        );
         return {
           ...mapAdminOrder(order, actorRole, t),
           additionalActions:
             canShowPayosQr || unpaidCod || hasRefundAction || canAssignShipper || canMarkDeliveryFailed || hasMetaBadges ? (
               <div className="inline-flex flex-wrap items-center gap-2">
+                {needsPendingRefund && (
+                  <span
+                    data-testid="pending-refund-badge"
+                    className="inline-flex items-center gap-1 rounded-full border border-amber-400/50 bg-amber-500/20 px-2.5 py-0.5 text-xs font-semibold text-amber-200"
+                  >
+                    {t('orderMgmt.pendingRefundBadge', { defaultValue: 'Chờ hoàn tiền' })}
+                  </span>
+                )}
                 {order.shipperName && (
                   <span
                     data-testid={`shipper-badge-${order.id}`}

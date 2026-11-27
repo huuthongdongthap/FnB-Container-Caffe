@@ -222,7 +222,7 @@ describe('Multi-Tenant & Franchise Preparation Integration', () => {
 
       const mockDb = {
         prepare: vi.fn((sql: string) => (isAccountLookup(sql)
-          ? accountStatement('staff', 'tenant_sadec_02')
+          ? accountStatement('manager', 'tenant_sadec_02')
           : {
             bind: vi.fn((...args: unknown[]) => {
               executedQuery = sql;
@@ -241,7 +241,7 @@ describe('Multi-Tenant & Franchise Preparation Integration', () => {
         AURA_DB: mockDb as any
       });
 
-      const req = await authRequest('GET', '/api/franchise/locations', 'staff', 'tenant_sadec_02');
+      const req = await authRequest('GET', '/api/franchise/locations', 'manager', 'tenant_sadec_02');
       const res = await app.fetch(req, env);
       expect(res.status).toBe(200);
       expect(executedQuery).toContain('AND tenant_id = ?');
@@ -253,7 +253,7 @@ describe('Multi-Tenant & Franchise Preparation Integration', () => {
     it('forbids franchisee from accessing another location profile', async () => {
       const mockDb = {
         prepare: vi.fn((sql: string) => (isAccountLookup(sql)
-          ? accountStatement('staff', 'tenant_sadec_02')
+          ? accountStatement('manager', 'tenant_sadec_02')
           : {
             bind: vi.fn(() => ({
               first: vi.fn().mockResolvedValue({
@@ -272,7 +272,7 @@ describe('Multi-Tenant & Franchise Preparation Integration', () => {
         AURA_DB: mockDb as any
       });
 
-      const req = await authRequest('GET', '/api/franchise/locations/loc_sd_flagship', 'staff', 'tenant_sadec_02');
+      const req = await authRequest('GET', '/api/franchise/locations/loc_sd_flagship', 'manager', 'tenant_sadec_02');
       const res = await app.fetch(req, env);
       expect(res.status).toBe(403);
       const body = await res.json() as any;
@@ -4542,7 +4542,7 @@ describe('Multi-Tenant & Franchise Preparation Integration', () => {
           if (/FROM users WHERE id = \?/i.test(sql)) {
             if (args[0] === 'user-supervisor') return staffAccountRow('supervisor', 'tenant_sadec_02');
             if (args[0] === 'user-manager') return staffAccountRow('manager', 'default');
-            if (args[0] === 'user-owner') return staffAccountRow('owner', 'default');
+            if (args[0] === 'user-owner') return staffAccountRow('owner', 'tenant_sadec_02');
             if (args[0] === 'user-admin') return staffAccountRow('admin', 'hq');
             if (args[0] === 'user-waiter') return staffAccountRow('waiter', 'default');
           }
@@ -4808,9 +4808,9 @@ describe('Multi-Tenant & Franchise Preparation Integration', () => {
       subApp.post('/api/subscriptions/invoices/generate', generateInvoices);
       subApp.get('/api/mobile/tables', getTablesMobile);
 
-      // Franchise supervisor creates subscription -> first invoice gets tenant_id = 'tenant_sadec_02', and default MRR snapshot only counts default store (2,000,000 VND)
+      // Franchise owner creates subscription -> first invoice gets tenant_id = 'tenant_sadec_02', and default MRR snapshot only counts default store (2,000,000 VND)
       const createFranSubRes = await subApp.fetch(
-        await authRequest('POST', '/api/subscriptions', 'supervisor', 'tenant_sadec_02', {
+        await authRequest('POST', '/api/subscriptions', 'owner', 'tenant_sadec_02', {
           plan_id: 'plan_1',
           customer_id: 'cust_fran_phone',
           customer_name: 'SaDec Member',
@@ -6794,6 +6794,20 @@ describe('Multi-Tenant & Franchise Preparation Integration', () => {
         }),
         all: vi.fn(async () => {
           executedSqls.push(sql);
+          if (/FROM recipes WHERE product_id = \? AND is_active = 1 AND/i.test(sql)) {
+            const pid = String(args[0] ?? '');
+            const t = String(args[1] ?? 'default');
+            return {
+              success: true,
+              results: recipes.filter((r) => r.product_id === pid && ((String(r.tenant_id ?? '').trim()) || 'default') === t),
+            };
+          }
+          if (/FROM recipes WHERE product_id = \?/i.test(sql)) {
+            return {
+              success: true,
+              results: recipes.filter((r) => r.product_id === args[0]),
+            };
+          }
           if (/^PRAGMA table_info\((cashback_transactions|loyalty_point_logs|loyalty_audit_log)\)/i.test(sql)) {
             return { success: true, results: [{ name: 'id', type: 'TEXT' }, { name: 'tenant_id', type: 'TEXT' }] };
           }
@@ -6801,9 +6815,9 @@ describe('Multi-Tenant & Franchise Preparation Integration', () => {
             return { success: true, results: inventoryTxs.filter((tx) => tx.reference_id === args[0] && tx.type === 'reserve') };
           }
           if (/FROM recipe_items ri/i.test(sql)) {
-            const rid = String(args[0] ?? '');
+            const rids = new Set(args.map((a) => String(a ?? '')));
             const items = recipeItems
-              .filter((ri) => ri.recipe_id === rid)
+              .filter((ri) => rids.has(String(ri.recipe_id)))
               .map((ri) => {
                 const ing = ingredients.find((i) => i.id === ri.ingredient_id);
                 return {
@@ -7056,9 +7070,7 @@ describe('Multi-Tenant & Franchise Preparation Integration', () => {
       });
       bdayApp.route('/api/birthday', birthdayRouter);
       const bdayCheckRes = await bdayApp.fetch(
-        new Request('https://api.test/api/birthday/check?customer_id=cust_fran_u1', {
-          headers: { 'X-Tenant-ID': 'tenant_sadec_02' },
-        }),
+        await authRequest('GET', '/api/birthday/check?customer_id=cust_fran_u1', 'supervisor', 'tenant_sadec_02'),
         franEnv
       );
       expect(bdayCheckRes.status).toBe(200);
@@ -7066,13 +7078,9 @@ describe('Multi-Tenant & Franchise Preparation Integration', () => {
       expect(bdayCheckBody.data.eligible).toBe(true);
 
       const bdayRedeemRes = await bdayApp.fetch(
-        new Request('https://api.test/api/birthday/redeem', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'X-Tenant-ID': 'tenant_sadec_02',
-          },
-          body: JSON.stringify({ customer_id: 'cust_fran_u1', order_id: 'ord_fran_u1' }),
+        await authRequest('POST', '/api/birthday/redeem', 'supervisor', 'tenant_sadec_02', {
+          customer_id: 'cust_fran_u1',
+          order_id: 'ord_fran_u1',
         }),
         franEnv
       );
@@ -10549,6 +10557,11 @@ describe('Multi-Tenant & Franchise Preparation Integration', () => {
         },
         all: async () => {
           executedSqls.push({ sql, args });
+          if (/FROM recipes WHERE product_id = \?/i.test(sql)) {
+            return {
+              results: [{ id: 'rec_ab3_1', product_id: String(args[0]), name: 'Espresso BOM', tenant_id: 'default' }],
+            };
+          }
           if (/FROM orders\s+WHERE status IN \('pending', 'confirmed', 'preparing'/i.test(sql)) {
             return {
               results: [
@@ -11411,9 +11424,20 @@ describe('Multi-Tenant & Franchise Preparation Integration', () => {
           headers: { 'X-Tenant-ID': 'tenant_sadec_02' },
         }),
         defEnv as any,
-        { id: 'u_cust', role: 'customer', tenantId: 'default' }
+        undefined
       );
       expect(guestHeaderTenant.tenantId).toBe('tenant_sadec_02');
+
+      await expect(
+        resolveOrderCreationScope(
+          new Request('https://api.test/api/orders', {
+            method: 'POST',
+            headers: { 'X-Tenant-ID': 'tenant_sadec_02' },
+          }),
+          defEnv as any,
+          { id: 'u_cust', role: 'customer', tenantId: 'default' }
+        )
+      ).rejects.toThrow('Forbidden: cross-tenant override denied');
 
       // AC1: GET /api/reservations pushes tenant_id into SQL before LIMIT/OFFSET
       const resApp = new Hono<{ Bindings: Env }>();
@@ -21524,6 +21548,11 @@ describe('Multi-Tenant & Franchise Preparation Integration', () => {
             },
             all: async () => {
               executedSql.push({ sql, args });
+              if (/FROM recipes WHERE product_id = \?/i.test(sql)) {
+                return {
+                  results: [{ id: 'rec-sd-1', product_id: 'prod-sd-1', name: 'Cà Phê Sa Đéc', tenant_id: 'sadec' }],
+                };
+              }
               if (/FROM recipe_items ri/i.test(sql)) {
                 return {
                   results: [{ ingredient_id: 'ing-sd-1', quantity: 15, unit: 'g', ing_name: 'Hạt Cafe', cost_per_unit: 500 }],
@@ -21580,6 +21609,11 @@ describe('Multi-Tenant & Franchise Preparation Integration', () => {
             },
             all: async () => {
               executedSql.push({ sql, args });
+              if (/FROM recipes WHERE product_id = \?/i.test(sql)) {
+                return {
+                  results: [{ id: 'rec-sd-bi2', product_id: 'prod-sd-bi2', name: 'Bạc Xỉu Sa Đéc', tenant_id: 'sadec' }],
+                };
+              }
               if (/FROM recipe_items ri/i.test(sql)) {
                 return {
                   results: [{ ingredient_id: 'ing-sd-bi2', quantity: 20, unit: 'ml', ing_name: 'Sữa Đặc', cost_per_unit: 300 }],

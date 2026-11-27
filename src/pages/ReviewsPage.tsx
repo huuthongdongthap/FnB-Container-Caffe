@@ -25,6 +25,21 @@ import { reviewRecordToEntry } from './ReviewsPage-utils';
 
 export type { ReviewsPageData, LoadingStatus } from '@/components/stitch/StitchReviewsNew';
 
+const LIKED_REVIEWS_STORAGE_KEY = 'aura_liked_reviews';
+
+function readLikedReviewIds(): Set<string> {
+  if (typeof window === 'undefined') return new Set();
+  try {
+    const raw = window.localStorage.getItem(LIKED_REVIEWS_STORAGE_KEY);
+    if (!raw) return new Set();
+    const parsed: unknown = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return new Set();
+    return new Set(parsed.filter((id): id is string => typeof id === 'string' && id.length > 0));
+  } catch {
+    return new Set();
+  }
+}
+
 export function ReviewsPage() {
   const { t } = useTranslation('reviews');
   const [page, setPage] = useState(1);
@@ -55,10 +70,38 @@ export function ReviewsPage() {
       ? t('errorLoadMessage')
       : undefined;
 
+  const [likedIds, setLikedIds] = useState<Set<string>>(() => readLikedReviewIds());
+  const handleToggleLike = (reviewId: string) => {
+    setLikedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(reviewId)) {
+        next.delete(reviewId);
+      } else {
+        next.add(reviewId);
+      }
+      try {
+        if (typeof window !== 'undefined') {
+          window.localStorage.setItem(LIKED_REVIEWS_STORAGE_KEY, JSON.stringify(Array.from(next)));
+        }
+      } catch {
+        /* ignore storage errors */
+      }
+      return next;
+    });
+  };
+
   const reviewsPageData: ReviewsPageData = {
     aggregateRating: stats?.average_rating ?? 0,
     totalReviews: stats?.total_reviews ?? 0,
-    reviews: reviews.map(reviewRecordToEntry),
+    reviews: reviews.map((record) => {
+      const entry = reviewRecordToEntry(record);
+      const isLiked = likedIds.has(entry.id);
+      return {
+        ...entry,
+        liked: isLiked,
+        likeCount: entry.likeCount + (isLiked ? 1 : 0),
+      };
+    }),
   };
 
   const handleSubmitReview = async (data: {
@@ -117,7 +160,7 @@ export function ReviewsPage() {
         loadingState={loadingState}
         errorMessage={errorMessage}
         onWriteReview={() => setShowForm((prev) => !prev)}
-        onToggleLike={() => {}}
+        onToggleLike={handleToggleLike}
         onLoadMore={() => handlePageChange(page + 1)}
       />
 

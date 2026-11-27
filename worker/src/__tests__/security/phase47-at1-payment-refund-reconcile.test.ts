@@ -169,9 +169,9 @@ describe('Phase 47 Slice AT1 — Payment Reconcile, Refund Boundary, OpenAPI Pay
         expect(res.status).toBe(403);
       }
 
-      // Non-HQ cashier with wildcard tenantId '*' cannot access store-b payment
+      // Non-HQ supervisor with wildcard tenantId '*' cannot access store-b payment
       const spoofedWildcardRes = await makeApp(
-        { id: 'u_cashier', role: 'cashier', tenantId: 'store-a' },
+        { id: 'u_supervisor', role: 'supervisor', tenantId: 'store-a' },
         '*',
       ).fetch(new Request('https://test.aura/reconcile/pay_ORD_B', { method: 'POST' }), env);
       expect(spoofedWildcardRes.status).toBe(404);

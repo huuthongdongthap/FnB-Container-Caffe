@@ -386,9 +386,9 @@ describe('Wave 3 Regressions (#212, #224, #225, #226)', () => {
         INSERT INTO promotions (id, code, name, discount_type, discount_value, usage_limit, usage_count, is_active, tenant_id)
         VALUES ('promo-split', 'SPLIT10', 'Split Promo', 'fixed', 10000, 5, 1, 1, 'default');
         INSERT INTO orders (id, items, total, status, payment_status, payment_method, is_cod, customer_id, customer_name, customer_phone, table_id, loyalty_points_redeemed, tenant_id, created_at, updated_at)
-        VALUES ('ord-parent-split', '[]', 70000, 'pending', 'unpaid', 'cod', 1, 'cust-split', 'Split Cust', '0902223333', 'tbl-1', 50, 'default', datetime('now'), datetime('now'));
+        VALUES ('ord-parent-split', '[]', 85000, 'pending', 'unpaid', 'cod', 1, 'cust-split', 'Split Cust', '0902223333', 'tbl-1', 50, 'default', datetime('now'), datetime('now'));
         INSERT INTO payments (id, order_id, method, amount, status, tenant_id, created_at, updated_at)
-        VALUES ('pay-parent-split', 'ord-parent-split', 'cod', 70000, 'pending', 'default', datetime('now'), datetime('now'));
+        VALUES ('pay-parent-split', 'ord-parent-split', 'cod', 85000, 'pending', 'default', datetime('now'), datetime('now'));
         INSERT INTO promotion_redemptions (promotion_id, code, order_id, customer_id, discount_amount, order_total, tenant_id, redeemed_at)
         VALUES ('promo-split', 'SPLIT10', 'ord-parent-split', 'cust-split', 10000, 70000, 'default', datetime('now'));
       `);
@@ -628,13 +628,13 @@ describe('Wave 3 Regressions (#212, #224, #225, #226)', () => {
       );
       expect(stolenCod.status).toBe(403);
 
-      // Shipper A marks delivered -> then customer refuses unpaid COD -> Shipper A marks failed with reason
-      const deliveredOk = await makeApp('shipper', 'shipper-a').request(
+      // Shipper A cannot mark unpaid COD as delivered (409 per COD collection guard) -> customer refuses unpaid COD -> Shipper A marks failed with reason
+      const deliveredBlocked = await makeApp('shipper', 'shipper-a').request(
         '/orders/ord-deliv-custody/status',
         { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status: 'delivered' }) },
         fx.env,
       );
-      expect(deliveredOk.status).toBe(200);
+      expect(deliveredBlocked.status).toBe(409);
 
       const refusedOk = await makeApp('shipper', 'shipper-a').request(
         '/orders/ord-deliv-custody/status',

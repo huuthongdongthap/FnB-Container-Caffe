@@ -4,7 +4,6 @@
  */
 import type { Context } from 'hono';
 import { spendCashbackSchema } from '../../lib/validators';
-import { resolvePilotStore } from '../../lib/pilot-store';
 import type { Env } from '../../types/env';
 import type { Customer, CashbackWallet } from '../../types/models';
 
@@ -30,14 +29,7 @@ export async function handleSpendCashback(c: Context<{ Bindings: Env }>) {
   const custAny = cust as unknown as { tenant_id?: string | null; tenantId?: string | null };
   const custTenantRaw = custAny.tenant_id ?? custAny.tenantId;
   const custTenant = (custTenantRaw && String(custTenantRaw).trim()) || '';
-  let storeTenant = custTenant || 'default';
-  if (c.env?.PILOT_TENANT_ID) {
-    try {
-      storeTenant = resolvePilotStore(c.env as unknown as Record<string, unknown>);
-    } catch {
-      // keep fallback
-    }
-  }
+  const storeTenant = custTenant || 'default';
   const queryTenant = (
     c.req?.query?.('tenant_id') ||
     c.req?.query?.('tenantId') ||
@@ -261,10 +253,24 @@ export async function handleSpendCashback(c: Context<{ Bindings: Env }>) {
     let fallbackOrderRes: { meta?: { changes?: number }; changes?: number } | undefined;
     try {
       fallbackOrderRes = await db.prepare(
-        "UPDATE orders SET discount = COALESCE(discount, 0) + ?, total = MAX(0, total - ?) WHERE id = ? AND COALESCE(status, 'pending') NOT IN ('cancelled', 'completed') AND COALESCE(payment_status, 'unpaid') NOT IN ('paid', 'completed', 'refunded')"
-      ).bind(amount, amount, order_id).run();
+        "UPDATE orders SET cashback_used = ?, discount = COALESCE(discount, 0) + ?, total = MAX(0, total - ?) WHERE id = ? AND COALESCE(cashback_used, 0) = 0 AND COALESCE(status, 'pending') NOT IN ('cancelled', 'completed') AND COALESCE(payment_status, 'unpaid') NOT IN ('paid', 'completed', 'refunded')"
+      ).bind(amount, amount, amount, order_id).run();
     } catch {
-      fallbackOrderRes = await db.prepare('UPDATE orders SET discount = COALESCE(discount, 0) + ? WHERE id = ?').bind(amount, order_id).run().catch(() => undefined);
+      try {
+        fallbackOrderRes = await db.prepare(
+          "UPDATE orders SET discount = COALESCE(discount, 0) + ?, total = MAX(0, total - ?) WHERE id = ? AND COALESCE(cashback_used, 0) = 0 AND COALESCE(status, 'pending') NOT IN ('cancelled', 'completed') AND COALESCE(payment_status, 'unpaid') NOT IN ('paid', 'completed', 'refunded')"
+        ).bind(amount, amount, order_id).run();
+      } catch {
+        try {
+          fallbackOrderRes = await db.prepare(
+            "UPDATE orders SET discount = COALESCE(discount, 0) + ?, total = MAX(0, total - ?) WHERE id = ? AND COALESCE(status, 'pending') NOT IN ('cancelled', 'completed') AND COALESCE(payment_status, 'unpaid') NOT IN ('paid', 'completed', 'refunded')"
+          ).bind(amount, amount, order_id).run();
+        } catch {
+          fallbackOrderRes = await db.prepare('UPDATE orders SET discount = COALESCE(discount, 0) + ? WHERE id = ? AND COALESCE(cashback_used, 0) = 0').bind(amount, order_id).run().catch(() =>
+            db.prepare('UPDATE orders SET discount = COALESCE(discount, 0) + ? WHERE id = ?').bind(amount, order_id).run().catch(() => undefined)
+          );
+        }
+      }
     }
     const fallbackChanges = fallbackOrderRes ? (fallbackOrderRes.meta?.changes ?? (fallbackOrderRes as unknown as { changes?: number }).changes ?? 1) : 0;
     if (fallbackChanges === 0) {
@@ -273,22 +279,51 @@ export async function handleSpendCashback(c: Context<{ Bindings: Env }>) {
     }
   }
   const txId = makeCashbackTxId();
+  let atomicBalanceAfter = newBalance;
+  try {
+    const postWallet = await db
+      .prepare("SELECT balance FROM cashback_wallets WHERE customer_id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ? LIMIT 1")
+      .bind(cust.id, storeTenant)
+      .first<{ balance?: number }>()
+      .catch(() =>
+        storeTenant === 'default'
+          ? db.prepare('SELECT balance FROM cashback_wallets WHERE customer_id = ? LIMIT 1').bind(cust.id).first<{ balance?: number }>()
+          : null,
+      );
+    if (postWallet && typeof postWallet.balance === 'number' && Number.isFinite(postWallet.balance)) {
+      atomicBalanceAfter = postWallet.balance;
+    }
+  } catch {
+    // keep fallback newBalance
+  }
   try {
     await db.prepare(
       "INSERT INTO cashback_transactions (id, wallet_id, customer_id, order_id, type, amount, balance_after, tenant_id, created_at) VALUES (?, ?, ?, ?, 'spend', ?, ?, ?, ?)"
-    ).bind(txId, wallet.id ?? `wal_${cust.id}`, cust.id, order_id, amount, newBalance, storeTenant, now).run();
+    ).bind(txId, wallet.id ?? `wal_${cust.id}`, cust.id, order_id, amount, atomicBalanceAfter, storeTenant, now).run();
   } catch (txInsertErr) {
     if (storeTenant !== 'default') {
+      await db.prepare(
+        "UPDATE orders SET cashback_used = 0, discount = MAX(0, COALESCE(discount, 0) - ?), total = COALESCE(total, 0) + ?, total_amount = COALESCE(total_amount, COALESCE(total, 0)) + ? WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
+      ).bind(amount, amount, amount, order_id, storeTenant).run().catch(async () => {
+        await db.prepare(
+          "UPDATE orders SET cashback_used = 0, discount = MAX(0, COALESCE(discount, 0) - ?), total = COALESCE(total, 0) + ? WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
+        ).bind(amount, amount, order_id, storeTenant).run().catch(async () => {
+          await db.prepare(
+            "UPDATE orders SET cashback_used = 0 WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
+          ).bind(order_id, storeTenant).run().catch(() => {});
+        });
+      });
+      await refundWalletOnOrderConflict();
       throw txInsertErr;
     }
     try {
       await db.prepare(
         'INSERT INTO cashback_transactions (id, wallet_id, customer_id, order_id, type, amount, balance_after, created_at) VALUES (?, ?, ?, ?, \'spend\', ?, ?, ?)'
-      ).bind(txId, wallet.id ?? `wal_${cust.id}`, cust.id, order_id, amount, newBalance, now).run();
+      ).bind(txId, wallet.id ?? `wal_${cust.id}`, cust.id, order_id, amount, atomicBalanceAfter, now).run();
     } catch {
       await db.prepare(
         'INSERT INTO cashback_transactions (id, customer_id, order_id, type, amount, balance_after, created_at) VALUES (?, ?, ?, \'spend\', ?, ?, ?)'
-      ).bind(txId, cust.id, order_id, amount, newBalance, now).run().catch(() => {});
+      ).bind(txId, cust.id, order_id, amount, atomicBalanceAfter, now).run().catch(() => {});
     }
   }
   try {

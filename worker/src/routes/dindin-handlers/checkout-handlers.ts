@@ -263,7 +263,11 @@ export function registerCheckoutHandlers(router: Hono<{ Bindings: Env }>): void 
         // payments table optional in minimal schemas
       }
     }
-    if (paymentStatus && ['unpaid', 'pending'].includes(paymentStatus)) {
+    const isUnpaidCashOrCod =
+      ['cash', 'cod', ''].includes(paymentMethod) &&
+      paymentStatus !== 'paid' &&
+      paymentStatus !== 'completed';
+    if (!isUnpaidCashOrCod && paymentStatus && ['unpaid', 'pending', 'cod_pending'].includes(paymentStatus)) {
       return c.json({ success: false, error: 'Cannot complete QC for unpaid non-cash order' }, 409);
     }
     if (
@@ -274,6 +278,7 @@ export function registerCheckoutHandlers(router: Hono<{ Bindings: Env }>): void 
     ) {
       return c.json({ success: false, error: 'Cannot complete QC for unpaid non-cash order' }, 409);
     }
+    const nextOrderStatus = isUnpaidCashOrCod ? 'ready' : 'completed';
     const checkedAt = new Date().toISOString();
     {
       const tenantId = rowTenant;
@@ -285,7 +290,7 @@ export function registerCheckoutHandlers(router: Hono<{ Bindings: Env }>): void 
         await execute(
           c.env.AURA_DB,
           "UPDATE orders SET status = ?, updated_at = ? WHERE id = ? AND status NOT IN ('cancelled', 'canceled', 'failed', 'refunded', 'expired', 'rejected') AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?",
-          'completed',
+          nextOrderStatus,
           checkedAt,
           orderId,
           rowTenant
@@ -295,7 +300,7 @@ export function registerCheckoutHandlers(router: Hono<{ Bindings: Env }>): void 
           await execute(
             c.env.AURA_DB,
             "UPDATE orders SET status = ?, updated_at = ? WHERE id = ? AND status NOT IN ('cancelled', 'canceled', 'failed', 'refunded', 'expired', 'rejected')",
-            'completed',
+            nextOrderStatus,
             checkedAt,
             orderId
           );
@@ -308,7 +313,7 @@ export function registerCheckoutHandlers(router: Hono<{ Bindings: Env }>): void 
     if (c.env.AUTH_KV) {
       const eventPayload = JSON.stringify({
         orderId,
-        status: 'completed',
+        status: nextOrderStatus,
         tenant_id: effectiveOrderTenant,
         tenantId: effectiveOrderTenant,
         updatedAt: checkedAt,
@@ -320,10 +325,10 @@ export function registerCheckoutHandlers(router: Hono<{ Bindings: Env }>): void 
         ...(effectiveOrderTenant === 'default'
           ? [kvSet(c.env.AUTH_KV, `order_event:${orderId}`, eventPayload, 3600)]
           : []),
-        publishOrderEvent(c.env.AUTH_KV, orderId, 'completed', { tenantId: effectiveOrderTenant }).catch(() => {}),
+        publishOrderEvent(c.env.AUTH_KV, orderId, nextOrderStatus, { tenantId: effectiveOrderTenant }).catch(() => {}),
       ]).catch(() => undefined);
     }
-    return c.json({ success: true, orderId, qcPassed: true, status: 'completed', checkedAt });
+    return c.json({ success: true, orderId, qcPassed: true, status: nextOrderStatus, checkedAt });
   };
   router.post('/checkout/:orderId/qc', handleQcComplete);
   router.post('/checkout/:orderId/complete-qc', handleQcComplete);
@@ -792,7 +797,7 @@ export function registerCheckoutHandlers(router: Hono<{ Bindings: Env }>): void 
     ) {
       return c.json({ success: false, error: 'Cross-tenant access denied' }, 403);
     }
-    const user = c.get('user' as never) as { role?: string } | undefined;
+    const user = c.get('user' as never) as { id?: string; sub?: string; role?: string } | undefined;
     if (user?.role && !['owner', 'admin', 'manager', 'supervisor', 'cashier', 'staff'].includes(user.role.toLowerCase())) {
       return c.json({ success: false, error: 'Insufficient permissions' }, 403);
     }
@@ -836,44 +841,180 @@ export function registerCheckoutHandlers(router: Hono<{ Bindings: Env }>): void 
     ) {
       return c.json({ success: false, error: 'Cannot confirm payment for cancelled or refunded order' }, 409);
     }
+    const paymentMethod = String(ordRow.payment_method || '').trim().toLowerCase();
+    const isCashOrCod = ['cash', 'cod', ''].includes(paymentMethod);
     const rowTenant =
       (typeof ordRow.tenant_id === 'string' && ordRow.tenant_id.trim() ? ordRow.tenant_id.trim() : '') ||
       (tenantId && tenantId !== '*' && tenantId.toLowerCase() !== 'hq' ? tenantId : 'default');
-    const paidAt = new Date().toISOString();
-    await execute(
-      c.env.AURA_DB,
-      "UPDATE orders SET payment_status = 'paid', updated_at = ? WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?",
-      paidAt,
-      orderId,
-      rowTenant
-    ).catch(async () => {
-      if (rowTenant === 'default') {
-        await execute(
-          c.env.AURA_DB,
-          "UPDATE orders SET payment_status = 'paid', updated_at = ? WHERE id = ?",
-          paidAt,
-          orderId
+
+    // Non-cash orders require verified gateway settlement, except when PayOS is unconfigured and /checkout emitted a local pending attempt without a payment URL.
+    let existingPayRow: { id?: string; status?: string | null; payment_url?: string | null; transaction_id?: string | null } | null = null;
+    try {
+      existingPayRow = await c.env.AURA_DB.prepare(
+        "SELECT id, status, payment_url, transaction_id FROM payments WHERE order_id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ? ORDER BY created_at DESC LIMIT 1"
+      ).bind(orderId, rowTenant).first<{ id?: string; status?: string | null; payment_url?: string | null; transaction_id?: string | null }>().catch(() =>
+        c.env.AURA_DB.prepare(
+          "SELECT id, status FROM payments WHERE order_id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ? LIMIT 1"
+        ).bind(orderId, rowTenant).first<{ id?: string; status?: string | null }>().catch(() =>
+          rowTenant === 'default'
+            ? c.env.AURA_DB.prepare('SELECT id, status FROM payments WHERE order_id = ? LIMIT 1').bind(orderId).first<{ id?: string; status?: string | null }>().catch(() => null)
+            : null
+        )
+      );
+    } catch {
+      existingPayRow = null;
+    }
+
+    const wasAlreadyPaid = payStatus === 'paid' || payStatus === 'completed';
+    if (!isCashOrCod && !wasAlreadyPaid) {
+      const existingPayStatus = String(existingPayRow?.status || '').trim().toLowerCase();
+      let hasVerifiedOnlinePayment = existingPayStatus === 'completed' || existingPayStatus === 'paid';
+      if (
+        !hasVerifiedOnlinePayment &&
+        paymentMethod === 'payos' &&
+        existingPayRow &&
+        existingPayStatus === 'pending' &&
+        !existingPayRow.payment_url &&
+        Boolean(existingPayRow.transaction_id)
+      ) {
+        const creds = await resolvePayosReconcileCredentials(c.env.AURA_DB, c.env, rowTenant).catch(() => null);
+        const checkoutEvent = c.env.AUTH_KV
+          ? (await kvGet(c.env.AUTH_KV, `order_event:${rowTenant}:${orderId}`).catch(() => null)) ||
+            (rowTenant === 'default' ? await kvGet(c.env.AUTH_KV, `order_event:${orderId}`).catch(() => null) : null)
+          : null;
+        if (!creds && checkoutEvent) {
+          hasVerifiedOnlinePayment = true;
+        }
+      }
+      if (!hasVerifiedOnlinePayment) {
+        return c.json(
+          { success: false, error: 'Non-cash payment must be verified via payment webhook or reconciliation before confirmation' },
+          409
         );
       }
-    });
+    }
+
+    const paidAt = new Date().toISOString();
+    let orderSettledNow = false;
+    if (isCashOrCod) {
+      try {
+        const updRes = await c.env.AURA_DB.prepare(
+          "UPDATE orders SET payment_status = 'paid', cod_paid_at = COALESCE(cod_paid_at, ?), updated_at = ? WHERE id = ? AND LOWER(COALESCE(payment_status, 'unpaid')) NOT IN ('paid', 'completed', 'refunded', 'failed', 'cancelled', 'canceled') AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
+        ).bind(paidAt, paidAt, orderId, rowTenant).run();
+        orderSettledNow = Number(updRes?.meta?.changes ?? 0) > 0;
+      } catch {
+        try {
+          const updRes = await c.env.AURA_DB.prepare(
+            "UPDATE orders SET payment_status = 'paid', updated_at = ? WHERE id = ? AND LOWER(COALESCE(payment_status, 'unpaid')) NOT IN ('paid', 'completed', 'refunded', 'failed', 'cancelled', 'canceled') AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
+          ).bind(paidAt, orderId, rowTenant).run();
+          orderSettledNow = Number(updRes?.meta?.changes ?? 0) > 0;
+        } catch {
+          if (rowTenant === 'default') {
+            const updRes = await c.env.AURA_DB.prepare(
+              "UPDATE orders SET payment_status = 'paid', updated_at = ? WHERE id = ? AND LOWER(COALESCE(payment_status, 'unpaid')) NOT IN ('paid', 'completed', 'refunded', 'failed', 'cancelled', 'canceled')"
+            ).bind(paidAt, orderId).run().catch(() => null);
+            orderSettledNow = Number(updRes?.meta?.changes ?? 0) > 0;
+          }
+        }
+      }
+    } else {
+      await execute(
+        c.env.AURA_DB,
+        "UPDATE orders SET payment_status = 'paid', updated_at = ? WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?",
+        paidAt,
+        orderId,
+        rowTenant
+      ).catch(async () => {
+        if (rowTenant === 'default') {
+          await execute(
+            c.env.AURA_DB,
+            "UPDATE orders SET payment_status = 'paid', updated_at = ? WHERE id = ?",
+            paidAt,
+            orderId
+          );
+        }
+      });
+    }
+
+    let settledPaymentId = String(existingPayRow?.id || `pay_${orderId.toLowerCase()}`);
+    const orderAmount = Math.max(0, Number(ordRow.total ?? 0));
     try {
       const updPay = await c.env.AURA_DB.prepare(
         "UPDATE payments SET status = 'completed', updated_at = ? WHERE order_id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
       ).bind(paidAt, orderId, rowTenant).run();
       if (!updPay?.meta?.changes) {
+        settledPaymentId = `pay_${orderId.toLowerCase()}`;
         await execute(
           c.env.AURA_DB,
           'INSERT INTO payments (id, order_id, method, amount, status, tenant_id, created_at) VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)',
-          `pay_${orderId.toLowerCase()}`,
+          settledPaymentId,
           orderId,
           ordRow.payment_method || 'payos',
-          Number(ordRow.total ?? 0),
+          orderAmount,
           'completed',
           rowTenant
         ).catch(() => {});
       }
     } catch {
       // Optional payments table in minimal schemas
+    }
+
+    // Best-effort cash shift attribution for cash/COD DinDin collections so drawer reconciliation tracks the sale.
+    if (isCashOrCod && orderSettledNow && orderAmount > 0) {
+      const collectorId = String(user?.id || user?.sub || 'dindin_cashier').trim() || 'dindin_cashier';
+      try {
+        let activeShift: { id: string | number; staff_id?: string | null } | null = null;
+        try {
+          activeShift = await c.env.AURA_DB.prepare(
+            `SELECT s.id, s.staff_id
+             FROM staff_shifts s
+             WHERE COALESCE(NULLIF(TRIM(s.tenant_id), ''), 'default') = ?
+               AND s.clock_in IS NOT NULL AND s.clock_out IS NULL
+               AND LOWER(COALESCE(s.role, 'staff')) NOT IN ('barista', 'kitchen', 'chef', 'bep')
+               AND NOT EXISTS (
+                 SELECT 1 FROM shift_reconciliations r
+                 WHERE r.shift_id = CAST(s.id AS TEXT)
+                   AND COALESCE(NULLIF(TRIM(r.tenant_id), ''), 'default') = ?
+               )
+             ORDER BY CASE WHEN s.staff_id = ? THEN 0 ELSE 1 END, s.clock_in DESC
+             LIMIT 1`
+          ).bind(rowTenant, rowTenant, collectorId).first<{ id: string | number; staff_id?: string | null }>();
+        } catch {
+          activeShift = await c.env.AURA_DB.prepare(
+            `SELECT id, staff_id
+             FROM staff_shifts
+             WHERE COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?
+               AND clock_in IS NOT NULL AND clock_out IS NULL
+             ORDER BY CASE WHEN staff_id = ? THEN 0 ELSE 1 END, clock_in DESC
+             LIMIT 1`
+          ).bind(rowTenant, collectorId).first<{ id: string | number; staff_id?: string | null }>().catch(() => null);
+        }
+        if (activeShift && activeShift.id !== undefined && activeShift.id !== null) {
+          const shiftIdStr = String(activeShift.id);
+          let shouldCreditShift = true;
+          try {
+            const attrRes = await c.env.AURA_DB.prepare(
+              'INSERT INTO cash_payment_attributions (payment_id, tenant_id, shift_id, collected_by, settled_at) VALUES (?, ?, ?, ?, ?) ON CONFLICT DO NOTHING'
+            ).bind(settledPaymentId, rowTenant, shiftIdStr, collectorId, paidAt).run();
+            shouldCreditShift = Number(attrRes?.meta?.changes ?? 0) > 0;
+          } catch {
+            // Optional cash_payment_attributions table in minimal schemas
+          }
+          if (shouldCreditShift) {
+            await c.env.AURA_DB.prepare(
+              `UPDATE staff_shifts
+               SET cash_sales = COALESCE(cash_sales, 0) + ?,
+                   total_sales = COALESCE(total_sales, 0) + ?,
+                   order_count = COALESCE(order_count, 0) + 1
+               WHERE CAST(id AS TEXT) = ?
+                 AND clock_out IS NULL
+                 AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?`
+            ).bind(orderAmount, orderAmount, shiftIdStr, rowTenant).run().catch(() => {});
+          }
+        }
+      } catch {
+        // Optional staff_shifts table in minimal schemas
+      }
     }
     return c.json({ success: true, orderId, paymentStatus: 'paid', paidAt });
   });

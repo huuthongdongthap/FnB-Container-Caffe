@@ -11,6 +11,8 @@ import { createHash, createHmac } from 'node:crypto';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { D1Database } from '@cloudflare/workers-types';
 import { app } from '../../index';
+import { generateJWT } from '../../lib/jwt';
+import { staffSessionClaims } from '../test-utils';
 import { withPrimarySession, getDatabase } from '../../lib/db';
 import { paymentSqliteDB, payosCheckoutResponse } from '../helpers/payment-sqlite-db';
 import { orderCreationFixture } from '../integrations/order-creation-fixture';
@@ -555,13 +557,23 @@ describe('D1 primary session pinning and guest_token_hash verification', () => {
     created.sqlite.exec(`
       INSERT INTO cafe_tables (id, table_number, zone, capacity, status, tenant_id)
       VALUES ('tbl_split_1', 'B08', 'Indoor', 4, 'Available', 'default');
+      INSERT INTO users (id, name, role, tenant_id)
+      VALUES ('staff_split_1', 'Split Waiter', 'waiter', 'default');
     `);
+    const issuedAt = Math.floor(Date.now() / 1000);
+    const staffToken = await generateJWT(
+      { id: 'staff_split_1', role: 'waiter', tenantId: 'default', ...staffSessionClaims({ authTime: issuedAt }) },
+      'test-jwt-secret-at-least-16-chars',
+      28800,
+      issuedAt,
+    );
 
     const splitRes = await app.fetch(
       new Request('https://test.aura/api/orders/split', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          Authorization: `Bearer ${staffToken}`,
           'Idempotency-Key': 'idem-split-parity-1',
         },
         body: JSON.stringify({

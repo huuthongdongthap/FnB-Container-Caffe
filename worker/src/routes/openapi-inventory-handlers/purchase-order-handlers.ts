@@ -799,8 +799,12 @@ export function registerPurchaseOrderHandlers(app: OpenAPIHono<{ Bindings: Env }
     const params: (string | number)[] = [];
 
     if (query.status) {
-      whereClause += 'WHERE status = ? ';
-      params.push(query.status);
+      if (query.status === 'partial' || query.status === 'partially_received') {
+        whereClause += "WHERE status IN ('partial', 'partially_received') ";
+      } else {
+        whereClause += 'WHERE status = ? ';
+        params.push(query.status);
+      }
     }
 
     if (query.supplierId) {

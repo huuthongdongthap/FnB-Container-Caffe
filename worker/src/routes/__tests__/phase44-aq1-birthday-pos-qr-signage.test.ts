@@ -147,9 +147,21 @@ describe('Phase 44 Slice AQ1 — Birthday Loyalty, POS Customer Lookup, Admin QR
         .prepare('INSERT INTO customers (id, name, phone, birthday, tenant_id) VALUES (?, ?, ?, ?, ?)')
         .run('cust-2d', 'Two Days Out', '0901111333', bday2DaysOut, 'default');
 
-      const env = createMockEnv({ AURA_DB: db, AUTH_KV: undefined as unknown as KVNamespace });
+      const cust5Token = await generateJWT(
+        { id: 'cust-5d', sub: 'cust-5d', name: 'Five Days Out', role: 'customer', tenantId: 'default' },
+        TEST_JWT_SECRET,
+        3600
+      );
+      const cust2Token = await generateJWT(
+        { id: 'cust-2d', sub: 'cust-2d', name: 'Two Days Out', role: 'customer', tenantId: 'default' },
+        TEST_JWT_SECRET,
+        3600
+      );
+      const env = createMockEnv({ AURA_DB: db, JWT_SECRET: TEST_JWT_SECRET, AUTH_KV: undefined as unknown as KVNamespace });
 
-      const check5Res = await birthdayRouter.request('http://localhost/check?customer_id=cust-5d', {}, env);
+      const check5Res = await birthdayRouter.request('http://localhost/check?customer_id=cust-5d', {
+        headers: { Authorization: `Bearer ${cust5Token}` },
+      }, env);
       expect(check5Res.status).toBe(200);
       const check5Json = (await check5Res.json()) as { data: { eligible: boolean } };
       expect(check5Json.data.eligible).toBe(false);
@@ -158,14 +170,16 @@ describe('Phase 44 Slice AQ1 — Birthday Loyalty, POS Customer Lookup, Admin QR
         'http://localhost/redeem',
         {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${cust5Token}` },
           body: JSON.stringify({ customer_id: 'cust-5d' }),
         },
         env
       );
       expect(redeem5Res.status).toBe(400);
 
-      const check2Res = await birthdayRouter.request('http://localhost/check?customer_id=cust-2d', {}, env);
+      const check2Res = await birthdayRouter.request('http://localhost/check?customer_id=cust-2d', {
+        headers: { Authorization: `Bearer ${cust2Token}` },
+      }, env);
       expect(check2Res.status).toBe(200);
       const check2Json = (await check2Res.json()) as { data: { eligible: boolean; discount_percent: number } };
       expect(check2Json.data.eligible).toBe(true);
@@ -175,7 +189,7 @@ describe('Phase 44 Slice AQ1 — Birthday Loyalty, POS Customer Lookup, Admin QR
         'http://localhost/redeem',
         {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${cust2Token}` },
           body: JSON.stringify({ customer_id: 'cust-2d' }),
         },
         env

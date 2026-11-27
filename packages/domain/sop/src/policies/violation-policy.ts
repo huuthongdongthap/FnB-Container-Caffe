@@ -63,7 +63,8 @@ export function canApplyAction(input: AuthorityInput): boolean {
   switch (input.action) {
     // Shift leader / manager records, manager confirms.
     case 'confirm':
-      return violation.status === 'recorded' && (role === 'manager' || role === 'owner' || role === 'admin');
+      return (violation.status === 'recorded' || violation.status === 'appealed')
+        && (role === 'manager' || role === 'owner' || role === 'admin');
     // Only the owner may apply a termination; lesser steps are manager-level.
     case 'apply':
       if (violation.status !== 'confirmed') return false;

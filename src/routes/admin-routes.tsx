@@ -42,44 +42,57 @@ const TableManagementPage = React.lazy(() => import('@/pages/admin/TableManageme
 const AdminSaasSettingsPage = React.lazy(() => import('@/pages/admin/SaasSettings'));
 const AdminHqSaasPage = React.lazy(() => import('@/pages/admin/HqSaasAdmin'));
 
+const MANAGEMENT_ROLES = ['owner', 'admin', 'manager', 'supervisor'];
+const ADMIN_MANAGER_ROLES = ['owner', 'admin', 'manager'];
+const HQ_ADMIN_ROLES = ['owner', 'admin'];
+const POS_ORDER_ROLES = ['owner', 'admin', 'manager', 'supervisor', 'cashier', 'staff', 'waiter'];
+
 export const adminRoutes = [
   <Route key="/admin/login" path="/admin/login" element={guarded(<AdminLoginPage />)} />,
   <Route key="/admin" element={<ProtectedRoute allowedRoles={ADMIN_SHELL_ROLES} />}>
     <Route element={guarded(<AdminShell />)}>
-      <Route path="/admin" element={guarded(<AdminDashboardPage />)} />
-      <Route path="/admin/audit-logs" element={guarded(<AuditLogViewerPage />)} />
-      <Route path="/admin/birthday-config" element={guarded(<AdminBirthdayConfigPage />)} />
-      <Route path="/admin/broadcasts" element={guarded(<BroadcastPage />)} />
-      <Route path="/admin/campaigns" element={guarded(<CampaignsManagerPage />)} />
-      <Route path="/admin/chat" element={guarded(<ChatInboxPage />)} />
-      <Route path="/admin/checkin-approve" element={guarded(<AdminCheckinApprovePage />)} />
-      <Route path="/admin/customers" element={guarded(<AdminCustomersPage />)} />
-      <Route path="/admin/dashboard" element={guarded(<AdminDashboardPage />)} />
-      <Route path="/admin/erpnext-sync" element={guarded(<AdminERPNExtSyncPage />)} />
-      <Route path="/admin/table-management" element={guarded(<TableManagementPage />)} />
-      <Route path="/admin/generate-qr" element={guarded(<GenerateQRPage />)} />
-      <Route path="/admin/invoice-history" element={guarded(<AdminInvoiceHistoryPage />)} />
-      <Route path="/admin/inventory" element={guarded(<AdminInventoryPage />)} />
-      <Route path="/admin/manage-menu" element={guarded(<ManageMenuPage />)} />
-      <Route path="/admin/notification-settings" element={guarded(<AdminNotificationSettingsPage />)} />
-      <Route path="/admin/metrics" element={guarded(<AdminMetricsPage />)} />
-      <Route path="/admin/orders" element={guarded(<AdminOrdersPage />)} />
-      <Route path="/admin/pos" element={guarded(<AdminPOSPage />)} />
-      <Route path="/admin/promotions" element={guarded(<PromotionsManagerPage />)} />
-      <Route path="/admin/reservations" element={guarded(<AdminReservationsPage />)} />
-      <Route path="/admin/sales-reports" element={guarded(<SalesReportsPage />)} />
-      <Route path="/admin/revenue-accounting" element={guarded(<RevenueAccountingPage />)} />
-      <Route path="/admin/franchise" element={guarded(<FranchiseReportsPage />)} />
-      <Route path="/admin/staff" element={guarded(<AdminStaffPage />)} />
-      <Route path="/admin/subscriptions" element={guarded(<SubscriptionsManagerPage />)} />
-      <Route path="/admin/saas-settings" element={guarded(<AdminSaasSettingsPage />)} />
-      <Route path="/admin/hq-saas" element={guarded(<AdminHqSaasPage />)} />
-      <Route path="/admin/hq/tenants" element={guarded(<AdminHqSaasPage />)} />
-      <Route path="/admin/dindin/menu" element={guarded(<AdminDinDinMenuPage />)} />
-      <Route path="/admin/dindin/cart" element={guarded(<AdminDinDinCartPage />)} />
-      <Route path="/admin/dindin/checkout" element={guarded(<AdminDinDinCheckoutPage />)} />
-      <Route path="/admin/dindin/success" element={guarded(<AdminDinDinOrderSuccessPage />)} />
-      <Route path="/admin/devices" element={guarded(<AdminDevicesPage />)} />
+      <Route element={<ProtectedRoute allowedRoles={MANAGEMENT_ROLES} />}>
+        <Route path="/admin" element={guarded(<AdminDashboardPage />)} />
+        <Route path="/admin/audit-logs" element={guarded(<AuditLogViewerPage />)} />
+        <Route path="/admin/birthday-config" element={guarded(<AdminBirthdayConfigPage />)} />
+        <Route path="/admin/broadcasts" element={guarded(<BroadcastPage />)} />
+        <Route path="/admin/campaigns" element={guarded(<CampaignsManagerPage />)} />
+        <Route path="/admin/chat" element={guarded(<ChatInboxPage />)} />
+        <Route path="/admin/checkin-approve" element={guarded(<AdminCheckinApprovePage />)} />
+        <Route path="/admin/customers" element={guarded(<AdminCustomersPage />)} />
+        <Route path="/admin/dashboard" element={guarded(<AdminDashboardPage />)} />
+        <Route path="/admin/erpnext-sync" element={guarded(<AdminERPNExtSyncPage />)} />
+        <Route path="/admin/invoice-history" element={guarded(<AdminInvoiceHistoryPage />)} />
+        <Route path="/admin/notification-settings" element={guarded(<AdminNotificationSettingsPage />)} />
+        <Route path="/admin/reservations" element={guarded(<AdminReservationsPage />)} />
+        <Route path="/admin/sales-reports" element={guarded(<SalesReportsPage />)} />
+        <Route path="/admin/revenue-accounting" element={guarded(<RevenueAccountingPage />)} />
+        <Route path="/admin/franchise" element={guarded(<FranchiseReportsPage />)} />
+        <Route path="/admin/devices" element={guarded(<AdminDevicesPage />)} />
+      </Route>
+      <Route element={<ProtectedRoute allowedRoles={ADMIN_MANAGER_ROLES} />}>
+        <Route path="/admin/metrics" element={guarded(<AdminMetricsPage />)} />
+        <Route path="/admin/table-management" element={guarded(<TableManagementPage />)} />
+        <Route path="/admin/generate-qr" element={guarded(<GenerateQRPage />)} />
+        <Route path="/admin/inventory" element={guarded(<AdminInventoryPage />)} />
+        <Route path="/admin/manage-menu" element={guarded(<ManageMenuPage />)} />
+        <Route path="/admin/promotions" element={guarded(<PromotionsManagerPage />)} />
+        <Route path="/admin/staff" element={guarded(<AdminStaffPage />)} />
+        <Route path="/admin/subscriptions" element={guarded(<SubscriptionsManagerPage />)} />
+        <Route path="/admin/saas-settings" element={guarded(<AdminSaasSettingsPage />)} />
+      </Route>
+      <Route element={<ProtectedRoute allowedRoles={HQ_ADMIN_ROLES} />}>
+        <Route path="/admin/hq-saas" element={guarded(<AdminHqSaasPage />)} />
+        <Route path="/admin/hq/tenants" element={guarded(<AdminHqSaasPage />)} />
+      </Route>
+      <Route element={<ProtectedRoute allowedRoles={POS_ORDER_ROLES} />}>
+        <Route path="/admin/orders" element={guarded(<AdminOrdersPage />)} />
+        <Route path="/admin/pos" element={guarded(<AdminPOSPage />)} />
+        <Route path="/admin/dindin/menu" element={guarded(<AdminDinDinMenuPage />)} />
+        <Route path="/admin/dindin/cart" element={guarded(<AdminDinDinCartPage />)} />
+        <Route path="/admin/dindin/checkout" element={guarded(<AdminDinDinCheckoutPage />)} />
+        <Route path="/admin/dindin/success" element={guarded(<AdminDinDinOrderSuccessPage />)} />
+      </Route>
       {/* Short route aliases */}
       <Route path="/admin/menu" element={<Navigate to="/admin/manage-menu" replace />} />
       <Route path="/admin/tables" element={<Navigate to="/admin/table-management" replace />} />

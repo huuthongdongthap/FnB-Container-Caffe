@@ -150,10 +150,17 @@ const ZONES_FOR_TABLES = [
 ];
 
 export function TableOrder(): ReactNode {
-  const { t } = useTranslation('order');
+  const { t, i18n } = useTranslation('order');
   const navigate = useNavigate();
   const location = useLocation();
   const isPosRoute = location.pathname.startsWith('/pos');
+
+  useEffect(() => {
+    const match = location.pathname.match(/^\/(vi|en)(?:\/|$)/);
+    if (match?.[1] && i18n.language !== match[1]) {
+      void i18n.changeLanguage(match[1]);
+    }
+  }, [location.pathname, i18n]);
   const { tableId: paramTableId } = useParams<{ tableId?: string }>();
   const [searchParams, setSearchParams] = useSearchParams();
   const rawTable = searchParams.get('table') || searchParams.get('ban') || (paramTableId && paramTableId !== 'select' ? paramTableId : null);
@@ -401,6 +408,8 @@ export function TableOrder(): ReactNode {
         <LandingNav />
       )}
 
+      {!isPosRoute && <div className="h-[4.5rem]" aria-hidden="true" />}
+
       {/* Table & Guest Information Bar */}
       <GuestInfoForm
         guestName={guestName}
@@ -412,9 +421,7 @@ export function TableOrder(): ReactNode {
         onPhoneChange={(v) => { setGuestPhone(v); clearError(); }}
       />
 
-      {!isPosRoute && <div style={{ height: '7.5rem' }} aria-hidden="true" />}
-
-      {/* Payment method selector (COD / PayOS QR) — placed below fixed nav + guest bar */}
+      {/* Payment method selector (COD / PayOS QR) — placed below nav + guest bar in document flow */}
       <div
         data-testid="table-order-payment-selector"
         className="max-w-lg mx-auto px-4 pt-3 pb-1 flex items-center gap-2 text-xs relative z-10"

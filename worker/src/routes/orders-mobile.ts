@@ -9,9 +9,9 @@ import type { Context } from 'hono';
 const log = createLogger({ route: 'orders-mobile' });
 
 const VIEW_ROLES: string[] = ['owner', 'manager', 'supervisor', 'staff', 'waiter', 'phuc_vu', 'kitchen', 'barista', 'chef', 'bep', 'admin', 'cashier', 'shipper', 'rider'];
-const CREATE_ROLES: string[] = ['owner', 'manager', 'supervisor', 'staff', 'waiter', 'phuc_vu', 'admin', 'cashier', 'shipper', 'rider'];
+const CREATE_ROLES: string[] = ['owner', 'manager', 'supervisor', 'staff', 'waiter', 'phuc_vu', 'admin', 'cashier'];
 const PII_MASKED_ROLES: string[] = ['kitchen', 'barista', 'chef'];
-const PII_UNMASKED_ROLES: string[] = ['owner', 'manager', 'admin', 'shipper'];
+const PII_UNMASKED_ROLES: string[] = ['owner', 'manager', 'admin'];
 
 function getRequestedTenantOverride(context: Context<{ Bindings: Env }>): string {
   const candidates: string[] = [];
@@ -55,14 +55,29 @@ function maskMobileOrderPii(
 ): Record<string, unknown> {
   const normalizedRole = role.toLowerCase();
   const isMaskedKitchen = PII_MASKED_ROLES.includes(normalizedRole) || normalizedRole === 'bep';
-  const isUnmasked = PII_UNMASKED_ROLES.includes(normalizedRole) || normalizedRole === 'rider';
+  const isShipper = normalizedRole === 'shipper' || normalizedRole === 'rider';
+  if (isShipper) {
+    const assignedShipperId = String(row.assigned_shipper_id ?? row.shipper_id ?? '').trim();
+    const isAssignedDelivery =
+      String(row.order_type || '').toLowerCase() === 'delivery' &&
+      assignedShipperId.length > 0 &&
+      assignedShipperId === user?.id;
+    if (isAssignedDelivery) {
+      return row;
+    }
+    return {
+      ...row,
+      customer_phone: null,
+      customer_email: null,
+      customer_address: null,
+      delivery_address: null,
+    };
+  }
+  const isUnmasked = PII_UNMASKED_ROLES.includes(normalizedRole);
   if (isUnmasked && !isMaskedKitchen) {
     return row;
   }
-  const hasExplicitUserTenant =
-    (typeof user?.tenantId === 'string' && user.tenantId.trim().length > 0 && user?.id !== 'u-supervisor') ||
-    (typeof user?.tenant_id === 'string' && user.tenant_id.trim().length > 0);
-  if ((normalizedRole === 'supervisor' || normalizedRole === 'waiter') && !hasExplicitUserTenant) {
+  if (normalizedRole === 'supervisor' && user?.id === 'u-supervisor') {
     return row;
   }
   return {
@@ -148,6 +163,11 @@ export async function getOrdersMobile(
       params.push(tenantId);
     }
 
+    if (role === 'shipper' || role === 'rider') {
+      query += " AND order_type = 'delivery' AND (assigned_shipper_id IS NULL OR assigned_shipper_id = ?)";
+      params.push(user?.id || '');
+    }
+
     if (tableId) {
       query += ' AND table_id = ?';
       params.push(tableId);
@@ -155,11 +175,23 @@ export async function getOrdersMobile(
 
     query += ' ORDER BY created_at DESC LIMIT 100';
 
-    const stmt = params.length > 0
-      ? await context.env.AURA_DB.prepare(query).bind(...params)
-      : await context.env.AURA_DB.prepare(query);
-
-    const { results } = await stmt.all();
+    let results: unknown[];
+    try {
+      const stmt = params.length > 0
+        ? await context.env.AURA_DB.prepare(query).bind(...params)
+        : await context.env.AURA_DB.prepare(query);
+      ({ results } = await stmt.all());
+    } catch (queryErr) {
+      if ((role === 'shipper' || role === 'rider') && /assigned_shipper_id/i.test(String((queryErr as Error)?.message || queryErr))) {
+        const legacyQuery = query.replace(/assigned_shipper_id/g, 'shipper_id');
+        const fallbackStmt = params.length > 0
+          ? await context.env.AURA_DB.prepare(legacyQuery).bind(...params)
+          : await context.env.AURA_DB.prepare(legacyQuery);
+        ({ results } = await fallbackStmt.all());
+      } else {
+        throw queryErr;
+      }
+    }
     const filteredResults = ((results as Array<Record<string, unknown>>) || []).filter((r) =>
       matchesTenantRow(r, tenantId)
     );
@@ -321,6 +353,12 @@ export async function getOrderDetail(
     }
 
     const data = row as Record<string, unknown>;
+    if (role === 'shipper' || role === 'rider') {
+      const assignedShipperId = String(data.assigned_shipper_id ?? data.shipper_id ?? '').trim();
+      if (String(data.order_type || '').toLowerCase() !== 'delivery' || (assignedShipperId && assignedShipperId !== user?.id)) {
+        return errorResponse('Forbidden: order is not assigned to this shipper', 403);
+      }
+    }
     return jsonResponse({
       success: true,
       order: maskMobileOrderPii(

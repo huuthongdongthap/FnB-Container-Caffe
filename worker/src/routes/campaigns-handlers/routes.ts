@@ -8,7 +8,7 @@ import { registerCampaignStatsHandlers } from './stats-handlers';
 export const campaignsRouter = new Hono<{ Bindings: Env }>();
 
 // All routes require auth
-campaignsRouter.use('/*', requireAuth(['owner', 'manager', 'supervisor', 'staff', 'admin']));
+campaignsRouter.use('/*', requireAuth(['owner', 'admin', 'manager', 'supervisor']));
 
 campaignsRouter.use('/*', async (c, next) => {
   const candidateOverrides = [

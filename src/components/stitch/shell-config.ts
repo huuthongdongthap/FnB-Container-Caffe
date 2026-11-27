@@ -45,10 +45,11 @@ export const MD3_SHELL_CONFIG: ShellRouteConfig[] = [
 ];
 
 export function getShellConfig(pathname: string): ShellRouteConfig | undefined {
-  const exactHit = MD3_SHELL_CONFIG.find((c) => c.exact && c.match === pathname);
+  const normalizedPath = pathname.replace(/^\/(vi|en)(?=\/|$)/, '') || '/';
+  const exactHit = MD3_SHELL_CONFIG.find((c) => c.exact && c.match === normalizedPath);
   if (exactHit) return exactHit;
   return MD3_SHELL_CONFIG.find(
-    (c) => !c.exact && pathname.startsWith(c.match),
+    (c) => !c.exact && normalizedPath.startsWith(c.match),
   );
 }
 

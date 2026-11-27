@@ -10,6 +10,8 @@ import {
 } from './analytics-handlers';
 
 const ICT_OFFSET_MS = 7 * 3600_000;
+const PNL_RECOGNIZED_REVENUE_ORDER_SQL = `((${VALID_REVENUE_ORDER_SQL}) OR (LOWER(TRIM(COALESCE(status, ''))) IN ('completed', 'delivered') AND LOWER(TRIM(COALESCE(payment_status, ''))) = 'refunded' AND NOT (COALESCE(total, 0) = 0 AND (COALESCE(customer_name, '') = 'Khách QR - cho don mon' OR COALESCE(items, '') IN ('', '[]')))))`;
+const PNL_RECOGNIZED_REVENUE_ORDER_ALIAS_SQL = `((${VALID_REVENUE_ORDER_ALIAS_SQL}) OR (LOWER(TRIM(COALESCE(o.status, ''))) IN ('completed', 'delivered') AND LOWER(TRIM(COALESCE(o.payment_status, ''))) = 'refunded' AND NOT (COALESCE(o.total, 0) = 0 AND (COALESCE(o.customer_name, '') = 'Khách QR - cho don mon' OR COALESCE(o.items, '') IN ('', '[]')))))`;
 
 export interface DailyPnlEntry {
   date: string;
@@ -88,7 +90,7 @@ export function registerPnlHandlers(app: Hono<{ Bindings: Env }>) {
     try {
       const res = await db
         .prepare(
-          `SELECT DATE(datetime(created_at, '+7 hours')) as date,
+          `SELECT DATE(datetime(COALESCE(cod_paid_at, created_at), '+7 hours')) as date,
                   COUNT(*) as orders,
                   COALESCE(SUM(total), 0) as total_collected,
                   COALESCE(SUM(shipping_fee), 0) as shipping_fee,
@@ -96,8 +98,8 @@ export function registerPnlHandlers(app: Hono<{ Bindings: Env }>) {
                   COALESCE(SUM(tip_amount), 0) as tip_amount,
                   COALESCE(SUM(discount), 0) as discounts
            FROM orders
-           WHERE DATE(datetime(created_at, '+7 hours')) BETWEEN ? AND ? AND ${VALID_REVENUE_ORDER_SQL}${tf.and}
-           GROUP BY DATE(datetime(created_at, '+7 hours')) ORDER BY date`
+           WHERE DATE(datetime(COALESCE(cod_paid_at, created_at), '+7 hours')) BETWEEN ? AND ? AND ${PNL_RECOGNIZED_REVENUE_ORDER_SQL}${tf.and}
+           GROUP BY DATE(datetime(COALESCE(cod_paid_at, created_at), '+7 hours')) ORDER BY date`
         )
         .bind(from, to, ...tf.binds)
         .all<{
@@ -111,30 +113,57 @@ export function registerPnlHandlers(app: Hono<{ Bindings: Env }>) {
         }>();
       orderRows = res.results || [];
     } catch {
-      const res = await db
-        .prepare(
-          `SELECT DATE(datetime(created_at, '+7 hours')) as date,
-                  COUNT(*) as orders,
-                  COALESCE(SUM(total), 0) as total_collected,
-                  0 as shipping_fee,
-                  0 as service_fee,
-                  0 as tip_amount,
-                  COALESCE(SUM(discount), 0) as discounts
-           FROM orders
-           WHERE DATE(datetime(created_at, '+7 hours')) BETWEEN ? AND ? AND ${VALID_REVENUE_ORDER_SQL}${tf.and}
-           GROUP BY DATE(datetime(created_at, '+7 hours')) ORDER BY date`
-        )
-        .bind(from, to, ...tf.binds)
-        .all<{
-          date: string;
-          orders: number;
-          total_collected: number;
-          shipping_fee: number;
-          service_fee: number;
-          tip_amount: number;
-          discounts: number;
-        }>();
-      orderRows = res.results || [];
+      try {
+        const res = await db
+          .prepare(
+            `SELECT DATE(datetime(created_at, '+7 hours')) as date,
+                    COUNT(*) as orders,
+                    COALESCE(SUM(total), 0) as total_collected,
+                    COALESCE(SUM(shipping_fee), 0) as shipping_fee,
+                    COALESCE(SUM(service_fee), 0) as service_fee,
+                    COALESCE(SUM(tip_amount), 0) as tip_amount,
+                    COALESCE(SUM(discount), 0) as discounts
+             FROM orders
+             WHERE DATE(datetime(created_at, '+7 hours')) BETWEEN ? AND ? AND ${PNL_RECOGNIZED_REVENUE_ORDER_SQL}${tf.and}
+             GROUP BY DATE(datetime(created_at, '+7 hours')) ORDER BY date`
+          )
+          .bind(from, to, ...tf.binds)
+          .all<{
+            date: string;
+            orders: number;
+            total_collected: number;
+            shipping_fee: number;
+            service_fee: number;
+            tip_amount: number;
+            discounts: number;
+          }>();
+        orderRows = res.results || [];
+      } catch {
+        const res = await db
+          .prepare(
+            `SELECT DATE(datetime(created_at, '+7 hours')) as date,
+                    COUNT(*) as orders,
+                    COALESCE(SUM(total), 0) as total_collected,
+                    0 as shipping_fee,
+                    0 as service_fee,
+                    0 as tip_amount,
+                    COALESCE(SUM(discount), 0) as discounts
+             FROM orders
+             WHERE DATE(datetime(created_at, '+7 hours')) BETWEEN ? AND ? AND ${PNL_RECOGNIZED_REVENUE_ORDER_SQL}${tf.and}
+             GROUP BY DATE(datetime(created_at, '+7 hours')) ORDER BY date`
+          )
+          .bind(from, to, ...tf.binds)
+          .all<{
+            date: string;
+            orders: number;
+            total_collected: number;
+            shipping_fee: number;
+            service_fee: number;
+            tip_amount: number;
+            discounts: number;
+          }>();
+        orderRows = res.results || [];
+      }
     }
 
     // 2. Daily Inventory COGS (sale/reserve deductions net of release) & Waste Cost (Vietnam UTC+7)
@@ -222,26 +251,43 @@ export function registerPnlHandlers(app: Hono<{ Bindings: Env }>) {
       bomMovementRows = [];
     }
 
-    // 3. Daily Refunds on recognized-revenue orders (excludes fully refunded orders already omitted from orderRows)
+    // 3. Daily Refunds on recognized-revenue orders (per-tranche from payment_refund_transfers + legacy fallback)
     let refundRows: { date: string; refunds: number }[] = [];
     try {
-      const ordTf = buildTenantClause(tenantId, 'o');
+      const pTf = buildTenantClause(tenantId, 'p');
       const res = await db
         .prepare(
-          `SELECT DATE(datetime(r.created_at, '+7 hours')) as date,
-                  COALESCE(SUM(r.amount), 0) as refunds
-           FROM refunds r
-           JOIN orders o ON o.id = r.order_id
-           WHERE DATE(datetime(r.created_at, '+7 hours')) BETWEEN ? AND ?
-             AND r.status IN ('approved', 'completed', 'succeeded')
-             AND ${VALID_REVENUE_ORDER_ALIAS_SQL}${ordTf.and}
-           GROUP BY DATE(datetime(r.created_at, '+7 hours')) ORDER BY date`
+          `SELECT date, COALESCE(SUM(refunds), 0) AS refunds FROM (
+             SELECT DATE(datetime(t.created_at, '+7 hours')) AS date,
+                    COALESCE(t.amount, 0) AS refunds
+             FROM payment_refund_transfers t
+             JOIN payments p ON p.id = t.payment_id
+             JOIN orders o ON o.id = p.order_id
+              AND COALESCE(NULLIF(TRIM(o.tenant_id), ''), 'default') = COALESCE(NULLIF(TRIM(p.tenant_id), ''), 'default')
+             WHERE DATE(datetime(t.created_at, '+7 hours')) BETWEEN ? AND ?
+               AND COALESCE(t.amount, 0) > 0
+               AND ${PNL_RECOGNIZED_REVENUE_ORDER_ALIAS_SQL}${pTf.and}
+             UNION ALL
+             SELECT DATE(datetime(COALESCE(p.refunded_at, p.updated_at, p.created_at), '+7 hours')) AS date,
+                    COALESCE(p.refund_amount, 0) AS refunds
+             FROM payments p
+             JOIN orders o ON o.id = p.order_id
+              AND COALESCE(NULLIF(TRIM(o.tenant_id), ''), 'default') = COALESCE(NULLIF(TRIM(p.tenant_id), ''), 'default')
+             WHERE DATE(datetime(COALESCE(p.refunded_at, p.updated_at, p.created_at), '+7 hours')) BETWEEN ? AND ?
+               AND COALESCE(p.refund_amount, 0) > 0
+               AND NOT EXISTS (
+                 SELECT 1 FROM payment_refund_transfers t2
+                 WHERE t2.payment_id = p.id
+                   AND t2.tenant_id = COALESCE(NULLIF(TRIM(p.tenant_id), ''), 'default')
+               )
+               AND ${PNL_RECOGNIZED_REVENUE_ORDER_ALIAS_SQL}${pTf.and}
+           ) GROUP BY date ORDER BY date`
         )
-        .bind(from, to, ...ordTf.binds)
+        .bind(from, to, ...pTf.binds, from, to, ...pTf.binds)
         .all<{ date: string; refunds: number }>();
       refundRows = res.results || [];
     } catch {
-      // No refunds table → derive refunds from the payments refund ledger for recognized-revenue orders.
+      // No payment_refund_transfers table → derive refunds from the payments refund ledger for recognized-revenue orders.
       try {
         const pTf = buildTenantClause(tenantId, 'p');
         const res = await db
@@ -253,7 +299,7 @@ export function registerPnlHandlers(app: Hono<{ Bindings: Env }>) {
               AND COALESCE(NULLIF(TRIM(o.tenant_id), ''), 'default') = COALESCE(NULLIF(TRIM(p.tenant_id), ''), 'default')
              WHERE DATE(datetime(COALESCE(p.refunded_at, p.updated_at, p.created_at), '+7 hours')) BETWEEN ? AND ?
                AND COALESCE(p.refund_amount, 0) > 0
-               AND ${VALID_REVENUE_ORDER_ALIAS_SQL}${pTf.and}
+               AND ${PNL_RECOGNIZED_REVENUE_ORDER_ALIAS_SQL}${pTf.and}
              GROUP BY DATE(datetime(COALESCE(p.refunded_at, p.updated_at, p.created_at), '+7 hours')) ORDER BY date`
           )
           .bind(from, to, ...pTf.binds)
@@ -261,6 +307,27 @@ export function registerPnlHandlers(app: Hono<{ Bindings: Env }>) {
         refundRows = res.results || [];
       } catch {
         refundRows = [];
+      }
+    }
+    if (refundRows.length === 0) {
+      try {
+        const ordTf = buildTenantClause(tenantId, 'o');
+        const res = await db
+          .prepare(
+            `SELECT DATE(datetime(r.created_at, '+7 hours')) as date,
+                    COALESCE(SUM(r.amount), 0) as refunds
+             FROM refunds r
+             JOIN orders o ON o.id = r.order_id
+             WHERE DATE(datetime(r.created_at, '+7 hours')) BETWEEN ? AND ?
+               AND r.status IN ('approved', 'completed', 'succeeded')
+               AND ${PNL_RECOGNIZED_REVENUE_ORDER_ALIAS_SQL}${ordTf.and}
+             GROUP BY DATE(datetime(r.created_at, '+7 hours')) ORDER BY date`
+          )
+          .bind(from, to, ...ordTf.binds)
+          .all<{ date: string; refunds: number }>();
+        refundRows = res.results || [];
+      } catch {
+        // No refunds table
       }
     }
 
@@ -275,6 +342,8 @@ export function registerPnlHandlers(app: Hono<{ Bindings: Env }>) {
            FROM cash_payouts cp
            WHERE DATE(datetime(cp.created_at, '+7 hours')) BETWEEN ? AND ?
              AND LOWER(COALESCE(cp.status, 'completed')) IN ('completed', 'approved')
+             AND COALESCE(cp.id, '') NOT LIKE 'cpo_ref_%'
+             AND COALESCE(cp.id, '') NOT LIKE 'cpo_pref_%'
              AND LOWER(COALESCE(cp.reason, '')) NOT LIKE '%refund%'
              AND LOWER(COALESCE(cp.reason, '')) NOT LIKE '%hoàn tiền%'${cpTf.and}
            GROUP BY DATE(datetime(cp.created_at, '+7 hours')) ORDER BY date`
@@ -299,6 +368,7 @@ export function registerPnlHandlers(app: Hono<{ Bindings: Env }>) {
     const refundMap = new Map(refundRows.map((r) => [r.date, r]));
     const payoutMap = new Map(payoutRows.map((r) => [r.date, r]));
 
+    let totalGrossCollected = 0;
     const daily: DailyPnlEntry[] = [...dates].sort().map((date) => {
       const o = orderMap.get(date);
       const inv = invMap.get(date);
@@ -306,14 +376,16 @@ export function registerPnlHandlers(app: Hono<{ Bindings: Env }>) {
       const ref = refundMap.get(date);
       const pay = payoutMap.get(date);
       const orders = Number(o?.orders || 0);
-      const totalCollected = Math.round(Number(o?.total_collected || 0));
+      const grossTotalCollected = Math.round(Number(o?.total_collected || 0));
+      totalGrossCollected += grossTotalCollected;
       const shippingFee = Math.round(Number(o?.shipping_fee || 0));
       const serviceFee = Math.round(Number(o?.service_fee || 0));
       const tipAmount = Math.round(Number(o?.tip_amount || 0));
       const discounts = Math.round(Number(o?.discounts || 0));
       const refunds = Math.round(Number(ref?.refunds || 0));
+      const totalCollected = Math.max(0, grossTotalCollected - refunds);
       const cashPayouts = Math.round(Number(pay?.cash_payouts || 0));
-      const baseNetBeforeRefunds = Math.max(0, totalCollected - shippingFee - serviceFee - tipAmount);
+      const baseNetBeforeRefunds = Math.max(0, grossTotalCollected - shippingFee - serviceFee - tipAmount);
       const grossSales = baseNetBeforeRefunds + discounts;
       const netRevenue = baseNetBeforeRefunds - refunds;
       const invCogs = Math.round(Number(inv?.cogs || 0));
@@ -381,6 +453,7 @@ export function registerPnlHandlers(app: Hono<{ Bindings: Env }>) {
         gross_margin_pct: 0,
       }
     );
+    totals.total_collected = Math.max(0, totalGrossCollected - totals.refunds);
     totals.gross_margin_pct =
       totals.net_revenue > 0
         ? Math.round((totals.gross_profit / totals.net_revenue) * 10000) / 100

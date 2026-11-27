@@ -56,7 +56,7 @@ function resolveFranchiseTargetTenant(c: any, user: any): string {
   return boundTenant.toLowerCase() === 'hq' ? 'default' : boundTenant;
 }
 
-franchiseRouter.use('/*', requireAuth(['owner', 'admin', 'staff', 'manager', 'supervisor']));
+franchiseRouter.use('/*', requireAuth(['owner', 'admin', 'manager', 'supervisor']));
 franchiseRouter.use('/*', async (c, next) => {
   const candidates = extractFranchiseTenantCandidates(c);
   if (new Set(candidates).size > 1) {

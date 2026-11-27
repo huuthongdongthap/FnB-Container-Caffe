@@ -94,7 +94,7 @@ describe('admin-metrics security', () => {
   beforeEach(() => {
     app = new Hono();
     // Mirror the actual index.ts setup: auth middleware, then route
-    app.use('/api/admin/*', requireAuth(['owner', 'staff']));
+    app.use('/api/admin/*', requireAuth(['owner', 'manager', 'supervisor', 'staff']));
     app.route('/api/admin/metrics', adminMetrics);
   });
 
@@ -123,9 +123,18 @@ describe('admin-metrics security', () => {
     expect(res.status).toBe(200);
   });
 
-  it('returns 200 with valid staff token', async() => {
+  it('returns 403 with plain staff token (requires manager+)', async() => {
     const env = createTestEnv({ id: 'USR_2', name: 'Staff', phone: null, role: 'staff', tenant_id: 'default', is_active: 1, auth_version: 1 });
     const token = await signTestJwt({ sub: 'USR_2', role: 'staff', authVersion: 1, authTime: Math.floor(Date.now() / 1000), sessionType: 'staff-web' }, TEST_JWT_SECRET);
+    const res = await app.request('/api/admin/metrics?range=24h', {
+      headers: { Authorization: `Bearer ${token}` }
+    }, env);
+    expect(res.status).toBe(403);
+  });
+
+  it('returns 200 with valid manager token', async() => {
+    const env = createTestEnv({ id: 'USR_2M', name: 'Manager', phone: null, role: 'manager', tenant_id: 'default', is_active: 1, auth_version: 1 });
+    const token = await signTestJwt({ sub: 'USR_2M', role: 'manager', authVersion: 1, authTime: Math.floor(Date.now() / 1000), sessionType: 'staff-web' }, TEST_JWT_SECRET);
     const res = await app.request('/api/admin/metrics?range=24h', {
       headers: { Authorization: `Bearer ${token}` }
     }, env);

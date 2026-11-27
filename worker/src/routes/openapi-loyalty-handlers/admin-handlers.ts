@@ -208,6 +208,9 @@ export function registerAdminHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
     if (hasOpenApiLoyaltyTenantMismatch(c, tenantId)) {
       return c.json({ success: false, error: 'Forbidden: cross-tenant access denied' }, 403);
     }
+    if (!Number.isFinite(body.points) || body.points === 0) {
+      return c.json({ success: false, error: 'Points adjustment must be non-zero' }, 400);
+    }
 
     if (tenantId !== '*') {
       const userRow = (await db
@@ -346,9 +349,15 @@ export function registerAdminHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
     }
 
     if (query.search) {
-      whereClause += ' AND (customer_id IN (SELECT id FROM customers WHERE name LIKE ? OR email LIKE ?) OR referral_code LIKE ?)';
       const searchParam = `%${query.search}%`;
-      params.push(searchParam, searchParam, searchParam);
+      if (tenantId !== '*') {
+        whereClause +=
+          " AND (customer_id IN (SELECT id FROM customers WHERE (name LIKE ? OR email LIKE ? OR phone LIKE ?) AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?) OR referral_code LIKE ?)";
+        params.push(searchParam, searchParam, searchParam, tenantId, searchParam);
+      } else {
+        whereClause += ' AND (customer_id IN (SELECT id FROM customers WHERE name LIKE ? OR email LIKE ? OR phone LIKE ?) OR referral_code LIKE ?)';
+        params.push(searchParam, searchParam, searchParam, searchParam);
+      }
     }
 
     let accountResults: Record<string, unknown>[] = [];

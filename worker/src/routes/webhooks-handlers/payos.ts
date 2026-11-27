@@ -185,8 +185,16 @@ export async function handlePayosWebhook(
     }
     const initialOrderStatus = String((order as Record<string, unknown>).status || '').trim().toLowerCase();
     const isInitialTerminalOrder = ['cancelled', 'canceled', 'rejected', 'failed', 'expired', 'refunded'].includes(initialOrderStatus);
-    if (payment.status === 'refunded' || order.payment_status === 'refunded') return ack('Already processed');
-    if (payment.status === 'completed' && (!success || order.payment_status === 'paid' || isInitialTerminalOrder)) return ack('Already processed');
+    const normalizedInitialOrderPayStatus = String(order.payment_status || '').trim().toLowerCase();
+    if (payment.status === 'refunded' || normalizedInitialOrderPayStatus === 'refunded') return ack('Already processed');
+    if (
+      payment.status === 'completed' &&
+      (!success ||
+        ['paid', 'partially_refunded', 'completed'].includes(normalizedInitialOrderPayStatus) ||
+        isInitialTerminalOrder)
+    ) {
+      return ack('Already processed');
+    }
     const status = success ? 'completed' : rawStatus === 'EXPIRED' ? 'expired' : rawStatus === 'CANCELLED' ? 'cancelled' : 'failed';
     const providerReference = typeof data.reference === 'string' ? data.reference.trim() : '';
     let settled: Awaited<ReturnType<typeof settlePayOS>>;

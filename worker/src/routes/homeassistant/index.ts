@@ -76,7 +76,7 @@ const DispatchPresenceSchema = z.object({
 });
 
 export function createHARouter() {
-  const baseAuth = requireAuth(['owner', 'admin', 'manager', 'supervisor', 'staff']);
+  const baseAuth = requireAuth(['owner', 'admin', 'manager', 'supervisor']);
   const auth: MiddlewareHandler<{ Bindings: Env }> = async (c, next) => {
     let crossTenant = false;
     const authRes = await baseAuth(c, async () => {

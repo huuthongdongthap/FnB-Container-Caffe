@@ -16,6 +16,7 @@ export const passwordSchema = z
 // ── Name ──
 export const nameSchema = z
   .string()
+  .trim()
   .min(1, 'Tên không được để trống')
   .max(100, 'Tên không vượt quá 100 ký tự');
 

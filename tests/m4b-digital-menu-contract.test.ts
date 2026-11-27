@@ -371,8 +371,9 @@ describe('M4-B Digital Menu: Contract & Security', () => {
       );
       expect(unavailRes.status).toBe(200);
       const unavailBody = (await unavailRes.json()) as any;
-      expect(unavailBody.items.map((item: any) => item.id)).toEqual(['prod_matcha_out_of_stock']);
-      expect(unavailBody.pagination.total).toBe(1);
+      // Public customer menu never exposes unavailable/hidden products
+      expect(unavailBody.items.map((item: any) => item.id)).toEqual([]);
+      expect(unavailBody.pagination.total).toBe(0);
     });
 
     it('slices GET /api/menu results when limit and offset are provided while reporting pre-slice total', async () => {

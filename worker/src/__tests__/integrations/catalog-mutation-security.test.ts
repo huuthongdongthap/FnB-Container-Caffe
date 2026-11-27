@@ -259,10 +259,10 @@ describe('Catalog Routes Security and Public Access', () => {
   });
 
   describe('Authenticated staff mutations succeed', () => {
-    it('allows staff POST /api/categories', async () => {
+    it('allows manager POST /api/categories', async () => {
       const env = makeTestEnv();
       const issuedAt = Math.floor(Date.now() / 1000);
-      const token = await generateJWT({ id: 'staff-1', role: 'staff', name: 'Barista', ...staffSessionClaims({ authTime: issuedAt }) }, TEST_SECRET, 28800, issuedAt);
+      const token = await generateJWT({ id: 'mgr-1', role: 'manager', name: 'Manager', ...staffSessionClaims({ authTime: issuedAt }) }, TEST_SECRET, 28800, issuedAt);
       const res = await app.fetch(
         new Request('https://test.aura/api/categories', {
           method: 'POST',

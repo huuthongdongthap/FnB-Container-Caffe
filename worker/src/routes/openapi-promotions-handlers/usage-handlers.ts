@@ -1,3 +1,4 @@
+import type { Context } from 'hono';
 import type { OpenAPIHono } from '@hono/zod-openapi';
 import type { Env } from '../../types/env';
 import { PromotionRoutes } from '../../schemas/promotions';
@@ -115,6 +116,8 @@ export function registerUsageHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
     );
     if (perCustomerLimit > 0 && targetCustomerId) {
       let custUsage: { cnt: number } | null = null;
+      let custRedemptions: { cnt: number } | null = null;
+      const upperPromoCode = String(promotion.code || '').trim().toUpperCase();
       if (tenantId && tenantId !== '*') {
         try {
           custUsage = await db
@@ -128,14 +131,31 @@ export function registerUsageHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
             .first<{ cnt: number }>()
             .catch(() => null);
         }
+        try {
+          custRedemptions = await db
+            .prepare("SELECT COUNT(*) as cnt FROM promotion_redemptions WHERE (promotion_id = ? OR UPPER(code) = ?) AND customer_id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?")
+            .bind(body.promotionId, upperPromoCode, targetCustomerId, tenantId)
+            .first<{ cnt: number }>();
+        } catch {
+          custRedemptions = await db
+            .prepare('SELECT COUNT(*) as cnt FROM promotion_redemptions WHERE (promotion_id = ? OR UPPER(code) = ?) AND customer_id = ?')
+            .bind(body.promotionId, upperPromoCode, targetCustomerId)
+            .first<{ cnt: number }>()
+            .catch(() => null);
+        }
       } else {
         custUsage = await db
           .prepare('SELECT COUNT(*) as cnt FROM promotion_usages WHERE promotion_id = ? AND customer_id = ?')
           .bind(body.promotionId, targetCustomerId)
           .first<{ cnt: number }>()
           .catch(() => null);
+        custRedemptions = await db
+          .prepare('SELECT COUNT(*) as cnt FROM promotion_redemptions WHERE (promotion_id = ? OR UPPER(code) = ?) AND customer_id = ?')
+          .bind(body.promotionId, upperPromoCode, targetCustomerId)
+          .first<{ cnt: number }>()
+          .catch(() => null);
       }
-      if (Number(custUsage?.cnt ?? 0) >= perCustomerLimit) {
+      if (Number(custUsage?.cnt ?? 0) + Number(custRedemptions?.cnt ?? 0) >= perCustomerLimit) {
         return c.json({ success: false, error: 'Per-customer promotion usage limit reached' }, 400);
       }
     }
@@ -227,18 +247,38 @@ export function registerUsageHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
           "UPDATE promotions SET current_uses = COALESCE(current_uses, 0) + 1, usage_count = COALESCE(usage_count, 0) + 1, updated_at = ? WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ? AND COALESCE(is_active, 1) = 1 AND (? <= 0 OR (COALESCE(current_uses, 0) < ? AND COALESCE(usage_count, 0) < ?))"
         ).bind(now, body.promotionId, tenantId, maxUses, maxUses, maxUses).run();
       } catch {
-        if (tenantId === 'default') {
+        try {
           usageUpdate = await db.prepare(
-            'UPDATE promotions SET current_uses = COALESCE(current_uses, 0) + 1, usage_count = COALESCE(usage_count, 0) + 1, updated_at = ? WHERE id = ? AND COALESCE(is_active, 1) = 1 AND (? <= 0 OR (COALESCE(current_uses, 0) < ? AND COALESCE(usage_count, 0) < ?))'
-          ).bind(now, body.promotionId, maxUses, maxUses, maxUses).run();
+            "UPDATE promotions SET usage_count = COALESCE(usage_count, 0) + 1 WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ? AND COALESCE(is_active, 1) = 1 AND (? <= 0 OR COALESCE(usage_count, 0) < ?)"
+          ).bind(body.promotionId, tenantId, maxUses, maxUses).run();
+        } catch {
+          try {
+            usageUpdate = await db.prepare(
+              "UPDATE promotions SET current_uses = COALESCE(current_uses, 0) + 1 WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ? AND COALESCE(is_active, 1) = 1 AND (? <= 0 OR COALESCE(current_uses, 0) < ?)"
+            ).bind(body.promotionId, tenantId, maxUses, maxUses).run();
+          } catch {
+            if (tenantId === 'default') {
+              usageUpdate = await db.prepare(
+                'UPDATE promotions SET current_uses = COALESCE(current_uses, 0) + 1, usage_count = COALESCE(usage_count, 0) + 1, updated_at = ? WHERE id = ? AND COALESCE(is_active, 1) = 1 AND (? <= 0 OR (COALESCE(current_uses, 0) < ? AND COALESCE(usage_count, 0) < ?))'
+              ).bind(now, body.promotionId, maxUses, maxUses, maxUses).run().catch(() =>
+                db.prepare(
+                  'UPDATE promotions SET usage_count = COALESCE(usage_count, 0) + 1 WHERE id = ? AND COALESCE(is_active, 1) = 1 AND (? <= 0 OR COALESCE(usage_count, 0) < ?)'
+                ).bind(body.promotionId, maxUses, maxUses).run()
+              );
+            }
+          }
         }
       }
     } else {
       usageUpdate = await db.prepare(
         'UPDATE promotions SET current_uses = COALESCE(current_uses, 0) + 1, usage_count = COALESCE(usage_count, 0) + 1, updated_at = ? WHERE id = ? AND COALESCE(is_active, 1) = 1 AND (? <= 0 OR (COALESCE(current_uses, 0) < ? AND COALESCE(usage_count, 0) < ?))'
-      ).bind(now, body.promotionId, maxUses, maxUses, maxUses).run();
+      ).bind(now, body.promotionId, maxUses, maxUses, maxUses).run().catch(() =>
+        db.prepare(
+          'UPDATE promotions SET usage_count = COALESCE(usage_count, 0) + 1 WHERE id = ? AND COALESCE(is_active, 1) = 1 AND (? <= 0 OR COALESCE(usage_count, 0) < ?)'
+        ).bind(body.promotionId, maxUses, maxUses).run()
+      );
     }
-    if ((usageUpdate?.meta?.changes ?? 1) === 0) {
+    if (!usageUpdate || (usageUpdate?.meta?.changes ?? 1) === 0) {
       return c.json({ success: false, error: 'Promotion usage limit reached' }, 409);
     }
 
@@ -364,8 +404,12 @@ export function registerUsageHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
         const byTypeMap: Record<string, number> = {};
         const byDiscountTypeMap: Record<string, number> = {};
         for (const p of scopedPromos) {
-          const t = String(p.type ?? (p.discount_type === 'percent' ? 'percentage' : (p.discount_type || 'percentage')));
-          const dt = String(p.discount_type || 'percentage');
+          const isFixed = [p.type, p.discount_type].some((v) => {
+            const s = String(v ?? '').trim().toLowerCase();
+            return s === 'fixed' || s === 'fixed_amount' || s === 'amount';
+          });
+          const t = isFixed ? 'fixed' : 'percent';
+          const dt = isFixed ? 'fixed_amount' : 'percentage';
           byTypeMap[t] = (byTypeMap[t] || 0) + 1;
           byDiscountTypeMap[dt] = (byDiscountTypeMap[dt] || 0) + 1;
         }
@@ -513,4 +557,63 @@ export function registerUsageHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
       },
     });
   });
+
+  // GET /api/promotions/{id}/usage - List promotion usage
+  app.openapi(PromotionRoutes.usage.list, (async (c: Context<{ Bindings: Env }>) => {
+    const db = getDatabase(c);
+    const tenantId = getTenantId(c).trim() || 'default';
+    const user = c.get('user');
+    if (!user || !PROMO_ADMIN_ROLES.includes(user.role)) {
+      return c.json({ success: false, error: 'Admin access required' }, 403);
+    }
+    const tenantCheck = verifyOpenApiPromoTenant(c, PROMO_ADMIN_ROLES, true);
+    if (tenantCheck) return tenantCheck;
+
+    const id = c.req.param('id') || '';
+    const page = Math.max(1, Number(c.req.query('page') || 1));
+    const limit = Math.min(100, Math.max(1, Number(c.req.query('limit') || 20)));
+    const offset = (page - 1) * limit;
+
+    const promo = await db
+      .prepare('SELECT id, tenant_id FROM promotions WHERE id = ? LIMIT 1')
+      .bind(id)
+      .first<Record<string, unknown>>()
+      .catch(() => null);
+    if (!promo || (tenantId !== '*' && !matchesTenantRow(promo, tenantId))) {
+      return c.json({ success: false, error: 'Promotion not found' }, 404);
+    }
+
+    const allUsagesRes = await db
+      .prepare('SELECT * FROM promotion_usages WHERE promotion_id = ? ORDER BY created_at DESC LIMIT ? OFFSET ?')
+      .bind(id, limit, offset)
+      .all<Record<string, unknown>>()
+      .catch(() => ({ results: [] as Record<string, unknown>[] }));
+    const countRow = await db
+      .prepare('SELECT COUNT(*) as total FROM promotion_usages WHERE promotion_id = ?')
+      .bind(id)
+      .first<{ total?: number }>()
+      .catch(() => ({ total: 0 }));
+    const total = Number(countRow?.total || 0);
+    const usages = (allUsagesRes.results || []).map((u) => ({
+      id: String(u.id ?? ''),
+      promotionId: String(u.promotion_id ?? id),
+      orderId: String(u.order_id ?? ''),
+      customerId: u.customer_id ? String(u.customer_id) : null,
+      discountAmount: Number(u.discount_amount ?? 0),
+      createdAt: String(u.created_at ?? ''),
+    }));
+
+    return c.json({
+      success: true,
+      data: {
+        usages,
+        meta: {
+          page,
+          limit,
+          total,
+          totalPages: Math.ceil(total / limit),
+        },
+      },
+    });
+  }) as never);
 }

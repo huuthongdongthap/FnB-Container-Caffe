@@ -39,7 +39,11 @@ async function loadOrderForInvoice(
     return { allowed: true, orderRow: null };
   }
   const selectQueries = [
+    'SELECT id, items, total, discount_amount, discount, customer_name, customer_phone, customer_id, status, payment_status, tenant_id FROM orders WHERE id = ? LIMIT 1',
+    'SELECT id, items, total, discount, customer_name, customer_phone, customer_id, status, payment_status, tenant_id FROM orders WHERE id = ? LIMIT 1',
     'SELECT id, items, total, discount_amount, customer_name, customer_phone, customer_id, status, payment_status, tenant_id FROM orders WHERE id = ? LIMIT 1',
+    'SELECT id, items, total, discount_amount, discount, customer_name, customer_phone, customer_id, status, payment_status FROM orders WHERE id = ? LIMIT 1',
+    'SELECT id, items, total, discount, customer_name, customer_phone, customer_id, status, payment_status FROM orders WHERE id = ? LIMIT 1',
     'SELECT id, items, total, discount_amount, customer_name, customer_phone, customer_id, status, payment_status FROM orders WHERE id = ? LIMIT 1',
     'SELECT id, items, total, discount_amount, customer_name, customer_phone, customer_id, tenant_id FROM orders WHERE id = ? LIMIT 1',
     'SELECT * FROM orders WHERE id = ? LIMIT 1',
@@ -166,8 +170,19 @@ function mergeAuthoritativeOrder(
   } else if (dbTotal !== undefined || parsedItems.length > 0) {
     delete mergedRec.tax;
   }
-  const dbDiscount = orderRow.discount_amount ?? orderRow.discount;
-  if (typeof dbDiscount === 'number' && !Number.isNaN(dbDiscount)) {
+  const rawDiscountAmount = Number(orderRow.discount_amount);
+  const rawDiscountCol = Number(orderRow.discount);
+  const dbDiscount =
+    Number.isFinite(rawDiscountAmount) && rawDiscountAmount > 0
+      ? rawDiscountAmount
+      : Number.isFinite(rawDiscountCol) && rawDiscountCol > 0
+        ? rawDiscountCol
+        : Number.isFinite(rawDiscountAmount) && orderRow.discount_amount !== null && orderRow.discount_amount !== undefined
+          ? rawDiscountAmount
+          : Number.isFinite(rawDiscountCol) && orderRow.discount !== null && orderRow.discount !== undefined
+            ? rawDiscountCol
+            : undefined;
+  if (dbDiscount !== undefined) {
     mergedRec.discount_amount = dbDiscount;
     mergedRec.discount = dbDiscount;
   } else if (dbTotal !== undefined || parsedItems.length > 0) {
@@ -291,17 +306,24 @@ export async function handleErpnextInvoicesRequest(
       if (!allowed) {
         return json({ success: false, error: 'Order not found' }, 404);
       }
-      const rawOrderStatus = typeof (orderRow?.status ?? (body as unknown as Record<string, unknown>).status) === 'string'
-        ? String(orderRow?.status ?? (body as unknown as Record<string, unknown>).status).trim().toLowerCase()
+      const bodyRec = body as unknown as Record<string, unknown>;
+      const statusSource: Record<string, unknown> = orderRow ? (orderRow as Record<string, unknown>) : bodyRec;
+      const hasOrderStatus = 'status' in statusSource;
+      const hasPaymentStatus = 'payment_status' in statusSource;
+      const rawOrderStatus = typeof statusSource.status === 'string'
+        ? statusSource.status.trim().toLowerCase()
         : '';
-      const rawPaymentStatus = typeof (orderRow?.payment_status ?? (body as unknown as Record<string, unknown>).payment_status) === 'string'
-        ? String(orderRow?.payment_status ?? (body as unknown as Record<string, unknown>).payment_status).trim().toLowerCase()
+      const rawPaymentStatus = typeof statusSource.payment_status === 'string'
+        ? statusSource.payment_status.trim().toLowerCase()
         : '';
       if (
-        ['cancelled', 'canceled', 'failed', 'rejected', 'expired', 'refunded'].includes(rawOrderStatus) ||
-        ['refunded', 'failed', 'cancelled', 'canceled'].includes(rawPaymentStatus)
+        (hasOrderStatus && ['cancelled', 'canceled', 'failed', 'rejected', 'expired', 'refunded'].includes(rawOrderStatus)) ||
+        (hasPaymentStatus && ['refunded', 'failed', 'cancelled', 'canceled'].includes(rawPaymentStatus))
       ) {
         return json({ success: false, error: 'Cannot invoice a cancelled, failed, or refunded order' }, 409);
+      }
+      if (hasPaymentStatus && !['paid', 'completed', 'partially_refunded'].includes(rawPaymentStatus)) {
+        return json({ success: false, error: 'Cannot invoice an unpaid or pending order' }, 409);
       }
 
       if (!accountingClient) {
@@ -433,7 +455,8 @@ export async function handleErpnextInvoicesRequest(
           const retryPayStatus = typeof loaded.orderRow?.payment_status === 'string' ? loaded.orderRow.payment_status.trim().toLowerCase() : '';
           if (
             ['cancelled', 'canceled', 'failed', 'rejected', 'expired', 'refunded'].includes(retryStatus) ||
-            ['refunded', 'failed', 'cancelled', 'canceled'].includes(retryPayStatus)
+            ['refunded', 'failed', 'cancelled', 'canceled'].includes(retryPayStatus) ||
+            (retryPayStatus && !['paid', 'completed', 'partially_refunded'].includes(retryPayStatus))
           ) {
             continue;
           }

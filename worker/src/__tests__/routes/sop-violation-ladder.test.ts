@@ -79,9 +79,10 @@ describe('staff violation rights', () => {
     });
     const { data } = await created.json() as { data: { id: string } };
 
-    // Same store, not their file: the ownership check refuses it as 403.
+    // Same store, not their file: anti-oracle scoping refuses it as 404 so the
+    // caller cannot tell whether the violation id exists.
     const sameTenant = await fx.request(`/api/sop/violations/${data.id}`, await fx.token(SAME_STORE_STAFF));
-    expect(sameTenant.status).toBe(403);
+    expect(sameTenant.status).toBe(404);
 
     // Another store's member cannot even tell the id exists — tenant scoping
     // refuses it as 404, which is the stronger guarantee of the two.

@@ -211,6 +211,8 @@ export async function createAdminCustomer(request: Request, env: Record<string, 
   );
 }
 
+const VALID_CUSTOMER_TIERS = new Set(['bronze', 'silver', 'gold', 'platinum', 'diamond', 'vip']);
+
 export async function updateAdminCustomer(request: Request, env: Record<string, unknown>, id: string, effectiveTenantId?: string) {
   const db = (env.AURA_DB ?? env.DB) as import('@cloudflare/workers-types').D1Database;
   const tenantId = resolveEnvTenant(env, effectiveTenantId);
@@ -219,6 +221,8 @@ export async function updateAdminCustomer(request: Request, env: Record<string, 
     phone?: string;
     email?: string;
     tier?: string;
+    birthday?: string;
+    date_of_birth?: string;
   };
   const baseUpdates: string[] = [];
   const baseParams: unknown[] = [];
@@ -234,23 +238,42 @@ export async function updateAdminCustomer(request: Request, env: Record<string, 
     baseUpdates.push('email = ?');
     baseParams.push(body.email.trim());
   }
+  const rawBirthday = typeof body.birthday === 'string' && body.birthday.trim()
+    ? body.birthday.trim()
+    : typeof body.date_of_birth === 'string' && body.date_of_birth.trim()
+      ? body.date_of_birth.trim()
+      : '';
+  if (rawBirthday) {
+    baseUpdates.push('birthday = ?');
+    baseParams.push(rawBirthday);
+  }
   const hasTier = typeof body.tier === 'string' && Boolean(body.tier.trim());
   if (baseUpdates.length === 0 && !hasTier) {
     return Response.json({ success: false, error: 'No fields to update' }, { status: 400 });
   }
 
   const tierValue = hasTier ? body.tier!.trim().toLowerCase() : null;
+  if (tierValue && !VALID_CUSTOMER_TIERS.has(tierValue)) {
+    return Response.json({ success: false, error: `Invalid tier: ${tierValue}` }, { status: 400 });
+  }
+
+  let changes = 0;
   try {
     const canonicalUpdates = [...baseUpdates];
     const canonicalParams = [...baseParams];
     if (tierValue) {
-      canonicalUpdates.push('loyalty_tier = ?');
-      canonicalParams.push(tierValue);
+      canonicalUpdates.push('loyalty_tier = ?', 'tier = ?');
+      canonicalParams.push(tierValue, tierValue);
     }
     canonicalParams.push(id, tenantId, tenantId);
-    await db.prepare(`UPDATE customers SET ${canonicalUpdates.join(', ')} WHERE id = ? AND (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?)`).bind(...canonicalParams).run();
+    const res = await db.prepare(`UPDATE customers SET ${canonicalUpdates.join(', ')} WHERE id = ? AND (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?)`).bind(...canonicalParams).run();
+    changes = Number(res?.meta?.changes ?? 0);
   } catch (err) {
-    const missingTenantCol = /no such column:\s*tenant_id/i.test(err instanceof Error ? err.message : String(err));
+    const errMsg = err instanceof Error ? err.message : String(err);
+    if (/unique/i.test(errMsg)) {
+      return Response.json({ success: false, error: 'Customer phone or email already exists' }, { status: 409 });
+    }
+    const missingTenantCol = /no such column:\s*tenant_id/i.test(errMsg);
     try {
       const canonicalUpdates = [...baseUpdates];
       const canonicalParams = [...baseParams];
@@ -263,13 +286,19 @@ export async function updateAdminCustomer(request: Request, env: Record<string, 
           throw err;
         }
         canonicalParams.push(id);
-        await db.prepare(`UPDATE customers SET ${canonicalUpdates.join(', ')} WHERE id = ?`).bind(...canonicalParams).run();
+        const res = await db.prepare(`UPDATE customers SET ${canonicalUpdates.join(', ')} WHERE id = ?`).bind(...canonicalParams).run();
+        changes = Number(res?.meta?.changes ?? 0);
       } else {
         canonicalParams.push(id, tenantId, tenantId);
-        await db.prepare(`UPDATE customers SET ${canonicalUpdates.join(', ')} WHERE id = ? AND (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?)`).bind(...canonicalParams).run();
+        const res = await db.prepare(`UPDATE customers SET ${canonicalUpdates.join(', ')} WHERE id = ? AND (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?)`).bind(...canonicalParams).run();
+        changes = Number(res?.meta?.changes ?? 0);
       }
     } catch (innerErr) {
-      const innerMissingTenant = missingTenantCol || /no such column:\s*tenant_id/i.test(innerErr instanceof Error ? innerErr.message : String(innerErr));
+      const innerMsg = innerErr instanceof Error ? innerErr.message : String(innerErr);
+      if (/unique/i.test(innerMsg)) {
+        return Response.json({ success: false, error: 'Customer phone or email already exists' }, { status: 409 });
+      }
+      const innerMissingTenant = missingTenantCol || /no such column:\s*tenant_id/i.test(innerMsg);
       const legacyUpdates = [...baseUpdates];
       const legacyParams = [...baseParams];
       if (tierValue) {
@@ -281,12 +310,17 @@ export async function updateAdminCustomer(request: Request, env: Record<string, 
           throw innerErr;
         }
         legacyParams.push(id);
-        await db.prepare(`UPDATE customers SET ${legacyUpdates.join(', ')} WHERE id = ?`).bind(...legacyParams).run();
+        const res = await db.prepare(`UPDATE customers SET ${legacyUpdates.join(', ')} WHERE id = ?`).bind(...legacyParams).run();
+        changes = Number(res?.meta?.changes ?? 0);
       } else {
         legacyParams.push(id, tenantId, tenantId);
-        await db.prepare(`UPDATE customers SET ${legacyUpdates.join(', ')} WHERE id = ? AND (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?)`).bind(...legacyParams).run();
+        const res = await db.prepare(`UPDATE customers SET ${legacyUpdates.join(', ')} WHERE id = ? AND (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?)`).bind(...legacyParams).run();
+        changes = Number(res?.meta?.changes ?? 0);
       }
     }
+  }
+  if (changes === 0) {
+    return Response.json({ success: false, error: 'Customer not found' }, { status: 404 });
   }
   return Response.json({ success: true, id });
 }

@@ -3,10 +3,18 @@
  * Birthday discount eligibility and redemption.
  */
 import { describe, test, expect, vi, beforeEach } from 'vitest';
+import { generateJWT } from '../worker/src/lib/jwt';
+
+const TEST_JWT_SECRET = 'test-birthday-root-jwt-secret-minimum-32-chars';
 
 function createMockD1(seedData: Record<string, any[]> = {}) {
   const tables: Record<string, any[]> = {
+    users: [
+      { id: 'staff-1', name: 'Staff', role: 'staff', tenant_id: 'default', is_active: 1, auth_version: 1 },
+      ...(seedData.users || []),
+    ],
     customers: [...(seedData.customers || [])],
+    orders: [...(seedData.orders || [])],
     birthday_redemptions: [...(seedData.birthday_redemptions || [])],
   };
 
@@ -55,15 +63,31 @@ function createMockD1(seedData: Record<string, any[]> = {}) {
 }
 
 function createEnv(overrides: Record<string, unknown> = {}) {
-  return { AURA_DB: createMockD1(), ...overrides };
+  return { AURA_DB: createMockD1(), JWT_SECRET: TEST_JWT_SECRET, ...overrides };
 }
 
 let router: any;
 let env: ReturnType<typeof createEnv>;
+let authHeaders: Record<string, string>;
 
 beforeEach(async () => {
   vi.clearAllMocks();
   env = createEnv();
+  const token = await generateJWT(
+    {
+      id: 'staff-1',
+      sub: 'staff-1',
+      name: 'Staff',
+      role: 'staff',
+      tenantId: 'default',
+      authVersion: 1,
+      authTime: Math.floor(Date.now() / 1000),
+      sessionType: 'staff-web',
+    },
+    TEST_JWT_SECRET,
+    3600
+  );
+  authHeaders = { Authorization: `Bearer ${token}` };
   const mod = await import('../worker/src/routes/birthday.ts');
   router = mod.birthdayRouter;
 });
@@ -79,7 +103,7 @@ describe('GET /check', () => {
       customers: [{ id: 'cust1', name: 'Alice', phone: '0912345678', birthday }],
     });
 
-    const res = await router.request(`/check?customer_id=cust1`, { method: 'GET' }, env);
+    const res = await router.request(`/check?customer_id=cust1`, { method: 'GET', headers: authHeaders }, env);
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.success).toBe(true);
@@ -91,7 +115,7 @@ describe('GET /check', () => {
       customers: [{ id: 'cust1', name: 'Alice', phone: '0912345678', birthday: null }],
     });
 
-    const res = await router.request(`/check?customer_id=cust1`, { method: 'GET' }, env);
+    const res = await router.request(`/check?customer_id=cust1`, { method: 'GET', headers: authHeaders }, env);
     const body = await res.json();
     expect(body.success).toBe(true);
     expect(body.data.eligible).toBe(false);
@@ -99,7 +123,7 @@ describe('GET /check', () => {
   });
 
   test('returns 400 when neither customer_id nor phone provided', async () => {
-    const res = await router.request('/check', { method: 'GET' }, env);
+    const res = await router.request('/check', { method: 'GET', headers: authHeaders }, env);
     expect(res.status).toBe(400);
     const body = await res.json();
     expect(body.success).toBe(false);
@@ -114,11 +138,12 @@ describe('POST /redeem', () => {
     const todayBirthday = `1990-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
     env.AURA_DB = createMockD1({
       customers: [{ id: 'cust1', name: 'Alice', birthday: todayBirthday }],
+      orders: [{ id: 'ord1', customer_id: 'cust1', status: 'completed', tenant_id: 'default' }],
     });
 
     const res = await router.request('/redeem', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...authHeaders },
       body: JSON.stringify({ customer_id: 'cust1', order_id: 'ord1' }),
     }, env);
 
@@ -131,7 +156,7 @@ describe('POST /redeem', () => {
   test('returns 400 on missing customer_id', async () => {
     const res = await router.request('/redeem', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...authHeaders },
       body: JSON.stringify({}),
     }, env);
 
@@ -143,7 +168,7 @@ describe('POST /redeem', () => {
   test('returns 404 when customer not found', async () => {
     const res = await router.request('/redeem', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...authHeaders },
       body: JSON.stringify({ customer_id: 'nonexistent' }),
     }, env);
 
@@ -164,7 +189,7 @@ describe('POST /redeem', () => {
 
     const res = await router.request('/redeem', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...authHeaders },
       body: JSON.stringify({ customer_id: 'cust1' }),
     }, env);
 

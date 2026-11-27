@@ -3,7 +3,7 @@ import type { D1Database } from '@cloudflare/workers-types';
 import type { Env } from '../../types/env';
 import { executeKdsStatusTransition } from '@aura/domain-kitchen';
 import { restoreInventoryForOrder } from '@aura/domain-inventory';
-import { compensateVoidedOrder, releaseTableIfNoActiveOrders } from '@aura/domain-order';
+import { compensateVoidedOrder, releaseTableIfNoActiveOrders, verifyGuestOrderToken } from '@aura/domain-order';
 import { getDatabase, matchesTenantRow } from '../../lib/db';
 import { fetchOrderItemsAndPayments, formatCustomerOrder, formatOrder, resolveOpenApiOrdersTenant } from './helpers';
 import { fetchOrderForRead } from './order-read-handlers';
@@ -179,37 +179,54 @@ export async function handleCancelOrder(c: Context<{ Bindings: Env }>) {
 
   const rawTenantId = (tenantCheck.tenantId || 'default').trim() || 'default';
   const tenantId = rawTenantId.toLowerCase() === 'hq' ? '*' : rawTenantId;
-  const customer = user?.role === 'customer';
-  const ownerIds = customer ? await resolveCustomerOwnerIdsForMutation(db, user as Record<string, any> | undefined, tenantId) : [];
-  if (customer && ownerIds.length === 0) {
+  const presentedOrderToken = (
+    c.req.header('X-Order-Token') || c.req.header('x-order-token') || c.req.query('order_token') || ''
+  ).trim();
+  const isGuestTokenCancel = !user && Boolean(presentedOrderToken);
+  if (!user && !isGuestTokenCancel) {
+    return c.json({ success: false, error: 'Unauthorized' }, 401);
+  }
+  const customer = user?.role === 'customer' || isGuestTokenCancel;
+  const ownerIds = user?.role === 'customer'
+    ? await resolveCustomerOwnerIdsForMutation(db, user as Record<string, any> | undefined, tenantId)
+    : [];
+  if (user?.role === 'customer' && ownerIds.length === 0) {
     return c.json({ success: false, error: 'Order not found' }, 404);
   }
-  const customerClause = customer
+  const customerClause = user?.role === 'customer'
     ? (ownerIds.length === 1 ? ' AND customer_id = ?' : ` AND customer_id IN (${ownerIds.map(() => '?').join(', ')})`)
     : '';
-  const tenantParamIdx = customer ? ownerIds.length + 2 : 2;
+  const tenantParamIdx = user?.role === 'customer' ? ownerIds.length + 2 : 2;
   const tenantClause = tenantId === '*'
     ? ''
     : tenantId === 'default'
       ? " AND (tenant_id = ? OR tenant_id IS NULL OR tenant_id = '' OR TRIM(tenant_id) = '')"
       : ` AND (tenant_id = ? OR TRIM(tenant_id) = ?${tenantParamIdx})`;
   const clause = `${customerClause}${tenantClause}`;
-  const scope = customer
+  const scope = user?.role === 'customer'
     ? (tenantId === '*' ? [...ownerIds] : [...ownerIds, tenantId])
     : (tenantId === '*' ? [] : [tenantId]);
   let existing = (await db.prepare(`SELECT * FROM orders WHERE id = ?${clause}`).bind(id, ...scope).first().catch(async () => {
     if (tenantId === 'default') {
-      const fallbackScope = customer ? [...ownerIds] : [];
+      const fallbackScope = user?.role === 'customer' ? [...ownerIds] : [];
       return db.prepare(`SELECT * FROM orders WHERE id = ?${customerClause}`).bind(id, ...fallbackScope).first();
     }
     return null;
   })) as {
-    id: string; status: string; payment_status?: string | null; customer_id?: string | null; tenant_id?: string;
+    id: string; status: string; payment_status?: string | null; customer_id?: string | null; tenant_id?: string; total?: number | null; total_amount?: number | null; guest_token_hash?: string | null;
   } | null;
-  if (existing && customer) {
+  if (existing && user?.role === 'customer') {
     const ordCustId = existing.customer_id ? String(existing.customer_id).trim() : '';
     if (!ordCustId || !ownerIds.includes(ordCustId)) {
       existing = null;
+    }
+  }
+  if (existing && isGuestTokenCancel) {
+    const tokenOk = existing.guest_token_hash
+      ? await verifyGuestOrderToken(existing.guest_token_hash, presentedOrderToken)
+      : false;
+    if (!tokenOk) {
+      return c.json({ success: false, error: 'Invalid order token' }, 401);
     }
   }
   if (existing && tenantId !== '*' && 'tenant_id' in existing && existing.tenant_id !== undefined) {
@@ -245,17 +262,30 @@ export async function handleCancelOrder(c: Context<{ Bindings: Env }>) {
   if (isShipperCancel) {
     const existingRec = existing as Record<string, unknown>;
     const existingType = typeof existingRec.order_type === 'string' ? existingRec.order_type.trim().toLowerCase() : '';
-    const assignedShipper = typeof existingRec.assigned_shipper_id === 'string' ? existingRec.assigned_shipper_id.trim() : '';
+    const assignedShipper = String(existingRec.assigned_shipper_id ?? existingRec.shipper_id ?? '').trim();
     const callerId = String(user?.id || (user as unknown as Record<string, unknown> | undefined)?.sub || '').trim();
     if (existingType && existingType !== 'delivery') {
       return c.json({ success: false, error: 'Shippers may only cancel assigned delivery orders' }, 403);
     }
-    if (assignedShipper && assignedShipper !== callerId) {
-      return c.json({ success: false, error: 'Forbidden: order is assigned to another shipper' }, 403);
+    if (!assignedShipper || !callerId || assignedShipper !== callerId) {
+      return c.json({ success: false, error: 'Forbidden: order is not assigned to this shipper' }, 403);
     }
   }
   const canCompensatePaid = ['owner', 'admin', 'manager', 'supervisor'].includes(normalizedCancelRole);
-  if (!canCompensatePaid && String(existing.payment_status || '').trim().toLowerCase() === 'paid') {
+  const rawExistingTotal: unknown = existing.total ?? existing.total_amount;
+  const hasExplicitZeroTotal =
+    rawExistingTotal !== null &&
+    rawExistingTotal !== undefined &&
+    rawExistingTotal !== '' &&
+    Number(rawExistingTotal) === 0;
+  const isZeroTotalPending =
+    hasExplicitZeroTotal &&
+    String(existing.status || '').trim().toLowerCase() === 'pending';
+  if (
+    !canCompensatePaid &&
+    !isZeroTotalPending &&
+    ['paid', 'completed', 'partially_refunded'].includes(String(existing.payment_status || '').trim().toLowerCase())
+  ) {
     return c.json({
       success: false,
       error: customer ? 'Paid orders cannot be cancelled by customer' : 'Paid order cannot be cancelled; initiate a refund instead',
@@ -274,12 +304,12 @@ export async function handleCancelOrder(c: Context<{ Bindings: Env }>) {
 
   // All aliases share tenant confinement, role/state validation and compare-and-set.
   const cancelReasonText = typeof body.reason === 'string' && body.reason.trim() ? body.reason.trim() : undefined;
-  const transition = await executeKdsStatusTransition(db, id, 'cancelled', user?.role, {
+  const transition = await executeKdsStatusTransition(db, id, 'cancelled', user?.role || (isGuestTokenCancel ? 'customer' : undefined), {
     tenantId: customer ? (rawExistingTenant || 'default') : (tenantId === '*' ? (rawExistingTenant || 'default') : tenantId),
     kv: c.env?.AUTH_KV,
     env: c.env as unknown as Record<string, unknown>,
     skipCancelSideEffects: true,
-    allowPaidCompensation: canCompensatePaid,
+    allowPaidCompensation: canCompensatePaid || isZeroTotalPending,
     actorId: user?.id,
     ...(cancelReasonText ? { fields: { failure_reason: cancelReasonText } } : {}),
   });

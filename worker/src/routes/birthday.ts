@@ -375,7 +375,10 @@ birthdayRouter.put(
 });
 
 // GET /api/birthday/check — check eligibility
-birthdayRouter.get('/check', async(c) => {
+birthdayRouter.get(
+  '/check',
+  requireAuth(['owner', 'manager', 'supervisor', 'admin', 'staff', 'waiter', 'cashier', 'customer']),
+  async(c) => {
   if (hasCrossTenantBirthdayOverride(c)) {
     return c.json({ success: false, error: 'Cross-tenant access denied' }, 403);
   }
@@ -389,6 +392,31 @@ birthdayRouter.get('/check', async(c) => {
 
   try {
     const user = c.get('user' as never) as { id?: string; email?: string; phone?: string; role?: string } | undefined;
+    const isStaff = ['owner', 'manager', 'supervisor', 'admin', 'staff', 'cashier', 'barista', 'chef', 'waiter'].includes(
+      String(user?.role ?? '').toLowerCase()
+    );
+    if (user && !isStaff) {
+      if (customerId && user.id && String(customerId).trim() !== String(user.id).trim()) {
+        return c.json({ success: false, error: 'Forbidden: cannot inspect another customer birthday' }, 403);
+      }
+      if (phone) {
+        const reqPhoneNorm = String(phone).replace(/\s+/g, '');
+        if (user.phone && reqPhoneNorm !== String(user.phone).replace(/\s+/g, '')) {
+          return c.json({ success: false, error: 'Forbidden: cannot inspect another customer birthday' }, 403);
+        }
+        if (!user.phone && user.id) {
+          const ownRow = await db
+            .prepare('SELECT phone FROM customers WHERE id = ? LIMIT 1')
+            .bind(user.id)
+            .first<{ phone?: string | null }>()
+            .catch(() => null);
+          const ownPhoneNorm = ownRow?.phone ? String(ownRow.phone).replace(/\s+/g, '') : '';
+          if (!ownPhoneNorm || ownPhoneNorm !== reqPhoneNorm) {
+            return c.json({ success: false, error: 'Forbidden: cannot inspect another customer birthday' }, 403);
+          }
+        }
+      }
+    }
     const tenantId = Boolean(user) || c.get('tenantId' as never)
       ? getTenantId(c)
       : resolvePublicTenantId(c as unknown as Parameters<typeof resolvePublicTenantId>[0]);
@@ -397,6 +425,18 @@ birthdayRouter.get('/check', async(c) => {
       customerId ? { id: customerId } : { phone: phone || '' },
       tenantId
     );
+
+    const isSelf = Boolean(
+      user &&
+        customer &&
+        ((user.id && user.id === customer.id) ||
+          (user.phone &&
+            customer.phone &&
+            String(user.phone).replace(/\s+/g, '') === String(customer.phone).replace(/\s+/g, '')))
+    );
+    if (user && !isStaff && customer && !isSelf) {
+      return c.json({ success: false, error: 'Forbidden: cannot inspect another customer birthday' }, 403);
+    }
 
     if (!customer || !customer.birthday) {
       return c.json({
@@ -411,19 +451,6 @@ birthdayRouter.get('/check', async(c) => {
       });
     }
 
-    const isStaff = ['owner', 'manager', 'supervisor', 'admin', 'staff', 'cashier', 'barista', 'chef', 'waiter'].includes(
-      String(user?.role ?? '').toLowerCase()
-    );
-    const isSelf = Boolean(
-      user &&
-        ((user.id && user.id === customer.id) ||
-          (user.phone &&
-            customer.phone &&
-            String(user.phone).replace(/\s+/g, '') === String(customer.phone).replace(/\s+/g, '')))
-    );
-    if (user && !isStaff && !isSelf) {
-      return c.json({ success: false, error: 'Forbidden: cannot inspect another customer birthday' }, 403);
-    }
     const isAuthenticated = Boolean(user && (isStaff || isSelf));
 
     const checkTenant = (tenantId && tenantId !== '*' ? tenantId : customer.tenant_id) || 'default';
@@ -554,17 +581,7 @@ birthdayRouter.get('/check', async(c) => {
 // POST /api/birthday/redeem — redeem birthday discount
 birthdayRouter.post(
   '/redeem',
-  async (c, next) => {
-    const envRecord = (c.env ?? {}) as unknown as Record<string, unknown>;
-    const isProd =
-      c.env?.ENVIRONMENT === 'production' ||
-      c.env?.ENVIRONMENT === 'staging' ||
-      envRecord.NODE_ENV === 'production';
-    if ((isProd && c.env?.JWT_SECRET) || c.req.header('Authorization')) {
-      return requireAuth(['owner', 'manager', 'supervisor', 'admin', 'staff', 'waiter', 'cashier', 'customer'])(c, next);
-    }
-    await next();
-  },
+  requireAuth(['owner', 'manager', 'supervisor', 'admin', 'staff', 'waiter', 'cashier', 'customer']),
   async(c) => {
   if (hasCrossTenantBirthdayOverride(c)) {
     return c.json({ success: false, error: 'Cross-tenant access denied' }, 403);
@@ -578,10 +595,10 @@ birthdayRouter.post(
   }
   const data = parsed.data;
   const user = c.get('user' as never) as { id?: string; email?: string; role?: string } | undefined;
-  if (user?.role && !['owner', 'manager', 'supervisor', 'admin', 'staff', 'waiter', 'cashier', 'customer'].includes(user.role)) {
+  if (!user?.role || !['owner', 'manager', 'supervisor', 'admin', 'staff', 'waiter', 'cashier', 'customer'].includes(user.role)) {
     return c.json({ success: false, error: 'Forbidden' }, 403);
   }
-  if (user?.role === 'customer' && user.id && user.id !== data.customer_id && !user.email) {
+  if (user.role === 'customer' && (!user.id || user.id !== data.customer_id)) {
     return c.json({ success: false, error: 'Forbidden' }, 403);
   }
 
@@ -768,9 +785,28 @@ birthdayRouter.post(
     let nonDefaultTenantSchemaError = false;
     try {
       try {
-        await db.prepare(
-          'INSERT INTO birthday_redemptions (id, customer_id, discount_percent, order_id, redeemed_at, tenant_id) VALUES (?, ?, ?, ?, ?, ?)'
-        ).bind(id, customer.id, discountPercent, data.order_id || null, now, effectiveTenant).run();
+        const atomicRes = (await db.prepare(
+          `INSERT INTO birthday_redemptions (id, customer_id, discount_percent, order_id, redeemed_at, tenant_id)
+           SELECT ?, ?, ?, ?, ?, ?
+           WHERE NOT EXISTS (
+             SELECT 1 FROM birthday_redemptions
+             WHERE customer_id = ? AND redeemed_at >= ?
+               AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?
+           )`
+        ).bind(
+          id,
+          customer.id,
+          discountPercent,
+          data.order_id || null,
+          now,
+          effectiveTenant,
+          customer.id,
+          cycleStart,
+          effectiveTenant
+        ).run()) as { meta?: { changes?: number } };
+        if (atomicRes?.meta?.changes === 0) {
+          return c.json({ success: false, error: 'Already redeemed this year' }, 400);
+        }
       } catch (insertErr) {
         const msg = insertErr instanceof Error ? insertErr.message : String(insertErr);
         if (/unique|constraint/i.test(msg)) {
@@ -780,9 +816,19 @@ birthdayRouter.post(
           nonDefaultTenantSchemaError = true;
           throw insertErr;
         }
-        await db.prepare(
-          'INSERT INTO birthday_redemptions (id, customer_id, discount_percent, order_id, redeemed_at) VALUES (?, ?, ?, ?, ?)'
-        ).bind(id, customer.id, discountPercent, data.order_id || null, now).run();
+        const legacyRes = (await db.prepare(
+          `INSERT INTO birthday_redemptions (id, customer_id, discount_percent, order_id, redeemed_at)
+           SELECT ?, ?, ?, ?, ?
+           WHERE NOT EXISTS (
+             SELECT 1 FROM birthday_redemptions
+             WHERE customer_id = ? AND redeemed_at >= ?
+           )`
+        ).bind(id, customer.id, discountPercent, data.order_id || null, now, customer.id, cycleStart).run()) as {
+          meta?: { changes?: number };
+        };
+        if (legacyRes?.meta?.changes === 0) {
+          return c.json({ success: false, error: 'Already redeemed this year' }, 400);
+        }
       }
     } catch {
       if (nonDefaultTenantSchemaError) {

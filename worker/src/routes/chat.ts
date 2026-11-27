@@ -23,7 +23,16 @@ function normalizeChatPhone(raw: string): string {
 }
 const sendMessageSchema = z.object({
   name: z.string().trim().min(1, 'Ten khong duoc de trong').max(100),
-  phone: z.string().trim().min(8, 'So dien thoai khong hop le').max(15),
+  phone: z
+    .string()
+    .trim()
+    .min(8, 'So dien thoai khong hop le')
+    .max(15)
+    .refine((val) => {
+      if (!/^\+?[\d\s\-().]+$/.test(val)) return false;
+      const digits = normalizeChatPhone(val);
+      return digits.length >= 9 && digits.length <= 15;
+    }, 'So dien thoai khong hop le'),
   message: z.string().trim().min(1, 'Tin nhan khong duoc de trong').max(2000),
   direction: z.enum(['customer', 'admin']).optional(),
 });
@@ -66,7 +75,8 @@ async function sendMessage(c: Context<{ Bindings: Env }>) {
       const first = parsed.error.issues[0];
       return errorResponse(`${first.path.join('.')}: ${first.message}`, 400);
     }
-    const { name, phone, message } = parsed.data;
+    const { name, phone: rawPhone, message } = parsed.data;
+    const phone = normalizeChatPhone(rawPhone);
     const ip = c.req.header('CF-Connecting-IP') || c.req.header('X-Forwarded-For')?.split(',')[0]?.trim();
     if ((ip && !(await checkRateLimit(c.env, `ip:${ip}`, 20)))
       || !(await checkRateLimit(c.env, `msg:${phone}`, 10)))
@@ -135,7 +145,8 @@ async function getMessageHistory(c: Context<{ Bindings: Env }>) {
     }
 
     const repository = await contactMessageRepository(c.env.AURA_DB);
-    return jsonResponse({ success: true, data: await repository.history(tenantId, phone) });
+    const markAsRead = caller?.role !== 'customer';
+    return jsonResponse({ success: true, data: await repository.history(tenantId, phone.trim(), { markAsRead }) });
   } catch (error) { return chatError(error, 'Failed to get message history'); }
 }
 export const chatRouter = new Hono<{ Bindings: Env }>();

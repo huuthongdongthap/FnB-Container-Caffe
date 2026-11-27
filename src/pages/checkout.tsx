@@ -23,7 +23,7 @@ export function CheckoutPage() {
   const submittingRef = useRef(false);
   const retryCreatePaymentLink = usePaymentStore((s) => s.retryCreatePaymentLink);
   const clearPaymentError = usePaymentStore((s) => s.clearPaymentError);
-  const { t } = useTranslation('checkout');
+  const { t, i18n } = useTranslation('checkout');
 
   // Activate offline flush (no-op on online, flushes queued orders on reconnect)
   useOrderStoreWithOfflineFlush();
@@ -34,10 +34,63 @@ export function CheckoutPage() {
     subtotal,
     deliveryFee,
     qualifiesForFreeDelivery,
+    addItem,
     updateQuantity,
     removeItem,
     clearCart,
   } = useCart();
+
+  /* ── Restore items when retrying a failed order (?order_id=...) with empty cart ── */
+  const restoredOrderRef = useRef<string | null>(null);
+  useEffect(() => {
+    const paymentStatus = searchParams.get('payment');
+    const orderId = searchParams.get('order_id')?.trim();
+    if (!orderId || paymentStatus || items.length > 0 || restoredOrderRef.current === orderId) {
+      return;
+    }
+    restoredOrderRef.current = orderId;
+    let active = true;
+    useOrderStore
+      .getState()
+      .fetchOrder(orderId)
+      .then(() => {
+        const order = useOrderStore.getState().currentOrder;
+        if (!active || !order || !Array.isArray(order.items) || order.items.length === 0) return;
+        for (const item of order.items) {
+          const rawItem = item as typeof item & {
+            id?: string;
+            productId?: string;
+            product_id?: string;
+            price?: number;
+            image?: string;
+          };
+          const qty = Math.max(1, item.quantity || 1);
+          const resolvedProductId = (rawItem.productId || rawItem.product_id || rawItem.id || '').trim();
+          const itemId = resolvedProductId || item.name;
+          const itemPrice = Number(rawItem.unitPriceCents ?? rawItem.price ?? 0);
+          const itemModifiers = Array.isArray(item.modifiers) && item.modifiers.length > 0
+            ? item.modifiers.map((m) => (typeof m === 'string' ? m : m.name)).filter(Boolean)
+            : undefined;
+          for (let q = 0; q < qty; q += 1) {
+            addItem({
+              id: itemId,
+              ...(resolvedProductId ? { productId: resolvedProductId } : {}),
+              name: item.name,
+              price: itemPrice,
+              image: rawItem.image ?? '',
+              ...(itemModifiers && itemModifiers.length > 0 ? { modifiers: itemModifiers } : {}),
+              notes: item.notes ?? undefined,
+            });
+          }
+        }
+      })
+      .catch(() => {
+        /* best-effort restore */
+      });
+    return () => {
+      active = false;
+    };
+  }, [searchParams, items.length, addItem]);
 
   /* ── Handle redirect from checkout.html (PayOS return URL bridge) ── */
   useEffect(() => {
@@ -105,7 +158,8 @@ export function CheckoutPage() {
       : 0;
     const appliedDiscount = Math.max(0, Number(formData.discount || 0));
     const appliedCashback = Math.max(0, Math.floor(Number(formData.cashbackAmount || 0)));
-    const effectiveTotal = Math.max(0, subtotal + effectiveShippingFee - appliedDiscount - appliedCashback);
+    const appliedRedeemPoints = Math.max(0, Math.floor(Number(formData.redeemPoints || 0)));
+    const effectiveTotal = Math.max(0, subtotal + effectiveShippingFee - appliedDiscount - appliedCashback - appliedRedeemPoints * 100);
     const normalizedPromoCode = formData.promoCode?.trim().toUpperCase() || undefined;
 
     const payload = {
@@ -145,6 +199,7 @@ export function CheckoutPage() {
       discount: appliedDiscount,
       ...(normalizedPromoCode ? { promo_code: normalizedPromoCode } : {}),
       ...(appliedCashback > 0 ? { use_cashback: true, cashback_amount: appliedCashback } : {}),
+      ...(appliedRedeemPoints > 0 ? { redeem_points: appliedRedeemPoints } : {}),
       tip: 0,
     };
 
@@ -206,7 +261,7 @@ export function CheckoutPage() {
         isProcessing={payosRetrying}
         error={payosError}
         onPlaceOrder={handlePlaceOrder}
-        locale="vi"
+        locale={i18n?.language || 'vi'}
         onUpdateQuantity={updateQuantity}
         onRemoveItem={removeItem}
         onClearCart={() => { clearCheckoutIntent(); clearCart(); }}

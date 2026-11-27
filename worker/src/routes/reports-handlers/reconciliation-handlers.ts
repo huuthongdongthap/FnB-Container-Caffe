@@ -368,15 +368,31 @@ export function registerReconciliationHandlers(app: Hono<{ Bindings: Env }>) {
     }
 
     try {
-      const { results: orderItemRows } = await db
-        .prepare(
-          `SELECT items FROM orders
-           WHERE DATE(datetime(created_at, '+7 hours')) BETWEEN ? AND ? AND ${VALID_REVENUE_ORDER_SQL}${tf.and}`
-        )
-        .bind(from, to, ...tf.binds)
-        .all<{ items?: string | null }>();
+      let orderItemRows: Array<{ items?: string | null; total?: number | null; net_total?: number | null }> = [];
+      try {
+        const res = await db
+          .prepare(
+            `SELECT items, total, (${NET_ORDER_TOTAL_SQL}) AS net_total FROM orders
+             WHERE ${orderDateSettlementPredicate} AND ${VALID_REVENUE_ORDER_SQL}${tf.and}`
+          )
+          .bind(from, to, ...tf.binds)
+          .all<{ items?: string | null; total?: number | null; net_total?: number | null }>();
+        orderItemRows = res.results || [];
+      } catch {
+        const res = await db
+          .prepare(
+            `SELECT items, total, total AS net_total FROM orders
+             WHERE DATE(datetime(created_at, '+7 hours')) BETWEEN ? AND ? AND ${VALID_REVENUE_ORDER_SQL}${tf.and}`
+          )
+          .bind(from, to, ...tf.binds)
+          .all<{ items?: string | null; total?: number | null; net_total?: number | null }>();
+        orderItemRows = res.results || [];
+      }
       for (const row of orderItemRows || []) {
         if (!row.items) continue;
+        const grossTotal = Number(row.total ?? 0);
+        const netTotal = Number(row.net_total ?? grossTotal);
+        const refundRatio = grossTotal > 0 && netTotal < grossTotal ? Math.max(0, netTotal / grossTotal) : 1;
         try {
           const parsed = JSON.parse(row.items) as Array<{
             category?: string;
@@ -439,7 +455,7 @@ export function registerReconciliationHandlers(app: Hono<{ Bindings: Env }>) {
             const prev = categoryMap.get(cat) || { items_sold: 0, revenue: 0 };
             categoryMap.set(cat, {
               items_sold: prev.items_sold + qty,
-              revenue: prev.revenue + lineRevenue,
+              revenue: prev.revenue + Math.round(lineRevenue * refundRatio),
             });
           }
         } catch {

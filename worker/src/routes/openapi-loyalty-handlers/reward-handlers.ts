@@ -25,13 +25,32 @@ const TIER_RANK: Record<string, number> = {
   vip: 4,
 };
 
+function resolveEffectivePointsCost(r: Record<string, unknown>): number {
+  const pc = r.points_cost !== undefined && r.points_cost !== null ? Number(r.points_cost) : null;
+  const legacyPc = r.point_cost !== undefined && r.point_cost !== null ? Number(r.point_cost) : null;
+  if (legacyPc !== null && Number.isFinite(legacyPc) && (pc === null || (pc === 100 && legacyPc !== 100))) {
+    return legacyPc;
+  }
+  return pc !== null && Number.isFinite(pc) ? pc : 100;
+}
+
+function resolveEffectiveRewardType(r: Record<string, unknown>): string {
+  const t = typeof r.type === 'string' && r.type.trim() ? r.type.trim() : null;
+  const rt = typeof r.reward_type === 'string' && r.reward_type.trim() ? r.reward_type.trim() : null;
+  const dt = typeof r.discount_type === 'string' && r.discount_type.trim() ? r.discount_type.trim() : null;
+  if (dt && (!t || (t === 'fixed' && dt !== 'fixed'))) {
+    return dt;
+  }
+  return t ?? rt ?? dt ?? 'voucher';
+}
+
 function mapRewardRow(r: any) {
   return {
     ...r,
     name: r.name ?? r.title,
-    type: r.type ?? r.reward_type ?? r.discount_type ?? 'voucher',
+    type: resolveEffectiveRewardType(r),
     value: r.value ?? r.reward_value ?? r.discount_value ?? 0,
-    pointsCost: r.points_cost ?? r.point_cost ?? 100,
+    pointsCost: resolveEffectivePointsCost(r),
     maxRedemptions: r.max_redemptions ?? (r.stock !== undefined && r.stock > 0 ? r.stock : null),
     currentRedemptions: r.current_redemptions ?? r.redeemed_count ?? 0,
     validFrom: r.valid_from ?? null,
@@ -74,7 +93,7 @@ async function findRewardByIdWithFallback(db: any, id: string): Promise<{ reward
         id: raw.id,
         name: raw.name ?? raw.title,
         description: raw.description ?? null,
-        points_cost: raw.points_cost ?? raw.point_cost ?? 100,
+        points_cost: resolveEffectivePointsCost(raw),
         type: raw.type ?? raw.reward_type ?? raw.discount_type ?? 'voucher',
         reward_type: raw.reward_type ?? raw.type ?? raw.discount_type ?? 'voucher',
         value: raw.value ?? (raw.reward_value !== undefined ? Number(raw.reward_value) || 0 : raw.discount_value ?? 0),
@@ -128,6 +147,7 @@ export function registerRewardHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
 
     let total = 0;
     let rewardResults: any[] = [];
+    let allLoyaltyRewards: any[] = [];
     if (tenantId !== '*') {
       let rawRewards: any[] = [];
       try {
@@ -168,6 +188,7 @@ export function registerRewardHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
           scoped.push(r);
         }
       }
+      allLoyaltyRewards = scoped;
       total = scoped.length;
       rewardResults = scoped.slice(offset, offset + limit);
     } else {
@@ -189,26 +210,32 @@ export function registerRewardHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
         ).bind(...params, limit, offset).all().catch(() => ({ results: [] }))) as { results: any[] };
         rewardResults = rewards.results || [];
       }
+      allLoyaltyRewards = rewardResults;
     }
 
-    if (rewardResults.length === 0 && !query.type) {
+    if (((tenantId !== '*' ? allLoyaltyRewards.length === 0 : total === 0) || tenantId === 'default') && !query.type) {
       try {
         const activeFilter = query.isActive !== undefined ? 'WHERE is_active = ?' : '';
         const activeParams = query.isActive !== undefined ? [query.isActive ? 1 : 0] : [];
         const fallbackRewards = (await db.prepare(
           `SELECT * FROM rewards ${activeFilter}`
-        ).bind(...activeParams).all()) as { results: any[] };
-        const sortedFallback = (fallbackRewards.results || []).sort(
-          (a: any, b: any) => Number(a.points_cost ?? a.point_cost ?? 100) - Number(b.points_cost ?? b.point_cost ?? 100)
-        );
-        const scopedFallback: any[] = [];
-        for (const r of sortedFallback) {
-          if (await checkRewardTenant(db, r, tenantId)) {
-            scopedFallback.push(r);
+        ).bind(...activeParams).all<Record<string, unknown>>()) as { results?: Record<string, unknown>[] };
+        const baseRewards = tenantId !== '*' ? allLoyaltyRewards : rewardResults;
+        const existingIds = new Set(baseRewards.map((r: Record<string, unknown>) => String(r.id)));
+        const mergedFallback: Record<string, unknown>[] = [];
+        for (const r of fallbackRewards.results || []) {
+          if (!existingIds.has(String(r.id)) && (await checkRewardTenant(db, r, tenantId))) {
+            mergedFallback.push(r);
           }
         }
-        total = scopedFallback.length;
-        rewardResults = scopedFallback.slice(offset, offset + limit);
+        if (mergedFallback.length > 0) {
+          const combined = [...baseRewards, ...mergedFallback].sort(
+            (a: Record<string, unknown>, b: Record<string, unknown>) =>
+              resolveEffectivePointsCost(a) - resolveEffectivePointsCost(b)
+          );
+          total = combined.length;
+          rewardResults = combined.slice(offset, offset + limit);
+        }
       } catch {
         // Ignore when rewards table is absent
       }
@@ -529,7 +556,11 @@ export function registerRewardHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
       return c.json({ success: false, error: 'Reward is not active' }, 400);
     }
 
-    const customerLookupId = String(user.customerId || user.customer_id || user.id);
+    const isStaffRedeem = ['owner', 'admin', 'manager', 'supervisor', 'staff', 'cashier'].includes(String(user.role || '').toLowerCase());
+    const customerLookupId =
+      isStaffRedeem && body.customerId && String(body.customerId).trim()
+        ? String(body.customerId).trim()
+        : String(user.customerId || user.customer_id || user.id);
     let verifiedOrderTenant: string | null = null;
     if (body.orderId) {
       let orderRow: Record<string, unknown> | null = null;
@@ -582,7 +613,7 @@ export function registerRewardHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
     const currentPoints = Number(account.current_points ?? account.loyalty_points ?? 0);
     const currentRedemptions = Number(reward.current_redemptions ?? reward.redeemed_count ?? 0);
     const maxRedemptions = reward.max_redemptions;
-    const pointsCost = Number(reward.points_cost ?? reward.point_cost ?? 100);
+    const pointsCost = resolveEffectivePointsCost(reward);
 
     // Always verify customer has sufficient points to redeem the reward
     if (currentPoints < pointsCost) {

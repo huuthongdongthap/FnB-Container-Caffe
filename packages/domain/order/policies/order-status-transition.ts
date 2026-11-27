@@ -94,9 +94,12 @@ export async function transitionOrderStatus(
       payment_status?: string | null;
       order_type?: string | null;
       assigned_shipper_id?: string | null;
+      total?: number | string | null;
+      total_amount?: number | string | null;
     };
     paymentStatus?: string | null;
     allowPaidCompensation?: boolean;
+    allowZeroTotalCancel?: boolean;
     actorId?: string;
     validateAssignedShipper?: boolean;
     fields?: Record<string, unknown>;
@@ -414,6 +417,13 @@ export async function transitionOrderStatus(
         statusCode: 409,
       };
     }
+    if (targetStatus === 'delivered' && isCodDelivery && !isPaid) {
+      return {
+        success: false,
+        error: 'Đơn giao hàng COD phải thu tiền trước khi đánh dấu đã giao',
+        statusCode: 409,
+      };
+    }
   }
 
   if (isVoidStatus(targetStatus) && !isNoOp) {
@@ -432,6 +442,13 @@ export async function transitionOrderStatus(
     // rollback paths (or authorized delivery-failure reporting with an explicit reason) may compensate a paid order.
     const hasFailureReason =
       typeof mutableFields.failure_reason === 'string' && mutableFields.failure_reason.trim().length > 0;
+    if (targetStatus === 'failed' && !hasFailureReason) {
+      return {
+        success: false,
+        error: 'Lý do giao thất bại là bắt buộc',
+        statusCode: 400,
+      };
+    }
     const isManagerActor =
       normalizedActor === 'owner' ||
       normalizedActor === 'admin' ||
@@ -441,9 +458,51 @@ export async function transitionOrderStatus(
       targetStatus === 'failed' &&
       order.status === 'delivering' &&
       hasFailureReason &&
-      (normalizedActor === 'staff' || normalizedActor === 'cashier' || normalizedActor === 'waiter');
+      (normalizedActor === 'staff' ||
+        normalizedActor === 'cashier' ||
+        normalizedActor === 'waiter' ||
+        normalizedActor === 'shipper' ||
+        normalizedActor === 'rider');
+    let isZeroTotalPendingCancel = false;
+    if (
+      targetStatus === 'cancelled' &&
+      String(order.status ?? '').trim().toLowerCase() === 'pending' &&
+      (options.allowZeroTotalCancel || options.allowPaidCompensation)
+    ) {
+      if (options.allowZeroTotalCancel) {
+        isZeroTotalPendingCancel = true;
+      } else {
+        let rawKnownTotal: unknown =
+          options.currentOrder?.total ?? options.currentOrder?.total_amount;
+        if (rawKnownTotal === undefined) {
+          try {
+            const totalRow = await db
+              .prepare(`SELECT total, total_amount FROM orders WHERE id = ?${writeTenantClause}`)
+              .bind(orderId, ...writeTenantBinds)
+              .first<{ total?: number | string | null; total_amount?: number | string | null }>()
+              .catch(() =>
+                db
+                  .prepare(`SELECT total FROM orders WHERE id = ?${writeTenantClause}`)
+                  .bind(orderId, ...writeTenantBinds)
+                  .first<{ total?: number | string | null }>()
+                  .catch(() => null)
+              );
+            rawKnownTotal = totalRow?.total ?? (totalRow as { total_amount?: unknown } | null)?.total_amount;
+          } catch {
+            // ignore schema without total column
+          }
+        }
+        isZeroTotalPendingCancel =
+          rawKnownTotal !== null &&
+          rawKnownTotal !== undefined &&
+          rawKnownTotal !== '' &&
+          Number(rawKnownTotal) === 0;
+      }
+    }
     const canCompensatePaid = Boolean(
-      options.allowPaidCompensation && (isManagerActor || isDispatchFailureActor),
+      (options.allowPaidCompensation && isManagerActor) ||
+        isDispatchFailureActor ||
+        isZeroTotalPendingCancel,
     );
     let knownPaymentStatus: string | null | undefined =
       options.paymentStatus ??

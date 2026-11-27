@@ -31,13 +31,44 @@ function resolveRequestTenantId(c: any): string {
   return resolvePublicTenantId(c).trim() || 'default';
 }
 
+function isValidCalendarDate(dateStr: string): boolean {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateStr);
+  if (!m) return false;
+  const year = Number(m[1]);
+  const month = Number(m[2]);
+  const day = Number(m[3]);
+  if (month < 1 || month > 12 || day < 1 || day > 31) return false;
+  const d = new Date(Date.UTC(year, month - 1, day));
+  return d.getUTCFullYear() === year && d.getUTCMonth() === month - 1 && d.getUTCDate() === day;
+}
+
+function isValidTimeHHMM(timeStr: string): boolean {
+  const m = /^(\d{2}):(\d{2})$/.exec(timeStr);
+  if (!m) return false;
+  const h = Number(m[1]);
+  const min = Number(m[2]);
+  return h >= 0 && h <= 23 && min >= 0 && min <= 59;
+}
+
+function normalizePhoneForMatch(phone: string): string {
+  const digits = String(phone || '').replace(/[\s\-().]/g, '');
+  if (digits.startsWith('+84')) return `0${digits.slice(3)}`;
+  if (digits.startsWith('84') && digits.length >= 10) return `0${digits.slice(2)}`;
+  return digits;
+}
+
+function isValidReservationPhone(phone: string): boolean {
+  const cleaned = String(phone || '').trim().replace(/[\s\-().]/g, '');
+  return /^\+?\d{8,15}$/.test(cleaned);
+}
+
 const reservationSchema = z.object({
-  table_id: z.string().min(1),
-  customer_name: z.string().min(1).max(100),
-  customer_phone: z.string().min(8).max(20),
+  table_id: z.string().trim().min(1),
+  customer_name: z.string().trim().min(1, 'Tên khách không được để trống').max(100),
+  customer_phone: z.string().trim().min(8).max(20).refine(isValidReservationPhone, 'Số điện thoại không hợp lệ'),
   guest_count: z.number().int().min(1).max(200).optional(),
-  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Ngày không hợp lệ (YYYY-MM-DD)'),
-  time: z.string().regex(/^\d{2}:\d{2}$/, 'Giờ không hợp lệ (HH:MM)'),
+  date: z.string().trim().regex(/^\d{4}-\d{2}-\d{2}$/, 'Ngày không hợp lệ (YYYY-MM-DD)').refine(isValidCalendarDate, 'Ngày không tồn tại'),
+  time: z.string().trim().regex(/^\d{2}:\d{2}$/, 'Giờ không hợp lệ (HH:MM)').refine(isValidTimeHHMM, 'Giờ không hợp lệ (00:00–23:59)'),
   notes: z.string().max(500).optional(),
 });
 
@@ -454,7 +485,13 @@ reservationsRouter.post('/', optionalAuth() as any, async (c) => {
       .prepare('SELECT * FROM cafe_tables WHERE id = ? OR table_number = ?')
       .bind(table_id, table_id)
       .first<Record<string, unknown>>()
-      .catch(() => null);
+      .catch(() =>
+        db
+          .prepare('SELECT * FROM cafe_tables WHERE id = ?')
+          .bind(table_id)
+          .first<Record<string, unknown>>()
+          .catch(() => null)
+      );
     if (singleTable) candidateTables = [singleTable];
   }
   const tenantMatchedTables = candidateTables.filter((t) => matchesTenantRow(t, tenantId));
@@ -514,7 +551,9 @@ reservationsRouter.post('/', optionalAuth() as any, async (c) => {
   crypto.getRandomValues(rsvRand);
   const id = `rsv_${Date.now()}_${Array.from(rsvRand, (b) => b.toString(16).padStart(2, '0')).join('')}`;
   const now = new Date().toISOString();
-  const customerId = reqUser && !isStaffCaller ? String(reqUser.id ?? reqUser.sub ?? '').trim() || null : null;
+  const reqRole = String(reqUser?.role || '').trim().toLowerCase();
+  const isCustomerCaller = Boolean(reqUser && (!reqRole || reqRole === 'customer'));
+  const customerId = isCustomerCaller ? String(reqUser?.id ?? reqUser?.sub ?? '').trim() || null : null;
 
   try {
     await db.prepare(
@@ -970,17 +1009,28 @@ async function canResetTableToAvailableOnCancel(
   }
   const rsvDate = String(rsv.date ?? rsv.reservation_date ?? rsv.reserved_date ?? '').trim();
   const todayVN = getTodayVN();
+  if (rsvDate && /^\d{4}-\d{2}-\d{2}$/.test(rsvDate) && rsvDate < todayVN) {
+    return false;
+  }
   if (tableRow) {
     const exactStatus = tableRow.status !== undefined && tableRow.status !== null
       ? String(tableRow.status).trim()
       : '';
     const rawStatus = exactStatus.toLowerCase();
+    const rsvStatus = String(rsv.status ?? '').trim().toLowerCase();
     if (INACTIVE_TABLE_STATUSES.has(rawStatus)) {
       return false;
     }
+    if (
+      tableRow.current_session_id !== undefined &&
+      tableRow.current_session_id !== null &&
+      String(tableRow.current_session_id).trim() !== '' &&
+      (rsvStatus !== 'seated' || !opts?.allowOccupiedRelease)
+    ) {
+      return false;
+    }
     if (rawStatus === 'occupied') {
-      const rsvStatus = String(rsv.status ?? '').trim().toLowerCase();
-      if (rsvStatus !== 'seated' || (rsvDate && rsvDate !== todayVN)) {
+      if (rsvStatus !== 'seated') {
         return false;
       }
       if (!opts?.allowOccupiedRelease) {
@@ -1066,11 +1116,9 @@ async function releaseTableIfEligible(
   const tableIdStr = String(rsv.table_id);
   const rsvId = String(rsv.id ?? '').trim();
   const rsvStatus = String(rsv.status ?? '').trim().toLowerCase();
-  const rsvDate = String(rsv.date ?? rsv.reservation_date ?? rsv.reserved_date ?? '').trim();
   const isOwnedOccupiedRelease = Boolean(
     opts?.allowOccupiedRelease &&
-    rsvStatus === 'seated' &&
-    (!rsvDate || rsvDate === getTodayVN())
+    rsvStatus === 'seated'
   );
   if (
     !(await canResetTableToAvailableOnCancel(db, rsv, rsvTenant, {
@@ -1195,13 +1243,14 @@ reservationsRouter.patch('/:id', optionalAuth() as any, requireReservationStaff(
   if ((body.party_size !== undefined || body.guest_count !== undefined) && (!Number.isFinite(nextPartySize) || !Number.isInteger(nextPartySize) || nextPartySize < 1)) {
     return c.json({ success: false, error: 'party_size must be a positive integer' }, 400);
   }
+  const currentDate = String(rsv.date ?? rsv.reservation_date ?? rsv.reserved_date ?? '').trim();
   const nextDate = body.date !== undefined
     ? String(body.date).trim()
     : body.reservation_date !== undefined
       ? String(body.reservation_date).trim()
       : body.reserved_date !== undefined
         ? String(body.reserved_date).trim()
-        : String(rsv.date ?? rsv.reservation_date ?? rsv.reserved_date ?? '').trim();
+        : currentDate;
   const nextTime = body.time !== undefined
     ? String(body.time).trim()
     : body.reservation_time !== undefined
@@ -1209,6 +1258,26 @@ reservationsRouter.patch('/:id', optionalAuth() as any, requireReservationStaff(
       : body.reserved_time !== undefined
         ? String(body.reserved_time).trim()
         : String(rsv.time ?? rsv.reservation_time ?? rsv.reserved_time ?? '').trim();
+
+  if (body.date !== undefined || body.reservation_date !== undefined || body.reserved_date !== undefined) {
+    if (!isValidCalendarDate(nextDate)) {
+      return c.json({ success: false, error: 'Ngày không hợp lệ (YYYY-MM-DD)' }, 400);
+    }
+    if (nextDate !== currentDate && nextDate < getTodayVN()) {
+      return c.json({ success: false, error: 'Cannot reschedule reservation to a past date' }, 400);
+    }
+  }
+  if (body.time !== undefined || body.reservation_time !== undefined || body.reserved_time !== undefined) {
+    if (!isValidTimeHHMM(nextTime)) {
+      return c.json({ success: false, error: 'Giờ không hợp lệ (HH:MM)' }, 400);
+    }
+  }
+  if (body.customer_name !== undefined && !String(body.customer_name).trim()) {
+    return c.json({ success: false, error: 'Tên khách không được để trống' }, 400);
+  }
+  if (body.customer_phone !== undefined && !isValidReservationPhone(String(body.customer_phone))) {
+    return c.json({ success: false, error: 'Số điện thoại không hợp lệ' }, 400);
+  }
 
   const rsvTenant = resolveEffectiveRsvTenant(rsv, tenantId);
   const targetTenant = rsvTenant || 'default';
@@ -1791,12 +1860,25 @@ reservationsRouter.post('/waitlist/:id/seat', requireReservationStaff() as any, 
       .bind(tableId, tableId, effectiveTenant)
       .first<Record<string, unknown>>();
   } catch {
-    if (effectiveTenant === 'default') {
+    try {
       tableRow = await db
-        .prepare('SELECT * FROM cafe_tables WHERE id = ? OR table_number = ?')
-        .bind(tableId, tableId)
-        .first<Record<string, unknown>>()
-        .catch(() => null);
+        .prepare("SELECT * FROM cafe_tables WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?")
+        .bind(tableId, effectiveTenant)
+        .first<Record<string, unknown>>();
+    } catch {
+      if (effectiveTenant === 'default') {
+        tableRow = await db
+          .prepare('SELECT * FROM cafe_tables WHERE id = ? OR table_number = ?')
+          .bind(tableId, tableId)
+          .first<Record<string, unknown>>()
+          .catch(() =>
+            db
+              .prepare('SELECT * FROM cafe_tables WHERE id = ?')
+              .bind(tableId)
+              .first<Record<string, unknown>>()
+              .catch(() => null)
+          );
+      }
     }
   }
   if (!tableRow || !matchesTenantRow(tableRow, effectiveTenant)) {
@@ -1825,12 +1907,19 @@ reservationsRouter.post('/waitlist/:id/seat', requireReservationStaff() as any, 
         .bind(canonicalTableId, id, effectiveTenant)
         .run();
     } catch {
-      if (effectiveTenant === 'default') {
+      try {
         await db
-          .prepare(`UPDATE ${sourceTable} SET status = 'seated' WHERE id = ?`)
-          .bind(id)
-          .run()
-          .catch(() => undefined);
+          .prepare(`UPDATE ${sourceTable} SET status = 'seated' WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?`)
+          .bind(id, effectiveTenant)
+          .run();
+      } catch {
+        if (effectiveTenant === 'default') {
+          await db
+            .prepare(`UPDATE ${sourceTable} SET status = 'seated' WHERE id = ?`)
+            .bind(id)
+            .run()
+            .catch(() => undefined);
+        }
       }
     }
   }
@@ -2008,7 +2097,39 @@ reservationsRouter.delete(
     if (isCustomer) {
       const callerId = String(user?.id ?? user?.sub ?? '').trim();
       const ownerId = String(rsv.customer_id ?? '').trim();
-      if (!callerId || !ownerId || ownerId !== callerId) {
+      let isOwner = Boolean(callerId && ownerId && ownerId === callerId);
+      if (!isOwner && callerId && !ownerId) {
+        // Fallback for legacy reservations without customer_id: match normalized phone within the same tenant
+        const rsvPhone = normalizePhoneForMatch(String(rsv.customer_phone ?? rsv.guest_phone ?? rsv.phone ?? ''));
+        let callerPhone = normalizePhoneForMatch(String((user as { phone?: string } | undefined)?.phone ?? ''));
+        if (!callerPhone) {
+          const lookupTenant =
+            resolveEffectiveRsvTenant(rsv, tenantId) ||
+            (tenantId && tenantId !== '*' && tenantId.toLowerCase() !== 'hq' ? tenantId : 'default');
+          let custRow: { phone?: string | null; tenant_id?: string | null } | null = null;
+          try {
+            custRow = await db
+              .prepare("SELECT phone, tenant_id FROM customers WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ? LIMIT 1")
+              .bind(callerId, lookupTenant)
+              .first<{ phone?: string | null; tenant_id?: string | null }>();
+          } catch (err) {
+            if (lookupTenant === 'default' && isNoSuchColumnError(err)) {
+              custRow = await db
+                .prepare('SELECT phone FROM customers WHERE id = ? LIMIT 1')
+                .bind(callerId)
+                .first<{ phone?: string | null }>()
+                .catch(() => null);
+            }
+          }
+          if (custRow && (!('tenant_id' in custRow) || matchesTenantRow(custRow as Record<string, unknown>, lookupTenant))) {
+            callerPhone = normalizePhoneForMatch(String(custRow.phone ?? ''));
+          }
+        }
+        if (rsvPhone && !/^0+$/.test(rsvPhone) && callerPhone && rsvPhone === callerPhone) {
+          isOwner = true;
+        }
+      }
+      if (!isOwner) {
         return c.json({ success: false, error: 'Forbidden' }, 403);
       }
     }
@@ -2043,18 +2164,229 @@ reservationsRouter.delete(
 );
 
 export const waitlistRouter = new Hono<{ Bindings: Env }>();
+
+const waitlistCreateSchema = z.object({
+  customer_name: z.string().trim().min(1, 'Tên khách không được để trống').max(100),
+  customer_phone: z.string().trim().min(8).max(20).refine(isValidReservationPhone, 'Số điện thoại không hợp lệ'),
+  party_size: z.number().int().min(1).max(200).optional(),
+  guest_count: z.number().int().min(1).max(200).optional(),
+  zone: z.string().trim().max(50).optional(),
+  notes: z.string().max(500).optional(),
+});
+
+const waitlistUpdateSchema = z.object({
+  status: z.enum(['waiting', 'notified', 'seated', 'cancelled', 'no_show']).optional(),
+  party_size: z.number().int().min(1).max(200).optional(),
+  zone: z.string().trim().max(50).optional(),
+  notes: z.string().max(500).optional(),
+});
+
 waitlistRouter.get('/', optionalAuth() as any, requireReservationStaff() as any, async (c) => {
   const db = c.env.AURA_DB;
   const tenantId = resolveRequestTenantId(c);
+  const statusFilter = c.req.query('status')?.trim();
   let rows: Record<string, unknown>[] = [];
   try {
-    const stmt = tenantId !== '*'
-      ? db.prepare("SELECT * FROM waitlist WHERE COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ? ORDER BY created_at ASC").bind(tenantId)
-      : db.prepare('SELECT * FROM waitlist ORDER BY created_at ASC');
-    const res = await stmt.all<Record<string, unknown>>();
+    const clauses: string[] = [];
+    const params: unknown[] = [];
+    if (tenantId !== '*') {
+      clauses.push("COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?");
+      params.push(tenantId);
+    }
+    if (statusFilter) {
+      clauses.push('status = ?');
+      params.push(statusFilter);
+    }
+    const where = clauses.length > 0 ? `WHERE ${clauses.join(' AND ')}` : '';
+    const res = await db
+      .prepare(`SELECT * FROM waitlist ${where} ORDER BY created_at ASC`)
+      .bind(...params)
+      .all<Record<string, unknown>>();
     rows = (res.results || []).filter((r) => matchesTenantRow(r, tenantId));
   } catch {
     rows = [];
   }
   return c.json({ success: true, data: rows });
+});
+
+waitlistRouter.post('/', optionalAuth() as never, requireReservationStaff() as never, async (c) => {
+  const db = c.env.AURA_DB;
+  const tenantId = resolveRequestTenantId(c);
+  const effectiveTenant = tenantId === '*' ? 'default' : tenantId;
+  const rawBody = await c.req.json().catch(() => null);
+  const parsed = waitlistCreateSchema.safeParse(rawBody);
+  if (!parsed.success) {
+    return c.json({ success: false, error: parsed.error.issues[0]?.message || 'Invalid waitlist payload' }, 400);
+  }
+  const { customer_name, customer_phone, party_size, guest_count, zone, notes } = parsed.data;
+  const id = `wl_${crypto.randomUUID().slice(0, 12)}`;
+  const now = new Date().toISOString();
+  const size = party_size ?? guest_count ?? 2;
+  await db
+    .prepare(
+      `INSERT INTO waitlist (id, tenant_id, customer_name, customer_phone, party_size, zone, notes, status, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, 'waiting', ?, ?)`
+    )
+    .bind(id, effectiveTenant, customer_name, customer_phone, size, zone || 'indoor', notes || null, now, now)
+    .run();
+  return c.json(
+    {
+      success: true,
+      data: {
+        id,
+        tenant_id: effectiveTenant,
+        customer_name,
+        customer_phone,
+        party_size: size,
+        zone: zone || 'indoor',
+        notes: notes || null,
+        status: 'waiting',
+        created_at: now,
+        updated_at: now,
+      },
+    },
+    201
+  );
+});
+
+waitlistRouter.patch('/:id', optionalAuth() as never, requireReservationStaff() as never, async (c) => {
+  const db = c.env.AURA_DB;
+  const tenantId = resolveRequestTenantId(c);
+  const id = c.req.param('id');
+  const rawBody = await c.req.json().catch(() => null);
+  const parsed = waitlistUpdateSchema.safeParse(rawBody);
+  if (!parsed.success) {
+    return c.json({ success: false, error: parsed.error.issues[0]?.message || 'Invalid waitlist update payload' }, 400);
+  }
+  let existing: Record<string, unknown> | null = null;
+  if (tenantId !== '*') {
+    try {
+      existing = await db
+        .prepare("SELECT * FROM waitlist WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?")
+        .bind(id, tenantId)
+        .first<Record<string, unknown>>();
+    } catch (err) {
+      if (tenantId === 'default' && isNoSuchColumnError(err)) {
+        existing = await db
+          .prepare('SELECT * FROM waitlist WHERE id = ?')
+          .bind(id)
+          .first<Record<string, unknown>>()
+          .catch(() => null);
+      }
+    }
+  } else {
+    existing = await db
+      .prepare('SELECT * FROM waitlist WHERE id = ?')
+      .bind(id)
+      .first<Record<string, unknown>>()
+      .catch(() => null);
+  }
+  if (!existing || !matchesTenantRow(existing, tenantId)) {
+    return c.json({ success: false, error: 'Waitlist entry not found' }, 404);
+  }
+  const existingStatus = String(existing.status ?? '').trim().toLowerCase();
+  if (existingStatus === 'seated' || existingStatus === 'cancelled') {
+    return c.json({ success: false, error: `Cannot modify a ${existingStatus} waitlist entry` }, 409);
+  }
+  const effectiveTenant =
+    tenantId === '*'
+      ? (String(existing.tenant_id ?? '').trim() || 'default')
+      : tenantId;
+  const now = new Date().toISOString();
+  const sets: string[] = ['updated_at = ?'];
+  const params: unknown[] = [now];
+  if (parsed.data.status !== undefined) {
+    sets.push('status = ?');
+    params.push(parsed.data.status);
+    if (parsed.data.status === 'notified') {
+      sets.push('notified_at = ?');
+      params.push(now);
+    } else if (parsed.data.status === 'seated') {
+      sets.push('seated_at = ?');
+      params.push(now);
+    }
+  }
+  if (parsed.data.party_size !== undefined) {
+    sets.push('party_size = ?');
+    params.push(parsed.data.party_size);
+  }
+  if (parsed.data.zone !== undefined) {
+    sets.push('zone = ?');
+    params.push(parsed.data.zone);
+  }
+  if (parsed.data.notes !== undefined) {
+    sets.push('notes = ?');
+    params.push(parsed.data.notes);
+  }
+  try {
+    await db
+      .prepare(`UPDATE waitlist SET ${sets.join(', ')} WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?`)
+      .bind(...params, id, effectiveTenant)
+      .run();
+  } catch (err) {
+    if (effectiveTenant !== 'default' || !isNoSuchColumnError(err)) throw err;
+    await db.prepare(`UPDATE waitlist SET ${sets.join(', ')} WHERE id = ?`).bind(...params, id).run();
+  }
+  let updated: Record<string, unknown> | null = null;
+  try {
+    updated = await db
+      .prepare("SELECT * FROM waitlist WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?")
+      .bind(id, effectiveTenant)
+      .first<Record<string, unknown>>();
+  } catch (err) {
+    if (effectiveTenant === 'default' && isNoSuchColumnError(err)) {
+      updated = await db.prepare('SELECT * FROM waitlist WHERE id = ?').bind(id).first<Record<string, unknown>>();
+    }
+  }
+  return c.json({ success: true, data: updated });
+});
+
+waitlistRouter.delete('/:id', optionalAuth() as never, requireReservationStaff() as never, async (c) => {
+  const db = c.env.AURA_DB;
+  const tenantId = resolveRequestTenantId(c);
+  const id = c.req.param('id');
+  let existing: Record<string, unknown> | null = null;
+  if (tenantId !== '*') {
+    try {
+      existing = await db
+        .prepare("SELECT * FROM waitlist WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?")
+        .bind(id, tenantId)
+        .first<Record<string, unknown>>();
+    } catch (err) {
+      if (tenantId === 'default' && isNoSuchColumnError(err)) {
+        existing = await db
+          .prepare('SELECT * FROM waitlist WHERE id = ?')
+          .bind(id)
+          .first<Record<string, unknown>>()
+          .catch(() => null);
+      }
+    }
+  } else {
+    existing = await db
+      .prepare('SELECT * FROM waitlist WHERE id = ?')
+      .bind(id)
+      .first<Record<string, unknown>>()
+      .catch(() => null);
+  }
+  if (!existing || !matchesTenantRow(existing, tenantId)) {
+    return c.json({ success: false, error: 'Waitlist entry not found' }, 404);
+  }
+  const existingStatus = String(existing.status ?? '').trim().toLowerCase();
+  if (existingStatus === 'seated' || existingStatus === 'cancelled') {
+    return c.json({ success: false, error: `Cannot delete a ${existingStatus} waitlist entry` }, 409);
+  }
+  const effectiveTenant =
+    tenantId === '*'
+      ? (String(existing.tenant_id ?? '').trim() || 'default')
+      : tenantId;
+  try {
+    await db
+      .prepare("DELETE FROM waitlist WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?")
+      .bind(id, effectiveTenant)
+      .run();
+  } catch (err) {
+    if (effectiveTenant !== 'default' || !isNoSuchColumnError(err)) throw err;
+    await db.prepare('DELETE FROM waitlist WHERE id = ?').bind(id).run();
+  }
+  return c.json({ success: true, message: 'Waitlist entry deleted' });
 });

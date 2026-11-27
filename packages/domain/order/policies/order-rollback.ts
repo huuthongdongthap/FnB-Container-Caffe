@@ -447,6 +447,17 @@ export async function compensateVoidedOrder(params: CompensateVoidedOrderParams)
             .catch(() => null);
           updatedChanges = upd ? Number(upd?.meta?.changes ?? (upd as unknown as { changes?: number })?.changes ?? 1) : 0;
         }
+        if (updatedChanges > 0 && unrefunded > 0) {
+          await db
+            .prepare(
+              `INSERT OR IGNORE INTO payment_refund_transfers
+               (tenant_id, manual_transfer_ref, payment_id, amount, reason, actor_id, created_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?)`,
+            )
+            .bind(effectiveTenant, `void_cash:${pay.id}`, pay.id, unrefunded, reason, actorId || 'system', now)
+            .run()
+            .catch(() => {});
+        }
         if (updatedChanges > 0) {
           cashRefunded = true;
           await adjustShiftCustodyForCashRefund(db, {
@@ -796,19 +807,12 @@ export async function compensateVoidedOrder(params: CompensateVoidedOrderParams)
                         .catch(() => {}),
                     );
                 }
-              }
-            });
-          await db
-            .prepare(
-              "UPDATE customers SET cashback_balance = COALESCE(cashback_balance, 0) + ? WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?",
-            )
-            .bind(refundAmount, refundCustomerId, effectiveTenant)
-            .run()
-            .catch(() => {
-              if (effectiveTenant === 'default') {
-                return db
-                  .prepare('UPDATE customers SET cashback_balance = COALESCE(cashback_balance, 0) + ? WHERE id = ?')
-                  .bind(refundAmount, refundCustomerId)
+                // Fallback for schemas storing cashback directly on customers.cashback_balance
+                await db
+                  .prepare(
+                    "UPDATE customers SET cashback_balance = COALESCE(cashback_balance, 0) + ? WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?",
+                  )
+                  .bind(refundAmount, refundCustomerId, effectiveTenant)
                   .run()
                   .catch(() => {});
               }

@@ -16,6 +16,8 @@ import { canAccessOrder, verifyGuestOrderToken } from '@aura/domain-order';
 export { handleGetOrderSummary };
 
 const STAFF_ROLES = ['owner', 'manager', 'supervisor', 'staff', 'admin', 'waiter', 'kitchen', 'barista', 'chef', 'cashier', 'shipper', 'rider'];
+const KITCHEN_ROLES = new Set(['kitchen', 'barista', 'chef', 'bep']);
+const SHIPPER_ROLES = new Set(['shipper', 'rider']);
 const ALLOWED_SORT_COLUMNS: Record<string, string> = {
   created_at: 'o.created_at',
   total_amount: 'COALESCE(o.total_amount, o.total)',
@@ -24,16 +26,32 @@ const ALLOWED_SORT_COLUMNS: Record<string, string> = {
   total: 'COALESCE(o.total_amount, o.total)',
 };
 
-function resolveCustomerScope(c: Context<{ Bindings: Env }>): { allowAll: boolean; owner: string | null } {
-  const user = c.get('user') as Record<string, any> | undefined;
-  if (user && STAFF_ROLES.includes(user.role)) {
-    return { allowAll: true, owner: null };
+interface ActorReadScope {
+  allowAll: boolean;
+  owner: string | null;
+  isKitchen: boolean;
+  isShipper: boolean;
+  actorId: string | null;
+}
+
+function resolveCustomerScope(c: Context<{ Bindings: Env }>): ActorReadScope {
+  const user = c.get('user') as unknown as Record<string, unknown> | undefined;
+  const role = typeof user?.role === 'string' ? user.role.toLowerCase() : '';
+  const actorId = typeof user?.id === 'string' && user.id.trim() ? user.id.trim() : null;
+  if (user && STAFF_ROLES.includes(role)) {
+    return {
+      allowAll: true,
+      owner: null,
+      isKitchen: KITCHEN_ROLES.has(role),
+      isShipper: SHIPPER_ROLES.has(role),
+      actorId,
+    };
   }
   const owner =
-    user?.role === 'customer'
-      ? String(user.id ?? user.customerId ?? user.customer_id ?? '').trim() || null
+    role === 'customer'
+      ? String(user?.id ?? user?.customerId ?? user?.customer_id ?? '').trim() || null
       : null;
-  return { allowAll: false, owner };
+  return { allowAll: false, owner, isKitchen: false, isShipper: false, actorId };
 }
 
 async function resolveCustomerOwnerIds(
@@ -82,15 +100,39 @@ async function resolveCustomerOwnerIds(
   return Array.from(ids);
 }
 
-function projectForActor(
-  scope: { allowAll: boolean },
-  order: any,
-  items: any[],
-  full: (_o: any, _i: any[], _p: any[]) => any,
-  guest: (_o: any, _i: any[]) => any,
-  payments: any[],
-): any {
-  return scope.allowAll ? full(order, items, payments) : guest(order, items);
+function redactOrderPii<T extends Record<string, unknown>>(formatted: T): T {
+  const copy = { ...formatted } as Record<string, unknown>;
+  if ('customerPhone' in copy) copy.customerPhone = null;
+  if ('customerEmail' in copy) copy.customerEmail = null;
+  if ('customerAddress' in copy) copy.customerAddress = null;
+  if ('customer_phone' in copy) copy.customer_phone = null;
+  if ('customer_email' in copy) copy.customer_email = null;
+  if ('customer_address' in copy) copy.customer_address = null;
+  return copy as T;
+}
+
+function projectForActor<TOrder extends Record<string, unknown>, TItem, TPayment>(
+  scope: ActorReadScope,
+  order: TOrder,
+  items: TItem[],
+  full: (_o: TOrder, _i: TItem[], _p: TPayment[]) => Record<string, unknown>,
+  guest: (_o: TOrder, _i: TItem[]) => Record<string, unknown>,
+  payments: TPayment[],
+): Record<string, unknown> {
+  if (!scope.allowAll) {
+    return guest(order, items);
+  }
+  const formatted = full(order, items, payments);
+  if (scope.isKitchen) {
+    return redactOrderPii(formatted);
+  }
+  if (scope.isShipper) {
+    const assignedShipperId = String(order.assigned_shipper_id ?? order.shipper_id ?? '').trim();
+    if (!scope.actorId || assignedShipperId !== scope.actorId) {
+      return redactOrderPii(formatted);
+    }
+  }
+  return formatted;
 }
 
 /**
@@ -105,13 +147,14 @@ export async function fetchOrderForRead(
   id: string,
   tenantId: string,
 ): Promise<Record<string, any> | null> {
+  const cleanId = id.trim().replace(/^#/, '');
   const rawTenant = (tenantId || '').trim() || 'default';
   const cleanTenant = rawTenant.toLowerCase() === 'hq' ? '*' : rawTenant;
   const scoped = cleanTenant !== '*';
   const joinTenantClause = !scoped
     ? ''
     : cleanTenant === 'default'
-      ? " AND (o.tenant_id = ? OR o.tenant_id IS NULL OR o.tenant_id = '' OR TRIM(o.tenant_id) = '')"
+      ? " AND (o.tenant_id = ?2 OR o.tenant_id IS NULL OR o.tenant_id = '' OR TRIM(o.tenant_id) = '')"
       : ' AND (o.tenant_id = ?2 OR TRIM(o.tenant_id) = ?2)';
   const tableJoinTenantClause = !scoped
     ? " AND COALESCE(NULLIF(TRIM(t.tenant_id), ''), 'default') = COALESCE(NULLIF(TRIM(o.tenant_id), ''), 'default')"
@@ -121,21 +164,26 @@ export async function fetchOrderForRead(
   const bareTenantClause = !scoped
     ? ''
     : cleanTenant === 'default'
-      ? " AND (tenant_id = ? OR tenant_id IS NULL OR tenant_id = '' OR TRIM(tenant_id) = '')"
+      ? " AND (tenant_id = ?2 OR tenant_id IS NULL OR tenant_id = '' OR TRIM(tenant_id) = '')"
       : ' AND (tenant_id = ?2 OR TRIM(tenant_id) = ?2)';
-  const idPlaceholder = scoped && cleanTenant !== 'default' ? '?1' : '?';
+  const bindArgs = scoped ? [cleanId, cleanTenant] : [cleanId];
   try {
     return (await db.prepare(
-      `SELECT o.*, COALESCE(t.table_number, t.id) as table_name FROM orders o LEFT JOIN cafe_tables t ON o.table_id = t.id${tableJoinTenantClause} WHERE o.id = ${idPlaceholder}${joinTenantClause}`
-    ).bind(...(scoped ? [id, cleanTenant] : [id])).first()) as Record<string, any> | null;
+      `SELECT o.*, COALESCE(t.table_number, t.id) as table_name FROM orders o LEFT JOIN cafe_tables t ON o.table_id = t.id${tableJoinTenantClause} WHERE (o.id = ?1 OR UPPER(o.order_number) = UPPER(?1))${joinTenantClause}`
+    ).bind(...bindArgs).first()) as Record<string, unknown> | null;
   } catch {
     try {
       return (await db.prepare(
-        `SELECT o.*, COALESCE(t.table_number, t.id) as table_name FROM orders o LEFT JOIN cafe_tables t ON o.table_id = t.id WHERE o.id = ${idPlaceholder}${joinTenantClause}`
-      ).bind(...(scoped ? [id, cleanTenant] : [id])).first()) as Record<string, any> | null;
+        `SELECT o.*, COALESCE(t.table_number, t.id) as table_name FROM orders o LEFT JOIN cafe_tables t ON o.table_id = t.id WHERE (o.id = ?1 OR UPPER(o.order_number) = UPPER(?1))${joinTenantClause}`
+      ).bind(...bindArgs).first()) as Record<string, unknown> | null;
     } catch {
-      return (await db.prepare(`SELECT * FROM orders WHERE id = ${idPlaceholder}${bareTenantClause}`)
-        .bind(...(scoped ? [id, cleanTenant] : [id])).first()) as Record<string, any> | null;
+      try {
+        return (await db.prepare(`SELECT * FROM orders WHERE (id = ?1 OR UPPER(order_number) = UPPER(?1))${bareTenantClause}`)
+          .bind(...bindArgs).first()) as Record<string, unknown> | null;
+      } catch {
+        return (await db.prepare(`SELECT * FROM orders WHERE id = ?1${bareTenantClause}`)
+          .bind(...bindArgs).first()) as Record<string, unknown> | null;
+      }
     }
   }
 }
@@ -174,7 +222,13 @@ export async function handleListOrders(c: Context<{ Bindings: Env }>) {
     params.push(tenantId);
   }
 
+  const baseWhereBeforeShipper = whereClause;
+  const baseParamsBeforeShipper = [...params];
   if (scope.allowAll) {
+    if (scope.isShipper) {
+      whereClause += " AND o.order_type = 'delivery' AND (o.assigned_shipper_id IS NULL OR o.assigned_shipper_id = ?)";
+      params.push(scope.actorId || '');
+    }
     if (customerId) { whereClause += ' AND o.customer_id = ?'; params.push(customerId); }
   } else if (scope.owner) {
     const ownerIds = await resolveCustomerOwnerIds(db, c.get('user') as Record<string, any> | undefined, tenantId);
@@ -200,7 +254,42 @@ export async function handleListOrders(c: Context<{ Bindings: Env }>) {
   if (dateFrom) { whereClause += " AND date(o.created_at, '+7 hours') >= ?"; params.push(dateFrom === 'today' ? vnToday : dateFrom); }
   if (dateTo) { whereClause += " AND date(o.created_at, '+7 hours') <= ?"; params.push(dateTo === 'today' ? vnToday : dateTo); }
 
-  const countResult = (await db.prepare(`SELECT COUNT(*) as total FROM orders o ${whereClause}`).bind(...params).first()) as { total?: number } | null;
+  let countResult: { total?: number } | null = null;
+  try {
+    countResult = (await db.prepare(`SELECT COUNT(*) as total FROM orders o ${whereClause}`).bind(...params).first()) as { total?: number } | null;
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    if (scope.isShipper && /no such column/i.test(msg)) {
+      whereClause = baseWhereBeforeShipper;
+      params.length = 0;
+      params.push(...baseParamsBeforeShipper);
+      whereClause += " AND o.order_type = 'delivery' AND (o.shipper_id IS NULL OR o.shipper_id = ?)";
+      params.push(scope.actorId || '');
+      if (customerId) { whereClause += ' AND o.customer_id = ?'; params.push(customerId); }
+      if (tableId) { whereClause += ' AND o.table_id = ?'; params.push(tableId); }
+      if (locationId) { whereClause += ' AND o.location_id = ?'; params.push(locationId); }
+      if (status) { whereClause += ' AND o.status = ?'; params.push(status); }
+      if (paymentStatus) { whereClause += ' AND o.payment_status = ?'; params.push(paymentStatus); }
+      if (date) { whereClause += " AND date(o.created_at, '+7 hours') = ?"; params.push(date === 'today' ? vnToday : date); }
+      if (dateFrom) { whereClause += " AND date(o.created_at, '+7 hours') >= ?"; params.push(dateFrom === 'today' ? vnToday : dateFrom); }
+      if (dateTo) { whereClause += " AND date(o.created_at, '+7 hours') <= ?"; params.push(dateTo === 'today' ? vnToday : dateTo); }
+      try {
+        countResult = (await db.prepare(`SELECT COUNT(*) as total FROM orders o ${whereClause}`).bind(...params).first()) as { total?: number } | null;
+      } catch (legacyErr) {
+        const legacyMsg = legacyErr instanceof Error ? legacyErr.message : String(legacyErr);
+        if (/no such column/i.test(legacyMsg)) {
+          whereClause = `${baseWhereBeforeShipper} AND 1=0`;
+          params.length = 0;
+          params.push(...baseParamsBeforeShipper);
+          countResult = { total: 0 };
+        } else {
+          throw legacyErr;
+        }
+      }
+    } else {
+      throw err;
+    }
+  }
   const total = Number(countResult?.total || 0);
   const offset = (pageNum - 1) * limitNum;
   const safeSort = ALLOWED_SORT_COLUMNS[sort] || 'o.created_at';
@@ -290,7 +379,14 @@ export async function handleGetOrderById(c: Context<{ Bindings: Env }>) {
   }
 
   const scope = resolveCustomerScope(c);
-  const { items, payments } = await fetchOrderItemsAndPayments(db, id, effectiveOrderTenant);
+  if (scope.isShipper) {
+    const orderType = String(order.order_type || '').toLowerCase();
+    const assignedShipperId = String(order.assigned_shipper_id ?? order.shipper_id ?? '').trim();
+    if (orderType !== 'delivery' || (assignedShipperId && assignedShipperId !== scope.actorId)) {
+      return c.json({ success: false, error: 'Forbidden: order is not assigned to this shipper' }, 403);
+    }
+  }
+  const { items, payments } = await fetchOrderItemsAndPayments(db, String(order.id), effectiveOrderTenant);
   return c.json({
     success: true,
     data: projectForActor(scope, order, items, formatOrder, formatCustomerOrder, payments),
@@ -351,7 +447,7 @@ export async function handleTrackOrder(c: Context<{ Bindings: Env }>) {
     return c.json({ success: false, error: access.reason || (status === 401 ? 'Unauthorized' : 'Forbidden') }, status);
   }
 
-  const { items } = await fetchOrderItemsAndPayments(db, id, effectiveOrderTenant);
+  const { items } = await fetchOrderItemsAndPayments(db, String(order.id), effectiveOrderTenant);
   return c.json({ success: true, data: formatCustomerOrder(order, items) });
 }
 

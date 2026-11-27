@@ -7,7 +7,7 @@ import { orderCreationFixture } from './order-creation-fixture';
 import { payosCheckoutResponse } from '../helpers/payment-sqlite-db';
 
 const fixtures: ReturnType<typeof orderCreationFixture>[] = [];
-const fixture = () => { const value = orderCreationFixture(); value.sqlite.prepare('INSERT INTO users(id,name,role,tenant_id) VALUES (?,?,?,?)').run('staff-a','Waiter','waiter','cafe-a'); fixtures.push(value); return value; };
+const fixture = () => { const value = orderCreationFixture(); value.sqlite.prepare('INSERT INTO users(id,name,role,tenant_id) VALUES (?,?,?,?)').run('staff-a','Waiter','waiter','cafe-a'); value.sqlite.prepare('INSERT INTO users(id,name,role,tenant_id) VALUES (?,?,?,?)').run('staff-default','Default Waiter','waiter','default'); fixtures.push(value); return value; };
 afterEach(() => { vi.restoreAllMocks(); for (const { sqlite } of fixtures.splice(0)) sqlite.close(); });
 const entryFor = (productId = 'coffee') => ({
   customer_name: 'Split guest', customer_phone: '0900000010', total: 1000,
@@ -15,9 +15,9 @@ const entryFor = (productId = 'coffee') => ({
 });
 const entry = entryFor('coffee-a');
 const guestEntry = entryFor('coffee');
-const auth = () => {
+const auth = (tenantId = 'cafe-a', userId = 'staff-a') => {
   const issuedAt = Math.floor(Date.now() / 1000);
-  return generateJWT({ id: 'staff-a', role: 'waiter', tenantId: 'cafe-a', ...staffSessionClaims({ authTime: issuedAt }) }, 'test-jwt-secret-at-least-16-chars', 28800, issuedAt);
+  return generateJWT({ id: userId, role: 'waiter', tenantId, ...staffSessionClaims({ authTime: issuedAt }) }, 'test-jwt-secret-at-least-16-chars', 28800, issuedAt);
 };
 function split(env: any, table_id: string, orders: unknown[], token?: string) {
   return app.fetch(new Request('https://test.aura/api/orders/split?tenant_id=cafe-b', {
@@ -48,7 +48,7 @@ describe('Split bill server financial and tenant boundaries', () => {
     const { env, sqlite } = fixture();
     vi.spyOn(globalThis, 'fetch').mockImplementation(async (_url, init) =>
       payosCheckoutResponse(JSON.parse(String(init?.body)), env.PAYOS_CHECKSUM_KEY, 'split-link'));
-    const response = await split(env, 'D1', [{ ...guestEntry, payment_method: 'payos' }, guestEntry]);
+    const response = await split(env, 'D1', [{ ...guestEntry, payment_method: 'payos' }, guestEntry], await auth('default', 'staff-default'));
     expect(response.status).toBe(201);
     const { data } = await response.json() as any;
     const link = await app.fetch(new Request('https://test.aura/api/payment/create-link', {
@@ -65,14 +65,20 @@ describe('Split bill server financial and tenant boundaries', () => {
   });
 
   it('confines guest tables to default and staff tables to their signed store', async () => {
-    for (const [table, token] of [['table-b', undefined], ['table-b', await auth()]] as const) {
+    {
       const { env, sqlite } = fixture();
-      expect((await split(env, table, [entry, entry], token)).status).toBe(400);
+      expect((await split(env, 'table-b', [entry, entry], undefined)).status).toBe(401);
       expect(sqlite.prepare('SELECT COUNT(*) AS count FROM orders').get()).toMatchObject({ count: 0 });
-      expect(sqlite.prepare('SELECT status FROM cafe_tables WHERE id=?').get(table)).toMatchObject({ status: 'Available' });
+      expect(sqlite.prepare('SELECT status FROM cafe_tables WHERE id=?').get('table-b')).toMatchObject({ status: 'Available' });
+    }
+    {
+      const { env, sqlite } = fixture();
+      expect((await split(env, 'table-b', [entry, entry], await auth())).status).toBe(400);
+      expect(sqlite.prepare('SELECT COUNT(*) AS count FROM orders').get()).toMatchObject({ count: 0 });
+      expect(sqlite.prepare('SELECT status FROM cafe_tables WHERE id=?').get('table-b')).toMatchObject({ status: 'Available' });
     }
     const { env, sqlite } = fixture();
-    expect((await split(env, 'D1', [guestEntry, guestEntry])).status).toBe(201);
+    expect((await split(env, 'D1', [guestEntry, guestEntry], await auth('default', 'staff-default'))).status).toBe(201);
     expect(sqlite.prepare('SELECT DISTINCT tenant_id FROM orders').all()).toEqual([{ tenant_id: 'default' }]);
   });
 

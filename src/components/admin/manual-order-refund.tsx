@@ -134,7 +134,8 @@ function RefundSession({ order, onRecorded }: { order: AdminOrder; onRecorded: (
   const canManageRefund = Boolean(role && ['owner', 'manager', 'admin', 'super_admin'].includes(role));
   const normalizedMethod = String(payment.payment_method ?? '').trim().toLowerCase();
   const isCashOrCod = normalizedMethod === 'cod' || normalizedMethod === 'cash';
-  const isSupportedMethod = normalizedMethod === 'payos' || isCashOrCod;
+  const isManualBankTransfer = ['bank_transfer', 'qr', 'vietqr'].includes(normalizedMethod);
+  const isSupportedMethod = normalizedMethod === 'payos' || isCashOrCod || isManualBankTransfer;
 
   const isFullyRefunded = Boolean(payment.payment_id) && isSupportedMethod
     && (payment.refund_status === 'completed' || payment.refund_status === 'refunded' || payment.payment_status === 'refunded');
@@ -152,6 +153,7 @@ function RefundSession({ order, onRecorded }: { order: AdminOrder; onRecorded: (
 
   const hasTransactionIdField = payment.payment_transaction_id !== undefined;
   const hasValidPayosTransactionId = isCashOrCod
+    || isManualBankTransfer
     || !hasTransactionIdField
     || (typeof payment.payment_transaction_id === 'string' && /^\d+$/.test(payment.payment_transaction_id.trim()));
 

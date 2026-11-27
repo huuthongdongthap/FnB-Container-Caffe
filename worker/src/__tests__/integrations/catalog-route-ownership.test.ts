@@ -22,7 +22,7 @@ const TEST_PROD_ID = 'prod-456';
  * file. The role must match the token's role claim, otherwise the gate
  * revokes the session on the ("Quyền đã thay đổi") authority change path.
  */
-const STAFF_ROW = { ...STAFF_ACCOUNT_ROW, id: 'staff-1', role: 'staff' };
+const STAFF_ROW = { ...STAFF_ACCOUNT_ROW, id: 'mgr-1', role: 'manager' };
 
 function createOwnershipTestEnv(initialState: {
   categories?: Map<string, any>;
@@ -143,7 +143,7 @@ describe('Consolidated Catalog Route Ownership & Precedence', () => {
       ['cat-2', { id: 'cat-2', name: 'Trà', slug: 'tra', sort_order: 2 }],
     ]);
     const env = createOwnershipTestEnv({ categories: cats });
-    const token = await generateJWT({ id: 'staff-1', role: 'staff', name: 'Barista' , authVersion: 1, authTime: Math.floor(Date.now() / 1000), sessionType: 'staff-web'}, TEST_SECRET, 3600);
+    const token = await generateJWT({ id: 'mgr-1', role: 'manager', name: 'Manager' , authVersion: 1, authTime: Math.floor(Date.now() / 1000), sessionType: 'staff-web'}, TEST_SECRET, 3600);
 
     // 1. GET /api/categories/tree -> must NOT hit /:id with id="tree" (which would 404)
     const treeRes = await app.fetch(new Request('https://test.aura/api/categories/tree'), env);
@@ -193,7 +193,7 @@ describe('Consolidated Catalog Route Ownership & Precedence', () => {
     const cats = new Map<string, any>([[TEST_CAT_ID, { id: TEST_CAT_ID, name: 'Cà phê' }]]);
     const prods = new Map<string, any>([[TEST_PROD_ID, { id: TEST_PROD_ID, category_id: TEST_CAT_ID, name: 'Espresso' }]]);
     const env = createOwnershipTestEnv({ categories: cats, products: prods });
-    const token = await generateJWT({ id: 'staff-1', role: 'staff', name: 'Barista' , authVersion: 1, authTime: Math.floor(Date.now() / 1000), sessionType: 'staff-web'}, TEST_SECRET, 3600);
+    const token = await generateJWT({ id: 'mgr-1', role: 'manager', name: 'Manager' , authVersion: 1, authTime: Math.floor(Date.now() / 1000), sessionType: 'staff-web'}, TEST_SECRET, 3600);
 
     const delRes = await app.fetch(
       new Request(`https://test.aura/api/categories/${TEST_CAT_ID}`, {
@@ -212,7 +212,7 @@ describe('Consolidated Catalog Route Ownership & Precedence', () => {
   it('supports PATCH and PUT for category updates', async () => {
     const cats = new Map<string, any>([[TEST_CAT_ID, { id: TEST_CAT_ID, name: 'Old Name', slug: 'old-name' }]]);
     const env = createOwnershipTestEnv({ categories: cats });
-    const token = await generateJWT({ id: 'staff-1', role: 'staff', name: 'Barista' , authVersion: 1, authTime: Math.floor(Date.now() / 1000), sessionType: 'staff-web'}, TEST_SECRET, 3600);
+    const token = await generateJWT({ id: 'mgr-1', role: 'manager', name: 'Manager' , authVersion: 1, authTime: Math.floor(Date.now() / 1000), sessionType: 'staff-web'}, TEST_SECRET, 3600);
 
     // PATCH update
     const patchRes = await app.fetch(

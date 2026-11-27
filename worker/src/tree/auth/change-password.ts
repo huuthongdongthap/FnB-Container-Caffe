@@ -81,15 +81,53 @@ export async function changePassword(request: Request, env: Record<string, unkno
       user.auth_version = nextVersion;
       if (payload.email) await authKV.put(`user:${payload.email}`, JSON.stringify(user)).catch(() => {});
     } else {
+      const customerTenant = String(
+        (payload as { tenantId?: string; tenant_id?: string }).tenantId ||
+          (payload as { tenant_id?: string }).tenant_id ||
+          (user as { tenant_id?: string; tenantId?: string }).tenant_id ||
+          (user as { tenantId?: string }).tenantId ||
+          (typeof env.PILOT_TENANT_ID === 'string' && env.PILOT_TENANT_ID.trim() && env.PILOT_TENANT_ID.trim() !== '*'
+            ? env.PILOT_TENANT_ID.trim()
+            : '') ||
+          'default'
+      ).trim() || 'default';
       if (env.AURA_DB) {
         const db = env.AURA_DB as import('@cloudflare/workers-types').D1Database;
         const dbRow = (await db
-          .prepare('SELECT auth_version FROM users WHERE id = ? OR email = ?')
-          .bind(custId || null, payload.email || null)
+          .prepare(
+            "SELECT auth_version FROM users WHERE (id = ? OR email = ?) AND COALESCE(NULLIF(TRIM(role), ''), 'customer') = 'customer' AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
+          )
+          .bind(custId || null, payload.email || null, customerTenant)
           .first<{ auth_version?: number }>()
-          .catch(() => null));
+          .catch(() =>
+            customerTenant === 'default'
+              ? db
+                  .prepare("SELECT auth_version FROM users WHERE (id = ? OR email = ?) AND COALESCE(NULLIF(TRIM(role), ''), 'customer') = 'customer'")
+                  .bind(custId || null, payload.email || null)
+                  .first<{ auth_version?: number }>()
+                  .catch(() => null)
+              : null
+          ));
         if (dbRow && Number.isFinite(Number(dbRow.auth_version))) {
           nextVersion = Math.max(nextVersion, Number(dbRow.auth_version) + 1);
+        }
+        const custDbRow = (await db
+          .prepare(
+            "SELECT auth_version FROM customers WHERE (id = ? OR email = ?) AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
+          )
+          .bind(custId || null, payload.email || null, customerTenant)
+          .first<{ auth_version?: number }>()
+          .catch(() =>
+            customerTenant === 'default'
+              ? db
+                  .prepare('SELECT auth_version FROM customers WHERE id = ? OR email = ?')
+                  .bind(custId || null, payload.email || null)
+                  .first<{ auth_version?: number }>()
+                  .catch(() => null)
+              : null
+          ));
+        if (custDbRow && Number.isFinite(Number(custDbRow.auth_version))) {
+          nextVersion = Math.max(nextVersion, Number(custDbRow.auth_version) + 1);
         }
       }
       try {
@@ -128,16 +166,6 @@ export async function changePassword(request: Request, env: Record<string, unkno
       }
       if (env.AURA_DB) {
         const db = env.AURA_DB as import('@cloudflare/workers-types').D1Database;
-        const customerTenant = String(
-          (payload as { tenantId?: string; tenant_id?: string }).tenantId ||
-            (payload as { tenant_id?: string }).tenant_id ||
-            (user as { tenant_id?: string; tenantId?: string }).tenant_id ||
-            (user as { tenantId?: string }).tenantId ||
-            (typeof env.PILOT_TENANT_ID === 'string' && env.PILOT_TENANT_ID.trim() && env.PILOT_TENANT_ID.trim() !== '*'
-              ? env.PILOT_TENANT_ID.trim()
-              : '') ||
-            'default'
-        ).trim() || 'default';
         await db
           .prepare(
             "UPDATE users SET password_hash = ?, auth_version = MAX(COALESCE(auth_version, 1) + 1, ?), updated_at = datetime('now') WHERE (id = ? OR email = ?) AND COALESCE(NULLIF(TRIM(role), ''), 'customer') = 'customer' AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
@@ -147,7 +175,22 @@ export async function changePassword(request: Request, env: Record<string, unkno
           .catch(async () => {
             if (customerTenant === 'default') {
               await db
-                .prepare("UPDATE users SET password_hash = ?, auth_version = COALESCE(auth_version, 1) + 1, updated_at = datetime('now') WHERE id = ? OR email = ?")
+                .prepare("UPDATE users SET password_hash = ?, auth_version = COALESCE(auth_version, 1) + 1, updated_at = datetime('now') WHERE (id = ? OR email = ?) AND COALESCE(NULLIF(TRIM(role), ''), 'customer') = 'customer'")
+                .bind(user.password, custId || null, payload.email || null)
+                .run()
+                .catch(() => {});
+            }
+          });
+        await db
+          .prepare(
+            "UPDATE customers SET password_hash = ?, auth_version = MAX(COALESCE(auth_version, 1) + 1, ?), updated_at = datetime('now') WHERE (id = ? OR email = ?) AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
+          )
+          .bind(user.password, nextVersion, custId || null, payload.email || null, customerTenant)
+          .run()
+          .catch(async () => {
+            if (customerTenant === 'default') {
+              await db
+                .prepare("UPDATE customers SET password_hash = ?, auth_version = COALESCE(auth_version, 1) + 1, updated_at = datetime('now') WHERE id = ? OR email = ?")
                 .bind(user.password, custId || null, payload.email || null)
                 .run()
                 .catch(() => {});

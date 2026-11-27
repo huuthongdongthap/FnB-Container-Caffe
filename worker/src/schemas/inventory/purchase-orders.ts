@@ -10,13 +10,24 @@ import {
 } from '../common';
 import { IdParamsSchema } from './common';
 
+export const PurchaseOrderStatusEnum = z.enum([
+  'draft',
+  'pending',
+  'ordered',
+  'approved',
+  'partial',
+  'partially_received',
+  'received',
+  'cancelled',
+]);
+
 export const PurchaseOrderSchema = z.object({
   id: z.string().min(1),
   orderNumber: z.string().openapi({ example: 'PO-20260826-001' }),
   supplierId: z.string().min(1),
   supplier: ReferenceSchema.nullable().optional(),
   locationId: z.string().min(1),
-  status: z.enum(['draft', 'ordered', 'partial', 'received', 'cancelled']).default('draft'),
+  status: PurchaseOrderStatusEnum.default('draft'),
   items: z.array(z.object({
     ingredientId: z.string().min(1),
     ingredientName: z.string(),
@@ -47,7 +58,7 @@ export const PurchaseOrderCreateSchema = z.object({
 }).openapi('PurchaseOrderCreate');
 
 export const PurchaseOrderUpdateSchema = z.object({
-  status: z.enum(['draft', 'ordered', 'partial', 'received', 'cancelled']).optional(),
+  status: PurchaseOrderStatusEnum.optional(),
   expectedDate: z.string().date().optional(),
   notes: z.string().max(1000).optional(),
 }).openapi('PurchaseOrderUpdate');
@@ -72,7 +83,7 @@ export const purchaseOrderRoutes = {
     request: {
       query: PaginationQuerySchema.extend({
         supplierId: z.string().min(1).optional(),
-        status: z.enum(['draft', 'ordered', 'partial', 'received', 'cancelled']).optional(),
+        status: PurchaseOrderStatusEnum.optional(),
         dateFrom: z.string().date().optional(),
         dateTo: z.string().date().optional(),
       }),

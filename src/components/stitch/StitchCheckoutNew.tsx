@@ -149,6 +149,7 @@ export function StitchCheckoutNew({
   const [loyalty, setLoyalty] = useState<LoyaltyLookupResult | null>(null);
   const [isLookingUp, setIsLookingUp] = useState(false);
   const [useCashback, setUseCashback] = useState(false);
+  const [useLoyaltyPoints, setUseLoyaltyPoints] = useState(false);
   const initialQueryPromo = typeof window !== 'undefined'
     ? (new URLSearchParams(window.location.search).get('promo') || '').trim().toUpperCase()
     : '';
@@ -283,13 +284,27 @@ export function StitchCheckoutNew({
       ? Math.max(0, payableBeforeCashback - 1000)
       : rawMaxCashback;
   const appliedCashbackAmount = useCashback ? maxUsableCashback : 0;
-  const effectiveTotal = Math.max(0, payableBeforeCashback - appliedCashbackAmount);
+  const remainingAfterCashback = Math.max(0, payableBeforeCashback - appliedCashbackAmount);
+  // Backend caps loyalty points redemption at 50% of subtotal and remaining subtotal payable (100 VND/point).
+  const remainingSubtotalPayable = Math.max(0, summary.subtotal - effectiveDiscount);
+  const maxSubtotalRedeemVnd = Math.floor(summary.subtotal * 0.5);
+  const maxPointsByOrder = Math.floor(
+    Math.min(remainingAfterCashback, remainingSubtotalPayable, maxSubtotalRedeemVnd) / 100,
+  );
+  const maxRedeemablePoints = loyalty && loyalty.loyalty_points > 0
+    ? Math.max(0, Math.min(Math.floor(loyalty.loyalty_points), maxPointsByOrder))
+    : 0;
+  const appliedRedeemPoints = useLoyaltyPoints ? maxRedeemablePoints : 0;
+  const appliedPointsDiscount = appliedRedeemPoints * 100;
+  const effectiveTotal = Math.max(0, remainingAfterCashback - appliedPointsDiscount);
 
   const activeSummary: CheckoutNewSummary = {
     ...summary,
     deliveryFee: effectiveDeliveryFee,
     deliveryLabel: effectiveDeliveryLabel,
-    ...(effectiveDiscount + appliedCashbackAmount > 0 ? { discount: effectiveDiscount + appliedCashbackAmount } : {}),
+    ...(effectiveDiscount + appliedCashbackAmount + appliedPointsDiscount > 0
+      ? { discount: effectiveDiscount + appliedCashbackAmount + appliedPointsDiscount }
+      : {}),
     ...(effectivePromoCode ? { promoCode: effectivePromoCode } : {}),
     total: effectiveTotal,
   };
@@ -384,6 +399,7 @@ export function StitchCheckoutNew({
         orderType,
         ...(effectivePromoCode ? { promoCode: effectivePromoCode, discount: effectiveDiscount } : {}),
         ...(appliedCashbackAmount > 0 ? { useCashback: true, cashbackAmount: appliedCashbackAmount } : {}),
+        ...(appliedRedeemPoints > 0 ? { redeemPoints: appliedRedeemPoints } : {}),
       });
     } catch (err) {
       setSubmitError(
@@ -577,6 +593,27 @@ export function StitchCheckoutNew({
                             {appliedCashbackAmount > 0
                               ? ` (-${appliedCashbackAmount.toLocaleString('vi-VN')}₫)`
                               : ` (tối đa ${maxUsableCashback.toLocaleString('vi-VN')}₫)`}
+                          </span>
+                        </label>
+                      )}
+                      {loyalty.loyalty_points > 0 && (
+                        <label
+                          className="w-full mt-1 inline-flex items-center gap-2 text-xs text-[var(--aura-chrome-bright)] cursor-pointer select-none"
+                          data-testid="checkout-redeem-points-toggle"
+                        >
+                          <input
+                            type="checkbox"
+                            checked={useLoyaltyPoints}
+                            onChange={(e) => setUseLoyaltyPoints(e.target.checked)}
+                            className="rounded border-white/20 bg-white/10 accent-[#C69C6D]"
+                          />
+                          <span>
+                            Đổi Điểm Thưởng ({loyalty.loyalty_points.toLocaleString('vi-VN')} điểm)
+                            {appliedRedeemPoints > 0
+                              ? ` (-${appliedPointsDiscount.toLocaleString('vi-VN')}₫)`
+                              : maxRedeemablePoints > 0
+                                ? ` (tối đa -${(maxRedeemablePoints * 100).toLocaleString('vi-VN')}₫)`
+                                : ''}
                           </span>
                         </label>
                       )}

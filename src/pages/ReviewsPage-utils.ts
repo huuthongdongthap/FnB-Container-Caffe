@@ -16,13 +16,14 @@ export function formatDate(iso: string): string {
 
 export function reviewRecordToEntry(record: ReviewRecord): ReviewEntry {
   const name = record.customer_name || 'Guest';
+  const rawRecord = record as ReviewRecord & { content?: string; text?: string };
   return {
     id: record.id,
     author: name,
     avatarUrl: '',
     avatarAlt: '',
     rating: record.rating,
-    content: record.comment || '',
+    content: rawRecord.content || record.comment || rawRecord.text || '',
     liked: false,
     likeCount: 0,
     date: formatDate(record.created_at),

@@ -43,10 +43,16 @@ export default function TableCheckinPage() {
       return;
     }
 
+    const normalizedPhone = phone.replace(/[\s.-]/g, '');
+    if (!/^0\d{9,10}$/.test(normalizedPhone)) {
+      setError('Số điện thoại không hợp lệ. Vui lòng nhập 10 chữ số bắt đầu bằng 0 (VD: 0901234567).');
+      return;
+    }
+
     setLoading(true);
     try {
       const trimmedName = name.trim();
-      const trimmedPhone = phone.trim();
+      const trimmedPhone = normalizedPhone;
       try {
         localStorage.setItem(
           'aura_saved_customer',

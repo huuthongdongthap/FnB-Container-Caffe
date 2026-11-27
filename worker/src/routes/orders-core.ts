@@ -137,7 +137,23 @@ export const handleSyncOrders = async (c: import('hono').Context<{ Bindings: Env
   return res;
 };
 
-export const handleSplitOrders = (c: import('hono').Context<{ Bindings: Env }>) => splitOrders(c.req.raw, c.env);
+const SPLIT_ORDER_ROLES = ['owner', 'admin', 'manager', 'supervisor', 'staff', 'waiter', 'cashier'];
+
+export const handleSplitOrders = (c: import('hono').Context<{ Bindings: Env }>) => {
+  const user = c.get('user');
+  let ctx: { waitUntil?: (promise: Promise<unknown>) => void } | undefined;
+  try {
+    ctx = c.executionCtx;
+  } catch {
+    // No execution context in test environment
+  }
+  return splitOrders(
+    c.req.raw,
+    c.env,
+    ctx,
+    user ? { id: user.id, role: user.role, tenantId: user.tenantId } : undefined,
+  );
+};
 export const handleLatestOrderTimestamp = (c: import('hono').Context<{ Bindings: Env }>) => getLatestOrderTimestamp(c.req.raw, c.env);
 export const handleUpdateOrder = (c: import('hono').Context<{ Bindings: Env }>) => {
   const user = c.get('user');
@@ -147,6 +163,6 @@ export const handleUpdateOrder = (c: import('hono').Context<{ Bindings: Env }>) 
 
 ordersCoreRouter.post('/', orderRateLimit, handleCreateOrder);
 ordersCoreRouter.post('/sync', orderRateLimit, handleSyncOrders);
-ordersCoreRouter.post('/split', orderRateLimit, handleSplitOrders);
+ordersCoreRouter.post('/split', orderRateLimit, requireAuth(SPLIT_ORDER_ROLES), handleSplitOrders);
 ordersCoreRouter.get('/latest', handleLatestOrderTimestamp);
 ordersCoreRouter.patch('/:id', requireAuth(['owner', 'manager', 'supervisor', 'staff', 'admin', 'waiter', 'kitchen', 'barista', 'chef', 'cashier', 'shipper']), handleUpdateOrder);

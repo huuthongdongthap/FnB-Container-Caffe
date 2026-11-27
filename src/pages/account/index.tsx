@@ -8,12 +8,13 @@
  */
 'use client';
 
-import { useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useAccount } from '@/hooks/use-account';
 import { useAuthStore } from '@/hooks/stores/use-auth-store';
 import { useLoyaltyStore } from '@/hooks/stores/use-loyalty-store';
+import { apiFetch } from '@/lib/api-client';
 import { StitchAccountDashNew } from '@/components/stitch';
 import type { DashAccountProfile, DashLoyaltyData, DashOrderItem } from '@/components/stitch';
 import { MyVouchersSection } from '@/components/loyalty/MyVouchersSection';
@@ -43,8 +44,15 @@ export {
 /* ─── Main Component ─────────────────────────────────────────────── */
 
 export default function AccountPage() {
+  const navigate = useNavigate();
   const user = useAuthStore((s) => s.user);
+  const logout = useAuthStore((s) => s.logout);
   const { profile, orders, loading, error, ordersError, refetchProfile } = useAccount();
+  const [editingProfile, setEditingProfile] = useState(false);
+  const [editName, setEditName] = useState('');
+  const [editPhone, setEditPhone] = useState('');
+  const [savingProfile, setSavingProfile] = useState(false);
+  const [profileSaveMsg, setProfileSaveMsg] = useState<string | null>(null);
   const {
     myVouchers,
     tierLadder,
@@ -172,6 +180,123 @@ export default function AccountPage() {
           <MyVouchersSection vouchers={myVouchers} compact />
 
           <NotificationPreferences customerId={user.id} />
+
+          {/* Account Profile Edit & Logout */}
+          <div className="rounded-2xl border border-white/10 bg-[#1B1714]/80 p-5 space-y-4">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <p className="text-sm font-semibold text-[#F5EFE6]">Quản lý tài khoản</p>
+                <p className="text-xs text-[#A89F91]">{profile.email || user.email || ''}</p>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  data-testid="account-edit-profile-btn"
+                  onClick={() => {
+                    setEditName(profile.name || user.name || '');
+                    setEditPhone(profile.phone || user.phone || '');
+                    setProfileSaveMsg(null);
+                    setEditingProfile((v) => !v);
+                  }}
+                  className="px-4 py-2 rounded-xl border border-white/15 hover:border-white/30 text-xs font-semibold text-[#F5EFE6] transition-colors"
+                >
+                  {editingProfile ? 'Đóng' : 'Chỉnh sửa hồ sơ'}
+                </button>
+                <button
+                  type="button"
+                  data-testid="account-logout-btn"
+                  onClick={async () => {
+                    await logout();
+                    navigate('/login');
+                  }}
+                  className="px-4 py-2 rounded-xl border border-rose-500/40 bg-rose-500/15 hover:bg-rose-500/25 text-xs font-semibold text-rose-200 transition-colors"
+                >
+                  Đăng xuất
+                </button>
+              </div>
+            </div>
+
+            {editingProfile && (
+              <form
+                data-testid="account-edit-profile-form"
+                className="pt-3 border-t border-white/10 space-y-3"
+                onSubmit={async (e) => {
+                  e.preventDefault();
+                  setSavingProfile(true);
+                  setProfileSaveMsg(null);
+                  try {
+                    const nextName = editName.trim();
+                    const nextPhone = editPhone.trim() || undefined;
+                    await apiFetch('/api/customers/me', {
+                      method: 'PATCH',
+                      body: JSON.stringify({
+                        name: nextName,
+                        phone: nextPhone,
+                      }),
+                    });
+                    const currentUser = useAuthStore.getState().user;
+                    if (currentUser) {
+                      useAuthStore.setState({
+                        user: {
+                          ...currentUser,
+                          name: nextName || currentUser.name,
+                          ...(nextPhone !== undefined ? { phone: nextPhone } : {}),
+                        },
+                      });
+                    }
+                    await refetchProfile();
+                    setProfileSaveMsg('Đã cập nhật hồ sơ thành công.');
+                    setEditingProfile(false);
+                  } catch (err) {
+                    setProfileSaveMsg(err instanceof Error ? err.message : 'Không thể cập nhật hồ sơ');
+                  } finally {
+                    setSavingProfile(false);
+                  }
+                }}
+              >
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label htmlFor="account-edit-name" className="block text-xs text-[#A89F91] mb-1">
+                      Họ và tên
+                    </label>
+                    <input
+                      id="account-edit-name"
+                      type="text"
+                      value={editName}
+                      onChange={(e) => setEditName(e.target.value)}
+                      required
+                      className="w-full rounded-xl border border-white/15 bg-black/30 px-3 py-2 text-sm text-[#F5EFE6] focus:outline-none focus:border-[#C69C6D]"
+                    />
+                  </div>
+                  <div>
+                    <label htmlFor="account-edit-phone" className="block text-xs text-[#A89F91] mb-1">
+                      Số điện thoại
+                    </label>
+                    <input
+                      id="account-edit-phone"
+                      type="tel"
+                      value={editPhone}
+                      onChange={(e) => setEditPhone(e.target.value)}
+                      className="w-full rounded-xl border border-white/15 bg-black/30 px-3 py-2 text-sm text-[#F5EFE6] focus:outline-none focus:border-[#C69C6D]"
+                    />
+                  </div>
+                </div>
+                <button
+                  type="submit"
+                  disabled={savingProfile}
+                  className="px-4 py-2 rounded-xl bg-[#C69C6D] text-[#0A1A2E] text-xs font-bold uppercase tracking-wider disabled:opacity-50"
+                >
+                  {savingProfile ? 'Đang lưu...' : 'Lưu thay đổi'}
+                </button>
+              </form>
+            )}
+
+            {profileSaveMsg && (
+              <p className="text-xs text-emerald-300" role="status">
+                {profileSaveMsg}
+              </p>
+            )}
+          </div>
         </div>
       </>
     );

@@ -126,7 +126,7 @@ export async function getMyViolation(c: Context<{ Bindings: Env }>) {
     // An unknown id and someone else's file are both refused here: telling them
     // apart would confirm that the id exists.
     if (violation.staffId !== scope.actorId) {
-      return errorResponse('You may only view your own record', 403);
+      return errorResponse('Violation not found', 404);
     }
 
     return jsonResponse({ success: true, violation, data: { item: violation } });

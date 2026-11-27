@@ -106,10 +106,32 @@ async function reverseSnapshot(db: D1Database, policy: LoyaltyPolicy, input: Ref
       AND COALESCE(points_earned, 0) = ? AND COALESCE(cashback_earned, 0) = ?`,
     points, cashback, input.orderId, tenant, order.points_earned ?? 0, order.cashback_earned ?? 0);
   assertChanged();
-  add(`UPDATE customers SET loyalty_points = ?, lifetime_points = ?, loyalty_tier = ?, updated_at = ?
+  const hasTotalSpent = await db
+    .prepare('SELECT total_spent FROM customers LIMIT 0')
+    .all()
+    .then(() => true)
+    .catch(() => false);
+  const hasTierCol = await db
+    .prepare('SELECT tier FROM customers LIMIT 0')
+    .all()
+    .then(() => true)
+    .catch(() => false);
+  const customerSetClauses = ['loyalty_points = ?', 'lifetime_points = ?', 'loyalty_tier = ?'];
+  const customerSetBinds: unknown[] = [newPoints, newLifetime, tier.tierName];
+  if (hasTierCol) {
+    customerSetClauses.push('tier = ?');
+    customerSetBinds.push(tier.tierName);
+  }
+  if (hasTotalSpent) {
+    customerSetClauses.push('total_spent = MAX(0, COALESCE(total_spent, 0) - ?)');
+    customerSetBinds.push(Math.max(0, Number(input.refundAmountVnd) || 0));
+  }
+  customerSetClauses.push('updated_at = ?');
+  customerSetBinds.push(now);
+  add(`UPDATE customers SET ${customerSetClauses.join(', ')}
     WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?
       AND COALESCE(loyalty_points, 0) = ? AND COALESCE(lifetime_points, 0) = ? AND loyalty_tier IS ?`,
-    newPoints, newLifetime, tier.tierName, now, input.customerId, tenant, customer.loyalty_points,
+    ...customerSetBinds, input.customerId, tenant, customer.loyalty_points,
     customer.lifetime_points, customer.loyalty_tier);
   assertChanged();
   const reversalId = stable('ptl_refund_');

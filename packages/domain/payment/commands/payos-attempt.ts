@@ -168,7 +168,7 @@ async function rotateAttemptInPlace(
         },
       };
     } else if (verified.status === 'PENDING') {
-      if (!input.regenerate && prior.status !== 'expired') {
+      if (!input.regenerate && prior.status !== 'expired' && prior.status !== 'cancelled') {
         return {
           ok: false,
           result: {
