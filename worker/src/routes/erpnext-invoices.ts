@@ -292,13 +292,14 @@ export async function handleErpnextInvoicesRequest(
         return json({ success: false, error: 'Order not found' }, 404);
       }
       const bodyRec = body as unknown as Record<string, unknown>;
-      const hasOrderStatus = Boolean(orderRow && 'status' in orderRow) || 'status' in bodyRec;
-      const hasPaymentStatus = Boolean(orderRow && 'payment_status' in orderRow) || 'payment_status' in bodyRec;
-      const rawOrderStatus = typeof (orderRow?.status ?? bodyRec.status) === 'string'
-        ? String(orderRow?.status ?? bodyRec.status).trim().toLowerCase()
+      const statusSource: Record<string, unknown> = orderRow ? (orderRow as Record<string, unknown>) : bodyRec;
+      const hasOrderStatus = 'status' in statusSource;
+      const hasPaymentStatus = 'payment_status' in statusSource;
+      const rawOrderStatus = typeof statusSource.status === 'string'
+        ? statusSource.status.trim().toLowerCase()
         : '';
-      const rawPaymentStatus = typeof (orderRow?.payment_status ?? bodyRec.payment_status) === 'string'
-        ? String(orderRow?.payment_status ?? bodyRec.payment_status).trim().toLowerCase()
+      const rawPaymentStatus = typeof statusSource.payment_status === 'string'
+        ? statusSource.payment_status.trim().toLowerCase()
         : '';
       if (
         (hasOrderStatus && ['cancelled', 'canceled', 'failed', 'rejected', 'expired', 'refunded'].includes(rawOrderStatus)) ||

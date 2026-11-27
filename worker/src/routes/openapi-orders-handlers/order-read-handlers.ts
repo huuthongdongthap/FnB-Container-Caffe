@@ -263,6 +263,8 @@ export async function handleListOrders(c: Context<{ Bindings: Env }>) {
       whereClause = baseWhereBeforeShipper;
       params.length = 0;
       params.push(...baseParamsBeforeShipper);
+      whereClause += " AND o.order_type = 'delivery' AND (o.shipper_id IS NULL OR o.shipper_id = ?)";
+      params.push(scope.actorId || '');
       if (customerId) { whereClause += ' AND o.customer_id = ?'; params.push(customerId); }
       if (tableId) { whereClause += ' AND o.table_id = ?'; params.push(tableId); }
       if (locationId) { whereClause += ' AND o.location_id = ?'; params.push(locationId); }
@@ -271,7 +273,19 @@ export async function handleListOrders(c: Context<{ Bindings: Env }>) {
       if (date) { whereClause += " AND date(o.created_at, '+7 hours') = ?"; params.push(date === 'today' ? vnToday : date); }
       if (dateFrom) { whereClause += " AND date(o.created_at, '+7 hours') >= ?"; params.push(dateFrom === 'today' ? vnToday : dateFrom); }
       if (dateTo) { whereClause += " AND date(o.created_at, '+7 hours') <= ?"; params.push(dateTo === 'today' ? vnToday : dateTo); }
-      countResult = (await db.prepare(`SELECT COUNT(*) as total FROM orders o ${whereClause}`).bind(...params).first()) as { total?: number } | null;
+      try {
+        countResult = (await db.prepare(`SELECT COUNT(*) as total FROM orders o ${whereClause}`).bind(...params).first()) as { total?: number } | null;
+      } catch (legacyErr) {
+        const legacyMsg = legacyErr instanceof Error ? legacyErr.message : String(legacyErr);
+        if (/no such column/i.test(legacyMsg)) {
+          whereClause = `${baseWhereBeforeShipper} AND 1=0`;
+          params.length = 0;
+          params.push(...baseParamsBeforeShipper);
+          countResult = { total: 0 };
+        } else {
+          throw legacyErr;
+        }
+      }
     } else {
       throw err;
     }
