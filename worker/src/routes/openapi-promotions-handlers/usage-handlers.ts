@@ -530,10 +530,9 @@ export function registerUsageHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
     const tenantCheck = verifyOpenApiPromoTenant(c, PROMO_ADMIN_ROLES, true);
     if (tenantCheck) return tenantCheck;
 
-    const { id } = c.req.valid('param');
-    const query = c.req.valid('query') || {};
-    const page = Math.max(1, Number(query.page || 1));
-    const limit = Math.min(100, Math.max(1, Number(query.limit || 20)));
+    const id = c.req.param('id') || '';
+    const page = Math.max(1, Number(c.req.query('page') || 1));
+    const limit = Math.min(100, Math.max(1, Number(c.req.query('limit') || 20)));
     const offset = (page - 1) * limit;
 
     const promo = await db
