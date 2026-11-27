@@ -533,14 +533,24 @@ export async function reconcileShiftCash(
       const tsExpr = withRefundAmount
         ? 'CASE WHEN COALESCE(p.refund_amount, 0) > 0 THEN p.created_at ELSE COALESCE(p.updated_at, p.created_at) END'
         : 'COALESCE(p.updated_at, p.created_at)';
+      const onlineOrderGuard = `AND NOT EXISTS (
+        SELECT 1 FROM orders o
+        WHERE o.id = p.order_id
+          AND COALESCE(NULLIF(TRIM(o.tenant_id), ''), 'default') = COALESCE(NULLIF(TRIM(p.tenant_id), ''), 'default')
+          AND (
+            LOWER(COALESCE(o.status, '')) IN ('cancelled', 'canceled', 'failed', 'expired', 'rejected', 'refunded')
+            OR LOWER(COALESCE(o.payment_status, '')) = 'refunded'
+          )
+      )`;
       if (shiftWindow.staff_id) {
         return db
           .prepare(
             `SELECT COALESCE(SUM(${amountExpr}), 0) AS total
              FROM payments p
-             WHERE p.method = 'payos'
+             WHERE LOWER(COALESCE(p.method, '')) IN ('payos', 'bank_transfer', 'qr', 'vietqr')
                AND p.status IN ('completed', 'paid', 'partially_refunded')
                AND COALESCE(NULLIF(TRIM(p.tenant_id), ''), 'default') = ?
+               ${onlineOrderGuard}
                AND julianday(${tsExpr}) >= julianday(?)
                AND julianday(${tsExpr}) <= julianday(?)
                AND COALESCE(
@@ -572,9 +582,10 @@ export async function reconcileShiftCash(
         .prepare(
           `SELECT COALESCE(SUM(${amountExpr}), 0) AS total
            FROM payments p
-           WHERE p.method = 'payos'
+           WHERE LOWER(COALESCE(p.method, '')) IN ('payos', 'bank_transfer', 'qr', 'vietqr')
              AND p.status IN ('completed', 'paid', 'partially_refunded')
              AND COALESCE(NULLIF(TRIM(p.tenant_id), ''), 'default') = ?
+             ${onlineOrderGuard}
              AND julianday(${tsExpr}) >= julianday(?)
              AND julianday(${tsExpr}) <= julianday(?)`,
         )

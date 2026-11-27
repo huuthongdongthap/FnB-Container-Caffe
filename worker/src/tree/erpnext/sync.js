@@ -46,13 +46,17 @@ export async function syncOrderToERPNext(env, orderId, orderData) {
           .slice(0, 10),
         items: Array.isArray(orderData?.items)
           ? orderData.items.map((it) => {
-              const itemCode = String(it.product_id || it.item_code || '');
+              const itemCode = String(it.product_id || it.item_code || it.menuItemId || '');
               const qty = Number(it.quantity ?? it.qty ?? 1);
-              const rate = Number(it.unit_price ?? it.rate ?? 0);
+              const rate = Number(it.unit_price ?? it.rate ?? it.unitPriceCents ?? 0);
               const amount =
                 it.subtotal !== undefined
                   ? Number(it.subtotal)
-                  : rate * qty;
+                  : it.subtotalCents !== undefined
+                    ? Number(it.subtotalCents)
+                    : it.amount !== undefined
+                      ? Number(it.amount)
+                      : rate * qty;
               return { item_code: itemCode, qty, rate, amount };
             })
           : [],

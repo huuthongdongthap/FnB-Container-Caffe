@@ -13,6 +13,7 @@ import {
   adjustShiftCustodyForCashRefund,
   compensateVoidedOrder,
 } from '../../../../packages/domain/order/policies/order-rollback';
+import { hasIssuedEInvoice } from '../openapi-orders-handlers/order-cancel-handlers';
 import {
   fanOutOrderBroadcast,
   normalizeBroadcastTotal,
@@ -55,9 +56,17 @@ export async function handleRefund(c: Context<{ Bindings: Env }>, openApi = fals
         : body
     );
     if (!preParsed.success) return c.json({ success: false, error: preParsed.error.issues[0].message }, 400);
-    const manualTransferRef = typeof body.manual_transfer_ref === 'string'
+    const rawIdempotencyKey =
+      typeof body.idempotency_key === 'string' && body.idempotency_key.trim()
+        ? body.idempotency_key.trim()
+        : typeof body.idempotencyKey === 'string' && body.idempotencyKey.trim()
+          ? body.idempotencyKey.trim()
+          : (c.req.header('idempotency-key') || '').trim();
+    const manualTransferRef = typeof body.manual_transfer_ref === 'string' && body.manual_transfer_ref.trim()
       ? body.manual_transfer_ref.trim()
-      : (typeof body.manualTransferRef === 'string' ? body.manualTransferRef.trim() : '');
+      : (typeof body.manualTransferRef === 'string' && body.manualTransferRef.trim()
+        ? body.manualTransferRef.trim()
+        : rawIdempotencyKey);
     // An order may have multiple payment attempts. A settled reference identifies
     // its original payment even when another paid attempt now wins generic lookup.
     const referencedTransfer = !rawPaymentId && rawOrderId && manualTransferRef
@@ -134,7 +143,16 @@ export async function handleRefund(c: Context<{ Bindings: Env }>, openApi = fals
     const effectivePaymentTenant = (payment.tenant_id && String(payment.tenant_id).trim()) || 'default';
     const normPaymentMethod = String(payment.method || '').trim().toLowerCase();
     const isCashOrCodPayment = normPaymentMethod === 'cod' || normPaymentMethod === 'cash';
+    const isManualBankTransferPayment = ['bank_transfer', 'qr', 'vietqr'].includes(normPaymentMethod);
     const isVerifiedPayosPayment = normPaymentMethod === 'payos' && /^\d+$/.test(payment.transaction_id || '');
+
+    if (await hasIssuedEInvoice(db, payment.order_id)) {
+      return c.json({
+        success: false,
+        code: 'EINVOICE_ADJUSTMENT_REQUIRED',
+        error: 'Order already has an issued e-invoice; issue an adjustment or replacement credit note instead of refunding directly',
+      }, 409);
+    }
 
     if (manualTransferRef) {
       if (!canManualRefund) {
@@ -186,11 +204,14 @@ export async function handleRefund(c: Context<{ Bindings: Env }>, openApi = fals
     if (payment.refund_status && !(payment.refund_status === 'partial' && hasManualTransferRef)) return c.json({ ...ERRORS.PAYMENT_ALREADY_REFUNDED,
       error: 'Refund already submitted or pending reconciliation' }, 409);
     if (amount > refundableBalance) return c.json(ERRORS.AMOUNT_EXCEEDS_PAYMENT, 400);
-    if (!isVerifiedPayosPayment && !isCashOrCodPayment) {
-      return c.json({ success: false, error: 'Only verified PayOS payments support this refund operation' }, 409);
+    if (!isVerifiedPayosPayment && !isCashOrCodPayment && !isManualBankTransferPayment) {
+      return c.json({ success: false, error: 'Only verified PayOS, cash/COD, or bank transfer/QR payments support this refund operation' }, 409);
     }
-    if (isCashOrCodPayment && !canManualRefund) {
-      return c.json({ success: false, error: 'Only owner or manager can authorize cash or COD refunds' }, 403);
+    if (isManualBankTransferPayment && !manualTransferRef) {
+      return c.json({ success: false, error: 'manual_transfer_ref is required for bank transfer or QR refunds' }, 400);
+    }
+    if ((isCashOrCodPayment || isManualBankTransferPayment) && !canManualRefund) {
+      return c.json({ success: false, error: 'Only owner or manager can authorize cash, COD, or manual transfer refunds' }, 403);
     }
 
     if (effectiveTransferRef) {
@@ -213,19 +234,33 @@ export async function handleRefund(c: Context<{ Bindings: Env }>, openApi = fals
             .bind(refundStatus, cumulativeRefunded, refundReason, now, fullRefund ? 1 : 0, now,
               payment.id, payment.order_id, payment.amount, priorRefunded, cumulativeRefunded,
               effectivePaymentTenant)
-        : db.prepare(`UPDATE payments
-            SET refund_status = ?, refund_amount = ?, refund_reason = ?, refunded_at = ?,
-              status = CASE WHEN ? = 1 THEN 'refunded' ELSE status END, updated_at = ?
-            WHERE id = ? AND order_id = ? AND amount = ? AND method = 'payos' AND transaction_id = ?
-              AND status IN ('paid', 'completed')
-              AND (refund_status IS NULL OR refund_status IN ('', 'partial'))
-              AND COALESCE(refund_amount, 0) = ? AND ? <= amount
-              AND EXISTS (SELECT 1 FROM orders o WHERE o.id = payments.order_id
-                AND COALESCE(NULLIF(TRIM(o.tenant_id), ''), 'default') = ?)
-              AND EXISTS (SELECT 1 FROM refund_tenant_readiness WHERE tenant_id = ?)`)
-            .bind(refundStatus, cumulativeRefunded, refundReason, now, fullRefund ? 1 : 0, now,
-              payment.id, payment.order_id, payment.amount, payment.transaction_id, priorRefunded, cumulativeRefunded,
-              effectivePaymentTenant, effectivePaymentTenant);
+        : isManualBankTransferPayment
+          ? db.prepare(`UPDATE payments
+              SET refund_status = ?, refund_amount = ?, refund_reason = ?, refunded_at = ?,
+                status = CASE WHEN ? = 1 THEN 'refunded' ELSE status END, updated_at = ?
+              WHERE id = ? AND order_id = ? AND amount = ? AND LOWER(COALESCE(method, '')) IN ('bank_transfer', 'qr', 'vietqr')
+                AND status IN ('paid', 'completed')
+                AND (refund_status IS NULL OR refund_status IN ('', 'partial'))
+                AND COALESCE(refund_amount, 0) = ? AND ? <= amount
+                AND EXISTS (SELECT 1 FROM orders o WHERE o.id = payments.order_id
+                  AND COALESCE(NULLIF(TRIM(o.tenant_id), ''), 'default') = ?)
+                AND EXISTS (SELECT 1 FROM refund_tenant_readiness WHERE tenant_id = ?)`)
+              .bind(refundStatus, cumulativeRefunded, refundReason, now, fullRefund ? 1 : 0, now,
+                payment.id, payment.order_id, payment.amount, priorRefunded, cumulativeRefunded,
+                effectivePaymentTenant, effectivePaymentTenant)
+          : db.prepare(`UPDATE payments
+              SET refund_status = ?, refund_amount = ?, refund_reason = ?, refunded_at = ?,
+                status = CASE WHEN ? = 1 THEN 'refunded' ELSE status END, updated_at = ?
+              WHERE id = ? AND order_id = ? AND amount = ? AND method = 'payos' AND transaction_id = ?
+                AND status IN ('paid', 'completed')
+                AND (refund_status IS NULL OR refund_status IN ('', 'partial'))
+                AND COALESCE(refund_amount, 0) = ? AND ? <= amount
+                AND EXISTS (SELECT 1 FROM orders o WHERE o.id = payments.order_id
+                  AND COALESCE(NULLIF(TRIM(o.tenant_id), ''), 'default') = ?)
+                AND EXISTS (SELECT 1 FROM refund_tenant_readiness WHERE tenant_id = ?)`)
+              .bind(refundStatus, cumulativeRefunded, refundReason, now, fullRefund ? 1 : 0, now,
+                payment.id, payment.order_id, payment.amount, payment.transaction_id, priorRefunded, cumulativeRefunded,
+                effectivePaymentTenant, effectivePaymentTenant);
       // The payment, durable transfer identity, retryable loyalty work, and full-refund
       // order transition commit together. CHECK assertions abort the whole D1 batch if
       // any CAS or tenant-scoped order update changes anything other than one row.
@@ -268,17 +303,43 @@ export async function handleRefund(c: Context<{ Bindings: Env }>, openApi = fals
       }
 
       if (isCashOrCodPayment) {
-        await adjustShiftCustodyForCashRefund(db, {
-          paymentId: payment.id,
-          orderId: payment.order_id,
-          tenant: effectivePaymentTenant,
-          amount,
-          fullRefund,
-          payoutKey: effectiveTransferRef,
-          actorId: user?.id || null,
-          reason: refundReason,
-          now,
-        }).catch(() => {});
+        try {
+          await adjustShiftCustodyForCashRefund(db, {
+            paymentId: payment.id,
+            orderId: payment.order_id,
+            tenant: effectivePaymentTenant,
+            amount,
+            fullRefund,
+            payoutKey: effectiveTransferRef,
+            actorId: user?.id || null,
+            reason: refundReason,
+            now,
+          });
+        } catch (custodyErr) {
+          log.error('Shift custody adjustment failed on cash refund:', {
+            message: (custodyErr as Error).message,
+            paymentId: payment.id,
+            orderId: payment.order_id,
+          });
+        }
+      }
+
+      if (amount > 0) {
+        await db
+          .prepare('INSERT INTO _metrics (name, value, labels, timestamp) VALUES (?, ?, ?, ?)')
+          .bind('revenue', -amount, JSON.stringify({ provider: normPaymentMethod || 'unknown', refund: true, order_id: payment.order_id, tenant_id: effectivePaymentTenant }), Math.floor(Date.now() / 1000))
+          .run()
+          .catch(() => {});
+        await db
+          .prepare(
+            `UPDATE table_sessions
+             SET total_amount = MAX(0, COALESCE(total_amount, 0) - ?), updated_at = ?
+             WHERE id = (SELECT session_id FROM orders WHERE id = ? AND session_id IS NOT NULL AND session_id != '' LIMIT 1)
+               AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?`
+          )
+          .bind(amount, now, payment.order_id, effectivePaymentTenant)
+          .run()
+          .catch(() => {});
       }
 
       type PostRefundOrderRow = {
@@ -307,7 +368,8 @@ export async function handleRefund(c: Context<{ Bindings: Env }>, openApi = fals
       const effectiveOrderPayStatus = String(postRefundOrder?.payment_status || 'paid');
       const effectiveOrderLower = effectiveOrderStatus.trim().toLowerCase();
 
-      if (fullRefund && ['cancelled', 'failed', 'expired'].includes(effectiveOrderLower)) {
+      if (fullRefund && ['cancelled', 'failed', 'expired', 'completed', 'delivered'].includes(effectiveOrderLower)) {
+        const isCompletedOrDelivered = effectiveOrderLower === 'completed' || effectiveOrderLower === 'delivered';
         if (effectiveOrderLower === 'cancelled') {
           await db
             .prepare(
@@ -317,22 +379,24 @@ export async function handleRefund(c: Context<{ Bindings: Env }>, openApi = fals
             .run()
             .catch(() => {});
         }
-        // Idempotent inventory/BOM reversal mirroring order cancellation (pre-prep releases, post-prep spoils)
-        try {
-          const { restoreInventoryForOrder } = await import('@aura/domain-inventory');
-          const restoreEnv = { ...(c.env || {}), AURA_DB: db } as unknown as Parameters<typeof restoreInventoryForOrder>[0];
-          if (['preparing', 'ready', 'delivering', 'delivered', 'served', 'completed'].includes(preRefundOrderStatus)) {
-            await restoreInventoryForOrder(restoreEnv, payment.order_id, effectivePaymentTenant, {
-              preCancelStatus: preRefundOrderStatus,
+        // Idempotent inventory/BOM reversal mirroring order cancellation (skip for already-served completed/delivered orders)
+        if (!isCompletedOrDelivered) {
+          try {
+            const { restoreInventoryForOrder } = await import('@aura/domain-inventory');
+            const restoreEnv = { ...(c.env || {}), AURA_DB: db } as unknown as Parameters<typeof restoreInventoryForOrder>[0];
+            if (['preparing', 'ready', 'delivering', 'delivered', 'served', 'completed'].includes(preRefundOrderStatus)) {
+              await restoreInventoryForOrder(restoreEnv, payment.order_id, effectivePaymentTenant, {
+                preCancelStatus: preRefundOrderStatus,
+              });
+            } else {
+              await restoreInventoryForOrder(restoreEnv, payment.order_id, effectivePaymentTenant);
+            }
+          } catch (invErr) {
+            log.error('Inventory restore error on full refund (non-blocking):', {
+              message: (invErr as Error).message,
+              orderId: payment.order_id,
             });
-          } else {
-            await restoreInventoryForOrder(restoreEnv, payment.order_id, effectivePaymentTenant);
           }
-        } catch (invErr) {
-          log.error('Inventory restore error on full refund (non-blocking):', {
-            message: (invErr as Error).message,
-            orderId: payment.order_id,
-          });
         }
         await compensateVoidedOrder({
           db,
@@ -347,7 +411,7 @@ export async function handleRefund(c: Context<{ Bindings: Env }>, openApi = fals
           skipInventoryRestore: true,
           skipAccrualReversal: true,
         }).catch(() => {});
-        if (postRefundOrder?.table_id) {
+        if (!isCompletedOrDelivered && postRefundOrder?.table_id) {
           const { releaseTableIfNoActiveOrders } = await import('../../../../packages/domain/order/policies/table-occupancy-release');
           await releaseTableIfNoActiveOrders(db, String(postRefundOrder.table_id), effectivePaymentTenant).catch(() => {});
         }

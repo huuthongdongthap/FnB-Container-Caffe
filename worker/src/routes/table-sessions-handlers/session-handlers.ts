@@ -306,7 +306,10 @@ export function registerSessionHandlers(router: Hono<{ Bindings: Env }>): void {
     const activeStatuses = new Set(['active', 'seated', 'occupied', 'ordering', 'paying', 'paid']);
     const activeSessions = rows.filter((r) => activeStatuses.has(String(r.status || '').toLowerCase())).length;
     const closedSessions = rows.filter((r) => ['closed', 'completed'].includes(String(r.status || '').toLowerCase())).length;
-    const totalRevenue = rows.reduce((acc, r) => acc + Number(r.total_amount ?? 0), 0);
+    const settledRevenueStatuses = new Set(['closed', 'completed', 'paid']);
+    const totalRevenue = rows
+      .filter((r) => settledRevenueStatuses.has(String(r.status || '').toLowerCase()))
+      .reduce((acc, r) => acc + Math.max(0, Number(r.total_amount ?? 0)), 0);
     const totalTables = tableRows.length;
     const statsPayload = {
       total_sessions: rows.length,
@@ -682,7 +685,7 @@ export function registerSessionHandlers(router: Hono<{ Bindings: Env }>): void {
             .prepare(
               `SELECT id, status, payment_status FROM orders
                WHERE (session_id = ? OR table_id = ?)
-                 AND LOWER(COALESCE(status, 'pending')) NOT IN ('completed', 'cancelled', 'canceled', 'rejected', 'failed', 'expired', 'refunded')
+                 AND LOWER(COALESCE(status, 'pending')) NOT IN ('cancelled', 'canceled', 'rejected', 'failed', 'expired', 'refunded')
                  AND LOWER(COALESCE(payment_status, 'unpaid')) NOT IN ('paid', 'completed', 'refunded', 'cancelled', 'canceled')
                  AND (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?)
                LIMIT 1`
@@ -699,7 +702,7 @@ export function registerSessionHandlers(router: Hono<{ Bindings: Env }>): void {
               .prepare(
                 `SELECT id, status, payment_status FROM orders
                  WHERE table_id = ?
-                   AND LOWER(COALESCE(status, 'pending')) NOT IN ('completed', 'cancelled', 'canceled', 'rejected', 'failed', 'expired', 'refunded')
+                   AND LOWER(COALESCE(status, 'pending')) NOT IN ('cancelled', 'canceled', 'rejected', 'failed', 'expired', 'refunded')
                    AND LOWER(COALESCE(payment_status, 'unpaid')) NOT IN ('paid', 'completed', 'refunded', 'cancelled', 'canceled')
                    AND (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?)
                  LIMIT 1`
@@ -716,7 +719,7 @@ export function registerSessionHandlers(router: Hono<{ Bindings: Env }>): void {
                 .prepare(
                   `SELECT id, status, payment_status FROM orders
                    WHERE table_id = ?
-                     AND LOWER(COALESCE(status, 'pending')) NOT IN ('completed', 'cancelled', 'canceled', 'rejected', 'failed', 'expired', 'refunded')
+                     AND LOWER(COALESCE(status, 'pending')) NOT IN ('cancelled', 'canceled', 'rejected', 'failed', 'expired', 'refunded')
                      AND LOWER(COALESCE(payment_status, 'unpaid')) NOT IN ('paid', 'completed', 'refunded', 'cancelled', 'canceled')
                    LIMIT 1`
                 )
@@ -830,7 +833,7 @@ export function registerSessionHandlers(router: Hono<{ Bindings: Env }>): void {
           .prepare(
             `SELECT id, status, payment_status FROM orders
              WHERE (session_id = ? OR table_id = ?)
-               AND LOWER(COALESCE(status, 'pending')) NOT IN ('completed', 'cancelled', 'canceled', 'rejected', 'failed', 'expired', 'refunded')
+               AND LOWER(COALESCE(status, 'pending')) NOT IN ('cancelled', 'canceled', 'rejected', 'failed', 'expired', 'refunded')
                AND LOWER(COALESCE(payment_status, 'unpaid')) NOT IN ('paid', 'completed', 'refunded', 'cancelled', 'canceled')
                AND (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?)
              LIMIT 1`
@@ -847,7 +850,7 @@ export function registerSessionHandlers(router: Hono<{ Bindings: Env }>): void {
             .prepare(
               `SELECT id, status, payment_status FROM orders
                WHERE table_id = ?
-                 AND LOWER(COALESCE(status, 'pending')) NOT IN ('completed', 'cancelled', 'canceled', 'rejected', 'failed', 'expired', 'refunded')
+                 AND LOWER(COALESCE(status, 'pending')) NOT IN ('cancelled', 'canceled', 'rejected', 'failed', 'expired', 'refunded')
                  AND LOWER(COALESCE(payment_status, 'unpaid')) NOT IN ('paid', 'completed', 'refunded', 'cancelled', 'canceled')
                  AND (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?)
                LIMIT 1`
@@ -864,7 +867,7 @@ export function registerSessionHandlers(router: Hono<{ Bindings: Env }>): void {
             .prepare(
               `SELECT id, status, payment_status FROM orders
                WHERE table_id = ?
-                 AND LOWER(COALESCE(status, 'pending')) NOT IN ('completed', 'cancelled', 'canceled', 'rejected', 'failed', 'expired', 'refunded')
+                 AND LOWER(COALESCE(status, 'pending')) NOT IN ('cancelled', 'canceled', 'rejected', 'failed', 'expired', 'refunded')
                  AND LOWER(COALESCE(payment_status, 'unpaid')) NOT IN ('paid', 'completed', 'refunded', 'cancelled', 'canceled')
                LIMIT 1`
             )

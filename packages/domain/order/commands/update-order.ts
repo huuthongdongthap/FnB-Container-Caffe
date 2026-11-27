@@ -327,89 +327,7 @@ export async function updateOrder(
         preCancelStatus: currentStatus,
         skipInventoryRestore: true,
         skipTableRelease: true,
-        // The legacy loyalty block below already reverses accrual and decrements
-        // `customers.total_spent`; letting the policy do it as well double-counts
-        // the reversal for every paid order that earned points/cashback.
-        skipAccrualReversal: true,
       }).catch(() => {});
-
-      // Reverse loyalty accrual if order had already earned points/cashback
-      try {
-        let earnRow = await db.prepare(
-          "SELECT customer_id FROM cashback_transactions WHERE order_id = ? AND type = 'earn' AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ? LIMIT 1"
-        ).bind(id, effectiveCancelTenant).first<{ customer_id: string; amount?: number }>().catch(() => null);
-        if (!earnRow && effectiveCancelTenant === 'default') {
-          const fallbackEarn = await db.prepare(
-            "SELECT customer_id FROM cashback_transactions WHERE order_id = ? AND type = 'earn' LIMIT 1"
-          ).bind(id).first<{ customer_id: string; amount?: number; tenant_id?: string | null }>().catch(() => null);
-          if (
-            fallbackEarn &&
-            (!('tenant_id' in fallbackEarn) ||
-              fallbackEarn.tenant_id === undefined ||
-              (String(fallbackEarn.tenant_id ?? '').trim() || 'default') === effectiveCancelTenant)
-          ) {
-            earnRow = fallbackEarn;
-          }
-        }
-        if (earnRow?.customer_id) {
-          const { loadPolicy, reverseAccrual } = await import('@aura/domain-crm');
-          const policy = await loadPolicy(
-            db,
-            env.AUTH_KV as import('@cloudflare/workers-types').KVNamespace | undefined,
-            new Date(),
-            orderTenantForCancel
-          ).catch(() => null);
-          if (policy) {
-            await reverseAccrual(db, policy, {
-              orderId: id,
-              customerId: earnRow.customer_id,
-              refundAmountVnd: Number(results[0]?.total ?? 0),
-              reason: 'order_cancelled',
-              ...(orderTenantForCancel ? { tenantId: orderTenantForCancel } : {}),
-            });
-          }
-        }
-        const cancelPaymentStatus = String(results[0]?.payment_status ?? '')
-          .trim()
-          .toLowerCase();
-        let cancelCustomerId =
-          (results[0]?.customer_id ? String(results[0].customer_id).trim() : '') ||
-          (earnRow?.customer_id ? String(earnRow.customer_id).trim() : '');
-        if (!cancelCustomerId) {
-          const ordCustRow = await db
-            .prepare('SELECT customer_id FROM orders WHERE id = ? LIMIT 1')
-            .bind(id)
-            .first<{ customer_id?: string | null }>()
-            .catch(() => null);
-          if (ordCustRow?.customer_id) {
-            cancelCustomerId = String(ordCustRow.customer_id).trim();
-          }
-        }
-        const cancelTotalVnd = Number(results[0]?.total ?? results[0]?.total_amount ?? 0);
-        if (
-          cancelCustomerId &&
-          cancelTotalVnd > 0 &&
-          (cancelPaymentStatus === 'paid' || cancelPaymentStatus === 'completed' || Boolean(earnRow?.customer_id))
-        ) {
-          await db
-            .prepare(
-              "UPDATE customers SET total_spent = MAX(0, COALESCE(total_spent, 0) - ?) WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
-            )
-            .bind(cancelTotalVnd, cancelCustomerId, effectiveCancelTenant)
-            .run()
-            .catch(() => {
-              if (effectiveCancelTenant === 'default') {
-                return db
-                  .prepare('UPDATE customers SET total_spent = MAX(0, COALESCE(total_spent, 0) - ?) WHERE id = ?')
-                  .bind(cancelTotalVnd, cancelCustomerId)
-                  .run()
-                  .catch(() => {});
-              }
-            });
-        }
-      } catch (revAccErr) {
-        log.warn('Loyalty accrual reversal error (non-blocking):', { message: (revAccErr as Error).message, orderId: id });
-      }
 
       // Refund redeemed loyalty points on order cancellation if not already refunded
       try {
@@ -902,16 +820,18 @@ export async function updateOrder(
       // one visit row + VisitRecorded event per completed order.
       try {
         const order = await db.prepare(
-          `SELECT total, order_type, table_id, customer_email, customer_phone, tenant_id FROM orders WHERE id = ?${tenantClause}`
-        ).bind(id, ...tenantBinds).first<{ total: number; order_type: string | null; table_id: string | null; customer_email: string | null; customer_phone: string | null; tenant_id?: string | null }>().catch(() =>
+          `SELECT total, payment_status, order_type, table_id, customer_email, customer_phone, tenant_id FROM orders WHERE id = ?${tenantClause}`
+        ).bind(id, ...tenantBinds).first<{ total: number; payment_status?: string | null; order_type: string | null; table_id: string | null; customer_email: string | null; customer_phone: string | null; tenant_id?: string | null }>().catch(() =>
           (tenantId === 'default' || tenantId === '*')
             ? db.prepare(
-                'SELECT total, order_type, table_id, customer_email, customer_phone FROM orders WHERE id = ?'
-              ).bind(id).first<{ total: number; order_type: string | null; table_id: string | null; customer_email: string | null; customer_phone: string | null; tenant_id?: string | null }>()
+                'SELECT total, payment_status, order_type, table_id, customer_email, customer_phone FROM orders WHERE id = ?'
+              ).bind(id).first<{ total: number; payment_status?: string | null; order_type: string | null; table_id: string | null; customer_email: string | null; customer_phone: string | null; tenant_id?: string | null }>()
             : null
         );
 
-        if (order) {
+        const orderPayStatus = String(order?.payment_status ?? '').trim().toLowerCase();
+        const isSettledForVisit = ['paid', 'completed', 'partially_refunded'].includes(orderPayStatus);
+        if (order && isSettledForVisit) {
           const { sanitizeCustomerIdentity } = await import('../policies/loyalty-trigger');
           const { normalizedPhone, email: sanitizedEmail } = sanitizeCustomerIdentity(
             order.customer_phone,

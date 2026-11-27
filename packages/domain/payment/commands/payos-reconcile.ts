@@ -389,20 +389,43 @@ export async function reconcilePayOSPayment(input: ReconcilePayOSInput): Promise
         } catch {
           // Non-blocking loyalty/referral side effects after payment settlement
         }
+        const settledAmt = Number(row.amount ?? expectedOrderTotal ?? 0);
+        if (settledAmt > 0) {
+          await input.db
+            .prepare('INSERT INTO _metrics (name, value, labels, timestamp) VALUES (?, ?, ?, ?)')
+            .bind('revenue', settledAmt, JSON.stringify({ provider: 'payos', source: input.source, order_id: row.order_id, tenant_id: rowTenant }), Math.floor(Date.now() / 1000))
+            .run()
+            .catch(() => {});
+          await input.db
+            .prepare(
+              `UPDATE staff_shifts
+               SET online_sales = COALESCE(online_sales, 0) + ?,
+                   total_sales = COALESCE(total_sales, 0) + ?,
+                   order_count = COALESCE(order_count, 0) + 1
+               WHERE id = (
+                 SELECT id FROM staff_shifts
+                 WHERE clock_in IS NOT NULL AND clock_out IS NULL
+                   AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?
+                   AND LOWER(COALESCE(role, '')) NOT IN ('barista', 'kitchen', 'chef', 'bep')
+                 ORDER BY CASE WHEN LOWER(COALESCE(role, '')) IN ('cashier', 'owner', 'admin', 'manager', 'supervisor') THEN 0 ELSE 1 END,
+                          clock_in DESC, id DESC
+                 LIMIT 1
+               )`
+            )
+            .bind(settledAmt, settledAmt, rowTenant)
+            .run()
+            .catch(() => {});
+        }
       }
     }
 
     if (isTerminalNonPayable) {
       const reviewTag = '[PAID_ON_CANCELLED_ORDER_REQUIRES_REVIEW]';
-      const paidStatusSet =
-        afterOrderStatus !== 'refunded'
-          ? "payment_status = CASE WHEN LOWER(COALESCE(payment_status, '')) IN ('refunded', 'partially_refunded') THEN payment_status ELSE 'paid' END,\n             "
-          : '';
       try {
         await input.db
           .prepare(
             `UPDATE orders
-             SET ${paidStatusSet}notes = CASE
+             SET notes = CASE
                WHEN notes IS NULL OR TRIM(notes) = '' THEN ?
                WHEN INSTR(notes, ?) > 0 THEN notes
                ELSE notes || ' ' || ?
@@ -417,7 +440,7 @@ export async function reconcilePayOSPayment(input: ReconcilePayOSInput): Promise
           await input.db
             .prepare(
               `UPDATE orders
-               SET ${paidStatusSet}notes = CASE
+               SET notes = CASE
                  WHEN notes IS NULL OR TRIM(notes) = '' THEN ?
                  WHEN INSTR(notes, ?) > 0 THEN notes
                  ELSE notes || ' ' || ?

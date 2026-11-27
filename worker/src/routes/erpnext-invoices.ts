@@ -303,6 +303,9 @@ export async function handleErpnextInvoicesRequest(
       ) {
         return json({ success: false, error: 'Cannot invoice a cancelled, failed, or refunded order' }, 409);
       }
+      if (!['paid', 'completed', 'partially_refunded'].includes(rawPaymentStatus)) {
+        return json({ success: false, error: 'Cannot invoice an unpaid or pending order' }, 409);
+      }
 
       if (!accountingClient) {
         return json({ success: false, error: 'ERPNext accounting not configured' }, 503);

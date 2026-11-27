@@ -275,7 +275,11 @@ export async function handleCancelOrder(c: Context<{ Bindings: Env }>) {
   const isZeroTotalPending =
     Number(existing.total ?? -1) === 0 &&
     String(existing.status || '').trim().toLowerCase() === 'pending';
-  if (!canCompensatePaid && !isZeroTotalPending && String(existing.payment_status || '').trim().toLowerCase() === 'paid') {
+  if (
+    !canCompensatePaid &&
+    !isZeroTotalPending &&
+    ['paid', 'completed', 'partially_refunded'].includes(String(existing.payment_status || '').trim().toLowerCase())
+  ) {
     return c.json({
       success: false,
       error: customer ? 'Paid orders cannot be cancelled by customer' : 'Paid order cannot be cancelled; initiate a refund instead',

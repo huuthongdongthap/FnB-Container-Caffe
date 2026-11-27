@@ -183,29 +183,27 @@ export async function adjustShiftCustodyForCashRefund(
     // staff_shifts absent in minimal test schemas
   }
 
-  if (activeDrawerShiftId) {
-    const closedShiftPayoutId = `cpo_ref_${paymentId}_${payoutKey}`.slice(0, 120);
-    const payoutReason = reason || `Hoàn tiền mặt đơn ${orderId}`;
+  const closedShiftPayoutId = `cpo_ref_${paymentId}_${payoutKey}`.slice(0, 120);
+  const payoutReason = reason || `Hoàn tiền mặt đơn ${orderId}`;
+  try {
+    await db
+      .prepare(
+        `INSERT OR IGNORE INTO cash_payouts (id, tenant_id, shift_id, amount, reason, status, created_by, created_at)
+         VALUES (?, ?, ?, ?, ?, 'completed', ?, ?)`,
+      )
+      .bind(closedShiftPayoutId, cleanTenant, activeDrawerShiftId, amount, payoutReason, actorId || 'system', now)
+      .run();
+  } catch {
     try {
       await db
         .prepare(
-          `INSERT OR IGNORE INTO cash_payouts (id, tenant_id, shift_id, amount, reason, status, created_by, created_at)
-           VALUES (?, ?, ?, ?, ?, 'completed', ?, ?)`,
+          `INSERT OR IGNORE INTO cash_payouts (id, tenant_id, shift_id, amount, status)
+           VALUES (?, ?, ?, ?, 'completed')`,
         )
-        .bind(closedShiftPayoutId, cleanTenant, activeDrawerShiftId, amount, payoutReason, actorId || 'system', now)
+        .bind(closedShiftPayoutId, cleanTenant, activeDrawerShiftId, amount)
         .run();
     } catch {
-      try {
-        await db
-          .prepare(
-            `INSERT OR IGNORE INTO cash_payouts (id, tenant_id, shift_id, amount, status)
-             VALUES (?, ?, ?, ?, 'completed')`,
-          )
-          .bind(closedShiftPayoutId, cleanTenant, activeDrawerShiftId, amount)
-          .run();
-      } catch {
-        // Optional cash_payouts table
-      }
+      // Optional cash_payouts table
     }
   }
 }
@@ -446,6 +444,17 @@ export async function compensateVoidedOrder(params: CompensateVoidedOrderParams)
             .run()
             .catch(() => null);
           updatedChanges = upd ? Number(upd?.meta?.changes ?? (upd as unknown as { changes?: number })?.changes ?? 1) : 0;
+        }
+        if (updatedChanges > 0 && unrefunded > 0) {
+          await db
+            .prepare(
+              `INSERT OR IGNORE INTO payment_refund_transfers
+               (tenant_id, manual_transfer_ref, payment_id, amount, reason, actor_id, created_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?)`,
+            )
+            .bind(tenant, `void_cash:${pay.id}`, pay.id, unrefunded, reason, actorId || 'system', now)
+            .run()
+            .catch(() => {});
         }
         if (updatedChanges > 0) {
           cashRefunded = true;

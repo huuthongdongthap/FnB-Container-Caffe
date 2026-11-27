@@ -274,6 +274,11 @@ export function registerCheckoutHandlers(router: Hono<{ Bindings: Env }>): void 
     ) {
       return c.json({ success: false, error: 'Cannot complete QC for unpaid non-cash order' }, 409);
     }
+    const isUnpaidCashOrCod =
+      ['cash', 'cod', ''].includes(paymentMethod) &&
+      paymentStatus !== 'paid' &&
+      paymentStatus !== 'completed';
+    const nextOrderStatus = isUnpaidCashOrCod ? 'ready' : 'completed';
     const checkedAt = new Date().toISOString();
     {
       const tenantId = rowTenant;
@@ -285,7 +290,7 @@ export function registerCheckoutHandlers(router: Hono<{ Bindings: Env }>): void 
         await execute(
           c.env.AURA_DB,
           "UPDATE orders SET status = ?, updated_at = ? WHERE id = ? AND status NOT IN ('cancelled', 'canceled', 'failed', 'refunded', 'expired', 'rejected') AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?",
-          'completed',
+          nextOrderStatus,
           checkedAt,
           orderId,
           rowTenant
@@ -295,7 +300,7 @@ export function registerCheckoutHandlers(router: Hono<{ Bindings: Env }>): void 
           await execute(
             c.env.AURA_DB,
             "UPDATE orders SET status = ?, updated_at = ? WHERE id = ? AND status NOT IN ('cancelled', 'canceled', 'failed', 'refunded', 'expired', 'rejected')",
-            'completed',
+            nextOrderStatus,
             checkedAt,
             orderId
           );
@@ -308,7 +313,7 @@ export function registerCheckoutHandlers(router: Hono<{ Bindings: Env }>): void 
     if (c.env.AUTH_KV) {
       const eventPayload = JSON.stringify({
         orderId,
-        status: 'completed',
+        status: nextOrderStatus,
         tenant_id: effectiveOrderTenant,
         tenantId: effectiveOrderTenant,
         updatedAt: checkedAt,
@@ -320,10 +325,10 @@ export function registerCheckoutHandlers(router: Hono<{ Bindings: Env }>): void 
         ...(effectiveOrderTenant === 'default'
           ? [kvSet(c.env.AUTH_KV, `order_event:${orderId}`, eventPayload, 3600)]
           : []),
-        publishOrderEvent(c.env.AUTH_KV, orderId, 'completed', { tenantId: effectiveOrderTenant }).catch(() => {}),
+        publishOrderEvent(c.env.AUTH_KV, orderId, nextOrderStatus, { tenantId: effectiveOrderTenant }).catch(() => {}),
       ]).catch(() => undefined);
     }
-    return c.json({ success: true, orderId, qcPassed: true, status: 'completed', checkedAt });
+    return c.json({ success: true, orderId, qcPassed: true, status: nextOrderStatus, checkedAt });
   };
   router.post('/checkout/:orderId/qc', handleQcComplete);
   router.post('/checkout/:orderId/complete-qc', handleQcComplete);
