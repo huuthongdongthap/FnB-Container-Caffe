@@ -152,8 +152,9 @@ describe('Order Persistence Tamper & Schema Validation', () => {
     const orderInsert = insertLogs.find(l => l.sql.includes('INSERT INTO orders'));
     expect(orderInsert).toBeDefined();
     expect(orderInsert?.sql).toContain('customer_email, customer_address');
-    expect(orderInsert?.binds[15]).toBe('delivery');
-    expect(orderInsert?.binds[7]).toBe('123 Đường Hoa, Sa Đéc');
+    const orderCols = orderInsert!.sql.match(/INSERT INTO orders\s*\(([^)]+)\)/i)![1].split(',').map((s: string) => s.trim());
+    expect(orderInsert?.binds[orderCols.indexOf('order_type')]).toBe('delivery');
+    expect(orderInsert?.binds[orderCols.indexOf('customer_address')]).toBe('123 Đường Hoa, Sa Đéc');
 
     // Verify order_items insert matches canonical 7 columns
     const itemInsert = insertLogs.find(l => l.sql.includes('INSERT INTO order_items'));

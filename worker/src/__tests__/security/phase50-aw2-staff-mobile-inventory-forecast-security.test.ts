@@ -453,12 +453,14 @@ describe('Phase 50 Slice AW2 — Staff, Tips, Mobile Tables/Orders, Inventory, P
           delivery_address TEXT,
           items TEXT,
           status TEXT,
+          order_type TEXT,
+          assigned_shipper_id TEXT,
           created_at TEXT,
           updated_at TEXT,
           tenant_id TEXT
         );
       `);
-      sqlite.prepare(`INSERT INTO orders VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(
+      sqlite.prepare(`INSERT INTO orders VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(
         'ord-mob-1',
         'tbl-1',
         'Nguyen Van Khach',
@@ -467,6 +469,8 @@ describe('Phase 50 Slice AW2 — Staff, Tips, Mobile Tables/Orders, Inventory, P
         '456 Le Loi, Q1',
         JSON.stringify([{ name: 'Cà phê đen', qty: 1, price: 30000 }]),
         'pending',
+        'delivery',
+        'u-shipper',
         '2026-11-03T02:00:00Z',
         '2026-11-03T02:00:00Z',
         '  store-a  '

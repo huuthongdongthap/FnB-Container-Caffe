@@ -111,30 +111,57 @@ export function registerPnlHandlers(app: Hono<{ Bindings: Env }>) {
         }>();
       orderRows = res.results || [];
     } catch {
-      const res = await db
-        .prepare(
-          `SELECT DATE(datetime(created_at, '+7 hours')) as date,
-                  COUNT(*) as orders,
-                  COALESCE(SUM(total), 0) as total_collected,
-                  0 as shipping_fee,
-                  0 as service_fee,
-                  0 as tip_amount,
-                  COALESCE(SUM(discount), 0) as discounts
-           FROM orders
-           WHERE DATE(datetime(created_at, '+7 hours')) BETWEEN ? AND ? AND ${VALID_REVENUE_ORDER_SQL}${tf.and}
-           GROUP BY DATE(datetime(created_at, '+7 hours')) ORDER BY date`
-        )
-        .bind(from, to, ...tf.binds)
-        .all<{
-          date: string;
-          orders: number;
-          total_collected: number;
-          shipping_fee: number;
-          service_fee: number;
-          tip_amount: number;
-          discounts: number;
-        }>();
-      orderRows = res.results || [];
+      try {
+        const res = await db
+          .prepare(
+            `SELECT DATE(datetime(created_at, '+7 hours')) as date,
+                    COUNT(*) as orders,
+                    COALESCE(SUM(total), 0) as total_collected,
+                    COALESCE(SUM(shipping_fee), 0) as shipping_fee,
+                    COALESCE(SUM(service_fee), 0) as service_fee,
+                    COALESCE(SUM(tip_amount), 0) as tip_amount,
+                    COALESCE(SUM(discount), 0) as discounts
+             FROM orders
+             WHERE DATE(datetime(created_at, '+7 hours')) BETWEEN ? AND ? AND ${VALID_REVENUE_ORDER_SQL}${tf.and}
+             GROUP BY DATE(datetime(created_at, '+7 hours')) ORDER BY date`
+          )
+          .bind(from, to, ...tf.binds)
+          .all<{
+            date: string;
+            orders: number;
+            total_collected: number;
+            shipping_fee: number;
+            service_fee: number;
+            tip_amount: number;
+            discounts: number;
+          }>();
+        orderRows = res.results || [];
+      } catch {
+        const res = await db
+          .prepare(
+            `SELECT DATE(datetime(created_at, '+7 hours')) as date,
+                    COUNT(*) as orders,
+                    COALESCE(SUM(total), 0) as total_collected,
+                    0 as shipping_fee,
+                    0 as service_fee,
+                    0 as tip_amount,
+                    COALESCE(SUM(discount), 0) as discounts
+             FROM orders
+             WHERE DATE(datetime(created_at, '+7 hours')) BETWEEN ? AND ? AND ${VALID_REVENUE_ORDER_SQL}${tf.and}
+             GROUP BY DATE(datetime(created_at, '+7 hours')) ORDER BY date`
+          )
+          .bind(from, to, ...tf.binds)
+          .all<{
+            date: string;
+            orders: number;
+            total_collected: number;
+            shipping_fee: number;
+            service_fee: number;
+            tip_amount: number;
+            discounts: number;
+          }>();
+        orderRows = res.results || [];
+      }
     }
 
     // 2. Daily Inventory COGS (sale/reserve deductions net of release) & Waste Cost (Vietnam UTC+7)
@@ -278,6 +305,27 @@ export function registerPnlHandlers(app: Hono<{ Bindings: Env }>) {
         refundRows = res.results || [];
       } catch {
         refundRows = [];
+      }
+    }
+    if (refundRows.length === 0) {
+      try {
+        const ordTf = buildTenantClause(tenantId, 'o');
+        const res = await db
+          .prepare(
+            `SELECT DATE(datetime(r.created_at, '+7 hours')) as date,
+                    COALESCE(SUM(r.amount), 0) as refunds
+             FROM refunds r
+             JOIN orders o ON o.id = r.order_id
+             WHERE DATE(datetime(r.created_at, '+7 hours')) BETWEEN ? AND ?
+               AND r.status IN ('approved', 'completed', 'succeeded')
+               AND ${VALID_REVENUE_ORDER_ALIAS_SQL}${ordTf.and}
+             GROUP BY DATE(datetime(r.created_at, '+7 hours')) ORDER BY date`
+          )
+          .bind(from, to, ...ordTf.binds)
+          .all<{ date: string; refunds: number }>();
+        refundRows = res.results || [];
+      } catch {
+        // No refunds table
       }
     }
 

@@ -106,11 +106,24 @@ async function reverseSnapshot(db: D1Database, policy: LoyaltyPolicy, input: Ref
       AND COALESCE(points_earned, 0) = ? AND COALESCE(cashback_earned, 0) = ?`,
     points, cashback, input.orderId, tenant, order.points_earned ?? 0, order.cashback_earned ?? 0);
   assertChanged();
-  add(`UPDATE customers SET loyalty_points = ?, lifetime_points = ?, loyalty_tier = ?, total_spent = MAX(0, COALESCE(total_spent, 0) - ?), updated_at = ?
-    WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?
-      AND COALESCE(loyalty_points, 0) = ? AND COALESCE(lifetime_points, 0) = ? AND loyalty_tier IS ?`,
-    newPoints, newLifetime, tier.tierName, Math.max(0, Number(input.refundAmountVnd) || 0), now, input.customerId, tenant, customer.loyalty_points,
-    customer.lifetime_points, customer.loyalty_tier);
+  const hasTotalSpent = await db
+    .prepare('SELECT total_spent FROM customers LIMIT 0')
+    .all()
+    .then(() => true)
+    .catch(() => false);
+  if (hasTotalSpent) {
+    add(`UPDATE customers SET loyalty_points = ?, lifetime_points = ?, loyalty_tier = ?, total_spent = MAX(0, COALESCE(total_spent, 0) - ?), updated_at = ?
+      WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?
+        AND COALESCE(loyalty_points, 0) = ? AND COALESCE(lifetime_points, 0) = ? AND loyalty_tier IS ?`,
+      newPoints, newLifetime, tier.tierName, Math.max(0, Number(input.refundAmountVnd) || 0), now, input.customerId, tenant, customer.loyalty_points,
+      customer.lifetime_points, customer.loyalty_tier);
+  } else {
+    add(`UPDATE customers SET loyalty_points = ?, lifetime_points = ?, loyalty_tier = ?, updated_at = ?
+      WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?
+        AND COALESCE(loyalty_points, 0) = ? AND COALESCE(lifetime_points, 0) = ? AND loyalty_tier IS ?`,
+      newPoints, newLifetime, tier.tierName, now, input.customerId, tenant, customer.loyalty_points,
+      customer.lifetime_points, customer.loyalty_tier);
+  }
   assertChanged();
   const reversalId = stable('ptl_refund_');
   add(`INSERT INTO loyalty_point_logs (id, customer_id, order_id, points_change, reason, balance_after, description, tenant_id, created_at)

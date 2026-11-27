@@ -222,9 +222,11 @@ export async function handleListOrders(c: Context<{ Bindings: Env }>) {
     params.push(tenantId);
   }
 
+  const baseWhereBeforeShipper = whereClause;
+  const baseParamsBeforeShipper = [...params];
   if (scope.allowAll) {
     if (scope.isShipper) {
-      whereClause += " AND o.order_type = 'delivery' AND (o.shipper_id IS NULL OR o.shipper_id = ?)";
+      whereClause += " AND o.order_type = 'delivery' AND (o.assigned_shipper_id IS NULL OR o.assigned_shipper_id = ?)";
       params.push(scope.actorId || '');
     }
     if (customerId) { whereClause += ' AND o.customer_id = ?'; params.push(customerId); }
@@ -252,7 +254,28 @@ export async function handleListOrders(c: Context<{ Bindings: Env }>) {
   if (dateFrom) { whereClause += " AND date(o.created_at, '+7 hours') >= ?"; params.push(dateFrom === 'today' ? vnToday : dateFrom); }
   if (dateTo) { whereClause += " AND date(o.created_at, '+7 hours') <= ?"; params.push(dateTo === 'today' ? vnToday : dateTo); }
 
-  const countResult = (await db.prepare(`SELECT COUNT(*) as total FROM orders o ${whereClause}`).bind(...params).first()) as { total?: number } | null;
+  let countResult: { total?: number } | null = null;
+  try {
+    countResult = (await db.prepare(`SELECT COUNT(*) as total FROM orders o ${whereClause}`).bind(...params).first()) as { total?: number } | null;
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    if (scope.isShipper && /no such column/i.test(msg)) {
+      whereClause = baseWhereBeforeShipper;
+      params.length = 0;
+      params.push(...baseParamsBeforeShipper);
+      if (customerId) { whereClause += ' AND o.customer_id = ?'; params.push(customerId); }
+      if (tableId) { whereClause += ' AND o.table_id = ?'; params.push(tableId); }
+      if (locationId) { whereClause += ' AND o.location_id = ?'; params.push(locationId); }
+      if (status) { whereClause += ' AND o.status = ?'; params.push(status); }
+      if (paymentStatus) { whereClause += ' AND o.payment_status = ?'; params.push(paymentStatus); }
+      if (date) { whereClause += " AND date(o.created_at, '+7 hours') = ?"; params.push(date === 'today' ? vnToday : date); }
+      if (dateFrom) { whereClause += " AND date(o.created_at, '+7 hours') >= ?"; params.push(dateFrom === 'today' ? vnToday : dateFrom); }
+      if (dateTo) { whereClause += " AND date(o.created_at, '+7 hours') <= ?"; params.push(dateTo === 'today' ? vnToday : dateTo); }
+      countResult = (await db.prepare(`SELECT COUNT(*) as total FROM orders o ${whereClause}`).bind(...params).first()) as { total?: number } | null;
+    } else {
+      throw err;
+    }
+  }
   const total = Number(countResult?.total || 0);
   const offset = (pageNum - 1) * limitNum;
   const safeSort = ALLOWED_SORT_COLUMNS[sort] || 'o.created_at';

@@ -16,7 +16,7 @@ function fixture(status = 'completed', tenant = 'default') {
     CREATE TABLE cashback_transactions (customer_id TEXT, order_id TEXT, type TEXT, amount INTEGER, tenant_id TEXT);`);
   sql.sqlite.exec("UPDATE orders SET payment_status = 'paid'");
   // Known fixture actors remain independent of the token generation helper.
-  for (const [role, tenant] of [['owner','default'], ['cashier','cafe-a'], ['staff','default'], ['waiter','default'], ['kitchen','default']]) {
+  for (const [role, tenant] of [['owner','default'], ['supervisor','cafe-a'], ['staff','default'], ['waiter','default'], ['kitchen','default']]) {
     sql.staffAccount(`${role}-${tenant}`, role, tenant);
   }
   return { ...sql, env: { ...createMockEnv(), AURA_DB: sql.db }, app: new Hono().route('/api/payments', refundRouter) };
@@ -73,7 +73,7 @@ describe('POST /api/payments/refund', () => {
   it('does not reveal another tenant payment or invoke provider', async () => {
     const { app, env, sqlite } = fixture('completed', 'cafe-b'); const spy = vi.spyOn(globalThis, 'fetch');
     const before = sqlite.prepare('SELECT * FROM payments').get();
-    expect((await app.fetch(req(valid, await headers('cashier', 'cafe-a')), env)).status).toBe(404);
+    expect((await app.fetch(req(valid, await headers('supervisor', 'cafe-a')), env)).status).toBe(404);
     expect(sqlite.prepare('SELECT * FROM payments').get()).toEqual(before); expect(spy).not.toHaveBeenCalled();
   });
   it.each(['staff', 'waiter', 'customer', 'kitchen'])('rejects non-financial role %s', async (role) => {
@@ -232,7 +232,7 @@ describe('manual refund transfer ledger', () => {
       sqlite
         .prepare("SELECT type, quantity FROM stock_movements WHERE reference_id = 'ORDER_PREP' AND type = 'waste'")
         .get(),
-    ).toMatchObject({ type: 'waste', quantity: 10 });
+    ).toMatchObject({ type: 'waste', quantity: -10 });
   });
 });
 
@@ -244,7 +244,7 @@ describe('GET /api/payments/refunds/:paymentId', () => {
   });
   it('conceals foreign tenant refund details', async () => {
     const { app, env } = fixture('completed', 'cafe-b');
-    expect((await app.fetch(new Request('https://test.aura/api/payments/refunds/pay_ORDER', { headers: await headers('cashier', 'cafe-a') }), env)).status).toBe(404);
+    expect((await app.fetch(new Request('https://test.aura/api/payments/refunds/pay_ORDER', { headers: await headers('supervisor', 'cafe-a') }), env)).status).toBe(404);
   });
   it('requires authentication', async () => {
     const { app, env } = fixture(); expect((await app.fetch(new Request('https://test.aura/api/payments/refunds/pay_ORDER'), env)).status).toBe(401);

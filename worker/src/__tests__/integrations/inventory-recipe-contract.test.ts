@@ -36,6 +36,9 @@ describe('Inventory / Recipe Contract', () => {
             return null as T;
           },
           all: async <T = unknown>() => {
+            if (sql.includes('recipes WHERE product_id')) {
+              return { results: recipes.filter(r => r.product_id === binds[0]) } as any;
+            }
             if (sql.includes('FROM recipe_items ri')) {
               const joined = recipe_items.filter(ri => ri.recipe_id === binds[0]).map(ri => {
                 const ing = ingredients.find(i => i.id === ri.ingredient_id);
@@ -277,6 +280,9 @@ describe('Inventory / Recipe Contract', () => {
             return null;
           },
           all: async () => {
+            if (sql.includes('recipes WHERE product_id')) {
+              return { results: binds[0] === 'prod_espresso' ? [{ id: 'rec_esp', product_id: 'prod_espresso', name: 'Espresso BOM' }] : [] };
+            }
             if (sql.includes('FROM recipe_items ri')) {
               return {
                 results: [{ id: 'ri_1', recipe_id: 'rec_esp', ingredient_id: 'ing_beans', quantity: 18, unit: 'g', ing_name: 'Beans', cost_per_unit: 500 }],

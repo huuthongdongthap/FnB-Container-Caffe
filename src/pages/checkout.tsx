@@ -248,7 +248,7 @@ export function CheckoutPage() {
         isProcessing={payosRetrying}
         error={payosError}
         onPlaceOrder={handlePlaceOrder}
-        locale={i18n.language || 'vi'}
+        locale={i18n?.language || 'vi'}
         onUpdateQuantity={updateQuantity}
         onRemoveItem={removeItem}
         onClearCart={() => { clearCheckoutIntent(); clearCart(); }}

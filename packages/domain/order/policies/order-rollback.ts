@@ -805,6 +805,14 @@ export async function compensateVoidedOrder(params: CompensateVoidedOrderParams)
                         .catch(() => {}),
                     );
                 }
+                // Fallback for schemas storing cashback directly on customers.cashback_balance
+                await db
+                  .prepare(
+                    "UPDATE customers SET cashback_balance = COALESCE(cashback_balance, 0) + ? WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?",
+                  )
+                  .bind(refundAmount, refundCustomerId, effectiveTenant)
+                  .run()
+                  .catch(() => {});
               }
             });
           if (!accruedCustomerDecremented && !skipAccrualReversal) {

@@ -558,7 +558,8 @@ describe('Wave 1 KDS & Orders Regressions (#213, #216, #219, #220, #221, #235)',
         total_spent: number;
       };
       expect(custRow.loyalty_points).toBe(70);
-      expect(custRow.total_spent).toBe(40000);
+      // No earn accrual was credited for ord-paid-cancel, so total_spent is not decremented (#257)
+      expect(custRow.total_spent).toBe(100000);
 
       const sessRow = sqlite.prepare('SELECT order_count, total_amount, current_order_id FROM table_sessions WHERE id = ?').get('sess-1') as {
         order_count: number;
@@ -730,7 +731,8 @@ describe('Wave 1 KDS & Orders Regressions (#213, #216, #219, #220, #221, #235)',
       const list = Array.isArray(riderJson.data)
         ? riderJson.data
         : riderJson.data?.orders ?? riderJson.orders ?? [];
-      expect(list.length).toBeGreaterThanOrEqual(2);
+      // Rider only sees delivery orders in their custody/unassigned pool (#259)
+      expect(list.length).toBeGreaterThanOrEqual(1);
 
       // 5. PayOS reconcile triggers DO fan-out cleanly
       const { namespace, instances } = createInMemoryBroadcasterNamespace();

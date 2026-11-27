@@ -10,6 +10,7 @@ afterEach(() => { for (const { sqlite } of fixtures.splice(0)) sqlite.close(); }
 const entry = { items: [{ id: 'coffee', name: 'Coffee', price: 1000, quantity: 2 }], total: 1000,
   customer_name: 'Split customer', customer_phone: '0909123456', payment_method: 'cod' };
 const payload = { table_id: 'D1', orders: [entry, { ...entry, payment_method: 'payos' }] };
+const staffActor = { id: 'staff-1', role: 'staff', tenantId: 'default' } as const;
 const request = (body: unknown) => new Request('https://test.aura/api/orders/split', {
   method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
 });
@@ -17,7 +18,7 @@ const request = (body: unknown) => new Request('https://test.aura/api/orders/spl
 describe('splitOrders', () => {
   it('creates independent bills with stable response shape and correct catalog prices', async () => {
     const { env, sqlite } = fixture();
-    const response = await splitOrders(request(payload), env);
+    const response = await splitOrders(request(payload), env, undefined, staffActor);
     expect(response.status).toBe(201);
     const body = await response.json() as any;
     expect(body.success).toBe(true); expect(body.data).toHaveLength(2);
@@ -29,33 +30,33 @@ describe('splitOrders', () => {
   it('defaults to COD when a payment method is omitted', async () => {
     const { env } = fixture();
     const { payment_method: _method, ...withoutMethod } = entry;
-    const response = await splitOrders(request({ table_id: 'D1', orders: [withoutMethod, withoutMethod] }), env);
+    const response = await splitOrders(request({ table_id: 'D1', orders: [withoutMethod, withoutMethod] }), env, undefined, staffActor);
     expect(response.status).toBe(201);
     expect((await response.json() as any).data.every((o: any) => o.payment_method === 'cod')).toBe(true);
   });
   it.each([[], [entry], Array(5).fill(entry)])('rejects invalid number of sub-orders', async orders => {
     const { env, sqlite } = fixture();
-    expect((await splitOrders(request({ table_id: 'D1', orders }), env)).status).toBe(400);
+    expect((await splitOrders(request({ table_id: 'D1', orders }), env, undefined, staffActor)).status).toBe(400);
     expect(sqlite.prepare('SELECT COUNT(*) count FROM orders').get()).toMatchObject({ count: 0 });
   });
   it('rejects missing table information', async () => {
     const { env } = fixture();
-    expect((await splitOrders(request({ orders: [entry, entry] }), env)).status).toBe(400);
+    expect((await splitOrders(request({ orders: [entry, entry] }), env, undefined, staffActor)).status).toBe(400);
   });
   it('rejects unresolved tables without a table-less fallback', async () => {
     const { env } = fixture();
-    expect((await splitOrders(request({ ...payload, table_id: 'missing-table' }), env)).status).toBe(400);
+    expect((await splitOrders(request({ ...payload, table_id: 'missing-table' }), env, undefined, staffActor)).status).toBe(400);
   });
   it.each(['momo', 'apple_pay', 'google_pay'])('rejects unsupported method %s before writing', async method => {
     const { env, sqlite } = fixture();
-    const response = await splitOrders(request({ ...payload, orders: [entry, { ...entry, payment_method: method }] }), env);
+    const response = await splitOrders(request({ ...payload, orders: [entry, { ...entry, payment_method: method }] }), env, undefined, staffActor);
     expect(response.status).toBe(400);
     expect(sqlite.prepare('SELECT COUNT(*) count FROM orders').get()).toMatchObject({ count: 0 });
   });
   it('returns a sanitized failure on database errors', async () => {
     const { env } = fixture();
     env.AURA_DB.prepare = () => { throw new Error('D1 error'); };
-    const response = await splitOrders(request(payload), env);
+    const response = await splitOrders(request(payload), env, undefined, staffActor);
     expect(response.status).toBe(500);
     expect(await response.json()).toEqual({ success: false, error: 'Failed to create split orders' });
   });

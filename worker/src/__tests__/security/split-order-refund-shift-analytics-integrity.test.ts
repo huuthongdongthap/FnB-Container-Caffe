@@ -66,7 +66,7 @@ describe('Split-order concurrency & BOM conservation, manual refund fanout & vou
       INSERT INTO recipe_ingredients VALUES ('rec_1', 'prod_latte', 'inv_beans', 10, 'g', 'sadec');
       INSERT INTO inventory_transactions VALUES ('itx_parent_1', 'inv_beans', 'order', -20, 500, 'order', 'ord_parent_1', 'Order #ord_parent_1: 2xprod_latte', 'pos', 'sadec');
       INSERT INTO customers VALUES ('cust_cb_1', '0901112222', 0, 'sadec');
-      INSERT INTO orders VALUES ('ord_parent_1', '[{"id":"prod_latte","product_id":"prod_latte","name":"Latte","quantity":2,"price":45000}]', 90000, 0, 0, 85000, 'pending', 'Parent', '0901112222', 'cust_cb_1', NULL, NULL, 'cod', 'unpaid', NULL, NULL, 5000, 'R1', NULL, '2026-11-17T00:00:00Z', '2026-11-17T00:00:00Z', 'sadec');
+      INSERT INTO orders VALUES ('ord_parent_1', '[{"id":"prod_latte","product_id":"prod_latte","name":"Latte","quantity":2,"price":45000}]', 90000, 0, 0, 90000, 'pending', 'Parent', '0901112222', 'cust_cb_1', NULL, NULL, 'cod', 'unpaid', NULL, NULL, 5000, 'R1', NULL, '2026-11-17T00:00:00Z', '2026-11-17T00:00:00Z', 'sadec');
       INSERT INTO orders VALUES ('ord_paid_completed', '[{"id":"prod_latte","product_id":"prod_latte","name":"Latte","quantity":1,"price":45000}]', 45000, 0, 0, 45000, 'confirmed', 'PaidGuest', '0909998888', NULL, NULL, NULL, 'payos', 'completed', NULL, NULL, 0, 'R1', NULL, '2026-11-17T00:00:00Z', '2026-11-17T00:00:00Z', 'sadec');
     `);
     const db = createSqliteD1(sqlite);

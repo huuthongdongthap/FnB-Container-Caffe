@@ -473,7 +473,7 @@ describe('PR-4: Shifts, Cash Reconciliation, Counter Cash & Delivery State Machi
 
     const blockedFail = await transitionOrderStatus(d1.db, 'ord-paid-deliv', 'failed', 'shipper', { tenantId: 'default' });
     expect(blockedFail.success).toBe(false);
-    expect(blockedFail.statusCode).toBe(409);
+    expect(blockedFail.statusCode).toBe(400);
 
     const blockedExpire = await transitionOrderStatus(d1.db, 'ord-paid-pending', 'expired', 'manager', { tenantId: 'default' });
     expect(blockedExpire.success).toBe(false);

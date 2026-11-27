@@ -164,7 +164,7 @@ describe('customers smoke', () => {
           if (sql.includes('INSERT INTO customers') && !sql.includes('loyalty_tier')) {
             throw new Error('D1_ERROR: table customers has no column named tier');
           }
-          return { success: true };
+          return { success: true, meta: { changes: 1 } };
         }
       })
     })) as any;

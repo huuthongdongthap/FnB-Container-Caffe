@@ -692,6 +692,8 @@ describe('Phase 49 Slice AV2 — Mobile POS, Check-in, Admin Sales/Metrics/Audit
         items: JSON.stringify([{ name: 'Matcha Latte', qty: 1, price: 55000 }]),
         total: 55000,
         status: 'preparing',
+        order_type: 'delivery',
+        assigned_shipper_id: 'u-shipper',
         tenant_id: 'store-a',
       };
 

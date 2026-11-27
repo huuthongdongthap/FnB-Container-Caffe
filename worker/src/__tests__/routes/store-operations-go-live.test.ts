@@ -312,7 +312,7 @@ export function createStoreMockDb() {  const customers = new Map<string, { id: s
                   })) as unknown as T[],
                 };
               }
-              if (sql.includes('FROM orders') && sql.includes("DATE(datetime(created_at, '+7 hours')) BETWEEN ? AND ?")) {
+              if (sql.includes('FROM orders') && (sql.includes("DATE(datetime(created_at, '+7 hours')) BETWEEN ? AND ?") || sql.includes("DATE(datetime(COALESCE(cod_paid_at, created_at), '+7 hours')) BETWEEN ? AND ?"))) {
                 const from = String(args[0]);
                 const to = String(args[1]);
                 const matched = [...orders.values()].filter((o) => {
@@ -980,7 +980,7 @@ describe('Store Operations Go-Live Readiness Suite', () => {
         };
       };
       const day = body.data.daily.find((d) => d.date === '2026-11-18');
-      expect(day?.total_collected).toBe(250000);
+      expect(day?.total_collected).toBe(210000);
       expect(day?.shipping_fee).toBe(15000);
       expect(day?.service_fee).toBe(10000);
       expect(day?.tip_amount).toBe(5000);

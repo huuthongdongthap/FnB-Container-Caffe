@@ -61,12 +61,12 @@ export async function handleRefund(c: Context<{ Bindings: Env }>, openApi = fals
         ? body.idempotency_key.trim()
         : typeof body.idempotencyKey === 'string' && body.idempotencyKey.trim()
           ? body.idempotencyKey.trim()
-          : (c.req.header('idempotency-key') || '').trim();
+          : (typeof c.req.header === 'function' ? c.req.header('idempotency-key') || '' : '').trim();
     const manualTransferRef = typeof body.manual_transfer_ref === 'string' && body.manual_transfer_ref.trim()
       ? body.manual_transfer_ref.trim()
       : (typeof body.manualTransferRef === 'string' && body.manualTransferRef.trim()
         ? body.manualTransferRef.trim()
-        : rawIdempotencyKey);
+        : '');
     // An order may have multiple payment attempts. A settled reference identifies
     // its original payment even when another paid attempt now wins generic lookup.
     const referencedTransfer = !rawPaymentId && rawOrderId && manualTransferRef
@@ -198,7 +198,7 @@ export async function handleRefund(c: Context<{ Bindings: Env }>, openApi = fals
     const amount = parsed.data.amount ?? refundableBalance;
     if (!['paid', 'completed'].includes(payment.status)) return c.json(ERRORS.PAYMENT_NOT_PAID, 400);
     const effectiveTransferRef =
-      manualTransferRef || (isCashOrCodPayment && canManualRefund ? `cash_ref:${payment.id}:${priorRefunded}:${amount}` : '');
+      manualTransferRef || (isCashOrCodPayment && canManualRefund ? (rawIdempotencyKey || `cash_ref:${payment.id}:${priorRefunded}:${amount}`) : '');
     const hasManualTransferRef = effectiveTransferRef.length > 0;
     // Only a manually settled transfer or authorized cash refund may add a tranche on top of an existing partial refund.
     if (payment.refund_status && !(payment.refund_status === 'partial' && hasManualTransferRef)) return c.json({ ...ERRORS.PAYMENT_ALREADY_REFUNDED,

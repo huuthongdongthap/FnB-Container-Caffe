@@ -199,6 +199,19 @@ reviewsRouter.post('/', optionalAuth(), async(c) => {
         .catch(() => null);
       if (!orderRow) {
         orderRow = await db
+          .prepare('SELECT id, customer_id, customer_phone, status, tenant_id FROM orders WHERE id = ?')
+          .bind(cleanOrderId)
+          .first<{
+            id: string;
+            customer_id?: string | null;
+            customer_phone?: string | null;
+            status?: string | null;
+            tenant_id?: string | null;
+          }>()
+          .catch(() => null);
+      }
+      if (!orderRow) {
+        orderRow = await db
           .prepare('SELECT id, customer_id, tenant_id FROM orders WHERE id = ?')
           .bind(cleanOrderId)
           .first<{ id: string; customer_id?: string | null; tenant_id?: string | null }>()

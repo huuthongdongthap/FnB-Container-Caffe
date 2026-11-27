@@ -291,6 +291,7 @@ describe('sub-handlers', () => {
       ]);
       const env = makeEnv(db);
       const ctx = buildCtx(env, {
+        header: vi.fn((name: string) => (name === 'Authorization' ? 'Bearer mock-owner-token' : undefined)),
         json: async() => ({
           plan_id: 'plan_1',
           customer_name: 'Nguyen',

@@ -2,9 +2,50 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { createMockDB, createMockEnv } from '../test-utils';
 import { Hono } from 'hono';
 import { birthdayRouter } from '../../routes/birthday';
+import { generateJWT } from '../../lib/jwt';
+
+const TEST_JWT_SECRET = 'test-birthday-jwt-secret-minimum-32-chars';
+
+async function makeStaffToken(): Promise<string> {
+  return generateJWT(
+    {
+      id: 'staff-1',
+      sub: 'staff-1',
+      name: 'Staff',
+      role: 'staff',
+      tenantId: 'default',
+      authVersion: 1,
+      authTime: Math.floor(Date.now() / 1000),
+      sessionType: 'staff-web',
+    },
+    TEST_JWT_SECRET,
+    3600
+  );
+}
 
 function makeDB(): ReturnType<typeof createMockDB> {
-  return createMockDB();
+  const db = createMockDB();
+  const origPrepare = db.prepare;
+  db.prepare = vi.fn().mockImplementation((sql: string) => {
+    if (/FROM users WHERE id = \?/i.test(sql)) {
+      return {
+        bind: vi.fn().mockReturnValue({
+          first: vi.fn().mockResolvedValue({
+            id: 'staff-1',
+            name: 'Staff',
+            role: 'staff',
+            tenant_id: 'default',
+            is_active: 1,
+            auth_version: 1,
+          }),
+          all: vi.fn().mockResolvedValue({ results: [] }),
+          run: vi.fn().mockResolvedValue({ success: true }),
+        }),
+      };
+    }
+    return origPrepare(sql);
+  }) as any;
+  return db;
 }
 
 describe('birthday smoke', () => {
@@ -15,13 +56,14 @@ describe('birthday smoke', () => {
   it('GET /check — missing params returns 400', async() => {
     const app = new Hono();
     app.route('/api/birthday', birthdayRouter);
+    const token = await makeStaffToken();
 
     const req = new Request('https://test.aura/api/birthday/check', {
       method: 'GET',
-      headers: { 'Content-Type': 'application/json' }
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }
     });
 
-    const env = { ...createMockEnv(), AURA_DB: makeDB() };
+    const env = { ...createMockEnv(), JWT_SECRET: TEST_JWT_SECRET, AURA_DB: makeDB() };
     const res = await app.fetch(req, env);
     expect(res.status).toBe(400);
   });
@@ -29,31 +71,33 @@ describe('birthday smoke', () => {
   it('GET /check — no customer found returns eligible:false', async() => {
     const app = new Hono();
     app.route('/api/birthday', birthdayRouter);
+    const token = await makeStaffToken();
 
     const req = new Request('https://test.aura/api/birthday/check?phone=0000000000', {
       method: 'GET',
-      headers: { 'Content-Type': 'application/json' }
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }
     });
 
-    const env = { ...createMockEnv(), AURA_DB: makeDB() };
+    const env = { ...createMockEnv(), JWT_SECRET: TEST_JWT_SECRET, AURA_DB: makeDB() };
     const res = await app.fetch(req, env);
     expect(res.status).toBe(200);
     const data = await res.json() as Record<string, unknown>;
     expect(data.success).toBe(true);
-    expect(data.data.eligible).toBe(false);
+    expect((data.data as Record<string, unknown>).eligible).toBe(false);
   });
 
   it('POST /redeem — missing body returns 400', async() => {
     const app = new Hono();
     app.route('/api/birthday', birthdayRouter);
+    const token = await makeStaffToken();
 
     const req = new Request('https://test.aura/api/birthday/redeem', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
       body: JSON.stringify({})
     });
 
-    const env = { ...createMockEnv(), AURA_DB: makeDB() };
+    const env = { ...createMockEnv(), JWT_SECRET: TEST_JWT_SECRET, AURA_DB: makeDB() };
     const res = await app.fetch(req, env);
     expect(res.status).toBe(400);
   });
@@ -61,6 +105,7 @@ describe('birthday smoke', () => {
   it('GET /check and POST /redeem support canonical D1 date_of_birth column', async() => {
     const app = new Hono();
     app.route('/api/birthday', birthdayRouter);
+    const token = await makeStaffToken();
 
     const todayIso = new Date().toISOString().slice(0, 10);
     const dob = `1995-${todayIso.slice(5, 10)}`;
@@ -68,6 +113,9 @@ describe('birthday smoke', () => {
     db.prepare = vi.fn().mockImplementation((sql: string) => ({
       bind: vi.fn().mockReturnValue({
         first: vi.fn().mockImplementation(async () => {
+          if (/FROM users WHERE id = \?/i.test(sql)) {
+            return { id: 'staff-1', name: 'Staff', role: 'staff', tenant_id: 'default', is_active: 1, auth_version: 1 };
+          }
           if (sql.includes('date_of_birth AS birthday')) {
             return { id: 'cust_bday', name: 'Lan', phone: '0909111222', birthday: dob };
           }
@@ -80,9 +128,12 @@ describe('birthday smoke', () => {
       })
     })) as any;
 
-    const env = { ...createMockEnv(), AURA_DB: db };
+    const env = { ...createMockEnv(), JWT_SECRET: TEST_JWT_SECRET, AURA_DB: db };
     const checkRes = await app.fetch(
-      new Request('https://test.aura/api/birthday/check?phone=0909111222', { method: 'GET' }),
+      new Request('https://test.aura/api/birthday/check?phone=0909111222', {
+        method: 'GET',
+        headers: { Authorization: `Bearer ${token}` }
+      }),
       env
     );
     expect(checkRes.status).toBe(200);
@@ -94,7 +145,7 @@ describe('birthday smoke', () => {
     const redeemRes = await app.fetch(
       new Request('https://test.aura/api/birthday/redeem', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({ customer_id: 'cust_bday' })
       }),
       env

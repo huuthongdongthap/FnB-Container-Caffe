@@ -1224,13 +1224,14 @@ reservationsRouter.patch('/:id', optionalAuth() as any, requireReservationStaff(
   if ((body.party_size !== undefined || body.guest_count !== undefined) && (!Number.isFinite(nextPartySize) || !Number.isInteger(nextPartySize) || nextPartySize < 1)) {
     return c.json({ success: false, error: 'party_size must be a positive integer' }, 400);
   }
+  const currentDate = String(rsv.date ?? rsv.reservation_date ?? rsv.reserved_date ?? '').trim();
   const nextDate = body.date !== undefined
     ? String(body.date).trim()
     : body.reservation_date !== undefined
       ? String(body.reservation_date).trim()
       : body.reserved_date !== undefined
         ? String(body.reserved_date).trim()
-        : String(rsv.date ?? rsv.reservation_date ?? rsv.reserved_date ?? '').trim();
+        : currentDate;
   const nextTime = body.time !== undefined
     ? String(body.time).trim()
     : body.reservation_time !== undefined
@@ -1243,7 +1244,7 @@ reservationsRouter.patch('/:id', optionalAuth() as any, requireReservationStaff(
     if (!isValidCalendarDate(nextDate)) {
       return c.json({ success: false, error: 'Ngày không hợp lệ (YYYY-MM-DD)' }, 400);
     }
-    if (nextDate < getTodayVN()) {
+    if (nextDate !== currentDate && nextDate < getTodayVN()) {
       return c.json({ success: false, error: 'Cannot reschedule reservation to a past date' }, 400);
     }
   }

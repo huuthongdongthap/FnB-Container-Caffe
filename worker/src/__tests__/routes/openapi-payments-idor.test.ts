@@ -34,6 +34,7 @@ function makePaymentsTestEnv() {
   // a token whose id has no row reads as a revoked session, not as "no data".
   fixture.staffAccount('mgr-1', 'manager', 'default');
   fixture.staffAccount('staff-a', 'cashier');
+  fixture.staffAccount('sup-a', 'supervisor', 'cafe-a');
   const db = fixture.db;
 
   return {
@@ -238,7 +239,7 @@ describe('OpenAPI Payments IDOR & RBAC Hardening', () => {
     await env.AURA_DB.prepare("UPDATE payments SET status = 'completed' WHERE id = ?").bind(PAY_2).run();
     const before = await env.AURA_DB.prepare('SELECT * FROM payments WHERE id = ?').bind(PAY_2).first();
     const issuedAt = Math.floor(Date.now() / 1000);
-    const token = await generateJWT({ id: 'staff-a', role: 'cashier', tenantId: 'cafe-a' , authVersion: 1, authTime: issuedAt, sessionType: 'staff-web'}, TEST_SECRET, 28800, issuedAt);
+    const token = await generateJWT({ id: 'sup-a', role: 'supervisor', tenantId: 'cafe-a' , authVersion: 1, authTime: issuedAt, sessionType: 'staff-web'}, TEST_SECRET, 28800, issuedAt);
     const auth = { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' };
     const url = operation === 'refund' ? '/api/payments/refund' : operation === 'refund-details' ? `/api/payments/refunds/${PAY_2}` : `/api/payments/${PAY_2}`;
     const spy = vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('Provider must not be invoked'));

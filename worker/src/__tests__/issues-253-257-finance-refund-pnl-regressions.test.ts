@@ -62,12 +62,14 @@ describe('Issues #253-#257 Finance, Refund, P&L, ERP & Shift Regressions', () =>
       );
       CREATE TABLE payments (
         id TEXT PRIMARY KEY, order_id TEXT, method TEXT, amount REAL, status TEXT,
+        refund_status TEXT, refund_amount REAL DEFAULT 0,
         tenant_id TEXT DEFAULT 'default', created_at TEXT, updated_at TEXT
       );
       CREATE TABLE _metrics (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, value REAL, labels TEXT, timestamp INTEGER);
       CREATE TABLE staff_shifts (
         id TEXT PRIMARY KEY, staff_id TEXT, role TEXT, clock_in TEXT, clock_out TEXT,
         cash_sales REAL DEFAULT 0, total_sales REAL DEFAULT 0, order_count INTEGER DEFAULT 0,
+        status TEXT DEFAULT 'active', attendance_state TEXT DEFAULT 'active',
         tenant_id TEXT DEFAULT 'default'
       );
       CREATE TABLE shift_reconciliations (id TEXT PRIMARY KEY, shift_id TEXT, tenant_id TEXT DEFAULT 'default');
@@ -97,7 +99,7 @@ describe('Issues #253-#257 Finance, Refund, P&L, ERP & Shift Regressions', () =>
     const qcBody = (await qcRes.json()) as { status: string };
     expect(qcBody.status).toBe('ready');
 
-    const collectRes = await collectCodPayment(db, 'DIN-cod-1', 'staff-1', { tenantId: 'default' });
+    const collectRes = await collectCodPayment(db, 'DIN-cod-1', 'default', 'staff-1');
     expect(collectRes.success).toBe(true);
 
     const metric = raw.prepare("SELECT value FROM _metrics WHERE name = 'revenue'").get() as { value: number } | undefined;
@@ -237,14 +239,15 @@ describe('Issues #253-#257 Finance, Refund, P&L, ERP & Shift Regressions', () =>
       CREATE TABLE cash_payouts (id TEXT PRIMARY KEY, shift_id TEXT, tenant_id TEXT DEFAULT 'default', amount REAL, status TEXT, created_at TEXT);
       CREATE TABLE staff_shifts (
         id TEXT PRIMARY KEY, staff_id TEXT, role TEXT, clock_in TEXT, clock_out TEXT,
-        opening_cash REAL DEFAULT 0, tenant_id TEXT DEFAULT 'default', attendance_state TEXT DEFAULT 'active'
+        opening_cash REAL DEFAULT 0, hours_worked REAL, notes TEXT,
+        tenant_id TEXT DEFAULT 'default', status TEXT DEFAULT 'active', attendance_state TEXT DEFAULT 'active'
       );
       CREATE TABLE orders (
         id TEXT PRIMARY KEY, tenant_id TEXT DEFAULT 'default', status TEXT, payment_status TEXT, total REAL
       );
       CREATE TABLE payments (
         id TEXT PRIMARY KEY, order_id TEXT, method TEXT, amount REAL, status TEXT,
-        refund_amount REAL DEFAULT 0, tenant_id TEXT DEFAULT 'default', created_at TEXT, updated_at TEXT
+        refund_status TEXT, refund_amount REAL DEFAULT 0, tenant_id TEXT DEFAULT 'default', created_at TEXT, updated_at TEXT
       );
       CREATE TABLE cash_payment_attributions (
         payment_id TEXT PRIMARY KEY, tenant_id TEXT DEFAULT 'default', shift_id TEXT, collected_by TEXT, settled_at TEXT
@@ -252,7 +255,9 @@ describe('Issues #253-#257 Finance, Refund, P&L, ERP & Shift Regressions', () =>
       CREATE TABLE shift_reconciliations (
         id TEXT PRIMARY KEY, shift_id TEXT, tenant_id TEXT, staff_id TEXT,
         opening_float REAL, opening_cash REAL, cash_sales_total REAL, cash_payouts_total REAL,
-        expected_cash REAL, actual_counted REAL, actual_cash REAL, variance REAL, variance_status TEXT,
+        cash_payment_total REAL, cash_payout_total REAL, denominations TEXT,
+        expected_cash REAL, actual_counted REAL, actual_cash REAL, variance REAL, variance_amount REAL, variance_status TEXT,
+        cash_sales REAL, remitted_cash REAL, closing_float REAL, handover_to_staff_id TEXT,
         online_sales_total REAL, reconciled_by TEXT, notes TEXT, reconciled_at TEXT, created_at TEXT,
         status TEXT DEFAULT 'completed', variance_reason TEXT
       );

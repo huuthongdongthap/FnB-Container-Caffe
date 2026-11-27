@@ -59,11 +59,29 @@ describe('durable Staff revocation and scope', () => {
   });
   it('cannot enroll an account promoted after the management permission check', async () => {
     const manager = await f.token('manager');
-    const batch = f.db.batch.bind(f.db);
-    f.db.batch = async statements => {
+    let promoted = false;
+    const promoteStaff = () => {
+      if (promoted) return;
+      promoted = true;
       f.sqlite.prepare("UPDATE users SET role = 'owner', auth_version = auth_version + 1 WHERE id = 'staff'").run();
-      return batch(statements);
     };
+    const origPrepare = f.db.prepare.bind(f.db);
+    f.db.prepare = ((sql: string) => {
+      const stmt = origPrepare(sql);
+      if (sql.includes('INSERT INTO staff_devices')) {
+        const origBind = stmt.bind.bind(stmt);
+        stmt.bind = (...args: unknown[]) => {
+          const bound = origBind(...args);
+          const origRun = bound.run.bind(bound);
+          bound.run = async () => {
+            promoteStaff();
+            return origRun();
+          };
+          return bound;
+        };
+      }
+      return stmt;
+    }) as typeof f.db.prepare;
     const response = await f.request('/mobile/devices/register', manager, 'POST', {
       device_token: 'race-device', device_name: 'Local test', staff_id: 'staff', pin: '5678', role: 'staff',
     });

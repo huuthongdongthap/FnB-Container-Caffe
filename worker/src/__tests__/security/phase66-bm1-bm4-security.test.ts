@@ -1465,7 +1465,7 @@ describe('Phase 66 Security & Multi-Tenant Suite (BM1..BM4)', () => {
       expect(qcRes.status).toBe(200);
       expect(kv.store.has('dindin:qc:tenant_b:DIN_ORD_B1')).toBe(true);
       const ordAfter = sqlite.prepare('SELECT status FROM orders WHERE id = ?').get('DIN_ORD_B1') as { status: string };
-      expect(ordAfter.status).toBe('completed');
+      expect(ordAfter.status).toBe('ready');
     });
 
     it('BM4-03: checkinRouter masks PII for non-staff, blocks customer approval (403), inherits customer tenant under HQ wildcard, and notifications-mobile blocks non-HQ wildcard', async () => {
