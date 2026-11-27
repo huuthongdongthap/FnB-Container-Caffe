@@ -375,7 +375,10 @@ birthdayRouter.put(
 });
 
 // GET /api/birthday/check — check eligibility
-birthdayRouter.get('/check', async(c) => {
+birthdayRouter.get(
+  '/check',
+  requireAuth(['owner', 'manager', 'supervisor', 'admin', 'staff', 'waiter', 'cashier', 'customer']),
+  async(c) => {
   if (hasCrossTenantBirthdayOverride(c)) {
     return c.json({ success: false, error: 'Cross-tenant access denied' }, 403);
   }
@@ -554,17 +557,7 @@ birthdayRouter.get('/check', async(c) => {
 // POST /api/birthday/redeem — redeem birthday discount
 birthdayRouter.post(
   '/redeem',
-  async (c, next) => {
-    const envRecord = (c.env ?? {}) as unknown as Record<string, unknown>;
-    const isProd =
-      c.env?.ENVIRONMENT === 'production' ||
-      c.env?.ENVIRONMENT === 'staging' ||
-      envRecord.NODE_ENV === 'production';
-    if ((isProd && c.env?.JWT_SECRET) || c.req.header('Authorization')) {
-      return requireAuth(['owner', 'manager', 'supervisor', 'admin', 'staff', 'waiter', 'cashier', 'customer'])(c, next);
-    }
-    await next();
-  },
+  requireAuth(['owner', 'manager', 'supervisor', 'admin', 'staff', 'waiter', 'cashier', 'customer']),
   async(c) => {
   if (hasCrossTenantBirthdayOverride(c)) {
     return c.json({ success: false, error: 'Cross-tenant access denied' }, 403);
@@ -578,10 +571,10 @@ birthdayRouter.post(
   }
   const data = parsed.data;
   const user = c.get('user' as never) as { id?: string; email?: string; role?: string } | undefined;
-  if (user?.role && !['owner', 'manager', 'supervisor', 'admin', 'staff', 'waiter', 'cashier', 'customer'].includes(user.role)) {
+  if (!user?.role || !['owner', 'manager', 'supervisor', 'admin', 'staff', 'waiter', 'cashier', 'customer'].includes(user.role)) {
     return c.json({ success: false, error: 'Forbidden' }, 403);
   }
-  if (user?.role === 'customer' && user.id && user.id !== data.customer_id && !user.email) {
+  if (user.role === 'customer' && (!user.id || user.id !== data.customer_id)) {
     return c.json({ success: false, error: 'Forbidden' }, 403);
   }
 

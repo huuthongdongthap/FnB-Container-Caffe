@@ -1,8 +1,8 @@
 import { getTenantId, isHQSuperAdmin, resolvePublicTenantId } from 'worker/src/middleware/tenant';
 import { verifyGuestOrderToken } from '../../customer/policies/order-ownership-policy';
 
-export const FINANCIAL_ROLES = ['owner', 'manager', 'admin', 'cashier'];
-export const PAYMENT_ROLES = [...FINANCIAL_ROLES, 'supervisor', 'staff', 'waiter', 'shipper'];
+export const FINANCIAL_ROLES = ['owner', 'admin', 'manager', 'supervisor'];
+export const PAYMENT_ROLES = [...FINANCIAL_ROLES, 'cashier', 'staff', 'waiter', 'shipper'];
 
 export interface PaymentOrderIdentity {
   tenant_id?: string | null;

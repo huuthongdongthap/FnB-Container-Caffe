@@ -245,13 +245,13 @@ export async function handleCancelOrder(c: Context<{ Bindings: Env }>) {
   if (isShipperCancel) {
     const existingRec = existing as Record<string, unknown>;
     const existingType = typeof existingRec.order_type === 'string' ? existingRec.order_type.trim().toLowerCase() : '';
-    const assignedShipper = typeof existingRec.assigned_shipper_id === 'string' ? existingRec.assigned_shipper_id.trim() : '';
+    const assignedShipper = String(existingRec.assigned_shipper_id ?? existingRec.shipper_id ?? '').trim();
     const callerId = String(user?.id || (user as unknown as Record<string, unknown> | undefined)?.sub || '').trim();
     if (existingType && existingType !== 'delivery') {
       return c.json({ success: false, error: 'Shippers may only cancel assigned delivery orders' }, 403);
     }
-    if (assignedShipper && assignedShipper !== callerId) {
-      return c.json({ success: false, error: 'Forbidden: order is assigned to another shipper' }, 403);
+    if (!assignedShipper || !callerId || assignedShipper !== callerId) {
+      return c.json({ success: false, error: 'Forbidden: order is not assigned to this shipper' }, 403);
     }
   }
   const canCompensatePaid = ['owner', 'admin', 'manager', 'supervisor'].includes(normalizedCancelRole);

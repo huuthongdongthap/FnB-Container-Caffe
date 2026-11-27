@@ -53,7 +53,7 @@ export const SopRecordViolationSchema = z
 
 export const SopApplySanctionSchema = z
   .object({
-    step: SopDisciplineStepEnum,
+    step: SopDisciplineStepEnum.optional(),
     sanctionNote: z.string().max(2000).optional(),
   })
   .openapi('SopApplySanction');

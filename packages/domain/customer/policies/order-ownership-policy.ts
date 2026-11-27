@@ -295,6 +295,7 @@ export interface EvaluateOrderClaimPolicyInput {
     customer_id?: string | null;
     customer_phone?: string | null;
     table_id?: string | null;
+    guest_token_hash?: string | null;
     order_token?: string | null;
   };
   customerProfilePhone?: string | null;
@@ -380,6 +381,10 @@ export function evaluateOrderClaimPolicy(
       return { allowed: false, statusCode: 403, error: 'A verified phone number or valid order token is required to claim this order' };
     }
     return { allowed: true, statusCode: 200 };
+  }
+
+  if (hasGuestTokenHash(order)) {
+    return { allowed: false, statusCode: 403, error: 'Valid order token is required to claim this guest order' };
   }
 
   const orderTableId = typeof order.table_id === 'string' && order.table_id.trim() ? order.table_id.trim() : null;

@@ -364,8 +364,12 @@ export function registerUsageHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
         const byTypeMap: Record<string, number> = {};
         const byDiscountTypeMap: Record<string, number> = {};
         for (const p of scopedPromos) {
-          const t = String(p.type ?? (p.discount_type === 'percent' ? 'percentage' : (p.discount_type || 'percentage')));
-          const dt = String(p.discount_type || 'percentage');
+          const isFixed = [p.type, p.discount_type].some((v) => {
+            const s = String(v ?? '').trim().toLowerCase();
+            return s === 'fixed' || s === 'fixed_amount' || s === 'amount';
+          });
+          const t = isFixed ? 'fixed' : 'percent';
+          const dt = isFixed ? 'fixed_amount' : 'percentage';
           byTypeMap[t] = (byTypeMap[t] || 0) + 1;
           byDiscountTypeMap[dt] = (byDiscountTypeMap[dt] || 0) + 1;
         }
@@ -509,6 +513,66 @@ export function registerUsageHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
         thisMonth: {
           usageCount: thisMonthUsage?.count || 0,
           totalDiscount: thisMonthUsage?.total_discount || 0,
+        },
+      },
+    });
+  });
+
+  // GET /api/promotions/{id}/usage - List promotion usage
+  app.openapi(PromotionRoutes.usage.list as any, async (c: any) => {
+    const db = getDatabase(c);
+    const tenantId = getTenantId(c).trim() || 'default';
+    const user = c.get('user');
+    if (!user || !PROMO_ADMIN_ROLES.includes(user.role)) {
+      return c.json({ success: false, error: 'Admin access required' }, 403);
+    }
+    const tenantCheck = verifyOpenApiPromoTenant(c, PROMO_ADMIN_ROLES, true);
+    if (tenantCheck) return tenantCheck;
+
+    const { id } = c.req.valid('param');
+    const query = c.req.valid('query') || {};
+    const page = Math.max(1, Number(query.page || 1));
+    const limit = Math.min(100, Math.max(1, Number(query.limit || 20)));
+    const offset = (page - 1) * limit;
+
+    const promo = await db
+      .prepare('SELECT id, tenant_id FROM promotions WHERE id = ? LIMIT 1')
+      .bind(id)
+      .first<Record<string, unknown>>()
+      .catch(() => null);
+    if (!promo || (tenantId !== '*' && !matchesTenantRow(promo, tenantId))) {
+      return c.json({ success: false, error: 'Promotion not found' }, 404);
+    }
+
+    const allUsagesRes = await db
+      .prepare('SELECT * FROM promotion_usages WHERE promotion_id = ? ORDER BY created_at DESC LIMIT ? OFFSET ?')
+      .bind(id, limit, offset)
+      .all<Record<string, unknown>>()
+      .catch(() => ({ results: [] as Record<string, unknown>[] }));
+    const countRow = await db
+      .prepare('SELECT COUNT(*) as total FROM promotion_usages WHERE promotion_id = ?')
+      .bind(id)
+      .first<{ total?: number }>()
+      .catch(() => ({ total: 0 }));
+    const total = Number(countRow?.total || 0);
+    const usages = (allUsagesRes.results || []).map((u) => ({
+      id: String(u.id ?? ''),
+      promotionId: String(u.promotion_id ?? id),
+      orderId: String(u.order_id ?? ''),
+      customerId: u.customer_id ? String(u.customer_id) : null,
+      discountAmount: Number(u.discount_amount ?? 0),
+      createdAt: String(u.created_at ?? ''),
+    }));
+
+    return c.json({
+      success: true,
+      data: {
+        usages,
+        meta: {
+          page,
+          limit,
+          total,
+          totalPages: Math.ceil(total / limit),
         },
       },
     });

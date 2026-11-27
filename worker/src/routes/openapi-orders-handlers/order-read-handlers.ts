@@ -16,6 +16,8 @@ import { canAccessOrder, verifyGuestOrderToken } from '@aura/domain-order';
 export { handleGetOrderSummary };
 
 const STAFF_ROLES = ['owner', 'manager', 'supervisor', 'staff', 'admin', 'waiter', 'kitchen', 'barista', 'chef', 'cashier', 'shipper', 'rider'];
+const KITCHEN_ROLES = new Set(['kitchen', 'barista', 'chef', 'bep']);
+const SHIPPER_ROLES = new Set(['shipper', 'rider']);
 const ALLOWED_SORT_COLUMNS: Record<string, string> = {
   created_at: 'o.created_at',
   total_amount: 'COALESCE(o.total_amount, o.total)',
@@ -24,16 +26,32 @@ const ALLOWED_SORT_COLUMNS: Record<string, string> = {
   total: 'COALESCE(o.total_amount, o.total)',
 };
 
-function resolveCustomerScope(c: Context<{ Bindings: Env }>): { allowAll: boolean; owner: string | null } {
-  const user = c.get('user') as Record<string, any> | undefined;
-  if (user && STAFF_ROLES.includes(user.role)) {
-    return { allowAll: true, owner: null };
+interface ActorReadScope {
+  allowAll: boolean;
+  owner: string | null;
+  isKitchen: boolean;
+  isShipper: boolean;
+  actorId: string | null;
+}
+
+function resolveCustomerScope(c: Context<{ Bindings: Env }>): ActorReadScope {
+  const user = c.get('user') as unknown as Record<string, unknown> | undefined;
+  const role = typeof user?.role === 'string' ? user.role.toLowerCase() : '';
+  const actorId = typeof user?.id === 'string' && user.id.trim() ? user.id.trim() : null;
+  if (user && STAFF_ROLES.includes(role)) {
+    return {
+      allowAll: true,
+      owner: null,
+      isKitchen: KITCHEN_ROLES.has(role),
+      isShipper: SHIPPER_ROLES.has(role),
+      actorId,
+    };
   }
   const owner =
-    user?.role === 'customer'
-      ? String(user.id ?? user.customerId ?? user.customer_id ?? '').trim() || null
+    role === 'customer'
+      ? String(user?.id ?? user?.customerId ?? user?.customer_id ?? '').trim() || null
       : null;
-  return { allowAll: false, owner };
+  return { allowAll: false, owner, isKitchen: false, isShipper: false, actorId };
 }
 
 async function resolveCustomerOwnerIds(
@@ -82,15 +100,39 @@ async function resolveCustomerOwnerIds(
   return Array.from(ids);
 }
 
-function projectForActor(
-  scope: { allowAll: boolean },
-  order: any,
-  items: any[],
-  full: (_o: any, _i: any[], _p: any[]) => any,
-  guest: (_o: any, _i: any[]) => any,
-  payments: any[],
-): any {
-  return scope.allowAll ? full(order, items, payments) : guest(order, items);
+function redactOrderPii<T extends Record<string, unknown>>(formatted: T): T {
+  const copy = { ...formatted } as Record<string, unknown>;
+  if ('customerPhone' in copy) copy.customerPhone = null;
+  if ('customerEmail' in copy) copy.customerEmail = null;
+  if ('customerAddress' in copy) copy.customerAddress = null;
+  if ('customer_phone' in copy) copy.customer_phone = null;
+  if ('customer_email' in copy) copy.customer_email = null;
+  if ('customer_address' in copy) copy.customer_address = null;
+  return copy as T;
+}
+
+function projectForActor<TOrder extends Record<string, unknown>, TItem, TPayment>(
+  scope: ActorReadScope,
+  order: TOrder,
+  items: TItem[],
+  full: (_o: TOrder, _i: TItem[], _p: TPayment[]) => Record<string, unknown>,
+  guest: (_o: TOrder, _i: TItem[]) => Record<string, unknown>,
+  payments: TPayment[],
+): Record<string, unknown> {
+  if (!scope.allowAll) {
+    return guest(order, items);
+  }
+  const formatted = full(order, items, payments);
+  if (scope.isKitchen) {
+    return redactOrderPii(formatted);
+  }
+  if (scope.isShipper) {
+    const assignedShipperId = typeof order.shipper_id === 'string' ? order.shipper_id.trim() : '';
+    if (!scope.actorId || assignedShipperId !== scope.actorId) {
+      return redactOrderPii(formatted);
+    }
+  }
+  return formatted;
 }
 
 /**
@@ -175,6 +217,10 @@ export async function handleListOrders(c: Context<{ Bindings: Env }>) {
   }
 
   if (scope.allowAll) {
+    if (scope.isShipper) {
+      whereClause += " AND o.order_type = 'delivery' AND (o.shipper_id IS NULL OR o.shipper_id = ?)";
+      params.push(scope.actorId || '');
+    }
     if (customerId) { whereClause += ' AND o.customer_id = ?'; params.push(customerId); }
   } else if (scope.owner) {
     const ownerIds = await resolveCustomerOwnerIds(db, c.get('user') as Record<string, any> | undefined, tenantId);
@@ -290,6 +336,13 @@ export async function handleGetOrderById(c: Context<{ Bindings: Env }>) {
   }
 
   const scope = resolveCustomerScope(c);
+  if (scope.isShipper) {
+    const orderType = String(order.order_type || '').toLowerCase();
+    const assignedShipperId = typeof order.shipper_id === 'string' ? order.shipper_id.trim() : '';
+    if (orderType !== 'delivery' || (assignedShipperId && assignedShipperId !== scope.actorId)) {
+      return c.json({ success: false, error: 'Forbidden: order is not assigned to this shipper' }, 403);
+    }
+  }
   const { items, payments } = await fetchOrderItemsAndPayments(db, id, effectiveOrderTenant);
   return c.json({
     success: true,

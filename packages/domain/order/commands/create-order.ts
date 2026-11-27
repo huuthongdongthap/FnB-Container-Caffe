@@ -237,9 +237,12 @@ export async function createOrder(
         promoPhoneDigits.startsWith('84') && promoPhoneDigits.length >= 10
           ? '0' + promoPhoneDigits.slice(2)
           : promoPhoneDigits;
-      const promoType = String(promo.discount_type ?? promo.type ?? '').trim().toLowerCase();
-      const isFixedType = promoType === 'fixed' || promoType === 'fixed_amount' || promoType === 'amount';
-      const isPercentType = promoType === '' || promoType === 'percent' || promoType === 'percentage';
+      const isFixedType = [promo.type, promo.discount_type].some((t) => {
+        const s = String(t ?? '').trim().toLowerCase();
+        return s === 'fixed' || s === 'fixed_amount' || s === 'amount';
+      });
+      const promoType = String(promo.type ?? promo.discount_type ?? '').trim().toLowerCase();
+      const isPercentType = !isFixedType && (promoType === '' || promoType === 'percent' || promoType === 'percentage');
       if (!isFixedType && !isPercentType) {
         return errorResponse('Loại khuyến mãi không hợp lệ', 400);
       }
@@ -703,6 +706,13 @@ export async function createOrder(
       extraOrderVals.push(appliedCashback);
       loyaltyExtraOrderCols.push('cashback_used');
       loyaltyExtraOrderVals.push(appliedCashback);
+    }
+    extraOrderCols.push('subtotal', 'discount_amount');
+    extraOrderVals.push(snapshot.subtotal, snapshot.discount);
+    const persistedPromoCode = typeof data.promo_code === 'string' ? data.promo_code.trim().toUpperCase() : '';
+    if (persistedPromoCode) {
+      extraOrderCols.push('promo_code');
+      extraOrderVals.push(persistedPromoCode);
     }
     const extraColSql = extraOrderCols.length > 0 ? `, ${extraOrderCols.join(', ')}` : '';
     const extraPhSql = extraOrderCols.length > 0 ? `, ${extraOrderCols.map(() => '?').join(', ')}` : '';

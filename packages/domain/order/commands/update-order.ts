@@ -130,9 +130,10 @@ export async function updateOrder(
       if (orderType && orderType !== 'delivery') {
         return errorResponse('Shippers may only update delivery orders', 403);
       }
-      const persistedShipperId = String((results[0] as { assigned_shipper_id?: unknown }).assigned_shipper_id ?? '').trim();
+      const orderRow = results[0] as { assigned_shipper_id?: unknown; shipper_id?: unknown };
+      const persistedShipperId = String(orderRow.assigned_shipper_id ?? orderRow.shipper_id ?? '').trim();
       const cleanActorId = String(actorId ?? '').trim();
-      if (persistedShipperId && (!cleanActorId || persistedShipperId !== cleanActorId)) {
+      if (!persistedShipperId || !cleanActorId || persistedShipperId !== cleanActorId) {
         return errorResponse('Shippers may only update orders assigned to them', 403);
       }
       if (body.payment_method !== undefined || body.assigned_shipper_id !== undefined) {

@@ -9,9 +9,9 @@ import type { Context } from 'hono';
 const log = createLogger({ route: 'orders-mobile' });
 
 const VIEW_ROLES: string[] = ['owner', 'manager', 'supervisor', 'staff', 'waiter', 'phuc_vu', 'kitchen', 'barista', 'chef', 'bep', 'admin', 'cashier', 'shipper', 'rider'];
-const CREATE_ROLES: string[] = ['owner', 'manager', 'supervisor', 'staff', 'waiter', 'phuc_vu', 'admin', 'cashier', 'shipper', 'rider'];
+const CREATE_ROLES: string[] = ['owner', 'manager', 'supervisor', 'staff', 'waiter', 'phuc_vu', 'admin', 'cashier'];
 const PII_MASKED_ROLES: string[] = ['kitchen', 'barista', 'chef'];
-const PII_UNMASKED_ROLES: string[] = ['owner', 'manager', 'admin', 'shipper'];
+const PII_UNMASKED_ROLES: string[] = ['owner', 'manager', 'admin'];
 
 function getRequestedTenantOverride(context: Context<{ Bindings: Env }>): string {
   const candidates: string[] = [];
@@ -55,7 +55,24 @@ function maskMobileOrderPii(
 ): Record<string, unknown> {
   const normalizedRole = role.toLowerCase();
   const isMaskedKitchen = PII_MASKED_ROLES.includes(normalizedRole) || normalizedRole === 'bep';
-  const isUnmasked = PII_UNMASKED_ROLES.includes(normalizedRole) || normalizedRole === 'rider';
+  const isShipper = normalizedRole === 'shipper' || normalizedRole === 'rider';
+  if (isShipper) {
+    const isAssignedDelivery =
+      String(row.order_type || '').toLowerCase() === 'delivery' &&
+      typeof row.shipper_id === 'string' &&
+      row.shipper_id.trim().length > 0 &&
+      row.shipper_id.trim() === user?.id;
+    if (isAssignedDelivery) {
+      return row;
+    }
+    return {
+      ...row,
+      customer_phone: null,
+      customer_email: null,
+      customer_address: null,
+    };
+  }
+  const isUnmasked = PII_UNMASKED_ROLES.includes(normalizedRole);
   if (isUnmasked && !isMaskedKitchen) {
     return row;
   }
@@ -146,6 +163,11 @@ export async function getOrdersMobile(
         ? " AND (tenant_id = ? OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?1 OR tenant_id IS NULL OR tenant_id = '' OR TRIM(tenant_id) = '')"
         : " AND (tenant_id = ? OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?1)";
       params.push(tenantId);
+    }
+
+    if (role === 'shipper' || role === 'rider') {
+      query += " AND order_type = 'delivery' AND (shipper_id IS NULL OR shipper_id = ?)";
+      params.push(user?.id || '');
     }
 
     if (tableId) {
@@ -321,6 +343,12 @@ export async function getOrderDetail(
     }
 
     const data = row as Record<string, unknown>;
+    if (role === 'shipper' || role === 'rider') {
+      const assignedShipperId = typeof data.shipper_id === 'string' ? data.shipper_id.trim() : '';
+      if (String(data.order_type || '').toLowerCase() !== 'delivery' || (assignedShipperId && assignedShipperId !== user?.id)) {
+        return errorResponse('Forbidden: order is not assigned to this shipper', 403);
+      }
+    }
     return jsonResponse({
       success: true,
       order: maskMobileOrderPii(

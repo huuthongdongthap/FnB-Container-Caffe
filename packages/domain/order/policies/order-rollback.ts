@@ -798,21 +798,6 @@ export async function compensateVoidedOrder(params: CompensateVoidedOrderParams)
                 }
               }
             });
-          await db
-            .prepare(
-              "UPDATE customers SET cashback_balance = COALESCE(cashback_balance, 0) + ? WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?",
-            )
-            .bind(refundAmount, refundCustomerId, effectiveTenant)
-            .run()
-            .catch(() => {
-              if (effectiveTenant === 'default') {
-                return db
-                  .prepare('UPDATE customers SET cashback_balance = COALESCE(cashback_balance, 0) + ? WHERE id = ?')
-                  .bind(refundAmount, refundCustomerId)
-                  .run()
-                  .catch(() => {});
-              }
-            });
           if (!accruedCustomerDecremented && !skipAccrualReversal) {
             await db
               .prepare(

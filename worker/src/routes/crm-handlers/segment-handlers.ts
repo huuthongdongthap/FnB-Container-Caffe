@@ -85,7 +85,7 @@ export function registerSegmentHandlers(router: Hono<{ Bindings: Env }>): void {
    * List all segment definitions with counts (no member list).
    * Auth: owner, manager, supervisor or staff only.
    */
-  router.get('/segments', requireAuth(['owner', 'manager', 'supervisor', 'staff', 'admin']), async (c) => {
+  router.get('/segments', requireAuth(['owner', 'admin', 'manager', 'supervisor']), async (c) => {
     if (hasCrmSegmentTenantMismatch(c)) {
       return c.json({ success: false, error: 'Forbidden' }, 403);
     }
@@ -129,7 +129,7 @@ export function registerSegmentHandlers(router: Hono<{ Bindings: Env }>): void {
    * Paginated member list for a segment.
    * Auth: owner, manager, supervisor or staff only.
    */
-  router.get('/segments/:key/customers', requireAuth(['owner', 'manager', 'supervisor', 'staff', 'admin']), async (c) => {
+  router.get('/segments/:key/customers', requireAuth(['owner', 'admin', 'manager', 'supervisor']), async (c) => {
     if (hasCrmSegmentTenantMismatch(c)) {
       return c.json({ success: false, error: 'Forbidden' }, 403);
     }

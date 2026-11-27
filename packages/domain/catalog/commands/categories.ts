@@ -23,12 +23,13 @@ categoriesRouter.use('*', async (c, next) => {
   }
   await next();
 });
-const baseStaffAuth = requireAuth(['owner', 'manager', 'supervisor', 'staff', 'admin']);
+const CATEGORY_WRITE_ROLES = ['owner', 'admin', 'manager'];
+const baseStaffAuth = requireAuth(CATEGORY_WRITE_ROLES);
 const staffAuth: typeof baseStaffAuth = async (c, next) => {
   const existingUser = c.get('user' as never) as { role?: string } | undefined;
   if (
     existingUser?.role &&
-    ['owner', 'manager', 'supervisor', 'staff', 'admin'].includes(existingUser.role) &&
+    CATEGORY_WRITE_ROLES.includes(existingUser.role) &&
     !c.req.header('Authorization')
   ) {
     return next();

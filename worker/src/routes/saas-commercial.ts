@@ -618,6 +618,8 @@ export function createSaasCommercialRoutes() {
   }
 
   router.get('/me', async (c) => {
+    const denied = requireOwnerOrAdmin(c);
+    if (denied) return denied;
     const db = c.env.AURA_DB;
     const tenantId = resolveScopedTenant(c);
 

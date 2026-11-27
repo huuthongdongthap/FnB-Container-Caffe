@@ -414,6 +414,13 @@ export async function transitionOrderStatus(
         statusCode: 409,
       };
     }
+    if (targetStatus === 'delivered' && isCodDelivery && !isPaid) {
+      return {
+        success: false,
+        error: 'Đơn giao hàng COD phải thu tiền trước khi đánh dấu đã giao',
+        statusCode: 409,
+      };
+    }
   }
 
   if (isVoidStatus(targetStatus) && !isNoOp) {
@@ -432,6 +439,13 @@ export async function transitionOrderStatus(
     // rollback paths (or authorized delivery-failure reporting with an explicit reason) may compensate a paid order.
     const hasFailureReason =
       typeof mutableFields.failure_reason === 'string' && mutableFields.failure_reason.trim().length > 0;
+    if (targetStatus === 'failed' && !hasFailureReason) {
+      return {
+        success: false,
+        error: 'Lý do giao thất bại là bắt buộc',
+        statusCode: 400,
+      };
+    }
     const isManagerActor =
       normalizedActor === 'owner' ||
       normalizedActor === 'admin' ||
@@ -441,9 +455,13 @@ export async function transitionOrderStatus(
       targetStatus === 'failed' &&
       order.status === 'delivering' &&
       hasFailureReason &&
-      (normalizedActor === 'staff' || normalizedActor === 'cashier' || normalizedActor === 'waiter');
+      (normalizedActor === 'staff' ||
+        normalizedActor === 'cashier' ||
+        normalizedActor === 'waiter' ||
+        normalizedActor === 'shipper' ||
+        normalizedActor === 'rider');
     const canCompensatePaid = Boolean(
-      options.allowPaidCompensation && (isManagerActor || isDispatchFailureActor),
+      (options.allowPaidCompensation && isManagerActor) || isDispatchFailureActor,
     );
     let knownPaymentStatus: string | null | undefined =
       options.paymentStatus ??

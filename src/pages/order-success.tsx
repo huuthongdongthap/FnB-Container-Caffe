@@ -139,6 +139,7 @@ export function OrderSuccessPage(_props: Readonly<OrderSuccessPageProps>) {
           order_id: matchedOrder.id,
           amount: totalAmount,
           description: `Order #${matchedOrder.orderNumber || matchedOrder.id.slice(0, 8)}`,
+          regenerate: true,
         }),
       });
       const targetUrl =

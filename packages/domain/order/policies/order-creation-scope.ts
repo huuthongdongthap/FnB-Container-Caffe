@@ -103,7 +103,7 @@ export async function resolveOrderCreationScope(
     if (actorTenant === '*' || actorTenant.toLowerCase() === 'hq') {
       throw new OrderCreationError('Forbidden wildcard tenant claim for non-HQ role', 403);
     }
-    if (actorTenant && actorTenant !== 'default' && TENANT_ID_PATTERN.test(actorTenant)) {
+    if (actorTenant && TENANT_ID_PATTERN.test(actorTenant)) {
       if (
         candidateTenant &&
         (candidateTenant === '*' || candidateTenant.toLowerCase() === 'hq' || candidateTenant !== actorTenant)

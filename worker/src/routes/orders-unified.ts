@@ -54,8 +54,10 @@ export const ordersUnifiedRouter = new Hono<{ Bindings: Env }>();
 ordersUnifiedRouter.post('/guest-checkin', rateLimitMiddleware(ORDER_RATE_LIMIT), handleGuestCheckin);
 ordersUnifiedRouter.post('/guest-checkout', rateLimitMiddleware(ORDER_RATE_LIMIT), handleGuestCheckout);
 
+const SPLIT_ORDER_ROLES = ['owner', 'admin', 'manager', 'supervisor', 'staff', 'waiter', 'cashier'];
+
 ordersUnifiedRouter.post('/sync', orderRateLimit, handleSyncOrders);
-ordersUnifiedRouter.post('/split', orderRateLimit, handleSplitOrders);
+ordersUnifiedRouter.post('/split', orderRateLimit, requireAuth(SPLIT_ORDER_ROLES), handleSplitOrders);
 ordersUnifiedRouter.get('/latest', handleLatestOrderTimestamp);
 
 ordersUnifiedRouter.get('/kds/recent', requireAuth(KDS_ROLES), handleGetKdsRecentOrders);

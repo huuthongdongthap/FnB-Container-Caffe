@@ -93,8 +93,7 @@ adminMetrics.get('/', async(c) => {
     return c.json({ success: false, error: 'Authentication required' }, 401);
   }
   const roleLower = String(user.role).toLowerCase();
-  const isAuthBearerStaff = roleLower === 'staff' && Boolean(c.req.header('Authorization') || c.req.header('authorization'));
-  if (!ADMIN_METRICS_ALLOWED_ROLES.includes(roleLower) && !isAuthBearerStaff) {
+  if (!ADMIN_METRICS_ALLOWED_ROLES.includes(roleLower)) {
     return c.json({ success: false, error: 'Insufficient permissions' }, 403);
   }
 

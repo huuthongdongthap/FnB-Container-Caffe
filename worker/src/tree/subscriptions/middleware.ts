@@ -222,7 +222,7 @@ export async function requireVendor(c: Context<{ Bindings: Env }>): Promise<Resp
   if (!payload) {
     return c.json({ success: false, error: 'Token không hợp lệ' }, 401);
   }
-  const allowedVendorRoles = ['owner', 'manager', 'supervisor', 'admin', 'staff', 'vendor', 'customer'];
+  const allowedVendorRoles = ['owner', 'manager', 'admin', 'vendor', 'customer'];
   if (!allowedVendorRoles.includes(payload.role || '')) {
     return c.json({ success: false, error: 'Forbidden' }, 403);
   }

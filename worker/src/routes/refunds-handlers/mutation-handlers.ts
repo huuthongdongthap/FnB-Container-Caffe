@@ -244,7 +244,7 @@ export async function handleRefund(c: Context<{ Bindings: Env }>, openApi = fals
           VALUES (CASE WHEN changes() = 1 THEN 1 ELSE 0 END)`),
         db.prepare(`UPDATE orders
           SET payment_status = ?,
-              status = CASE WHEN ? = 1 AND LOWER(COALESCE(status, '')) NOT IN ('completed', 'cancelled', 'failed', 'expired') THEN 'cancelled' ELSE status END,
+              status = CASE WHEN ? = 1 AND LOWER(COALESCE(status, '')) NOT IN ('completed', 'delivered', 'cancelled', 'failed', 'expired') THEN 'cancelled' ELSE status END,
               updated_at = ?
           WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?
             AND LOWER(COALESCE(payment_status, '')) IN ('paid', 'completed', 'partially_refunded')`)

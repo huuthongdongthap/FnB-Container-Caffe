@@ -465,7 +465,7 @@ export default function AdminOrdersPage() {
   useEffect(() => {
     let active = true;
     const normRole = (actorRole || '').trim().toLowerCase();
-    if (!['owner', 'admin', 'super_admin', 'manager', 'supervisor', 'staff', 'cashier', 'waiter', 'shipper', 'rider'].includes(normRole)) {
+    if (!['owner', 'admin', 'super_admin', 'manager', 'supervisor'].includes(normRole)) {
       return;
     }
     void apiFetch<{

@@ -156,6 +156,13 @@ export async function splitOrders(
 
     const { actor, tenantId: resolvedScopeTenant } = await resolveOrderCreationScope(scopeRequest, env, trustedActor);
     const actorRole = String(actor?.role || '').toLowerCase();
+    const SPLIT_ALLOWED_ROLES = new Set(['owner', 'admin', 'manager', 'supervisor', 'staff', 'waiter', 'cashier']);
+    if (!actor || !actorRole) {
+      return errorResponse('Unauthorized: authentication required to split orders', 401);
+    }
+    if (!SPLIT_ALLOWED_ROLES.has(actorRole)) {
+      return errorResponse('Forbidden: insufficient role to split orders', 403);
+    }
     const actorTenant = String(actor?.tenantId || '').trim();
     const isHqSuperAdmin =
       (actorRole === 'owner' || actorRole === 'admin') &&
@@ -456,6 +463,16 @@ export async function splitOrders(
         return errorResponse('Order total mismatch with server calculation', 400);
       }
     }
+    if (parentOrder && typeof parentOrder.total === 'number' && Number.isFinite(parentOrder.total) && parentOrder.total > 0) {
+      const childrenTotalSum = snapshots.reduce((sum, snap, idx) => {
+        const rawTax = parsed.data.orders[idx]?.tax;
+        const taxAmount = typeof rawTax === 'number' && rawTax > 0 ? Math.round(rawTax) : 0;
+        return sum + snap.total + taxAmount;
+      }, 0);
+      if (Math.abs(childrenTotalSum - parentOrder.total) > 1) {
+        return errorResponse('Split orders total must equal parent order total', 400);
+      }
+    }
     const ownerships = await Promise.all(parsed.data.orders.map(order => resolveServerOrderOwnership({
       actor,
       clientSuppliedCustomerId: order.customer_id || null,
@@ -496,18 +513,19 @@ export async function splitOrders(
       if (guestCap?.token) {
         orderTokens[id] = guestCap.token;
       }
+      const parentSessionId = parentOrder?.session_id ? String(parentOrder.session_id).trim() || null : null;
       const orderInsertArgsWithHash = [
         id, orderNumber, snapshot.itemsJson, orderTotal, 'pending', order.customer_name, order.customer_phone,
         order.customer_email || null, order.customer_address || null, order.payment_method, childPaymentStatus,
         snapshot.shipping_fee, snapshot.discount, order.notes || null, order.delivery_time || 'now',
-        tableId, 'dine_in', snapshot.tip_amount, resolvedCustomerId, guestCap?.hash ?? null, tenantId, now, now,
+        tableId, parentSessionId, 'dine_in', snapshot.tip_amount, resolvedCustomerId, guestCap?.hash ?? null, tenantId, now, now,
       ] as const;
       const orderInsertSqlWithHash = `INSERT INTO orders (
         id, order_number, items, total, status, customer_name, customer_phone,
         customer_email, customer_address, payment_method, payment_status,
-        shipping_fee, discount, notes, delivery_time, table_id,
+        shipping_fee, discount, notes, delivery_time, table_id, session_id,
         order_type, tip_amount, customer_id, guest_token_hash, tenant_id, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
       const orderInsertArgs = [
         id, snapshot.itemsJson, orderTotal, 'pending', order.customer_name, order.customer_phone,
         order.customer_email || null, order.customer_address || null, order.payment_method, childPaymentStatus,

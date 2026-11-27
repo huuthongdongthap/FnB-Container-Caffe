@@ -23,7 +23,7 @@ const VIOLATION_TRANSITIONS: Record<SopViolationStatus, readonly SopViolationSta
   recorded: ['confirmed', 'appealed', 'closed'],
   confirmed: ['applied', 'closed'],
   applied: ['appealed', 'closed'],
-  appealed: ['closed'],
+  appealed: ['confirmed', 'closed'],
   closed: [],
 };
 

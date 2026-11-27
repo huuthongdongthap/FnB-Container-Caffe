@@ -35,9 +35,14 @@ export default function AdminLogin({ onSubmit, onSuccess, error: externalError }
         }
       }
       const loggedInUser = useAuthStore.getState().user;
-      const defaultTarget = loggedInUser && ['kitchen', 'barista', 'chef', 'bep'].includes(loggedInUser.role)
+      const role = loggedInUser?.role?.toLowerCase() ?? '';
+      const defaultTarget = ['kitchen', 'barista', 'chef', 'bep'].includes(role)
         ? '/kds'
-        : '/admin';
+        : role === 'cashier'
+          ? '/admin/pos'
+          : ['shipper', 'rider', 'staff', 'waiter'].includes(role)
+            ? '/mobile/orders'
+            : '/admin';
       onSuccess ? onSuccess() : navigate(defaultTarget);
       setStatus('success');
     } catch (err) {

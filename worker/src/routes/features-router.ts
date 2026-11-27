@@ -87,7 +87,7 @@ export function registerFeatureRoutes(app: Hono<{ Bindings: Env }>): void {
     }
     return adminGeneralAuth(c, next);
   });
-  app.get('/api/admin/orders', (c) => {
+  app.get('/api/admin/orders', requireAuth(['owner', 'manager', 'supervisor', 'staff', 'waiter', 'cashier', 'admin']), (c) => {
     const user = c.get('user' as any) as { tenantId?: string; role?: string } | undefined;
     const isHQ = isHQSuperAdmin(user);
     const requestedTenant = (c.req.query('tenant_id') || c.req.header('X-Tenant-ID') || c.req.header('x-tenant-id') || '').trim() || undefined;

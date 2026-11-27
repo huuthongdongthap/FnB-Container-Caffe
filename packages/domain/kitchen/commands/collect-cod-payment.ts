@@ -146,9 +146,11 @@ export async function collectCodPayment(
         error: 'Order must be in delivering or delivered status before shipper COD collection',
       };
     }
-    const assignedShipper = typeof order.assigned_shipper_id === 'string' ? order.assigned_shipper_id.trim() : '';
-    if (assignedShipper && staff && assignedShipper !== staff) {
-      return { success: false, statusCode: 403, error: 'Forbidden: order is assigned to another shipper' };
+    const assignedShipper = String(
+      (order as Record<string, unknown>).assigned_shipper_id ?? (order as Record<string, unknown>).shipper_id ?? ''
+    ).trim();
+    if (!assignedShipper || !staff || assignedShipper !== staff) {
+      return { success: false, statusCode: 403, error: 'Forbidden: order is not assigned to this shipper' };
     }
   }
 

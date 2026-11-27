@@ -96,8 +96,10 @@ function computePromotionDiscountAmount(
   percentFallback: number,
   maxDiscountCap: number,
 ): number {
-  const rawType = String(promoRow.discount_type ?? promoRow.type ?? '').toLowerCase();
-  const isFixed = rawType === 'fixed' || rawType === 'fixed_amount' || rawType === 'amount';
+  const isFixed = [promoRow.type, promoRow.discount_type].some((t) => {
+    const s = String(t ?? '').trim().toLowerCase();
+    return s === 'fixed' || s === 'fixed_amount' || s === 'amount';
+  });
   const fixedValue = Number(promoRow.discount_value ?? promoRow.value ?? promoRow.percent ?? 0);
   const rawDiscount = isFixed
     ? Math.max(0, Math.round(fixedValue))
