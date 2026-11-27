@@ -160,7 +160,8 @@ describe('Security & Data Protection Contract — Canonical Invariants', () => {
     expect(isAllowedOrigin('https://auraspace.cafe')).toBe(true);
     expect(isAllowedOrigin('https://fnb-caffe-container.pages.dev')).toBe(true);
     expect(isAllowedOrigin('https://staging-branch.fnb-caffe-container.pages.dev')).toBe(true);
-    expect(isAllowedOrigin('http://localhost:5173')).toBe(true);
+    expect(isAllowedOrigin('http://localhost:5173', 'development')).toBe(true);
+    expect(isAllowedOrigin('http://localhost:5173', 'production')).toBe(false);
 
     expect(isAllowedOrigin('https://malicious-site.com')).toBe(false);
     expect(isAllowedOrigin('https://fakeauraspace.cafe')).toBe(false);

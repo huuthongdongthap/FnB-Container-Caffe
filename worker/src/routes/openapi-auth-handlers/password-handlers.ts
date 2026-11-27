@@ -259,6 +259,12 @@ export function registerPasswordHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
 
     const requestedResetTenant = String(resolvePublicTenantId(c) || '').trim();
     if (submittedCode && submittedNewPassword) {
+      if (submittedNewPassword.length < 8 || submittedNewPassword.length > 128) {
+        return c.json(
+          { success: false, error: 'Mật khẩu mới phải có từ 8 đến 128 ký tự' },
+          400
+        );
+      }
       const targetUser = await resolveResetTargetUser(db, c.env, normalizedEmail, requestedResetTenant);
       const resetTenant = String(targetUser?.tenant_id || requestedResetTenant || 'default').trim() || 'default';
       const attemptKey = `rate:reset-password:attempts:${normalizedEmail || clientIp}`;

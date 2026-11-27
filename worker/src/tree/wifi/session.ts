@@ -141,89 +141,15 @@ export async function loginWifiGuest(
   const nowIso = now.toISOString();
   const expiresIso = new Date(now.getTime() + timeoutSeconds * 1000).toISOString();
 
-  let customer = await db
-    .prepare(
-      "SELECT id, phone, name, tenant_id FROM customers WHERE phone = ? AND (COALESCE(NULLIF(tenant_id, ''), 'default') = ? OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?2) LIMIT 1"
-    )
-    .bind(normalizedPhone, effectiveTenant)
-    .first<{ id: string; phone: string; name: string; tenant_id?: string | null }>()
-    .catch(() =>
-      db
-        .prepare("SELECT id, phone, name, tenant_id FROM customers WHERE phone = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ? LIMIT 1")
-        .bind(normalizedPhone, effectiveTenant)
-        .first<{ id: string; phone: string; name: string; tenant_id?: string | null }>()
-    )
-    .catch(() =>
-      effectiveTenant === 'default'
-        ? db.prepare('SELECT id, phone, name FROM customers WHERE phone = ? LIMIT 1').bind(normalizedPhone).first<{ id: string; phone: string; name: string; tenant_id?: string | null }>()
-        : null
-    );
-  if (customer && !matchesWifiTenant(customer as unknown as Record<string, unknown>, effectiveTenant)) customer = null;
-
-  let customerId: string;
-  if (customer) {
-    customerId = customer.id;
-    await db
-      .prepare("UPDATE customers SET updated_at = ? WHERE id = ? AND (COALESCE(NULLIF(tenant_id, ''), 'default') = ? OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?3)")
-      .bind(nowIso, customerId, effectiveTenant)
-      .run()
-      .catch(() =>
-        effectiveTenant === 'default'
-          ? db.prepare('UPDATE customers SET updated_at = ? WHERE id = ?').bind(nowIso, customerId).run()
-          : null
-      )
-      .catch(() => {});
-  } else {
-    customerId = `CUS_WIFI_${crypto.randomUUID().slice(0, 8)}`;
-    const email = effectiveTenant === 'default'
-      ? `${normalizedPhone}@wifi.aura`
-      : `${normalizedPhone}+${effectiveTenant}@wifi.aura`;
-    const name = data.name?.trim() || 'Khách WiFi';
-    try {
-      await db
-        .prepare(
-          `INSERT INTO customers (id, email, name, phone, loyalty_points, lifetime_points, loyalty_tier, source, created_at, updated_at, tenant_id)
-           VALUES (?, ?, ?, ?, 0, 0, 'BRONZE', 'wifi_portal', ?, ?, ?)`
-        )
-        .bind(customerId, email, name, normalizedPhone, nowIso, nowIso, effectiveTenant)
-        .run();
-    } catch {
-      try {
-        await db
-          .prepare('INSERT INTO customers (id, email, name, phone, created_at, updated_at, tenant_id) VALUES (?, ?, ?, ?, ?, ?, ?)')
-          .bind(customerId, email, name, normalizedPhone, nowIso, nowIso, effectiveTenant)
-          .run();
-      } catch (tenantCustErr) {
-        if (effectiveTenant !== 'default') {
-          throw tenantCustErr;
-        }
-        try {
-          await db
-            .prepare(
-              `INSERT INTO customers (id, email, name, phone, loyalty_points, lifetime_points, loyalty_tier, source, created_at, updated_at)
-               VALUES (?, ?, ?, ?, 0, 0, 'BRONZE', 'wifi_portal', ?, ?)`
-            )
-            .bind(customerId, email, name, normalizedPhone, nowIso, nowIso)
-            .run();
-        } catch {
-          await db
-            .prepare('INSERT INTO customers (id, email, name, phone, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)')
-            .bind(customerId, email, name, normalizedPhone, nowIso, nowIso)
-            .run()
-            .catch((err) => log.warn('customer_create_fallback_failed', { error: (err as Error).message }));
-        }
-      }
-    }
-  }
-
   const sessionId = crypto.randomUUID();
+  const guestSessionCustomerId = `CUS_WIFI_${sessionId.slice(0, 8)}`;
   try {
     await db
       .prepare(
         `INSERT INTO wifi_sessions (id, client_mac, ip_address, phone, customer_id, status, session_timeout, authorized_at, expires_at, created_at, tenant_id)
          VALUES (?, ?, ?, ?, ?, 'authorized', ?, ?, ?, ?, ?)`
       )
-      .bind(sessionId, normalizedMac, data.ip_address ?? null, normalizedPhone, customerId, timeoutSeconds, nowIso, expiresIso, nowIso, effectiveTenant)
+      .bind(sessionId, normalizedMac, data.ip_address ?? null, normalizedPhone, guestSessionCustomerId, timeoutSeconds, nowIso, expiresIso, nowIso, effectiveTenant)
       .run();
   } catch (sessErr) {
     if (effectiveTenant !== 'default') {
@@ -234,11 +160,11 @@ export async function loginWifiGuest(
         `INSERT INTO wifi_sessions (id, client_mac, ip_address, phone, customer_id, status, session_timeout, authorized_at, expires_at, created_at)
          VALUES (?, ?, ?, ?, ?, 'authorized', ?, ?, ?, ?)`
       )
-      .bind(sessionId, normalizedMac, data.ip_address ?? null, normalizedPhone, customerId, timeoutSeconds, nowIso, expiresIso, nowIso)
+      .bind(sessionId, normalizedMac, data.ip_address ?? null, normalizedPhone, guestSessionCustomerId, timeoutSeconds, nowIso, expiresIso, nowIso)
       .run();
   }
-  log.info('wifi_guest_authorized', { mac: normalizedMac, customerId, sessionId });
-  return { success: true, authorized: true, session_id: sessionId, customer_id: customerId, redirect_url: 'https://auracafe.vn/menu', remaining_seconds: timeoutSeconds };
+  log.info('wifi_guest_authorized', { mac: normalizedMac, sessionId });
+  return { success: true, authorized: true, session_id: sessionId, customer_id: guestSessionCustomerId, redirect_url: 'https://auracafe.vn/menu', remaining_seconds: timeoutSeconds };
 }
 
 export async function authorizeWifiOverride(

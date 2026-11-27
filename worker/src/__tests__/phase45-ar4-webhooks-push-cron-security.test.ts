@@ -5,6 +5,7 @@
  * Marketing/Ticketing/Booking Bridges Security Tests
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { createHmac } from 'node:crypto';
 import { Hono } from 'hono';
 import { issueStaffSession, type StaffAccount } from '../lib/staff-session';
 import { pushRouter } from '../routes/push';
@@ -409,24 +410,25 @@ describe('Webhooks, Push, Cron & Marketing/Ticketing/Booking Bridges Security', 
         CAL_WEBHOOK_SECRET: 'cal_secret_ar4',
       } as unknown as Env;
 
+      const rescheduleReqBody = JSON.stringify({
+        triggerEvent: 'BOOKING_RESCHEDULED',
+        payload: {
+          uid: 'uid_shared_1_rescheduled',
+          rescheduleUid: 'uid_shared_1',
+          startTime: '2026-11-05T20:00:00',
+          endTime: '2026-11-05T21:00:00',
+          metadata: { tenant_id: 'tenant_sadec_02' },
+        },
+      });
       const rescheduleRes = await handleCalBookingWebhook(
         new Request('https://api.test/api/cal-booking-webhook', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'x-cal-webhook-secret': 'cal_secret_ar4',
+            'x-cal-signature-256': createHmac('sha256', 'cal_secret_ar4').update(rescheduleReqBody).digest('hex'),
             'X-Tenant-ID': 'tenant_sadec_02',
           },
-          body: JSON.stringify({
-            triggerEvent: 'BOOKING_RESCHEDULED',
-            payload: {
-              uid: 'uid_shared_1_rescheduled',
-              rescheduleUid: 'uid_shared_1',
-              startTime: '2026-11-05T20:00:00',
-              endTime: '2026-11-05T21:00:00',
-              metadata: { tenant_id: 'tenant_sadec_02' },
-            },
-          }),
+          body: rescheduleReqBody,
         }),
         env
       );

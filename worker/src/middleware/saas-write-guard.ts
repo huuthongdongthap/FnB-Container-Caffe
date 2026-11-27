@@ -21,8 +21,12 @@ import { isHQSuperAdmin } from './tenant';
 const WRITE_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
 
 const EXEMPT_PREFIXES = [
-  '/api/auth/',
-  '/api/v1/auth/',
+  '/api/auth/login',
+  '/api/auth/logout',
+  '/api/auth/refresh',
+  '/api/v1/auth/login',
+  '/api/v1/auth/logout',
+  '/api/v1/auth/refresh',
   '/api/saas/signup',
   '/api/saas/check-slug',
   '/api/saas/billing',
@@ -38,10 +42,10 @@ export function isSaasWriteExemptPath(pathname: string): boolean {
   return EXEMPT_PREFIXES.some((prefix) => pathname.startsWith(prefix));
 }
 
-function resolveGuestCandidateTenant(c: Context<{ Bindings: Env }>): string {
+async function resolveGuestCandidateTenant(c: Context<{ Bindings: Env }>): Promise<string> {
   const ctxGetter = (c as unknown as { get?: (k: string) => unknown }).get;
   const fromCtx = String(ctxGetter?.('tenantId') || ctxGetter?.('hostTenantId') || '').trim();
-  if (fromCtx) return fromCtx;
+  if (fromCtx && fromCtx !== 'default') return fromCtx;
   const readHeader = (name: string): string =>
     typeof c.req.header === 'function'
       ? c.req.header(name) || ''
@@ -67,7 +71,25 @@ function resolveGuestCandidateTenant(c: Context<{ Bindings: Env }>): string {
     readQuery('storeId') ||
     ''
   ).trim();
-  return fromQuery;
+  if (fromQuery) return fromQuery;
+
+  // Inspect JSON body for tenant_id / store_id on public guest write routes
+  const contentType = (readHeader('content-type') || readHeader('Content-Type') || '').toLowerCase();
+  if (contentType.includes('application/json') && c.req.raw && typeof c.req.raw.clone === 'function') {
+    try {
+      const parsed = (await c.req.raw.clone().json()) as Record<string, unknown> | null;
+      if (parsed && typeof parsed === 'object') {
+        const fromBody = String(
+          parsed.tenant_id ?? parsed.tenantId ?? parsed.store_id ?? parsed.storeId ?? ''
+        ).trim();
+        if (fromBody) return fromBody;
+      }
+    } catch {
+      // Ignore invalid JSON; downstream route validation will handle it
+    }
+  }
+
+  return fromCtx;
 }
 
 /**
@@ -115,7 +137,7 @@ export async function enforceSaasWriteGuard(
             tenantId: session.payload.tenantId,
           };
         } else if (session && 'blocked' in session) {
-          const guestTenant = resolveGuestCandidateTenant(c);
+          const guestTenant = await resolveGuestCandidateTenant(c);
           if (!guestTenant || guestTenant === 'default' || guestTenant === 'hq' || guestTenant === '*') {
             return null;
           }
@@ -130,9 +152,14 @@ export async function enforceSaasWriteGuard(
     return null;
   }
 
-  const resolvedTenant = resolvedUser
+  const userTenant = resolvedUser
     ? String(resolvedUser.tenantId || resolvedUser.tenant_id || '').trim()
-    : resolveGuestCandidateTenant(c);
+    : '';
+  const candidateTenant = await resolveGuestCandidateTenant(c);
+  const resolvedTenant =
+    userTenant && userTenant !== 'default'
+      ? userTenant
+      : candidateTenant || userTenant;
 
   if (!resolvedTenant || resolvedTenant === 'default' || resolvedTenant === 'hq' || resolvedTenant === '*') {
     return null;

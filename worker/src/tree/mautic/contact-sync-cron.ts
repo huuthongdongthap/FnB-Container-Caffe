@@ -47,6 +47,8 @@ export async function syncMauticContacts(env: Record<string, unknown>, tenantOve
           c.updated_at
          FROM customers c
          WHERE c.updated_at > ?1
+           AND c.anonymized_at IS NULL
+           AND (COALESCE(c.consent_marketing, 0) = 1 OR COALESCE(c.marketing_consent, 0) = 1 OR EXISTS (SELECT 1 FROM consents co WHERE co.customer_id = c.id AND co.granted = 1 AND co.revoked_at IS NULL))
            AND COALESCE(NULLIF(TRIM(c.tenant_id), ''), 'default') = ?2
          ORDER BY c.updated_at ASC
          LIMIT 500`

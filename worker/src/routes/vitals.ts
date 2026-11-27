@@ -66,16 +66,16 @@ async function isVitalsRateLimited(
   const cutoff = now - VITALS_RATE_LIMIT_WINDOW_MS;
   const existing = (vitalsRateBuckets.get(key) || []).filter((ts) => ts > cutoff);
 
-  if (env?.AURA_KV && typeof env.AURA_KV.get === 'function') {
+  if (env?.AUTH_KV && typeof env.AUTH_KV.get === 'function') {
     try {
       const kvKey = `rl:vitals:${key}:${Math.floor(now / VITALS_RATE_LIMIT_WINDOW_MS)}`;
-      const rawCount = await env.AURA_KV.get(kvKey);
+      const rawCount = await env.AUTH_KV.get(kvKey);
       const kvCount = rawCount ? parseInt(rawCount, 10) : 0;
       if (Number.isFinite(kvCount) && kvCount >= VITALS_RATE_LIMIT_MAX) {
         return true;
       }
-      if (typeof env.AURA_KV.put === 'function') {
-        await env.AURA_KV.put(kvKey, String(Math.max(kvCount, existing.length) + 1), { expirationTtl: 60 });
+      if (typeof env.AUTH_KV.put === 'function') {
+        await env.AUTH_KV.put(kvKey, String(Math.max(kvCount, existing.length) + 1), { expirationTtl: 60 });
       }
     } catch {
       // fall through to in-memory sliding window

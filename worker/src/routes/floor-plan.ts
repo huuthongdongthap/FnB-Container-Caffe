@@ -718,6 +718,20 @@ async function handleFloorPlanTableStatusPatch(c: any) {
   if (!rawStatus) {
     return c.json({ success: false, error: 'status is required' }, 400);
   }
+  const ALLOWED_FLOOR_PLAN_STATUSES = new Set([
+    'available',
+    'free',
+    'occupied',
+    'reserved',
+    'cleaning',
+    'dirty',
+    'maintenance',
+    'inactive',
+  ]);
+  const lowerTarget = rawStatus.toLowerCase();
+  if (!ALLOWED_FLOOR_PLAN_STATUSES.has(lowerTarget)) {
+    return c.json({ success: false, error: 'Invalid table status' }, 400);
+  }
   let table: Record<string, unknown> | null = null;
   let useLegacyTable = false;
   try {
@@ -735,10 +749,9 @@ async function handleFloorPlanTableStatusPatch(c: any) {
       : tenantId === '*'
         ? 'default'
         : tenantId;
-  const lowerTarget = rawStatus.toLowerCase();
   const isAvailableTarget = lowerTarget === 'available' || lowerTarget === 'free';
   const isCleaningTarget = lowerTarget === 'cleaning';
-  if (isAvailableTarget && (await hasUnpaidActiveOrdersForTable(db, id, effectiveTableTenant))) {
+  if ((isAvailableTarget || isCleaningTarget) && (await hasUnpaidActiveOrdersForTable(db, id, effectiveTableTenant))) {
     return c.json({ success: false, error: 'Cannot release table with unpaid active orders' }, 409);
   }
   const now = new Date().toISOString();

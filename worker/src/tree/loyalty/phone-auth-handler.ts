@@ -230,10 +230,10 @@ export async function handlePhoneAuth(c: Context<{ Bindings: Env }>) {
               meta = null;
               hadCrossTenantCustomer = true;
             } else {
-              return c.json({ success: false, error: 'Tài khoản thuộc cửa hàng khác' }, 403);
+              return c.json({ success: false, error: 'Cần xác thực OTP để tiếp tục', requiresOtp: true }, 401);
             }
           } else if (resolvedTenant !== tenantId) {
-            return c.json({ success: false, error: 'Tài khoản thuộc cửa hàng khác' }, 403);
+            return c.json({ success: false, error: 'Cần xác thực OTP để tiếp tục', requiresOtp: true }, 401);
           } else {
             customer = tenantCustomer;
             meta = { tenant_id: tenantId, verified_at: tenantCustomer.verified_at ?? null };

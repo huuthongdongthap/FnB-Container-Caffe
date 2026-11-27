@@ -309,10 +309,8 @@ export function registerSendHandler(router: Hono<{ Bindings: Env }>): void {
             perCh.has(ch) ? Boolean(perCh.get(ch)) : Boolean(perCh.get('all'))
           );
         });
-      } catch (consentErr) {
-        if (!/no such table:\s*consents/i.test(String(consentErr))) {
-          return c.json({ success: false, error: 'Consent verification unavailable', retryable: true }, 503);
-        }
+      } catch {
+        return c.json({ success: false, error: 'Consent verification unavailable', retryable: true }, 503);
       }
     }
 

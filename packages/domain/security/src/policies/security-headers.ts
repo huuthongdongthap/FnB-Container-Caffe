@@ -18,12 +18,20 @@ export const ALLOWED_ORIGIN_PATTERNS: RegExp[] = [
   /^https:\/\/[a-z0-9-]+\.fnb-caffe-container\.pages\.dev$/,
   /^https:\/\/(www\.)?auraspace\.cafe$/,
   /^https:\/\/(www\.)?auracafe\.vn$/,
-  /^https:\/\/[a-z0-9-]+\.auracafe\.vn$/,
+  /^https:\/\/[a-z0-9-]+\.auracafe\.vn$/
+];
+
+export const DEV_LOCALHOST_ORIGIN_PATTERNS: RegExp[] = [
   /^https?:\/\/localhost(:\d+)?$/,
   /^https?:\/\/127\.0\.0\.1(:\d+)?$/
 ];
 
-export function isAllowedOrigin(origin?: string | null): boolean {
+export function isAllowedOrigin(origin?: string | null, environment?: string): boolean {
   if (!origin) return false;
-  return ALLOWED_ORIGIN_PATTERNS.some((rx) => rx.test(origin));
+  if (ALLOWED_ORIGIN_PATTERNS.some((rx) => rx.test(origin))) return true;
+  const envName = String(environment || '').toLowerCase();
+  if ((envName === 'development' || envName === 'test') && DEV_LOCALHOST_ORIGIN_PATTERNS.some((rx) => rx.test(origin))) {
+    return true;
+  }
+  return false;
 }

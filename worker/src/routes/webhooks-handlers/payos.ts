@@ -51,7 +51,7 @@ export async function handlePayosWebhook(
         .first<{ id: string }>()
         .catch(() => null);
       if (!tenantRow) {
-        return c.json({ error: 1, message: 'Unknown tenant webhook endpoint' }, 404);
+        return c.json({ error: 1, message: 'Invalid signature' }, 401);
       }
       targetTenantId = tenantRow.id;
     }
@@ -61,12 +61,14 @@ export async function handlePayosWebhook(
       merchantPayment.payos?.checksumKey ||
       (!explicitTenantSlugOrId ? c.env.PAYOS_CHECKSUM_KEY : undefined);
     if (!checksumKey) {
-      return c.json({ error: 1, message: 'Merchant PayOS checksum key not configured' }, explicitTenantSlugOrId ? 400 : 500);
+      return c.json({ error: 1, message: 'Invalid signature' }, 401);
     }
 
-    if (!payload.data || typeof payload.data !== 'object' || !Object.keys(payload.data).length) return ack('Webhook endpoint alive');
     const signature = (payload.signature as string) || c.req.header('x-payos-signature');
     if (!signature) return c.json({ error: 1, message: 'Invalid signature' }, 401);
+    if (!payload.data || typeof payload.data !== 'object' || !Object.keys(payload.data).length) {
+      return c.json({ error: 1, message: 'Invalid PayOS webhook payload' }, 400);
+    }
     const parsed = payosWebhookSchema.safeParse(payload);
     if (!parsed.success) return c.json({ error: 1, message: 'Invalid PayOS webhook payload' }, 400);
     const data = payload.data as Record<string, unknown>;

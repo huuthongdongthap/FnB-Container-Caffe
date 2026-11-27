@@ -73,7 +73,7 @@ export const pinSchema = z
   .regex(/^\d{4}$/, 'PIN phải là 4 chữ số');
 
 export const registerDeviceSchema = z.object({
-  device_token: z.string().min(8, 'device_token quá ngắn'),
+  device_token: z.string().min(8, 'device_token quá ngắn').max(128, 'device_token quá dài'),
   device_name: z.string().max(100).optional(),
   staff_id: z.string().min(1, 'staff_id là bắt buộc'),
   role: staffRoleSchema.optional().default('staff'),
@@ -81,7 +81,7 @@ export const registerDeviceSchema = z.object({
 });
 
 export const staffLoginSchema = z.object({
-  device_token: z.string().min(8, 'device_token quá ngắn'),
+  device_token: z.string().min(8, 'device_token quá ngắn').max(128, 'device_token quá dài'),
   pin: pinSchema
 });
 

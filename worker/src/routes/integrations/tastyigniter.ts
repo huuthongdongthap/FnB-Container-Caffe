@@ -248,10 +248,7 @@ export function createTIRoutes() {
   app.post('/webhook', async(c) => {
     try {
       const isProd = c.env?.ENVIRONMENT === 'production' || c.env?.NODE_ENV === 'production';
-      const allowUnsignedDev = !isProd && (
-        c.env?.ENVIRONMENT === 'development' ||
-        c.env?.ENVIRONMENT === 'test'
-      );
+      const allowUnsignedDev = !isProd && (c.env as Record<string, unknown>)?.ALLOW_UNSIGNED_TASTYIGNITER_WEBHOOK === 'true';
       const secret = (c.env.TASTYIGNITER_WEBHOOK_SECRET ?? '') as string;
       if (!secret && !allowUnsignedDev) {
         return c.json({ error: 'TastyIgniter webhook secret not configured' }, 503);
@@ -267,14 +264,10 @@ export function createTIRoutes() {
         if (!sig) {
           return c.json({ error: 'Unauthorized webhook signature' }, 401);
         }
-        const directMatch = await timingSafeEqual(sig, secret);
-        let hmacMatch = false;
-        if (!directMatch) {
-          const hmacHex = await computeHmacSha256(rawBody, secret);
-          const normalizedSig = sig.replace(/^sha256=/i, '').trim().toLowerCase();
-          hmacMatch = await timingSafeEqual(normalizedSig, hmacHex.toLowerCase());
-        }
-        if (!directMatch && !hmacMatch) {
+        const hmacHex = await computeHmacSha256(rawBody, secret);
+        const normalizedSig = sig.replace(/^sha256=/i, '').trim().toLowerCase();
+        const hmacMatch = await timingSafeEqual(normalizedSig, hmacHex.toLowerCase());
+        if (!hmacMatch) {
           return c.json({ error: 'Unauthorized webhook signature' }, 401);
         }
       }

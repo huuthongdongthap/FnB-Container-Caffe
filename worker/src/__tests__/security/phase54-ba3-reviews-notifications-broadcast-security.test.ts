@@ -127,7 +127,8 @@ describe('Phase 54 — Slice BA3 Security Hardening', () => {
           customer_id TEXT,
           customer_phone TEXT,
           status TEXT,
-          tenant_id TEXT
+          tenant_id TEXT,
+          order_token TEXT
         );
         CREATE TABLE reviews (
           id TEXT PRIMARY KEY,
@@ -139,7 +140,7 @@ describe('Phase 54 — Slice BA3 Security Hardening', () => {
           created_at TEXT
         );
       `);
-      sqlite.prepare("INSERT INTO orders (id, customer_id, customer_phone, status, tenant_id) VALUES ('ord_guest_1', '', '0901234567', 'completed', 'default')").run();
+      sqlite.prepare("INSERT INTO orders (id, customer_id, customer_phone, status, tenant_id, order_token) VALUES ('ord_guest_1', '', '0901234567', 'completed', 'default', 'guest_tok_1')").run();
 
       const db = createSqliteD1(sqlite);
       const app = new Hono<{ Bindings: Env }>();
@@ -176,13 +177,14 @@ describe('Phase 54 — Slice BA3 Security Hardening', () => {
       });
       expect(resMismatch.status).toBe(403);
 
-      // 3. Matching phone with Vietnam prefix normalization (+84 -> 0)
+      // 3. Matching phone with Vietnam prefix normalization (+84 -> 0) and valid guest order_token
       const resMatch = await app.request('/api/reviews', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           order_id: 'ord_guest_1',
           customer_phone: '+84 901 234 567',
+          order_token: 'guest_tok_1',
           rating: 5,
           comment: 'Great coffee!',
         }),

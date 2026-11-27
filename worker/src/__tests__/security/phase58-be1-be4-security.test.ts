@@ -239,7 +239,7 @@ describe('Phase 58 Security Gate (BE1..BE4)', () => {
         { headers: { Authorization: `Bearer ${token}` } },
         env
       );
-      expect(legacyLocRes.status).toBe(403);
+      expect(legacyLocRes.status).toBe(404);
     });
 
     it('scopes table_sessions JOIN by tenant_id and strips cross-tenant/legacy session fields in floorPlanRouter', async () => {

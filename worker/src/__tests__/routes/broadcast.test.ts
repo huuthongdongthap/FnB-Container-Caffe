@@ -107,9 +107,9 @@ describe('broadcast smoke', () => {
     };
     const hbRes = await containerTelemetryRouter.request('https://test.aura/telemetry/heartbeat', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'x-edge-telemetry-secret': 'test-edge-secret-123' },
       body: JSON.stringify({ container_id: 'CONT_SADEC', ambient_temp_celsius: 26 }),
-    }, { AURA_DB: hbDb, PILOT_TENANT_ID: 'tenant_sadec_02' } as any);
+    }, { AURA_DB: hbDb, PILOT_TENANT_ID: 'tenant_sadec_02', EDGE_TELEMETRY_SECRET: 'test-edge-secret-123' } as any);
     expect(hbRes.status).toBe(200);
     expect(capturedHbBinds[0]).toContain('tenant_sadec_02');
 

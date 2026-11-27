@@ -8,6 +8,7 @@ import { ErpnextClient } from '../clients/erpnext-client';
 import { verifyJWT, getAuthToken, cookieWriteBlockReason } from '../lib/jwt';
 import { validateStaffSession, staffSessionErrorResponse, type StaffSession } from '../lib/staff-session';
 import { erpnextConfigureSchema, erpnextLeadSchema, erpnextTagSchema, customerUpdateSchema, zodErrorResponseRaw } from '../lib/validators';
+import { encryptTenantSecret } from '../lib/tenant-secrets';
 import { createLogger } from '../middleware/logger';
 
 const log = createLogger({ route: 'erpnext' });
@@ -119,9 +120,17 @@ export async function handleErpnextRequest(request: Request, env: Env, resolvedT
 			const confParsed = erpnextConfigureSchema.safeParse(await request.json());
 			if (!confParsed.success) return zodErrorResponseRaw(confParsed.error);
 			const keys = erpnextKvKeys(authCheck.tenantId);
+			const masterKey =
+				(env as unknown as Record<string, string | undefined>).TENANT_SECRETS_KEY ||
+				env.JWT_SECRET;
+			if (!masterKey) {
+				return jsonResp({ success: false, error: 'Encryption key not configured' }, 500);
+			}
+			const encKey = await encryptTenantSecret(confParsed.data.api_key, masterKey, undefined, authCheck.tenantId);
+			const encSecret = await encryptTenantSecret(confParsed.data.api_secret, masterKey, undefined, authCheck.tenantId);
 			await env.AUTH_KV.put(keys.url, confParsed.data.url);
-			await env.AUTH_KV.put(keys.key, confParsed.data.api_key);
-			await env.AUTH_KV.put(keys.secret, confParsed.data.api_secret);
+			await env.AUTH_KV.put(keys.key, encKey);
+			await env.AUTH_KV.put(keys.secret, encSecret);
 			try {
 				const testClient = new ErpnextClient({ url: confParsed.data.url, apiKey: confParsed.data.api_key, apiSecret: confParsed.data.api_secret });
 				await testClient.list('Customer', { limit: 1 });

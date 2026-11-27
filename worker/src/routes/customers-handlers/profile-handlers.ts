@@ -157,6 +157,38 @@ export function registerProfileHandlers(router: Hono<{ Bindings: Env }>): void {
 
     if (typeof data.phone === 'string' && data.phone.trim() !== '') {
       const trimmedPhone = data.phone.trim();
+      const currentRow = await db
+        .prepare(
+          `SELECT phone FROM customers WHERE id = ? AND (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?) LIMIT 1`
+        )
+        .bind(customerId, tenantId, tenantId)
+        .first<{ phone?: string | null }>()
+        .catch(() => null);
+      const currentPhone = String(currentRow?.phone || '').trim();
+      if (currentPhone !== trimmedPhone) {
+        const rawBody = (await c.req.json().catch(() => ({}))) as { otp?: string; phone_otp?: string };
+        const submittedOtp = String(rawBody.otp || rawBody.phone_otp || '').trim();
+        const kv = c.env?.AUTH_KV;
+        let otpValid = false;
+        if (submittedOtp && kv && typeof kv.get === 'function') {
+          const otpKey = `phone_change_otp:${customerId}:${trimmedPhone}`;
+          const storedOtp = await kv.get(otpKey).catch(() => null);
+          if (storedOtp && storedOtp === submittedOtp) {
+            otpValid = true;
+            await kv.delete(otpKey).catch(() => {});
+          }
+        }
+        if (!otpValid) {
+          return c.json(
+            {
+              success: false,
+              error: 'Cần xác thực OTP để cập nhật số điện thoại',
+              code: 'PHONE_OTP_REQUIRED',
+            },
+            403
+          );
+        }
+      }
       let existingPhone: { id?: string; phone?: string | null; tenant_id?: string | null } | null = null;
       try {
         existingPhone = await db

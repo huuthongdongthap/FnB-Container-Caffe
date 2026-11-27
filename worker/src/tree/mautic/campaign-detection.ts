@@ -109,6 +109,8 @@ export async function detectWinbackCandidates(
       (SELECT MAX(o.created_at) FROM orders o WHERE o.customer_id = c.id AND COALESCE(o.status, '') NOT IN ('cancelled', 'rejected', 'failed', 'expired')) as last_order_date
      FROM customers c
      WHERE c.phone IS NOT NULL AND c.phone != ''
+       AND c.anonymized_at IS NULL
+       AND (COALESCE(c.consent_marketing, 0) = 1 OR COALESCE(c.marketing_consent, 0) = 1 OR EXISTS (SELECT 1 FROM consents co WHERE co.customer_id = c.id AND co.granted = 1 AND co.revoked_at IS NULL))
        AND c.id NOT IN (
          SELECT customer_id FROM campaign_enrollments WHERE campaign_type = 'winback'
            AND created_at > ?
@@ -127,6 +129,8 @@ export async function detectWinbackCandidates(
         (SELECT MAX(o.created_at) FROM orders o WHERE o.customer_id = c.id AND COALESCE(o.status, '') NOT IN ('cancelled', 'rejected', 'failed', 'expired') AND COALESCE(NULLIF(TRIM(o.tenant_id), ''), 'default') = ?) as last_order_date
        FROM customers c
        WHERE c.phone IS NOT NULL AND c.phone != ''
+         AND c.anonymized_at IS NULL
+         AND (COALESCE(c.consent_marketing, 0) = 1 OR COALESCE(c.marketing_consent, 0) = 1 OR EXISTS (SELECT 1 FROM consents co WHERE co.customer_id = c.id AND co.granted = 1 AND co.revoked_at IS NULL))
          AND COALESCE(NULLIF(TRIM(c.tenant_id), ''), 'default') = ?
          AND c.id NOT IN (
            SELECT customer_id FROM campaign_enrollments WHERE campaign_type = 'winback'

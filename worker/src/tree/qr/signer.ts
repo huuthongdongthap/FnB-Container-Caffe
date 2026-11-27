@@ -5,9 +5,16 @@
 
 export const WINDOW_SECONDS = 300;
 
-async function sha256Hex(data: string): Promise<string> {
+async function hmacSha256Hex(message: string, secret: string): Promise<string> {
   const encoder = new TextEncoder();
-  const buffer = await crypto.subtle.digest('SHA-256', encoder.encode(data));
+  const key = await crypto.subtle.importKey(
+    'raw',
+    encoder.encode(secret),
+    { name: 'HMAC', hash: 'SHA-256' },
+    false,
+    ['sign']
+  );
+  const buffer = await crypto.subtle.sign('HMAC', key, encoder.encode(message));
   return Array.from(new Uint8Array(buffer))
     .map((b) => b.toString(16).padStart(2, '0'))
     .join('');
@@ -15,7 +22,7 @@ async function sha256Hex(data: string): Promise<string> {
 
 export async function signQRUrl(slug: string, secret: string, baseUrl: string): Promise<string> {
   const ts = Math.floor(Date.now() / 1000);
-  const sig = await sha256Hex(`${ts}|${slug}|${secret}`);
+  const sig = await hmacSha256Hex(`${ts}|${slug}`, secret);
   return `${baseUrl}/api/qr/${slug}?ts=${ts}&sig=${sig}`;
 }
 
@@ -23,7 +30,7 @@ export async function verifyQRSignature(slug: string, ts: number, sig: string, s
   if (!Number.isFinite(ts)) return false;
   const now = Math.floor(Date.now() / 1000);
   if (Math.abs(now - ts) > WINDOW_SECONDS) return false;
-  const expected = await sha256Hex(`${ts}|${slug}|${secret}`);
+  const expected = await hmacSha256Hex(`${ts}|${slug}`, secret);
   if (typeof sig !== 'string' || sig.length !== expected.length) return false;
   let diff = 0;
   for (let i = 0; i < expected.length; i++) {

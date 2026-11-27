@@ -100,8 +100,8 @@ export function resolveTenantLifecycle(
   const billingCycle = normalizeBillingCycle(sub?.billing_cycle);
   const rawStatus = String(sub?.status || 'trial').trim().toLowerCase();
 
-  // Explicit administrative suspension or read-only lock
-  if (rawStatus === 'suspended' || rawStatus === 'readonly' || rawStatus === 'expired') {
+  // Explicit administrative suspension, cancellation, or read-only lock
+  if (rawStatus === 'suspended' || rawStatus === 'readonly' || rawStatus === 'expired' || rawStatus === 'cancelled') {
     return {
       tenantId,
       planId,

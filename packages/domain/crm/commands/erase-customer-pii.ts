@@ -43,21 +43,25 @@ export async function eraseCustomerPii(
   const erasedToken = await computeErasedToken(input.customerId, tenantId);
 
   let priorPhone: string | null = null;
+  let priorEmail: string | null = null;
   let resolvedRowTenant: string | null = null;
   let existingChecked = false;
   let existingFound = false;
   try {
     const existing = await db
       .prepare(
-        "SELECT id, phone, tenant_id FROM customers WHERE id = ? AND (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?) LIMIT 1",
+        "SELECT id, phone, email, tenant_id FROM customers WHERE id = ? AND (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?) LIMIT 1",
       )
       .bind(input.customerId, tenantId, tenantId)
-      .first<{ id?: string; phone?: string | null; tenant_id?: string | null }>();
+      .first<{ id?: string; phone?: string | null; email?: string | null; tenant_id?: string | null }>();
     existingChecked = true;
     if (existing) {
       existingFound = true;
       if (existing.phone) {
         priorPhone = String(existing.phone).trim();
+      }
+      if (existing.email) {
+        priorEmail = String(existing.email).trim();
       }
       if (typeof existing.tenant_id === 'string' && existing.tenant_id.trim()) {
         resolvedRowTenant = existing.tenant_id.trim();
@@ -68,15 +72,18 @@ export async function eraseCustomerPii(
       throw err;
     }
     const legacyExisting = await db
-      .prepare('SELECT id, phone FROM customers WHERE id = ? LIMIT 1')
+      .prepare('SELECT id, phone, email FROM customers WHERE id = ? LIMIT 1')
       .bind(input.customerId)
-      .first<{ id?: string; phone?: string | null }>()
+      .first<{ id?: string; phone?: string | null; email?: string | null }>()
       .catch(() => undefined);
     if (legacyExisting !== undefined) {
       existingChecked = true;
       existingFound = Boolean(legacyExisting);
       if (legacyExisting?.phone) {
         priorPhone = String(legacyExisting.phone).trim();
+      }
+      if (legacyExisting?.email) {
+        priorEmail = String(legacyExisting.email).trim();
       }
     }
   }
@@ -102,6 +109,7 @@ export async function eraseCustomerPii(
                 consent_marketing = 0,
                 consent_analytics = 0,
                 referral_code = NULL,
+                last_ip = NULL,
                 anonymized_at = CURRENT_TIMESTAMP,
                 auth_version = COALESCE(auth_version, 1) + 1,
                 updated_at = CURRENT_TIMESTAMP
@@ -155,7 +163,9 @@ export async function eraseCustomerPii(
             SET customer_name = '[ERASED]',
                 customer_phone = ?,
                 customer_email = NULL,
-                customer_address = NULL
+                customer_address = NULL,
+                delivery_address = NULL,
+                notes = NULL
           WHERE customer_id = ? AND (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?)`,
       )
       .bind(erasedToken, input.customerId, tenantId, tenantId)
@@ -164,35 +174,48 @@ export async function eraseCustomerPii(
     try {
       await db
         .prepare(
-          "UPDATE orders SET customer_name = '[ERASED]', customer_phone = ? WHERE customer_id = ? AND (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?)",
+          `UPDATE orders
+              SET customer_name = '[ERASED]',
+                  customer_phone = ?,
+                  customer_email = NULL,
+                  customer_address = NULL
+            WHERE customer_id = ? AND (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?)`,
         )
         .bind(erasedToken, input.customerId, tenantId, tenantId)
         .run()
-        .catch(async (fallbackErr) => {
-          if (/no such column:\s*tenant_id/i.test(String(fallbackErr)) && (tenantId === 'default' || tenantId === '*')) {
-            await db
-              .prepare("UPDATE orders SET customer_name = '[ERASED]', customer_phone = ? WHERE customer_id = ?")
-              .bind(erasedToken, input.customerId)
-              .run();
-          }
-        });
+        .catch(() =>
+          db
+            .prepare(
+              "UPDATE orders SET customer_name = '[ERASED]', customer_phone = ? WHERE customer_id = ? AND (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?)",
+            )
+            .bind(erasedToken, input.customerId, tenantId, tenantId)
+            .run()
+            .catch(async (fallbackErr) => {
+              if (/no such column:\s*tenant_id/i.test(String(fallbackErr)) && (tenantId === 'default' || tenantId === '*')) {
+                await db
+                  .prepare("UPDATE orders SET customer_name = '[ERASED]', customer_phone = ? WHERE customer_id = ?")
+                  .bind(erasedToken, input.customerId)
+                  .run();
+              }
+            }),
+        );
     } catch {
       // Best-effort when orders table is absent in minimal mocks
     }
   }
 
-  // 3. Revoke all active consents and purge auxiliary identity/push bindings
+  // 3. Revoke all active consents and purge auxiliary identity/push/PII bindings
   try {
     await db
       .prepare(
-        "UPDATE consents SET revoked_at = ? WHERE customer_id = ? AND revoked_at IS NULL AND (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?)",
+        "UPDATE consents SET granted = 0, revoked_at = ? WHERE customer_id = ? AND (revoked_at IS NULL OR granted = 1) AND (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?)",
       )
       .bind(now, input.customerId, tenantId, tenantId)
       .run()
       .catch(async (err) => {
         if (/no such column:\s*tenant_id/i.test(String(err)) && (tenantId === 'default' || tenantId === '*')) {
           await db
-            .prepare('UPDATE consents SET revoked_at = ? WHERE customer_id = ? AND revoked_at IS NULL')
+            .prepare('UPDATE consents SET granted = 0, revoked_at = ? WHERE customer_id = ? AND (revoked_at IS NULL OR granted = 1)')
             .bind(now, input.customerId)
             .run();
         }
@@ -205,6 +228,160 @@ export async function eraseCustomerPii(
 
   try {
     await db.prepare('DELETE FROM push_subscriptions WHERE customer_id = ?').bind(input.customerId).run();
+  } catch { /* optional table */ }
+
+  // 3b. Scrub/purge PII across all auxiliary D1 tables (GDPR Art. 17 / VN ND 13)
+  const cleanPhone = priorPhone && !priorPhone.startsWith('erased_') ? priorPhone : null;
+  const cleanEmail = priorEmail ? priorEmail.toLowerCase() : null;
+
+  try {
+    await db
+      .prepare(
+        `UPDATE subscriptions
+            SET customer_name = '[ERASED]', customer_email = ?, customer_phone = ?
+          WHERE customer_id = ? OR (? IS NOT NULL AND LOWER(customer_email) = ?) OR (? IS NOT NULL AND customer_phone = ?)`,
+      )
+      .bind(`${erasedToken}@erased.invalid`, erasedToken, input.customerId, cleanEmail, cleanEmail, cleanPhone, cleanPhone)
+      .run();
+  } catch { /* optional table */ }
+
+  try {
+    await db
+      .prepare(
+        `UPDATE reservations
+            SET customer_name = '[ERASED]', customer_phone = ?, notes = NULL
+          WHERE customer_id = ? OR (? IS NOT NULL AND customer_phone = ?)`,
+      )
+      .bind(erasedToken, input.customerId, cleanPhone, cleanPhone)
+      .run();
+  } catch { /* optional table */ }
+
+  try {
+    await db
+      .prepare("UPDATE checkins SET customer_name = '[ERASED]' WHERE customer_id = ?")
+      .bind(input.customerId)
+      .run();
+  } catch { /* optional table */ }
+
+  try {
+    await db
+      .prepare(
+        `UPDATE contact_messages
+            SET name = '[ERASED]', phone = NULL, email = NULL, content = '[ERASED]'
+          WHERE (? IS NOT NULL AND LOWER(email) = ?) OR (? IS NOT NULL AND phone = ?)`,
+      )
+      .bind(cleanEmail, cleanEmail, cleanPhone, cleanPhone)
+      .run();
+  } catch { /* optional table */ }
+
+  try {
+    await db
+      .prepare("UPDATE reviews SET customer_name = '[ERASED]' WHERE customer_id = ?")
+      .bind(input.customerId)
+      .run();
+  } catch { /* optional table */ }
+
+  try {
+    await db
+      .prepare(
+        `UPDATE table_sessions
+            SET customer_name = '[ERASED]', customer_phone = NULL, notes = NULL
+          WHERE customer_id = ? OR (? IS NOT NULL AND customer_phone = ?)`,
+      )
+      .bind(input.customerId, cleanPhone, cleanPhone)
+      .run();
+  } catch { /* optional table */ }
+
+  try {
+    await db
+      .prepare(
+        `UPDATE wifi_sessions
+            SET phone = NULL, ip_address = NULL
+          WHERE customer_id = ? OR (? IS NOT NULL AND phone = ?)`,
+      )
+      .bind(input.customerId, cleanPhone, cleanPhone)
+      .run();
+  } catch { /* optional table */ }
+
+  try {
+    await db
+      .prepare(
+        `UPDATE ai_barista_interactions
+            SET customer_phone = NULL, query_prompt = '[ERASED]', preferences_json = NULL
+          WHERE customer_id = ? OR (? IS NOT NULL AND customer_phone = ?)`,
+      )
+      .bind(input.customerId, cleanPhone, cleanPhone)
+      .run();
+  } catch { /* optional table */ }
+
+  try {
+    if (cleanPhone) {
+      await db
+        .prepare(
+          `UPDATE customer_support_interactions
+              SET customer_phone = NULL, user_query = '[ERASED]'
+            WHERE customer_phone = ?`,
+        )
+        .bind(cleanPhone)
+        .run();
+    }
+  } catch { /* optional table */ }
+
+  try {
+    if (cleanPhone) {
+      await db.prepare('DELETE FROM otp_challenges WHERE phone = ?').bind(cleanPhone).run();
+    }
+  } catch { /* optional table */ }
+
+  try {
+    await db
+      .prepare('DELETE FROM email_verifications WHERE user_id = ? OR (? IS NOT NULL AND LOWER(email) = ?)')
+      .bind(input.customerId, cleanEmail, cleanEmail)
+      .run();
+  } catch { /* optional table */ }
+
+  try {
+    await db
+      .prepare(
+        `UPDATE promotion_redemptions
+            SET customer_phone = NULL
+          WHERE customer_id = ? OR (? IS NOT NULL AND customer_phone = ?)`,
+      )
+      .bind(input.customerId, cleanPhone, cleanPhone)
+      .run();
+  } catch { /* optional table */ }
+
+  try {
+    await db
+      .prepare(
+        `UPDATE signup_bonus_log
+            SET phone = NULL, ip_hint = NULL
+          WHERE customer_id = ? OR (? IS NOT NULL AND phone = ?)`,
+      )
+      .bind(input.customerId, cleanPhone, cleanPhone)
+      .run();
+  } catch { /* optional table */ }
+
+  try {
+    await db
+      .prepare(
+        `UPDATE notification_audit_log
+            SET recipient = NULL, phone = NULL, payload = NULL, data = NULL
+          WHERE customer_id = ?
+             OR (? IS NOT NULL AND (LOWER(recipient) = ? OR recipient = ?))
+             OR (? IS NOT NULL AND (phone = ? OR recipient = ?))`,
+      )
+      .bind(input.customerId, cleanEmail, cleanEmail, priorEmail, cleanPhone, cleanPhone, cleanPhone)
+      .run();
+  } catch { /* optional table */ }
+
+  try {
+    await db
+      .prepare(
+        'DELETE FROM leads WHERE (? IS NOT NULL AND LOWER(email) = ?) OR (? IS NOT NULL AND phone = ?)',
+      )
+      .bind(cleanEmail, cleanEmail, cleanPhone, cleanPhone)
+      .run();
   } catch { /* optional table */ }
 
   const effectiveTargetTenant = resolvedRowTenant || (tenantId === '*' ? 'default' : tenantId);
@@ -251,6 +428,12 @@ export async function eraseCustomerPii(
     try {
       await input.kv.delete(`user:${input.customerId}`);
       await input.kv.delete(`cust_auth_ver:${input.customerId}`);
+      if (cleanEmail) {
+        await input.kv.delete(`user:${cleanEmail}`);
+        if (priorEmail && priorEmail !== cleanEmail) {
+          await input.kv.delete(`user:${priorEmail}`);
+        }
+      }
       if (priorPhone && !priorPhone.startsWith('erased_')) {
         await input.kv.delete(`phone_otp:${effectiveTargetTenant}:${priorPhone}`);
         await input.kv.delete(`phone_otp:${priorPhone}`);

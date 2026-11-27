@@ -333,7 +333,7 @@ describe('Wave 6 Regressions — #227, #232, #236, #239, #240', () => {
       'http://localhost/messages',
       {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${custToken1}` },
         body: JSON.stringify({ name: 'Lan', phone: '0911000111', message: 'Cho hoi mon moi' }),
       },
       env

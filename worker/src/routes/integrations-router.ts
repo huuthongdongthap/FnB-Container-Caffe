@@ -44,9 +44,18 @@ export function registerIntegrationRoutes(app: Hono<{ Bindings: Env }>): void {
   );
   app.use('/api/erpnext-invoices/*', requireAuth(['owner', 'manager', 'supervisor', 'staff', 'admin']));
   app.all('/api/erpnext-invoices/*', (c) => handleErpnextInvoicesRequest(c.req.raw, c.env as unknown as Record<string, unknown>, getTenantId(c)));
-  app.get('/api/public/products/:productId/availability', (c) =>
-    handleErpnextPosRequest(new Request(`https://internal/api/erpnext-pos/products/${c.req.param('productId')}/availability`, c.req.raw), c.env as unknown as Record<string, unknown>, getTenantId(c))
-  );
+  app.get('/api/public/products/:productId/availability', (c) => {
+    const productId = String(c.req.param('productId') || '').trim();
+    if (!/^[A-Za-z0-9_-]{1,64}$/.test(productId)) {
+      return c.json({ success: false, error: 'Invalid product ID' }, 400);
+    }
+    const safeProductId = encodeURIComponent(productId);
+    return handleErpnextPosRequest(
+      new Request(`https://internal/api/erpnext-pos/products/${safeProductId}/availability`, c.req.raw),
+      c.env as unknown as Record<string, unknown>,
+      getTenantId(c)
+    );
+  });
 
   // Mixpost, Mautic, Zalo, Integrations
   app.use('/api/mixpost/*', requireAuth(['owner', 'manager', 'supervisor', 'staff', 'admin']));

@@ -333,14 +333,14 @@ describe('PayOS Payment Reconciliation & Identifiable DLQ (real SQLite)', () => 
   });
 
   it('enforces auth, RBAC, cross-tenant 404, cooldown bypass, and 202 when lease is busy on POST /api/admin/payments/:id/reconcile', async () => {
-    const { env, db, sqlite } = createReconcileFixture({ tenantId: 'store-a' });
-    sqlite.prepare("INSERT INTO users (id, name, role, tenant_id, is_active, auth_version) VALUES ('u_waiter', 'Waiter', 'waiter', 'store-a', 1, 1)").run();
+    const { env, db, sqlite } = createReconcileFixture({ tenantId: 'default' });
+    sqlite.prepare("INSERT INTO users (id, name, role, tenant_id, is_active, auth_version) VALUES ('u_waiter', 'Waiter', 'waiter', 'default', 1, 1)").run();
     sqlite.prepare("INSERT INTO users (id, name, role, tenant_id, is_active, auth_version) VALUES ('u_mgr_b', 'Manager B', 'manager', 'store-b', 1, 1)").run();
-    sqlite.prepare("INSERT INTO users (id, name, role, tenant_id, is_active, auth_version) VALUES ('u_mgr_a', 'Manager A', 'manager', 'store-a', 1, 1)").run();
+    sqlite.prepare("INSERT INTO users (id, name, role, tenant_id, is_active, auth_version) VALUES ('u_mgr_a', 'Manager A', 'manager', 'default', 1, 1)").run();
 
     const { token: waiterToken } = await issueStaffSession(
       { JWT_SECRET: TEST_JWT_SECRET },
-      { id: 'u_waiter', name: 'Waiter', phone: null, role: 'waiter', tenant_id: 'store-a', is_active: 1, auth_version: 1 },
+      { id: 'u_waiter', name: 'Waiter', phone: null, role: 'waiter', tenant_id: 'default', is_active: 1, auth_version: 1 },
       { email: 'w@a.com', sessionType: 'staff-web' }
     );
     const { token: mgrBToken } = await issueStaffSession(
@@ -350,7 +350,7 @@ describe('PayOS Payment Reconciliation & Identifiable DLQ (real SQLite)', () => 
     );
     const { token: mgrAToken } = await issueStaffSession(
       { JWT_SECRET: TEST_JWT_SECRET },
-      { id: 'u_mgr_a', name: 'Manager A', phone: null, role: 'manager', tenant_id: 'store-a', is_active: 1, auth_version: 1 },
+      { id: 'u_mgr_a', name: 'Manager A', phone: null, role: 'manager', tenant_id: 'default', is_active: 1, auth_version: 1 },
       { email: 'a@a.com', sessionType: 'staff-web' }
     );
 

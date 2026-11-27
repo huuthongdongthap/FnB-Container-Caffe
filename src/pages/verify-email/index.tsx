@@ -62,7 +62,17 @@ const VerifyEmailPage: React.FC = () => {
 
       const params = new URLSearchParams(window.location.search);
       const nextPath = params.get('next');
-      const safeNext = nextPath && nextPath.startsWith('/') && !nextPath.startsWith('//') ? nextPath : '/account';
+      let safeNext = '/account';
+      if (nextPath && nextPath.startsWith('/') && !nextPath.startsWith('//') && !nextPath.startsWith('/\\') && !nextPath.includes('\\')) {
+        try {
+          const parsed = new URL(nextPath, window.location.origin);
+          if (parsed.origin === window.location.origin) {
+            safeNext = `${parsed.pathname}${parsed.search}${parsed.hash}`;
+          }
+        } catch {
+          safeNext = '/account';
+        }
+      }
 
       setTimeout(() => {
         window.location.href = safeNext;

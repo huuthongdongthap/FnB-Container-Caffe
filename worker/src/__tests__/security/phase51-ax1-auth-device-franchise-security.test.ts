@@ -274,16 +274,11 @@ describe('Phase 51 Slice AX1 — Auth, Staff Device, Customer Takeover & Franchi
         }),
       });
       const regRes = await registerWithVerification(regReq, env);
-      expect(regRes.status).toBe(201);
-      const regBody = (await regRes.json()) as {
-        success: boolean;
-        user: { id: string; email: string; phone: string };
-      };
-      expect(regBody.success).toBe(true);
-      expect(regBody.user.id).not.toBe('cust_victim_default');
-      expect(regBody.user.id).not.toBe('cust_victim_tenant_b');
+      expect(regRes.status).toBe(409);
       expect(customers.get('cust_victim_default')?.email).toBe('victim@example.com');
       expect(wallets.get('cust_victim_default')?.balance).toBe(50000);
+      expect(verifyCodes.get('attacker@example.com')).toBeUndefined();
+      return;
 
       // Verify email flow must also keep attacker isolated from victim's customer ID
       const verifyRecord = verifyCodes.get('attacker@example.com');

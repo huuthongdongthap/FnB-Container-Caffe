@@ -97,6 +97,16 @@ export async function loginUser(request: Request, env: Record<string, unknown>, 
       user.tenant_id = state.account.tenant_id;
     } else {
       if (!await verifyPassword(password, user.password)) return failedPassword();
+      if (user.email_verified === false) {
+        return jsonResponse(
+          {
+            success: false,
+            error: 'Vui lòng xác thực email trước khi đăng nhập',
+            code: 'EMAIL_NOT_VERIFIED',
+          },
+          403
+        );
+      }
       if (!String(user.password).startsWith('pbkdf2$')) {
         user.password = await hashPassword(password);
         await authKV.put(`user:${email}`, JSON.stringify(user));
@@ -120,20 +130,27 @@ export async function loginUser(request: Request, env: Record<string, unknown>, 
         }
         const effectiveTenant = tenantId || defaultPilotTenant;
         if (db?.prepare) {
-          let existingCust: { id: string; email?: string | null; tenant_id?: string | null } | null = null;
+          let existingCust: { id: string; email?: string | null; tenant_id?: string | null; anonymized_at?: string | null } | null = null;
           try {
             existingCust = await db.prepare(
-              `SELECT id, email, tenant_id FROM customers
+              `SELECT id, email, tenant_id, anonymized_at FROM customers
                WHERE (id = ? OR lower(email) = lower(?))
                  AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?
                LIMIT 1`
-            ).bind(user.id, email, effectiveTenant).first<{ id: string; email?: string | null; tenant_id?: string | null }>();
+            ).bind(user.id, email, effectiveTenant).first<{ id: string; email?: string | null; tenant_id?: string | null; anonymized_at?: string | null }>();
           } catch {
             if (effectiveTenant === 'default') {
               existingCust = await db.prepare(
-                'SELECT id, email FROM customers WHERE id = ? OR lower(email) = lower(?) LIMIT 1'
-              ).bind(user.id, email).first<{ id: string; email?: string | null; tenant_id?: string | null }>().catch(() => null);
+                'SELECT id, email, anonymized_at FROM customers WHERE id = ? OR lower(email) = lower(?) LIMIT 1'
+              ).bind(user.id, email).first<{ id: string; email?: string | null; tenant_id?: string | null; anonymized_at?: string | null }>().catch(() =>
+                db.prepare(
+                  'SELECT id, email FROM customers WHERE id = ? OR lower(email) = lower(?) LIMIT 1'
+                ).bind(user.id, email).first<{ id: string; email?: string | null; tenant_id?: string | null; anonymized_at?: string | null }>().catch(() => null),
+              );
             }
+          }
+          if (existingCust?.anonymized_at) {
+            return errorResponse('Invalid credentials', 401);
           }
           const custTenant = String(existingCust?.tenant_id || '').trim() || effectiveTenant;
           const custEmail = String(existingCust?.email || '').trim().toLowerCase();

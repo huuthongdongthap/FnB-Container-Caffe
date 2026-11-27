@@ -241,9 +241,11 @@ export async function staffMobileLogin(c: Context<{ Bindings: Env }>) {
     if (rawRequestedTenant === '__CONFLICT__') {
       return errorResponse('Không đủ quyền truy cập cửa hàng', 403);
     }
-    const deviceToken = String(body.device_token ?? '');
+    const deviceToken = String(body.device_token ?? '').trim();
     const parsed = pinSchema.safeParse(body.pin);
-    if (!deviceToken || !parsed.success) return errorResponse('Thiếu thiết bị hoặc PIN không hợp lệ', 400);
+    if (!deviceToken || deviceToken.length < 8 || deviceToken.length > 128 || !parsed.success) {
+      return errorResponse('Thiếu thiết bị hoặc PIN không hợp lệ', 400);
+    }
     const kv = c.env.AUTH_KV;
     if (!kv) throw new SessionUnavailableError();
     const key = `pin_lockout:${deviceToken}`;

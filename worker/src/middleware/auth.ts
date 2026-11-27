@@ -39,11 +39,8 @@ export function requireAuth(allowedRoles: string[] = DEFAULT_AUTHENTICATED_ROLES
   return async (c, next) => {
     const env = c.env as Env;
     const isProd = env?.ENVIRONMENT === 'production' || (env as Record<string, unknown>)?.NODE_ENV === 'production';
-    const allowTestHarness = !isProd && (
-      (env as Record<string, unknown>)?.ALLOW_PLAYWRIGHT_TEST_HEADER === 'true' ||
-      env?.ENVIRONMENT === 'development' ||
-      env?.ENVIRONMENT === 'test'
-    );
+    const allowTestHarness = !isProd &&
+      (env as Record<string, unknown>)?.ALLOW_PLAYWRIGHT_TEST_HEADER === 'true';
     const testHeader = (typeof c?.req?.header === 'function' ? c.req.header('x-playwright-test') : null)
       ?? (c?.req?.raw?.headers?.get?.('x-playwright-test') ?? null);
     const isPlaywright = allowTestHarness && testHeader === 'true' && allowedRoles.includes('staff');

@@ -87,28 +87,39 @@ jobs:
           PATH="$GITHUB_WORKSPACE/worker/node_modules/.bin:$PATH" \
             bash worker/scripts/apply-migrations.sh --dry-run --file "$MIGRATION_FILE_INPUT"
 
-      - name: Export pre-migration D1 backup
+      - name: Export and encrypt pre-migration D1 backup
         working-directory: worker
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          D1_BACKUP_ENCRYPTION_KEY: ${{ secrets.D1_BACKUP_ENCRYPTION_KEY }}
         run: |
           set -euo pipefail
+          if [ -z "${D1_BACKUP_ENCRYPTION_KEY:-}" ]; then
+            echo "Error: D1_BACKUP_ENCRYPTION_KEY secret is required to encrypt pre-migration backups" >&2
+            exit 1
+          fi
           BACKUP_DIR="$GITHUB_WORKSPACE/d1-backups"
           mkdir -p "$BACKUP_DIR"
           BACKUP_PATH="$BACKUP_DIR/fnb-caffe-db-pre-${MIGRATION_FILE_INPUT%.sql}-$(date -u +%Y%m%dT%H%M%SZ).sql"
-          echo "Exporting remote D1 backup before migration to $BACKUP_PATH..."
+          ENCRYPTED_PATH="${BACKUP_PATH}.enc"
+          echo "Exporting remote D1 backup before migration..."
           npx --no-install wrangler d1 export fnb-caffe-db --remote --output="$BACKUP_PATH"
           test -s "$BACKUP_PATH"
-          echo "BACKUP_PATH=$BACKUP_PATH" >> "$GITHUB_ENV"
+          openssl enc -aes-256-cbc -pbkdf2 -iter 600000 -salt \
+            -in "$BACKUP_PATH" \
+            -out "$ENCRYPTED_PATH" \
+            -pass env:D1_BACKUP_ENCRYPTION_KEY
+          shred -u "$BACKUP_PATH" 2>/dev/null || rm -f "$BACKUP_PATH"
+          test -s "$ENCRYPTED_PATH"
+          echo "BACKUP_PATH=$ENCRYPTED_PATH" >> "$GITHUB_ENV"
 
-      - name: Upload pre-migration D1 backup artifact
+      - name: Upload encrypted pre-migration D1 backup artifact
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: d1-pre-migration-backup-${{ github.run_id }}
-          path: d1-backups/
+          path: d1-backups/*.enc
           if-no-files-found: error
-          retention-days: 30
-          compression-level: 0
+          retention-days: 7
 
       - name: Apply explicit forward D1 migration
         env:

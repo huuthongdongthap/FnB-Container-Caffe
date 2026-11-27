@@ -48,7 +48,7 @@ describe('Client Errors Route (/api/client-error)', () => {
     expect(body.success).toBe(true);
     expect(body.id).toMatch(/^CE-/);
 
-    expect(bindSpy).toHaveBeenCalledTimes(1);
+    expect(bindSpy).toHaveBeenCalledTimes(2);
     const [, route, message, stack, href, userAgent, ts] = bindSpy.mock.calls[0];
     expect(route).toBe('/checkout');
     expect(message).toBe('Cannot read properties of undefined (reading "price")');

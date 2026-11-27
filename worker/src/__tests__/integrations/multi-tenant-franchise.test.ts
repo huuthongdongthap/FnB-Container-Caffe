@@ -12,6 +12,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { createHmac } from 'node:crypto';
 import { getAdminOrders } from '@aura/domain-order';
 import { buildOrderFilterClause } from '../../../../packages/domain/order/queries/shared-listing';
 import { createMockEnv, TEST_JWT_SECRET } from '../test-utils';
@@ -274,9 +275,7 @@ describe('Multi-Tenant & Franchise Preparation Integration', () => {
 
       const req = await authRequest('GET', '/api/franchise/locations/loc_sd_flagship', 'manager', 'tenant_sadec_02');
       const res = await app.fetch(req, env);
-      expect(res.status).toBe(403);
-      const body = await res.json() as any;
-      expect(body.error).toContain('Access denied');
+      expect(res.status).toBe(404);
     });
 
     it('rejects franchise onboarding from non-HQ users', async () => {
@@ -2493,14 +2492,14 @@ describe('Multi-Tenant & Franchise Preparation Integration', () => {
       const supOwnRes = await app.fetch(supOwnReq, env);
       expect(supOwnRes.status).toBe(200);
       const supOwnJson = (await supOwnRes.json()) as any;
-      expect(supOwnJson.outcome).toBe('already_settled');
+      expect(supOwnJson.outcome).toBe('skipped_already_settled');
 
       // 2. HQ owner in 'hq' with ?tenant_id=* can reconcile SaDec branch payment (200 instead of 404)
       const hqWildcardReq = await authRequest('POST', '/api/admin/payments/pay-sad-1/reconcile?tenant_id=*', 'owner', 'hq');
       const hqWildcardRes = await app.fetch(hqWildcardReq, env);
       expect(hqWildcardRes.status).toBe(200);
       const hqWildcardJson = (await hqWildcardRes.json()) as any;
-      expect(hqWildcardJson.outcome).toBe('already_settled');
+      expect(hqWildcardJson.outcome).toBe('skipped_already_settled');
     });
 
     it('enforces HQ wildcard (?tenant_id=*) and supervisor parity on Admin Customers, Admin Orders, and DinDin Checkouts (J2)', async () => {
@@ -3112,9 +3111,9 @@ describe('Multi-Tenant & Franchise Preparation Integration', () => {
       const defMgrDetailReq = await authRequest('GET', '/locations/loc-def', 'manager', 'default');
       expect((await franchiseRouter.fetch(defMgrDetailReq, env)).status).toBe(200);
 
-      // HQ owner passing explicit ?tenant_id=tenant_sadec_02 gets 403 when querying loc-def (tenant mismatch against explicit filter)
+      // HQ owner passing explicit ?tenant_id=tenant_sadec_02 gets 404 when querying loc-def (anti-oracle tenant mismatch)
       const hqScopedMismatchReq = await authRequest('GET', '/locations/loc-def?tenant_id=tenant_sadec_02', 'owner', 'hq');
-      expect((await franchiseRouter.fetch(hqScopedMismatchReq, env)).status).toBe(403);
+      expect((await franchiseRouter.fetch(hqScopedMismatchReq, env)).status).toBe(404);
 
       // 2. Customer Assistant: authenticated SaDec customer cannot read Default order even if passing ?tenant_id=default; public caller with ?tenant_id=tenant_sadec_02 gets SaDec order
       const custToken = await generateJWT(
@@ -3139,8 +3138,7 @@ describe('Multi-Tenant & Franchise Preparation Integration', () => {
         }),
       });
       const sadCustChatRes = await customerAssistantRouter.fetch(sadCustChatReq, env);
-      expect(sadCustChatRes.status).toBe(200);
-      expect(((await sadCustChatRes.json()) as any).data.reply).toContain('chưa tìm thấy');
+      expect(sadCustChatRes.status).toBe(403);
 
       const pubSadChatReq = new Request('https://test.local/?tenant_id=tenant_sadec_02', {
         method: 'POST',
@@ -3158,7 +3156,7 @@ describe('Multi-Tenant & Franchise Preparation Integration', () => {
       });
       const supSimRes = await zaloWebhookRouter.fetch(supSimReq, env);
       expect(supSimRes.status).toBe(200);
-      expect(((await supSimRes.json()) as any).data.reply).toContain('#ord-sad-88');
+      expect(((await supSimRes.json()) as any).data.reply).toContain('***d-88');
     });
 
     it('enforces supervisor role parity & tenant isolation across inner integration and ops routers (ERPNext, Frigate, TastyIgniter, HomeAssistant, Pretix, CalBookings, WiFi, Push, CronAdmin) (K3)', async () => {
@@ -4008,7 +4006,7 @@ describe('Multi-Tenant & Franchise Preparation Integration', () => {
         }),
         sadecEnv
       );
-      expect(crossPhoneAuthRes.status).toBe(403);
+      expect(crossPhoneAuthRes.status).toBe(401);
 
       const crossPhoneOtpRes = await loyaltyApp.fetch(
         new Request('https://test.local/phone-otp/request', {
@@ -9132,27 +9130,28 @@ describe('Multi-Tenant & Franchise Preparation Integration', () => {
       calApp.route('/api/webhooks/cal', calBookingWebhookRouter);
 
       // Cross-tenant BOOKING_CANCELLED for 'cal_uid_def_1' from 'tenant_sadec_02' is rejected with 404
+      const crossCalCancelBody = JSON.stringify({
+        triggerEvent: 'BOOKING_CANCELLED',
+        createdAt: new Date().toISOString(),
+        payload: {
+          uid: 'cal_uid_def_1',
+          title: 'Default Table',
+          startTime: '2026-11-10T12:00:00.000Z',
+          endTime: '2026-11-10T13:00:00.000Z',
+          attendees: [{ name: 'Shared Caller', email: 'caller@def.vn', timeZone: 'Asia/Ho_Chi_Minh' }],
+          organizer: { name: 'AURA', email: 'host@aura.vn' },
+          location: 'Default Store',
+        },
+      });
       const crossCalCancelRes = await calApp.fetch(
         new Request('https://api.test/api/webhooks/cal', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'x-cal-webhook-secret': 'cal_sec_y2',
+            'x-cal-signature-256': createHmac('sha256', 'cal_sec_y2').update(crossCalCancelBody).digest('hex'),
             'X-Tenant-ID': 'tenant_sadec_02',
           },
-          body: JSON.stringify({
-            triggerEvent: 'BOOKING_CANCELLED',
-            createdAt: new Date().toISOString(),
-            payload: {
-              uid: 'cal_uid_def_1',
-              title: 'Default Table',
-              startTime: '2026-11-10T12:00:00.000Z',
-              endTime: '2026-11-10T13:00:00.000Z',
-              attendees: [{ name: 'Shared Caller', email: 'caller@def.vn', timeZone: 'Asia/Ho_Chi_Minh' }],
-              organizer: { name: 'AURA', email: 'host@aura.vn' },
-              location: 'Default Store',
-            },
-          }),
+          body: crossCalCancelBody,
         }),
         franEnv
       );
@@ -9160,27 +9159,28 @@ describe('Multi-Tenant & Franchise Preparation Integration', () => {
       expect(reservations.find((r) => r.id === 'res_def_existing')?.status).toBe('confirmed');
 
       // Same-tenant BOOKING_CANCELLED for 'cal_uid_fran_1' from 'tenant_sadec_02' succeeds (200)
+      const validCalCancelBody = JSON.stringify({
+        triggerEvent: 'BOOKING_CANCELLED',
+        createdAt: new Date().toISOString(),
+        payload: {
+          uid: 'cal_uid_fran_1',
+          title: 'SaDec Table',
+          startTime: '2026-11-10T12:00:00.000Z',
+          endTime: '2026-11-10T13:00:00.000Z',
+          attendees: [{ name: 'Shared Caller', email: 'caller@sadec.vn', timeZone: 'Asia/Ho_Chi_Minh' }],
+          organizer: { name: 'AURA', email: 'host@aura.vn' },
+          location: 'AURA Sa Đéc',
+        },
+      });
       const validCalCancelRes = await calApp.fetch(
         new Request('https://api.test/api/webhooks/cal', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'x-cal-webhook-secret': 'cal_sec_y2',
+            'x-cal-signature-256': createHmac('sha256', 'cal_sec_y2').update(validCalCancelBody).digest('hex'),
             'X-Tenant-ID': 'tenant_sadec_02',
           },
-          body: JSON.stringify({
-            triggerEvent: 'BOOKING_CANCELLED',
-            createdAt: new Date().toISOString(),
-            payload: {
-              uid: 'cal_uid_fran_1',
-              title: 'SaDec Table',
-              startTime: '2026-11-10T12:00:00.000Z',
-              endTime: '2026-11-10T13:00:00.000Z',
-              attendees: [{ name: 'Shared Caller', email: 'caller@sadec.vn', timeZone: 'Asia/Ho_Chi_Minh' }],
-              organizer: { name: 'AURA', email: 'host@aura.vn' },
-              location: 'AURA Sa Đéc',
-            },
-          }),
+          body: validCalCancelBody,
         }),
         franEnv
       );
@@ -9677,7 +9677,7 @@ describe('Multi-Tenant & Franchise Preparation Integration', () => {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'x-erpnext-webhook-secret': 'pos_sec_z1',
+            'x-frappe-webhook-signature': createHmac('sha256', 'pos_sec_z1').update(posWebhookPayload).digest('hex'),
             'X-Tenant-ID': 'tenant_sadec_02',
           },
           body: posWebhookPayload,
@@ -9697,6 +9697,7 @@ describe('Multi-Tenant & Franchise Preparation Integration', () => {
         AURA_DB: mockDb as any,
         PILOT_TENANT_ID: 'default',
         ENVIRONMENT: 'test',
+        ALLOW_UNSIGNED_ZALO_WEBHOOK: 'true',
         AUTH_KV: mockKv as any,
         CACHE_KV: mockCacheKv as any,
       });
@@ -9725,7 +9726,7 @@ describe('Multi-Tenant & Franchise Preparation Integration', () => {
           headers: { 'Content-Type': 'application/json' },
           body: zaloPayload,
         }),
-        franEnv
+        { ...franEnv, ALLOW_UNSIGNED_ZALO_WEBHOOK: 'true' } as any
       );
       expect(zaloFranRes.status).toBe(200);
       const zaloFranBody = (await zaloFranRes.json()) as { deduplicated?: boolean };
@@ -14454,6 +14455,19 @@ describe('Multi-Tenant & Franchise Preparation Integration', () => {
         await next();
       });
       calApp.route('/api/webhooks/cal', calBookingWebhookRouter);
+      const calAh1Body = JSON.stringify({
+        triggerEvent: 'BOOKING_CANCELLED',
+        createdAt: '2026-11-03T10:00:00Z',
+        payload: {
+          uid: 'uid_sadec_cal_1',
+          title: 'Bàn Sân Vườn',
+          startTime: '2026-11-04T10:00:00Z',
+          endTime: '2026-11-04T11:00:00Z',
+          organizer: { name: 'Sa Đéc Cafe', email: 'sadec@aura.cafe' },
+          location: 'Sa Đéc',
+          cancellationReason: 'Rain',
+        },
+      });
       const calRes = await calApp.request(
         '/api/webhooks/cal',
         {
@@ -14461,21 +14475,9 @@ describe('Multi-Tenant & Franchise Preparation Integration', () => {
           headers: {
             'Content-Type': 'application/json',
             'X-Tenant-ID': 'sadec',
-            'x-cal-webhook-secret': 'cal-sec-123456',
+            'x-cal-signature-256': createHmac('sha256', 'cal-sec-123456').update(calAh1Body).digest('hex'),
           },
-          body: JSON.stringify({
-            triggerEvent: 'BOOKING_CANCELLED',
-            createdAt: '2026-11-03T10:00:00Z',
-            payload: {
-              uid: 'uid_sadec_cal_1',
-              title: 'Bàn Sân Vườn',
-              startTime: '2026-11-04T10:00:00Z',
-              endTime: '2026-11-04T11:00:00Z',
-              organizer: { name: 'Sa Đéc Cafe', email: 'sadec@aura.cafe' },
-              location: 'Sa Đéc',
-              cancellationReason: 'Rain',
-            },
-          }),
+          body: calAh1Body,
         },
         { AURA_DB: calDb, CAL_WEBHOOK_SECRET: 'cal-sec-123456' } as any
       );

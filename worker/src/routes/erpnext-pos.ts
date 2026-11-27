@@ -454,11 +454,7 @@ export async function handleErpnextPosRequest(
         (envName === 'development' || envName === 'test') &&
         (String(env.ALLOW_UNSIGNED_WEBHOOKS || '').trim().toLowerCase() === 'true' ||
           String(env.ALLOW_UNSIGNED_ERPNEXT_WEBHOOK || '').trim().toLowerCase() === 'true');
-      const isLegacyMockWithoutEnv =
-        !envName &&
-        (String(env.ERPNEXT_MOCK || '').trim().toLowerCase() === 'true' ||
-          (!env.JWT_SECRET && Boolean(env.ERPNEXT_URL && env.ERPNEXT_API_KEY && env.ERPNEXT_API_SECRET)));
-      if (!webhookSecret && !allowUnsignedDev && !isLegacyMockWithoutEnv) {
+      if (!webhookSecret && !allowUnsignedDev) {
         return json({ success: false, error: 'ERPNext webhook secret not configured' }, 503);
       }
 
@@ -477,10 +473,9 @@ export async function handleErpnextPosRequest(
         } else if (secretHeader) {
           const normalizedSecretHeader = secretHeader.replace(/^sha256=/i, '').trim();
           signatureValid =
-            Boolean(secretHeader) &&
+            Boolean(normalizedSecretHeader) &&
             (constantTimeEqual(normalizedSecretHeader.toLowerCase(), expectedHex) ||
-              constantTimeEqual(normalizedSecretHeader, expectedBase64) ||
-              constantTimeEqual(secretHeader, webhookSecret));
+              constantTimeEqual(normalizedSecretHeader, expectedBase64));
         }
         if (!signatureValid) {
           return json({ success: false, error: 'Invalid webhook secret' }, 401);

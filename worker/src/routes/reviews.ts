@@ -341,48 +341,10 @@ reviewsRouter.post('/', optionalAuth(), async(c) => {
           }
         }
         if (!guestTokenVerified) {
-          if (orderRow.customer_phone) {
-            let suppliedPhone = String(
-              (body.customer_phone ?? body.phone ?? (auth as { phone?: string } | undefined)?.phone ?? '') || '',
-            ).trim();
-            if (!suppliedPhone && auth?.id) {
-              let custPhoneRow = await db
-                .prepare(
-                  "SELECT phone FROM customers WHERE id = ? AND (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?) LIMIT 1"
-                )
-                .bind(auth.id, tenantId, tenantId)
-                .first<{ phone?: string | null }>()
-                .catch(() => null);
-              if (!custPhoneRow && (tenantId === 'default' || tenantId === '*')) {
-                custPhoneRow = await db
-                  .prepare('SELECT phone FROM customers WHERE id = ?')
-                  .bind(auth.id)
-                  .first<{ phone?: string | null }>()
-                  .catch(() => null);
-              }
-              suppliedPhone = String(custPhoneRow?.phone ?? '').trim();
-            }
-            const normalizePhoneDigits = (raw: string): string => {
-              const digits = raw.replace(/\D/g, '');
-              if (digits.startsWith('84') && digits.length >= 10) {
-                return '0' + digits.slice(2);
-              }
-              return digits;
-            };
-            const orderPhoneNorm = normalizePhoneDigits(String(orderRow.customer_phone));
-            const suppliedPhoneNorm = normalizePhoneDigits(suppliedPhone);
-            if (!orderPhoneNorm || /^0+$/.test(orderPhoneNorm) || !suppliedPhoneNorm || suppliedPhoneNorm !== orderPhoneNorm) {
-              return c.json(
-                { success: false, error: 'Forbidden: customer phone verification required to review guest order' },
-                403,
-              );
-            }
-          } else if (!auth?.id && 'customer_phone' in orderRow) {
-            return c.json(
-              { success: false, error: 'Forbidden: customer phone verification required to review guest order' },
-              403,
-            );
-          }
+          return c.json(
+            { success: false, error: 'Forbidden: guest order token required to review guest order' },
+            403,
+          );
         }
       }
     }

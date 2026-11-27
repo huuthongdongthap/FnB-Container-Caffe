@@ -145,7 +145,7 @@ export function ReferralPage() {
         sms: `sms:?body=${encodeURIComponent(text)}`,
       };
       const url = urls[arg];
-      if (url) window.open(url, '_blank');
+      if (url) window.open(url, '_blank', 'noopener,noreferrer');
     }
     // When called with the actual code string, the Stitch component
     // handles clipboard copy internally — no wrapper action needed.

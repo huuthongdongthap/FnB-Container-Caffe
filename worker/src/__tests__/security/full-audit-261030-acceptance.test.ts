@@ -1,5 +1,6 @@
 // @vitest-environment node
 import { describe, expect, it } from 'vitest';
+import { createHmac } from 'node:crypto';
 import { DatabaseSync } from 'node:sqlite';
 import { app } from '../../index';
 import { issueStaffSession } from '../../lib/staff-session';
@@ -599,7 +600,7 @@ describe('Full Security Audit Acceptance — KDS Surfaces & Collection Guards', 
         }),
         env
       );
-      expect(idorReceipt.status).toBe(403);
+      expect(idorReceipt.status).toBe(404);
 
       const ownReceipt = await app.fetch(
         new Request('http://localhost/api/subscriptions/invoices/inv-def-1/receipt', {
@@ -2055,11 +2056,15 @@ describe('Full Security Audit Acceptance — KDS Surfaces & Collection Guards', 
       );
       expect(badWhRes.status).toBe(401);
 
+      const goodWhBody = JSON.stringify({ doctype: 'Sales Order', docname: 'SO-001', action: 'on_update' });
       const goodWhRes = await app.fetch(
         new Request('http://localhost/api/erpnext-pos/webhook', {
           method: 'POST',
-          headers: { ...bManagerHeaders, 'x-erpnext-webhook-secret': 'erp_wh_secret_123' },
-          body: JSON.stringify({ doctype: 'Sales Order', docname: 'SO-001', action: 'on_update' }),
+          headers: {
+            ...bManagerHeaders,
+            'x-frappe-webhook-signature': createHmac('sha256', 'erp_wh_secret_123').update(goodWhBody).digest('hex'),
+          },
+          body: goodWhBody,
         }),
         multiTenantEnv
       );
@@ -2110,15 +2115,16 @@ describe('Full Security Audit Acceptance — KDS Surfaces & Collection Guards', 
       );
       expect(tiQuerySecretRes.status).toBe(401);
 
-      // T3: POST /api/integrations/tastyigniter/webhook with header secret maps unknown status to allowlisted 'confirmed'
+      // T3: POST /api/integrations/tastyigniter/webhook with HMAC signature maps unknown status to allowlisted 'confirmed'
+      const tiHeaderSecretBodyRaw = JSON.stringify({ event: 'order.arbitrary_pwn_status', local_order_id: 'ord_t21_def' });
       const tiHeaderSecretRes = await app.fetch(
         new Request('http://localhost/api/integrations/tastyigniter/webhook', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'x-tastyigniter-signature': 'ti_wh_secret_123',
+            'x-tastyigniter-signature': createHmac('sha256', 'ti_wh_secret_123').update(tiHeaderSecretBodyRaw).digest('hex'),
           },
-          body: JSON.stringify({ event: 'order.arbitrary_pwn_status', local_order_id: 'ord_t21_def' }),
+          body: tiHeaderSecretBodyRaw,
         }),
         multiTenantEnv
       );
@@ -7731,7 +7737,7 @@ describe('Phase 43 (AP1..AP4) — Loyalty, Checkin, Reviews, Subscriptions, Refe
     expect(checkinSrc).toContain('resolvePublicTenantId');
     expect(checkinSrc).toContain('Forbidden: cannot check in for another customer');
     expect(reviewsSrc).toContain('Order cannot be reviewed in its current status');
-    expect(reviewsSrc).toContain('suppliedPhoneNorm !== orderPhoneNorm');
+    expect(reviewsSrc).toContain('x-order-token');
     expect(loyaltySrc).toContain('filterTenantReward');
     expect(loyaltySrc).toContain('Tier requirement not met for this reward');
     expect(loyaltySrc).toContain('Reward redemption limit reached');
@@ -9124,7 +9130,7 @@ describe('Phase 51 (AX1..AX4) — Auth/Devices/Franchise, Reports/Analytics/Shif
     expect(deviceHandlersSrc).toContain('verifyDeviceCallerTenant');
     expect(deviceHandlersSrc).toContain('substr(device_token, -4) AS device_fingerprint');
     expect(passwordHandlersSrc).toContain('invalidatePriorPasswordResetCodes');
-    expect(authRegisterSrc).toContain('canAdoptCustomer');
+    expect(authRegisterSrc).toContain('Email đã được đăng ký');
     expect(authVerifySrc).toContain('canBindCustomer');
     expect(listStaffSrc).toContain('Cross-tenant staff access denied');
     expect(staffAuthSrc).toContain("UPDATE users SET auth_version = auth_version + 1, updated_at = ? WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?");

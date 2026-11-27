@@ -5,6 +5,7 @@
  * Strategy: write tests BEFORE implementation, verify RED → GREEN.
  */
 
+import { createHmac } from 'node:crypto';
 import { test, expect, describe, vi } from 'vitest';
 import * as calModule from '../worker/src/routes/cal-booking-webhook.ts';
 
@@ -103,10 +104,18 @@ function createMockEnv(overrides: Record<string, any> = {}) {
 // ═══════════════════════════════════════════════════════════════════
 
 function createRequest({ secret, body }: { secret: string | null; body: any }) {
+  const rawBody = JSON.stringify(body);
+  const sig = secret ? createHmac('sha256', secret).update(rawBody).digest('hex') : null;
   return {
     headers: {
-      get: (name: string) => name === 'x-cal-webhook-secret' ? secret : null,
+      get: (name: string) => {
+        const lower = name.toLowerCase();
+        if (lower === 'x-cal-signature-256') return sig;
+        if (lower === 'x-cal-webhook-secret') return secret;
+        return null;
+      },
     },
+    text: async () => rawBody,
     json: async () => body,
     method: 'POST',
     url: 'https://test.worker.dev/api/webhooks/cal-booking',

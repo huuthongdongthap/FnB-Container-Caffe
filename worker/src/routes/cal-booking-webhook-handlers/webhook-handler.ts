@@ -16,9 +16,6 @@ async function verifyCalWebhookSignature(
   rawBody: string,
 ): Promise<boolean> {
   if (!sig || !secret) return false;
-  if (await timingSafeEqual(sig, secret)) {
-    return true;
-  }
   const hmacHex = await computeHmacSha256(rawBody, secret);
   const normalizedSig = sig.replace(/^sha256=/i, '').trim().toLowerCase();
   return timingSafeEqual(normalizedSig, hmacHex.toLowerCase());

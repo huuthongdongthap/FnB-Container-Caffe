@@ -97,6 +97,38 @@ async function sendMessage(c: Context<{ Bindings: Env }>) {
       )
         return errorResponse('Không đủ quyền truy cập cửa hàng', 403);
       direction = 'admin';
+    } else {
+      // Prevent spoofing another customer's phone in support chat
+      const session = await authenticateRequest(c.req.raw, c.env, { optional: true }).catch(() => null);
+      if (session && 'blocked' in session) return errorResponse(session.blocked, 403);
+      const callerPayload = session && 'payload' in session ? session.payload : null;
+      if (callerPayload && callerPayload.role === 'customer') {
+        const callerId = String(callerPayload.id || '').trim();
+        let callerPhone = '';
+        if (callerId && c.env.AURA_DB) {
+          const custRow = await c.env.AURA_DB
+            .prepare("SELECT phone FROM customers WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ? LIMIT 1")
+            .bind(callerId, tenantId)
+            .first<{ phone?: string | null }>()
+            .catch(() => null);
+          if (custRow?.phone) {
+            callerPhone = normalizeChatPhone(String(custRow.phone));
+          }
+        }
+        if (!callerPhone || callerPhone !== phone) {
+          return errorResponse('Không được phép gửi tin nhắn dưới số điện thoại của khách hàng khác', 403);
+        }
+      } else if (!callerPayload && c.env.AURA_DB) {
+        // Anonymous caller cannot spoof a registered customer's phone
+        const existingOwner = await c.env.AURA_DB
+          .prepare("SELECT id FROM customers WHERE phone = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ? LIMIT 1")
+          .bind(phone, tenantId)
+          .first<{ id?: string }>()
+          .catch(() => null);
+        if (existingOwner?.id) {
+          return errorResponse('Vui lòng đăng nhập để gửi tin nhắn bằng số điện thoại đã đăng ký', 401);
+        }
+      }
     }
     const repository = await contactMessageRepository(c.env.AURA_DB);
     const id = await repository.insert({ tenantId, classification: 'chat', name, phone, content: message,

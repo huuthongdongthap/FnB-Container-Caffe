@@ -21,40 +21,35 @@ const ALLOWED_ORIGIN_PATTERNS: RegExp[] = [
   /^https:\/\/(www\.)?auraspace\.cafe$/,
   /^https:\/\/[a-z0-9-]+\.auraspace\.cafe$/,
   /^https:\/\/(www\.)?auracafe\.vn$/,
-  /^https:\/\/[a-z0-9-]+\.auracafe\.vn$/,
+  /^https:\/\/[a-z0-9-]+\.auracafe\.vn$/
+];
+
+const DEV_LOCALHOST_ORIGIN_PATTERNS: RegExp[] = [
   /^https?:\/\/localhost(:\d+)?$/,
   /^https?:\/\/127\.0\.0\.1(:\d+)?$/
 ];
 
-/** Exact origins kept for readability and for the legacy auracafe/auraspace entries. */
+/** Exact production origins kept for readability and for the legacy auracafe/auraspace entries. */
 const ALLOWED_ORIGINS = [
-  'http://localhost:5173',
-  'http://localhost:3000',
-  'http://localhost:8787',
   'https://auracafe.vn',
   'https://staging.auracafe.vn',
   'https://auraspace.cafe',
   'https://www.auraspace.cafe',
 ];
 
-function isAllowedOrigin(origin: string): boolean {
+function isAllowedOrigin(origin: string, environment?: string): boolean {
   if (!origin) return false;
   if (ALLOWED_ORIGINS.includes(origin)) return true;
-  return ALLOWED_ORIGIN_PATTERNS.some((rx) => rx.test(origin));
+  if (ALLOWED_ORIGIN_PATTERNS.some((rx) => rx.test(origin))) return true;
+  const envName = String(environment || '').toLowerCase();
+  if ((envName === 'development' || envName === 'test') && DEV_LOCALHOST_ORIGIN_PATTERNS.some((rx) => rx.test(origin))) {
+    return true;
+  }
+  return false;
 }
 
-/**
- * Resolves the origin to echo back, or `false` when the caller must not be granted
- * cross-origin reads.
- *
- * An unmatched origin never falls back to a fixed default. Emitting
- * `Access-Control-Allow-Origin: http://localhost:5173` for a request from anywhere else
- * is a lie the browser enforces anyway, it hides which origin was rejected, and it leaks
- * a dev URL in production responses. Returning `false` means "emit no ACAO", so the
- * browser blocks the read — the same outcome the app-level middleware produces.
- */
-export function getCorsOrigin(originHeader?: string | null): string | false {
-  if (originHeader && isAllowedOrigin(originHeader)) {
+export function getCorsOrigin(originHeader?: string | null, environment?: string): string | false {
+  if (originHeader && isAllowedOrigin(originHeader, environment)) {
     return originHeader;
   }
   return false;

@@ -129,23 +129,23 @@ export async function verifyJWT(
 
     const now = Date.now() / 1000;
 
-    // exp validation with clock skew
-    if (payload.exp && payload.exp < now - JWT_CLOCK_SKEW_SECONDS) {
+    // exp validation with clock skew (required)
+    if (typeof payload.exp !== 'number' || !Number.isFinite(payload.exp) || payload.exp < now - JWT_CLOCK_SKEW_SECONDS) {
       return null;
     }
 
     // nbf validation with clock skew
-    if (payload.nbf && payload.nbf > now + JWT_CLOCK_SKEW_SECONDS) {
+    if (payload.nbf !== undefined && (typeof payload.nbf !== 'number' || !Number.isFinite(payload.nbf) || payload.nbf > now + JWT_CLOCK_SKEW_SECONDS)) {
       return null;
     }
 
-    // aud validation
-    if (options.expectedAudience && payload.aud && payload.aud !== options.expectedAudience) {
+    // aud validation (required when expectedAudience is specified)
+    if (options.expectedAudience && payload.aud !== options.expectedAudience) {
       return null;
     }
 
-    // iss validation
-    if (options.expectedIssuer && payload.iss && payload.iss !== options.expectedIssuer) {
+    // iss validation (required when expectedIssuer is specified)
+    if (options.expectedIssuer && payload.iss !== options.expectedIssuer) {
       return null;
     }
 
@@ -184,11 +184,11 @@ function getExplicitToken(request: Request): string | null {
   return null;
 }
 
-/** Token the browser sent implicitly, from the login session cookie. */
+/** Token the browser sent implicitly, from any login session cookie. */
 function getCookieToken(request: Request): string | null {
   const cookie = request.headers.get('Cookie');
   if (!cookie) return null;
-  const match = cookie.match(/(?:^|;\s*)access_token=([^\s;]+)/);
+  const match = cookie.match(/(?:^|;\s*)(?:aura_staff_token|aura_access_token|access_token|token)=([^\s;]+)/);
   return match && match[1] ? match[1] : null;
 }
 
@@ -235,15 +235,7 @@ export function timingSafeEqualString(a: string, b: string): boolean {
   return diff === 0;
 }
 
-// ── Password hashing (PBKDF2 + legacy SHA-256) ──
-
-async function legacyHashPassword(password: string): Promise<string> {
-  const encoder = new TextEncoder();
-  const data = encoder.encode(password);
-  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-  return Array.from(new Uint8Array(hashBuffer))
-    .map(b => b.toString(16).padStart(2, '0')).join('');
-}
+// ── Password hashing (PBKDF2 only; unsalted legacy SHA-256 removed) ──
 
 export async function hashPassword(password: string): Promise<string> {
   const enc = new TextEncoder();
@@ -289,6 +281,5 @@ export async function verifyPassword(password: string, stored: string): Promise<
       .map(b => b.toString(16).padStart(2, '0')).join('');
     return timingSafeEqualString(computed, hashHex);
   }
-  const legacy = await legacyHashPassword(password);
-  return timingSafeEqualString(legacy, stored);
+  return false;
 }

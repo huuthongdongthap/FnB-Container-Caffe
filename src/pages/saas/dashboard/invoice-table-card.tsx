@@ -46,7 +46,20 @@ export default function InvoiceTableCard({ invoices, isLoading }: Props) {
         res?.data?.payment_url ??
         res?.data?.checkout_url;
       if (paymentUrl) {
-        window.location.href = paymentUrl;
+        let isSafePayment = false;
+        try {
+          const parsed = new URL(String(paymentUrl));
+          isSafePayment =
+            parsed.protocol === 'https:' &&
+            (/^(?:[a-z0-9-]+\.)?payos\.vn$/i.test(parsed.hostname) || parsed.origin === window.location.origin);
+        } catch {
+          isSafePayment = false;
+        }
+        if (isSafePayment) {
+          window.location.href = paymentUrl;
+        } else {
+          setPaymentError('Liên kết thanh toán không hợp lệ');
+        }
       } else {
         setPaymentError('Không nhận được liên kết thanh toán từ cổng thanh toán');
       }

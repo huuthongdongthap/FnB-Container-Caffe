@@ -469,11 +469,7 @@ export async function nowPaymentsIPN(request: Request, env: Record<string, unkno
     const bodyText = await request.text().catch(() => '');
 
     const isProd = env.ENVIRONMENT === 'production' || env.NODE_ENV === 'production';
-    const allowUnsignedDev = !isProd && (
-      env.ALLOW_UNSIGNED_NOWPAYMENTS_IPN === 'true' ||
-      env.ENVIRONMENT === 'development' ||
-      env.ENVIRONMENT === 'test'
-    );
+    const allowUnsignedDev = !isProd && env.ALLOW_UNSIGNED_NOWPAYMENTS_IPN === 'true';
     if (!secret) {
       if (!allowUnsignedDev) {
         log.error('NOWPAYMENTS_IPN_SECRET not configured — rejecting IPN');

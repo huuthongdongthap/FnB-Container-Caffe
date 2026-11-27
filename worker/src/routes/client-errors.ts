@@ -95,6 +95,14 @@ clientErrorsRouter.post('/', rateLimitMiddleware(CLIENT_ERROR_RATE_LIMIT), async
        VALUES (?, ?, ?, ?, ?, ?, ?)`
     ).bind(id, route, message, stack, href, c.req.header('User-Agent') || null, ts).run();
 
+    // Best-effort retention pruning (14 days) to prevent unbounded D1 growth
+    const retentionCutoff = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString();
+    await db
+      .prepare('DELETE FROM client_errors WHERE ts < ?')
+      .bind(retentionCutoff)
+      .run()
+      .catch(() => undefined);
+
     return c.json({ success: true, id }, 201);
   } catch (error) {
     log.error('Failed to persist client error report', { message: (error as Error).message });

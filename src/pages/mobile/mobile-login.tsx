@@ -233,7 +233,7 @@ export default function MobileLogin() {
         <div style={pinRow}>
           {pin.map((d, i) => (
             <input key={i} ref={refs[i]} id={`pin-${i}`}
-              type={d ? 'text' : 'password'} inputMode="numeric" maxLength={1}
+              type="password" inputMode="numeric" maxLength={1}
               style={pinBoxStyle(focusedIdx === i)}
               value={d} onChange={(e) => updatePin(i, e.target.value)}
               onFocus={() => setFocusedIdx(i)} onBlur={() => setFocusedIdx(-1)}

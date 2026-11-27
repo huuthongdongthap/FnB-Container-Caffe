@@ -53,6 +53,8 @@ async function expireStalePending(
   }
 }
 
+const inFlightAuditIds = new Set<string>();
+
 async function claimAndNotify(
   db: D1Database,
   env: Env,
@@ -60,22 +62,34 @@ async function claimAndNotify(
   summary: SaasLifecycleCronSummary
 ): Promise<boolean> {
   if (!env.TELEGRAM_BOT_TOKEN || !env.TELEGRAM_CHAT_ID) return false;
-  const res = await db
-    .prepare(
-      `INSERT OR IGNORE INTO saas_audit_logs (id, tenant_id, actor_user_id, actor_role, action, after_json, reason, created_at)
-       VALUES (?, ?, 'system_cron', 'system', ?, ?, ?, ?)`
-    )
-    .bind(evt.auditId, evt.tenantId, evt.action, JSON.stringify(evt.details), evt.reason, evt.nowIso)
-    .run();
-  if (Number(res.meta?.changes ?? 0) !== 1) return false;
+  if (inFlightAuditIds.has(evt.auditId)) return false;
+  inFlightAuditIds.add(evt.auditId);
+  try {
+    const existing = await db
+      .prepare('SELECT id FROM saas_audit_logs WHERE id = ? LIMIT 1')
+      .bind(evt.auditId)
+      .first<{ id: string }>();
+    if (existing) return false;
 
-  const sent = await sendTelegramMessage(env.TELEGRAM_BOT_TOKEN, env.TELEGRAM_CHAT_ID, evt.text);
-  if (!sent) {
-    await db.prepare('DELETE FROM saas_audit_logs WHERE id = ?').bind(evt.auditId).run().catch(() => {});
-    return false;
+    const sent = await sendTelegramMessage(env.TELEGRAM_BOT_TOKEN, env.TELEGRAM_CHAT_ID, evt.text);
+    if (!sent) {
+      return false;
+    }
+
+    const res = await db
+      .prepare(
+        `INSERT OR IGNORE INTO saas_audit_logs (id, tenant_id, actor_user_id, actor_role, action, after_json, reason, created_at)
+         VALUES (?, ?, 'system_cron', 'system', ?, ?, ?, ?)`
+      )
+      .bind(evt.auditId, evt.tenantId, evt.action, JSON.stringify(evt.details), evt.reason, evt.nowIso)
+      .run();
+    if (Number(res.meta?.changes ?? 0) !== 1) return false;
+
+    summary.telegramDispatched++;
+    return true;
+  } finally {
+    inFlightAuditIds.delete(evt.auditId);
   }
-  summary.telegramDispatched++;
-  return true;
 }
 
 export async function runSaasLifecycleCron(env: Env, now: Date = new Date()): Promise<SaasLifecycleCronSummary> {

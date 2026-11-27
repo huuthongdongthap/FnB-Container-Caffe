@@ -223,35 +223,53 @@ export function createHARouter() {
   app.post('/webhook', async(c) => {
     try {
       const isProd = c.env?.ENVIRONMENT === 'production' || c.env?.NODE_ENV === 'production';
-      const allowUnsignedDev = !isProd && (
-        c.env?.ENVIRONMENT === 'development' ||
-        c.env?.ENVIRONMENT === 'test' ||
-        (c.env as Record<string, unknown>)?.HA_MOCK === 'true'
-      );
-      const secret = (c.env.HA_WEBHOOK_SECRET ?? c.env.HA_TOKEN ?? '') as string;
+      const allowUnsignedDev = !isProd && (c.env as Record<string, unknown>)?.ALLOW_UNSIGNED_HA_WEBHOOK === 'true';
+      const secret = (c.env.HA_WEBHOOK_SECRET ?? '') as string;
       if (!secret && !allowUnsignedDev) {
         return c.json({ error: 'HA webhook secret not configured' }, 503);
       }
+      const rawBody = await c.req.text().catch(() => '');
       if (secret) {
         if (c.req.query('token')) {
-          return c.json({ error: 'Query token is not supported; pass X-HA-Token or Authorization header' }, 401);
+          return c.json({ error: 'Query token is not supported; pass X-HA-Signature header' }, 401);
         }
-        const token =
-          c.req.header('x-ha-token') ??
-          c.req.header('authorization')?.replace(/^Bearer\s+/i, '');
+        const sig =
+          c.req.header('x-ha-signature') ??
+          c.req.header('x-webhook-signature') ??
+          '';
+        if (!sig) {
+          return c.json({ error: 'Unauthorized HA webhook signature' }, 401);
+        }
         const enc = new TextEncoder();
-        const aBytes = enc.encode(token ?? '');
-        const bBytes = enc.encode(secret);
+        const key = await crypto.subtle.importKey(
+          'raw',
+          enc.encode(secret),
+          { name: 'HMAC', hash: 'SHA-256' },
+          false,
+          ['sign']
+        );
+        const macBuf = await crypto.subtle.sign('HMAC', key, enc.encode(rawBody));
+        const expectedHex = Array.from(new Uint8Array(macBuf))
+          .map((b) => b.toString(16).padStart(2, '0'))
+          .join('');
+        const normalizedSig = sig.replace(/^sha256=/i, '').trim().toLowerCase();
+        const aBytes = enc.encode(normalizedSig);
+        const bBytes = enc.encode(expectedHex);
         let diff = aBytes.length === bBytes.length ? 0 : 1;
         if (diff === 0) {
           for (let i = 0; i < aBytes.length; i++) diff |= aBytes[i] ^ bBytes[i];
         }
-        if (!token || diff !== 0) {
-          return c.json({ error: 'Unauthorized HA token' }, 401);
+        if (diff !== 0) {
+          return c.json({ error: 'Unauthorized HA webhook signature' }, 401);
         }
       }
 
-      const body = await c.req.json<Record<string, unknown>>();
+      let body: Record<string, unknown>;
+      try {
+        body = JSON.parse(rawBody) as Record<string, unknown>;
+      } catch {
+        return c.json({ error: 'Invalid JSON payload' }, 400);
+      }
       if (!body || typeof body !== 'object') {
         return c.json({ error: 'Invalid JSON payload' }, 400);
       }
