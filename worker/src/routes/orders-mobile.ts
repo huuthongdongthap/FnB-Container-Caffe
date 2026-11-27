@@ -57,11 +57,11 @@ function maskMobileOrderPii(
   const isMaskedKitchen = PII_MASKED_ROLES.includes(normalizedRole) || normalizedRole === 'bep';
   const isShipper = normalizedRole === 'shipper' || normalizedRole === 'rider';
   if (isShipper) {
+    const assignedShipperId = String(row.assigned_shipper_id ?? row.shipper_id ?? '').trim();
     const isAssignedDelivery =
       String(row.order_type || '').toLowerCase() === 'delivery' &&
-      typeof row.shipper_id === 'string' &&
-      row.shipper_id.trim().length > 0 &&
-      row.shipper_id.trim() === user?.id;
+      assignedShipperId.length > 0 &&
+      assignedShipperId === user?.id;
     if (isAssignedDelivery) {
       return row;
     }
@@ -70,6 +70,7 @@ function maskMobileOrderPii(
       customer_phone: null,
       customer_email: null,
       customer_address: null,
+      delivery_address: null,
     };
   }
   const isUnmasked = PII_UNMASKED_ROLES.includes(normalizedRole);
@@ -344,7 +345,7 @@ export async function getOrderDetail(
 
     const data = row as Record<string, unknown>;
     if (role === 'shipper' || role === 'rider') {
-      const assignedShipperId = typeof data.shipper_id === 'string' ? data.shipper_id.trim() : '';
+      const assignedShipperId = String(data.assigned_shipper_id ?? data.shipper_id ?? '').trim();
       if (String(data.order_type || '').toLowerCase() !== 'delivery' || (assignedShipperId && assignedShipperId !== user?.id)) {
         return errorResponse('Forbidden: order is not assigned to this shipper', 403);
       }

@@ -127,7 +127,7 @@ function projectForActor<TOrder extends Record<string, unknown>, TItem, TPayment
     return redactOrderPii(formatted);
   }
   if (scope.isShipper) {
-    const assignedShipperId = typeof order.shipper_id === 'string' ? order.shipper_id.trim() : '';
+    const assignedShipperId = String(order.assigned_shipper_id ?? order.shipper_id ?? '').trim();
     if (!scope.actorId || assignedShipperId !== scope.actorId) {
       return redactOrderPii(formatted);
     }
@@ -338,7 +338,7 @@ export async function handleGetOrderById(c: Context<{ Bindings: Env }>) {
   const scope = resolveCustomerScope(c);
   if (scope.isShipper) {
     const orderType = String(order.order_type || '').toLowerCase();
-    const assignedShipperId = typeof order.shipper_id === 'string' ? order.shipper_id.trim() : '';
+    const assignedShipperId = String(order.assigned_shipper_id ?? order.shipper_id ?? '').trim();
     if (orderType !== 'delivery' || (assignedShipperId && assignedShipperId !== scope.actorId)) {
       return c.json({ success: false, error: 'Forbidden: order is not assigned to this shipper' }, 403);
     }
