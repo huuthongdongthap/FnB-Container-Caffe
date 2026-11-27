@@ -680,17 +680,23 @@ export function registerSessionHandlers(router: Hono<{ Bindings: Env }>): void {
       if (!canForceClose) {
         let hasUnpaidOrder = false;
         let unpaidOrderId: string | null = null;
+        const sessionOpenedAt = String(
+          (session as unknown as Record<string, unknown>).opened_at ??
+            (session as unknown as Record<string, unknown>).started_at ??
+            (session as unknown as Record<string, unknown>).created_at ??
+            ''
+        ).trim();
         try {
           const unpaidRow = (await db
             .prepare(
               `SELECT id, status, payment_status FROM orders
-               WHERE (session_id = ? OR table_id = ?)
+               WHERE (session_id = ? OR ((session_id IS NULL OR TRIM(session_id) = '') AND table_id = ? AND (? = '' OR created_at IS NULL OR TRIM(created_at) = '' OR datetime(created_at) >= datetime(?))))
                  AND LOWER(COALESCE(status, 'pending')) NOT IN ('cancelled', 'canceled', 'rejected', 'failed', 'expired', 'refunded')
-                 AND LOWER(COALESCE(payment_status, 'unpaid')) NOT IN ('paid', 'completed', 'refunded', 'cancelled', 'canceled')
+                 AND LOWER(COALESCE(payment_status, 'unpaid')) NOT IN ('paid', 'completed', 'partially_refunded', 'refunded', 'cancelled', 'canceled')
                  AND (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?)
                LIMIT 1`
             )
-            .bind(id, String(session.table_id ?? ''), effectiveTenant, effectiveTenant)
+            .bind(id, String(session.table_id ?? ''), sessionOpenedAt, sessionOpenedAt, effectiveTenant, effectiveTenant)
             .first()) as Record<string, unknown> | null;
           if (unpaidRow && ('id' in unpaidRow || 'status' in unpaidRow || 'payment_status' in unpaidRow)) {
             hasUnpaidOrder = true;
@@ -703,7 +709,7 @@ export function registerSessionHandlers(router: Hono<{ Bindings: Env }>): void {
                 `SELECT id, status, payment_status FROM orders
                  WHERE table_id = ?
                    AND LOWER(COALESCE(status, 'pending')) NOT IN ('cancelled', 'canceled', 'rejected', 'failed', 'expired', 'refunded')
-                   AND LOWER(COALESCE(payment_status, 'unpaid')) NOT IN ('paid', 'completed', 'refunded', 'cancelled', 'canceled')
+                   AND LOWER(COALESCE(payment_status, 'unpaid')) NOT IN ('paid', 'completed', 'partially_refunded', 'refunded', 'cancelled', 'canceled')
                    AND (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?)
                  LIMIT 1`
               )
@@ -720,7 +726,7 @@ export function registerSessionHandlers(router: Hono<{ Bindings: Env }>): void {
                   `SELECT id, status, payment_status FROM orders
                    WHERE table_id = ?
                      AND LOWER(COALESCE(status, 'pending')) NOT IN ('cancelled', 'canceled', 'rejected', 'failed', 'expired', 'refunded')
-                     AND LOWER(COALESCE(payment_status, 'unpaid')) NOT IN ('paid', 'completed', 'refunded', 'cancelled', 'canceled')
+                     AND LOWER(COALESCE(payment_status, 'unpaid')) NOT IN ('paid', 'completed', 'partially_refunded', 'refunded', 'cancelled', 'canceled')
                    LIMIT 1`
                 )
                 .bind(String(session.table_id ?? ''))
@@ -828,17 +834,23 @@ export function registerSessionHandlers(router: Hono<{ Bindings: Env }>): void {
     if (!canForceClose) {
       let hasUnpaidOrder = false;
       let unpaidOrderId: string | null = null;
+      const sessionOpenedAt = String(
+        (session as unknown as Record<string, unknown>).opened_at ??
+          (session as unknown as Record<string, unknown>).started_at ??
+          (session as unknown as Record<string, unknown>).created_at ??
+          ''
+      ).trim();
       try {
         const unpaidRow = (await db
           .prepare(
             `SELECT id, status, payment_status FROM orders
-             WHERE (session_id = ? OR table_id = ?)
+             WHERE (session_id = ? OR ((session_id IS NULL OR TRIM(session_id) = '') AND table_id = ? AND (? = '' OR created_at IS NULL OR TRIM(created_at) = '' OR datetime(created_at) >= datetime(?))))
                AND LOWER(COALESCE(status, 'pending')) NOT IN ('cancelled', 'canceled', 'rejected', 'failed', 'expired', 'refunded')
-               AND LOWER(COALESCE(payment_status, 'unpaid')) NOT IN ('paid', 'completed', 'refunded', 'cancelled', 'canceled')
+               AND LOWER(COALESCE(payment_status, 'unpaid')) NOT IN ('paid', 'completed', 'partially_refunded', 'refunded', 'cancelled', 'canceled')
                AND (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?)
              LIMIT 1`
           )
-          .bind(id, String(session.table_id ?? ''), effectiveTenant, effectiveTenant)
+          .bind(id, String(session.table_id ?? ''), sessionOpenedAt, sessionOpenedAt, effectiveTenant, effectiveTenant)
           .first()) as Record<string, unknown> | null;
         if (unpaidRow && ('id' in unpaidRow || 'status' in unpaidRow || 'payment_status' in unpaidRow)) {
           hasUnpaidOrder = true;
@@ -851,7 +863,7 @@ export function registerSessionHandlers(router: Hono<{ Bindings: Env }>): void {
               `SELECT id, status, payment_status FROM orders
                WHERE table_id = ?
                  AND LOWER(COALESCE(status, 'pending')) NOT IN ('cancelled', 'canceled', 'rejected', 'failed', 'expired', 'refunded')
-                 AND LOWER(COALESCE(payment_status, 'unpaid')) NOT IN ('paid', 'completed', 'refunded', 'cancelled', 'canceled')
+                 AND LOWER(COALESCE(payment_status, 'unpaid')) NOT IN ('paid', 'completed', 'partially_refunded', 'refunded', 'cancelled', 'canceled')
                  AND (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?)
                LIMIT 1`
             )
@@ -868,7 +880,7 @@ export function registerSessionHandlers(router: Hono<{ Bindings: Env }>): void {
               `SELECT id, status, payment_status FROM orders
                WHERE table_id = ?
                  AND LOWER(COALESCE(status, 'pending')) NOT IN ('cancelled', 'canceled', 'rejected', 'failed', 'expired', 'refunded')
-                 AND LOWER(COALESCE(payment_status, 'unpaid')) NOT IN ('paid', 'completed', 'refunded', 'cancelled', 'canceled')
+                 AND LOWER(COALESCE(payment_status, 'unpaid')) NOT IN ('paid', 'completed', 'partially_refunded', 'refunded', 'cancelled', 'canceled')
                LIMIT 1`
             )
             .bind(String(session.table_id ?? ''))

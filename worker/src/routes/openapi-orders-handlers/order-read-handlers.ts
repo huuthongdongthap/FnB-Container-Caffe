@@ -386,7 +386,7 @@ export async function handleGetOrderById(c: Context<{ Bindings: Env }>) {
       return c.json({ success: false, error: 'Forbidden: order is not assigned to this shipper' }, 403);
     }
   }
-  const { items, payments } = await fetchOrderItemsAndPayments(db, id, effectiveOrderTenant);
+  const { items, payments } = await fetchOrderItemsAndPayments(db, String(order.id), effectiveOrderTenant);
   return c.json({
     success: true,
     data: projectForActor(scope, order, items, formatOrder, formatCustomerOrder, payments),
@@ -447,7 +447,7 @@ export async function handleTrackOrder(c: Context<{ Bindings: Env }>) {
     return c.json({ success: false, error: access.reason || (status === 401 ? 'Unauthorized' : 'Forbidden') }, status);
   }
 
-  const { items } = await fetchOrderItemsAndPayments(db, id, effectiveOrderTenant);
+  const { items } = await fetchOrderItemsAndPayments(db, String(order.id), effectiveOrderTenant);
   return c.json({ success: true, data: formatCustomerOrder(order, items) });
 }
 

@@ -962,13 +962,45 @@ export async function updateOrder(
             }
 
             const orderRow = await db.prepare(
-              'SELECT id, items, customer_phone, customer_email, customer_name, customer_address, total, shipping_fee, discount, created_at, notes FROM orders WHERE id = ?'
-            ).bind(id).first<Record<string, unknown>>();
+              'SELECT id, items, customer_phone, customer_email, customer_name, customer_address, total, shipping_fee, discount, discount_amount, payment_status, created_at, notes FROM orders WHERE id = ?'
+            ).bind(id).first<Record<string, unknown>>().catch(() =>
+              db.prepare(
+                'SELECT id, items, customer_phone, customer_email, customer_name, customer_address, total, shipping_fee, discount, payment_status, created_at, notes FROM orders WHERE id = ?'
+              ).bind(id).first<Record<string, unknown>>().catch(() =>
+                db.prepare(
+                  'SELECT id, items, customer_phone, customer_email, customer_name, customer_address, total, shipping_fee, discount, created_at, notes FROM orders WHERE id = ?'
+                ).bind(id).first<Record<string, unknown>>()
+              )
+            );
 
             if (!orderRow) {
               log.warn('Order not found for ERPNext invoice', { order_id: id });
               return;
             }
+
+            const erpPaymentStatus = String(
+              orderRow.payment_status ?? (results[0] as Record<string, unknown> | undefined)?.payment_status ?? ''
+            )
+              .trim()
+              .toLowerCase();
+            if (erpPaymentStatus && !['paid', 'completed', 'partially_refunded'].includes(erpPaymentStatus)) {
+              log.info('Skipping ERPNext e-invoice for unpaid order', { order_id: id, payment_status: erpPaymentStatus });
+              return;
+            }
+
+            const rawDiscountAmount = Number(orderRow.discount_amount);
+            const rawDiscount = Number(orderRow.discount);
+            const resolvedDiscount =
+              Number.isFinite(rawDiscountAmount) && rawDiscountAmount > 0
+                ? rawDiscountAmount
+                : Number.isFinite(rawDiscount) && rawDiscount > 0
+                  ? rawDiscount
+                  : Number.isFinite(rawDiscountAmount) && orderRow.discount_amount !== null && orderRow.discount_amount !== undefined
+                    ? rawDiscountAmount
+                    : Number.isFinite(rawDiscount) && orderRow.discount !== null && orderRow.discount !== undefined
+                      ? rawDiscount
+                      : undefined;
+            const resolvedTotal = Number(orderRow.total);
 
             const { createErpnextClientWithKv } = await import('worker/src/clients/erpnext-client');
             const { ErpnextAccountingClient } = await import('worker/src/clients/erpnext-accounting-client');
@@ -987,6 +1019,8 @@ export async function updateOrder(
             await accountingClient.processOrderToInvoice({
               id: orderRow.id as string,
               items: orderRow.items as string | Array<Record<string, unknown>> | undefined,
+              ...(Number.isFinite(resolvedTotal) ? { total: resolvedTotal } : {}),
+              ...(resolvedDiscount !== undefined ? { discount_amount: resolvedDiscount } : {}),
               customer_phone: orderRow.customer_phone as string | undefined,
               customer_email: orderRow.customer_email as string | undefined,
               customer_name: orderRow.customer_name as string | undefined,

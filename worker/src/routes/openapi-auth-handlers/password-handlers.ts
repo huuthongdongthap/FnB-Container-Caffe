@@ -23,35 +23,78 @@ function constantTimeEqualCode(a: string, b: string): boolean {
   return diff === 0;
 }
 
-async function resolveResetTargetUser(db: any, env: Env, email: string): Promise<{ id: string; role?: string; tenant_id?: string } | null> {
+async function resolveResetTargetUser(
+  db: any,
+  env: Env,
+  email: string,
+  requestedTenant?: string
+): Promise<{ id: string; role?: string; tenant_id?: string } | null> {
   const normalizedEmail = String(email || '').trim().toLowerCase();
   if (!normalizedEmail) return null;
-  let user = await db.prepare('SELECT id, role, tenant_id FROM users WHERE lower(email) = lower(?)').bind(normalizedEmail).first().catch(() => null);
-  if (!user) {
-    user = await db.prepare('SELECT id, role FROM users WHERE lower(email) = lower(?)').bind(normalizedEmail).first().catch(() => null);
+  const cleanTenant = typeof requestedTenant === 'string' && requestedTenant.trim() && requestedTenant.trim() !== '*'
+    ? requestedTenant.trim()
+    : '';
+  let user: { id: string; role?: string; tenant_id?: string } | null = null;
+  if (cleanTenant) {
+    user = await db
+      .prepare("SELECT id, role, tenant_id FROM users WHERE lower(email) = lower(?) AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?")
+      .bind(normalizedEmail, cleanTenant)
+      .first()
+      .catch(() => null);
+    if (!user) {
+      user = await db
+        .prepare(
+          "SELECT u.id, u.role, u.tenant_id FROM staff_login_identities s JOIN users u ON u.id = s.staff_id WHERE lower(s.email) = lower(?) AND COALESCE(NULLIF(TRIM(u.tenant_id), ''), 'default') = ?"
+        )
+        .bind(normalizedEmail, cleanTenant)
+        .first()
+        .catch(() => null);
+    }
+    if (!user) {
+      user = await db
+        .prepare("SELECT id, 'customer' AS role, tenant_id FROM customers WHERE lower(email) = lower(?) AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?")
+        .bind(normalizedEmail, cleanTenant)
+        .first()
+        .catch(() => null);
+    }
   }
-  if (!user) {
-    user = await db.prepare('SELECT id, role FROM users WHERE email = ?').bind(normalizedEmail).first().catch(() => null);
-  }
-  if (!user) {
-    user = await db.prepare(
-      'SELECT u.id, u.role, u.tenant_id FROM staff_login_identities s JOIN users u ON u.id = s.staff_id WHERE lower(s.email) = lower(?)'
-    ).bind(normalizedEmail).first().catch(() => null);
-  }
-  if (!user) {
-    user = await db.prepare(
-      'SELECT u.id, u.role FROM staff_login_identities s JOIN users u ON u.id = s.staff_id WHERE lower(s.email) = lower(?)'
-    ).bind(normalizedEmail).first().catch(() => null);
-  }
-  if (!user) {
-    user = await db.prepare(
-      'SELECT staff_id AS id FROM staff_login_identities WHERE lower(email) = lower(?)'
-    ).bind(normalizedEmail).first().catch(() => null);
+  if (!user && (!cleanTenant || cleanTenant === 'default')) {
+    user = await db.prepare('SELECT id, role, tenant_id FROM users WHERE lower(email) = lower(?)').bind(normalizedEmail).first().catch(() => null);
+    if (!user) {
+      user = await db.prepare('SELECT id, role FROM users WHERE lower(email) = lower(?)').bind(normalizedEmail).first().catch(() => null);
+    }
+    if (!user) {
+      user = await db.prepare('SELECT id, role FROM users WHERE email = ?').bind(normalizedEmail).first().catch(() => null);
+    }
+    if (!user) {
+      user = await db.prepare(
+        'SELECT u.id, u.role, u.tenant_id FROM staff_login_identities s JOIN users u ON u.id = s.staff_id WHERE lower(s.email) = lower(?)'
+      ).bind(normalizedEmail).first().catch(() => null);
+    }
+    if (!user) {
+      user = await db.prepare(
+        'SELECT u.id, u.role FROM staff_login_identities s JOIN users u ON u.id = s.staff_id WHERE lower(s.email) = lower(?)'
+      ).bind(normalizedEmail).first().catch(() => null);
+    }
+    if (!user) {
+      user = await db.prepare(
+        'SELECT staff_id AS id FROM staff_login_identities WHERE lower(email) = lower(?)'
+      ).bind(normalizedEmail).first().catch(() => null);
+    }
+    if (!user) {
+      user = await db.prepare("SELECT id, 'customer' AS role, tenant_id FROM customers WHERE lower(email) = lower(?)").bind(normalizedEmail).first().catch(() => null);
+    }
+    if (!user) {
+      user = await db.prepare("SELECT id, 'customer' AS role FROM customers WHERE lower(email) = lower(?)").bind(normalizedEmail).first().catch(() => null);
+    }
   }
   if (!user && env) {
     const kvOrStaffUser = await findLoginUser(env, normalizedEmail).catch(() => null);
     if (kvOrStaffUser?.id) {
-      user = { id: kvOrStaffUser.id, role: kvOrStaffUser.role, tenant_id: (kvOrStaffUser as { tenant_id?: string }).tenant_id };
+      const kvTenant = String((kvOrStaffUser as { tenant_id?: string; tenantId?: string }).tenant_id || (kvOrStaffUser as { tenantId?: string }).tenantId || 'default').trim() || 'default';
+      if (!cleanTenant || kvTenant === cleanTenant) {
+        user = { id: kvOrStaffUser.id, role: kvOrStaffUser.role, tenant_id: (kvOrStaffUser as { tenant_id?: string }).tenant_id };
+      }
     }
   }
   return user;
@@ -75,6 +118,64 @@ async function invalidatePriorPasswordResetCodes(db: any, normalizedEmail: strin
   await db.prepare(
     "UPDATE email_verifications SET used = 1 WHERE lower(email) = lower(?) AND type = 'password_reset' AND COALESCE(used, 0) = 0"
   ).bind(normalizedEmail).run().catch(() => {});
+}
+
+async function storeEmailVerificationResetCode(
+  db: any,
+  resetId: string,
+  normalizedEmail: string,
+  code: string,
+  expiresAt: string,
+  now: string
+): Promise<void> {
+  const isConflictTargetMissing = (msg: string) =>
+    msg.includes('on conflict') || msg.includes('unique constraint') || msg.includes('primary key');
+
+  try {
+    await db.prepare(
+      `INSERT INTO email_verifications (id, email, code, type, expires_at, used, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?)
+       ON CONFLICT(email) DO UPDATE SET
+         id = excluded.id,
+         code = excluded.code,
+         type = excluded.type,
+         expires_at = excluded.expires_at,
+         used = 0,
+         attempts = 0,
+         created_at = excluded.created_at`
+    ).bind(resetId, normalizedEmail, code, 'password_reset', expiresAt, 0, now).run();
+    return;
+  } catch (err: unknown) {
+    const msg = (err instanceof Error ? err.message : String(err)).toLowerCase();
+    if (msg.includes('attempts')) {
+      try {
+        await db.prepare(
+          `INSERT INTO email_verifications (id, email, code, type, expires_at, used, created_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?)
+           ON CONFLICT(email) DO UPDATE SET
+             id = excluded.id,
+             code = excluded.code,
+             type = excluded.type,
+             expires_at = excluded.expires_at,
+             used = 0,
+             created_at = excluded.created_at`
+        ).bind(resetId, normalizedEmail, code, 'password_reset', expiresAt, 0, now).run();
+        return;
+      } catch (retryErr: unknown) {
+        const retryMsg = (retryErr instanceof Error ? retryErr.message : String(retryErr)).toLowerCase();
+        if (!isConflictTargetMissing(retryMsg)) {
+          throw retryErr;
+        }
+      }
+    } else if (!isConflictTargetMissing(msg)) {
+      throw err;
+    }
+  }
+
+  await db.prepare(
+    `INSERT INTO email_verifications (id, email, code, type, expires_at, used, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?)`
+  ).bind(resetId, normalizedEmail, code, 'password_reset', expiresAt, 0, now).run();
 }
 
 export function registerForgotPasswordHandler(app: OpenAPIHono<{ Bindings: Env }>) {
@@ -107,7 +208,8 @@ export function registerForgotPasswordHandler(app: OpenAPIHono<{ Bindings: Env }
       return c.json({ success: false, error: 'Email is required' }, 400);
     }
 
-    const user = await resolveResetTargetUser(db, c.env, normalizedEmail);
+    const requestedForgotTenant = String(resolvePublicTenantId(c) || '').trim();
+    const user = await resolveResetTargetUser(db, c.env, normalizedEmail, requestedForgotTenant);
     if (!user) {
       return c.json({ success: true, data: { success: true } });
     }
@@ -121,35 +223,7 @@ export function registerForgotPasswordHandler(app: OpenAPIHono<{ Bindings: Env }
     const expiresAt = new Date(Date.now() + 15 * 60 * 1000).toISOString();
     const resetId = crypto.randomUUID();
 
-    await db.prepare(
-      `INSERT INTO email_verifications (id, email, code, type, expires_at, used, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?)
-       ON CONFLICT(email) DO UPDATE SET
-         id = excluded.id,
-         code = excluded.code,
-         type = excluded.type,
-         expires_at = excluded.expires_at,
-         used = 0,
-         attempts = 0,
-         created_at = excluded.created_at`
-    ).bind(resetId, normalizedEmail, code, 'password_reset', expiresAt, 0, now).run().catch(async (err: unknown) => {
-      const msg = err instanceof Error ? err.message : String(err);
-      if (msg.toLowerCase().includes('attempts')) {
-        await db.prepare(
-          `INSERT INTO email_verifications (id, email, code, type, expires_at, used, created_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?)
-           ON CONFLICT(email) DO UPDATE SET
-             id = excluded.id,
-             code = excluded.code,
-             type = excluded.type,
-             expires_at = excluded.expires_at,
-             used = 0,
-             created_at = excluded.created_at`
-        ).bind(resetId, normalizedEmail, code, 'password_reset', expiresAt, 0, now).run();
-        return;
-      }
-      throw err;
-    });
+    await storeEmailVerificationResetCode(db, resetId, normalizedEmail, code, expiresAt, now);
 
     await db.prepare(
       `INSERT INTO otp_codes (id, email, code, purpose, expires_at, used, created_at)
@@ -183,9 +257,10 @@ export function registerPasswordHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
       normalizedEmail ||
       'ip';
 
+    const requestedResetTenant = String(resolvePublicTenantId(c) || '').trim();
     if (submittedCode && submittedNewPassword) {
-      const targetUser = await resolveResetTargetUser(db, c.env, normalizedEmail);
-      const resetTenant = String(targetUser?.tenant_id || resolvePublicTenantId(c) || 'default').trim() || 'default';
+      const targetUser = await resolveResetTargetUser(db, c.env, normalizedEmail, requestedResetTenant);
+      const resetTenant = String(targetUser?.tenant_id || requestedResetTenant || 'default').trim() || 'default';
       const attemptKey = `rate:reset-password:attempts:${normalizedEmail || clientIp}`;
       const ipVerifyKey = `rate:reset-password:verify:${clientIp}`;
       let failedAttempts = 0;
@@ -301,10 +376,31 @@ export function registerPasswordHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
         if (currentRow && Number.isFinite(Number(currentRow.auth_version))) {
           nextVersion = Math.max(nextVersion, Number(currentRow.auth_version) + 1);
         }
+        const currentCustomerRow = (await db.prepare('SELECT auth_version FROM customers WHERE id = ?').bind(targetUser.id).first().catch(() => null)) as { auth_version?: number } | null;
+        if (currentCustomerRow && Number.isFinite(Number(currentCustomerRow.auth_version))) {
+          nextVersion = Math.max(nextVersion, Number(currentCustomerRow.auth_version) + 1);
+        }
         await db.prepare(
-          'UPDATE users SET password_hash = ?, auth_version = COALESCE(auth_version, 1) + 1, updated_at = ? WHERE id = ?'
-        ).bind(passwordHash, now, targetUser.id).run().catch(async () => {
-          await db.prepare('UPDATE users SET password_hash = ?, updated_at = ? WHERE id = ?').bind(passwordHash, now, targetUser.id).run().catch(() => {});
+          "UPDATE users SET password_hash = ?, auth_version = COALESCE(auth_version, 1) + 1, updated_at = ? WHERE id = ? AND COALESCE(NULLIF(TRIM(role), ''), 'customer') = 'customer' AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
+        ).bind(passwordHash, now, targetUser.id, resetTenant).run().catch(async () => {
+          if (resetTenant === 'default') {
+            await db.prepare(
+              'UPDATE users SET password_hash = ?, auth_version = COALESCE(auth_version, 1) + 1, updated_at = ? WHERE id = ?'
+            ).bind(passwordHash, now, targetUser.id).run().catch(async () => {
+              await db.prepare('UPDATE users SET password_hash = ?, updated_at = ? WHERE id = ?').bind(passwordHash, now, targetUser.id).run().catch(() => {});
+            });
+          }
+        });
+        await db.prepare(
+          "UPDATE customers SET password_hash = ?, auth_version = COALESCE(auth_version, 1) + 1, updated_at = ? WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
+        ).bind(passwordHash, now, targetUser.id, resetTenant).run().catch(async () => {
+          if (resetTenant === 'default') {
+            await db.prepare(
+              'UPDATE customers SET password_hash = ?, auth_version = COALESCE(auth_version, 1) + 1, updated_at = ? WHERE id = ?'
+            ).bind(passwordHash, now, targetUser.id).run().catch(async () => {
+              await db.prepare('UPDATE customers SET password_hash = ?, updated_at = ? WHERE id = ?').bind(passwordHash, now, targetUser.id).run().catch(() => {});
+            });
+          }
         });
         if (c.env?.AUTH_KV) {
           try {
@@ -373,7 +469,7 @@ export function registerPasswordHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
       }
     }
 
-    const user = await resolveResetTargetUser(db, c.env, normalizedEmail);
+    const user = await resolveResetTargetUser(db, c.env, normalizedEmail, requestedResetTenant);
     if (!user) {
       return c.json({ success: true, data: { success: true } });
     }
@@ -384,11 +480,9 @@ export function registerPasswordHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
     crypto.getRandomValues(randomBuf);
     const code = (100000 + (randomBuf[0] % 900000)).toString();
     const expiresAt = new Date(Date.now() + 15 * 60 * 1000).toISOString();
+    const resetId = crypto.randomUUID();
 
-    await db.prepare(
-      `INSERT INTO email_verifications (id, email, code, type, expires_at, used, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`
-    ).bind(crypto.randomUUID(), normalizedEmail, code, 'password_reset', expiresAt, 0, now).run();
+    await storeEmailVerificationResetCode(db, resetId, normalizedEmail, code, expiresAt, now);
 
     await db.prepare(
       `INSERT INTO otp_codes (id, email, code, purpose, expires_at, used, created_at)
@@ -408,7 +502,7 @@ export function registerPasswordHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
     const user = c.get('user');
     const now = new Date().toISOString();
 
-    const userRecord = await db
+    let userRecord = await db
       .prepare('SELECT password_hash, tenant_id, auth_version FROM users WHERE id = ?')
       .bind(user.id)
       .first()
@@ -418,9 +512,43 @@ export function registerPasswordHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
           .bind(user.id)
           .first()
           .catch(async () => {
-            return db.prepare('SELECT password_hash FROM users WHERE id = ?').bind(user.id).first();
+            return db.prepare('SELECT password_hash FROM users WHERE id = ?').bind(user.id).first().catch(() => null);
           });
       });
+    if ((!userRecord || !userRecord.password_hash) && user?.role === 'customer') {
+      userRecord = await db
+        .prepare('SELECT password_hash, tenant_id, auth_version FROM customers WHERE id = ?')
+        .bind(user.id)
+        .first()
+        .catch(async () => {
+          return db
+            .prepare('SELECT password_hash, tenant_id FROM customers WHERE id = ?')
+            .bind(user.id)
+            .first()
+            .catch(async () => {
+              return db.prepare('SELECT password_hash FROM customers WHERE id = ?').bind(user.id).first().catch(() => null);
+            });
+        });
+      if ((!userRecord || !userRecord.password_hash) && c.env?.AUTH_KV) {
+        const rawKv = (user.email ? await c.env.AUTH_KV.get(`user:${user.email}`).catch(() => null) : null)
+          || (user.id ? await c.env.AUTH_KV.get(`user:${user.id}`).catch(() => null) : null);
+        if (rawKv) {
+          try {
+            const parsedKv = JSON.parse(rawKv) as { password_hash?: string; password?: string; tenant_id?: string; auth_version?: number };
+            const kvHash = parsedKv.password_hash || parsedKv.password;
+            if (kvHash) {
+              userRecord = {
+                password_hash: kvHash,
+                tenant_id: parsedKv.tenant_id,
+                auth_version: parsedKv.auth_version,
+              };
+            }
+          } catch {
+            // ignore malformed cached entry
+          }
+        }
+      }
+    }
     if (!userRecord || !await verifyPassword(body.currentPassword, userRecord.password_hash)) {
       return c.json({ success: false, error: 'Invalid current password' }, 401);
     }
@@ -432,14 +560,36 @@ export function registerPasswordHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
     ) + 1;
     if (user.role !== 'customer') await changeStaffPassword(db, await requireStaffAccount(db, user.id), passwordHash);
     else {
+      const customerTenant = String(user?.tenantId || user?.tenant_id || (userRecord as any)?.tenant_id || resolvePublicTenantId(c) || 'default').trim() || 'default';
       try {
-        await db.prepare('UPDATE users SET password_hash = ?, auth_version = COALESCE(auth_version, 1) + 1, updated_at = ? WHERE id = ?').bind(passwordHash, now, user.id).run();
+        await db.prepare(
+          "UPDATE users SET password_hash = ?, auth_version = COALESCE(auth_version, 1) + 1, updated_at = ? WHERE id = ? AND COALESCE(NULLIF(TRIM(role), ''), 'customer') = 'customer' AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
+        ).bind(passwordHash, now, user.id, customerTenant).run();
         const refreshed = await db.prepare('SELECT auth_version FROM users WHERE id = ?').bind(user.id).first().catch(() => null);
         if (refreshed && Number.isFinite(Number((refreshed as any).auth_version))) {
           dbNextVersion = Math.max(dbNextVersion, Number((refreshed as any).auth_version));
         }
       } catch {
-        await db.prepare('UPDATE users SET password_hash = ?, updated_at = ? WHERE id = ?').bind(passwordHash, now, user.id).run();
+        if (customerTenant === 'default') {
+          await db.prepare('UPDATE users SET password_hash = ?, auth_version = COALESCE(auth_version, 1) + 1, updated_at = ? WHERE id = ?').bind(passwordHash, now, user.id).run().catch(async () => {
+            await db.prepare('UPDATE users SET password_hash = ?, updated_at = ? WHERE id = ?').bind(passwordHash, now, user.id).run().catch(() => {});
+          });
+        }
+      }
+      try {
+        await db.prepare(
+          "UPDATE customers SET password_hash = ?, auth_version = COALESCE(auth_version, 1) + 1, updated_at = ? WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
+        ).bind(passwordHash, now, user.id, customerTenant).run();
+        const refreshedCust = await db.prepare('SELECT auth_version FROM customers WHERE id = ?').bind(user.id).first().catch(() => null);
+        if (refreshedCust && Number.isFinite(Number((refreshedCust as any).auth_version))) {
+          dbNextVersion = Math.max(dbNextVersion, Number((refreshedCust as any).auth_version));
+        }
+      } catch {
+        if (customerTenant === 'default') {
+          await db.prepare('UPDATE customers SET password_hash = ?, auth_version = COALESCE(auth_version, 1) + 1, updated_at = ? WHERE id = ?').bind(passwordHash, now, user.id).run().catch(async () => {
+            await db.prepare('UPDATE customers SET password_hash = ?, updated_at = ? WHERE id = ?').bind(passwordHash, now, user.id).run().catch(() => {});
+          });
+        }
       }
     }
     await db.prepare('UPDATE sessions SET expires_at = ? WHERE user_id = ?').bind(now, user.id).run().catch(() => {});

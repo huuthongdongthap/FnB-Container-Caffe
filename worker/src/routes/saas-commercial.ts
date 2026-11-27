@@ -631,6 +631,15 @@ export function createSaasCommercialRoutes() {
     return null;
   }
 
+  function requireStrictOwnerOrAdmin(c: Context<SaasRouterEnv>): Response | null {
+    const user = c.get('user');
+    const role = String(user?.role || '').toLowerCase();
+    if (!['owner', 'admin'].includes(role) && !isHQSuperAdmin(user)) {
+      return c.json({ success: false, error: 'Chỉ chủ quán hoặc quản trị viên mới có quyền truy cập.' }, 403);
+    }
+    return null;
+  }
+
   router.get('/me', async (c) => {
     const denied = requireOwnerOrAdmin(c);
     if (denied) return denied;
@@ -878,7 +887,7 @@ export function createSaasCommercialRoutes() {
   });
 
   router.put('/payment-config', async (c) => {
-    const denied = requireOwnerOrAdmin(c);
+    const denied = requireStrictOwnerOrAdmin(c);
     if (denied) return denied;
     const db = c.env.AURA_DB;
     const tenantId = resolveScopedTenant(c);
@@ -1033,7 +1042,7 @@ export function createSaasCommercialRoutes() {
   });
 
   router.post('/domains', async (c) => {
-    const denied = requireOwnerOrAdmin(c);
+    const denied = requireStrictOwnerOrAdmin(c);
     if (denied) return denied;
     const db = c.env.AURA_DB;
     const tenantId = resolveScopedTenant(c);
@@ -1101,7 +1110,7 @@ export function createSaasCommercialRoutes() {
   });
 
   router.post('/domains/:id/verify', async (c) => {
-    const denied = requireOwnerOrAdmin(c);
+    const denied = requireStrictOwnerOrAdmin(c);
     if (denied) return denied;
     const db = c.env.AURA_DB;
     const tenantId = resolveScopedTenant(c);
@@ -1146,7 +1155,7 @@ export function createSaasCommercialRoutes() {
   });
 
   router.delete('/domains/:id', async (c) => {
-    const denied = requireOwnerOrAdmin(c);
+    const denied = requireStrictOwnerOrAdmin(c);
     if (denied) return denied;
     const tenantId = resolveScopedTenant(c);
     const id = c.req.param('id');
@@ -1186,7 +1195,7 @@ export function createSaasCommercialRoutes() {
   });
 
   router.post('/billing/checkout', async (c) => {
-    const denied = requireOwnerOrAdmin(c);
+    const denied = requireStrictOwnerOrAdmin(c);
     if (denied) return denied;
     const db = c.env.AURA_DB;
     const tenantId = resolveScopedTenant(c);
@@ -1331,7 +1340,7 @@ export function createSaasCommercialRoutes() {
   // =====================================================
 
   router.get('/export', async (c) => {
-    const denied = requireOwnerOrAdmin(c);
+    const denied = requireStrictOwnerOrAdmin(c);
     if (denied) return denied;
     const db = c.env.AURA_DB;
     const tenantId = resolveScopedTenant(c);

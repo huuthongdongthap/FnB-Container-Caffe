@@ -116,6 +116,8 @@ export function registerUsageHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
     );
     if (perCustomerLimit > 0 && targetCustomerId) {
       let custUsage: { cnt: number } | null = null;
+      let custRedemptions: { cnt: number } | null = null;
+      const upperPromoCode = String(promotion.code || '').trim().toUpperCase();
       if (tenantId && tenantId !== '*') {
         try {
           custUsage = await db
@@ -129,14 +131,31 @@ export function registerUsageHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
             .first<{ cnt: number }>()
             .catch(() => null);
         }
+        try {
+          custRedemptions = await db
+            .prepare("SELECT COUNT(*) as cnt FROM promotion_redemptions WHERE (promotion_id = ? OR UPPER(code) = ?) AND customer_id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?")
+            .bind(body.promotionId, upperPromoCode, targetCustomerId, tenantId)
+            .first<{ cnt: number }>();
+        } catch {
+          custRedemptions = await db
+            .prepare('SELECT COUNT(*) as cnt FROM promotion_redemptions WHERE (promotion_id = ? OR UPPER(code) = ?) AND customer_id = ?')
+            .bind(body.promotionId, upperPromoCode, targetCustomerId)
+            .first<{ cnt: number }>()
+            .catch(() => null);
+        }
       } else {
         custUsage = await db
           .prepare('SELECT COUNT(*) as cnt FROM promotion_usages WHERE promotion_id = ? AND customer_id = ?')
           .bind(body.promotionId, targetCustomerId)
           .first<{ cnt: number }>()
           .catch(() => null);
+        custRedemptions = await db
+          .prepare('SELECT COUNT(*) as cnt FROM promotion_redemptions WHERE (promotion_id = ? OR UPPER(code) = ?) AND customer_id = ?')
+          .bind(body.promotionId, upperPromoCode, targetCustomerId)
+          .first<{ cnt: number }>()
+          .catch(() => null);
       }
-      if (Number(custUsage?.cnt ?? 0) >= perCustomerLimit) {
+      if (Number(custUsage?.cnt ?? 0) + Number(custRedemptions?.cnt ?? 0) >= perCustomerLimit) {
         return c.json({ success: false, error: 'Per-customer promotion usage limit reached' }, 400);
       }
     }
@@ -228,18 +247,38 @@ export function registerUsageHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
           "UPDATE promotions SET current_uses = COALESCE(current_uses, 0) + 1, usage_count = COALESCE(usage_count, 0) + 1, updated_at = ? WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ? AND COALESCE(is_active, 1) = 1 AND (? <= 0 OR (COALESCE(current_uses, 0) < ? AND COALESCE(usage_count, 0) < ?))"
         ).bind(now, body.promotionId, tenantId, maxUses, maxUses, maxUses).run();
       } catch {
-        if (tenantId === 'default') {
+        try {
           usageUpdate = await db.prepare(
-            'UPDATE promotions SET current_uses = COALESCE(current_uses, 0) + 1, usage_count = COALESCE(usage_count, 0) + 1, updated_at = ? WHERE id = ? AND COALESCE(is_active, 1) = 1 AND (? <= 0 OR (COALESCE(current_uses, 0) < ? AND COALESCE(usage_count, 0) < ?))'
-          ).bind(now, body.promotionId, maxUses, maxUses, maxUses).run();
+            "UPDATE promotions SET usage_count = COALESCE(usage_count, 0) + 1 WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ? AND COALESCE(is_active, 1) = 1 AND (? <= 0 OR COALESCE(usage_count, 0) < ?)"
+          ).bind(body.promotionId, tenantId, maxUses, maxUses).run();
+        } catch {
+          try {
+            usageUpdate = await db.prepare(
+              "UPDATE promotions SET current_uses = COALESCE(current_uses, 0) + 1 WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ? AND COALESCE(is_active, 1) = 1 AND (? <= 0 OR COALESCE(current_uses, 0) < ?)"
+            ).bind(body.promotionId, tenantId, maxUses, maxUses).run();
+          } catch {
+            if (tenantId === 'default') {
+              usageUpdate = await db.prepare(
+                'UPDATE promotions SET current_uses = COALESCE(current_uses, 0) + 1, usage_count = COALESCE(usage_count, 0) + 1, updated_at = ? WHERE id = ? AND COALESCE(is_active, 1) = 1 AND (? <= 0 OR (COALESCE(current_uses, 0) < ? AND COALESCE(usage_count, 0) < ?))'
+              ).bind(now, body.promotionId, maxUses, maxUses, maxUses).run().catch(() =>
+                db.prepare(
+                  'UPDATE promotions SET usage_count = COALESCE(usage_count, 0) + 1 WHERE id = ? AND COALESCE(is_active, 1) = 1 AND (? <= 0 OR COALESCE(usage_count, 0) < ?)'
+                ).bind(body.promotionId, maxUses, maxUses).run()
+              );
+            }
+          }
         }
       }
     } else {
       usageUpdate = await db.prepare(
         'UPDATE promotions SET current_uses = COALESCE(current_uses, 0) + 1, usage_count = COALESCE(usage_count, 0) + 1, updated_at = ? WHERE id = ? AND COALESCE(is_active, 1) = 1 AND (? <= 0 OR (COALESCE(current_uses, 0) < ? AND COALESCE(usage_count, 0) < ?))'
-      ).bind(now, body.promotionId, maxUses, maxUses, maxUses).run();
+      ).bind(now, body.promotionId, maxUses, maxUses, maxUses).run().catch(() =>
+        db.prepare(
+          'UPDATE promotions SET usage_count = COALESCE(usage_count, 0) + 1 WHERE id = ? AND COALESCE(is_active, 1) = 1 AND (? <= 0 OR COALESCE(usage_count, 0) < ?)'
+        ).bind(body.promotionId, maxUses, maxUses).run()
+      );
     }
-    if ((usageUpdate?.meta?.changes ?? 1) === 0) {
+    if (!usageUpdate || (usageUpdate?.meta?.changes ?? 1) === 0) {
       return c.json({ success: false, error: 'Promotion usage limit reached' }, 409);
     }
 

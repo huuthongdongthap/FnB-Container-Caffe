@@ -264,7 +264,11 @@ export function registerIngredientHandlers(app: OpenAPIHono<{ Bindings: Env }>) 
           ).bind(...params, tenantId, limit, offset).all();
           itemResults = scopedItems.results || [];
           sqlTenantScoped = true;
-        } catch {
+        } catch (scopedErr) {
+          const scopedMsg = scopedErr instanceof Error ? scopedErr.message : String(scopedErr);
+          if (/no such table:\s*ingredients/i.test(scopedMsg)) {
+            throw scopedErr;
+          }
           sqlTenantScoped = false;
         }
       }
@@ -296,6 +300,11 @@ export function registerIngredientHandlers(app: OpenAPIHono<{ Bindings: Env }>) 
       if (query.isActive !== undefined) {
         invWhere += invWhere ? 'AND is_active = ? ' : 'WHERE is_active = ? ';
         invParams.push(query.isActive ? 1 : 0);
+      }
+      if (query.lowStock === true) {
+        invWhere += invWhere ? 'AND current_stock <= min_stock ' : 'WHERE current_stock <= min_stock ';
+      } else if (query.lowStock === false) {
+        invWhere += invWhere ? 'AND current_stock > min_stock ' : 'WHERE current_stock > min_stock ';
       }
       if (tenantId !== '*') {
         try {
@@ -574,27 +583,29 @@ export function registerIngredientHandlers(app: OpenAPIHono<{ Bindings: Env }>) 
               now,
               now
             ).run();
+            usingCanonical = true;
           } catch {
             throw err;
           }
+        } else {
+          await db.prepare(
+            `INSERT INTO ingredients (id, name, sku, category, unit, cost_per_unit, current_stock, min_stock, max_stock, is_active, created_at, updated_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+          ).bind(
+            id,
+            body.name,
+            body.sku,
+            body.category || 'raw',
+            body.unit,
+            body.costPerUnit ?? 0,
+            body.currentStock || 0,
+            body.minStock || 0,
+            body.maxStock || 0,
+            isActiveInt,
+            now,
+            now
+          ).run();
         }
-        await db.prepare(
-          `INSERT INTO ingredients (id, name, sku, category, unit, cost_per_unit, current_stock, min_stock, max_stock, is_active, created_at, updated_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-        ).bind(
-          id,
-          body.name,
-          body.sku,
-          body.category || 'raw',
-          body.unit,
-          body.costPerUnit ?? 0,
-          body.currentStock || 0,
-          body.minStock || 0,
-          body.maxStock || 0,
-          isActiveInt,
-          now,
-          now
-        ).run();
       }
 
       await db.prepare(

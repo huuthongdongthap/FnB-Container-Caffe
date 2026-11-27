@@ -186,17 +186,49 @@ reviewsRouter.post('/', optionalAuth(), async(c) => {
       tenant_id?: string | null;
     } | null = null;
     try {
-      orderRow = await db
-        .prepare('SELECT id, customer_id, customer_phone, status, tenant_id FROM orders WHERE id = ?1 OR UPPER(order_number) = UPPER(?1)')
-        .bind(cleanOrderId)
-        .first<{
-          id: string;
-          customer_id?: string | null;
-          customer_phone?: string | null;
-          status?: string | null;
-          tenant_id?: string | null;
-        }>()
-        .catch(() => null);
+      if (tenantId !== '*') {
+        orderRow = await db
+          .prepare(
+            "SELECT id, customer_id, customer_phone, status, tenant_id FROM orders WHERE (id = ?1 OR UPPER(order_number) = UPPER(?1)) AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?2 LIMIT 1"
+          )
+          .bind(cleanOrderId, tenantId)
+          .first<{
+            id: string;
+            customer_id?: string | null;
+            customer_phone?: string | null;
+            status?: string | null;
+            tenant_id?: string | null;
+          }>()
+          .catch(() => null);
+        if (!orderRow) {
+          orderRow = await db
+            .prepare(
+              "SELECT id, customer_id, customer_phone, status, tenant_id FROM orders WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ? LIMIT 1"
+            )
+            .bind(cleanOrderId, tenantId)
+            .first<{
+              id: string;
+              customer_id?: string | null;
+              customer_phone?: string | null;
+              status?: string | null;
+              tenant_id?: string | null;
+            }>()
+            .catch(() => null);
+        }
+      }
+      if (!orderRow && (tenantId === '*' || tenantId === 'default')) {
+        orderRow = await db
+          .prepare('SELECT id, customer_id, customer_phone, status, tenant_id FROM orders WHERE id = ?1 OR UPPER(order_number) = UPPER(?1)')
+          .bind(cleanOrderId)
+          .first<{
+            id: string;
+            customer_id?: string | null;
+            customer_phone?: string | null;
+            status?: string | null;
+            tenant_id?: string | null;
+          }>()
+          .catch(() => null);
+      }
       if (!orderRow) {
         orderRow = await db
           .prepare('SELECT id, customer_id, customer_phone, status, tenant_id FROM orders WHERE id = ?')
@@ -216,16 +248,18 @@ reviewsRouter.post('/', optionalAuth(), async(c) => {
           .bind(cleanOrderId)
           .first<{ id: string; customer_id?: string | null; tenant_id?: string | null }>()
           .catch(() =>
-            db
-              .prepare('SELECT id, customer_id FROM orders WHERE id = ?')
-              .bind(cleanOrderId)
-              .first<{ id: string; customer_id?: string | null; tenant_id?: string | null }>()
-              .catch(() =>
-                db
-                  .prepare('SELECT id, tenant_id FROM orders WHERE id = ?')
+            tenantId === 'default' || tenantId === '*'
+              ? db
+                  .prepare('SELECT id, customer_id FROM orders WHERE id = ?')
                   .bind(cleanOrderId)
                   .first<{ id: string; customer_id?: string | null; tenant_id?: string | null }>()
-              )
+                  .catch(() =>
+                    db
+                      .prepare('SELECT id, tenant_id FROM orders WHERE id = ?')
+                      .bind(cleanOrderId)
+                      .first<{ id: string; customer_id?: string | null; tenant_id?: string | null }>()
+                  )
+              : null
           );
       }
       if (orderRow?.id) {
@@ -312,11 +346,20 @@ reviewsRouter.post('/', optionalAuth(), async(c) => {
               (body.customer_phone ?? body.phone ?? (auth as { phone?: string } | undefined)?.phone ?? '') || '',
             ).trim();
             if (!suppliedPhone && auth?.id) {
-              const custPhoneRow = await db
-                .prepare('SELECT phone FROM customers WHERE id = ?')
-                .bind(auth.id)
+              let custPhoneRow = await db
+                .prepare(
+                  "SELECT phone FROM customers WHERE id = ? AND (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?) LIMIT 1"
+                )
+                .bind(auth.id, tenantId, tenantId)
                 .first<{ phone?: string | null }>()
                 .catch(() => null);
+              if (!custPhoneRow && (tenantId === 'default' || tenantId === '*')) {
+                custPhoneRow = await db
+                  .prepare('SELECT phone FROM customers WHERE id = ?')
+                  .bind(auth.id)
+                  .first<{ phone?: string | null }>()
+                  .catch(() => null);
+              }
               suppliedPhone = String(custPhoneRow?.phone ?? '').trim();
             }
             const normalizePhoneDigits = (raw: string): string => {

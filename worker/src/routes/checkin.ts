@@ -651,10 +651,11 @@ const handleApproveCheckin = async(c: import('hono').Context<{ Bindings: Env }>)
       .catch(() => {});
   }
 
-  // Credit check-in loyalty points to customers + loyalty_accounts if present
+  // Credit check-in loyalty points to customers + loyalty_accounts and record loyalty_transactions audit entry
   const pointsEarned = Number((checkin as unknown as { points_earned?: number }).points_earned || 0);
   if (pointsEarned > 0 && checkin.customer_id) {
     const nowPts = new Date().toISOString();
+    const checkinDay = nowPts.slice(0, 10);
     await db
       .prepare(
         "UPDATE customers SET loyalty_points = COALESCE(loyalty_points, 0) + ?, lifetime_points = COALESCE(lifetime_points, 0) + ?, updated_at = ? WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
@@ -670,13 +671,105 @@ const handleApproveCheckin = async(c: import('hono').Context<{ Bindings: Env }>)
             .catch(() => {});
         }
       });
-    await db
-      .prepare(
-        "UPDATE loyalty_accounts SET current_points = COALESCE(current_points, 0) + ?, lifetime_points = COALESCE(lifetime_points, 0) + ?, updated_at = ? WHERE customer_id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
-      )
-      .bind(pointsEarned, pointsEarned, nowPts, checkin.customer_id, effectiveTenant)
-      .run()
-      .catch(() => {});
+
+    let loyaltyAccountId = `la_${checkin.customer_id}`;
+    let loyaltyBalanceAfter = pointsEarned;
+    try {
+      let updateRes: { meta?: { changes?: number } } | null = null;
+      try {
+        updateRes = await db
+          .prepare(
+            "UPDATE loyalty_accounts SET current_points = COALESCE(current_points, 0) + ?, points_balance = COALESCE(points_balance, current_points, 0) + ?, lifetime_points = COALESCE(lifetime_points, 0) + ?, last_checkin_date = ?, updated_at = ? WHERE customer_id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
+          )
+          .bind(pointsEarned, pointsEarned, pointsEarned, checkinDay, nowPts, checkin.customer_id, effectiveTenant)
+          .run();
+      } catch {
+        updateRes = await db
+          .prepare(
+            "UPDATE loyalty_accounts SET current_points = COALESCE(current_points, 0) + ?, lifetime_points = COALESCE(lifetime_points, 0) + ?, updated_at = ? WHERE customer_id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
+          )
+          .bind(pointsEarned, pointsEarned, nowPts, checkin.customer_id, effectiveTenant)
+          .run();
+      }
+
+      if (Number(updateRes?.meta?.changes ?? 0) === 0) {
+        const custSnapshot = await db
+          .prepare("SELECT loyalty_points, lifetime_points, loyalty_tier FROM customers WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ? LIMIT 1")
+          .bind(checkin.customer_id, effectiveTenant)
+          .first<{ loyalty_points?: number; lifetime_points?: number; loyalty_tier?: string | null }>()
+          .catch(() => null);
+        const initPoints = Number(custSnapshot?.loyalty_points ?? pointsEarned);
+        const initLifetime = Number(custSnapshot?.lifetime_points ?? pointsEarned);
+        const initTier = (custSnapshot?.loyalty_tier && String(custSnapshot.loyalty_tier).trim()) || 'bronze';
+        loyaltyBalanceAfter = initPoints;
+        try {
+          await db
+            .prepare(
+              `INSERT INTO loyalty_accounts (id, tenant_id, customer_id, current_points, points_balance, lifetime_points, tier, last_checkin_date, created_at, updated_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+            )
+            .bind(loyaltyAccountId, effectiveTenant, checkin.customer_id, initPoints, initPoints, initLifetime, initTier, checkinDay, nowPts, nowPts)
+            .run();
+        } catch {
+          await db
+            .prepare(
+              `INSERT INTO loyalty_accounts (id, tenant_id, customer_id, current_points, lifetime_points, created_at, updated_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?)`
+            )
+            .bind(loyaltyAccountId, effectiveTenant, checkin.customer_id, initPoints, initLifetime, nowPts, nowPts)
+            .run()
+            .catch(() => {});
+        }
+      } else {
+        const updatedAcc = await db
+          .prepare("SELECT id, current_points FROM loyalty_accounts WHERE customer_id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ? LIMIT 1")
+          .bind(checkin.customer_id, effectiveTenant)
+          .first<{ id?: string; current_points?: number }>()
+          .catch(() => null);
+        if (updatedAcc?.id) loyaltyAccountId = String(updatedAcc.id);
+        if (updatedAcc?.current_points !== undefined && updatedAcc?.current_points !== null) {
+          loyaltyBalanceAfter = Number(updatedAcc.current_points);
+        }
+      }
+    } catch {
+      // Ignore when loyalty_accounts table is absent in lightweight test mocks
+    }
+
+    const ltxId = `ltx_checkin_${id}`;
+    const ltxDesc = `Check-in points approved (${id})`;
+    try {
+      await db
+        .prepare(
+          `INSERT OR IGNORE INTO loyalty_transactions
+           (id, tenant_id, account_id, customer_id, type, points, balance_after, description, reason, created_at)
+           VALUES (?, ?, ?, ?, 'earn', ?, ?, ?, 'checkin', ?)`
+        )
+        .bind(ltxId, effectiveTenant, loyaltyAccountId, checkin.customer_id, pointsEarned, loyaltyBalanceAfter, ltxDesc, nowPts)
+        .run();
+    } catch {
+      try {
+        await db
+          .prepare(
+            `INSERT OR IGNORE INTO loyalty_transactions
+             (id, tenant_id, account_id, customer_id, type, points, balance_after, description, created_at)
+             VALUES (?, ?, ?, ?, 'earn', ?, ?, ?, ?)`
+          )
+          .bind(ltxId, effectiveTenant, loyaltyAccountId, checkin.customer_id, pointsEarned, loyaltyBalanceAfter, ltxDesc, nowPts)
+          .run();
+      } catch {
+        if (effectiveTenant === 'default') {
+          await db
+            .prepare(
+              `INSERT OR IGNORE INTO loyalty_transactions
+               (id, account_id, customer_id, type, points, balance_after, description, created_at)
+               VALUES (?, ?, ?, 'earn', ?, ?, ?, ?)`
+            )
+            .bind(ltxId, loyaltyAccountId, checkin.customer_id, pointsEarned, loyaltyBalanceAfter, ltxDesc, nowPts)
+            .run()
+            .catch(() => {});
+        }
+      }
+    }
   }
 
   const row = await db.prepare('SELECT * FROM checkins WHERE id = ?').bind(id).first<CheckinRecord>();

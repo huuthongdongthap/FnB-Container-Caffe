@@ -63,6 +63,7 @@ export async function settlePayOS(
              WHERE COALESCE(NULLIF(TRIM(s.tenant_id), ''), 'default') = COALESCE(NULLIF(TRIM(o.tenant_id), ''), 'default')
                AND LOWER(COALESCE(o.status, 'pending')) NOT IN ('cancelled', 'canceled', 'rejected', 'failed', 'expired', 'refunded')
                AND s.clock_in IS NOT NULL AND s.clock_out IS NULL
+               AND LOWER(COALESCE(s.role, '')) NOT IN ('barista', 'kitchen', 'chef', 'bep')
                AND NOT EXISTS (
                  SELECT 1 FROM shift_reconciliations sr
                  WHERE sr.shift_id = CAST(s.id AS TEXT)
@@ -88,6 +89,7 @@ export async function settlePayOS(
                WHERE COALESCE(NULLIF(TRIM(s.tenant_id), ''), 'default') = COALESCE(NULLIF(TRIM(o.tenant_id), ''), 'default')
                  AND LOWER(COALESCE(o.status, 'pending')) NOT IN ('cancelled', 'canceled', 'rejected', 'failed', 'expired', 'refunded')
                  AND s.clock_in IS NOT NULL AND s.clock_out IS NULL
+                 AND LOWER(COALESCE(s.role, '')) NOT IN ('barista', 'kitchen', 'chef', 'bep')
                ORDER BY CASE WHEN LOWER(COALESCE(s.role, '')) IN ('owner', 'admin', 'manager', 'supervisor', 'cashier') THEN 0 ELSE 1 END, s.clock_in DESC
                LIMIT 1
              )`,

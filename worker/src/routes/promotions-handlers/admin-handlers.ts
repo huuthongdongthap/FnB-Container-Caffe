@@ -201,24 +201,40 @@ export function registerPromotionAdminHandlers(router: Hono<{ Bindings: Env }>):
     if (existing) {
       await db.prepare(
         `UPDATE promotions
-         SET percent = ?, max_discount = ?, min_order = ?, usage_limit = ?, usage_limit_per_customer = ?,
+         SET percent = ?, max_discount = ?, min_order = ?, usage_limit = ?, max_uses = ?, usage_limit_per_customer = ?,
+             usage_count = 0, current_uses = 0,
              type = ?, discount_type = ?, value = ?, discount_value = ?,
              starts_at = ?, expires_at = ?, is_active = ?
          WHERE UPPER(code) = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?`
       ).bind(
-        ...p.slice(1), usageLimitPerCustomer, normType, normDiscountType, rawValue, rawValue,
+        ...p.slice(1), body.usage_limit ?? 0, usageLimitPerCustomer, normType, normDiscountType, rawValue, rawValue,
         body.starts_at ?? null, body.expires_at ?? null, active, code, writeTenant,
       ).run().catch(async () => {
         await db.prepare(
-          "UPDATE promotions SET percent = ?, max_discount = ?, min_order = ?, usage_limit = ?, starts_at = ?, expires_at = ?, is_active = ? WHERE UPPER(code) = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
-        ).bind(...p.slice(1), body.starts_at ?? null, body.expires_at ?? null, active, code, writeTenant).run().catch(async () => {
-          if (writeTenant === 'default') {
-            await db.prepare(
-              'UPDATE promotions SET percent = ?, max_discount = ?, min_order = ?, usage_limit = ?, expires_at = ?, is_active = ? WHERE UPPER(code) = ?'
-            ).bind(...p.slice(1), body.expires_at ?? null, active, code).run();
-          }
+          `UPDATE promotions
+           SET percent = ?, max_discount = ?, min_order = ?, usage_limit = ?, usage_limit_per_customer = ?,
+               usage_count = 0, current_uses = 0,
+               type = ?, discount_type = ?, value = ?, discount_value = ?,
+               starts_at = ?, expires_at = ?, is_active = ?
+           WHERE UPPER(code) = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?`
+        ).bind(
+          ...p.slice(1), usageLimitPerCustomer, normType, normDiscountType, rawValue, rawValue,
+          body.starts_at ?? null, body.expires_at ?? null, active, code, writeTenant,
+        ).run().catch(async () => {
+          await db.prepare(
+            "UPDATE promotions SET percent = ?, max_discount = ?, min_order = ?, usage_limit = ?, usage_count = 0, starts_at = ?, expires_at = ?, is_active = ? WHERE UPPER(code) = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
+          ).bind(...p.slice(1), body.starts_at ?? null, body.expires_at ?? null, active, code, writeTenant).run().catch(async () => {
+            if (writeTenant === 'default') {
+              await db.prepare(
+                'UPDATE promotions SET percent = ?, max_discount = ?, min_order = ?, usage_limit = ?, usage_count = 0, expires_at = ?, is_active = ? WHERE UPPER(code) = ?'
+              ).bind(...p.slice(1), body.expires_at ?? null, active, code).run();
+            }
+          });
         });
       });
+      await db.prepare(
+        "UPDATE promotions SET used_count = 0 WHERE UPPER(code) = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
+      ).bind(code, writeTenant).run().catch(() => {});
       const revived = await findPromoForTenant(db, code, writeTenant);
       return c.json({ success: true, data: revived }, 201);
     }
@@ -270,34 +286,63 @@ export function registerPromotionAdminHandlers(router: Hono<{ Bindings: Env }>):
     const validationErr = validatePromotionNumericAndDateBounds(body, existing, false);
     if (validationErr) return c.json({ success: false, error: validationErr }, 400);
 
+    const rawPatchBody = body as Record<string, unknown>;
+    const rawPerCustomer = rawPatchBody.usage_limit_per_customer;
+    let usageLimitPerCustomerPatch: number | null = null;
+    if (rawPerCustomer !== undefined && rawPerCustomer !== null) {
+      const parsedPerCustomer = Number(rawPerCustomer);
+      if (!Number.isFinite(parsedPerCustomer) || parsedPerCustomer < 0) {
+        return c.json({ success: false, error: 'Giới hạn lượt dùng mỗi khách phải >= 0' }, 400);
+      }
+      usageLimitPerCustomerPatch = parsedPerCustomer;
+    }
+
     const whereClause = "WHERE (id = ? OR code = ?) AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?";
     const whereArgs = [rawParam, code, writeTenant];
     const baseFields = [body.percent ?? null, body.max_discount ?? null, body.min_order ?? null, body.usage_limit ?? null];
     const setCols = 'percent = COALESCE(?, percent), max_discount = COALESCE(?, max_discount), min_order = COALESCE(?, min_order), usage_limit = COALESCE(?, usage_limit)';
+    const setColsWithPerCustomer = `${setCols}, usage_limit_per_customer = COALESCE(?, usage_limit_per_customer)`;
+    const baseFieldsWithPerCustomer = [...baseFields, usageLimitPerCustomerPatch];
 
     try {
       await db.prepare(
-        `UPDATE promotions SET ${setCols}, starts_at = COALESCE(?, starts_at), expires_at = COALESCE(?, expires_at), is_active = COALESCE(?, is_active), updated_at = CURRENT_TIMESTAMP ${whereClause}`
-      ).bind(...baseFields, body.starts_at ?? null, body.expires_at ?? null, body.is_active ?? null, ...whereArgs).run();
+        `UPDATE promotions SET ${setColsWithPerCustomer}, starts_at = COALESCE(?, starts_at), expires_at = COALESCE(?, expires_at), is_active = COALESCE(?, is_active), updated_at = CURRENT_TIMESTAMP ${whereClause}`
+      ).bind(...baseFieldsWithPerCustomer, body.starts_at ?? null, body.expires_at ?? null, body.is_active ?? null, ...whereArgs).run();
     } catch {
       try {
         await db.prepare(
-          `UPDATE promotions SET ${setCols}, starts_at = COALESCE(?, starts_at), expires_at = COALESCE(?, expires_at), is_active = COALESCE(?, is_active) ${whereClause}`
-        ).bind(...baseFields, body.starts_at ?? null, body.expires_at ?? null, body.is_active ?? null, ...whereArgs).run();
+          `UPDATE promotions SET ${setColsWithPerCustomer}, starts_at = COALESCE(?, starts_at), expires_at = COALESCE(?, expires_at), is_active = COALESCE(?, is_active) ${whereClause}`
+        ).bind(...baseFieldsWithPerCustomer, body.starts_at ?? null, body.expires_at ?? null, body.is_active ?? null, ...whereArgs).run();
       } catch {
         try {
           await db.prepare(
-            `UPDATE promotions SET ${setCols}, expires_at = COALESCE(?, expires_at), is_active = COALESCE(?, is_active) ${whereClause}`
-          ).bind(...baseFields, body.expires_at ?? null, body.is_active ?? null, ...whereArgs).run();
+            `UPDATE promotions SET ${setCols}, starts_at = COALESCE(?, starts_at), expires_at = COALESCE(?, expires_at), is_active = COALESCE(?, is_active), updated_at = CURRENT_TIMESTAMP ${whereClause}`
+          ).bind(...baseFields, body.starts_at ?? null, body.expires_at ?? null, body.is_active ?? null, ...whereArgs).run();
         } catch {
-          if (writeTenant === 'default') {
+          try {
             await db.prepare(
-              `UPDATE promotions SET ${setCols}, starts_at = COALESCE(?, starts_at), expires_at = COALESCE(?, expires_at), is_active = COALESCE(?, is_active) WHERE (id = ? OR code = ?)`
-            ).bind(...baseFields, body.starts_at ?? null, body.expires_at ?? null, body.is_active ?? null, rawParam, code).run().catch(() =>
-              db.prepare(
-                `UPDATE promotions SET ${setCols}, expires_at = COALESCE(?, expires_at), is_active = COALESCE(?, is_active) WHERE (id = ? OR code = ?)`
-              ).bind(...baseFields, body.expires_at ?? null, body.is_active ?? null, rawParam, code).run().catch(() => {})
-            );
+              `UPDATE promotions SET ${setCols}, starts_at = COALESCE(?, starts_at), expires_at = COALESCE(?, expires_at), is_active = COALESCE(?, is_active) ${whereClause}`
+            ).bind(...baseFields, body.starts_at ?? null, body.expires_at ?? null, body.is_active ?? null, ...whereArgs).run();
+          } catch {
+            try {
+              await db.prepare(
+                `UPDATE promotions SET ${setCols}, expires_at = COALESCE(?, expires_at), is_active = COALESCE(?, is_active) ${whereClause}`
+              ).bind(...baseFields, body.expires_at ?? null, body.is_active ?? null, ...whereArgs).run();
+            } catch {
+              if (writeTenant === 'default') {
+                await db.prepare(
+                  `UPDATE promotions SET ${setColsWithPerCustomer}, starts_at = COALESCE(?, starts_at), expires_at = COALESCE(?, expires_at), is_active = COALESCE(?, is_active) WHERE (id = ? OR code = ?)`
+                ).bind(...baseFieldsWithPerCustomer, body.starts_at ?? null, body.expires_at ?? null, body.is_active ?? null, rawParam, code).run().catch(() =>
+                  db.prepare(
+                    `UPDATE promotions SET ${setCols}, starts_at = COALESCE(?, starts_at), expires_at = COALESCE(?, expires_at), is_active = COALESCE(?, is_active) WHERE (id = ? OR code = ?)`
+                  ).bind(...baseFields, body.starts_at ?? null, body.expires_at ?? null, body.is_active ?? null, rawParam, code).run().catch(() =>
+                    db.prepare(
+                      `UPDATE promotions SET ${setCols}, expires_at = COALESCE(?, expires_at), is_active = COALESCE(?, is_active) WHERE (id = ? OR code = ?)`
+                    ).bind(...baseFields, body.expires_at ?? null, body.is_active ?? null, rawParam, code).run().catch(() => {})
+                  )
+                );
+              }
+            }
           }
         }
       }

@@ -69,13 +69,14 @@ export async function handleRefund(c: Context<{ Bindings: Env }>, openApi = fals
         : '');
     // An order may have multiple payment attempts. A settled reference identifies
     // its original payment even when another paid attempt now wins generic lookup.
-    const referencedTransfer = !rawPaymentId && rawOrderId && manualTransferRef
+    const replayLookupRef = manualTransferRef || rawIdempotencyKey;
+    const referencedTransfer = !rawPaymentId && rawOrderId && replayLookupRef
       ? await db.prepare(`SELECT t.payment_id FROM payment_refund_transfers t
           JOIN payments p ON p.id = t.payment_id JOIN orders o ON o.id = p.order_id
           WHERE t.manual_transfer_ref = ? AND p.order_id = ?
             AND t.tenant_id = COALESCE(NULLIF(TRIM(o.tenant_id), ''), 'default')
             AND (? = '*' OR t.tenant_id = ?) LIMIT 1`)
-          .bind(manualTransferRef, rawOrderId, tenantId, tenantId).first<{ payment_id: string }>()
+          .bind(replayLookupRef, rawOrderId, tenantId, tenantId).first<{ payment_id: string }>()
       : null;
     const resolvedPaymentId = rawPaymentId || referencedTransfer?.payment_id || '';
     const lookupColumn = resolvedPaymentId ? 'p.id' : 'p.order_id';
@@ -167,12 +168,19 @@ export async function handleRefund(c: Context<{ Bindings: Env }>, openApi = fals
         if (!ready) return c.json({ success: false, code: 'REFUND_HISTORY_UNRECONCILED',
           error: 'Tenant refund history must be reconciled before manual refunds are enabled' }, 409);
       }
+    }
+    const lookupTransferRef =
+      manualTransferRef || (isCashOrCodPayment && canManualRefund ? rawIdempotencyKey : '');
+    if (lookupTransferRef) {
+      if (lookupTransferRef.length > 200) {
+        return c.json({ success: false, error: 'Transfer reference must be 200 characters or fewer' }, 400);
+      }
       const existingTransfer = await db.prepare(
         `SELECT t.payment_id, t.amount, t.reason, w.status AS loyalty_status
          FROM payment_refund_transfers t LEFT JOIN refund_loyalty_work w
            ON w.tenant_id = t.tenant_id AND w.reversal_key = t.manual_transfer_ref
          WHERE t.tenant_id = ? AND t.manual_transfer_ref = ? LIMIT 1`
-      ).bind(effectivePaymentTenant, manualTransferRef)
+      ).bind(effectivePaymentTenant, lookupTransferRef)
         .first<{ payment_id: string; amount: number; reason: string; loyalty_status: string | null }>();
       if (existingTransfer) {
         // A `failed` row is terminal for automated retries only: an operator replay with the
@@ -182,11 +190,11 @@ export async function handleRefund(c: Context<{ Bindings: Env }>, openApi = fals
           return c.json({ success: false, error: 'Transfer reference already recorded' }, 409);
         }
         const loyalty = await processRefundLoyalty(db, c.env, { tenantId: effectivePaymentTenant,
-          reference: manualTransferRef, paymentId: payment.id, orderId: payment.order_id,
+          reference: lookupTransferRef, paymentId: payment.id, orderId: payment.order_id,
           customerId: payment.customer_id, amount: existingTransfer.amount, reason: existingTransfer.reason });
         return c.json({ success: true, data: { paymentId: payment.id, orderId: payment.order_id,
           amount: existingTransfer.amount, refund_status: payment.refund_status,
-          manual_transfer_ref: manualTransferRef, loyalty_reversal: loyalty } }, 200);
+          manual_transfer_ref: lookupTransferRef, loyalty_reversal: loyalty } }, 200);
       }
     }
 
@@ -324,22 +332,72 @@ export async function handleRefund(c: Context<{ Bindings: Env }>, openApi = fals
         }
       }
 
+      const preRefundOrderStatus =
+        typeof payment.order_status === 'string' ? payment.order_status.trim().toLowerCase() : '';
+      const wasAlreadyVoided = ['cancelled', 'canceled', 'failed', 'expired'].includes(preRefundOrderStatus);
+      const shouldDecrementSessionOrder =
+        fullRefund && !wasAlreadyVoided && !['completed', 'delivered'].includes(preRefundOrderStatus);
+
       if (amount > 0) {
+        const metricTags = JSON.stringify({
+          provider: normPaymentMethod || 'unknown',
+          refund: true,
+          order_id: payment.order_id,
+          tenant_id: effectivePaymentTenant,
+        });
         await db
-          .prepare('INSERT INTO _metrics (name, value, labels, timestamp) VALUES (?, ?, ?, ?)')
-          .bind('revenue', -amount, JSON.stringify({ provider: normPaymentMethod || 'unknown', refund: true, order_id: payment.order_id, tenant_id: effectivePaymentTenant }), Math.floor(Date.now() / 1000))
+          .prepare('INSERT INTO _metrics (name, value, tags, created_at, tenant_id) VALUES (?, ?, ?, ?, ?)')
+          .bind('revenue', -amount, metricTags, now, effectivePaymentTenant)
           .run()
-          .catch(() => {});
-        await db
-          .prepare(
-            `UPDATE table_sessions
-             SET total_amount = MAX(0, COALESCE(total_amount, 0) - ?), updated_at = ?
-             WHERE id = (SELECT session_id FROM orders WHERE id = ? AND session_id IS NOT NULL AND session_id != '' LIMIT 1)
-               AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?`
-          )
-          .bind(amount, now, payment.order_id, effectivePaymentTenant)
-          .run()
-          .catch(() => {});
+          .catch(() =>
+            db
+              .prepare('INSERT INTO _metrics (name, value, tags, created_at) VALUES (?, ?, ?, ?)')
+              .bind('revenue', -amount, metricTags, now)
+              .run()
+              .catch(() =>
+                db
+                  .prepare('INSERT INTO _metrics (name, value, labels, timestamp) VALUES (?, ?, ?, ?)')
+                  .bind('revenue', -amount, metricTags, Math.floor(Date.now() / 1000))
+                  .run()
+                  .catch(() => {}),
+              ),
+          );
+        if (!wasAlreadyVoided) {
+          await db
+            .prepare(
+              `UPDATE table_sessions
+               SET total_amount = MAX(0, COALESCE(total_amount, 0) - ?),
+                   order_count = CASE WHEN ? = 1 AND COALESCE(order_count, 0) > 0 THEN order_count - 1 ELSE order_count END,
+                   current_order_id = CASE WHEN ? = 1 AND current_order_id = ? THEN NULL ELSE current_order_id END,
+                   updated_at = ?
+               WHERE id = (SELECT session_id FROM orders WHERE id = ? AND session_id IS NOT NULL AND session_id != '' LIMIT 1)
+                 AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?`,
+            )
+            .bind(
+              amount,
+              shouldDecrementSessionOrder ? 1 : 0,
+              shouldDecrementSessionOrder ? 1 : 0,
+              payment.order_id,
+              now,
+              payment.order_id,
+              effectivePaymentTenant,
+            )
+            .run()
+            .catch(() =>
+              db
+                .prepare(
+                  `UPDATE table_sessions
+                   SET total_amount = MAX(0, COALESCE(total_amount, 0) - ?),
+                       order_count = CASE WHEN ? = 1 AND COALESCE(order_count, 0) > 0 THEN order_count - 1 ELSE order_count END,
+                       updated_at = ?
+                   WHERE id = (SELECT session_id FROM orders WHERE id = ? AND session_id IS NOT NULL AND session_id != '' LIMIT 1)
+                     AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?`,
+                )
+                .bind(amount, shouldDecrementSessionOrder ? 1 : 0, now, payment.order_id, effectivePaymentTenant)
+                .run()
+                .catch(() => {}),
+            );
+        }
       }
 
       type PostRefundOrderRow = {
@@ -362,8 +420,6 @@ export async function handleRefund(c: Context<{ Bindings: Env }>, openApi = fals
             .bind(payment.order_id, effectivePaymentTenant)
             .first<PostRefundOrderRow>(),
         );
-      const preRefundOrderStatus =
-        typeof payment.order_status === 'string' ? payment.order_status.trim().toLowerCase() : '';
       const effectiveOrderStatus = String(postRefundOrder?.status || 'pending');
       const effectiveOrderPayStatus = String(postRefundOrder?.payment_status || 'paid');
       const effectiveOrderLower = effectiveOrderStatus.trim().toLowerCase();
@@ -409,6 +465,7 @@ export async function handleRefund(c: Context<{ Bindings: Env }>, openApi = fals
           preCancelStatus: preRefundOrderStatus,
           actorId: user?.id || null,
           skipInventoryRestore: true,
+          skipTableRelease: true,
           skipAccrualReversal: true,
         }).catch(() => {});
         if (!isCompletedOrDelivered && postRefundOrder?.table_id) {

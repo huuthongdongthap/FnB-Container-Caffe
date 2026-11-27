@@ -145,9 +145,8 @@ async function getMessageHistory(c: Context<{ Bindings: Env }>) {
     }
 
     const repository = await contactMessageRepository(c.env.AURA_DB);
-    const normalizedPhone = normalizeChatPhone(phone);
     const markAsRead = caller?.role !== 'customer';
-    return jsonResponse({ success: true, data: await repository.history(tenantId, normalizedPhone, { markAsRead }) });
+    return jsonResponse({ success: true, data: await repository.history(tenantId, phone.trim(), { markAsRead }) });
   } catch (error) { return chatError(error, 'Failed to get message history'); }
 }
 export const chatRouter = new Hono<{ Bindings: Env }>();

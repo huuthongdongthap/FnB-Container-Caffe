@@ -213,7 +213,7 @@ export async function handleCancelOrder(c: Context<{ Bindings: Env }>) {
     }
     return null;
   })) as {
-    id: string; status: string; payment_status?: string | null; customer_id?: string | null; tenant_id?: string; total?: number; guest_token_hash?: string | null;
+    id: string; status: string; payment_status?: string | null; customer_id?: string | null; tenant_id?: string; total?: number | null; total_amount?: number | null; guest_token_hash?: string | null;
   } | null;
   if (existing && user?.role === 'customer') {
     const ordCustId = existing.customer_id ? String(existing.customer_id).trim() : '';
@@ -272,8 +272,14 @@ export async function handleCancelOrder(c: Context<{ Bindings: Env }>) {
     }
   }
   const canCompensatePaid = ['owner', 'admin', 'manager', 'supervisor'].includes(normalizedCancelRole);
+  const rawExistingTotal: unknown = existing.total ?? existing.total_amount;
+  const hasExplicitZeroTotal =
+    rawExistingTotal !== null &&
+    rawExistingTotal !== undefined &&
+    rawExistingTotal !== '' &&
+    Number(rawExistingTotal) === 0;
   const isZeroTotalPending =
-    Number(existing.total ?? -1) === 0 &&
+    hasExplicitZeroTotal &&
     String(existing.status || '').trim().toLowerCase() === 'pending';
   if (
     !canCompensatePaid &&

@@ -176,54 +176,99 @@ async function queryTenantDepletions(
     }
   };
 
+  const invTypeFilterWithRef = `(
+    type IN ('out', 'reserve', 'usage', 'deduction', 'order_deduction', 'order_consumption', 'sale', 'consumption', 'release', 'restore', 'reversal', 'cancel_restore')
+    OR (type = 'waste' AND COALESCE(reference_type, '') != 'order')
+  )`;
+  const invTypeFilterLegacy = `type IN ('out', 'reserve', 'waste', 'usage', 'deduction', 'order_deduction', 'order_consumption', 'sale', 'consumption', 'release', 'restore', 'reversal', 'cancel_restore')`;
+  const runInvTxQuery = async (sqlWithRef: string, sqlLegacy: string, binds: unknown[]) => {
+    try {
+      const res = await db.prepare(sqlWithRef).bind(...binds).all<{ item_id: string; total_depleted: number; tenant_id?: string | null }>();
+      return filterRows(res.results || []);
+    } catch (err) {
+      if (!/reference_type/i.test(String(err))) throw err;
+      const res = await db.prepare(sqlLegacy).bind(...binds).all<{ item_id: string; total_depleted: number; tenant_id?: string | null }>();
+      return filterRows(res.results || []);
+    }
+  };
+
   let depletions: { item_id: string; total_depleted: number; tenant_id?: string | null }[] = [];
   try {
-    const res = await db.prepare(`
-      SELECT item_id,
-             MAX(0, SUM(CASE WHEN type IN ('release', 'restore', 'reversal', 'cancel_restore') THEN -ABS(quantity) ELSE ABS(quantity) END)) as total_depleted,
-             tenant_id
-      FROM inventory_transactions
-      WHERE replace(substr(created_at, 1, 19), 'T', ' ') >= ?
-        AND type IN ('out', 'reserve', 'waste', 'usage', 'deduction', 'order_deduction', 'order_consumption', 'sale', 'consumption', 'release', 'restore', 'reversal', 'cancel_restore')
-        AND (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?)
-      GROUP BY item_id, tenant_id
-    `).bind(normalizedStart, tenantId, tenantId).all<{ item_id: string; total_depleted: number; tenant_id?: string | null }>();
-    depletions = filterRows(res.results || []);
+    depletions = await runInvTxQuery(
+      `SELECT item_id,
+              MAX(0, SUM(CASE WHEN type IN ('release', 'restore', 'reversal', 'cancel_restore') THEN -ABS(quantity) ELSE ABS(quantity) END)) as total_depleted,
+              tenant_id
+       FROM inventory_transactions
+       WHERE replace(substr(created_at, 1, 19), 'T', ' ') >= ?
+         AND ${invTypeFilterWithRef}
+         AND (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?)
+       GROUP BY item_id, tenant_id`,
+      `SELECT item_id,
+              MAX(0, SUM(CASE WHEN type IN ('release', 'restore', 'reversal', 'cancel_restore') THEN -ABS(quantity) ELSE ABS(quantity) END)) as total_depleted,
+              tenant_id
+       FROM inventory_transactions
+       WHERE replace(substr(created_at, 1, 19), 'T', ' ') >= ?
+         AND ${invTypeFilterLegacy}
+         AND (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?)
+       GROUP BY item_id, tenant_id`,
+      [normalizedStart, tenantId, tenantId]
+    );
   } catch {
     try {
-      const res = await db.prepare(`
-        SELECT inventory_item_id as item_id,
-               MAX(0, SUM(CASE WHEN type IN ('release', 'restore', 'reversal', 'cancel_restore') THEN -ABS(quantity) ELSE ABS(quantity) END)) as total_depleted, tenant_id
-        FROM inventory_transactions
-        WHERE replace(substr(created_at, 1, 19), 'T', ' ') >= ?
-          AND type IN ('out', 'reserve', 'waste', 'usage', 'deduction', 'order_deduction', 'order_consumption', 'sale', 'consumption', 'release', 'restore', 'reversal', 'cancel_restore')
-          AND (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?)
-        GROUP BY inventory_item_id, tenant_id
-      `).bind(normalizedStart, tenantId, tenantId).all<{ item_id: string; total_depleted: number; tenant_id?: string | null }>();
-      depletions = filterRows(res.results || []);
+      depletions = await runInvTxQuery(
+        `SELECT inventory_item_id as item_id,
+                MAX(0, SUM(CASE WHEN type IN ('release', 'restore', 'reversal', 'cancel_restore') THEN -ABS(quantity) ELSE ABS(quantity) END)) as total_depleted,
+                tenant_id
+         FROM inventory_transactions
+         WHERE replace(substr(created_at, 1, 19), 'T', ' ') >= ?
+           AND ${invTypeFilterWithRef}
+           AND (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?)
+         GROUP BY inventory_item_id, tenant_id`,
+        `SELECT inventory_item_id as item_id,
+                MAX(0, SUM(CASE WHEN type IN ('release', 'restore', 'reversal', 'cancel_restore') THEN -ABS(quantity) ELSE ABS(quantity) END)) as total_depleted,
+                tenant_id
+         FROM inventory_transactions
+         WHERE replace(substr(created_at, 1, 19), 'T', ' ') >= ?
+           AND ${invTypeFilterLegacy}
+           AND (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?)
+         GROUP BY inventory_item_id, tenant_id`,
+        [normalizedStart, tenantId, tenantId]
+      );
     } catch {
       if (tenantId === 'default' || tenantId === '*') {
         try {
-          const res = await db.prepare(`
-            SELECT item_id,
-                   MAX(0, SUM(CASE WHEN type IN ('release', 'restore', 'reversal', 'cancel_restore') THEN -ABS(quantity) ELSE ABS(quantity) END)) as total_depleted
-            FROM inventory_transactions
-            WHERE replace(substr(created_at, 1, 19), 'T', ' ') >= ?
-              AND type IN ('out', 'reserve', 'waste', 'usage', 'deduction', 'order_deduction', 'order_consumption', 'sale', 'consumption', 'release', 'restore', 'reversal', 'cancel_restore')
-            GROUP BY item_id
-          `).bind(normalizedStart).all<{ item_id: string; total_depleted: number; tenant_id?: string | null }>();
-          depletions = filterRows(res.results || []);
+          depletions = await runInvTxQuery(
+            `SELECT item_id,
+                    MAX(0, SUM(CASE WHEN type IN ('release', 'restore', 'reversal', 'cancel_restore') THEN -ABS(quantity) ELSE ABS(quantity) END)) as total_depleted
+             FROM inventory_transactions
+             WHERE replace(substr(created_at, 1, 19), 'T', ' ') >= ?
+               AND ${invTypeFilterWithRef}
+             GROUP BY item_id`,
+            `SELECT item_id,
+                    MAX(0, SUM(CASE WHEN type IN ('release', 'restore', 'reversal', 'cancel_restore') THEN -ABS(quantity) ELSE ABS(quantity) END)) as total_depleted
+             FROM inventory_transactions
+             WHERE replace(substr(created_at, 1, 19), 'T', ' ') >= ?
+               AND ${invTypeFilterLegacy}
+             GROUP BY item_id`,
+            [normalizedStart]
+          );
         } catch {
           try {
-            const res = await db.prepare(`
-              SELECT COALESCE(inventory_item_id, item_id) as item_id,
-                     MAX(0, SUM(CASE WHEN type IN ('release', 'restore', 'reversal', 'cancel_restore') THEN -ABS(quantity) ELSE ABS(quantity) END)) as total_depleted
-              FROM inventory_transactions
-              WHERE replace(substr(created_at, 1, 19), 'T', ' ') >= ?
-                AND type IN ('out', 'reserve', 'waste', 'usage', 'deduction', 'order_deduction', 'order_consumption', 'sale', 'consumption', 'release', 'restore', 'reversal', 'cancel_restore')
-              GROUP BY COALESCE(inventory_item_id, item_id)
-            `).bind(normalizedStart).all<{ item_id: string; total_depleted: number; tenant_id?: string | null }>();
-            depletions = filterRows(res.results || []);
+            depletions = await runInvTxQuery(
+              `SELECT COALESCE(inventory_item_id, item_id) as item_id,
+                      MAX(0, SUM(CASE WHEN type IN ('release', 'restore', 'reversal', 'cancel_restore') THEN -ABS(quantity) ELSE ABS(quantity) END)) as total_depleted
+               FROM inventory_transactions
+               WHERE replace(substr(created_at, 1, 19), 'T', ' ') >= ?
+                 AND ${invTypeFilterWithRef}
+               GROUP BY COALESCE(inventory_item_id, item_id)`,
+              `SELECT COALESCE(inventory_item_id, item_id) as item_id,
+                      MAX(0, SUM(CASE WHEN type IN ('release', 'restore', 'reversal', 'cancel_restore') THEN -ABS(quantity) ELSE ABS(quantity) END)) as total_depleted
+               FROM inventory_transactions
+               WHERE replace(substr(created_at, 1, 19), 'T', ' ') >= ?
+                 AND ${invTypeFilterLegacy}
+               GROUP BY COALESCE(inventory_item_id, item_id)`,
+              [normalizedStart]
+            );
           } catch {
             depletions = [];
           }

@@ -491,6 +491,46 @@ export function inventoryCRUD(app: Hono<AppContext>) {
         throw err;
       }
     }
+
+    // Best-effort mirror to canonical ingredients table to keep BOM & admin inventory synchronized
+    const ingSets: string[] = [];
+    const ingParams: (string | number)[] = [];
+    const ingFields: (keyof typeof input)[] = [
+      'sku', 'name', 'category', 'unit',
+      'current_stock', 'min_stock', 'max_stock', 'cost_per_unit',
+    ];
+    for (const f of ingFields) {
+      if (input[f] !== undefined) {
+        ingSets.push(`${f} = ?`);
+        ingParams.push(input[f] as string | number);
+      }
+    }
+    if (ingSets.length > 0) {
+      const hasMirroredIngredient = await db
+        .prepare('SELECT id FROM ingredients WHERE id = ? LIMIT 1')
+        .bind(id)
+        .first<Record<string, unknown>>()
+        .catch(() => null);
+      if (hasMirroredIngredient) {
+        ingSets.push("updated_at = datetime('now')");
+        try {
+          await db
+            .prepare(
+              `UPDATE ingredients SET ${ingSets.join(', ')} WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?`
+            )
+            .bind(...ingParams, id, effectiveRowTenant)
+            .run();
+        } catch {
+          if (effectiveRowTenant === 'default') {
+            await db
+              .prepare(`UPDATE ingredients SET ${ingSets.join(', ')} WHERE id = ?`)
+              .bind(...ingParams, id)
+              .run()
+              .catch(() => undefined);
+          }
+        }
+      }
+    }
     return c.json({ success: true, data: { id, ...input } });
   });
 
@@ -539,6 +579,31 @@ export function inventoryCRUD(app: Hono<AppContext>) {
           .run();
       } else {
         throw err;
+      }
+    }
+
+    // Best-effort mirror soft-delete to canonical ingredients table
+    const hasMirroredIngredient = await db
+      .prepare('SELECT id FROM ingredients WHERE id = ? LIMIT 1')
+      .bind(id)
+      .first<Record<string, unknown>>()
+      .catch(() => null);
+    if (hasMirroredIngredient) {
+      try {
+        await db
+          .prepare(
+            "UPDATE ingredients SET is_active = 0, updated_at = datetime('now') WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
+          )
+          .bind(id, effectiveRowTenant)
+          .run();
+      } catch {
+        if (effectiveRowTenant === 'default') {
+          await db
+            .prepare("UPDATE ingredients SET is_active = 0, updated_at = datetime('now') WHERE id = ?")
+            .bind(id)
+            .run()
+            .catch(() => undefined);
+        }
       }
     }
     return c.json({ success: (result.meta.changes ?? 0) > 0 });

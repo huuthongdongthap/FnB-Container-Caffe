@@ -9,7 +9,7 @@ import {
   validateLoyaltyVoucher,
 } from '../../../../packages/domain/order/loyalty-voucher';
 import type { Env } from '../../types/env';
-import { isPlaceholderPhone } from './helpers';
+import { isPlaceholderPhone, normalizePromoPhone } from './helpers';
 import type { PromotionCode } from './types';
 
 function getTenantId(c: {
@@ -360,24 +360,47 @@ export function registerPromotionValidationHandlers(router: Hono<{ Bindings: Env
     const validatePerCustomerLimit = Number(
       validatePromoRow.usage_limit_per_customer ?? validatePromoRow.max_uses_per_customer ?? validatePromoRow.per_customer_limit ?? 0
     );
-    if (validatePerCustomerLimit > 0 && validateCustomerId) {
+    const validateRawPhone = data.customer_phone || user?.phone;
+    const validateNormalizedPhone = validateRawPhone && !isPlaceholderPhone(validateRawPhone)
+      ? normalizePromoPhone(validateRawPhone)
+      : '';
+    const validatePhoneKey = validateNormalizedPhone ? `phone:${validateNormalizedPhone}` : '';
+    const validatePerCustomerKey = validateCustomerId || validatePhoneKey;
+    const validateSecondaryKey = validateCustomerId && validatePhoneKey && validateCustomerId !== validatePhoneKey ? validatePhoneKey : '';
+    if (validatePerCustomerLimit > 0 && validatePerCustomerKey) {
       try {
+        const scopedTenant = tenantId === '*' ? 'default' : tenantId;
         const custRedemptions = await db
           .prepare(
-            "SELECT COUNT(*) AS cnt FROM promotion_redemptions WHERE (promotion_id = ? OR UPPER(code) = ?) AND customer_id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
+            "SELECT COUNT(*) AS cnt FROM promotion_redemptions WHERE (promotion_id = ? OR UPPER(code) = ?) AND (customer_id = ? OR (? != '' AND customer_id = ?)) AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
           )
-          .bind(promo.id ?? promo.code, upperCode, validateCustomerId, tenantId === '*' ? 'default' : tenantId)
+          .bind(promo.id ?? promo.code, upperCode, validatePerCustomerKey, validateSecondaryKey, validateSecondaryKey, scopedTenant)
           .first<{ cnt?: number }>()
           .catch(() =>
             db
               .prepare(
-                'SELECT COUNT(*) AS cnt FROM promotion_redemptions WHERE (promotion_id = ? OR UPPER(code) = ?) AND customer_id = ?'
+                "SELECT COUNT(*) AS cnt FROM promotion_redemptions WHERE (promotion_id = ? OR UPPER(code) = ?) AND (customer_id = ? OR (? != '' AND customer_id = ?))"
               )
-              .bind(promo.id ?? promo.code, upperCode, validateCustomerId)
+              .bind(promo.id ?? promo.code, upperCode, validatePerCustomerKey, validateSecondaryKey, validateSecondaryKey)
               .first<{ cnt?: number }>()
               .catch(() => null)
           );
-        if (Number(custRedemptions?.cnt ?? 0) >= validatePerCustomerLimit) {
+        const custUsages = await db
+          .prepare(
+            "SELECT COUNT(*) AS cnt FROM promotion_usages WHERE promotion_id = ? AND (customer_id = ? OR (? != '' AND customer_id = ?)) AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
+          )
+          .bind(promo.id ?? promo.code, validatePerCustomerKey, validateSecondaryKey, validateSecondaryKey, scopedTenant)
+          .first<{ cnt?: number }>()
+          .catch(() =>
+            db
+              .prepare(
+                "SELECT COUNT(*) AS cnt FROM promotion_usages WHERE promotion_id = ? AND (customer_id = ? OR (? != '' AND customer_id = ?))"
+              )
+              .bind(promo.id ?? promo.code, validatePerCustomerKey, validateSecondaryKey, validateSecondaryKey)
+              .first<{ cnt?: number }>()
+              .catch(() => null)
+          );
+        if (Number(custRedemptions?.cnt ?? 0) + Number(custUsages?.cnt ?? 0) >= validatePerCustomerLimit) {
           return c.json({
             success: true,
             data: { valid: false, reason: 'Bạn đã hết lượt sử dụng mã này' }
@@ -696,24 +719,48 @@ export function registerPromotionValidationHandlers(router: Hono<{ Bindings: Env
     const perCustomerLimit = Number(
       promoRow.usage_limit_per_customer ?? promoRow.max_uses_per_customer ?? promoRow.per_customer_limit ?? 0
     );
-    if (perCustomerLimit > 0 && effectiveCustomerId) {
+    const normalizedCustomerPhone = effectiveCustomerPhone && !isPlaceholderPhone(effectiveCustomerPhone)
+      ? normalizePromoPhone(effectiveCustomerPhone)
+      : '';
+    const phoneCustomerKey = normalizedCustomerPhone ? `phone:${normalizedCustomerPhone}` : '';
+    const effectivePerCustomerKey = effectiveCustomerId || phoneCustomerKey;
+    const secondaryCustomerKey = effectiveCustomerId && phoneCustomerKey && effectiveCustomerId !== phoneCustomerKey ? phoneCustomerKey : '';
+    let priorExternalUsageCount = 0;
+    if (perCustomerLimit > 0 && effectivePerCustomerKey) {
       try {
+        const scopedTenant = tenantId === '*' ? 'default' : tenantId;
         const custRedemptions = await db
           .prepare(
-            "SELECT COUNT(*) AS cnt FROM promotion_redemptions WHERE (promotion_id = ? OR UPPER(code) = ?) AND customer_id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
+            "SELECT COUNT(*) AS cnt FROM promotion_redemptions WHERE (promotion_id = ? OR UPPER(code) = ?) AND (customer_id = ? OR (? != '' AND customer_id = ?)) AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
           )
-          .bind(promo.id ?? promo.code, upperCode, effectiveCustomerId, tenantId === '*' ? 'default' : tenantId)
+          .bind(promo.id ?? promo.code, upperCode, effectivePerCustomerKey, secondaryCustomerKey, secondaryCustomerKey, scopedTenant)
           .first<{ cnt?: number }>()
           .catch(() =>
             db
               .prepare(
-                'SELECT COUNT(*) AS cnt FROM promotion_redemptions WHERE (promotion_id = ? OR UPPER(code) = ?) AND customer_id = ?'
+                "SELECT COUNT(*) AS cnt FROM promotion_redemptions WHERE (promotion_id = ? OR UPPER(code) = ?) AND (customer_id = ? OR (? != '' AND customer_id = ?))"
               )
-              .bind(promo.id ?? promo.code, upperCode, effectiveCustomerId)
+              .bind(promo.id ?? promo.code, upperCode, effectivePerCustomerKey, secondaryCustomerKey, secondaryCustomerKey)
               .first<{ cnt?: number }>()
               .catch(() => null)
           );
-        if (Number(custRedemptions?.cnt ?? 0) >= perCustomerLimit) {
+        const custUsages = await db
+          .prepare(
+            "SELECT COUNT(*) AS cnt FROM promotion_usages WHERE promotion_id = ? AND (customer_id = ? OR (? != '' AND customer_id = ?)) AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
+          )
+          .bind(promo.id ?? promo.code, effectivePerCustomerKey, secondaryCustomerKey, secondaryCustomerKey, scopedTenant)
+          .first<{ cnt?: number }>()
+          .catch(() =>
+            db
+              .prepare(
+                "SELECT COUNT(*) AS cnt FROM promotion_usages WHERE promotion_id = ? AND (customer_id = ? OR (? != '' AND customer_id = ?))"
+              )
+              .bind(promo.id ?? promo.code, effectivePerCustomerKey, secondaryCustomerKey, secondaryCustomerKey)
+              .first<{ cnt?: number }>()
+              .catch(() => null)
+          );
+        priorExternalUsageCount = Number(custUsages?.cnt ?? 0);
+        if (Number(custRedemptions?.cnt ?? 0) + priorExternalUsageCount >= perCustomerLimit) {
           return c.json({ success: false, error: 'Per-customer usage limit reached' }, 400);
         }
       } catch {
@@ -723,53 +770,88 @@ export function registerPromotionValidationHandlers(router: Hono<{ Bindings: Env
 
     const discountAmount = computePromotionDiscountAmount(promoRow, effectiveOrderTotal, percent, maxDiscount);
 
-    // Increment usage with atomic conditional guard
-    if (promo.usage_limit && promo.usage_limit > 0) {
+    // Increment usage with atomic conditional guard across both legacy usage_limit/usage_count and OpenAPI max_uses/current_uses
+    if (maxUsesLimit > 0) {
       let usageRes: { meta?: { changes?: number } } | null = null;
       if (promo.id !== undefined && promo.id !== null) {
         if (tenantId !== '*') {
           try {
             usageRes = await db.prepare(
-              "UPDATE promotions SET usage_count = COALESCE(usage_count, 0) + 1 WHERE id = ? AND (tenant_id = ? OR (? = 'default' AND (tenant_id IS NULL OR TRIM(tenant_id) = ''))) AND (usage_limit IS NULL OR usage_limit = 0 OR COALESCE(usage_count, 0) < usage_limit)"
-            ).bind(promo.id, tenantId, tenantId).run();
+              "UPDATE promotions SET usage_count = COALESCE(usage_count, 0) + 1, current_uses = COALESCE(current_uses, 0) + 1 WHERE id = ? AND (tenant_id = ? OR (? = 'default' AND (tenant_id IS NULL OR TRIM(tenant_id) = ''))) AND (usage_limit IS NULL OR usage_limit = 0 OR COALESCE(usage_count, 0) < usage_limit) AND (max_uses IS NULL OR max_uses = 0 OR COALESCE(current_uses, 0) < max_uses) AND COALESCE(usage_count, 0) < ? AND COALESCE(current_uses, 0) < ?"
+            ).bind(promo.id, tenantId, tenantId, maxUsesLimit, maxUsesLimit).run();
           } catch {
             try {
               usageRes = await db.prepare(
-                "UPDATE promotions SET used_count = COALESCE(used_count, 0) + 1 WHERE id = ? AND (tenant_id = ? OR (? = 'default' AND (tenant_id IS NULL OR TRIM(tenant_id) = '')))"
-              ).bind(promo.id, tenantId, tenantId).run();
+                "UPDATE promotions SET usage_count = COALESCE(usage_count, 0) + 1 WHERE id = ? AND (tenant_id = ? OR (? = 'default' AND (tenant_id IS NULL OR TRIM(tenant_id) = ''))) AND (usage_limit IS NULL OR usage_limit = 0 OR COALESCE(usage_count, 0) < usage_limit) AND COALESCE(usage_count, 0) < ?"
+              ).bind(promo.id, tenantId, tenantId, maxUsesLimit).run();
             } catch {
-              if (tenantId === 'default') {
+              try {
                 usageRes = await db.prepare(
-                  'UPDATE promotions SET usage_count = COALESCE(usage_count, 0) + 1 WHERE id = ? AND (usage_limit IS NULL OR usage_limit = 0 OR COALESCE(usage_count, 0) < usage_limit)'
-                ).bind(promo.id).run();
-              } else {
-                usageRes = { meta: { changes: 0 } };
+                  "UPDATE promotions SET current_uses = COALESCE(current_uses, 0) + 1 WHERE id = ? AND (tenant_id = ? OR (? = 'default' AND (tenant_id IS NULL OR TRIM(tenant_id) = ''))) AND (max_uses IS NULL OR max_uses = 0 OR COALESCE(current_uses, 0) < max_uses) AND COALESCE(current_uses, 0) < ?"
+                ).bind(promo.id, tenantId, tenantId, maxUsesLimit).run();
+              } catch {
+                try {
+                  usageRes = await db.prepare(
+                    "UPDATE promotions SET used_count = COALESCE(used_count, 0) + 1 WHERE id = ? AND (tenant_id = ? OR (? = 'default' AND (tenant_id IS NULL OR TRIM(tenant_id) = ''))) AND COALESCE(used_count, 0) < ?"
+                  ).bind(promo.id, tenantId, tenantId, maxUsesLimit).run();
+                } catch {
+                  if (tenantId === 'default') {
+                    usageRes = await db.prepare(
+                      'UPDATE promotions SET usage_count = COALESCE(usage_count, 0) + 1, current_uses = COALESCE(current_uses, 0) + 1 WHERE id = ? AND COALESCE(usage_count, 0) < ? AND COALESCE(current_uses, 0) < ?'
+                    ).bind(promo.id, maxUsesLimit, maxUsesLimit).run().catch(() =>
+                      db.prepare(
+                        'UPDATE promotions SET usage_count = COALESCE(usage_count, 0) + 1 WHERE id = ? AND (usage_limit IS NULL OR usage_limit = 0 OR COALESCE(usage_count, 0) < usage_limit) AND COALESCE(usage_count, 0) < ?'
+                      ).bind(promo.id, maxUsesLimit).run()
+                    );
+                  } else {
+                    usageRes = { meta: { changes: 0 } };
+                  }
+                }
               }
             }
           }
         } else {
           usageRes = await db.prepare(
-            'UPDATE promotions SET usage_count = COALESCE(usage_count, 0) + 1 WHERE id = ? AND (usage_limit IS NULL OR usage_limit = 0 OR COALESCE(usage_count, 0) < usage_limit)'
-          ).bind(promo.id).run();
+            'UPDATE promotions SET usage_count = COALESCE(usage_count, 0) + 1, current_uses = COALESCE(current_uses, 0) + 1 WHERE id = ? AND (usage_limit IS NULL OR usage_limit = 0 OR COALESCE(usage_count, 0) < usage_limit) AND (max_uses IS NULL OR max_uses = 0 OR COALESCE(current_uses, 0) < max_uses) AND COALESCE(usage_count, 0) < ? AND COALESCE(current_uses, 0) < ?'
+          ).bind(promo.id, maxUsesLimit, maxUsesLimit).run().catch(() =>
+            db.prepare(
+              'UPDATE promotions SET usage_count = COALESCE(usage_count, 0) + 1 WHERE id = ? AND (usage_limit IS NULL OR usage_limit = 0 OR COALESCE(usage_count, 0) < usage_limit) AND COALESCE(usage_count, 0) < ?'
+            ).bind(promo.id, maxUsesLimit).run()
+          );
         }
       } else if (tenantId !== '*') {
         try {
           usageRes = await db.prepare(
-            "UPDATE promotions SET usage_count = COALESCE(usage_count, 0) + 1 WHERE code = ? AND (COALESCE(NULLIF(tenant_id, ''), 'default') = ? OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?2) AND (usage_limit IS NULL OR usage_limit = 0 OR COALESCE(usage_count, 0) < usage_limit)"
-          ).bind(promo.code, tenantId).run();
+            "UPDATE promotions SET usage_count = COALESCE(usage_count, 0) + 1 WHERE code = ? AND (COALESCE(NULLIF(tenant_id, ''), 'default') = ? OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?2) AND (usage_limit IS NULL OR usage_limit = 0 OR COALESCE(usage_count, 0) < usage_limit) AND (max_uses IS NULL OR max_uses = 0 OR COALESCE(current_uses, 0) < max_uses) AND COALESCE(usage_count, 0) < ?3 AND COALESCE(current_uses, 0) < ?3"
+          ).bind(promo.code, tenantId, maxUsesLimit).run();
+          if ((usageRes?.meta?.changes ?? 1) > 0) {
+            await db.prepare(
+              "UPDATE promotions SET current_uses = COALESCE(current_uses, 0) + 1 WHERE code = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
+            ).bind(promo.code, tenantId).run().catch(() => {});
+          }
         } catch {
-          if (tenantId === 'default') {
+          try {
             usageRes = await db.prepare(
-              'UPDATE promotions SET usage_count = COALESCE(usage_count, 0) + 1 WHERE code = ? AND (usage_limit IS NULL OR usage_limit = 0 OR COALESCE(usage_count, 0) < usage_limit)'
-            ).bind(promo.code).run();
-          } else {
-            usageRes = { meta: { changes: 0 } };
+              "UPDATE promotions SET usage_count = COALESCE(usage_count, 0) + 1 WHERE code = ? AND (COALESCE(NULLIF(tenant_id, ''), 'default') = ? OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?2) AND (usage_limit IS NULL OR usage_limit = 0 OR COALESCE(usage_count, 0) < usage_limit) AND COALESCE(usage_count, 0) < ?3"
+            ).bind(promo.code, tenantId, maxUsesLimit).run();
+          } catch {
+            if (tenantId === 'default') {
+              usageRes = await db.prepare(
+                'UPDATE promotions SET usage_count = COALESCE(usage_count, 0) + 1 WHERE code = ? AND (usage_limit IS NULL OR usage_limit = 0 OR COALESCE(usage_count, 0) < usage_limit) AND COALESCE(usage_count, 0) < ?'
+              ).bind(promo.code, maxUsesLimit).run();
+            } else {
+              usageRes = { meta: { changes: 0 } };
+            }
           }
         }
       } else {
         usageRes = await db.prepare(
-          'UPDATE promotions SET usage_count = COALESCE(usage_count, 0) + 1 WHERE code = ? AND (usage_limit IS NULL OR usage_limit = 0 OR COALESCE(usage_count, 0) < usage_limit)'
-        ).bind(promo.code).run();
+          'UPDATE promotions SET usage_count = COALESCE(usage_count, 0) + 1, current_uses = COALESCE(current_uses, 0) + 1 WHERE code = ? AND (usage_limit IS NULL OR usage_limit = 0 OR COALESCE(usage_count, 0) < usage_limit) AND (max_uses IS NULL OR max_uses = 0 OR COALESCE(current_uses, 0) < max_uses) AND COALESCE(usage_count, 0) < ? AND COALESCE(current_uses, 0) < ?'
+        ).bind(promo.code, maxUsesLimit, maxUsesLimit).run().catch(() =>
+          db.prepare(
+            'UPDATE promotions SET usage_count = COALESCE(usage_count, 0) + 1 WHERE code = ? AND (usage_limit IS NULL OR usage_limit = 0 OR COALESCE(usage_count, 0) < usage_limit) AND COALESCE(usage_count, 0) < ?'
+          ).bind(promo.code, maxUsesLimit).run()
+        );
       }
       if ((usageRes?.meta?.changes ?? 1) === 0) {
         return c.json({ success: false, error: 'Usage limit reached' }, 409);
@@ -779,21 +861,32 @@ export function registerPromotionValidationHandlers(router: Hono<{ Bindings: Env
         if (promo.id !== undefined && promo.id !== null) {
           if (tenantId !== '*') {
             await db.prepare(
-              "UPDATE promotions SET usage_count = COALESCE(usage_count, 0) + 1 WHERE id = ? AND (tenant_id = ? OR (? = 'default' AND (tenant_id IS NULL OR TRIM(tenant_id) = '')))"
-            ).bind(promo.id, tenantId, tenantId).run();
+              "UPDATE promotions SET usage_count = COALESCE(usage_count, 0) + 1, current_uses = COALESCE(current_uses, 0) + 1 WHERE id = ? AND (tenant_id = ? OR (? = 'default' AND (tenant_id IS NULL OR TRIM(tenant_id) = '')))"
+            ).bind(promo.id, tenantId, tenantId).run().catch(() =>
+              db.prepare(
+                "UPDATE promotions SET usage_count = COALESCE(usage_count, 0) + 1 WHERE id = ? AND (tenant_id = ? OR (? = 'default' AND (tenant_id IS NULL OR TRIM(tenant_id) = '')))"
+              ).bind(promo.id, tenantId, tenantId).run()
+            );
           } else {
             await db.prepare(
-              'UPDATE promotions SET usage_count = COALESCE(usage_count, 0) + 1 WHERE id = ?'
-            ).bind(promo.id).run();
+              'UPDATE promotions SET usage_count = COALESCE(usage_count, 0) + 1, current_uses = COALESCE(current_uses, 0) + 1 WHERE id = ?'
+            ).bind(promo.id).run().catch(() =>
+              db.prepare('UPDATE promotions SET usage_count = COALESCE(usage_count, 0) + 1 WHERE id = ?').bind(promo.id).run()
+            );
           }
         } else if (tenantId !== '*') {
           await db.prepare(
             "UPDATE promotions SET usage_count = COALESCE(usage_count, 0) + 1 WHERE code = ? AND (COALESCE(NULLIF(tenant_id, ''), 'default') = ? OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?2)"
           ).bind(promo.code, tenantId).run();
+          await db.prepare(
+            "UPDATE promotions SET current_uses = COALESCE(current_uses, 0) + 1 WHERE code = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
+          ).bind(promo.code, tenantId).run().catch(() => {});
         } else {
           await db.prepare(
-            'UPDATE promotions SET usage_count = COALESCE(usage_count, 0) + 1 WHERE code = ?'
-          ).bind(promo.code).run();
+            'UPDATE promotions SET usage_count = COALESCE(usage_count, 0) + 1, current_uses = COALESCE(current_uses, 0) + 1 WHERE code = ?'
+          ).bind(promo.code).run().catch(() =>
+            db.prepare('UPDATE promotions SET usage_count = COALESCE(usage_count, 0) + 1 WHERE code = ?').bind(promo.code).run()
+          );
         }
       } catch {
         if (promo.id !== undefined && promo.id !== null) {
@@ -828,7 +921,7 @@ export function registerPromotionValidationHandlers(router: Hono<{ Bindings: Env
       }
     }
 
-    // Undo the usage reservation above with the same row key, counter column and tenant scope.
+    // Undo the usage reservation above with the same row key, counter columns and tenant scope.
     const releaseUsageReservation = async (): Promise<void> => {
       const hasId = promo.id !== undefined && promo.id !== null;
       const keySql = hasId ? 'id = ?' : 'UPPER(code) = UPPER(?)';
@@ -837,14 +930,22 @@ export function registerPromotionValidationHandlers(router: Hono<{ Bindings: Env
         ? ''
         : " AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?";
       const binds = tenantId === '*' ? [key] : [key, tenantId];
-      for (const column of ['usage_count', 'used_count']) {
+      try {
+        const bothRes = await db.prepare(
+          `UPDATE promotions SET usage_count = CASE WHEN COALESCE(usage_count, 0) > 0 THEN usage_count - 1 ELSE 0 END, current_uses = CASE WHEN COALESCE(current_uses, 0) > 0 THEN current_uses - 1 ELSE 0 END WHERE ${keySql}${tenantSql}`
+        ).bind(...binds).run() as { meta?: { changes?: number } };
+        if ((bothRes?.meta?.changes ?? 1) > 0) return;
+      } catch {
+        // Fall through when either counter column is absent in partial schemas.
+      }
+      for (const column of ['usage_count', 'current_uses', 'used_count']) {
         try {
           const res = await db.prepare(
             `UPDATE promotions SET ${column} = CASE WHEN COALESCE(${column}, 0) > 0 THEN ${column} - 1 ELSE 0 END WHERE ${keySql}${tenantSql}`
           ).bind(...binds).run() as { meta?: { changes?: number } };
           if ((res?.meta?.changes ?? 1) > 0) return;
         } catch {
-          // Column absent in this schema; try the legacy counter.
+          // Column absent in this schema; try the next counter.
         }
       }
     };
@@ -854,21 +955,22 @@ export function registerPromotionValidationHandlers(router: Hono<{ Bindings: Env
     const targetTenantId = tenantId === '*'
       ? ((orderRow?.tenant_id ? String(orderRow.tenant_id).trim() : '') || (promo.tenant_id ? String(promo.tenant_id).trim() : '') || 'default')
       : (tenantId || 'default');
-    const enforcePerCustomer = perCustomerLimit > 0 && Boolean(effectiveCustomerId);
+    const enforcePerCustomer = perCustomerLimit > 0 && Boolean(effectivePerCustomerKey);
+    const storedCustomerKey = effectiveCustomerId || (effectivePerCustomerKey || null);
     let guardedInsert: { meta?: { changes?: number } } | null = null;
     try {
       // The per-customer count is evaluated inside the INSERT so concurrent redemptions cannot both pass.
       guardedInsert = await db.prepare(
         `INSERT INTO promotion_redemptions (promotion_id, code, order_id, customer_id, tenant_id, discount_amount, order_total, redeemed_at)
          SELECT ?, ?, ?, ?, ?, ?, ?, ?
-         WHERE ? = 0 OR (SELECT COUNT(*) FROM promotion_redemptions
-           WHERE (promotion_id = ? OR UPPER(code) = ?) AND customer_id = ?
-           AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?) < ?`
+         WHERE ? = 0 OR ((SELECT COUNT(*) FROM promotion_redemptions
+           WHERE (promotion_id = ? OR UPPER(code) = ?) AND (customer_id = ? OR (? != '' AND customer_id = ?))
+           AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?) + ?) < ?`
       ).bind(
-        promo.id ?? promo.code, promo.code, data.order_id, effectiveCustomerId ?? null, targetTenantId,
+        promo.id ?? promo.code, promo.code, data.order_id, storedCustomerKey, targetTenantId,
         discountAmount, effectiveOrderTotal, redeemedAtIso,
         enforcePerCustomer ? 1 : 0,
-        promo.id ?? promo.code, upperCode, effectiveCustomerId ?? null, targetTenantId, perCustomerLimit,
+        promo.id ?? promo.code, upperCode, storedCustomerKey, secondaryCustomerKey, secondaryCustomerKey, targetTenantId, priorExternalUsageCount, perCustomerLimit,
       ).run() as { meta?: { changes?: number } };
     } catch (insertErr) {
       if (/UNIQUE constraint failed/i.test(String(insertErr))) {
@@ -891,7 +993,7 @@ export function registerPromotionValidationHandlers(router: Hono<{ Bindings: Env
       }
       await db.prepare(
         'UPDATE promotion_redemptions SET tenant_id = ?, customer_id = ? WHERE order_id = ?'
-      ).bind(targetTenantId, effectiveCustomerId ?? null, data.order_id).run().catch(async () => {
+      ).bind(targetTenantId, storedCustomerKey, data.order_id).run().catch(async () => {
         await db.prepare(
           'UPDATE promotion_redemptions SET tenant_id = ? WHERE order_id = ?'
         ).bind(targetTenantId, data.order_id).run().catch(() => {});

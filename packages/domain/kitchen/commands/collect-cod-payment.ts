@@ -377,11 +377,24 @@ export async function collectCodPayment(
   }
   if (!results || results.some(result => !result.success)) throw new Error('COD settlement transaction failed');
   if (amount > 0) {
+    const metricTags = JSON.stringify({ provider: 'cod', order_id: id, tenant_id: effectiveOrderTenant });
     await db
-      .prepare('INSERT INTO _metrics (name, value, labels, timestamp) VALUES (?, ?, ?, ?)')
-      .bind('revenue', amount, JSON.stringify({ provider: 'cod', order_id: id, tenant_id: effectiveOrderTenant }), Math.floor(Date.now() / 1000))
+      .prepare('INSERT INTO _metrics (name, value, tags, created_at, tenant_id) VALUES (?, ?, ?, ?, ?)')
+      .bind('revenue', amount, metricTags, now, effectiveOrderTenant)
       .run()
-      .catch(() => {});
+      .catch(() =>
+        db
+          .prepare('INSERT INTO _metrics (name, value, tags, created_at) VALUES (?, ?, ?, ?)')
+          .bind('revenue', amount, metricTags, now)
+          .run()
+          .catch(() =>
+            db
+              .prepare('INSERT INTO _metrics (name, value, labels, timestamp) VALUES (?, ?, ?, ?)')
+              .bind('revenue', amount, metricTags, Math.floor(Date.now() / 1000))
+              .run()
+              .catch(() => {}),
+          ),
+      );
   }
   return { success: true, status: order.status };
 }

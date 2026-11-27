@@ -64,7 +64,6 @@ export const adminRoutes = [
         <Route path="/admin/erpnext-sync" element={guarded(<AdminERPNExtSyncPage />)} />
         <Route path="/admin/invoice-history" element={guarded(<AdminInvoiceHistoryPage />)} />
         <Route path="/admin/notification-settings" element={guarded(<AdminNotificationSettingsPage />)} />
-        <Route path="/admin/metrics" element={guarded(<AdminMetricsPage />)} />
         <Route path="/admin/reservations" element={guarded(<AdminReservationsPage />)} />
         <Route path="/admin/sales-reports" element={guarded(<SalesReportsPage />)} />
         <Route path="/admin/revenue-accounting" element={guarded(<RevenueAccountingPage />)} />
@@ -72,6 +71,7 @@ export const adminRoutes = [
         <Route path="/admin/devices" element={guarded(<AdminDevicesPage />)} />
       </Route>
       <Route element={<ProtectedRoute allowedRoles={ADMIN_MANAGER_ROLES} />}>
+        <Route path="/admin/metrics" element={guarded(<AdminMetricsPage />)} />
         <Route path="/admin/table-management" element={guarded(<TableManagementPage />)} />
         <Route path="/admin/generate-qr" element={guarded(<GenerateQRPage />)} />
         <Route path="/admin/inventory" element={guarded(<AdminInventoryPage />)} />

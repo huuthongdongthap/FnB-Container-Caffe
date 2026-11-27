@@ -349,9 +349,15 @@ export function registerAdminHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
     }
 
     if (query.search) {
-      whereClause += ' AND (customer_id IN (SELECT id FROM customers WHERE name LIKE ? OR email LIKE ? OR phone LIKE ?) OR referral_code LIKE ?)';
       const searchParam = `%${query.search}%`;
-      params.push(searchParam, searchParam, searchParam, searchParam);
+      if (tenantId !== '*') {
+        whereClause +=
+          " AND (customer_id IN (SELECT id FROM customers WHERE (name LIKE ? OR email LIKE ? OR phone LIKE ?) AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?) OR referral_code LIKE ?)";
+        params.push(searchParam, searchParam, searchParam, tenantId, searchParam);
+      } else {
+        whereClause += ' AND (customer_id IN (SELECT id FROM customers WHERE name LIKE ? OR email LIKE ? OR phone LIKE ?) OR referral_code LIKE ?)';
+        params.push(searchParam, searchParam, searchParam, searchParam);
+      }
     }
 
     let accountResults: Record<string, unknown>[] = [];

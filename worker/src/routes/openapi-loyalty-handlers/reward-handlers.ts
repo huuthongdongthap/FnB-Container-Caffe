@@ -93,7 +93,7 @@ async function findRewardByIdWithFallback(db: any, id: string): Promise<{ reward
         id: raw.id,
         name: raw.name ?? raw.title,
         description: raw.description ?? null,
-        points_cost: raw.points_cost ?? raw.point_cost ?? 100,
+        points_cost: resolveEffectivePointsCost(raw),
         type: raw.type ?? raw.reward_type ?? raw.discount_type ?? 'voucher',
         reward_type: raw.reward_type ?? raw.type ?? raw.discount_type ?? 'voucher',
         value: raw.value ?? (raw.reward_value !== undefined ? Number(raw.reward_value) || 0 : raw.discount_value ?? 0),
@@ -147,6 +147,7 @@ export function registerRewardHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
 
     let total = 0;
     let rewardResults: any[] = [];
+    let allLoyaltyRewards: any[] = [];
     if (tenantId !== '*') {
       let rawRewards: any[] = [];
       try {
@@ -187,6 +188,7 @@ export function registerRewardHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
           scoped.push(r);
         }
       }
+      allLoyaltyRewards = scoped;
       total = scoped.length;
       rewardResults = scoped.slice(offset, offset + limit);
     } else {
@@ -208,16 +210,18 @@ export function registerRewardHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
         ).bind(...params, limit, offset).all().catch(() => ({ results: [] }))) as { results: any[] };
         rewardResults = rewards.results || [];
       }
+      allLoyaltyRewards = rewardResults;
     }
 
-    if ((rewardResults.length === 0 || tenantId === 'default') && !query.type) {
+    if (((tenantId !== '*' ? allLoyaltyRewards.length === 0 : total === 0) || tenantId === 'default') && !query.type) {
       try {
         const activeFilter = query.isActive !== undefined ? 'WHERE is_active = ?' : '';
         const activeParams = query.isActive !== undefined ? [query.isActive ? 1 : 0] : [];
         const fallbackRewards = (await db.prepare(
           `SELECT * FROM rewards ${activeFilter}`
         ).bind(...activeParams).all<Record<string, unknown>>()) as { results?: Record<string, unknown>[] };
-        const existingIds = new Set(rewardResults.map((r: Record<string, unknown>) => String(r.id)));
+        const baseRewards = tenantId !== '*' ? allLoyaltyRewards : rewardResults;
+        const existingIds = new Set(baseRewards.map((r: Record<string, unknown>) => String(r.id)));
         const mergedFallback: Record<string, unknown>[] = [];
         for (const r of fallbackRewards.results || []) {
           if (!existingIds.has(String(r.id)) && (await checkRewardTenant(db, r, tenantId))) {
@@ -225,12 +229,12 @@ export function registerRewardHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
           }
         }
         if (mergedFallback.length > 0) {
-          const combined = [...rewardResults, ...mergedFallback].sort(
+          const combined = [...baseRewards, ...mergedFallback].sort(
             (a: Record<string, unknown>, b: Record<string, unknown>) =>
               resolveEffectivePointsCost(a) - resolveEffectivePointsCost(b)
           );
-          total = Math.max(total + mergedFallback.length, combined.length);
-          rewardResults = combined.slice(0, limit);
+          total = combined.length;
+          rewardResults = combined.slice(offset, offset + limit);
         }
       } catch {
         // Ignore when rewards table is absent
@@ -609,7 +613,7 @@ export function registerRewardHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
     const currentPoints = Number(account.current_points ?? account.loyalty_points ?? 0);
     const currentRedemptions = Number(reward.current_redemptions ?? reward.redeemed_count ?? 0);
     const maxRedemptions = reward.max_redemptions;
-    const pointsCost = Number(reward.points_cost ?? reward.point_cost ?? 100);
+    const pointsCost = resolveEffectivePointsCost(reward);
 
     // Always verify customer has sufficient points to redeem the reward
     if (currentPoints < pointsCost) {

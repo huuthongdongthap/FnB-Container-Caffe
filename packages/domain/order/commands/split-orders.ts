@@ -183,6 +183,8 @@ export async function splitOrders(
       status?: string | null;
       payment_status?: string | null;
       total?: number | null;
+      discount?: number | null;
+      discount_amount?: number | null;
       session_id?: string | null;
       items?: string | unknown[] | null;
       customer_name?: string | null;
@@ -193,39 +195,55 @@ export async function splitOrders(
     if (parentOrderId) {
       parentOrder = await db
         .prepare(
-          "SELECT id, table_id, tenant_id, status, payment_status, total, session_id, items, customer_name, customer_phone, created_at FROM orders WHERE id = ? AND (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?) LIMIT 1"
+          "SELECT id, table_id, tenant_id, status, payment_status, total, discount, discount_amount, session_id, items, customer_name, customer_phone, created_at FROM orders WHERE id = ? AND (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?) LIMIT 1"
         )
         .bind(parentOrderId, scopeTenant, scopeTenant)
         .first<SplitParentOrderRow>()
         .catch(() =>
           db
             .prepare(
-              "SELECT id, table_id, tenant_id, status, payment_status, total, session_id FROM orders WHERE id = ? AND (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?) LIMIT 1"
+              "SELECT id, table_id, tenant_id, status, payment_status, total, discount, session_id, items, customer_name, customer_phone, created_at FROM orders WHERE id = ? AND (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?) LIMIT 1"
             )
             .bind(parentOrderId, scopeTenant, scopeTenant)
             .first<SplitParentOrderRow>()
             .catch(() =>
               db
                 .prepare(
-                  "SELECT id, table_id, tenant_id, status, payment_status, total FROM orders WHERE id = ? AND (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?) LIMIT 1"
+                  "SELECT id, table_id, tenant_id, status, payment_status, total, session_id, items, customer_name, customer_phone, created_at FROM orders WHERE id = ? AND (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?) LIMIT 1"
                 )
                 .bind(parentOrderId, scopeTenant, scopeTenant)
                 .first<SplitParentOrderRow>()
                 .catch(() =>
                   db
                     .prepare(
-                      "SELECT id, table_id, tenant_id, status, payment_status FROM orders WHERE id = ? AND (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?) LIMIT 1"
+                      "SELECT id, table_id, tenant_id, status, payment_status, total, session_id FROM orders WHERE id = ? AND (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?) LIMIT 1"
                     )
                     .bind(parentOrderId, scopeTenant, scopeTenant)
                     .first<SplitParentOrderRow>()
                     .catch(() =>
-                      (scopeTenant === 'default' || scopeTenant === '*')
-                        ? db
-                            .prepare('SELECT id, table_id, status FROM orders WHERE id = ? LIMIT 1')
-                            .bind(parentOrderId)
+                      db
+                        .prepare(
+                          "SELECT id, table_id, tenant_id, status, payment_status, total FROM orders WHERE id = ? AND (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?) LIMIT 1"
+                        )
+                        .bind(parentOrderId, scopeTenant, scopeTenant)
+                        .first<SplitParentOrderRow>()
+                        .catch(() =>
+                          db
+                            .prepare(
+                              "SELECT id, table_id, tenant_id, status, payment_status FROM orders WHERE id = ? AND (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?) LIMIT 1"
+                            )
+                            .bind(parentOrderId, scopeTenant, scopeTenant)
                             .first<SplitParentOrderRow>()
-                            .catch(() => null)
-                        : null
+                            .catch(() =>
+                              (scopeTenant === 'default' || scopeTenant === '*')
+                                ? db
+                                    .prepare('SELECT id, table_id, status FROM orders WHERE id = ? LIMIT 1')
+                                    .bind(parentOrderId)
+                                    .first<SplitParentOrderRow>()
+                                    .catch(() => null)
+                                : null
+                            )
+                        )
                     )
                 )
             )
@@ -427,6 +445,54 @@ export async function splitOrders(
     })));
     const rejected = snapshots.find(snapshot => snapshot.rejected)?.rejected;
     if (rejected) return errorResponse(rejected.message, 400);
+    const rawParentDiscountAmount = Number(parentOrder?.discount_amount);
+    const rawParentDiscountCol = Number(parentOrder?.discount);
+    const parentDiscount =
+      Number.isFinite(rawParentDiscountAmount) && rawParentDiscountAmount > 0
+        ? Math.round(rawParentDiscountAmount)
+        : Number.isFinite(rawParentDiscountCol) && rawParentDiscountCol > 0
+          ? Math.round(rawParentDiscountCol)
+          : 0;
+    const hasExplicitChildDiscount = parsed.data.orders.some(order => typeof order.discount === 'number');
+    const allocatedDiscounts: number[] = snapshots.map(snapshot => snapshot.discount);
+
+    if (parentOrder && parentDiscount > 0 && !hasExplicitChildDiscount) {
+      const rawChildrenSum = snapshots.reduce((sum, snap, idx) => {
+        const rawTax = parsed.data.orders[idx]?.tax;
+        const taxAmount = typeof rawTax === 'number' && rawTax > 0 ? Math.round(rawTax) : 0;
+        return sum + snap.total + taxAmount;
+      }, 0);
+      const shouldAllocateParentDiscount =
+        typeof parentOrder.total !== 'number' ||
+        !Number.isFinite(parentOrder.total) ||
+        rawChildrenSum - parentOrder.total > 1;
+      if (shouldAllocateParentDiscount) {
+        const totalSubtotal = snapshots.reduce((sum, snap) => sum + Math.max(0, snap.subtotal), 0);
+        if (totalSubtotal > 0) {
+          let remaining = Math.min(parentDiscount, totalSubtotal);
+          let lastEligibleIdx = -1;
+          for (let i = 0; i < snapshots.length; i++) {
+            const sub = Math.max(0, snapshots[i].subtotal);
+            if (sub <= 0) continue;
+            lastEligibleIdx = i;
+            const share = Math.min(sub, Math.floor((parentDiscount * sub) / totalSubtotal));
+            allocatedDiscounts[i] = share;
+            remaining -= share;
+          }
+          if (remaining > 0 && lastEligibleIdx >= 0) {
+            for (let i = snapshots.length - 1; i >= 0 && remaining > 0; i--) {
+              const capacity = Math.max(0, snapshots[i].subtotal - allocatedDiscounts[i]);
+              if (capacity <= 0) continue;
+              const add = Math.min(capacity, remaining);
+              allocatedDiscounts[i] += add;
+              remaining -= add;
+            }
+          }
+        }
+      }
+    }
+
+    let totalRequestedDiscount = 0;
     for (let i = 0; i < parsed.data.orders.length; i++) {
       const orderData = parsed.data.orders[i];
       const snapshot = snapshots[i];
@@ -450,11 +516,24 @@ export async function splitOrders(
           (orderData.customer_name === 'Split guest' &&
             orderData.discount === 19000 &&
             snapshot.subtotal === 20000));
-      if (!isLegacyPlaceholderTotal && typeof orderData.discount === 'number' && orderData.discount > snapshot.discount) {
-        return errorResponse('Unverified discount is not allowed on split orders', 400);
+      if (typeof orderData.discount === 'number') {
+        const requestedDiscount = Math.round(orderData.discount);
+        if (!isLegacyPlaceholderTotal) {
+          if (parentOrder && parentDiscount > 0) {
+            if (requestedDiscount > snapshot.subtotal) {
+              return errorResponse('Unverified discount is not allowed on split orders', 400);
+            }
+          } else if (orderData.discount > snapshot.discount) {
+            return errorResponse('Unverified discount is not allowed on split orders', 400);
+          }
+          allocatedDiscounts[i] = requestedDiscount;
+          totalRequestedDiscount += requestedDiscount;
+        }
       }
+      const childDiscount = allocatedDiscounts[i] ?? snapshot.discount;
+      const discountDelta = Math.max(0, childDiscount - snapshot.discount);
       const taxAmount = typeof orderData.tax === 'number' && orderData.tax > 0 ? Math.round(orderData.tax) : 0;
-      const computedTotal = snapshot.total + taxAmount;
+      const computedTotal = Math.max(0, snapshot.total - discountDelta + taxAmount);
       if (
         orderData.total !== undefined &&
         (!Number.isFinite(Number(orderData.total)) ||
@@ -463,11 +542,16 @@ export async function splitOrders(
         return errorResponse('Order total mismatch with server calculation', 400);
       }
     }
+    if (parentOrder && parentDiscount > 0 && hasExplicitChildDiscount && totalRequestedDiscount > parentDiscount + 1) {
+      return errorResponse('Unverified discount is not allowed on split orders', 400);
+    }
     if (parentOrder && typeof parentOrder.total === 'number' && Number.isFinite(parentOrder.total) && parentOrder.total > 0) {
       const childrenTotalSum = snapshots.reduce((sum, snap, idx) => {
         const rawTax = parsed.data.orders[idx]?.tax;
         const taxAmount = typeof rawTax === 'number' && rawTax > 0 ? Math.round(rawTax) : 0;
-        return sum + snap.total + taxAmount;
+        const childDiscount = allocatedDiscounts[idx] ?? snap.discount;
+        const discountDelta = Math.max(0, childDiscount - snap.discount);
+        return sum + Math.max(0, snap.total - discountDelta + taxAmount);
       }, 0);
       if (Math.abs(childrenTotalSum - parentOrder.total) > 1) {
         return errorResponse('Split orders total must equal parent order total', 400);
@@ -505,8 +589,10 @@ export async function splitOrders(
       const id = generateId('ORD_');
       const orderNumber = generateOrderNumber();
       const snapshot = snapshots[index];
+      const childDiscount = allocatedDiscounts[index] ?? snapshot.discount;
+      const discountDelta = Math.max(0, childDiscount - snapshot.discount);
       const taxAmount = typeof order.tax === 'number' && order.tax > 0 ? Math.round(order.tax) : 0;
-      const orderTotal = snapshot.total + taxAmount;
+      const orderTotal = Math.max(0, snapshot.total - discountDelta + taxAmount);
       const childPaymentStatus: 'paid' | 'unpaid' = orderTotal === 0 ? 'paid' : 'unpaid';
       const resolvedCustomerId = ownerships[index]?.customerId ?? null;
       const guestCap = guestTokens[index];
@@ -517,7 +603,7 @@ export async function splitOrders(
       const orderInsertArgsWithHash = [
         id, orderNumber, snapshot.itemsJson, orderTotal, 'pending', order.customer_name, order.customer_phone,
         order.customer_email || null, order.customer_address || null, order.payment_method, childPaymentStatus,
-        snapshot.shipping_fee, snapshot.discount, order.notes || null, order.delivery_time || 'now',
+        snapshot.shipping_fee, childDiscount, order.notes || null, order.delivery_time || 'now',
         tableId, parentSessionId, 'dine_in', snapshot.tip_amount, resolvedCustomerId, guestCap?.hash ?? null, tenantId, now, now,
       ] as const;
       const orderInsertSqlWithHash = `INSERT INTO orders (
@@ -529,7 +615,7 @@ export async function splitOrders(
       const orderInsertArgs = [
         id, snapshot.itemsJson, orderTotal, 'pending', order.customer_name, order.customer_phone,
         order.customer_email || null, order.customer_address || null, order.payment_method, childPaymentStatus,
-        snapshot.shipping_fee, snapshot.discount, order.notes || null, order.delivery_time || 'now',
+        snapshot.shipping_fee, childDiscount, order.notes || null, order.delivery_time || 'now',
         tableId, 'dine_in', snapshot.tip_amount, resolvedCustomerId, tenantId, now, now,
       ] as const;
       const orderInsertSql = `INSERT INTO orders (
@@ -705,7 +791,7 @@ export async function splitOrders(
                 .bind(
                   ord.id, snapshot.itemsJson, ord.total, 'pending', order.customer_name, order.customer_phone,
                   order.customer_email || null, order.customer_address || null, order.payment_method, fallbackPayStatus,
-                  snapshot.shipping_fee, snapshot.discount, order.notes || null, order.delivery_time || 'now',
+                  snapshot.shipping_fee, allocatedDiscounts[i] ?? snapshot.discount, order.notes || null, order.delivery_time || 'now',
                   tableId, 'dine_in', snapshot.tip_amount, resolvedCustomerId, tenantId, now, now
                 )
                 .run();
@@ -755,10 +841,18 @@ export async function splitOrders(
     } catch (commitErr) {
       if (parentOrder && claimedParentPriorStatus) {
         await db
-          .prepare("UPDATE orders SET status = ?, updated_at = ? WHERE id = ? AND status = 'cancelled'")
+          .prepare(
+            "UPDATE orders SET status = ?, cancelled_at = NULL, cancel_alert = 0, previous_status = NULL, updated_at = ? WHERE id = ? AND status = 'cancelled'"
+          )
           .bind(claimedParentPriorStatus, now, parentOrder.id)
           .run()
-          .catch(() => {});
+          .catch(() =>
+            db
+              .prepare("UPDATE orders SET status = ?, updated_at = ? WHERE id = ? AND status = 'cancelled'")
+              .bind(claimedParentPriorStatus, now, parentOrder.id)
+              .run()
+              .catch(() => {}),
+          );
       }
       const savedAfterConflict = idem ? await findSavedSplit() : null;
       if (savedAfterConflict) return replaySavedSplit(savedAfterConflict);

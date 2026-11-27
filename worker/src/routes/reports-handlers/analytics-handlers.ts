@@ -218,12 +218,21 @@ export function registerAnalyticsHandlers(app: Hono<{ Bindings: Env }>) {
       ).bind(from, to, ...tf.binds).all<{ date: string; count: number; revenue: number }>();
       orders = ordRes.results || [];
     } catch {
-      const ordRes = await db.prepare(
-        `SELECT DATE(datetime(created_at, '+7 hours')) as date, COUNT(*) as count, COALESCE(SUM(total), 0) as revenue
-         FROM orders WHERE DATE(datetime(created_at, '+7 hours')) BETWEEN ? AND ? AND ${VALID_REVENUE_ORDER_SQL}${tf.and}
-         GROUP BY DATE(datetime(created_at, '+7 hours')) ORDER BY date`
-      ).bind(from, to, ...tf.binds).all<{ date: string; count: number; revenue: number }>();
-      orders = ordRes.results || [];
+      try {
+        const ordRes = await db.prepare(
+          `SELECT DATE(datetime(created_at, '+7 hours')) as date, COUNT(*) as count, COALESCE(SUM(${NET_ORDER_TOTAL_SQL}), 0) as revenue
+           FROM orders WHERE DATE(datetime(created_at, '+7 hours')) BETWEEN ? AND ? AND ${VALID_REVENUE_ORDER_SQL}${tf.and}
+           GROUP BY DATE(datetime(created_at, '+7 hours')) ORDER BY date`
+        ).bind(from, to, ...tf.binds).all<{ date: string; count: number; revenue: number }>();
+        orders = ordRes.results || [];
+      } catch {
+        const ordRes = await db.prepare(
+          `SELECT DATE(datetime(created_at, '+7 hours')) as date, COUNT(*) as count, COALESCE(SUM(total), 0) as revenue
+           FROM orders WHERE DATE(datetime(created_at, '+7 hours')) BETWEEN ? AND ? AND ${VALID_REVENUE_ORDER_SQL}${tf.and}
+           GROUP BY DATE(datetime(created_at, '+7 hours')) ORDER BY date`
+        ).bind(from, to, ...tf.binds).all<{ date: string; count: number; revenue: number }>();
+        orders = ordRes.results || [];
+      }
     }
 
     // Cashback earned by day (ICT UTC+7) — primarily from cashback_transactions (earn/bonus), fallback to checkins only if cashback_transactions is absent
@@ -499,7 +508,7 @@ export function registerAnalyticsHandlers(app: Hono<{ Bindings: Env }>) {
                 COUNT(*) as count,
                 COALESCE(SUM(CASE WHEN ${VALID_REVENUE_ORDER_SQL} THEN ${NET_ORDER_TOTAL_SQL} ELSE 0 END), 0) as revenue
          FROM orders
-         WHERE DATE(datetime(created_at, '+7 hours')) BETWEEN ? AND ?
+         WHERE DATE(datetime(COALESCE(cod_paid_at, created_at), '+7 hours')) BETWEEN ? AND ?
            AND NOT (COALESCE(total, 0) = 0 AND (COALESCE(customer_name, '') = 'Khách QR - cho don mon' OR COALESCE(items, '') IN ('', '[]')))${tf.and}
          GROUP BY status ORDER BY revenue DESC`
       ).bind(from, to, ...tf.binds).all<{ status: string; count: number; revenue: number }>();
@@ -509,22 +518,35 @@ export function registerAnalyticsHandlers(app: Hono<{ Bindings: Env }>) {
         const res = await db.prepare(
           `SELECT status,
                   COUNT(*) as count,
-                  COALESCE(SUM(CASE WHEN ${VALID_REVENUE_ORDER_SQL} THEN total ELSE 0 END), 0) as revenue
+                  COALESCE(SUM(CASE WHEN ${VALID_REVENUE_ORDER_SQL} THEN ${NET_ORDER_TOTAL_SQL} ELSE 0 END), 0) as revenue
            FROM orders
-           WHERE DATE(datetime(created_at, '+7 hours')) BETWEEN ? AND ?${tf.and}
+           WHERE DATE(datetime(created_at, '+7 hours')) BETWEEN ? AND ?
+             AND NOT (COALESCE(total, 0) = 0 AND (COALESCE(customer_name, '') = 'Khách QR - cho don mon' OR COALESCE(items, '') IN ('', '[]')))${tf.and}
            GROUP BY status ORDER BY revenue DESC`
         ).bind(from, to, ...tf.binds).all<{ status: string; count: number; revenue: number }>();
         results = res.results || [];
       } catch {
-        const res = await db.prepare(
-          `SELECT status,
-                  COUNT(*) as count,
-                  COALESCE(SUM(CASE WHEN LOWER(TRIM(COALESCE(status, ''))) IN ('completed', 'paid', 'delivered', 'served') THEN total ELSE 0 END), 0) as revenue
-           FROM orders
-           WHERE DATE(datetime(created_at, '+7 hours')) BETWEEN ? AND ?${tf.and}
-           GROUP BY status ORDER BY revenue DESC`
-        ).bind(from, to, ...tf.binds).all<{ status: string; count: number; revenue: number }>();
-        results = res.results || [];
+        try {
+          const res = await db.prepare(
+            `SELECT status,
+                    COUNT(*) as count,
+                    COALESCE(SUM(CASE WHEN ${VALID_REVENUE_ORDER_SQL} THEN total ELSE 0 END), 0) as revenue
+             FROM orders
+             WHERE DATE(datetime(created_at, '+7 hours')) BETWEEN ? AND ?${tf.and}
+             GROUP BY status ORDER BY revenue DESC`
+          ).bind(from, to, ...tf.binds).all<{ status: string; count: number; revenue: number }>();
+          results = res.results || [];
+        } catch {
+          const res = await db.prepare(
+            `SELECT status,
+                    COUNT(*) as count,
+                    COALESCE(SUM(CASE WHEN LOWER(TRIM(COALESCE(status, ''))) IN ('completed', 'paid', 'delivered', 'served') THEN total ELSE 0 END), 0) as revenue
+             FROM orders
+             WHERE DATE(datetime(created_at, '+7 hours')) BETWEEN ? AND ?${tf.and}
+             GROUP BY status ORDER BY revenue DESC`
+          ).bind(from, to, ...tf.binds).all<{ status: string; count: number; revenue: number }>();
+          results = res.results || [];
+        }
       }
     }
 
@@ -549,11 +571,22 @@ export function registerAnalyticsHandlers(app: Hono<{ Bindings: Env }>) {
     const db = c.env.AURA_DB;
     const tf = buildTenantClause(getTenantId(c));
 
-    const { results } = await db.prepare(
-      `SELECT items FROM orders
-       WHERE DATE(datetime(created_at, '+7 hours')) BETWEEN ? AND ? AND ${VALID_REVENUE_ORDER_SQL}${tf.and}
-       ORDER BY created_at DESC`
-    ).bind(from, to, ...tf.binds).all<{ items: string }>();
+    let results: { items: string }[] | undefined;
+    try {
+      const res = await db.prepare(
+        `SELECT items FROM orders
+         WHERE DATE(datetime(COALESCE(cod_paid_at, created_at), '+7 hours')) BETWEEN ? AND ? AND ${VALID_REVENUE_ORDER_SQL}${tf.and}
+         ORDER BY COALESCE(cod_paid_at, created_at) DESC`
+      ).bind(from, to, ...tf.binds).all<{ items: string }>();
+      results = res.results;
+    } catch {
+      const res = await db.prepare(
+        `SELECT items FROM orders
+         WHERE DATE(datetime(created_at, '+7 hours')) BETWEEN ? AND ? AND ${VALID_REVENUE_ORDER_SQL}${tf.and}
+         ORDER BY created_at DESC`
+      ).bind(from, to, ...tf.binds).all<{ items: string }>();
+      results = res.results;
+    }
 
     // Aggregate by product name (parse JSON in JS for safety)
     const productMap = new Map<string, { qty: number; revenue: number }>();
@@ -609,24 +642,36 @@ export function registerAnalyticsHandlers(app: Hono<{ Bindings: Env }>) {
     let results: { hour: number; order_count: number; revenue: number }[] | undefined;
     try {
       const res = await db.prepare(
-        `SELECT CAST(strftime('%H', datetime(created_at, '+7 hours')) AS INTEGER) as hour,
+        `SELECT CAST(strftime('%H', datetime(COALESCE(cod_paid_at, created_at), '+7 hours')) AS INTEGER) as hour,
                 COUNT(*) as order_count,
                 COALESCE(SUM(${NET_ORDER_TOTAL_SQL}), 0) as revenue
          FROM orders
-         WHERE DATE(datetime(created_at, '+7 hours')) BETWEEN ? AND ? AND ${VALID_REVENUE_ORDER_SQL}${tf.and}
+         WHERE DATE(datetime(COALESCE(cod_paid_at, created_at), '+7 hours')) BETWEEN ? AND ? AND ${VALID_REVENUE_ORDER_SQL}${tf.and}
          GROUP BY hour ORDER BY hour`
       ).bind(from, to, ...tf.binds).all<{ hour: number; order_count: number; revenue: number }>();
       results = res.results;
     } catch {
-      const res = await db.prepare(
-        `SELECT CAST(strftime('%H', created_at) AS INTEGER) as hour,
-                COUNT(*) as order_count,
-                COALESCE(SUM(total), 0) as revenue
-         FROM orders
-         WHERE DATE(created_at) BETWEEN ? AND ? AND ${VALID_REVENUE_ORDER_SQL}${tf.and}
-         GROUP BY hour ORDER BY hour`
-      ).bind(from, to, ...tf.binds).all<{ hour: number; order_count: number; revenue: number }>();
-      results = res.results;
+      try {
+        const res = await db.prepare(
+          `SELECT CAST(strftime('%H', datetime(created_at, '+7 hours')) AS INTEGER) as hour,
+                  COUNT(*) as order_count,
+                  COALESCE(SUM(${NET_ORDER_TOTAL_SQL}), 0) as revenue
+           FROM orders
+           WHERE DATE(datetime(created_at, '+7 hours')) BETWEEN ? AND ? AND ${VALID_REVENUE_ORDER_SQL}${tf.and}
+           GROUP BY hour ORDER BY hour`
+        ).bind(from, to, ...tf.binds).all<{ hour: number; order_count: number; revenue: number }>();
+        results = res.results;
+      } catch {
+        const res = await db.prepare(
+          `SELECT CAST(strftime('%H', created_at) AS INTEGER) as hour,
+                  COUNT(*) as order_count,
+                  COALESCE(SUM(total), 0) as revenue
+           FROM orders
+           WHERE DATE(created_at) BETWEEN ? AND ? AND ${VALID_REVENUE_ORDER_SQL}${tf.and}
+           GROUP BY hour ORDER BY hour`
+        ).bind(from, to, ...tf.binds).all<{ hour: number; order_count: number; revenue: number }>();
+        results = res.results;
+      }
     }
 
     // Build zero-filled 24-hour array

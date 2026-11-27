@@ -253,10 +253,24 @@ export async function handleSpendCashback(c: Context<{ Bindings: Env }>) {
     let fallbackOrderRes: { meta?: { changes?: number }; changes?: number } | undefined;
     try {
       fallbackOrderRes = await db.prepare(
-        "UPDATE orders SET discount = COALESCE(discount, 0) + ?, total = MAX(0, total - ?) WHERE id = ? AND COALESCE(status, 'pending') NOT IN ('cancelled', 'completed') AND COALESCE(payment_status, 'unpaid') NOT IN ('paid', 'completed', 'refunded')"
-      ).bind(amount, amount, order_id).run();
+        "UPDATE orders SET cashback_used = ?, discount = COALESCE(discount, 0) + ?, total = MAX(0, total - ?) WHERE id = ? AND COALESCE(cashback_used, 0) = 0 AND COALESCE(status, 'pending') NOT IN ('cancelled', 'completed') AND COALESCE(payment_status, 'unpaid') NOT IN ('paid', 'completed', 'refunded')"
+      ).bind(amount, amount, amount, order_id).run();
     } catch {
-      fallbackOrderRes = await db.prepare('UPDATE orders SET discount = COALESCE(discount, 0) + ? WHERE id = ?').bind(amount, order_id).run().catch(() => undefined);
+      try {
+        fallbackOrderRes = await db.prepare(
+          "UPDATE orders SET discount = COALESCE(discount, 0) + ?, total = MAX(0, total - ?) WHERE id = ? AND COALESCE(cashback_used, 0) = 0 AND COALESCE(status, 'pending') NOT IN ('cancelled', 'completed') AND COALESCE(payment_status, 'unpaid') NOT IN ('paid', 'completed', 'refunded')"
+        ).bind(amount, amount, order_id).run();
+      } catch {
+        try {
+          fallbackOrderRes = await db.prepare(
+            "UPDATE orders SET discount = COALESCE(discount, 0) + ?, total = MAX(0, total - ?) WHERE id = ? AND COALESCE(status, 'pending') NOT IN ('cancelled', 'completed') AND COALESCE(payment_status, 'unpaid') NOT IN ('paid', 'completed', 'refunded')"
+          ).bind(amount, amount, order_id).run();
+        } catch {
+          fallbackOrderRes = await db.prepare('UPDATE orders SET discount = COALESCE(discount, 0) + ? WHERE id = ? AND COALESCE(cashback_used, 0) = 0').bind(amount, order_id).run().catch(() =>
+            db.prepare('UPDATE orders SET discount = COALESCE(discount, 0) + ? WHERE id = ?').bind(amount, order_id).run().catch(() => undefined)
+          );
+        }
+      }
     }
     const fallbackChanges = fallbackOrderRes ? (fallbackOrderRes.meta?.changes ?? (fallbackOrderRes as unknown as { changes?: number }).changes ?? 1) : 0;
     if (fallbackChanges === 0) {
@@ -288,6 +302,18 @@ export async function handleSpendCashback(c: Context<{ Bindings: Env }>) {
     ).bind(txId, wallet.id ?? `wal_${cust.id}`, cust.id, order_id, amount, atomicBalanceAfter, storeTenant, now).run();
   } catch (txInsertErr) {
     if (storeTenant !== 'default') {
+      await db.prepare(
+        "UPDATE orders SET cashback_used = 0, discount = MAX(0, COALESCE(discount, 0) - ?), total = COALESCE(total, 0) + ?, total_amount = COALESCE(total_amount, COALESCE(total, 0)) + ? WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
+      ).bind(amount, amount, amount, order_id, storeTenant).run().catch(async () => {
+        await db.prepare(
+          "UPDATE orders SET cashback_used = 0, discount = MAX(0, COALESCE(discount, 0) - ?), total = COALESCE(total, 0) + ? WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
+        ).bind(amount, amount, order_id, storeTenant).run().catch(async () => {
+          await db.prepare(
+            "UPDATE orders SET cashback_used = 0 WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
+          ).bind(order_id, storeTenant).run().catch(() => {});
+        });
+      });
+      await refundWalletOnOrderConflict();
       throw txInsertErr;
     }
     try {

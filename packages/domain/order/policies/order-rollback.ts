@@ -183,27 +183,29 @@ export async function adjustShiftCustodyForCashRefund(
     // staff_shifts absent in minimal test schemas
   }
 
-  const closedShiftPayoutId = `cpo_ref_${paymentId}_${payoutKey}`.slice(0, 120);
-  const payoutReason = reason || `Hoàn tiền mặt đơn ${orderId}`;
-  try {
-    await db
-      .prepare(
-        `INSERT OR IGNORE INTO cash_payouts (id, tenant_id, shift_id, amount, reason, status, created_by, created_at)
-         VALUES (?, ?, ?, ?, ?, 'completed', ?, ?)`,
-      )
-      .bind(closedShiftPayoutId, cleanTenant, activeDrawerShiftId, amount, payoutReason, actorId || 'system', now)
-      .run();
-  } catch {
+  if (activeDrawerShiftId) {
+    const closedShiftPayoutId = `cpo_ref_${paymentId}_${payoutKey}`.slice(0, 120);
+    const payoutReason = reason || `Hoàn tiền mặt đơn ${orderId}`;
     try {
       await db
         .prepare(
-          `INSERT OR IGNORE INTO cash_payouts (id, tenant_id, shift_id, amount, status)
-           VALUES (?, ?, ?, ?, 'completed')`,
+          `INSERT OR IGNORE INTO cash_payouts (id, tenant_id, shift_id, amount, reason, status, created_by, created_at)
+           VALUES (?, ?, ?, ?, ?, 'completed', ?, ?)`,
         )
-        .bind(closedShiftPayoutId, cleanTenant, activeDrawerShiftId, amount)
+        .bind(closedShiftPayoutId, cleanTenant, activeDrawerShiftId, amount, payoutReason, actorId || 'system', now)
         .run();
     } catch {
-      // Optional cash_payouts table
+      try {
+        await db
+          .prepare(
+            `INSERT OR IGNORE INTO cash_payouts (id, tenant_id, shift_id, amount, status)
+             VALUES (?, ?, ?, ?, 'completed')`,
+          )
+          .bind(closedShiftPayoutId, cleanTenant, activeDrawerShiftId, amount)
+          .run();
+      } catch {
+        // Optional cash_payouts table
+      }
     }
   }
 }
@@ -452,7 +454,7 @@ export async function compensateVoidedOrder(params: CompensateVoidedOrderParams)
                (tenant_id, manual_transfer_ref, payment_id, amount, reason, actor_id, created_at)
                VALUES (?, ?, ?, ?, ?, ?, ?)`,
             )
-            .bind(tenant, `void_cash:${pay.id}`, pay.id, unrefunded, reason, actorId || 'system', now)
+            .bind(effectiveTenant, `void_cash:${pay.id}`, pay.id, unrefunded, reason, actorId || 'system', now)
             .run()
             .catch(() => {});
         }

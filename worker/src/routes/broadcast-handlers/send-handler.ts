@@ -243,6 +243,7 @@ export function registerSendHandler(router: Hono<{ Bindings: Env }>): void {
       : [channel];
 
     const customerChannelMap = new Map<string, Map<string, boolean>>();
+    const preConsentCustomerCount = customers.length;
     let consentFilterActive = false;
     if (customers.length > 0) {
       try {
@@ -281,35 +282,33 @@ export function registerSendHandler(router: Hono<{ Bindings: Env }>): void {
             throw channelColErr;
           }
         }
-        if (consentRows.length > 0) {
-          consentFilterActive = true;
-          for (const row of consentRows) {
-            const cid = String(row.customer_id);
-            const rawCh = row.channel && String(row.channel).trim() !== ''
-              ? String(row.channel).trim().toLowerCase()
-              : 'all';
-            const chKey = rawCh === 'zalo' ? 'zns' : rawCh;
-            let perCh = customerChannelMap.get(cid);
-            if (!perCh) {
-              perCh = new Map<string, boolean>();
-              customerChannelMap.set(cid, perCh);
-            }
-            const isActiveGrant = Number(row.granted) === 1 && !row.revoked_at;
-            if (chKey === 'all' && !isActiveGrant) {
-              perCh.clear();
-              perCh.set('all', false);
-            } else {
-              perCh.set(chKey, isActiveGrant);
-            }
+        consentFilterActive = true;
+        for (const row of consentRows) {
+          const cid = String(row.customer_id);
+          const rawCh = row.channel && String(row.channel).trim() !== ''
+            ? String(row.channel).trim().toLowerCase()
+            : 'all';
+          const chKey = rawCh === 'zalo' ? 'zns' : rawCh;
+          let perCh = customerChannelMap.get(cid);
+          if (!perCh) {
+            perCh = new Map<string, boolean>();
+            customerChannelMap.set(cid, perCh);
           }
-          customers = customers.filter((cust) => {
-            const perCh = customerChannelMap.get(String(cust.id));
-            if (!perCh) return false;
-            return activeChannels.some((ch) =>
-              perCh.has(ch) ? Boolean(perCh.get(ch)) : Boolean(perCh.get('all'))
-            );
-          });
+          const isActiveGrant = Number(row.granted) === 1 && !row.revoked_at;
+          if (chKey === 'all' && !isActiveGrant) {
+            perCh.clear();
+            perCh.set('all', false);
+          } else {
+            perCh.set(chKey, isActiveGrant);
+          }
         }
+        customers = customers.filter((cust) => {
+          const perCh = customerChannelMap.get(String(cust.id));
+          if (!perCh) return false;
+          return activeChannels.some((ch) =>
+            perCh.has(ch) ? Boolean(perCh.get(ch)) : Boolean(perCh.get('all'))
+          );
+        });
       } catch (consentErr) {
         if (!/no such table:\s*consents/i.test(String(consentErr))) {
           return c.json({ success: false, error: 'Consent verification unavailable', retryable: true }, 503);
@@ -326,7 +325,16 @@ export function registerSendHandler(router: Hono<{ Bindings: Env }>): void {
     };
 
     if (customers.length === 0) {
-      return c.json({ success: false, error: 'Không có khách hàng nào trong phân khúc này' }, 400);
+      return c.json(
+        {
+          success: false,
+          error:
+            consentFilterActive && preConsentCustomerCount > 0
+              ? 'Không có khách hàng nào đã đồng ý nhận tin tiếp thị trong phân khúc này'
+              : 'Không có khách hàng nào trong phân khúc này',
+        },
+        400,
+      );
     }
 
     // Skip channels where env or required template is not configured

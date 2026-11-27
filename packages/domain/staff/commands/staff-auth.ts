@@ -198,7 +198,7 @@ async function upsertDevice(env: { AURA_DB: import('@cloudflare/workers-types').
      SELECT ?, ?, ?, ?, ?, ?, ?, ?, ? FROM users
      WHERE id = ? AND auth_version = ? AND role = ? AND is_active = 1
        AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?
-     ON CONFLICT(device_token) DO UPDATE SET pin_hash = excluded.pin_hash,
+     ON CONFLICT(device_token) DO UPDATE SET id = excluded.id, pin_hash = excluded.pin_hash,
        role = excluded.role, tenant_id = excluded.tenant_id, device_name = COALESCE(excluded.device_name, staff_devices.device_name), updated_at = excluded.updated_at
      WHERE staff_devices.staff_id = excluded.staff_id`,
   ).bind(devId, data.staff_id, data.device_name ?? null, data.device_token, data.pin_hash, data.role, targetTenant, now, now,
@@ -208,7 +208,7 @@ async function upsertDevice(env: { AURA_DB: import('@cloudflare/workers-types').
      SELECT ?, ?, ?, ?, ?, ?, ?, ? FROM users
      WHERE id = ? AND auth_version = ? AND role = ? AND is_active = 1
        AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?
-     ON CONFLICT(device_token) DO UPDATE SET pin_hash = excluded.pin_hash,
+     ON CONFLICT(device_token) DO UPDATE SET id = excluded.id, pin_hash = excluded.pin_hash,
        role = excluded.role, device_name = COALESCE(excluded.device_name, staff_devices.device_name), updated_at = excluded.updated_at
      WHERE staff_devices.staff_id = excluded.staff_id`,
   ).bind(devId, data.staff_id, data.device_name ?? null, data.device_token, data.pin_hash, data.role, now, now,

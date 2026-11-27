@@ -94,9 +94,12 @@ export async function transitionOrderStatus(
       payment_status?: string | null;
       order_type?: string | null;
       assigned_shipper_id?: string | null;
+      total?: number | string | null;
+      total_amount?: number | string | null;
     };
     paymentStatus?: string | null;
     allowPaidCompensation?: boolean;
+    allowZeroTotalCancel?: boolean;
     actorId?: string;
     validateAssignedShipper?: boolean;
     fields?: Record<string, unknown>;
@@ -460,8 +463,46 @@ export async function transitionOrderStatus(
         normalizedActor === 'waiter' ||
         normalizedActor === 'shipper' ||
         normalizedActor === 'rider');
+    let isZeroTotalPendingCancel = false;
+    if (
+      targetStatus === 'cancelled' &&
+      String(order.status ?? '').trim().toLowerCase() === 'pending' &&
+      (options.allowZeroTotalCancel || options.allowPaidCompensation)
+    ) {
+      if (options.allowZeroTotalCancel) {
+        isZeroTotalPendingCancel = true;
+      } else {
+        let rawKnownTotal: unknown =
+          options.currentOrder?.total ?? options.currentOrder?.total_amount;
+        if (rawKnownTotal === undefined) {
+          try {
+            const totalRow = await db
+              .prepare(`SELECT total, total_amount FROM orders WHERE id = ?${writeTenantClause}`)
+              .bind(orderId, ...writeTenantBinds)
+              .first<{ total?: number | string | null; total_amount?: number | string | null }>()
+              .catch(() =>
+                db
+                  .prepare(`SELECT total FROM orders WHERE id = ?${writeTenantClause}`)
+                  .bind(orderId, ...writeTenantBinds)
+                  .first<{ total?: number | string | null }>()
+                  .catch(() => null)
+              );
+            rawKnownTotal = totalRow?.total ?? (totalRow as { total_amount?: unknown } | null)?.total_amount;
+          } catch {
+            // ignore schema without total column
+          }
+        }
+        isZeroTotalPendingCancel =
+          rawKnownTotal !== null &&
+          rawKnownTotal !== undefined &&
+          rawKnownTotal !== '' &&
+          Number(rawKnownTotal) === 0;
+      }
+    }
     const canCompensatePaid = Boolean(
-      (options.allowPaidCompensation && isManagerActor) || isDispatchFailureActor,
+      (options.allowPaidCompensation && isManagerActor) ||
+        isDispatchFailureActor ||
+        isZeroTotalPendingCancel,
     );
     let knownPaymentStatus: string | null | undefined =
       options.paymentStatus ??

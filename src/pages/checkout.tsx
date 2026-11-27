@@ -57,15 +57,28 @@ export function CheckoutPage() {
         const order = useOrderStore.getState().currentOrder;
         if (!active || !order || !Array.isArray(order.items) || order.items.length === 0) return;
         for (const item of order.items) {
+          const rawItem = item as typeof item & {
+            id?: string;
+            productId?: string;
+            product_id?: string;
+            price?: number;
+            image?: string;
+          };
           const qty = Math.max(1, item.quantity || 1);
-          const itemId = item.name;
-          const itemPrice = Number(item.unitPriceCents ?? 0);
+          const resolvedProductId = (rawItem.productId || rawItem.product_id || rawItem.id || '').trim();
+          const itemId = resolvedProductId || item.name;
+          const itemPrice = Number(rawItem.unitPriceCents ?? rawItem.price ?? 0);
+          const itemModifiers = Array.isArray(item.modifiers) && item.modifiers.length > 0
+            ? item.modifiers.map((m) => (typeof m === 'string' ? m : m.name)).filter(Boolean)
+            : undefined;
           for (let q = 0; q < qty; q += 1) {
             addItem({
               id: itemId,
+              ...(resolvedProductId ? { productId: resolvedProductId } : {}),
               name: item.name,
               price: itemPrice,
-              image: '',
+              image: rawItem.image ?? '',
+              ...(itemModifiers && itemModifiers.length > 0 ? { modifiers: itemModifiers } : {}),
               notes: item.notes ?? undefined,
             });
           }

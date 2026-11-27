@@ -10,6 +10,8 @@ import {
 } from './analytics-handlers';
 
 const ICT_OFFSET_MS = 7 * 3600_000;
+const PNL_RECOGNIZED_REVENUE_ORDER_SQL = `((${VALID_REVENUE_ORDER_SQL}) OR (LOWER(TRIM(COALESCE(status, ''))) IN ('completed', 'delivered') AND LOWER(TRIM(COALESCE(payment_status, ''))) = 'refunded' AND NOT (COALESCE(total, 0) = 0 AND (COALESCE(customer_name, '') = 'Khách QR - cho don mon' OR COALESCE(items, '') IN ('', '[]')))))`;
+const PNL_RECOGNIZED_REVENUE_ORDER_ALIAS_SQL = `((${VALID_REVENUE_ORDER_ALIAS_SQL}) OR (LOWER(TRIM(COALESCE(o.status, ''))) IN ('completed', 'delivered') AND LOWER(TRIM(COALESCE(o.payment_status, ''))) = 'refunded' AND NOT (COALESCE(o.total, 0) = 0 AND (COALESCE(o.customer_name, '') = 'Khách QR - cho don mon' OR COALESCE(o.items, '') IN ('', '[]')))))`;
 
 export interface DailyPnlEntry {
   date: string;
@@ -96,7 +98,7 @@ export function registerPnlHandlers(app: Hono<{ Bindings: Env }>) {
                   COALESCE(SUM(tip_amount), 0) as tip_amount,
                   COALESCE(SUM(discount), 0) as discounts
            FROM orders
-           WHERE DATE(datetime(COALESCE(cod_paid_at, created_at), '+7 hours')) BETWEEN ? AND ? AND ${VALID_REVENUE_ORDER_SQL}${tf.and}
+           WHERE DATE(datetime(COALESCE(cod_paid_at, created_at), '+7 hours')) BETWEEN ? AND ? AND ${PNL_RECOGNIZED_REVENUE_ORDER_SQL}${tf.and}
            GROUP BY DATE(datetime(COALESCE(cod_paid_at, created_at), '+7 hours')) ORDER BY date`
         )
         .bind(from, to, ...tf.binds)
@@ -122,7 +124,7 @@ export function registerPnlHandlers(app: Hono<{ Bindings: Env }>) {
                     COALESCE(SUM(tip_amount), 0) as tip_amount,
                     COALESCE(SUM(discount), 0) as discounts
              FROM orders
-             WHERE DATE(datetime(created_at, '+7 hours')) BETWEEN ? AND ? AND ${VALID_REVENUE_ORDER_SQL}${tf.and}
+             WHERE DATE(datetime(created_at, '+7 hours')) BETWEEN ? AND ? AND ${PNL_RECOGNIZED_REVENUE_ORDER_SQL}${tf.and}
              GROUP BY DATE(datetime(created_at, '+7 hours')) ORDER BY date`
           )
           .bind(from, to, ...tf.binds)
@@ -147,7 +149,7 @@ export function registerPnlHandlers(app: Hono<{ Bindings: Env }>) {
                     0 as tip_amount,
                     COALESCE(SUM(discount), 0) as discounts
              FROM orders
-             WHERE DATE(datetime(created_at, '+7 hours')) BETWEEN ? AND ? AND ${VALID_REVENUE_ORDER_SQL}${tf.and}
+             WHERE DATE(datetime(created_at, '+7 hours')) BETWEEN ? AND ? AND ${PNL_RECOGNIZED_REVENUE_ORDER_SQL}${tf.and}
              GROUP BY DATE(datetime(created_at, '+7 hours')) ORDER BY date`
           )
           .bind(from, to, ...tf.binds)
@@ -264,7 +266,7 @@ export function registerPnlHandlers(app: Hono<{ Bindings: Env }>) {
               AND COALESCE(NULLIF(TRIM(o.tenant_id), ''), 'default') = COALESCE(NULLIF(TRIM(p.tenant_id), ''), 'default')
              WHERE DATE(datetime(t.created_at, '+7 hours')) BETWEEN ? AND ?
                AND COALESCE(t.amount, 0) > 0
-               AND ${VALID_REVENUE_ORDER_ALIAS_SQL}${pTf.and}
+               AND ${PNL_RECOGNIZED_REVENUE_ORDER_ALIAS_SQL}${pTf.and}
              UNION ALL
              SELECT DATE(datetime(COALESCE(p.refunded_at, p.updated_at, p.created_at), '+7 hours')) AS date,
                     COALESCE(p.refund_amount, 0) AS refunds
@@ -278,7 +280,7 @@ export function registerPnlHandlers(app: Hono<{ Bindings: Env }>) {
                  WHERE t2.payment_id = p.id
                    AND t2.tenant_id = COALESCE(NULLIF(TRIM(p.tenant_id), ''), 'default')
                )
-               AND ${VALID_REVENUE_ORDER_ALIAS_SQL}${pTf.and}
+               AND ${PNL_RECOGNIZED_REVENUE_ORDER_ALIAS_SQL}${pTf.and}
            ) GROUP BY date ORDER BY date`
         )
         .bind(from, to, ...pTf.binds, from, to, ...pTf.binds)
@@ -297,7 +299,7 @@ export function registerPnlHandlers(app: Hono<{ Bindings: Env }>) {
               AND COALESCE(NULLIF(TRIM(o.tenant_id), ''), 'default') = COALESCE(NULLIF(TRIM(p.tenant_id), ''), 'default')
              WHERE DATE(datetime(COALESCE(p.refunded_at, p.updated_at, p.created_at), '+7 hours')) BETWEEN ? AND ?
                AND COALESCE(p.refund_amount, 0) > 0
-               AND ${VALID_REVENUE_ORDER_ALIAS_SQL}${pTf.and}
+               AND ${PNL_RECOGNIZED_REVENUE_ORDER_ALIAS_SQL}${pTf.and}
              GROUP BY DATE(datetime(COALESCE(p.refunded_at, p.updated_at, p.created_at), '+7 hours')) ORDER BY date`
           )
           .bind(from, to, ...pTf.binds)
@@ -318,7 +320,7 @@ export function registerPnlHandlers(app: Hono<{ Bindings: Env }>) {
              JOIN orders o ON o.id = r.order_id
              WHERE DATE(datetime(r.created_at, '+7 hours')) BETWEEN ? AND ?
                AND r.status IN ('approved', 'completed', 'succeeded')
-               AND ${VALID_REVENUE_ORDER_ALIAS_SQL}${ordTf.and}
+               AND ${PNL_RECOGNIZED_REVENUE_ORDER_ALIAS_SQL}${ordTf.and}
              GROUP BY DATE(datetime(r.created_at, '+7 hours')) ORDER BY date`
           )
           .bind(from, to, ...ordTf.binds)
@@ -366,6 +368,7 @@ export function registerPnlHandlers(app: Hono<{ Bindings: Env }>) {
     const refundMap = new Map(refundRows.map((r) => [r.date, r]));
     const payoutMap = new Map(payoutRows.map((r) => [r.date, r]));
 
+    let totalGrossCollected = 0;
     const daily: DailyPnlEntry[] = [...dates].sort().map((date) => {
       const o = orderMap.get(date);
       const inv = invMap.get(date);
@@ -374,6 +377,7 @@ export function registerPnlHandlers(app: Hono<{ Bindings: Env }>) {
       const pay = payoutMap.get(date);
       const orders = Number(o?.orders || 0);
       const grossTotalCollected = Math.round(Number(o?.total_collected || 0));
+      totalGrossCollected += grossTotalCollected;
       const shippingFee = Math.round(Number(o?.shipping_fee || 0));
       const serviceFee = Math.round(Number(o?.service_fee || 0));
       const tipAmount = Math.round(Number(o?.tip_amount || 0));
@@ -449,6 +453,7 @@ export function registerPnlHandlers(app: Hono<{ Bindings: Env }>) {
         gross_margin_pct: 0,
       }
     );
+    totals.total_collected = Math.max(0, totalGrossCollected - totals.refunds);
     totals.gross_margin_pct =
       totals.net_revenue > 0
         ? Math.round((totals.gross_profit / totals.net_revenue) * 10000) / 100

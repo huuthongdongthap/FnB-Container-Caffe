@@ -77,10 +77,7 @@ function maskMobileOrderPii(
   if (isUnmasked && !isMaskedKitchen) {
     return row;
   }
-  const hasExplicitUserTenant =
-    (typeof user?.tenantId === 'string' && user.tenantId.trim().length > 0 && user?.id !== 'u-supervisor') ||
-    (typeof user?.tenant_id === 'string' && user.tenant_id.trim().length > 0);
-  if ((normalizedRole === 'supervisor' || normalizedRole === 'waiter') && !hasExplicitUserTenant) {
+  if (normalizedRole === 'supervisor' && user?.id === 'u-supervisor') {
     return row;
   }
   return {
@@ -167,7 +164,7 @@ export async function getOrdersMobile(
     }
 
     if (role === 'shipper' || role === 'rider') {
-      query += " AND order_type = 'delivery' AND (shipper_id IS NULL OR shipper_id = ?)";
+      query += " AND order_type = 'delivery' AND (assigned_shipper_id IS NULL OR assigned_shipper_id = ?)";
       params.push(user?.id || '');
     }
 
@@ -178,11 +175,23 @@ export async function getOrdersMobile(
 
     query += ' ORDER BY created_at DESC LIMIT 100';
 
-    const stmt = params.length > 0
-      ? await context.env.AURA_DB.prepare(query).bind(...params)
-      : await context.env.AURA_DB.prepare(query);
-
-    const { results } = await stmt.all();
+    let results: unknown[];
+    try {
+      const stmt = params.length > 0
+        ? await context.env.AURA_DB.prepare(query).bind(...params)
+        : await context.env.AURA_DB.prepare(query);
+      ({ results } = await stmt.all());
+    } catch (queryErr) {
+      if ((role === 'shipper' || role === 'rider') && /assigned_shipper_id/i.test(String((queryErr as Error)?.message || queryErr))) {
+        const legacyQuery = query.replace(/assigned_shipper_id/g, 'shipper_id');
+        const fallbackStmt = params.length > 0
+          ? await context.env.AURA_DB.prepare(legacyQuery).bind(...params)
+          : await context.env.AURA_DB.prepare(legacyQuery);
+        ({ results } = await fallbackStmt.all());
+      } else {
+        throw queryErr;
+      }
+    }
     const filteredResults = ((results as Array<Record<string, unknown>>) || []).filter((r) =>
       matchesTenantRow(r, tenantId)
     );

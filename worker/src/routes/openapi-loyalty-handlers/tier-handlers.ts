@@ -49,6 +49,7 @@ export function registerTierHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
     }
     const { tier } = c.req.valid('param');
 
+    const isScopedNonDefault = Boolean(tenantId && tenantId !== '*' && tenantId !== 'default');
     let config: any = null;
     if (tenantId && tenantId !== '*') {
       try {
@@ -62,7 +63,12 @@ export function registerTierHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
     }
     if (!config) {
       try {
-        config = await db.prepare('SELECT * FROM loyalty_tier_configs WHERE tier = ?').bind(tier).first();
+        config = isScopedNonDefault
+          ? await db
+              .prepare("SELECT * FROM loyalty_tier_configs WHERE tier = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = 'default'")
+              .bind(tier)
+              .first()
+          : await db.prepare('SELECT * FROM loyalty_tier_configs WHERE tier = ?').bind(tier).first();
       } catch {
         config = null;
       }
@@ -77,9 +83,21 @@ export function registerTierHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
         .catch(() => null);
     }
     if (!config) {
-      config = await db.prepare(
-        'SELECT *, COALESCE(display_name_vi, tier_name, tier) as name, points_multiplier as point_multiplier, COALESCE(benefits, perks, \'[]\') as benefits FROM tier_configs WHERE tier = ?'
-      ).bind(tier).first().catch(() => null);
+      config = isScopedNonDefault
+        ? await db
+            .prepare(
+              "SELECT *, COALESCE(display_name_vi, tier_name, tier) as name, points_multiplier as point_multiplier, COALESCE(benefits, perks, '[]') as benefits FROM tier_configs WHERE tier = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = 'default'"
+            )
+            .bind(tier)
+            .first()
+            .catch(() => null)
+        : await db
+            .prepare(
+              'SELECT *, COALESCE(display_name_vi, tier_name, tier) as name, points_multiplier as point_multiplier, COALESCE(benefits, perks, \'[]\') as benefits FROM tier_configs WHERE tier = ?'
+            )
+            .bind(tier)
+            .first()
+            .catch(() => null);
     }
     if (!config && tenantId && tenantId !== '*') {
       config = await db
@@ -91,13 +109,21 @@ export function registerTierHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
         .catch(() => null);
     }
     if (!config) {
-      config = await db
-        .prepare(
-          "SELECT *, LOWER(COALESCE(tier_name, name, id)) as tier, COALESCE(display_name_vi, name, tier_name) as name, COALESCE(points_multiplier, point_multiplier, 1) as point_multiplier, COALESCE(benefits, perks, '[]') as benefits FROM loyalty_tiers WHERE LOWER(COALESCE(tier_name, name, id)) = LOWER(?)"
-        )
-        .bind(tier)
-        .first()
-        .catch(() => null);
+      config = isScopedNonDefault
+        ? await db
+            .prepare(
+              "SELECT *, LOWER(COALESCE(tier_name, name, id)) as tier, COALESCE(display_name_vi, name, tier_name) as name, COALESCE(points_multiplier, point_multiplier, 1) as point_multiplier, COALESCE(benefits, perks, '[]') as benefits FROM loyalty_tiers WHERE LOWER(COALESCE(tier_name, name, id)) = LOWER(?) AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = 'default'"
+            )
+            .bind(tier)
+            .first()
+            .catch(() => null)
+        : await db
+            .prepare(
+              "SELECT *, LOWER(COALESCE(tier_name, name, id)) as tier, COALESCE(display_name_vi, name, tier_name) as name, COALESCE(points_multiplier, point_multiplier, 1) as point_multiplier, COALESCE(benefits, perks, '[]') as benefits FROM loyalty_tiers WHERE LOWER(COALESCE(tier_name, name, id)) = LOWER(?)"
+            )
+            .bind(tier)
+            .first()
+            .catch(() => null);
     }
 
     if (!config || (tenantId !== '*' && !matchesTenantRow(config, tenantId) && !matchesTenantRow(config, 'default'))) {

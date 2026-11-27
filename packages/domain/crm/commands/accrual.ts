@@ -582,7 +582,7 @@ async function applyAccrualAttempt(db: D1Database, policy: LoyaltyPolicy, input:
   }
   if (hasCustomerTotalSpent) {
     extraCustomerSet.push('total_spent = COALESCE(total_spent, 0) + ?');
-    extraCustomerBind.push(total);
+    extraCustomerBind.push(Math.max(0, total - priorRefundAmount));
   }
   if (hasCustomerTotalOrders) {
     extraCustomerSet.push('total_orders = COALESCE(total_orders, 0) + 1');

@@ -285,8 +285,14 @@ export function StitchCheckoutNew({
       : rawMaxCashback;
   const appliedCashbackAmount = useCashback ? maxUsableCashback : 0;
   const remainingAfterCashback = Math.max(0, payableBeforeCashback - appliedCashbackAmount);
+  // Backend caps loyalty points redemption at 50% of subtotal and remaining subtotal payable (100 VND/point).
+  const remainingSubtotalPayable = Math.max(0, summary.subtotal - effectiveDiscount);
+  const maxSubtotalRedeemVnd = Math.floor(summary.subtotal * 0.5);
+  const maxPointsByOrder = Math.floor(
+    Math.min(remainingAfterCashback, remainingSubtotalPayable, maxSubtotalRedeemVnd) / 100,
+  );
   const maxRedeemablePoints = loyalty && loyalty.loyalty_points > 0
-    ? Math.min(Math.floor(loyalty.loyalty_points), Math.floor(remainingAfterCashback / 100))
+    ? Math.max(0, Math.min(Math.floor(loyalty.loyalty_points), maxPointsByOrder))
     : 0;
   const appliedRedeemPoints = useLoyaltyPoints ? maxRedeemablePoints : 0;
   const appliedPointsDiscount = appliedRedeemPoints * 100;

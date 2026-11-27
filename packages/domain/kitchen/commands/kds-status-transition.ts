@@ -761,7 +761,7 @@ export async function executeKdsStatusTransition(
           .toLowerCase();
         const isEligibleForVisit =
           !rawPaymentStatus ||
-          !['pending', 'unpaid', 'failed', 'cancelled', 'canceled', 'refunded'].includes(rawPaymentStatus);
+          !['pending', 'unpaid', 'cod_pending', 'failed', 'cancelled', 'canceled', 'refunded'].includes(rawPaymentStatus);
         if (resolvedCustId) {
           if (isEligibleForVisit) {
             try {
@@ -808,10 +808,43 @@ export async function executeKdsStatusTransition(
               const erpnextUrl = await kvNs.get(`${erpPrefix}:api_url`);
               if (!erpnextUrl) return;
               const fullOrdRow = await rawDb
-                .prepare('SELECT id, items, customer_phone, customer_email, customer_name, customer_address FROM orders WHERE id = ?')
+                .prepare('SELECT id, items, total, discount, discount_amount, payment_status, customer_phone, customer_email, customer_name, customer_address FROM orders WHERE id = ?')
                 .bind(orderId)
-                .first<Record<string, unknown>>();
+                .first<Record<string, unknown>>()
+                .catch(() =>
+                  rawDb
+                    .prepare('SELECT id, items, total, discount, payment_status, customer_phone, customer_email, customer_name, customer_address FROM orders WHERE id = ?')
+                    .bind(orderId)
+                    .first<Record<string, unknown>>()
+                    .catch(() =>
+                      rawDb
+                        .prepare('SELECT id, items, customer_phone, customer_email, customer_name, customer_address FROM orders WHERE id = ?')
+                        .bind(orderId)
+                        .first<Record<string, unknown>>(),
+                    ),
+                );
               if (!fullOrdRow) return;
+              const erpPaymentStatus = String(
+                fullOrdRow.payment_status ?? ordRow.payment_status ?? (order as Record<string, unknown>).payment_status ?? '',
+              )
+                .trim()
+                .toLowerCase();
+              if (erpPaymentStatus && !['paid', 'completed', 'partially_refunded'].includes(erpPaymentStatus)) {
+                return;
+              }
+              const rawDiscountAmount = Number(fullOrdRow.discount_amount);
+              const rawDiscount = Number(fullOrdRow.discount);
+              const resolvedDiscount =
+                Number.isFinite(rawDiscountAmount) && rawDiscountAmount > 0
+                  ? rawDiscountAmount
+                  : Number.isFinite(rawDiscount) && rawDiscount > 0
+                    ? rawDiscount
+                    : Number.isFinite(rawDiscountAmount) && fullOrdRow.discount_amount !== null && fullOrdRow.discount_amount !== undefined
+                      ? rawDiscountAmount
+                      : Number.isFinite(rawDiscount) && fullOrdRow.discount !== null && fullOrdRow.discount !== undefined
+                        ? rawDiscount
+                        : undefined;
+              const resolvedTotal = Number(fullOrdRow.total ?? ordRow.total ?? ordRow.total_amount);
               const { createErpnextClientWithKv } = await import('worker/src/clients/erpnext-client');
               const { ErpnextAccountingClient } = await import('worker/src/clients/erpnext-accounting-client');
               const erpnextClient = await createErpnextClientWithKv(
@@ -824,6 +857,8 @@ export async function executeKdsStatusTransition(
                 {
                   id: String(fullOrdRow.id ?? orderId),
                   items: fullOrdRow.items as string | Array<Record<string, unknown>> | undefined,
+                  ...(Number.isFinite(resolvedTotal) ? { total: resolvedTotal } : {}),
+                  ...(resolvedDiscount !== undefined ? { discount_amount: resolvedDiscount } : {}),
                   customer_phone: fullOrdRow.customer_phone as string | undefined,
                   customer_email: fullOrdRow.customer_email as string | undefined,
                   customer_name: fullOrdRow.customer_name as string | undefined,

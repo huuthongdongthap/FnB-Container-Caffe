@@ -285,6 +285,7 @@ CREATE INDEX IF NOT EXISTS idx_reservations_customer_id ON reservations(customer
 CREATE TABLE IF NOT EXISTS waitlist (
   id TEXT PRIMARY KEY,
   tenant_id TEXT NOT NULL DEFAULT 'default',
+  table_id TEXT,
   customer_name TEXT NOT NULL,
   customer_phone TEXT NOT NULL,
   party_size INTEGER NOT NULL DEFAULT 2,

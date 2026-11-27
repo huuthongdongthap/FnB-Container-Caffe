@@ -127,6 +127,7 @@ interface RawRecipeRow {
   tenant_id?: string | null;
   ingredient_id?: string | null;
   quantity?: number | null;
+  unit?: string | null;
 }
 
 interface RawRecipeItemRow {
@@ -164,43 +165,10 @@ export async function getCanonicalRecipe(
     try {
       recipeRows = await queryRows<RawRecipeRow>(
         db.prepare(
-          'SELECT id, product_id, name, instructions, tenant_id, ingredient_id, quantity FROM recipes WHERE product_id = ? AND is_active = 1'
+          'SELECT id, product_id, name, instructions, tenant_id, ingredient_id, quantity, unit FROM recipes WHERE product_id = ? AND is_active = 1'
         ).bind(productId)
       );
     } catch {
-      try {
-        recipeRows = await queryRows<RawRecipeRow>(
-          db.prepare(
-            'SELECT id, product_id, name, instructions, tenant_id FROM recipes WHERE product_id = ? AND is_active = 1'
-          ).bind(productId)
-        );
-      } catch {
-        recipeRows = await queryRows<RawRecipeRow>(
-          db.prepare(
-            'SELECT id, product_id, name, instructions FROM recipes WHERE product_id = ? AND is_active = 1'
-          ).bind(productId)
-        ).catch(() => []);
-      }
-    }
-  } else {
-    try {
-      recipeRows = await queryRows<RawRecipeRow>(
-        db.prepare(
-          "SELECT id, product_id, name, instructions, tenant_id, ingredient_id, quantity FROM recipes WHERE product_id = ? AND is_active = 1 AND (COALESCE(NULLIF(tenant_id, ''), 'default') = ? OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?2)"
-        ).bind(productId, effectiveTenant)
-      );
-    } catch {
-      try {
-        recipeRows = await queryRows<RawRecipeRow>(
-          db.prepare(
-            "SELECT id, product_id, name, instructions, tenant_id FROM recipes WHERE product_id = ? AND is_active = 1 AND (COALESCE(NULLIF(tenant_id, ''), 'default') = ? OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?2)"
-          ).bind(productId, effectiveTenant)
-        );
-      } catch {
-        // Fallback when is_active or tenant_id column is absent
-      }
-    }
-    if (recipeRows.length === 0 && effectiveTenant === 'default') {
       try {
         recipeRows = await queryRows<RawRecipeRow>(
           db.prepare(
@@ -215,14 +183,71 @@ export async function getCanonicalRecipe(
             ).bind(productId)
           );
         } catch {
+          recipeRows = await queryRows<RawRecipeRow>(
+            db.prepare(
+              'SELECT id, product_id, name, instructions FROM recipes WHERE product_id = ? AND is_active = 1'
+            ).bind(productId)
+          ).catch(() => []);
+        }
+      }
+    }
+  } else {
+    try {
+      recipeRows = await queryRows<RawRecipeRow>(
+        db.prepare(
+          "SELECT id, product_id, name, instructions, tenant_id, ingredient_id, quantity, unit FROM recipes WHERE product_id = ? AND is_active = 1 AND (COALESCE(NULLIF(tenant_id, ''), 'default') = ? OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?2)"
+        ).bind(productId, effectiveTenant)
+      );
+    } catch {
+      try {
+        recipeRows = await queryRows<RawRecipeRow>(
+          db.prepare(
+            "SELECT id, product_id, name, instructions, tenant_id, ingredient_id, quantity FROM recipes WHERE product_id = ? AND is_active = 1 AND (COALESCE(NULLIF(tenant_id, ''), 'default') = ? OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?2)"
+          ).bind(productId, effectiveTenant)
+        );
+      } catch {
+        try {
+          recipeRows = await queryRows<RawRecipeRow>(
+            db.prepare(
+              "SELECT id, product_id, name, instructions, tenant_id FROM recipes WHERE product_id = ? AND is_active = 1 AND (COALESCE(NULLIF(tenant_id, ''), 'default') = ? OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?2)"
+            ).bind(productId, effectiveTenant)
+          );
+        } catch {
+          // Fallback when is_active or tenant_id column is absent
+        }
+      }
+    }
+    if (recipeRows.length === 0 && effectiveTenant === 'default') {
+      try {
+        recipeRows = await queryRows<RawRecipeRow>(
+          db.prepare(
+            'SELECT id, product_id, name, instructions, tenant_id, ingredient_id, quantity, unit FROM recipes WHERE product_id = ? AND is_active = 1'
+          ).bind(productId)
+        );
+      } catch {
+        try {
+          recipeRows = await queryRows<RawRecipeRow>(
+            db.prepare(
+              'SELECT id, product_id, name, instructions, tenant_id, ingredient_id, quantity FROM recipes WHERE product_id = ? AND is_active = 1'
+            ).bind(productId)
+          );
+        } catch {
           try {
             recipeRows = await queryRows<RawRecipeRow>(
               db.prepare(
-                'SELECT id, product_id, name, instructions FROM recipes WHERE product_id = ? AND is_active = 1'
+                'SELECT id, product_id, name, instructions, tenant_id FROM recipes WHERE product_id = ? AND is_active = 1'
               ).bind(productId)
             );
           } catch {
-            // Fallback when is_active column is absent
+            try {
+              recipeRows = await queryRows<RawRecipeRow>(
+                db.prepare(
+                  'SELECT id, product_id, name, instructions FROM recipes WHERE product_id = ? AND is_active = 1'
+                ).bind(productId)
+              );
+            } catch {
+              // Fallback when is_active column is absent
+            }
           }
         }
       }
@@ -247,30 +272,46 @@ export async function getCanonicalRecipe(
     try {
       recipeRows = await queryRows<RawRecipeRow>(
         db.prepare(
-          "SELECT id, product_id, name, instructions, tenant_id, ingredient_id, quantity FROM recipes WHERE product_id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
+          "SELECT id, product_id, name, instructions, tenant_id, ingredient_id, quantity, unit FROM recipes WHERE product_id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
         ).bind(productId, effectiveTenant)
       );
     } catch {
-      if (effectiveTenant === 'default' || isWildcard) {
-        try {
-          recipeRows = await queryRows<RawRecipeRow>(
-            db.prepare(
-              'SELECT id, product_id, name, instructions, tenant_id, ingredient_id, quantity FROM recipes WHERE product_id = ?'
-            ).bind(productId)
-          );
-        } catch {
+      try {
+        recipeRows = await queryRows<RawRecipeRow>(
+          db.prepare(
+            "SELECT id, product_id, name, instructions, tenant_id, ingredient_id, quantity FROM recipes WHERE product_id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
+          ).bind(productId, effectiveTenant)
+        );
+      } catch {
+        if (effectiveTenant === 'default' || isWildcard) {
           try {
             recipeRows = await queryRows<RawRecipeRow>(
               db.prepare(
-                'SELECT id, product_id, name, instructions, tenant_id FROM recipes WHERE product_id = ?'
+                'SELECT id, product_id, name, instructions, tenant_id, ingredient_id, quantity, unit FROM recipes WHERE product_id = ?'
               ).bind(productId)
             );
           } catch {
-            recipeRows = await queryRows<RawRecipeRow>(
-              db.prepare(
-                'SELECT id, product_id, name, instructions FROM recipes WHERE product_id = ?'
-              ).bind(productId)
-            );
+            try {
+              recipeRows = await queryRows<RawRecipeRow>(
+                db.prepare(
+                  'SELECT id, product_id, name, instructions, tenant_id, ingredient_id, quantity FROM recipes WHERE product_id = ?'
+                ).bind(productId)
+              );
+            } catch {
+              try {
+                recipeRows = await queryRows<RawRecipeRow>(
+                  db.prepare(
+                    'SELECT id, product_id, name, instructions, tenant_id FROM recipes WHERE product_id = ?'
+                  ).bind(productId)
+                );
+              } catch {
+                recipeRows = await queryRows<RawRecipeRow>(
+                  db.prepare(
+                    'SELECT id, product_id, name, instructions FROM recipes WHERE product_id = ?'
+                  ).bind(productId)
+                );
+              }
+            }
           }
         }
       }
@@ -278,7 +319,7 @@ export async function getCanonicalRecipe(
   }
 
   if (recipeRows.length === 0) return null;
-  const scopedRecipes = recipeRows.filter((r) => {
+  const scopedRecipesRaw = recipeRows.filter((r) => {
     if ('tenant_id' in r && r.tenant_id !== undefined) {
       const rawRecTenant = r.tenant_id && String(r.tenant_id).trim() ? String(r.tenant_id).trim() : 'default';
       const recTenant = rawRecTenant === '*' || rawRecTenant.toLowerCase() === 'hq' ? 'default' : rawRecTenant;
@@ -286,14 +327,22 @@ export async function getCanonicalRecipe(
     }
     return true;
   });
-  if (scopedRecipes.length === 0) return null;
+  if (scopedRecipesRaw.length === 0) return null;
 
-  const recipe = scopedRecipes[0]!;
+  const recipe = scopedRecipesRaw[0]!;
   if ('tenant_id' in recipe && recipe.tenant_id !== undefined) {
     const rawRecTenant = recipe.tenant_id && String(recipe.tenant_id).trim() ? String(recipe.tenant_id).trim() : 'default';
     const recTenant = rawRecTenant === '*' || rawRecTenant.toLowerCase() === 'hq' ? 'default' : rawRecTenant;
     effectiveTenant = recTenant;
   }
+  const scopedRecipes = isWildcard
+    ? scopedRecipesRaw.filter((r) => {
+        if (!('tenant_id' in r) || r.tenant_id === undefined) return true;
+        const rawRecTenant = r.tenant_id && String(r.tenant_id).trim() ? String(r.tenant_id).trim() : 'default';
+        const recTenant = rawRecTenant === '*' || rawRecTenant.toLowerCase() === 'hq' ? 'default' : rawRecTenant;
+        return recTenant === effectiveTenant;
+      })
+    : scopedRecipesRaw;
 
   const recipeIds = scopedRecipes.map((r) => r.id).filter(Boolean);
   const placeholders = recipeIds.map(() => '?').join(', ');
@@ -332,6 +381,7 @@ export async function getCanonicalRecipe(
   }
 
   const recipesWithItems = new Set(itemRows.map((r) => r.recipe_id).filter(Boolean));
+  const coveredIngredientIds = new Set(itemRows.map((r) => r.ingredient_id).filter(Boolean));
   const components: CanonicalRecipeComponent[] = itemRows.map((r) => ({
     ingredientId: r.ingredient_id,
     ingredientName: r.ing_name || undefined,
@@ -341,12 +391,12 @@ export async function getCanonicalRecipe(
     costPerUnit: Number(r.cost_per_unit || 0),
   }));
 
-  // Also include inline ingredient_id/quantity rows on recipes that do not have child recipe_items
+  // Also include inline ingredient_id/quantity rows on recipes not already represented in recipe_items
   for (const r of scopedRecipes) {
     if (recipesWithItems.has(r.id)) continue;
     const inlineIngId = r.ingredient_id ? String(r.ingredient_id).trim() : '';
     const inlineQty = Number(r.quantity || 0);
-    if (!inlineIngId || !Number.isFinite(inlineQty) || inlineQty <= 0) continue;
+    if (!inlineIngId || coveredIngredientIds.has(inlineIngId) || !Number.isFinite(inlineQty) || inlineQty <= 0) continue;
     let ingRow: { name?: string | null; unit?: string | null; cost_per_unit?: number | null } | null = null;
     try {
       ingRow = await db.prepare(
@@ -358,16 +408,20 @@ export async function getCanonicalRecipe(
         ).bind(inlineIngId).first();
       }
     } catch {
-      ingRow = await db.prepare(
-        'SELECT name, unit, COALESCE(cost_per_unit, 0) as cost_per_unit FROM ingredients WHERE id = ? LIMIT 1'
-      ).bind(inlineIngId).first().catch(() => null);
+      if (effectiveTenant === 'default') {
+        ingRow = await db.prepare(
+          'SELECT name, unit, COALESCE(cost_per_unit, 0) as cost_per_unit FROM ingredients WHERE id = ? LIMIT 1'
+        ).bind(inlineIngId).first().catch(() => null);
+      }
     }
+    const inlineUnit = r.unit && String(r.unit).trim() ? String(r.unit).trim() : null;
+    const stockUnit = ingRow?.unit ? String(ingRow.unit) : undefined;
     components.push({
       ingredientId: inlineIngId,
       ingredientName: ingRow?.name || undefined,
       quantity: inlineQty,
-      unit: ingRow?.unit ? String(ingRow.unit) : 'g',
-      stockUnit: ingRow?.unit ? String(ingRow.unit) : undefined,
+      unit: inlineUnit || stockUnit || 'g',
+      stockUnit,
       costPerUnit: Number(ingRow?.cost_per_unit || 0),
     });
   }

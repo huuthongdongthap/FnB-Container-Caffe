@@ -20,7 +20,99 @@ async function verifySubscriptionStaffSession(
   const rawPayload = payload as unknown as Record<string, unknown>;
   const staffId = String(payload.id || payload.sub || '');
   const role = String(payload.role || '');
-  if (!c.env.AURA_DB || !staffId || ['customer', 'vendor'].includes(role)) {
+  if (!staffId) {
+    return null;
+  }
+  if (['customer', 'vendor'].includes(role) && !rawPayload.sessionType) {
+    let hasVersionRecord = false;
+    let storedVersion = 1;
+    if (typeof c.env.AUTH_KV?.get === 'function') {
+      try {
+        const email = typeof rawPayload.email === 'string' ? rawPayload.email.trim() : '';
+        const rawByEmail = email ? await c.env.AUTH_KV.get(`user:${email}`) : null;
+        const rawById = await c.env.AUTH_KV.get(`user:${staffId}`);
+        const rawCustVer = await c.env.AUTH_KV.get(`cust_auth_ver:${staffId}`);
+        for (const raw of [rawByEmail, rawById]) {
+          if (!raw) continue;
+          hasVersionRecord = true;
+          try {
+            const parsed = JSON.parse(raw) as {
+              auth_version?: number;
+              is_active?: number | boolean;
+              active?: boolean;
+            };
+            if (parsed.is_active === 0 || parsed.is_active === false || parsed.active === false) {
+              return c.json({ success: false, error: 'Tài khoản đã bị vô hiệu hóa', code: 'STAFF_ACCOUNT_INACTIVE' }, 403);
+            }
+            if (Number.isFinite(Number(parsed.auth_version)) && Number(parsed.auth_version) > 0) {
+              storedVersion = Math.max(storedVersion, Number(parsed.auth_version));
+            }
+          } catch {
+            // ignore malformed KV payload
+          }
+        }
+        if (rawCustVer) {
+          const parsedVer = Number(rawCustVer);
+          if (Number.isFinite(parsedVer) && parsedVer > 0) {
+            hasVersionRecord = true;
+            storedVersion = Math.max(storedVersion, parsedVer);
+          }
+        }
+      } catch {
+        // continue to D1 check
+      }
+    }
+    if (c.env.AURA_DB?.prepare) {
+      const custRow = await c.env.AURA_DB
+        .prepare('SELECT id, is_active, auth_version FROM customers WHERE id = ? LIMIT 1')
+        .bind(staffId)
+        .first<{ id?: string; is_active?: number | boolean | null; auth_version?: number | null }>()
+        .catch(() =>
+          c.env.AURA_DB
+            .prepare('SELECT id, auth_version FROM customers WHERE id = ? LIMIT 1')
+            .bind(staffId)
+            .first<{ id?: string; is_active?: number | boolean | null; auth_version?: number | null }>()
+            .catch(() => null)
+        );
+      if (custRow && custRow.id === staffId) {
+        if (custRow.is_active !== undefined && custRow.is_active !== null && (Number(custRow.is_active) === 0 || custRow.is_active === false)) {
+          return c.json({ success: false, error: 'Tài khoản đã bị vô hiệu hóa', code: 'STAFF_ACCOUNT_INACTIVE' }, 403);
+        }
+        if (Number.isFinite(Number(custRow.auth_version)) && Number(custRow.auth_version) > 0) {
+          hasVersionRecord = true;
+          storedVersion = Math.max(storedVersion, Number(custRow.auth_version));
+        }
+      }
+      const userRow = await c.env.AURA_DB
+        .prepare('SELECT id, is_active, auth_version FROM users WHERE id = ? LIMIT 1')
+        .bind(staffId)
+        .first<{ id?: string; is_active?: number | boolean | null; auth_version?: number | null }>()
+        .catch(() =>
+          c.env.AURA_DB
+            .prepare('SELECT id, auth_version FROM users WHERE id = ? LIMIT 1')
+            .bind(staffId)
+            .first<{ id?: string; is_active?: number | boolean | null; auth_version?: number | null }>()
+            .catch(() => null)
+        );
+      if (userRow && userRow.id === staffId) {
+        if (userRow.is_active !== undefined && userRow.is_active !== null && (Number(userRow.is_active) === 0 || userRow.is_active === false)) {
+          return c.json({ success: false, error: 'Tài khoản đã bị vô hiệu hóa', code: 'STAFF_ACCOUNT_INACTIVE' }, 403);
+        }
+        if (Number.isFinite(Number(userRow.auth_version)) && Number(userRow.auth_version) > 0) {
+          hasVersionRecord = true;
+          storedVersion = Math.max(storedVersion, Number(userRow.auth_version));
+        }
+      }
+    }
+    if (hasVersionRecord) {
+      const tokenVersion = Number(rawPayload.authVersion ?? rawPayload.auth_version ?? 1);
+      if (!Number.isFinite(tokenVersion) || tokenVersion !== storedVersion) {
+        return c.json({ success: false, error: 'Phiên đã bị thu hồi, vui lòng đăng nhập lại', code: 'SESSION_REVOKED' }, 401);
+      }
+    }
+    return null;
+  }
+  if (!c.env.AURA_DB) {
     return null;
   }
 
@@ -70,7 +162,12 @@ async function verifySubscriptionStaffSession(
       return c.json({ success: false, error: 'Forbidden — insufficient role', code: 'SESSION_REVOKED' }, 403);
     }
     syncPayloadFromLiveAccount(check.account.role, check.account.tenant_id);
-    if (rawPayload.authVersion !== undefined) {
+    const hasStaffSessionClaim =
+      rawPayload.authVersion !== undefined ||
+      rawPayload.auth_version !== undefined ||
+      rawPayload.sessionType === 'staff-web' ||
+      rawPayload.sessionType === 'staff-mobile';
+    if (hasStaffSessionClaim) {
       const now = Math.floor(Date.now() / 1000);
       await validateStaffSession(c.env.AURA_DB, {
         ...(rawPayload as Partial<StaffSession>),
@@ -81,14 +178,19 @@ async function verifySubscriptionStaffSession(
           : typeof rawPayload.tenant_id === 'string'
             ? rawPayload.tenant_id
             : 'default',
-        authVersion: Number(rawPayload.authVersion),
+        authVersion: Number(rawPayload.authVersion ?? rawPayload.auth_version),
         authTime: typeof rawPayload.authTime === 'number' ? rawPayload.authTime : now,
         sessionType: (rawPayload.sessionType as 'staff-web' | 'staff-mobile') || 'staff-web',
         exp: typeof rawPayload.exp === 'number' ? rawPayload.exp : now + 3600,
       });
     }
   } catch (err) {
-    if (rawPayload.authVersion === undefined) {
+    const hasStaffSessionClaim =
+      rawPayload.authVersion !== undefined ||
+      rawPayload.auth_version !== undefined ||
+      rawPayload.sessionType === 'staff-web' ||
+      rawPayload.sessionType === 'staff-mobile';
+    if (!hasStaffSessionClaim) {
       const liteRow = await c.env.AURA_DB
         .prepare('SELECT id, role, tenant_id, is_active FROM users WHERE id = ?')
         .bind(staffId)

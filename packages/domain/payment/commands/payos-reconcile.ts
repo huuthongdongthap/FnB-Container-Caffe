@@ -124,11 +124,16 @@ export async function reconcilePayOSPayment(input: ReconcilePayOSInput): Promise
 
   const baseIds = { paymentId: row.id, orderId: row.order_id, orderCode: row.transaction_id };
   const initialOrderStatus = String(row.order_status || '').trim().toLowerCase();
+  const initialOrderPayStatus = String(row.order_payment_status || '').trim().toLowerCase();
+  const initialRefundStatus = String(row.refund_status || '').trim().toLowerCase();
   if (
     row.status === 'refunded' ||
-    row.refund_status === 'completed' ||
-    row.order_payment_status === 'refunded' ||
-    row.order_payment_status === 'paid' ||
+    initialRefundStatus === 'completed' ||
+    initialRefundStatus === 'partial' ||
+    initialOrderPayStatus === 'refunded' ||
+    initialOrderPayStatus === 'partially_refunded' ||
+    initialOrderPayStatus === 'paid' ||
+    initialOrderPayStatus === 'completed' ||
     (row.status === 'completed' && TERMINAL_NON_PAYABLE_ORDER_STATUSES.includes(initialOrderStatus))
   ) {
     return { ok: true, status: 200, outcome: 'already_settled', ...baseIds, paymentChanged: false };
@@ -178,11 +183,16 @@ export async function reconcilePayOSPayment(input: ReconcilePayOSInput): Promise
     return { ok: false, status: 404, outcome: 'not_found', error: 'Payment not found' };
   }
   const freshOrderStatus = String(fresh.order_status || '').trim().toLowerCase();
+  const freshOrderPayStatus = String(fresh.payment_status || '').trim().toLowerCase();
+  const freshRefundStatus = String(fresh.refund_status || '').trim().toLowerCase();
   if (
     fresh.status === 'refunded' ||
-    fresh.refund_status === 'completed' ||
-    fresh.payment_status === 'refunded' ||
-    fresh.payment_status === 'paid' ||
+    freshRefundStatus === 'completed' ||
+    freshRefundStatus === 'partial' ||
+    freshOrderPayStatus === 'refunded' ||
+    freshOrderPayStatus === 'partially_refunded' ||
+    freshOrderPayStatus === 'paid' ||
+    freshOrderPayStatus === 'completed' ||
     (fresh.status === 'completed' && TERMINAL_NON_PAYABLE_ORDER_STATUSES.includes(freshOrderStatus))
   ) {
     return { ok: true, status: 200, outcome: 'already_settled', ...baseIds, paymentChanged: false };
@@ -230,11 +240,16 @@ export async function reconcilePayOSPayment(input: ReconcilePayOSInput): Promise
     ).bind(row.id).first<{ status: string; payment_status: string; order_status: string }>();
 
     const afterOrderStatus = String(after?.order_status ?? fresh.order_status ?? '').trim().toLowerCase();
+    const afterPayStatus = String(after?.payment_status ?? '').trim().toLowerCase();
     const isTerminalNonPayable =
       TERMINAL_NON_PAYABLE_ORDER_STATUSES.includes(afterOrderStatus) ||
       TERMINAL_NON_PAYABLE_ORDER_STATUSES.includes(freshOrderStatus);
 
-    if (!paymentChanged && (after?.status !== 'completed' || (!isTerminalNonPayable && after?.payment_status !== 'paid'))) {
+    if (
+      !paymentChanged &&
+      (after?.status !== 'completed' ||
+        (!isTerminalNonPayable && !['paid', 'partially_refunded', 'completed'].includes(afterPayStatus)))
+    ) {
       await writePaymentReviewMarker(input.kv, { ...baseIds, source: input.source, stage: 'settlement_cas', errorCode: 'CAS_REJECTED' });
       return { ok: false, status: 409, outcome: 'requires_review', error: 'Payment requires reconciliation', ...baseIds };
     }
@@ -391,30 +406,29 @@ export async function reconcilePayOSPayment(input: ReconcilePayOSInput): Promise
         }
         const settledAmt = Number(row.amount ?? expectedOrderTotal ?? 0);
         if (settledAmt > 0) {
+          const metricPayload = JSON.stringify({
+            provider: 'payos',
+            source: input.source,
+            order_id: row.order_id,
+            tenant_id: rowTenant,
+          });
           await input.db
-            .prepare('INSERT INTO _metrics (name, value, labels, timestamp) VALUES (?, ?, ?, ?)')
-            .bind('revenue', settledAmt, JSON.stringify({ provider: 'payos', source: input.source, order_id: row.order_id, tenant_id: rowTenant }), Math.floor(Date.now() / 1000))
+            .prepare('INSERT INTO _metrics (name, value, tags, created_at, tenant_id) VALUES (?, ?, ?, ?, ?)')
+            .bind('revenue', settledAmt, metricPayload, nowIso, rowTenant)
             .run()
-            .catch(() => {});
-          await input.db
-            .prepare(
-              `UPDATE staff_shifts
-               SET online_sales = COALESCE(online_sales, 0) + ?,
-                   total_sales = COALESCE(total_sales, 0) + ?,
-                   order_count = COALESCE(order_count, 0) + 1
-               WHERE id = (
-                 SELECT id FROM staff_shifts
-                 WHERE clock_in IS NOT NULL AND clock_out IS NULL
-                   AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?
-                   AND LOWER(COALESCE(role, '')) NOT IN ('barista', 'kitchen', 'chef', 'bep')
-                 ORDER BY CASE WHEN LOWER(COALESCE(role, '')) IN ('cashier', 'owner', 'admin', 'manager', 'supervisor') THEN 0 ELSE 1 END,
-                          clock_in DESC, id DESC
-                 LIMIT 1
-               )`
-            )
-            .bind(settledAmt, settledAmt, rowTenant)
-            .run()
-            .catch(() => {});
+            .catch(() =>
+              input.db
+                .prepare('INSERT INTO _metrics (name, value, tags, created_at) VALUES (?, ?, ?, ?)')
+                .bind('revenue', settledAmt, metricPayload, nowIso)
+                .run()
+                .catch(() =>
+                  input.db
+                    .prepare('INSERT INTO _metrics (name, value, labels, timestamp) VALUES (?, ?, ?, ?)')
+                    .bind('revenue', settledAmt, metricPayload, Math.floor(Date.now() / 1000))
+                    .run()
+                    .catch(() => {}),
+                ),
+            );
         }
       }
     }

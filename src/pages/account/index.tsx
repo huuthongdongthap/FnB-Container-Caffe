@@ -225,13 +225,25 @@ export default function AccountPage() {
                   setSavingProfile(true);
                   setProfileSaveMsg(null);
                   try {
-                    await apiFetch('/api/auth/me', {
+                    const nextName = editName.trim();
+                    const nextPhone = editPhone.trim() || undefined;
+                    await apiFetch('/api/customers/me', {
                       method: 'PATCH',
                       body: JSON.stringify({
-                        name: editName.trim(),
-                        phone: editPhone.trim() || undefined,
+                        name: nextName,
+                        phone: nextPhone,
                       }),
                     });
+                    const currentUser = useAuthStore.getState().user;
+                    if (currentUser) {
+                      useAuthStore.setState({
+                        user: {
+                          ...currentUser,
+                          name: nextName || currentUser.name,
+                          ...(nextPhone !== undefined ? { phone: nextPhone } : {}),
+                        },
+                      });
+                    }
                     await refetchProfile();
                     setProfileSaveMsg('Đã cập nhật hồ sơ thành công.');
                     setEditingProfile(false);

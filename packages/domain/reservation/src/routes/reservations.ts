@@ -485,7 +485,13 @@ reservationsRouter.post('/', optionalAuth() as any, async (c) => {
       .prepare('SELECT * FROM cafe_tables WHERE id = ? OR table_number = ?')
       .bind(table_id, table_id)
       .first<Record<string, unknown>>()
-      .catch(() => null);
+      .catch(() =>
+        db
+          .prepare('SELECT * FROM cafe_tables WHERE id = ?')
+          .bind(table_id)
+          .first<Record<string, unknown>>()
+          .catch(() => null)
+      );
     if (singleTable) candidateTables = [singleTable];
   }
   const tenantMatchedTables = candidateTables.filter((t) => matchesTenantRow(t, tenantId));
@@ -545,7 +551,9 @@ reservationsRouter.post('/', optionalAuth() as any, async (c) => {
   crypto.getRandomValues(rsvRand);
   const id = `rsv_${Date.now()}_${Array.from(rsvRand, (b) => b.toString(16).padStart(2, '0')).join('')}`;
   const now = new Date().toISOString();
-  const customerId = reqUser && !isStaffCaller ? String(reqUser.id ?? reqUser.sub ?? '').trim() || null : null;
+  const reqRole = String(reqUser?.role || '').trim().toLowerCase();
+  const isCustomerCaller = Boolean(reqUser && (!reqRole || reqRole === 'customer'));
+  const customerId = isCustomerCaller ? String(reqUser?.id ?? reqUser?.sub ?? '').trim() || null : null;
 
   try {
     await db.prepare(
@@ -1001,16 +1009,27 @@ async function canResetTableToAvailableOnCancel(
   }
   const rsvDate = String(rsv.date ?? rsv.reservation_date ?? rsv.reserved_date ?? '').trim();
   const todayVN = getTodayVN();
+  if (rsvDate && /^\d{4}-\d{2}-\d{2}$/.test(rsvDate) && rsvDate < todayVN) {
+    return false;
+  }
   if (tableRow) {
     const exactStatus = tableRow.status !== undefined && tableRow.status !== null
       ? String(tableRow.status).trim()
       : '';
     const rawStatus = exactStatus.toLowerCase();
+    const rsvStatus = String(rsv.status ?? '').trim().toLowerCase();
     if (INACTIVE_TABLE_STATUSES.has(rawStatus)) {
       return false;
     }
+    if (
+      tableRow.current_session_id !== undefined &&
+      tableRow.current_session_id !== null &&
+      String(tableRow.current_session_id).trim() !== '' &&
+      (rsvStatus !== 'seated' || !opts?.allowOccupiedRelease)
+    ) {
+      return false;
+    }
     if (rawStatus === 'occupied') {
-      const rsvStatus = String(rsv.status ?? '').trim().toLowerCase();
       if (rsvStatus !== 'seated') {
         return false;
       }
@@ -1841,12 +1860,25 @@ reservationsRouter.post('/waitlist/:id/seat', requireReservationStaff() as any, 
       .bind(tableId, tableId, effectiveTenant)
       .first<Record<string, unknown>>();
   } catch {
-    if (effectiveTenant === 'default') {
+    try {
       tableRow = await db
-        .prepare('SELECT * FROM cafe_tables WHERE id = ? OR table_number = ?')
-        .bind(tableId, tableId)
-        .first<Record<string, unknown>>()
-        .catch(() => null);
+        .prepare("SELECT * FROM cafe_tables WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?")
+        .bind(tableId, effectiveTenant)
+        .first<Record<string, unknown>>();
+    } catch {
+      if (effectiveTenant === 'default') {
+        tableRow = await db
+          .prepare('SELECT * FROM cafe_tables WHERE id = ? OR table_number = ?')
+          .bind(tableId, tableId)
+          .first<Record<string, unknown>>()
+          .catch(() =>
+            db
+              .prepare('SELECT * FROM cafe_tables WHERE id = ?')
+              .bind(tableId)
+              .first<Record<string, unknown>>()
+              .catch(() => null)
+          );
+      }
     }
   }
   if (!tableRow || !matchesTenantRow(tableRow, effectiveTenant)) {
@@ -1875,12 +1907,19 @@ reservationsRouter.post('/waitlist/:id/seat', requireReservationStaff() as any, 
         .bind(canonicalTableId, id, effectiveTenant)
         .run();
     } catch {
-      if (effectiveTenant === 'default') {
+      try {
         await db
-          .prepare(`UPDATE ${sourceTable} SET status = 'seated' WHERE id = ?`)
-          .bind(id)
-          .run()
-          .catch(() => undefined);
+          .prepare(`UPDATE ${sourceTable} SET status = 'seated' WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?`)
+          .bind(id, effectiveTenant)
+          .run();
+      } catch {
+        if (effectiveTenant === 'default') {
+          await db
+            .prepare(`UPDATE ${sourceTable} SET status = 'seated' WHERE id = ?`)
+            .bind(id)
+            .run()
+            .catch(() => undefined);
+        }
       }
     }
   }
@@ -2060,18 +2099,33 @@ reservationsRouter.delete(
       const ownerId = String(rsv.customer_id ?? '').trim();
       let isOwner = Boolean(callerId && ownerId && ownerId === callerId);
       if (!isOwner && callerId && !ownerId) {
-        // Fallback for legacy reservations without customer_id: match normalized phone
-        const rsvPhone = normalizePhoneForMatch(String(rsv.customer_phone ?? rsv.guest_phone ?? ''));
+        // Fallback for legacy reservations without customer_id: match normalized phone within the same tenant
+        const rsvPhone = normalizePhoneForMatch(String(rsv.customer_phone ?? rsv.guest_phone ?? rsv.phone ?? ''));
         let callerPhone = normalizePhoneForMatch(String((user as { phone?: string } | undefined)?.phone ?? ''));
         if (!callerPhone) {
-          const custRow = await db
-            .prepare('SELECT phone FROM customers WHERE id = ? LIMIT 1')
-            .bind(callerId)
-            .first<{ phone?: string }>()
-            .catch(() => null);
-          callerPhone = normalizePhoneForMatch(String(custRow?.phone ?? ''));
+          const lookupTenant =
+            resolveEffectiveRsvTenant(rsv, tenantId) ||
+            (tenantId && tenantId !== '*' && tenantId.toLowerCase() !== 'hq' ? tenantId : 'default');
+          let custRow: { phone?: string | null; tenant_id?: string | null } | null = null;
+          try {
+            custRow = await db
+              .prepare("SELECT phone, tenant_id FROM customers WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ? LIMIT 1")
+              .bind(callerId, lookupTenant)
+              .first<{ phone?: string | null; tenant_id?: string | null }>();
+          } catch (err) {
+            if (lookupTenant === 'default' && isNoSuchColumnError(err)) {
+              custRow = await db
+                .prepare('SELECT phone FROM customers WHERE id = ? LIMIT 1')
+                .bind(callerId)
+                .first<{ phone?: string | null }>()
+                .catch(() => null);
+            }
+          }
+          if (custRow && (!('tenant_id' in custRow) || matchesTenantRow(custRow as Record<string, unknown>, lookupTenant))) {
+            callerPhone = normalizePhoneForMatch(String(custRow.phone ?? ''));
+          }
         }
-        if (rsvPhone && callerPhone && rsvPhone === callerPhone) {
+        if (rsvPhone && !/^0+$/.test(rsvPhone) && callerPhone && rsvPhone === callerPhone) {
           isOwner = true;
         }
       }
@@ -2204,14 +2258,40 @@ waitlistRouter.patch('/:id', optionalAuth() as never, requireReservationStaff() 
   if (!parsed.success) {
     return c.json({ success: false, error: parsed.error.issues[0]?.message || 'Invalid waitlist update payload' }, 400);
   }
-  const existing = await db
-    .prepare('SELECT * FROM waitlist WHERE id = ?')
-    .bind(id)
-    .first<Record<string, unknown>>()
-    .catch(() => null);
+  let existing: Record<string, unknown> | null = null;
+  if (tenantId !== '*') {
+    try {
+      existing = await db
+        .prepare("SELECT * FROM waitlist WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?")
+        .bind(id, tenantId)
+        .first<Record<string, unknown>>();
+    } catch (err) {
+      if (tenantId === 'default' && isNoSuchColumnError(err)) {
+        existing = await db
+          .prepare('SELECT * FROM waitlist WHERE id = ?')
+          .bind(id)
+          .first<Record<string, unknown>>()
+          .catch(() => null);
+      }
+    }
+  } else {
+    existing = await db
+      .prepare('SELECT * FROM waitlist WHERE id = ?')
+      .bind(id)
+      .first<Record<string, unknown>>()
+      .catch(() => null);
+  }
   if (!existing || !matchesTenantRow(existing, tenantId)) {
     return c.json({ success: false, error: 'Waitlist entry not found' }, 404);
   }
+  const existingStatus = String(existing.status ?? '').trim().toLowerCase();
+  if (existingStatus === 'seated' || existingStatus === 'cancelled') {
+    return c.json({ success: false, error: `Cannot modify a ${existingStatus} waitlist entry` }, 409);
+  }
+  const effectiveTenant =
+    tenantId === '*'
+      ? (String(existing.tenant_id ?? '').trim() || 'default')
+      : tenantId;
   const now = new Date().toISOString();
   const sets: string[] = ['updated_at = ?'];
   const params: unknown[] = [now];
@@ -2238,9 +2318,26 @@ waitlistRouter.patch('/:id', optionalAuth() as never, requireReservationStaff() 
     sets.push('notes = ?');
     params.push(parsed.data.notes);
   }
-  params.push(id);
-  await db.prepare(`UPDATE waitlist SET ${sets.join(', ')} WHERE id = ?`).bind(...params).run();
-  const updated = await db.prepare('SELECT * FROM waitlist WHERE id = ?').bind(id).first<Record<string, unknown>>();
+  try {
+    await db
+      .prepare(`UPDATE waitlist SET ${sets.join(', ')} WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?`)
+      .bind(...params, id, effectiveTenant)
+      .run();
+  } catch (err) {
+    if (effectiveTenant !== 'default' || !isNoSuchColumnError(err)) throw err;
+    await db.prepare(`UPDATE waitlist SET ${sets.join(', ')} WHERE id = ?`).bind(...params, id).run();
+  }
+  let updated: Record<string, unknown> | null = null;
+  try {
+    updated = await db
+      .prepare("SELECT * FROM waitlist WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?")
+      .bind(id, effectiveTenant)
+      .first<Record<string, unknown>>();
+  } catch (err) {
+    if (effectiveTenant === 'default' && isNoSuchColumnError(err)) {
+      updated = await db.prepare('SELECT * FROM waitlist WHERE id = ?').bind(id).first<Record<string, unknown>>();
+    }
+  }
   return c.json({ success: true, data: updated });
 });
 
@@ -2248,14 +2345,48 @@ waitlistRouter.delete('/:id', optionalAuth() as never, requireReservationStaff()
   const db = c.env.AURA_DB;
   const tenantId = resolveRequestTenantId(c);
   const id = c.req.param('id');
-  const existing = await db
-    .prepare('SELECT * FROM waitlist WHERE id = ?')
-    .bind(id)
-    .first<Record<string, unknown>>()
-    .catch(() => null);
+  let existing: Record<string, unknown> | null = null;
+  if (tenantId !== '*') {
+    try {
+      existing = await db
+        .prepare("SELECT * FROM waitlist WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?")
+        .bind(id, tenantId)
+        .first<Record<string, unknown>>();
+    } catch (err) {
+      if (tenantId === 'default' && isNoSuchColumnError(err)) {
+        existing = await db
+          .prepare('SELECT * FROM waitlist WHERE id = ?')
+          .bind(id)
+          .first<Record<string, unknown>>()
+          .catch(() => null);
+      }
+    }
+  } else {
+    existing = await db
+      .prepare('SELECT * FROM waitlist WHERE id = ?')
+      .bind(id)
+      .first<Record<string, unknown>>()
+      .catch(() => null);
+  }
   if (!existing || !matchesTenantRow(existing, tenantId)) {
     return c.json({ success: false, error: 'Waitlist entry not found' }, 404);
   }
-  await db.prepare('DELETE FROM waitlist WHERE id = ?').bind(id).run();
+  const existingStatus = String(existing.status ?? '').trim().toLowerCase();
+  if (existingStatus === 'seated' || existingStatus === 'cancelled') {
+    return c.json({ success: false, error: `Cannot delete a ${existingStatus} waitlist entry` }, 409);
+  }
+  const effectiveTenant =
+    tenantId === '*'
+      ? (String(existing.tenant_id ?? '').trim() || 'default')
+      : tenantId;
+  try {
+    await db
+      .prepare("DELETE FROM waitlist WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?")
+      .bind(id, effectiveTenant)
+      .run();
+  } catch (err) {
+    if (effectiveTenant !== 'default' || !isNoSuchColumnError(err)) throw err;
+    await db.prepare('DELETE FROM waitlist WHERE id = ?').bind(id).run();
+  }
   return c.json({ success: true, message: 'Waitlist entry deleted' });
 });

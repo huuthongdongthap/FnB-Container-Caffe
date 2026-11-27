@@ -215,18 +215,6 @@ export async function runPostOrderSideEffects(params: PostOrderParams): Promise<
   }
 
   const isInitiallyPaid = ['paid', 'completed'].includes(String(params.initialPaymentStatus || '').trim().toLowerCase());
-  if (isInitiallyPaid && snapshot.total > 0) {
-    const revMetricPromise = db.prepare(
-      `INSERT INTO _metrics (name, value, labels, timestamp) VALUES (?, ?, ?, ?)`
-    ).bind(
-      'revenue',
-      snapshot.total,
-      JSON.stringify({ provider: validatedMethod || 'cash', order_id: orderId, tenant_id: effectiveTenant }),
-      Math.floor(Date.now() / 1000)
-    ).run().catch(() => {});
-    if (ctx?.waitUntil) ctx.waitUntil(revMetricPromise);
-    else await revMetricPromise;
-  }
 
   if (ctx?.waitUntil && isInitiallyPaid) {
     const mappedErpItems = snapshot.items.map((it) => ({

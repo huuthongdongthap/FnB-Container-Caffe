@@ -706,9 +706,20 @@ productsRouter.delete('/:id', productMutationAuth, audit('product_delete'), asyn
     await syncProductAvailabilityProjection(db, id, 0, targetTenant);
   } else {
     try {
-      await db.prepare('DELETE FROM product_modifier_groups WHERE product_id = ?').bind(id).run();
+      await db
+        .prepare(
+          "DELETE FROM product_modifier_groups WHERE product_id = ? AND (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?)"
+        )
+        .bind(id, targetTenant, targetTenant)
+        .run();
     } catch {
-      // Optional table in partial test mocks
+      if (targetTenant === 'default' || targetTenant === '*') {
+        try {
+          await db.prepare('DELETE FROM product_modifier_groups WHERE product_id = ?').bind(id).run();
+        } catch {
+          // Optional table in partial test mocks
+        }
+      }
     }
     try {
       await db.prepare(
