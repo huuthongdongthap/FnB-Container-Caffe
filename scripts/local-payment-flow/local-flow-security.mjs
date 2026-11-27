@@ -115,7 +115,7 @@ export async function runSecurityChecks(runtime, context, check) {
       'foreign tenant refund rejected before provider, no SQL500',
       { status: response.status, body: response.body, fixtureSchema: 'worker/schema.sql' });
     const before = await db.prepare('SELECT status,refund_status,refund_amount FROM payments WHERE id = ?').bind(payment.id).first();
-    const own = await http(runtime, '/api/payments/refund', { method: 'POST', token: tokens['cashier-default'], body: {
+    const own = await http(runtime, '/api/payments/refund', { method: 'POST', token: tokens['supervisor-default'], body: {
       paymentId: payment.id, amount: 20000, reason: 'local-review-only',
     } });
     const after = await db.prepare('SELECT status,refund_status,refund_amount FROM payments WHERE id = ?').bind(payment.id).first();
@@ -175,6 +175,7 @@ export async function runSecurityChecks(runtime, context, check) {
       method: 'POST',
       headers: {
         'content-type': 'application/json',
+        Authorization: `Bearer ${tokens['staff-default']}`,
         'Idempotency-Key': `idem-split-${Date.now()}`,
         Connection: 'close',
       },

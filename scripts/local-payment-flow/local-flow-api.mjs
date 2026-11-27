@@ -31,7 +31,7 @@ export async function createOrder(runtime, method, name, extra = {}, token) {
 
 export async function runApiFlow(runtime, check) {
   const tokens = {};
-  for (const identity of ['staff-default', 'cashier-default', 'kitchen-default', 'staff-a', 'cashier-a']) {
+  for (const identity of ['staff-default', 'cashier-default', 'supervisor-default', 'kitchen-default', 'staff-a', 'cashier-a']) {
     const login = await http(runtime, '/api/auth/login', { method: 'POST', body: {
       email: `${identity}@local-review.test`, password: REVIEW_PASSWORD,
     } });
