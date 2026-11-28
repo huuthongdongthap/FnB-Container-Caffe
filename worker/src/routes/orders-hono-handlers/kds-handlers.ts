@@ -459,25 +459,40 @@ export async function handleMarkCodPaid(c: Context<{ Bindings: Env }>) {
   }
   let orderRow: CodOrderLookupRow | null = null;
   try {
-    orderRow = await (callerTenant && callerTenant !== '*'
-      ? db.prepare(
+    if (callerTenant && callerTenant !== '*') {
+      try {
+        orderRow = await db.prepare(
           "SELECT id, items, total, total_amount, customer_id, customer_name, customer_phone, customer_email, customer_address, table_id, created_at, tenant_id FROM orders WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
-        ).bind(id, callerTenant).first<CodOrderLookupRow>().catch(() =>
-          db.prepare(
+        ).bind(id, callerTenant).first<CodOrderLookupRow>();
+      } catch (primaryErr) {
+        try {
+          orderRow = await db.prepare(
             "SELECT id, items, total, total_amount, customer_id, customer_name, customer_phone, customer_email, table_id, created_at, tenant_id FROM orders WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
-          ).bind(id, callerTenant).first<CodOrderLookupRow>().catch(() => null)
-        )
-      : db.prepare(
-          'SELECT id, items, total, total_amount, customer_id, customer_name, customer_phone, customer_email, customer_address, table_id, created_at, tenant_id FROM orders WHERE id = ?'
+          ).bind(id, callerTenant).first<CodOrderLookupRow>();
+        } catch (fallbackErr) {
+          // Only fall back to unscoped lookup on legacy default schemas lacking orders.tenant_id
+          if (
+            callerTenant === 'default' &&
+            /no such column:\s*tenant_id/i.test(`${String(primaryErr)} ${String(fallbackErr)}`)
+          ) {
+            orderRow = await db.prepare(
+              'SELECT id, total, total_amount, customer_id, customer_phone, customer_email FROM orders WHERE id = ?'
+            ).bind(id).first<CodOrderLookupRow>().catch(() => null);
+          }
+        }
+      }
+    } else {
+      orderRow = await db.prepare(
+        'SELECT id, items, total, total_amount, customer_id, customer_name, customer_phone, customer_email, customer_address, table_id, created_at, tenant_id FROM orders WHERE id = ?'
+      ).bind(id).first<CodOrderLookupRow>().catch(() =>
+        db.prepare(
+          'SELECT id, items, total, total_amount, customer_id, customer_name, customer_phone, customer_email, table_id, created_at, tenant_id FROM orders WHERE id = ?'
         ).bind(id).first<CodOrderLookupRow>().catch(() =>
           db.prepare(
-            'SELECT id, items, total, total_amount, customer_id, customer_name, customer_phone, customer_email, table_id, created_at, tenant_id FROM orders WHERE id = ?'
+            'SELECT id, total, total_amount, customer_id, customer_phone, customer_email FROM orders WHERE id = ?'
           ).bind(id).first<CodOrderLookupRow>().catch(() => null)
-        ));
-    if (!orderRow) {
-      orderRow = await db.prepare(
-        'SELECT id, total, total_amount, customer_id, customer_phone, customer_email FROM orders WHERE id = ?'
-      ).bind(id).first<CodOrderLookupRow>().catch(() => null);
+        )
+      );
     }
   } catch {
     orderRow = null;

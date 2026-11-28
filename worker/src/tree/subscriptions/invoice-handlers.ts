@@ -5,8 +5,9 @@ import type { Context } from 'hono';
 import { verify } from 'hono/jwt';
 import type { Env } from '../../types/env';
 import type { InvoiceRecord, SubscriptionRecord, JwtPayload } from './types';
-import { requireAdmin } from './middleware';
+import { requireAdmin } from './auth-helpers';
 import { generateId, today, nowStr, addMonths } from './helpers';
+import { updateMRRSnapshot } from './mrr-calculator';
 import { payInvoiceSchema } from '../../lib/validators';
 import { createNowPaymentsInvoice } from './nowpayments';
 import { getTenantId, matchesTenantRow } from '../../lib/db';
@@ -496,12 +497,16 @@ export async function payInvoice(c: Context<{ Bindings: Env }>) {
     ? String(parentSub!.current_period_end).trim().slice(0, 10)
     : addMonths(basePeriodStart, cycleMonths);
   const updatedSubAt = nowStr();
+  const wasPendingActivation = ['pending_payment', 'pending'].includes(
+    String(parentSub?.status || '').trim().toLowerCase()
+  );
 
   if (tenantId && tenantId !== '*') {
     await db.prepare(
       `UPDATE subscriptions SET current_period_start = COALESCE(?, current_period_start),
        current_period_end = COALESCE(?, current_period_end),
        next_billing_date = COALESCE(?, next_billing_date),
+       status = CASE WHEN status IN ('pending_payment', 'pending') THEN 'active' ELSE status END,
        updated_at = ? WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?`
     ).bind(basePeriodStart, nextPeriodEnd, nextPeriodEnd, updatedSubAt, invoice.subscription_id, parentSubTenant).run().catch(() => {
       if (tenantId === 'default' || parentSubTenant === 'default') {
@@ -509,6 +514,7 @@ export async function payInvoice(c: Context<{ Bindings: Env }>) {
           `UPDATE subscriptions SET current_period_start = COALESCE(?, current_period_start),
            current_period_end = COALESCE(?, current_period_end),
            next_billing_date = COALESCE(?, next_billing_date),
+           status = CASE WHEN status IN ('pending_payment', 'pending') THEN 'active' ELSE status END,
            updated_at = ? WHERE id = ?`
         ).bind(basePeriodStart, nextPeriodEnd, nextPeriodEnd, updatedSubAt, invoice.subscription_id).run();
       }
@@ -519,6 +525,7 @@ export async function payInvoice(c: Context<{ Bindings: Env }>) {
       `UPDATE subscriptions SET current_period_start = current_period_end,
        current_period_end = date(current_period_end, '+1 month'),
        next_billing_date = date(current_period_end, '+1 month'),
+       status = CASE WHEN status IN ('pending_payment', 'pending') THEN 'active' ELSE status END,
        updated_at = ? WHERE id = ?`
     ).bind(updatedSubAt, invoice.subscription_id).run();
   } else {
@@ -526,8 +533,13 @@ export async function payInvoice(c: Context<{ Bindings: Env }>) {
       `UPDATE subscriptions SET current_period_start = COALESCE(?, current_period_start),
        current_period_end = COALESCE(?, current_period_end),
        next_billing_date = COALESCE(?, next_billing_date),
+       status = CASE WHEN status IN ('pending_payment', 'pending') THEN 'active' ELSE status END,
        updated_at = ? WHERE id = ?`
     ).bind(basePeriodStart, nextPeriodEnd, nextPeriodEnd, updatedSubAt, invoice.subscription_id).run();
+  }
+
+  if (wasPendingActivation) {
+    await updateMRRSnapshot(db, parentSubTenant).catch(() => {});
   }
 
   return c.json({ success: true, message: 'Invoice marked as paid (manual)', data: { id: invoiceId, status: 'manual' } });

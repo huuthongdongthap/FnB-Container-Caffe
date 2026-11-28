@@ -448,7 +448,11 @@ export async function handleTrackOrder(c: Context<{ Bindings: Env }>) {
   }
 
   const { items } = await fetchOrderItemsAndPayments(db, String(order.id), effectiveOrderTenant);
-  return c.json({ success: true, data: formatCustomerOrder(order, items) });
+  const canReadPrivateNotes = Boolean(effectiveUser) || orderTokenVerified;
+  return c.json({
+    success: true,
+    data: formatCustomerOrder(order, items, { includeNotes: canReadPrivateNotes }),
+  });
 }
 
 export function registerOrderReadHandlers(app: OpenAPIHono<{ Bindings: Env }>) {

@@ -196,7 +196,8 @@ export async function handlePhoneOtpRequest(c: Context<{ Bindings: Env }>) {
     if (customer && 'tenant_id' in customer && customer.tenant_id !== undefined) {
       const custTenant = (customer.tenant_id && String(customer.tenant_id).trim()) || 'default';
       if (custTenant !== tenantId) {
-        return c.json({ success: false, error: 'Tài khoản thuộc cửa hàng khác' }, 403);
+        // Generic refusal avoids confirming phone registration in another tenant
+        return c.json({ success: false, error: 'Không thể gửi mã OTP cho yêu cầu này' }, 403);
       }
     }
 

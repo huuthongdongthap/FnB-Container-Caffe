@@ -759,38 +759,128 @@ export async function handlePhoneAuth(c: Context<{ Bindings: Env }>) {
                   const candidateBonus = campaign.signup_bonus_vnd;
                   const bonusExpiresAt = new Date(Date.now() + 90 * 86400000).toISOString();
                   const auditMeta = JSON.stringify({ campaign: campaign.code, position: currentCount + 1, cap: campaign.signup_bonus_cap });
+                  // Enforce campaign cap atomically inside D1 batch so concurrent workers cannot exceed signup_bonus_cap.
+                  let batchResults: unknown[] = [];
                   try {
-                    await db.batch([
+                    batchResults = await db.batch([
                       db.prepare(
-                        'INSERT INTO cashback_transactions (id, wallet_id, customer_id, order_id, type, amount, balance_after, expires_at, campaign_id, description, tenant_id, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
-                      ).bind(genId('cbt_'), wid, id, null, 'bonus', candidateBonus, candidateBonus, bonusExpiresAt, campaign.id, `Quà khai trương — ${campaign.name}`, tenantId, now),
-                      db.prepare('UPDATE cashback_wallets SET balance = ?, total_earned = total_earned + ?, updated_at = ? WHERE id = ?').bind(candidateBonus, candidateBonus, now, wid),
-                      db.prepare('INSERT INTO signup_bonus_log (customer_id, campaign_id, bonus_vnd, tenant_id, granted_at) VALUES (?, ?, ?, ?, ?)').bind(id, campaign.id, candidateBonus, tenantId, now),
-                      db.prepare('INSERT INTO loyalty_audit_log (customer_id, action, amount_vnd, metadata, tenant_id, created_at) VALUES (?, ?, ?, ?, ?, ?)').bind(id, 'signup_bonus', candidateBonus, auditMeta, tenantId, now)
+                        `INSERT INTO signup_bonus_log (customer_id, campaign_id, bonus_vnd, tenant_id, granted_at)
+                         SELECT ?, ?, ?, ?, ?
+                         WHERE NOT EXISTS (
+                           SELECT 1 FROM signup_bonus_log WHERE customer_id = ? AND campaign_id = ?
+                         )
+                         AND (
+                           ? IS NULL OR (
+                             SELECT COUNT(*) FROM signup_bonus_log
+                             WHERE campaign_id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?
+                           ) < ?
+                         )`
+                      ).bind(id, campaign.id, candidateBonus, tenantId, now, id, campaign.id, numericCap, campaign.id, tenantId, numericCap),
+                      db.prepare(
+                        `INSERT INTO cashback_transactions (id, wallet_id, customer_id, order_id, type, amount, balance_after, expires_at, campaign_id, description, tenant_id, created_at)
+                         SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+                         WHERE EXISTS (
+                           SELECT 1 FROM signup_bonus_log WHERE customer_id = ? AND campaign_id = ? AND granted_at = ?
+                         )`
+                      ).bind(genId('cbt_'), wid, id, null, 'bonus', candidateBonus, candidateBonus, bonusExpiresAt, campaign.id, `Quà khai trương — ${campaign.name}`, tenantId, now, id, campaign.id, now),
+                      db.prepare(
+                        `UPDATE cashback_wallets
+                         SET balance = balance + ?, total_earned = total_earned + ?, updated_at = ?
+                         WHERE id = ? AND EXISTS (
+                           SELECT 1 FROM signup_bonus_log WHERE customer_id = ? AND campaign_id = ? AND granted_at = ?
+                         )`
+                      ).bind(candidateBonus, candidateBonus, now, wid, id, campaign.id, now),
+                      db.prepare(
+                        `INSERT INTO loyalty_audit_log (customer_id, action, amount_vnd, metadata, tenant_id, created_at)
+                         SELECT ?, ?, ?, ?, ?, ?
+                         WHERE EXISTS (
+                           SELECT 1 FROM signup_bonus_log WHERE customer_id = ? AND campaign_id = ? AND granted_at = ?
+                         )`
+                      ).bind(id, 'signup_bonus', candidateBonus, auditMeta, tenantId, now, id, campaign.id, now),
                     ]);
                   } catch {
                     try {
-                      await db.batch([
+                      batchResults = await db.batch([
                         db.prepare(
-                          'INSERT INTO cashback_transactions (id, wallet_id, customer_id, order_id, type, amount, balance_after, expires_at, campaign_id, description, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
-                        ).bind(genId('cbt_'), wid, id, null, 'bonus', candidateBonus, candidateBonus, bonusExpiresAt, campaign.id, `Quà khai trương — ${campaign.name}`, now),
-                        db.prepare('UPDATE cashback_wallets SET balance = ?, total_earned = total_earned + ?, updated_at = ? WHERE id = ?').bind(candidateBonus, candidateBonus, now, wid),
-                        db.prepare('INSERT INTO signup_bonus_log (customer_id, campaign_id, bonus_vnd, granted_at) VALUES (?, ?, ?, ?)').bind(id, campaign.id, candidateBonus, now),
-                        db.prepare('INSERT INTO loyalty_audit_log (customer_id, action, amount_vnd, metadata, created_at) VALUES (?, ?, ?, ?, ?)').bind(id, 'signup_bonus', candidateBonus, auditMeta, now)
+                          `INSERT INTO signup_bonus_log (customer_id, campaign_id, bonus_vnd, granted_at)
+                           SELECT ?, ?, ?, ?
+                           WHERE NOT EXISTS (
+                             SELECT 1 FROM signup_bonus_log WHERE customer_id = ? AND campaign_id = ?
+                           )
+                           AND (
+                             ? IS NULL OR (
+                               SELECT COUNT(*) FROM signup_bonus_log WHERE campaign_id = ?
+                             ) < ?
+                           )`
+                        ).bind(id, campaign.id, candidateBonus, now, id, campaign.id, numericCap, campaign.id, numericCap),
+                        db.prepare(
+                          `INSERT INTO cashback_transactions (id, wallet_id, customer_id, order_id, type, amount, balance_after, expires_at, campaign_id, description, created_at)
+                           SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+                           WHERE EXISTS (
+                             SELECT 1 FROM signup_bonus_log WHERE customer_id = ? AND campaign_id = ? AND granted_at = ?
+                           )`
+                        ).bind(genId('cbt_'), wid, id, null, 'bonus', candidateBonus, candidateBonus, bonusExpiresAt, campaign.id, `Quà khai trương — ${campaign.name}`, now, id, campaign.id, now),
+                        db.prepare(
+                          `UPDATE cashback_wallets
+                           SET balance = balance + ?, total_earned = total_earned + ?, updated_at = ?
+                           WHERE id = ? AND EXISTS (
+                             SELECT 1 FROM signup_bonus_log WHERE customer_id = ? AND campaign_id = ? AND granted_at = ?
+                           )`
+                        ).bind(candidateBonus, candidateBonus, now, wid, id, campaign.id, now),
+                        db.prepare(
+                          `INSERT INTO loyalty_audit_log (customer_id, action, amount_vnd, metadata, created_at)
+                           SELECT ?, ?, ?, ?, ?
+                           WHERE EXISTS (
+                             SELECT 1 FROM signup_bonus_log WHERE customer_id = ? AND campaign_id = ? AND granted_at = ?
+                           )`
+                        ).bind(id, 'signup_bonus', candidateBonus, auditMeta, now, id, campaign.id, now),
                       ]);
                     } catch {
-                      await db.batch([
+                      batchResults = await db.batch([
                         db.prepare(
-                          'INSERT INTO cashback_transactions (id, wallet_id, customer_id, order_id, type, amount, balance_after, expires_at, campaign_id, description, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
-                        ).bind(genId('cbt_'), wid, id, null, 'bonus', candidateBonus, candidateBonus, bonusExpiresAt, campaign.id, `Quà khai trương — ${campaign.name}`, now),
-                        db.prepare('UPDATE cashback_wallets SET balance = ?, total_earned = total_earned + ?, updated_at = ? WHERE id = ?').bind(candidateBonus, candidateBonus, now, wid),
-                        db.prepare('INSERT INTO signup_bonus_log (customer_id, campaign_id, amount_vnd, granted_at) VALUES (?, ?, ?, ?)').bind(id, campaign.id, candidateBonus, now),
-                        db.prepare('INSERT INTO loyalty_audit_log (customer_id, event_type, amount_vnd, metadata, created_at) VALUES (?, ?, ?, ?, ?)').bind(id, 'signup_bonus', candidateBonus, auditMeta, now)
+                          `INSERT INTO signup_bonus_log (customer_id, campaign_id, amount_vnd, granted_at)
+                           SELECT ?, ?, ?, ?
+                           WHERE NOT EXISTS (
+                             SELECT 1 FROM signup_bonus_log WHERE customer_id = ? AND campaign_id = ?
+                           )
+                           AND (
+                             ? IS NULL OR (
+                               SELECT COUNT(*) FROM signup_bonus_log WHERE campaign_id = ?
+                             ) < ?
+                           )`
+                        ).bind(id, campaign.id, candidateBonus, now, id, campaign.id, numericCap, campaign.id, numericCap),
+                        db.prepare(
+                          `INSERT INTO cashback_transactions (id, wallet_id, customer_id, order_id, type, amount, balance_after, expires_at, campaign_id, description, created_at)
+                           SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+                           WHERE EXISTS (
+                             SELECT 1 FROM signup_bonus_log WHERE customer_id = ? AND campaign_id = ? AND granted_at = ?
+                           )`
+                        ).bind(genId('cbt_'), wid, id, null, 'bonus', candidateBonus, candidateBonus, bonusExpiresAt, campaign.id, `Quà khai trương — ${campaign.name}`, now, id, campaign.id, now),
+                        db.prepare(
+                          `UPDATE cashback_wallets
+                           SET balance = balance + ?, total_earned = total_earned + ?, updated_at = ?
+                           WHERE id = ? AND EXISTS (
+                             SELECT 1 FROM signup_bonus_log WHERE customer_id = ? AND campaign_id = ? AND granted_at = ?
+                           )`
+                        ).bind(candidateBonus, candidateBonus, now, wid, id, campaign.id, now),
+                        db.prepare(
+                          `INSERT INTO loyalty_audit_log (customer_id, event_type, amount_vnd, metadata, created_at)
+                           SELECT ?, ?, ?, ?, ?
+                           WHERE EXISTS (
+                             SELECT 1 FROM signup_bonus_log WHERE customer_id = ? AND campaign_id = ? AND granted_at = ?
+                           )`
+                        ).bind(id, 'signup_bonus', candidateBonus, auditMeta, now, id, campaign.id, now),
                       ]);
                     }
                   }
-                  bonusGranted = candidateBonus;
-                  bonusMessage = `🚀 Bạn được tặng ${bonusGranted.toLocaleString('vi-VN')}đ vào ví khai trương AURA!`;
+                  const claimMeta = Array.isArray(batchResults)
+                    ? (batchResults[0] as { meta?: { changes?: number } } | undefined)?.meta
+                    : undefined;
+                  const bonusClaimed = claimMeta?.changes === undefined ? true : Number(claimMeta.changes) > 0;
+                  if (bonusClaimed) {
+                    bonusGranted = candidateBonus;
+                    bonusMessage = `🚀 Bạn được tặng ${bonusGranted.toLocaleString('vi-VN')}đ vào ví khai trương AURA!`;
+                  }
                 }
               });
             }

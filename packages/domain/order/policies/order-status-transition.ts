@@ -230,23 +230,32 @@ export async function transitionOrderStatus(
     } catch {
       try {
         metaRow = await db
-          .prepare(`SELECT order_type, payment_status, payment_method, is_cod FROM orders WHERE id = ?${writeTenantClause}`)
+          .prepare(
+            `SELECT order_type, payment_status, payment_method, assigned_shipper_id FROM orders WHERE id = ?${writeTenantClause}`,
+          )
           .bind(orderId, ...writeTenantBinds)
           .first();
       } catch {
         try {
           metaRow = await db
-            .prepare(`SELECT order_type, payment_status, payment_method FROM orders WHERE id = ?${writeTenantClause}`)
+            .prepare(`SELECT order_type, payment_status, payment_method, is_cod FROM orders WHERE id = ?${writeTenantClause}`)
             .bind(orderId, ...writeTenantBinds)
             .first();
         } catch {
           try {
             metaRow = await db
-              .prepare(`SELECT order_type, payment_status FROM orders WHERE id = ?${writeTenantClause}`)
+              .prepare(`SELECT order_type, payment_status, payment_method FROM orders WHERE id = ?${writeTenantClause}`)
               .bind(orderId, ...writeTenantBinds)
               .first();
           } catch {
-            metaRow = null;
+            try {
+              metaRow = await db
+                .prepare(`SELECT order_type, payment_status FROM orders WHERE id = ?${writeTenantClause}`)
+                .bind(orderId, ...writeTenantBinds)
+                .first();
+            } catch {
+              metaRow = null;
+            }
           }
         }
       }
@@ -308,8 +317,28 @@ export async function transitionOrderStatus(
         statusCode: 403,
       };
     }
-    if (cleanActorId && !persistedShipperId && !incomingShipperId && targetStatus === 'delivering') {
-      mutableFields.assigned_shipper_id = cleanActorId;
+    if (!persistedShipperId) {
+      const isSelfClaim =
+        order.status === 'ready' &&
+        targetStatus === 'delivering' &&
+        Boolean(cleanActorId);
+      if (isSelfClaim) {
+        if (!incomingShipperId) {
+          mutableFields.assigned_shipper_id = cleanActorId;
+        }
+      } else {
+        // Preserve 400 validation error when delivery failure is missing a required reason
+        const missingFailureReason =
+          targetStatus === 'failed' &&
+          !(typeof mutableFields.failure_reason === 'string' && mutableFields.failure_reason.trim().length > 0);
+        if (!missingFailureReason) {
+          return {
+            success: false,
+            error: 'Forbidden: order must be assigned to this shipper',
+            statusCode: 403,
+          };
+        }
+      }
     }
   }
 

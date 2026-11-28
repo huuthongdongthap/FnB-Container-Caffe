@@ -13,8 +13,11 @@ const log = createLogger({ route: 'cal-booking-webhook' });
 const WEBHOOK_TIMESTAMP_TOLERANCE_SECONDS = 300;
 const WEBHOOK_REPLAY_TTL_SECONDS = 600;
 
-function isFreshCalWebhookTimestamp(rawTs: string | undefined | null): boolean {
-  if (!rawTs || !rawTs.trim()) return true;
+function isFreshCalWebhookTimestamp(
+  rawTs: string | undefined | null,
+  requireTimestamp = false,
+): boolean {
+  if (!rawTs || !rawTs.trim()) return !requireTimestamp;
   const trimmed = rawTs.trim();
   let tsSeconds = NaN;
   if (/^\d+(\.\d+)?$/.test(trimmed)) {
@@ -328,11 +331,13 @@ export function registerWebhookHandler(router: Hono<{ Bindings: Env }>): void {
     if (!isValid) {
       return c.json({ success: false, error: 'Unauthorized' }, 401);
     }
+    const requireTimestamp =
+      String((c.env as unknown as Record<string, unknown>)?.WEBHOOK_REQUIRE_TIMESTAMP || '').toLowerCase() === 'true';
     const rawTimestamp =
       c.req.header('x-cal-timestamp') ||
       c.req.header('x-webhook-timestamp') ||
       c.req.header('x-timestamp');
-    if (!isFreshCalWebhookTimestamp(rawTimestamp)) {
+    if (!isFreshCalWebhookTimestamp(rawTimestamp, requireTimestamp)) {
       return c.json({ success: false, error: 'Stale or invalid webhook timestamp' }, 401);
     }
     const db = c.env.AURA_DB;
@@ -564,11 +569,13 @@ export async function handleCalBookingWebhook(request: Request, env: Env): Promi
   if (!sig || !env.CAL_WEBHOOK_SECRET) {
     return json({ success: false, error: 'Unauthorized' }, 401);
   }
+  const requireTimestamp =
+    String((env as unknown as Record<string, unknown>)?.WEBHOOK_REQUIRE_TIMESTAMP || '').toLowerCase() === 'true';
   const rawTimestamp =
     request.headers.get('x-cal-timestamp') ||
     request.headers.get('x-webhook-timestamp') ||
     request.headers.get('x-timestamp');
-  if (!isFreshCalWebhookTimestamp(rawTimestamp)) {
+  if (!isFreshCalWebhookTimestamp(rawTimestamp, requireTimestamp)) {
     return json({ success: false, error: 'Stale or invalid webhook timestamp' }, 401);
   }
 

@@ -35,10 +35,19 @@ function resolveLatestTenantId(request: Request): string {
   return 'default';
 }
 
-export async function getLatestOrderTimestamp(request: Request, env: Record<string, unknown>) {
+export async function getLatestOrderTimestamp(
+  request: Request,
+  env: Record<string, unknown>,
+  resolvedTenantId?: string
+) {
   try {
     const kv = env.AUTH_KV as import('@cloudflare/workers-types').KVNamespace | undefined;
-    const tenantId = resolveLatestTenantId(request);
+    const normalizedExplicit = typeof resolvedTenantId === 'string' ? resolvedTenantId.trim() : '';
+    const tenantId = normalizedExplicit
+      ? (normalizedExplicit === '*' || normalizedExplicit.toLowerCase() === 'hq'
+        ? 'default'
+        : TENANT_ID_PATTERN.test(normalizedExplicit) ? normalizedExplicit : 'default')
+      : resolveLatestTenantId(request);
     let ts: string | null = null;
     if (kv) {
       if (tenantId !== 'default') {

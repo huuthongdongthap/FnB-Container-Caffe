@@ -626,13 +626,17 @@ export async function createSubscription(c: Context<{ Bindings: Env }>) {
   const amount = cyclePlanAmount;
   const depositPaidFlag = isSubAdmin ? (body.deposit_paid ? 1 : 0) : 0;
   const depositAmount = Number(plan.deposit_vnd ?? 0);
+  // Self-service paid subscriptions must remain pending_payment until an invoice is settled;
+  // staff/admin-created or zero-cost subscriptions activate immediately.
+  const initialStatus = !isSubAdmin && amount > 0 ? 'pending_payment' : 'active';
+  const initialStatusSql = initialStatus === 'pending_payment' ? "'pending_payment'" : "'active'";
 
   try {
     await db.prepare(
       `INSERT INTO subscriptions (id, plan_id, customer_id, customer_name, customer_email, customer_phone,
        container_number, zone, status, billing_cycle, current_period_start, current_period_end,
        next_billing_date, amount_vnd, deposit_paid, deposit_vnd, notes, tenant_id, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'active', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ${initialStatusSql}, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     ).bind(
       id, body.plan_id, customerId || null, body.customer_name, body.customer_email || '', body.customer_phone,
       body.container_number || null, body.zone || 'Sky Deck', body.billing_cycle || 'monthly',
@@ -647,7 +651,7 @@ export async function createSubscription(c: Context<{ Bindings: Env }>) {
       `INSERT INTO subscriptions (id, plan_id, customer_id, customer_name, customer_email, customer_phone,
        container_number, zone, status, billing_cycle, current_period_start, current_period_end,
        next_billing_date, amount_vnd, deposit_paid, deposit_vnd, notes, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'active', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ${initialStatusSql}, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     ).bind(
       id, body.plan_id, customerId || null, body.customer_name, body.customer_email || '', body.customer_phone,
       body.container_number || null, body.zone || 'Sky Deck', body.billing_cycle || 'monthly',
@@ -681,7 +685,9 @@ export async function createSubscription(c: Context<{ Bindings: Env }>) {
     }
   }
 
-  await updateMRRSnapshot(db, rawTenantId);
+  if (initialStatus === 'active') {
+    await updateMRRSnapshot(db, rawTenantId);
+  }
 
   const sub = await db.prepare(
     'SELECT s.*, p.name as plan_name, p.slug as plan_slug, p.container_size FROM subscriptions s LEFT JOIN subscription_plans p ON s.plan_id = p.id WHERE s.id = ?'

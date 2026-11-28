@@ -1133,29 +1133,26 @@ async function releaseTableIfEligible(
   }
   const targetStatus = 'Available';
   if (rsvTenant) {
-    const res = await db
+    await db
       .prepare(`UPDATE cafe_tables SET status = '${targetStatus}', current_session_id = NULL WHERE id = ? AND LOWER(TRIM(COALESCE(status, ''))) IN ('reserved', 'occupied', 'seated', 'overdue') AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?`)
       .bind(rsv.table_id, rsvTenant)
       .run()
-      .catch(() =>
-        db
-          .prepare(`UPDATE cafe_tables SET status = '${targetStatus}' WHERE id = ? AND LOWER(TRIM(COALESCE(status, ''))) IN ('reserved', 'occupied', 'seated', 'overdue') AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?`)
-          .bind(rsv.table_id, rsvTenant)
-          .run()
-          .catch(() =>
-            rsvTenant === 'default'
-              ? db.prepare(`UPDATE cafe_tables SET status = '${targetStatus}' WHERE id = ? AND LOWER(TRIM(COALESCE(status, ''))) IN ('reserved', 'occupied', 'seated', 'overdue')`).bind(rsv.table_id).run()
-              : undefined
-          )
-      );
-    const changes = Number((res as { meta?: { changes?: number } } | undefined)?.meta?.changes ?? 0);
-    if (changes === 0 && rsvTenant === 'default') {
-      await db
-        .prepare(`UPDATE cafe_tables SET status = '${targetStatus}' WHERE id = ? AND LOWER(TRIM(COALESCE(status, ''))) IN ('reserved', 'occupied', 'seated', 'overdue')`)
-        .bind(rsv.table_id)
-        .run()
-        .catch(() => undefined);
-    }
+      .catch(async () => {
+        try {
+          await db
+            .prepare(`UPDATE cafe_tables SET status = '${targetStatus}' WHERE id = ? AND LOWER(TRIM(COALESCE(status, ''))) IN ('reserved', 'occupied', 'seated', 'overdue') AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?`)
+            .bind(rsv.table_id, rsvTenant)
+            .run();
+        } catch (err) {
+          // Only fall back to an unscoped update on legacy default schemas lacking cafe_tables.tenant_id
+          if (rsvTenant === 'default' && /no such column:\s*tenant_id/i.test(String(err))) {
+            await db
+              .prepare(`UPDATE cafe_tables SET status = '${targetStatus}' WHERE id = ? AND LOWER(TRIM(COALESCE(status, ''))) IN ('reserved', 'occupied', 'seated', 'overdue')`)
+              .bind(rsv.table_id)
+              .run();
+          }
+        }
+      });
   } else {
     await db
       .prepare(`UPDATE cafe_tables SET status = '${targetStatus}', current_session_id = NULL WHERE id = ? AND LOWER(TRIM(COALESCE(status, ''))) IN ('reserved', 'occupied', 'seated', 'overdue')`)

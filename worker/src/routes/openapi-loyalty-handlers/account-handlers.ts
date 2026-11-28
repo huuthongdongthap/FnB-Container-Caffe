@@ -7,8 +7,8 @@ import {
   getLoyaltyAccountWithFallback,
   getVietnamMonthAndYear,
   hasOpenApiLoyaltyTenantMismatch,
+  isUnverifiedCustomerPhoneSession,
   matchesLoyaltyTenant,
-  recordLoyaltyTransactionDualWrite,
   syncLoyaltyAccountAndCustomerBalance,
   writeLoyaltyAuditLog,
 } from './loyalty-db-helpers';
@@ -190,6 +190,13 @@ export function registerAccountHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
     const { currentMonth, currentYear } = getVietnamMonthAndYear(nowDate);
     void vnNow;
     const customerId = String(user.customerId || user.customer_id || user.id);
+    if (await isUnverifiedCustomerPhoneSession(db, user, customerId, tenantId)) {
+      return c.json({
+        success: false,
+        code: 'PHONE_VERIFICATION_REQUIRED',
+        error: 'Vui lòng xác thực mã OTP để sử dụng ví hoàn tiền và ưu đãi.',
+      }, 403);
+    }
 
     const { account } = await getLoyaltyAccountWithFallback(db, customerId, now, tenantId);
 
@@ -360,30 +367,144 @@ export function registerAccountHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
       const currentPoints = Number(account.current_points ?? account.loyalty_points ?? 0);
       const expectedBalance = currentPoints + birthdayPoints;
 
-      const resolvedBalance = await syncLoyaltyAccountAndCustomerBalance(db, {
-        accountId: String(account.id),
-        customerId: accountCustomerId,
-        newBalance: expectedBalance,
-        pointsDelta: birthdayPoints,
-        lifetimeDelta: birthdayPoints,
-        tenantId: effectiveTenant,
-        now,
-      });
+      // Atomically reserve the annual birthday bonus ledger row in D1 before crediting points
+      // so concurrent requests across separate worker isolates cannot double-grant the bonus.
+      let claimedSlot = false;
+      try {
+        const claimRes = await db.prepare(
+          `INSERT INTO loyalty_transactions (
+            id, account_id, customer_id, type, points, balance_after,
+            order_id, reward_id, description, reason, idempotency_key, created_by, tenant_id, created_at
+          )
+          SELECT ?, ?, ?, 'birthday', ?, ?, NULL, NULL, 'Birthday bonus', 'Birthday bonus', ?, NULL, ?, ?
+          WHERE NOT EXISTS (
+            SELECT 1 FROM loyalty_transactions
+            WHERE (account_id = ? OR customer_id = ?)
+              AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?
+              AND (
+                idempotency_key = ?
+                OR (
+                  (type = 'birthday' OR (type = 'bonus' AND description LIKE '%Birthday%') OR reason = 'Birthday bonus')
+                  AND strftime('%Y', created_at) = ?
+                )
+              )
+          )`
+        ).bind(
+          transactionId,
+          String(account.id),
+          accountCustomerId,
+          birthdayPoints,
+          expectedBalance,
+          idempotencyKey,
+          effectiveTenant,
+          now,
+          String(account.id),
+          accountCustomerId,
+          effectiveTenant,
+          idempotencyKey,
+          currentYear
+        ).run();
+        claimedSlot = claimRes?.meta?.changes === undefined ? true : Number(claimRes.meta.changes) > 0;
+      } catch (claimErr) {
+        const errMsg = String(claimErr);
+        if (/UNIQUE constraint failed/i.test(errMsg)) {
+          claimedSlot = false;
+        } else if (allowUnscopedClaimFallback && /no such column:\s*tenant_id|no column named\s*tenant_id/i.test(errMsg)) {
+          try {
+            const legacyClaimRes = await db.prepare(
+              `INSERT INTO loyalty_transactions (
+                id, account_id, customer_id, type, points, balance_after,
+                order_id, reward_id, description, reason, idempotency_key, created_by, created_at
+              )
+              SELECT ?, ?, ?, 'birthday', ?, ?, NULL, NULL, 'Birthday bonus', 'Birthday bonus', ?, NULL, ?
+              WHERE NOT EXISTS (
+                SELECT 1 FROM loyalty_transactions
+                WHERE (account_id = ? OR customer_id = ?)
+                  AND (
+                    idempotency_key = ?
+                    OR (
+                      (type = 'birthday' OR (type = 'bonus' AND description LIKE '%Birthday%') OR reason = 'Birthday bonus')
+                      AND strftime('%Y', created_at) = ?
+                    )
+                  )
+              )`
+            ).bind(
+              transactionId,
+              String(account.id),
+              accountCustomerId,
+              birthdayPoints,
+              expectedBalance,
+              idempotencyKey,
+              now,
+              String(account.id),
+              accountCustomerId,
+              idempotencyKey,
+              currentYear
+            ).run();
+            claimedSlot = legacyClaimRes?.meta?.changes === undefined ? true : Number(legacyClaimRes.meta.changes) > 0;
+          } catch (legacyErr) {
+            if (/UNIQUE constraint failed/i.test(String(legacyErr))) {
+              claimedSlot = false;
+            } else {
+              throw legacyErr;
+            }
+          }
+        } else {
+          throw claimErr;
+        }
+      }
+
+      if (!claimedSlot) {
+        return c.json({ success: false, error: 'Birthday bonus already claimed this year' }, 409);
+      }
+
+      let resolvedBalance: number | null | undefined;
+      try {
+        resolvedBalance = await syncLoyaltyAccountAndCustomerBalance(db, {
+          accountId: String(account.id),
+          customerId: accountCustomerId,
+          newBalance: expectedBalance,
+          pointsDelta: birthdayPoints,
+          lifetimeDelta: birthdayPoints,
+          tenantId: effectiveTenant,
+          now,
+        });
+      } catch (syncErr) {
+        await db.prepare('DELETE FROM loyalty_transactions WHERE id = ?').bind(transactionId).run().catch(() => {});
+        throw syncErr;
+      }
       const newBalance = typeof resolvedBalance === 'number' && Number.isFinite(resolvedBalance) ? resolvedBalance : expectedBalance;
 
-      await recordLoyaltyTransactionDualWrite(db, {
-        txId: transactionId,
-        accountId: String(account.id),
-        customerId: accountCustomerId,
-        type: 'birthday',
-        points: birthdayPoints,
-        balanceAfter: newBalance,
-        description: 'Birthday bonus',
-        reason: 'Birthday bonus',
-        idempotencyKey,
-        tenantId: effectiveTenant,
-        now,
-      });
+      if (newBalance !== expectedBalance) {
+        await db.prepare('UPDATE loyalty_transactions SET balance_after = ? WHERE id = ?')
+          .bind(newBalance, transactionId)
+          .run()
+          .catch(() => {});
+      }
+
+      try {
+        try {
+          await db.prepare(
+            `INSERT OR IGNORE INTO loyalty_point_logs (
+              id, customer_id, order_id, points_change, reason, balance_after, description, tenant_id, created_at
+            )
+            SELECT ?, ?, NULL, ?, 'Birthday bonus', ?, 'Birthday bonus', ?, ?
+            WHERE EXISTS (SELECT 1 FROM customers WHERE id = ?)`
+          ).bind(transactionId, accountCustomerId, birthdayPoints, newBalance, effectiveTenant, now, accountCustomerId).run();
+        } catch (logErr) {
+          if (/no such column:\s*tenant_id|no column named\s*tenant_id/i.test(String(logErr))) {
+            await db.prepare(
+              `INSERT OR IGNORE INTO loyalty_point_logs (
+                id, customer_id, order_id, points_change, reason, balance_after, description, created_at
+              )
+              SELECT ?, ?, NULL, ?, 'Birthday bonus', ?, 'Birthday bonus', ?
+              WHERE EXISTS (SELECT 1 FROM customers WHERE id = ?)`
+            ).bind(transactionId, accountCustomerId, birthdayPoints, newBalance, now, accountCustomerId).run();
+          }
+        }
+      } catch {
+        // Ignore when loyalty_point_logs is absent in older migration snapshots
+      }
 
       await writeLoyaltyAuditLog(
         db,

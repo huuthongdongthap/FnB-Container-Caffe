@@ -129,6 +129,13 @@ export const ORDER_RATE_LIMIT: RateLimitConfig = {
   errorMessage: 'Quá nhiều đơn hàng. Vui lòng thử lại sau 10 phút.'
 };
 
+export const ORDER_TRACK_RATE_LIMIT: RateLimitConfig = {
+  max: 60,
+  windowSec: 60,
+  keyPrefix: 'rate:order-track',
+  errorMessage: 'Too many order tracking requests. Please try again in 1 minute.'
+};
+
 /**
  * POS checkout is staff-driven and bursts during a rush, so it gets a higher
  * ceiling than the customer-facing order limit — never zero. Keyed per user,

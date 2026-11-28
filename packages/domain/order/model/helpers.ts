@@ -12,7 +12,8 @@ export function generateId(prefix = 'ID_') {
 }
 
 export function generateOrderNumber(prefix = 'ORD-'): string {
-  const bytes = new Uint8Array(4);
+  // 12 base-32 symbols provide 60 bits of entropy, preventing sequential/brute-force enumeration
+  const bytes = new Uint8Array(12);
   crypto.getRandomValues(bytes);
   let code = '';
   for (let i = 0; i < bytes.length; i++) {

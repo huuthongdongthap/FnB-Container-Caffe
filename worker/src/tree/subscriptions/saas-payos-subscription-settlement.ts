@@ -76,10 +76,18 @@ export async function settleSubscriptionInvoiceByPayOS(
   const { orderCode, amountPaid, isPaid, nowIso } = input;
   const prefixedRef = `payos:${orderCode}`;
 
-  const invoice = await db
-    .prepare('SELECT * FROM subscription_invoices WHERE payment_ref IN (?, ?) LIMIT 1')
-    .bind(prefixedRef, orderCode)
-    .first<InvoiceRow>();
+  let invoice: InvoiceRow | null;
+  try {
+    invoice = await db
+      .prepare('SELECT * FROM subscription_invoices WHERE payment_ref IN (?, ?) LIMIT 1')
+      .bind(prefixedRef, orderCode)
+      .first<InvoiceRow>();
+  } catch (err) {
+    if (/no such table:\s*subscription_invoices/i.test(err instanceof Error ? err.message : String(err))) {
+      return { handled: false, message: 'Subscription invoices table unavailable' };
+    }
+    throw err;
+  }
   if (!invoice) {
     return { handled: false, message: 'Not a subscription invoice' };
   }
@@ -140,6 +148,8 @@ export async function settleSubscriptionInvoiceByPayOS(
   const invoiceCovered = Boolean(invoiceEnd) && Boolean(subscriptionEnd) && invoiceEnd <= subscriptionEnd;
   const newStart = (invoiceCovered ? subscriptionStart : subscriptionEnd || invoiceStart) || todayIso;
   const newEnd = invoiceCovered ? subscriptionEnd : addMonths(newStart, months);
+  const subStatus = String(subscription.status ?? '').trim().toLowerCase();
+  const needsInitialActivation = invoiceCovered && (subStatus === 'pending_payment' || subStatus === 'pending');
 
   const invoiceClaim = db
     .prepare(
@@ -150,12 +160,23 @@ export async function settleSubscriptionInvoiceByPayOS(
     .bind(nowIso, prefixedRef, nowIso, invoice.id, invoice.status, tenantId);
 
   const advanceStatement = invoiceCovered
-    ? null
+    ? (needsInitialActivation
+        ? db
+            .prepare(
+              `UPDATE subscriptions
+               SET status = 'active', updated_at = ?
+               WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?
+                 AND status IN ('pending_payment', 'pending')
+                 AND EXISTS (SELECT 1 FROM subscription_invoices WHERE id = ? AND status = 'paid')`
+            )
+            .bind(nowIso, invoice.subscription_id, tenantId, invoice.id)
+        : null)
     : db
         .prepare(
           `UPDATE subscriptions
            SET status = 'active', current_period_start = ?, current_period_end = ?, next_billing_date = ?, updated_at = ?
            WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?
+             AND LOWER(TRIM(COALESCE(status, ''))) NOT IN ('cancelled', 'canceled')
              AND EXISTS (SELECT 1 FROM subscription_invoices WHERE id = ? AND status = 'paid')`
         )
         .bind(newStart, newEnd, newEnd, nowIso, invoice.subscription_id, tenantId, invoice.id);
@@ -172,7 +193,9 @@ export async function settleSubscriptionInvoiceByPayOS(
     : false;
   return {
     handled: true,
-    message: subscriptionAdvanced ? 'Subscription renewed' : 'Invoice paid, subscription not advanced',
+    message: subscriptionAdvanced
+      ? (needsInitialActivation ? 'Subscription activated' : 'Subscription renewed')
+      : 'Invoice paid, subscription not advanced',
     subscriptionAdvanced,
     tenantId,
   };
