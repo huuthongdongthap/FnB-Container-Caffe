@@ -8,13 +8,14 @@ import { Hono } from 'hono';
 import type { Env } from '../types/env';
 import { requireAuth, optionalAuth } from '../middleware/auth';
 import { audit } from '../middleware/audit-log';
-import { rateLimitMiddleware, ORDER_RATE_LIMIT, POS_CHECKOUT_RATE_LIMIT } from '../middleware/rate-limit';
+import { rateLimitMiddleware, ORDER_RATE_LIMIT, ORDER_TRACK_RATE_LIMIT, POS_CHECKOUT_RATE_LIMIT } from '../middleware/rate-limit';
 
 import {
   orderRateLimit,
   handleCreateOrder,
   handleSyncOrders,
   handleSplitOrders,
+  LATEST_ORDER_ROLES,
   handleLatestOrderTimestamp,
   handleUpdateOrder,
 } from './orders-core';
@@ -58,7 +59,7 @@ const SPLIT_ORDER_ROLES = ['owner', 'admin', 'manager', 'supervisor', 'staff', '
 
 ordersUnifiedRouter.post('/sync', orderRateLimit, handleSyncOrders);
 ordersUnifiedRouter.post('/split', orderRateLimit, requireAuth(SPLIT_ORDER_ROLES), handleSplitOrders);
-ordersUnifiedRouter.get('/latest', handleLatestOrderTimestamp);
+ordersUnifiedRouter.get('/latest', requireAuth(LATEST_ORDER_ROLES), handleLatestOrderTimestamp);
 
 ordersUnifiedRouter.get('/kds/recent', requireAuth(KDS_ROLES), handleGetKdsRecentOrders);
 ordersUnifiedRouter.get('/kds', requireAuth(KDS_ROLES), handleGetKdsOrders);
@@ -73,10 +74,11 @@ ordersUnifiedRouter.get('/', requireAuth(['owner', 'manager', 'supervisor', 'sta
 
 // ── 2. Parameterized Routes with Sub-paths (/:id/...) ──
 // Tracking links are shared, so these stay reachable without credentials — but
-// optionalAuth populates c.get('user') when a token is present so the handler's
-// ownership check can tell a returning customer from an anonymous guest.
-ordersUnifiedRouter.get('/:id/events', optionalAuth(), handleOrderStreamEvents);
-ordersUnifiedRouter.get('/:id/track', optionalAuth(), handleTrackOrder);
+// rate limiting curbs brute-force enumeration and optionalAuth populates c.get('user')
+// when a token is present so the handler's ownership check can tell a returning
+// customer from an anonymous guest.
+ordersUnifiedRouter.get('/:id/events', rateLimitMiddleware(ORDER_TRACK_RATE_LIMIT), optionalAuth(), handleOrderStreamEvents);
+ordersUnifiedRouter.get('/:id/track', rateLimitMiddleware(ORDER_TRACK_RATE_LIMIT), optionalAuth(), handleTrackOrder);
 
 ordersUnifiedRouter.patch('/:id/status', requireAuth(['owner', 'manager', 'supervisor', 'staff', 'waiter', 'cashier', 'admin', 'kitchen', 'barista', 'chef', 'shipper', 'rider']), audit('order_status_change'), handleUpdateOrderStatus);
 ordersUnifiedRouter.patch('/:id/mark-cod-paid', requireAuth(COD_COLLECTION_ROLES), audit('order_cod_paid'), handleMarkCodPaid);

@@ -14,7 +14,7 @@ import {
   pauseSubscription, resumeSubscription, deleteSubscription, deletePlan
 } from '../tree/subscriptions/sub-handlers';
 import { listInvoices, payInvoice, generateInvoices } from '../tree/subscriptions/invoice-handlers';
-import { requireSubAdminMiddleware, requireSubAuthMiddleware } from '../tree/subscriptions/middleware';
+import { requireSubAdminMiddleware, requireSubAuthMiddleware } from '../tree/subscriptions/auth-helpers';
 
 export const subscriptionsRouter = new Hono<{ Bindings: Env }>();
 subscriptionsRouter.use('*', async (c, next) => {

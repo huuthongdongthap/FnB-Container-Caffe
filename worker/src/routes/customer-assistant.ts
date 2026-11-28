@@ -180,31 +180,94 @@ async function loadTenantConciergeProfile(
   };
 }
 
+const ORDER_ID_EXTRACTION_REGEX = /(?:#([a-z0-9_-]{3,32})|\b((?:ord[_-])[a-z0-9_-]{2,32}|(?=[a-z0-9_-]*\d)[a-z0-9_-]{5,32})\b)/i;
+
+function normalizeAssistantAscii(input: string): string {
+  return input
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .replace(/đ/g, 'd');
+}
+
+function classifyCustomerAssistantIntent(data: {
+  query: string;
+  table_number?: string;
+  order_id?: string;
+}) {
+  const qLower = data.query.toLowerCase();
+  const qAscii = normalizeAssistantAscii(data.query);
+
+  const isWifiQuery =
+    qLower.includes('wifi') ||
+    qLower.includes('wi-fi') ||
+    qLower.includes('mật khẩu') ||
+    qAscii.includes('mat khau') ||
+    qLower.includes('pass');
+
+  const isBillQuery =
+    !isWifiQuery &&
+    (
+      qLower.includes('hóa đơn') ||
+      qLower.includes('hoá đơn') ||
+      qAscii.includes('hoa don') ||
+      qLower.includes('tính tiền') ||
+      qAscii.includes('tinh tien') ||
+      qLower.includes('thanh toán bàn') ||
+      qAscii.includes('thanh toan ban') ||
+      Boolean(data.table_number) ||
+      (!data.order_id && (qLower.includes('bàn') || /\bban\s*[0-9a-zA-Z]+/i.test(qAscii)))
+    );
+
+  const orderIdMatch = qLower.match(ORDER_ID_EXTRACTION_REGEX);
+  const extractedOrderId = data.order_id?.trim() || orderIdMatch?.[1] || orderIdMatch?.[2];
+
+  const isOrderStatusQuery =
+    !isWifiQuery &&
+    !isBillQuery &&
+    Boolean(
+      data.order_id ||
+      qLower.includes('đơn') ||
+      qAscii.includes('don hang') ||
+      qLower.includes('order') ||
+      qLower.includes('giao') ||
+      qLower.includes('làm xong') ||
+      qAscii.includes('lam xong')
+    );
+
+  const extractedTable =
+    data.table_number?.trim() ||
+    qLower.match(/bàn\s*([0-9a-zA-Z]+)/)?.[1] ||
+    qAscii.match(/\bban\s*([0-9a-zA-Z]+)/)?.[1];
+
+  return {
+    qLower,
+    qAscii,
+    isWifiQuery,
+    isBillQuery,
+    isOrderStatusQuery,
+    extractedTable,
+    extractedOrderId,
+  };
+}
+
 export async function processCustomerQuery(
   db: import('@cloudflare/workers-types').D1Database,
   aiBinding: unknown,
   tenantId: string,
   data: z.infer<typeof querySchema>
 ): Promise<{ intent: string; reply: string; engine: string }> {
-  const q = data.query.toLowerCase();
-  const qAscii = q
-    .normalize('NFD')
-    .replace(/[̀-ͯ]/g, '')
-    .replace(/đ/g, 'd');
+  const {
+    qLower: q,
+    isWifiQuery,
+    isBillQuery,
+    isOrderStatusQuery,
+    extractedTable,
+    extractedOrderId,
+  } = classifyCustomerAssistantIntent(data);
   let intent = 'general';
   let reply = '';
   let engine = 'deterministic';
-
-  const isWifiQuery = q.includes('wifi') || q.includes('wi-fi') || q.includes('mật khẩu') || q.includes('pass');
-  const isBillQuery =
-    q.includes('hóa đơn') ||
-    q.includes('hoá đơn') ||
-    qAscii.includes('hoa don') ||
-    q.includes('tính tiền') ||
-    qAscii.includes('tinh tien') ||
-    q.includes('thanh toán bàn') ||
-    Boolean(data.table_number) ||
-    (!data.order_id && q.includes('bàn'));
 
   if (isWifiQuery) {
     intent = 'wifi_info';
@@ -217,7 +280,7 @@ export async function processCustomerQuery(
   } else if (isBillQuery) {
     intent = 'table_bill';
     const profile = await loadTenantConciergeProfile(db, tenantId);
-    const tbl = data.table_number || q.match(/bàn\s*([0-9a-zA-Z]+)/)?.[1] || qAscii.match(/ban\s*([0-9a-zA-Z]+)/)?.[1];
+    const tbl = extractedTable;
     if (tbl) {
       let activeOrder: { id: string; total: number; status: string; tenant_id?: string | null } | null = null;
       try {
@@ -287,16 +350,15 @@ export async function processCustomerQuery(
     } else {
       reply = `Bạn đang ngồi tại bàn số mấy để ${profile.brandName} kiểm tra hóa đơn giúp bạn nhé?`;
     }
-  } else if (q.includes('đơn') || q.includes('order') || q.includes('giao') || q.includes('làm xong') || data.order_id) {
+  } else if (isOrderStatusQuery) {
     intent = 'order_status';
     let orderRow: { id: string; status: string; total: number; tenant_id?: string | null } | null = null;
-    const extractedId = data.order_id?.trim() || q.match(/(?:#([a-z0-9_-]{3,32})|\b((?:ord[_-])[a-z0-9_-]{2,32}|(?=[a-z0-9_-]*\d)[a-z0-9_-]{5,32})\b)/i)?.[1]
-      || q.match(/(?:#([a-z0-9_-]{3,32})|\b((?:ord[_-])[a-z0-9_-]{2,32}|(?=[a-z0-9_-]*\d)[a-z0-9_-]{5,32})\b)/i)?.[2];
+    const extractedId = extractedOrderId;
 
     if (extractedId) {
       try {
         orderRow = await db.prepare(
-          "SELECT id, status, COALESCE(total_amount, total, 0) as total, tenant_id FROM orders WHERE (? = '*' OR COALESCE(NULLIF(tenant_id, ''), 'default') = ?) AND LOWER(id) = LOWER(?) OR (?1 = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?2) AND LOWER(id) = LOWER(?3) LIMIT 1"
+          "SELECT id, status, COALESCE(total_amount, total, 0) as total, tenant_id FROM orders WHERE (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?) AND LOWER(id) = LOWER(?) LIMIT 1"
         ).bind(tenantId, tenantId, extractedId).first<{ id: string; status: string; total: number; tenant_id?: string | null }>();
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
@@ -309,14 +371,14 @@ export async function processCustomerQuery(
             orderRow = null;
           }
         } else {
-          orderRow = await db.prepare("SELECT id, status, COALESCE(total, 0) as total, tenant_id FROM orders WHERE (? = '*' OR COALESCE(NULLIF(tenant_id, ''), 'default') = ?) AND LOWER(id) = LOWER(?) OR (?1 = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?2) AND LOWER(id) = LOWER(?3) LIMIT 1")
+          orderRow = await db.prepare("SELECT id, status, COALESCE(total, 0) as total, tenant_id FROM orders WHERE (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?) AND LOWER(id) = LOWER(?) LIMIT 1")
             .bind(tenantId, tenantId, extractedId).first<{ id: string; status: string; total: number; tenant_id?: string | null }>().catch(() => null);
         }
       }
     } else if (data.phone) {
       try {
         orderRow = await db.prepare(
-          "SELECT id, status, COALESCE(total_amount, total, 0) as total, tenant_id FROM orders WHERE (? = '*' OR COALESCE(NULLIF(tenant_id, ''), 'default') = ?) AND customer_phone = ? OR (?1 = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?2) AND customer_phone = ?3 ORDER BY created_at DESC LIMIT 1"
+          "SELECT id, status, COALESCE(total_amount, total, 0) as total, tenant_id FROM orders WHERE (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?) AND customer_phone = ? ORDER BY created_at DESC LIMIT 1"
         ).bind(tenantId, tenantId, data.phone).first<{ id: string; status: string; total: number; tenant_id?: string | null }>();
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
@@ -329,7 +391,7 @@ export async function processCustomerQuery(
             orderRow = null;
           }
         } else {
-          orderRow = await db.prepare("SELECT id, status, COALESCE(total, 0) as total, tenant_id FROM orders WHERE (? = '*' OR COALESCE(NULLIF(tenant_id, ''), 'default') = ?) AND customer_phone = ? OR (?1 = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?2) AND customer_phone = ?3 ORDER BY created_at DESC LIMIT 1")
+          orderRow = await db.prepare("SELECT id, status, COALESCE(total, 0) as total, tenant_id FROM orders WHERE (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?) AND customer_phone = ? ORDER BY created_at DESC LIMIT 1")
             .bind(tenantId, tenantId, data.phone).first<{ id: string; status: string; total: number; tenant_id?: string | null }>().catch(() => null);
         }
       }
@@ -494,24 +556,14 @@ customerAssistantRouter.post('/', rateLimitMiddleware(CHAT_ASSISTANT_RATE_LIMIT)
   const db = (c.env.AURA_DB ?? (c.env as Record<string, unknown>).DB) as import('@cloudflare/workers-types').D1Database;
   const aiBinding = (c.env as Record<string, unknown>).AI;
 
-  const qLower = parsed.data.query.toLowerCase();
-  const extractedOrderId =
-    parsed.data.order_id?.trim() ||
-    qLower.match(/(?:#([a-z0-9_-]{3,32})|\b((?:ord[_-])[a-z0-9_-]{2,32}|(?=[a-z0-9_-]*\d)[a-z0-9_-]{5,32})\b)/i)?.[1] ||
-    qLower.match(/(?:#([a-z0-9_-]{3,32})|\b((?:ord[_-])[a-z0-9_-]{2,32}|(?=[a-z0-9_-]*\d)[a-z0-9_-]{5,32})\b)/i)?.[2];
-  const isOrderStatusQuery = Boolean(
-    parsed.data.order_id ||
-    qLower.includes('đơn') ||
-    qLower.includes('order') ||
-    qLower.includes('giao') ||
-    qLower.includes('làm xong')
-  );
-  const extractedTable =
-    parsed.data.table_number?.trim() ||
-    (!isOrderStatusQuery ? qLower.match(/bàn\s*([0-9a-zA-Z]+)/i)?.[1] : undefined);
-  const isTableBillQuery =
-    !isOrderStatusQuery &&
-    Boolean(parsed.data.table_number || qLower.includes('bàn') || qLower.includes('tính tiền') || qLower.includes('hóa đơn'));
+  // Share the exact same diacritic-normalized classifier as processCustomerQuery so
+  // ASCII or mixed-keyword payloads cannot bypass route auth/ownership guards.
+  const {
+    isBillQuery: isTableBillQuery,
+    isOrderStatusQuery,
+    extractedTable,
+    extractedOrderId,
+  } = classifyCustomerAssistantIntent(parsed.data);
 
   const pilotStore = resolvePilotStore(c.env) || 'default';
 
@@ -611,7 +663,7 @@ customerAssistantRouter.post('/', rateLimitMiddleware(CHAT_ASSISTANT_RATE_LIMIT)
     try {
       existingOrder = await db
         .prepare(
-          "SELECT id, customer_id, customer_phone, tenant_id FROM orders WHERE (? = '*' OR COALESCE(NULLIF(tenant_id, ''), 'default') = ?) AND LOWER(id) = LOWER(?) OR (?1 = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?2) AND LOWER(id) = LOWER(?3) LIMIT 1"
+          "SELECT id, customer_id, customer_phone, tenant_id FROM orders WHERE (? = '*' OR COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?) AND LOWER(id) = LOWER(?) LIMIT 1"
         )
         .bind(tenantId, tenantId, extractedOrderId)
         .first<{ id?: string; customer_id?: string | null; customer_phone?: string | null; tenant_id?: string | null }>();
@@ -664,6 +716,7 @@ customerAssistantRouter.post('/', rateLimitMiddleware(CHAT_ASSISTANT_RATE_LIMIT)
         .prepare(
           `SELECT o.id, o.customer_id, o.customer_phone, o.tenant_id FROM orders o
            LEFT JOIN cafe_tables t ON o.table_id = t.id
+             AND COALESCE(NULLIF(TRIM(t.tenant_id), ''), 'default') = COALESCE(NULLIF(TRIM(o.tenant_id), ''), 'default')
            WHERE (? = '*' OR COALESCE(NULLIF(TRIM(o.tenant_id), ''), 'default') = ?)
              AND (o.table_number = ? OR CAST(t.table_number AS TEXT) = ? OR o.table_id = ?)
              AND o.status NOT IN ('completed', 'cancelled')
@@ -676,6 +729,7 @@ customerAssistantRouter.post('/', rateLimitMiddleware(CHAT_ASSISTANT_RATE_LIMIT)
         .prepare(
           `SELECT o.id, o.customer_id, o.customer_phone, o.tenant_id FROM orders o
            LEFT JOIN cafe_tables t ON o.table_id = t.id
+             AND COALESCE(NULLIF(TRIM(t.tenant_id), ''), 'default') = COALESCE(NULLIF(TRIM(o.tenant_id), ''), 'default')
            WHERE (? = '*' OR COALESCE(NULLIF(TRIM(o.tenant_id), ''), 'default') = ?)
              AND (CAST(t.table_number AS TEXT) = ? OR o.table_id = ?)
              AND o.status NOT IN ('completed', 'cancelled')

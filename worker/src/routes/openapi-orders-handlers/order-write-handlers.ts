@@ -196,7 +196,12 @@ export async function handleOpenApiUpdateOrder(c: Context<{ Bindings: Env }>) {
       }
       const persistedShipperId = String(existing.assigned_shipper_id || '').trim();
       const actorId = String(user?.id || '').trim();
-      if (persistedShipperId && (!actorId || persistedShipperId !== actorId)) {
+      const isSelfClaimDispatch =
+        !persistedShipperId &&
+        Boolean(actorId) &&
+        String(existing.status || '').trim().toLowerCase() === 'ready' &&
+        String(body.status || '').trim().toLowerCase() === 'delivering';
+      if (!actorId || (!persistedShipperId && !isSelfClaimDispatch) || (persistedShipperId && persistedShipperId !== actorId)) {
         return c.json({ success: false, error: 'Shippers may only update orders assigned to them' }, 403);
       }
       const hasCustomerPiiMutation =

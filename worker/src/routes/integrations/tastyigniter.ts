@@ -31,8 +31,11 @@ const log = createLogger({ route: 'ti-gateway' });
 const WEBHOOK_TIMESTAMP_TOLERANCE_SECONDS = 300;
 const WEBHOOK_REPLAY_TTL_SECONDS = 600;
 
-function isFreshTiWebhookTimestamp(rawTs: string | undefined | null): boolean {
-  if (!rawTs || !rawTs.trim()) return true;
+function isFreshTiWebhookTimestamp(
+  rawTs: string | undefined | null,
+  requireTimestamp = false,
+): boolean {
+  if (!rawTs || !rawTs.trim()) return !requireTimestamp;
   const trimmed = rawTs.trim();
   let tsSeconds = NaN;
   if (/^\d+(\.\d+)?$/.test(trimmed)) {
@@ -317,12 +320,14 @@ export function createTIRoutes() {
         }
       }
 
+      const requireTimestamp =
+        String((c.env as unknown as Record<string, unknown>)?.WEBHOOK_REQUIRE_TIMESTAMP || '').toLowerCase() === 'true';
       const rawTimestamp =
         c.req.header('x-tastyigniter-timestamp') ??
         c.req.header('X-TastyIgniter-Timestamp') ??
         c.req.header('x-webhook-timestamp') ??
         c.req.header('x-timestamp');
-      if (!isFreshTiWebhookTimestamp(rawTimestamp)) {
+      if (!isFreshTiWebhookTimestamp(rawTimestamp, requireTimestamp)) {
         return c.json({ error: 'Stale or invalid webhook timestamp' }, 401);
       }
 

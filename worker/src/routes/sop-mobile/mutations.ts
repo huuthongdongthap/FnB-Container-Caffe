@@ -192,11 +192,15 @@ export async function postAppealMyViolation(c: Context<{ Bindings: Env }>) {
  * holds the right HTTP status, so the handler does not re-decide policy.
  */
 function sopError(err: unknown) {
-  const status = typeof err === 'object' && err !== null && 'status' in err
+  const rawStatus = typeof err === 'object' && err !== null && 'status' in err
     ? Number((err as { status: unknown }).status)
     : 500;
-  const message = err instanceof Error ? err.message : 'Checklist action rejected';
-  return errorResponse(message, (status >= 400 && status <= 599 ? status : 500) as 400 | 401 | 403 | 404 | 409 | 503);
+  const status = (rawStatus >= 400 && rawStatus <= 599 ? rawStatus : 500) as 400 | 401 | 403 | 404 | 409 | 500 | 503;
+  // Never expose raw internal database/runtime error messages on 5xx responses
+  const message = status >= 500
+    ? (status === 503 ? 'Service temporarily unavailable' : 'Internal server error')
+    : (err instanceof Error ? err.message : 'Checklist action rejected');
+  return errorResponse(message, status);
 }
 
 // The body is unvalidated JSON, so each reader narrows explicitly rather than

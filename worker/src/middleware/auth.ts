@@ -12,6 +12,7 @@ export interface AuthUser {
   role: 'customer' | 'staff' | 'waiter' | 'manager' | 'supervisor' | 'owner' | 'admin' | 'cashier' | 'kitchen' | 'barista' | 'chef' | 'shipper';
   tenantId?: string; tier?: string; authVersion?: number;
   emailVerified?: boolean; email_verified?: boolean | number;
+  phoneVerified?: boolean; phone_verified?: boolean | number;
 }
 declare module 'hono' {
   // eslint-disable-next-line no-unused-vars
@@ -24,13 +25,16 @@ declare module 'hono' {
     userTier?: string;
   }
 }
-export function toUser(payload: { id: string; email: string; name: string; role: string; tenantId?: string; tier?: string; authVersion?: number; emailVerified?: boolean; email_verified?: boolean | number }): AuthUser {
+export function toUser(payload: { id: string; email: string; name: string; role: string; tenantId?: string; tier?: string; authVersion?: number; emailVerified?: boolean; email_verified?: boolean | number; phoneVerified?: boolean; phone_verified?: boolean | number }): AuthUser {
   const rawVerified = payload.emailVerified ?? payload.email_verified;
   const isVerified = rawVerified === undefined ? undefined : Boolean(rawVerified && rawVerified !== 0);
+  const rawPhoneVerified = payload.phoneVerified ?? payload.phone_verified;
+  const isPhoneVerified = rawPhoneVerified === undefined ? undefined : Boolean(rawPhoneVerified && rawPhoneVerified !== 0);
   return { id: payload.id, email: payload.email || '', name: payload.name || '',
     role: (payload.role || 'customer') as AuthUser['role'], tenantId: payload.tenantId, tier: payload.tier,
     ...(payload.authVersion !== undefined ? { authVersion: payload.authVersion } : {}),
-    ...(isVerified !== undefined ? { emailVerified: isVerified, email_verified: rawVerified } : {}) };
+    ...(isVerified !== undefined ? { emailVerified: isVerified, email_verified: rawVerified } : {}),
+    ...(isPhoneVerified !== undefined ? { phoneVerified: isPhoneVerified, phone_verified: rawPhoneVerified } : {}) };
 }
 const DEFAULT_AUTHENTICATED_ROLES = [
   'customer', 'user', 'staff', 'waiter', 'manager', 'supervisor', 'owner', 'admin', 'cashier', 'kitchen', 'barista', 'chef', 'bep', 'shipper', 'rider',

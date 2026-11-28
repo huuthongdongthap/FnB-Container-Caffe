@@ -63,8 +63,11 @@ const log = createLogger({ route: 'ha' });
 const WEBHOOK_TIMESTAMP_TOLERANCE_SECONDS = 300;
 const WEBHOOK_REPLAY_TTL_SECONDS = 600;
 
-function isFreshHaWebhookTimestamp(rawTs: string | undefined | null): boolean {
-  if (!rawTs || !rawTs.trim()) return true;
+function isFreshHaWebhookTimestamp(
+  rawTs: string | undefined | null,
+  requireTimestamp = false,
+): boolean {
+  if (!rawTs || !rawTs.trim()) return !requireTimestamp;
   const trimmed = rawTs.trim();
   let tsSeconds = NaN;
   if (/^\d+(\.\d+)?$/.test(trimmed)) {
@@ -309,11 +312,13 @@ export function createHARouter() {
         }
       }
 
+      const requireTimestamp =
+        String((c.env as unknown as Record<string, unknown>)?.WEBHOOK_REQUIRE_TIMESTAMP || '').toLowerCase() === 'true';
       const rawTimestamp =
         c.req.header('x-ha-timestamp') ??
         c.req.header('x-webhook-timestamp') ??
         c.req.header('x-timestamp');
-      if (!isFreshHaWebhookTimestamp(rawTimestamp)) {
+      if (!isFreshHaWebhookTimestamp(rawTimestamp, requireTimestamp)) {
         return c.json({ error: 'Stale or invalid webhook timestamp' }, 401);
       }
 

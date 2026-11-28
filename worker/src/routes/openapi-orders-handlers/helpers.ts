@@ -164,12 +164,19 @@ export function formatOrderItem(item: Row): OrderItem {
  * Customer-safe line-item projection. Drops product identifiers and modifier
  * option ids so a guest response never carries procurement-side references.
  */
-export function formatCustomerOrderItem(item: Row): CustomerOrderItem {
+export function formatCustomerOrderItem(
+  item: Row,
+  options: { includeNotes?: boolean } = {},
+): CustomerOrderItem {
   const qty = Number(item.quantity) || 1;
-  const subtotal = Number(item.total_price ?? item.subtotal ?? 0);
-  const unitPrice = item.unit_price !== undefined && item.unit_price !== null
-    ? Number(item.unit_price)
-    : Math.round(subtotal / qty);
+  const rawUnitPrice = item.unit_price ?? item.price ?? item.unitPriceCents;
+  const rawSubtotal = item.total_price ?? item.subtotal ?? item.subtotalCents;
+  const unitPrice = rawUnitPrice !== undefined && rawUnitPrice !== null
+    ? Number(rawUnitPrice)
+    : Math.round(Number(rawSubtotal ?? 0) / qty);
+  const subtotal = rawSubtotal !== undefined && rawSubtotal !== null
+    ? Number(rawSubtotal)
+    : Math.round(unitPrice * qty);
   const modifiers = parseModifiers(item.modifiers) as Array<Row>;
   const includeCatalogRef =
     item.menu_item_id !== undefined ||
@@ -194,7 +201,7 @@ export function formatCustomerOrderItem(item: Row): CustomerOrderItem {
           priceAdjustment: m.priceAdjustment ?? m.price_adjustment ?? m.price_delta ?? 0,
         }))
       : undefined,
-    notes: item.notes ?? null,
+    notes: options.includeNotes === false ? null : (item.notes ?? null),
     status: item.status ?? 'pending',
   };
 }
@@ -241,15 +248,26 @@ export function formatOrder(order: Row, items: Row[], payments: Row[]) {
  * `source`, `payments`, `locationId`, `tableId` and every staff field.
  * Callers must not spread the raw row into this object.
  */
-export function formatCustomerOrder(order: Row, items: Row[]) {
-  let fallbackItems: any[] = [];
+export function formatCustomerOrder(
+  order: Row,
+  items: Row[],
+  options: { includeNotes?: boolean } = {},
+) {
+  let rawFallbackItems: unknown[] = [];
   if (items.length === 0 && order.items) {
     try {
-      fallbackItems = typeof order.items === 'string' ? JSON.parse(order.items) : order.items;
+      const parsed = typeof order.items === 'string' ? JSON.parse(order.items) : order.items;
+      rawFallbackItems = Array.isArray(parsed) ? parsed : [];
     } catch {
-      fallbackItems = [];
+      rawFallbackItems = [];
     }
   }
+  const safeItems =
+    items.length > 0
+      ? items.map((item) => formatCustomerOrderItem(item, options))
+      : rawFallbackItems
+          .filter((item): item is Row => Boolean(item && typeof item === 'object'))
+          .map((item) => formatCustomerOrderItem(item, options));
   const discountAmount = order.discount_amount ?? order.discount ?? 0;
   const totalAmount = order.total_amount ?? order.total ?? 0;
   const subtotal = order.subtotal ?? Number(totalAmount) + Number(discountAmount);
@@ -257,7 +275,7 @@ export function formatCustomerOrder(order: Row, items: Row[]) {
     id: order.id,
     orderNumber: order.order_number,
     table: order.table_id ? { id: order.table_id, name: order.table_name } : null,
-    items: items.length > 0 ? items.map(formatCustomerOrderItem) : fallbackItems,
+    items: safeItems,
     channel: order.order_type || order.channel || 'dine_in',
     subtotal,
     discountAmount,
@@ -266,7 +284,7 @@ export function formatCustomerOrder(order: Row, items: Row[]) {
     status: order.status,
     paymentStatus: order.payment_status,
     paymentMethod: typeof order.payment_method === 'string' ? order.payment_method : undefined,
-    notes: sanitizeOrderNotes(order.notes),
+    notes: options.includeNotes === false ? null : sanitizeOrderNotes(order.notes),
     createdAt: order.created_at,
     updatedAt: order.updated_at,
   };

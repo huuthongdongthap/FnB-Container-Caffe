@@ -63,9 +63,9 @@ containerTelemetryRouter.post(
     const envRec = (c.env ?? {}) as Record<string, unknown>;
     const providedSecret =
       c.req.header('x-edge-telemetry-secret') ||
-      c.req.header('x-edge-secret') ||
-      c.req.header('x-webhook-secret');
-    const rawExpected = envRec.EDGE_TELEMETRY_SECRET ?? envRec.EDGE_SECRET ?? c.env?.WEBHOOK_SECRET;
+      c.req.header('x-edge-secret');
+    // Dedicated edge telemetry secret only — never fall back to shared WEBHOOK_SECRET
+    const rawExpected = envRec.EDGE_TELEMETRY_SECRET ?? envRec.EDGE_SECRET;
     const expectedSecret = typeof rawExpected === 'string' && rawExpected.length > 0 ? rawExpected : undefined;
 
     if (providedSecret && expectedSecret && await timingSafeEqual(providedSecret, expectedSecret)) {
@@ -111,7 +111,29 @@ containerTelemetryRouter.post(
         tenantId = requestedTenant || resolvePilotStore(c.env);
       }
     } else if (c.get('edgeSecretVerified' as never)) {
-      tenantId = requestedTenant || resolvePilotStore(c.env);
+      const envRec = (c.env ?? {}) as Record<string, unknown>;
+      const isProd = envRec.ENVIRONMENT === 'production' || envRec.NODE_ENV === 'production';
+      const configuredEdgeTenant =
+        typeof envRec.EDGE_TELEMETRY_TENANT_ID === 'string' ? envRec.EDGE_TELEMETRY_TENANT_ID.trim() : '';
+      const configuredPilotTenant =
+        typeof envRec.PILOT_TENANT_ID === 'string' ? envRec.PILOT_TENANT_ID.trim() : '';
+      const pinnedEdgeTenant = configuredEdgeTenant || configuredPilotTenant;
+      if (configuredEdgeTenant === '*') {
+        tenantId = requestedTenant || resolvePilotStore(c.env);
+      } else if (pinnedEdgeTenant) {
+        if (requestedTenant && requestedTenant !== pinnedEdgeTenant) {
+          return c.json({ success: false, error: 'Cross-tenant telemetry target denied' }, 403);
+        }
+        tenantId = pinnedEdgeTenant;
+      } else if (isProd) {
+        const defaultProdTenant = resolvePilotStore(c.env) || 'default';
+        if (requestedTenant && requestedTenant !== defaultProdTenant) {
+          return c.json({ success: false, error: 'Cross-tenant telemetry target denied' }, 403);
+        }
+        tenantId = defaultProdTenant;
+      } else {
+        tenantId = requestedTenant || resolvePilotStore(c.env);
+      }
     } else {
       if (requestedTenant && requestedTenant !== resolvePilotStore(c.env)) {
         return c.json({ success: false, error: 'Authentication required for tenant-scoped telemetry' }, 401);

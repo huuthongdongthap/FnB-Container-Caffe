@@ -416,12 +416,22 @@ export function createSaasCommercialRoutes() {
 
     // Merchant subscription invoices (`subscription_invoices`) settle first: they share the
     // platform PayOS account and are identified by `payos:<orderCode>` in payment_ref.
-    const subscriptionSettlement = await settleSubscriptionInvoiceByPayOS(db, {
-      orderCode,
-      amountPaid,
-      isPaid,
-      nowIso: new Date().toISOString(),
-    }).catch(() => null);
+    // Transient DB/settlement failures must return 503 so PayOS retries instead of dropping
+    // paid webhooks with HTTP 200.
+    let subscriptionSettlement: Awaited<ReturnType<typeof settleSubscriptionInvoiceByPayOS>>;
+    try {
+      subscriptionSettlement = await settleSubscriptionInvoiceByPayOS(db, {
+        orderCode,
+        amountPaid,
+        isPaid,
+        nowIso: new Date().toISOString(),
+      });
+    } catch {
+      return c.json(
+        { error: 1, code: 'settlement_retry_required', message: 'Temporary settlement failure, please retry' },
+        503
+      );
+    }
     if (subscriptionSettlement?.handled) {
       if (subscriptionSettlement.subscriptionAdvanced && subscriptionSettlement.tenantId) {
         await updateMRRSnapshot(db, subscriptionSettlement.tenantId).catch(() => {});
@@ -484,6 +494,8 @@ export function createSaasCommercialRoutes() {
     // 2. Gate every statement on `tenant_invoices.status != 'paid'` and mark `paid` as the final
     //    statement so duplicate deliveries are strict no-ops and any mid-batch failure rolls back
     //    the invoice back to `pending` for safe webhook retry.
+    // 3. Never auto-reactivate an admin-suspended tenant (except immune flagship 'default'): record
+    //    the payment as `paid` + audit log for accounting/admin review without lifting suspension.
     const batchResults = await db.batch([
       db
         .prepare(
@@ -514,6 +526,14 @@ export function createSaasCommercialRoutes() {
              ?, ?
            FROM calc
            WHERE EXISTS (SELECT 1 FROM tenant_invoices WHERE id = ? AND status != 'paid')
+             AND NOT EXISTS (
+               SELECT 1 FROM saas_tenants
+               WHERE id = ? AND id != 'default' AND LOWER(TRIM(COALESCE(status, ''))) = 'suspended'
+             )
+             AND NOT EXISTS (
+               SELECT 1 FROM tenant_subscriptions
+               WHERE tenant_id = ? AND tenant_id != 'default' AND LOWER(TRIM(COALESCE(status, ''))) = 'suspended'
+             )
            ON CONFLICT(tenant_id) DO UPDATE SET
              tier = excluded.tier,
              billing_cycle = excluded.billing_cycle,
@@ -538,7 +558,9 @@ export function createSaasCommercialRoutes() {
           `+${graceDays} days`,
           expectedAmountVnd,
           nowIso,
-          invoiceId
+          invoiceId,
+          tenantId,
+          tenantId
         ),
       db
         .prepare(
@@ -548,16 +570,32 @@ export function createSaasCommercialRoutes() {
                current_period_end = (SELECT current_period_end FROM tenant_subscriptions WHERE tenant_id = ? LIMIT 1),
                updated_at = ?
            WHERE id = ?
+             AND (id = 'default' OR LOWER(TRIM(COALESCE(status, ''))) != 'suspended')
+             AND NOT EXISTS (
+               SELECT 1 FROM tenant_subscriptions
+               WHERE tenant_id = ? AND tenant_id != 'default' AND LOWER(TRIM(COALESCE(status, ''))) = 'suspended'
+             )
              AND EXISTS (SELECT 1 FROM tenant_invoices WHERE id = ? AND status != 'paid')`
         )
-        .bind(planId, tenantId, nowIso, tenantId, invoiceId),
+        .bind(planId, tenantId, nowIso, tenantId, tenantId, invoiceId),
       db
         .prepare(
           `INSERT INTO saas_audit_logs (
              id, tenant_id, actor_user_id, actor_role, action, after_json, reason, created_at
            )
            SELECT
-             ?, ?, 'payos-webhook', 'system', 'subscription_activated',
+             ?, ?, 'payos-webhook', 'system',
+             CASE
+               WHEN EXISTS (
+                 SELECT 1 FROM saas_tenants
+                 WHERE id = ? AND id != 'default' AND LOWER(TRIM(COALESCE(status, ''))) = 'suspended'
+               ) OR EXISTS (
+                 SELECT 1 FROM tenant_subscriptions
+                 WHERE tenant_id = ? AND tenant_id != 'default' AND LOWER(TRIM(COALESCE(status, ''))) = 'suspended'
+               )
+                 THEN 'payment_received_while_suspended'
+               ELSE 'subscription_activated'
+             END,
              json_object(
                'invoiceId', ?,
                'planId', ?,
@@ -570,6 +608,8 @@ export function createSaasCommercialRoutes() {
         )
         .bind(
           auditId,
+          tenantId,
+          tenantId,
           tenantId,
           invoiceId,
           planId,
@@ -592,6 +632,17 @@ export function createSaasCommercialRoutes() {
     const claimed = Number(batchResults[3]?.meta?.changes ?? 0);
     if (claimed !== 1) {
       return c.json({ error: 0, message: 'Already processed', data: null });
+    }
+
+    const activated =
+      Number(batchResults[0]?.meta?.changes ?? 0) > 0 ||
+      Number(batchResults[1]?.meta?.changes ?? 0) > 0;
+    if (!activated) {
+      return c.json({
+        error: 0,
+        message: 'Payment recorded; tenant remains suspended pending admin review',
+        data: null,
+      });
     }
 
     return c.json({ error: 0, message: 'SaaS subscription activated', data: null });
@@ -1286,6 +1337,37 @@ export function createSaasCommercialRoutes() {
     if (denied) return denied;
     const db = c.env.AURA_DB;
     const tenantId = resolveScopedTenant(c);
+
+    // Admin-suspended tenants cannot self-reactivate through billing checkout.
+    // Expired/readonly trials remain eligible to upgrade and renew.
+    if (tenantId !== 'default') {
+      const [tenantStatusRow, subStatusRow] = await Promise.all([
+        db
+          .prepare('SELECT status FROM saas_tenants WHERE id = ? LIMIT 1')
+          .bind(tenantId)
+          .first<{ status?: string | null }>()
+          .catch(() => null),
+        db
+          .prepare('SELECT status FROM tenant_subscriptions WHERE tenant_id = ? LIMIT 1')
+          .bind(tenantId)
+          .first<{ status?: string | null }>()
+          .catch(() => null),
+      ]);
+      const isSuspended =
+        String(tenantStatusRow?.status || '').trim().toLowerCase() === 'suspended' ||
+        String(subStatusRow?.status || '').trim().toLowerCase() === 'suspended';
+      if (isSuspended) {
+        return c.json(
+          {
+            success: false,
+            code: 'tenant_suspended',
+            error: 'Tài khoản cửa hàng đang bị tạm đình chỉ bởi quản trị hệ thống. Vui lòng liên hệ hỗ trợ để khôi phục.',
+          },
+          403
+        );
+      }
+    }
+
     const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
 
     const planId = normalizeSaasPlanId(String(body.planId || body.tier || 'pro'));

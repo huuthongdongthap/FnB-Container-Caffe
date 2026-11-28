@@ -7,7 +7,7 @@ import { Hono } from 'hono';
 import type { MiddlewareHandler } from 'hono';
 import { createOrder, updateOrder, getLatestOrderTimestamp, splitOrders } from '@aura/domain-order';
 import { requireAuth } from '../middleware/auth';
-import { getTenantId } from '../middleware/tenant';
+import { getTenantId, isHQSuperAdmin, resolvePilotStore } from '../middleware/tenant';
 import type { Env } from '../types/env';
 
 export const ordersCoreRouter = new Hono<{ Bindings: Env }>();
@@ -154,7 +154,46 @@ export const handleSplitOrders = (c: import('hono').Context<{ Bindings: Env }>) 
     user ? { id: user.id, role: user.role, tenantId: user.tenantId } : undefined,
   );
 };
-export const handleLatestOrderTimestamp = (c: import('hono').Context<{ Bindings: Env }>) => getLatestOrderTimestamp(c.req.raw, c.env);
+export const LATEST_ORDER_ROLES = [
+  'owner', 'admin', 'manager', 'supervisor', 'staff',
+  'waiter', 'cashier', 'kitchen', 'barista', 'chef', 'shipper', 'rider',
+];
+
+export const handleLatestOrderTimestamp = (c: import('hono').Context<{ Bindings: Env }>) => {
+  const user = c.get('user') as { role?: string; tenantId?: string; tenant_id?: string } | undefined;
+  const requestedCandidates = [
+    c.req.header('X-Tenant-ID'),
+    c.req.header('x-tenant-id'),
+    c.req.header('X-Store-ID'),
+    c.req.header('x-store-id'),
+    c.req.query('tenant_id'),
+    c.req.query('tenantId'),
+    c.req.query('store_id'),
+    c.req.query('storeId'),
+  ]
+    .map((v) => (typeof v === 'string' ? v.trim() : ''))
+    .filter(Boolean);
+
+  if (new Set(requestedCandidates).size > 1) {
+    return c.json({ success: false, error: 'Cross-tenant access denied' }, 403);
+  }
+  const requestedTenant = requestedCandidates[0] || '';
+  if (user && !isHQSuperAdmin(user)) {
+    const rawUserTenant = String(user.tenantId ?? user.tenant_id ?? '').trim();
+    if (rawUserTenant === '*' || rawUserTenant.toLowerCase() === 'hq') {
+      return c.json({ success: false, error: 'Cross-tenant access denied' }, 403);
+    }
+    const boundTenant = rawUserTenant || 'default';
+    if (requestedTenant && (requestedTenant === '*' || requestedTenant.toLowerCase() === 'hq' || requestedTenant !== boundTenant)) {
+      return c.json({ success: false, error: 'Cross-tenant access denied' }, 403);
+    }
+    return getLatestOrderTimestamp(c.req.raw, c.env, boundTenant);
+  }
+  const hqTenant = requestedTenant && requestedTenant !== '*' && requestedTenant.toLowerCase() !== 'hq'
+    ? requestedTenant
+    : (resolvePilotStore(c.env) || 'default');
+  return getLatestOrderTimestamp(c.req.raw, c.env, hqTenant);
+};
 export const handleUpdateOrder = (c: import('hono').Context<{ Bindings: Env }>) => {
   const user = c.get('user');
   const orderId = c.req.param('id')!;
@@ -164,5 +203,5 @@ export const handleUpdateOrder = (c: import('hono').Context<{ Bindings: Env }>) 
 ordersCoreRouter.post('/', orderRateLimit, handleCreateOrder);
 ordersCoreRouter.post('/sync', orderRateLimit, handleSyncOrders);
 ordersCoreRouter.post('/split', orderRateLimit, requireAuth(SPLIT_ORDER_ROLES), handleSplitOrders);
-ordersCoreRouter.get('/latest', handleLatestOrderTimestamp);
+ordersCoreRouter.get('/latest', requireAuth(LATEST_ORDER_ROLES), handleLatestOrderTimestamp);
 ordersCoreRouter.patch('/:id', requireAuth(['owner', 'manager', 'supervisor', 'staff', 'admin', 'waiter', 'kitchen', 'barista', 'chef', 'cashier', 'shipper']), handleUpdateOrder);

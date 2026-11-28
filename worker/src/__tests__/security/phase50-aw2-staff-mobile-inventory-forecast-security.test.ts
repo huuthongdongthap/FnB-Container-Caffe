@@ -479,7 +479,7 @@ describe('Phase 50 Slice AW2 — Staff, Tips, Mobile Tables/Orders, Inventory, P
       const { db } = createSqliteD1(sqlite);
       const env = { ...createMockEnv(), AURA_DB: db as unknown as Env['AURA_DB'] };
 
-      for (const maskedRole of ['waiter', 'staff', 'cashier', 'kitchen', 'barista', 'chef']) {
+      for (const maskedRole of ['supervisor', 'waiter', 'staff', 'cashier', 'kitchen', 'barista', 'chef']) {
         const app = new Hono<{ Bindings: Env }>();
         app.use('*', async (c, next) => {
           c.set('user' as never, { id: `u-${maskedRole}`, role: maskedRole, tenantId: 'store-a' } as never);
@@ -505,7 +505,7 @@ describe('Phase 50 Slice AW2 — Staff, Tips, Mobile Tables/Orders, Inventory, P
         expect(detailBody.order.delivery_address).toBeNull();
       }
 
-      for (const unmaskedRole of ['manager', 'shipper', 'owner', 'supervisor', 'admin']) {
+      for (const unmaskedRole of ['manager', 'shipper', 'owner', 'admin']) {
         const app = new Hono<{ Bindings: Env }>();
         app.use('*', async (c, next) => {
           c.set('user' as never, { id: `u-${unmaskedRole}`, role: unmaskedRole, tenantId: 'store-a' } as never);

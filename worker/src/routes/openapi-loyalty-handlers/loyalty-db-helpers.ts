@@ -1,5 +1,57 @@
 import { matchesTenantRow } from '../../lib/db';
 
+/**
+ * Checks whether an authenticated customer session is an unverified phone-signup
+ * session (JWT explicitly carries phoneVerified=false / phone_verified=0 and the
+ * customer row has no verified_at timestamp). Legacy sessions without the claim
+ * and staff sessions remain unaffected.
+ */
+export async function isUnverifiedCustomerPhoneSession(
+  db: any,
+  user: Record<string, unknown> | null | undefined,
+  customerId: string,
+  tenantId: string
+): Promise<boolean> {
+  if (!user) return false;
+  const role = String(user.role || '').trim().toLowerCase();
+  if (role !== 'customer') return false;
+  const explicitlyUnverified =
+    user.phoneVerified === false ||
+    user.phone_verified === false ||
+    user.phone_verified === 0;
+  if (!explicitlyUnverified) return false;
+
+  const cleanTenant = tenantId && tenantId !== '*' && tenantId.trim().toLowerCase() !== 'hq'
+    ? tenantId.trim()
+    : null;
+  let custRow: { verified_at?: string | null } | null = null;
+  try {
+    if (cleanTenant) {
+      custRow = await db
+        .prepare("SELECT verified_at FROM customers WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ? LIMIT 1")
+        .bind(customerId, cleanTenant)
+        .first();
+    } else {
+      custRow = await db
+        .prepare('SELECT verified_at FROM customers WHERE id = ? LIMIT 1')
+        .bind(customerId)
+        .first();
+    }
+  } catch (err) {
+    if (!cleanTenant || cleanTenant === 'default') {
+      if (/no such column:\s*tenant_id|no column named\s*tenant_id/i.test(String(err))) {
+        custRow = await db
+          .prepare('SELECT verified_at FROM customers WHERE id = ? LIMIT 1')
+          .bind(customerId)
+          .first()
+          .catch(() => null);
+      }
+    }
+  }
+  const verifiedAt = custRow?.verified_at ? String(custRow.verified_at).trim() : '';
+  return !verifiedAt;
+}
+
 export async function writeLoyaltyAuditLog(
   db: any,
   userId: string,
@@ -52,11 +104,6 @@ export async function writeLoyaltyAuditLog(
       }
     }
   }
-  await db
-    .prepare('UPDATE audit_logs SET tenant_id = ? WHERE (entity_id = ? OR resource_id = ?) AND action = ? AND created_at = ?')
-    .bind(writeTenant, entityId, entityId, action, now)
-    .run()
-    .catch(() => {});
 }
 
 export async function findExistingLoyaltyIdempotencyTx(
@@ -1008,47 +1055,96 @@ export async function recordLoyaltyTransactionDualWrite(
   const effectiveTenant = tenantId && tenantId !== '*' ? tenantId.trim() || 'default' : null;
   const writeTenant = effectiveTenant || 'default';
 
-  await db.prepare(
-    `INSERT INTO loyalty_transactions (
-      id, account_id, customer_id, type, points, balance_after,
-      order_id, reward_id, description, reason, idempotency_key, created_by, created_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-  ).bind(
-    txId,
-    accountId,
-    customerId,
-    type,
-    points,
-    balanceAfter,
-    orderId,
-    rewardId,
-    description,
-    reason ?? description,
-    idempotencyKey,
-    createdBy,
-    now
-  ).run();
-  await db.prepare('UPDATE loyalty_transactions SET tenant_id = ? WHERE id = ?').bind(writeTenant, txId).run().catch(() => {});
-
   try {
     await db.prepare(
-      `INSERT OR IGNORE INTO loyalty_point_logs (
-        id, customer_id, order_id, points_change, reason, balance_after, description, created_at
-      )
-      SELECT ?, ?, ?, ?, ?, ?, ?, ?
-      WHERE EXISTS (SELECT 1 FROM customers WHERE id = ?)`
+      `INSERT INTO loyalty_transactions (
+        id, account_id, customer_id, type, points, balance_after,
+        order_id, reward_id, description, reason, idempotency_key, created_by, tenant_id, created_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     ).bind(
       txId,
+      accountId,
       customerId,
-      orderId,
+      type,
       points,
-      reason ?? type,
       balanceAfter,
+      orderId,
+      rewardId,
       description,
-      now,
-      customerId
+      reason ?? description,
+      idempotencyKey,
+      createdBy,
+      writeTenant,
+      now
     ).run();
-    await db.prepare('UPDATE loyalty_point_logs SET tenant_id = ? WHERE id = ?').bind(writeTenant, txId).run().catch(() => {});
+  } catch (err) {
+    if (!/no such column:\s*tenant_id|no column named\s*tenant_id/i.test(String(err))) {
+      throw err;
+    }
+    await db.prepare(
+      `INSERT INTO loyalty_transactions (
+        id, account_id, customer_id, type, points, balance_after,
+        order_id, reward_id, description, reason, idempotency_key, created_by, created_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    ).bind(
+      txId,
+      accountId,
+      customerId,
+      type,
+      points,
+      balanceAfter,
+      orderId,
+      rewardId,
+      description,
+      reason ?? description,
+      idempotencyKey,
+      createdBy,
+      now
+    ).run();
+  }
+
+  try {
+    try {
+      await db.prepare(
+        `INSERT OR IGNORE INTO loyalty_point_logs (
+          id, customer_id, order_id, points_change, reason, balance_after, description, tenant_id, created_at
+        )
+        SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?
+        WHERE EXISTS (SELECT 1 FROM customers WHERE id = ?)`
+      ).bind(
+        txId,
+        customerId,
+        orderId,
+        points,
+        reason ?? type,
+        balanceAfter,
+        description,
+        writeTenant,
+        now,
+        customerId
+      ).run();
+    } catch (logErr) {
+      if (!/no such column:\s*tenant_id|no column named\s*tenant_id/i.test(String(logErr))) {
+        throw logErr;
+      }
+      await db.prepare(
+        `INSERT OR IGNORE INTO loyalty_point_logs (
+          id, customer_id, order_id, points_change, reason, balance_after, description, created_at
+        )
+        SELECT ?, ?, ?, ?, ?, ?, ?, ?
+        WHERE EXISTS (SELECT 1 FROM customers WHERE id = ?)`
+      ).bind(
+        txId,
+        customerId,
+        orderId,
+        points,
+        reason ?? type,
+        balanceAfter,
+        description,
+        now,
+        customerId
+      ).run();
+    }
   } catch {
     // Ignore when loyalty_point_logs is absent in older migration snapshots
   }

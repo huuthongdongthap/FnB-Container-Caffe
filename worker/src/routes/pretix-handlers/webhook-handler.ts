@@ -11,6 +11,55 @@ import type { PretixEnv } from './types';
 
 const log = createLogger({ route: 'pretix-webhook' });
 
+const WEBHOOK_TIMESTAMP_TOLERANCE_SECONDS = 300;
+const WEBHOOK_REPLAY_TTL_SECONDS = 600;
+
+function isFreshPretixWebhookTimestamp(
+  rawTs: string | undefined | null,
+  requireTimestamp = false,
+): boolean {
+  if (!rawTs || !rawTs.trim()) return !requireTimestamp;
+  const trimmed = rawTs.trim();
+  let tsSeconds = NaN;
+  if (/^\d+(\.\d+)?$/.test(trimmed)) {
+    const num = Number(trimmed);
+    if (!Number.isFinite(num) || num <= 0) return false;
+    tsSeconds = num > 1e11 ? Math.floor(num / 1000) : Math.floor(num);
+  } else if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$/.test(trimmed)) {
+    const parsedMs = Date.parse(trimmed);
+    if (!Number.isFinite(parsedMs) || parsedMs <= 0) return false;
+    tsSeconds = Math.floor(parsedMs / 1000);
+  } else {
+    return false;
+  }
+  const nowSeconds = Math.floor(Date.now() / 1000);
+  return Math.abs(nowSeconds - tsSeconds) <= WEBHOOK_TIMESTAMP_TOLERANCE_SECONDS;
+}
+
+async function isDuplicatePretixWebhookReplay(
+  env: PretixEnv | undefined,
+  tenantId: string,
+  rawBody: string,
+): Promise<boolean> {
+  const envMap = env as unknown as Record<string, unknown> | undefined;
+  const kv = (envMap?.AUTH_KV ?? envMap?.AURA_KV) as
+    | import('@cloudflare/workers-types').KVNamespace
+    | undefined;
+  if (!kv || typeof kv.get !== 'function') return false;
+  const input = new TextEncoder().encode(`${tenantId}:${rawBody}`);
+  const digest = await crypto.subtle.digest('SHA-256', input);
+  const hex = Array.from(new Uint8Array(digest))
+    .map((b) => b.toString(16).padStart(2, '0'))
+    .join('');
+  const replayKey = `webhook:replay:pretix:${hex}`;
+  const existing = await kv.get(replayKey).catch(() => null);
+  if (existing) return true;
+  if (typeof kv.put === 'function') {
+    await kv.put(replayKey, '1', { expirationTtl: WEBHOOK_REPLAY_TTL_SECONDS }).catch(() => {});
+  }
+  return false;
+}
+
 type TicketOrderStatus = 'placed' | 'paid' | 'canceled' | 'expired' | 'refunded' | 'checked_in' | 'ignored';
 
 function mapPretixActionToStatus(action: string): TicketOrderStatus {
@@ -44,6 +93,17 @@ export function registerWebhookHandler(router: Hono): void {
     const isValid = await validateWebhookSignature(bodyText, signature, env.PRETIX_WEBHOOK_SECRET);
     if (!isValid) {
       return c.json({ success: false, error: 'Invalid signature' }, 401);
+    }
+
+    const requireTimestamp =
+      String((env as unknown as Record<string, unknown>)?.WEBHOOK_REQUIRE_TIMESTAMP || '').toLowerCase() === 'true';
+    const rawTimestamp =
+      c.req.header('x-pretix-timestamp') ??
+      c.req.header('X-pretix-Timestamp') ??
+      c.req.header('x-webhook-timestamp') ??
+      c.req.header('x-timestamp');
+    if (!isFreshPretixWebhookTimestamp(rawTimestamp, requireTimestamp)) {
+      return c.json({ success: false, error: 'Stale or invalid webhook timestamp' }, 401);
     }
 
     let parsedBody: Record<string, unknown>;
@@ -84,6 +144,11 @@ export function registerWebhookHandler(router: Hono): void {
       } catch {
         activeTenant = 'default';
       }
+    }
+
+    const replayScopeTenant = !activeTenant || activeTenant === '*' ? 'default' : activeTenant;
+    if (await isDuplicatePretixWebhookReplay(env, replayScopeTenant, bodyText)) {
+      return c.json({ success: false, error: 'Duplicate webhook replay detected' }, 409);
     }
 
     if (db) {

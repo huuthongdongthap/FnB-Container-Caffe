@@ -8,6 +8,7 @@ import {
   findExistingLoyaltyIdempotencyTx,
   getLoyaltyAccountWithFallback,
   hasOpenApiLoyaltyTenantMismatch,
+  isUnverifiedCustomerPhoneSession,
   matchesLoyaltyTenant,
   resolveRewardTenantId,
   writeLoyaltyAuditLog,
@@ -292,33 +293,31 @@ export function registerRewardHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
     const isActiveInt = body.isActive !== false ? 1 : 0;
 
     let insertedWithTenant = false;
-    if (tenantId !== 'default') {
-      try {
-        await db.prepare(
-          `INSERT INTO loyalty_rewards (id, name, description, points_cost, type, value, max_redemptions, current_redemptions, valid_from, valid_to, is_active, image_url, terms, tenant_id, created_at, updated_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-        ).bind(
-          id,
-          body.name,
-          body.description || null,
-          body.pointsCost,
-          body.type,
-          body.value,
-          body.maxRedemptions || null,
-          0,
-          body.validFrom || null,
-          body.validTo || null,
-          isActiveInt,
-          body.imageUrl || null,
-          body.terms || null,
-          tenantId,
-          now,
-          now
-        ).run();
-        insertedWithTenant = true;
-      } catch {
-        insertedWithTenant = false;
-      }
+    try {
+      await db.prepare(
+        `INSERT INTO loyalty_rewards (id, name, description, points_cost, type, value, max_redemptions, current_redemptions, valid_from, valid_to, is_active, image_url, terms, tenant_id, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      ).bind(
+        id,
+        body.name,
+        body.description || null,
+        body.pointsCost,
+        body.type,
+        body.value,
+        body.maxRedemptions || null,
+        0,
+        body.validFrom || null,
+        body.validTo || null,
+        isActiveInt,
+        body.imageUrl || null,
+        body.terms || null,
+        tenantId,
+        now,
+        now
+      ).run();
+      insertedWithTenant = true;
+    } catch {
+      insertedWithTenant = false;
     }
     if (!insertedWithTenant) {
       try {
@@ -342,53 +341,103 @@ export function registerRewardHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
           now,
           now
         ).run();
-        await db.prepare('UPDATE loyalty_rewards SET tenant_id = ? WHERE id = ?').bind(tenantId, id).run().catch(() => {});
       } catch {
-        await db.prepare(
-          `INSERT INTO loyalty_rewards (id, name, description, points_cost, reward_type, reward_value, stock, redeemed_count, is_active, created_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?, ?)`
-        ).bind(
-          id,
-          body.name,
-          body.description || null,
-          body.pointsCost,
-          body.type,
-          String(body.value ?? ''),
-          body.maxRedemptions ?? null,
-          isActiveInt,
-          now
-        ).run();
-        await db.prepare('UPDATE loyalty_rewards SET tenant_id = ? WHERE id = ?').bind(tenantId, id).run().catch(() => {});
+        try {
+          await db.prepare(
+            `INSERT INTO loyalty_rewards (id, name, description, points_cost, reward_type, reward_value, stock, redeemed_count, is_active, tenant_id, created_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?)`
+          ).bind(
+            id,
+            body.name,
+            body.description || null,
+            body.pointsCost,
+            body.type,
+            String(body.value ?? ''),
+            body.maxRedemptions ?? null,
+            isActiveInt,
+            tenantId,
+            now
+          ).run();
+        } catch (legacyRewardErr) {
+          if (!/no such column:\s*tenant_id|no column named\s*tenant_id/i.test(String(legacyRewardErr))) {
+            throw legacyRewardErr;
+          }
+          await db.prepare(
+            `INSERT INTO loyalty_rewards (id, name, description, points_cost, reward_type, reward_value, stock, redeemed_count, is_active, created_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?, ?)`
+          ).bind(
+            id,
+            body.name,
+            body.description || null,
+            body.pointsCost,
+            body.type,
+            String(body.value ?? ''),
+            body.maxRedemptions ?? null,
+            isActiveInt,
+            now
+          ).run();
+        }
       }
     }
 
     try {
-      await db.prepare(
-        `INSERT OR IGNORE INTO rewards (
-          id, title, name, description, point_cost, points_cost,
-          discount_type, discount_value, type, value, reward_type, reward_value,
-          min_tier, stock, image_url, is_active, created_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'bronze', ?, ?, ?, ?, ?)`
-      ).bind(
-        id,
-        body.name,
-        body.name,
-        body.description || null,
-        body.pointsCost,
-        body.pointsCost,
-        body.type,
-        Math.round(Number(body.value || 0)),
-        body.type,
-        Number(body.value || 0),
-        body.type,
-        Number(body.value || 0),
-        body.maxRedemptions ?? -1,
-        body.imageUrl || null,
-        isActiveInt,
-        now,
-        now
-      ).run();
-      try { await db.prepare('UPDATE rewards SET tenant_id = ? WHERE id = ?').bind(tenantId, id).run(); } catch { /* tenant_id column may not exist */ }
+      try {
+        await db.prepare(
+          `INSERT OR IGNORE INTO rewards (
+            id, title, name, description, point_cost, points_cost,
+            discount_type, discount_value, type, value, reward_type, reward_value,
+            min_tier, stock, image_url, is_active, tenant_id, created_at, updated_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'bronze', ?, ?, ?, ?, ?, ?)`
+        ).bind(
+          id,
+          body.name,
+          body.name,
+          body.description || null,
+          body.pointsCost,
+          body.pointsCost,
+          body.type,
+          Math.round(Number(body.value || 0)),
+          body.type,
+          Number(body.value || 0),
+          body.type,
+          Number(body.value || 0),
+          body.maxRedemptions ?? -1,
+          body.imageUrl || null,
+          isActiveInt,
+          tenantId,
+          now,
+          now
+        ).run();
+      } catch (rewardsErr) {
+        if (!/no such column:\s*tenant_id|no column named\s*tenant_id/i.test(String(rewardsErr))) {
+          throw rewardsErr;
+        }
+        await db.prepare(
+          `INSERT OR IGNORE INTO rewards (
+            id, title, name, description, point_cost, points_cost,
+            discount_type, discount_value, type, value, reward_type, reward_value,
+            min_tier, stock, image_url, is_active, created_at, updated_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'bronze', ?, ?, ?, ?, ?)`
+        ).bind(
+          id,
+          body.name,
+          body.name,
+          body.description || null,
+          body.pointsCost,
+          body.pointsCost,
+          body.type,
+          Math.round(Number(body.value || 0)),
+          body.type,
+          Number(body.value || 0),
+          body.type,
+          Number(body.value || 0),
+          body.maxRedemptions ?? -1,
+          body.imageUrl || null,
+          isActiveInt,
+          now,
+          now
+        ).run();
+      }
     } catch {
       // Ignore when rewards table is absent
     }
@@ -561,6 +610,13 @@ export function registerRewardHandlers(app: OpenAPIHono<{ Bindings: Env }>) {
       isStaffRedeem && body.customerId && String(body.customerId).trim()
         ? String(body.customerId).trim()
         : String(user.customerId || user.customer_id || user.id);
+    if (!isStaffRedeem && await isUnverifiedCustomerPhoneSession(db, user, customerLookupId, tenantId)) {
+      return c.json({
+        success: false,
+        code: 'PHONE_VERIFICATION_REQUIRED',
+        error: 'Vui lòng xác thực mã OTP để sử dụng ví hoàn tiền và ưu đãi.',
+      }, 403);
+    }
     let verifiedOrderTenant: string | null = null;
     if (body.orderId) {
       let orderRow: Record<string, unknown> | null = null;

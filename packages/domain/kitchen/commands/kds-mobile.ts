@@ -453,18 +453,34 @@ export async function markKdsOrderItemReady(
         : tenantId === '*'
           ? 'default'
           : tenantId;
-    await context.env.AURA_DB
-      .prepare(
-        "UPDATE orders SET items = ?, updated_at = ? WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
-      )
-      .bind(JSON.stringify(rawItems), now, orderId, effectiveOrderTenant)
-      .run()
-      .catch(() =>
-        context.env.AURA_DB
+    try {
+      await context.env.AURA_DB
+        .prepare(
+          "UPDATE orders SET items = ?, updated_at = ? WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
+        )
+        .bind(JSON.stringify(rawItems), now, orderId, effectiveOrderTenant)
+        .run();
+    } catch (updateErr) {
+      const errMsg = String(updateErr);
+      if (/no such column:\s*updated_at/i.test(errMsg)) {
+        await context.env.AURA_DB
+          .prepare(
+            "UPDATE orders SET items = ? WHERE id = ? AND COALESCE(NULLIF(TRIM(tenant_id), ''), 'default') = ?"
+          )
+          .bind(JSON.stringify(rawItems), orderId, effectiveOrderTenant)
+          .run();
+      } else if (
+        effectiveOrderTenant === 'default' &&
+        /no such column:\s*tenant_id/i.test(errMsg)
+      ) {
+        await context.env.AURA_DB
           .prepare('UPDATE orders SET items = ? WHERE id = ?')
           .bind(JSON.stringify(rawItems), orderId)
-          .run()
-      );
+          .run();
+      } else {
+        throw updateErr;
+      }
+    }
 
     // Synchronize order_item_stations so station tickets stay in lockstep with JSON items
     for (const key of matchedItemKeys) {

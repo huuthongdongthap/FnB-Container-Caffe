@@ -77,9 +77,6 @@ function maskMobileOrderPii(
   if (isUnmasked && !isMaskedKitchen) {
     return row;
   }
-  if (normalizedRole === 'supervisor' && user?.id === 'u-supervisor') {
-    return row;
-  }
   return {
     ...row,
     customer_phone: null,

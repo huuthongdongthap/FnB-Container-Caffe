@@ -3067,7 +3067,7 @@ describe('Multi-Tenant & Franchise Preparation Integration', () => {
               gross_sales: matched.reduce((acc, o) => acc + o.total, 0),
             };
           }
-          if (/FROM orders WHERE \(\? = '\*' OR COALESCE\(NULLIF\(tenant_id, ''\), 'default'\) = \?\)/i.test(sql)) {
+          if (/FROM orders WHERE \(\? = '\*' OR COALESCE\(NULLIF\((?:TRIM\()?tenant_id\)?, ''\), 'default'\) = \?\)/i.test(sql)) {
             const t = String(args[0] ?? 'default');
             if (/LOWER\(id\) = LOWER\(\?\)/i.test(sql)) {
               const oid = String(args[2] ?? '').toLowerCase();
@@ -11349,13 +11349,14 @@ describe('Multi-Tenant & Franchise Preparation Integration', () => {
             if (row) row.tenant_id = args[0];
           }
           if (/INSERT INTO loyalty_transactions/i.test(sql)) {
+            const hasTenant = /tenant_id/i.test(sql);
             loyaltyTxs.push({
               id: args[0],
               account_id: args[1],
               customer_id: args[2],
               type: args[3],
               points: args[4],
-              tenant_id: 'unset',
+              tenant_id: hasTenant ? args[12] : 'unset',
             });
           }
           if (/UPDATE loyalty_transactions SET tenant_id = \? WHERE id = \?/i.test(sql)) {
@@ -11363,12 +11364,13 @@ describe('Multi-Tenant & Franchise Preparation Integration', () => {
             if (row) row.tenant_id = args[0];
           }
           if (/INSERT(?: OR IGNORE)? INTO loyalty_point_logs/i.test(sql)) {
+            const hasTenant = /tenant_id/i.test(sql);
             loyaltyPointLogs.push({
               id: args[0],
               customer_id: args[1],
               order_id: args[2],
               points_change: args[3],
-              tenant_id: 'unset',
+              tenant_id: hasTenant ? args[7] : 'unset',
             });
           }
           if (/UPDATE loyalty_point_logs SET tenant_id = \? WHERE id = \?/i.test(sql)) {

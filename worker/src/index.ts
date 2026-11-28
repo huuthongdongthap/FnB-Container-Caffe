@@ -202,16 +202,25 @@ app.route('/', openApiCronRouter);
 app.route('/', openApiApp);
 
 // ── API v1 alias ──
-const v1 = new Hono<{ Bindings: Env }>();
-v1.use('/*', async (c) => {
-  const url = new URL(c.req.raw.url);
-  url.pathname = url.pathname.replace(/^\/api\/v1/, '/api');
-  return app.fetch(new Request(url.toString(), c.req.raw), c.env, c.executionCtx);
-});
-app.route('/api/v1', v1);
+// Rewrite `/api/v1` to `/api` before dispatch so global middlewares (CORS, rate limits,
+// CSRF, SaaS write guard) execute once per request and request bodies are never consumed twice.
+const rawAppFetch = app.fetch.bind(app);
+const dispatchRequest = (
+  request: Request,
+  env?: Env,
+  ctx?: ExecutionContext
+): Response | Promise<Response> => {
+  const url = new URL(request.url);
+  if (url.pathname === '/api/v1' || url.pathname.startsWith('/api/v1/')) {
+    url.pathname = url.pathname.replace(/^\/api\/v1/, '/api');
+    return rawAppFetch(new Request(url.toString(), request), env, ctx);
+  }
+  return rawAppFetch(request, env, ctx);
+};
+app.fetch = dispatchRequest as typeof app.fetch;
 
 export default {
-  fetch: (request: Request, env: Env, ctx: ExecutionContext) => app.fetch(request, env, ctx),
+  fetch: (request: Request, env: Env, ctx: ExecutionContext) => dispatchRequest(request, env, ctx),
   scheduled: handleScheduled,
 };
 export { app };

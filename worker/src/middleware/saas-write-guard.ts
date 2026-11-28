@@ -48,7 +48,8 @@ function isControlTenantId(tenantId: string): boolean {
 }
 
 export function isSaasWriteExemptPath(pathname: string): boolean {
-  return EXEMPT_PREFIXES.some((prefix) => pathname.startsWith(prefix));
+  const normalized = pathname.replace(/^\/api\/v1(?=\/|$)/, '/api');
+  return EXEMPT_PREFIXES.some((prefix) => normalized.startsWith(prefix));
 }
 
 async function resolveGuestCandidateTenants(c: Context<{ Bindings: Env }>): Promise<string[]> {
